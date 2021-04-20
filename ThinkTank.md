@@ -15,6 +15,7 @@
         position: {
             components: ['x', 'y', 'z'],                // either components ..
             size: 3,                                    // .. or size
+            meshCount: 2,                               // [optional] override meshCount
             type: 'float32',                            // [optional] the default type
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
             get: () => any,                             // [optional] getter ? 'setPosition(...)'
