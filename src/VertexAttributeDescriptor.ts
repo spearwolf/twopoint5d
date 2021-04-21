@@ -15,11 +15,15 @@ export class VertexAttributeDescriptor {
   }
 
   get dataType(): VertexAttributeDataType {
-    return this.description.type;
+    return this.description.type ?? 'float32';
+  }
+
+  get normalizedData(): boolean {
+    return Boolean(this.description.normalized);
   }
 
   get usageType(): VertexAttributeUsageType {
-    return this.description.usage;
+    return this.description.usage ?? 'static';
   }
 
   get size(): number {
@@ -38,6 +42,8 @@ export class VertexAttributeDescriptor {
   }
 
   get bufferName(): string {
-    return `${this.usageType}_${this.dataType}`;
+    return `${this.usageType}_${this.dataType}${
+      this.normalizedData ? 'N' : ''
+    }`;
   }
 }

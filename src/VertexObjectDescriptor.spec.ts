@@ -26,7 +26,8 @@ describe('VertexObjectDescriptor', () => {
       },
     });
     expect(descriptor).toBeDefined();
-    expect(descriptor.itemCount).toBe(4);
+    expect(descriptor.vertexCount).toBe(4);
+    expect(descriptor.getInstanceCount(3)).toBe(3);
     expect(descriptor.hasIndices).toBeTruthy();
     expect(descriptor.indices).toEqual([0, 1, 2, 0, 2, 3]);
     expect(Array.from(descriptor.attributeNames.values()).sort()).toEqual(
@@ -59,7 +60,8 @@ describe('VertexObjectDescriptor', () => {
       },
     });
     expect(descriptor).toBeDefined();
-    expect(descriptor.itemCount).toBe(2);
+    expect(descriptor.vertexCount).toBe(1);
+    expect(descriptor.getInstanceCount(3)).toBe(2);
     expect(descriptor.hasIndices).toBeFalsy();
     expect(descriptor.indices).toEqual([]);
     expect(Array.from(descriptor.attributeNames.values()).sort()).toEqual(
@@ -90,7 +92,7 @@ describe('VertexObjectDescriptor', () => {
       },
     });
     expect(descriptor).toBeDefined();
-    expect(descriptor.itemCount).toBe(1);
+    expect(descriptor.vertexCount).toBe(1);
     expect(descriptor.hasIndices).toBeFalsy();
     expect(descriptor.indices).toEqual([]);
     expect(Array.from(descriptor.attributeNames.values()).sort()).toEqual(

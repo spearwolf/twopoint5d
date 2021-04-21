@@ -20,9 +20,14 @@ export class VertexObjectDescriptor {
     );
   }
 
-  /** Returns `vertexCount` or `meshCount` or `1` */
-  get itemCount(): number {
-    return this.description.vertexCount ?? this.description.meshCount ?? 1;
+  /** Returns `vertexCount` or `1` */
+  get vertexCount(): number {
+    return this.description.vertexCount ?? 1;
+  }
+
+  getInstanceCount(capacity: number): number {
+    const meshCount = this.description.meshCount ?? 1;
+    return meshCount > 1 ? Math.ceil(capacity / meshCount) : capacity;
   }
 
   get hasIndices(): boolean {

@@ -16,6 +16,7 @@
             components: ['x', 'y', 'z'],                // either components ..
             size: 3,                                    // .. or size
             type: 'float32',                            // [optional] the default type
+            normalized: boolean,                        // [optional] default is not
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
             // get: () => any,                             // [optional] getter ? 'setPosition(...)'
             // set: (...args: any[]) => void,              // [optional] setter ? 'getPosition(...)'
