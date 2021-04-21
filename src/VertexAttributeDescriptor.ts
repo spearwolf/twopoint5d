@@ -8,16 +8,10 @@ export class VertexAttributeDescriptor {
   private readonly description: VertexAttributeDescription;
 
   readonly name: string;
-  readonly vertexCount: number;
 
-  constructor(
-    name: string,
-    description: VertexAttributeDescription,
-    vertexCount: number,
-  ) {
+  constructor(name: string, description: VertexAttributeDescription) {
     this.name = name;
     this.description = description;
-    this.vertexCount = vertexCount;
   }
 
   get dataType(): VertexAttributeDataType {

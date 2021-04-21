@@ -13,19 +13,16 @@ export class VertexObjectDescriptor {
     this.bufferNames = new Set();
     Object.entries(this.description.attributes).forEach(
       ([attrName, attrDesc]) => {
-        const descriptor = new VertexAttributeDescriptor(
-          attrName,
-          attrDesc,
-          this.vertexCount,
-        );
+        const descriptor = new VertexAttributeDescriptor(attrName, attrDesc);
         this.attributes.set(attrName, descriptor);
         this.bufferNames.add(descriptor.bufferName);
       },
     );
   }
 
-  get vertexCount(): number {
-    return this.description.vertexCount;
+  /** Returns `vertexCount` or `meshCount` or `1` */
+  get itemCount(): number {
+    return this.description.vertexCount ?? this.description.meshCount ?? 1;
   }
 
   get hasIndices(): boolean {

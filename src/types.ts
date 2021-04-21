@@ -1,45 +1,33 @@
+// === vertex attribute descriptions === ------------------ --- --  -   -
+
 export type VertexAttributeDataType = 'float32' | 'float64';
 export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 
-export interface VertexAttributeByComponents {
-  components: string[];
-}
-
-export interface VertexAttributeBySize {
-  size: number;
-}
-
-export interface VertexAttributeBaseDescription {
+export interface VADescription {
   type: VertexAttributeDataType;
   usage: VertexAttributeUsageType;
 }
 
-export type VertexAttributeDescription = VertexAttributeBaseDescription &
-  (VertexAttributeByComponents | VertexAttributeBySize);
-
-export interface InstancedVertexAttributeBaseDescription
-  extends VertexAttributeBaseDescription {
-  meshCount?: number;
+export interface VAComponentsDescription extends VADescription {
+  components: string[];
 }
 
-export type InstancedVertexAttributeDescription =
-  | InstancedVertexAttributeBaseDescription
-  | (VertexAttributeByComponents & VertexAttributeBySize);
+export interface VASizeDescription extends VADescription {
+  size: number;
+}
+
+export type VertexAttributeDescription =
+  | VAComponentsDescription
+  | VASizeDescription;
 
 export type VertexAttributesType = Record<string, VertexAttributeDescription>;
 
-export type InstancedVertexAttributesType = Record<
-  string,
-  InstancedVertexAttributeDescription
->;
+// === vertex object description === ------------------ --- --  -   -
 
 export interface VertexObjectDescription {
-  vertexCount: number;
+  vertexCount?: number;
   indices?: number[];
+  meshCount?: number;
   attributes: VertexAttributesType;
-}
-
-export interface InstancedVertexObjectDescription {
-  meshCount: number;
-  attributes: InstancedVertexAttributesType;
+  // TODO methods
 }
