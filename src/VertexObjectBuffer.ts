@@ -13,7 +13,9 @@ interface Buffer {
   dataType: VertexAttributeDataType;
   usageType: VertexAttributeUsageType;
   // typedArray
-  // serial?
+  // serial
+  // needsUpdate
+  // autoTouch
   // THREE->bufferAttribute?
 }
 

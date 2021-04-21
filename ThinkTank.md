@@ -23,6 +23,8 @@
          }
     }
 
+    prototpe: MyBaseClass.prototype;  // [optional]
+
     methods: {
         [methodName]() {}
     }
