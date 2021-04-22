@@ -159,23 +159,59 @@ export class VertexObjectBuffer {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
         const buffer = this.buffers.get(attr.bufferName);
-        if (buffer) {
-          const {vertexCount} = this.descriptor;
-          const attrSize = this.descriptor.getAttribute(attrName).size;
-          let idx = 0;
-          let bufIdx = objectOffset * vertexCount * buffer.itemSize;
-          while (idx < data.length) {
-            for (let i = 0; i < vertexCount; i++) {
-              buffer.typedArray.set(
-                Array.prototype.slice.call(data, idx, idx + attrSize),
-                bufIdx + attr.offset,
-              );
-              idx += attrSize;
-              bufIdx += buffer.itemSize;
-            }
+        const {vertexCount} = this.descriptor;
+        const attrSize = this.descriptor.getAttribute(attrName).size;
+        let idx = 0;
+        let bufIdx = objectOffset * vertexCount * buffer.itemSize;
+        while (idx < data.length) {
+          for (let i = 0; i < vertexCount; i++) {
+            buffer.typedArray.set(
+              Array.prototype.slice.call(data, idx, idx + attrSize),
+              bufIdx + attr.offset,
+            );
+            idx += attrSize;
+            bufIdx += buffer.itemSize;
           }
         }
       }
     }
+  }
+
+  toAttributeArrays<T extends string[]>(
+    attributeNames: T,
+    start = 0,
+    end = this.capacity,
+  ): Record<keyof T, TypedArray> {
+    return Object.fromEntries(
+      attributeNames.map((attrName) => {
+        const attr = this.bufferAttributes.get(attrName);
+        if (attr) {
+          const buffer = this.buffers.get(attr.bufferName);
+          const {vertexCount} = this.descriptor;
+          const attrSize = this.descriptor.getAttribute(attrName).size;
+
+          const targetArray = createTypedArray(
+            buffer.dataType,
+            (end - start) * vertexCount * attrSize,
+          );
+
+          let targetIdx = 0;
+          let bufferIdx = start * vertexCount * buffer.itemSize + attr.offset;
+
+          for (let objIdx = start; objIdx < end; objIdx++) {
+            for (let i = 0; i < vertexCount; i++) {
+              targetArray.set(
+                buffer.typedArray.subarray(bufferIdx, bufferIdx + attrSize),
+                targetIdx,
+              );
+              targetIdx += attrSize;
+              bufferIdx += buffer.itemSize;
+            }
+          }
+          return [attrName, targetArray];
+        }
+        return [attrName];
+      }),
+    );
   }
 }

@@ -413,4 +413,66 @@ describe('VertexObjectBuffer', () => {
       103,
     ]);
   });
+
+  test('toAttributeArrays', () => {
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+        },
+        bar: {
+          size: 1,
+          usage: 'dynamic',
+        },
+        plah: {
+          components: ['a', 'b', 'c'],
+        },
+      },
+    });
+    const vob = new VertexObjectBuffer(descriptor, 2);
+
+    vob.copyAttributes({
+      foo: new Uint8Array([
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+      ]),
+      bar: [100, 101, 102, 103],
+    });
+
+    // @ts-ignore
+    expect(Array.from(vob.toAttributeArrays(['foo'], 1).foo)).toEqual([
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+    ]);
+
+    // @ts-ignore
+    expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1).bar)).toEqual([
+      100,
+      101,
+      102,
+      103,
+    ]);
+  });
 });
