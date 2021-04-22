@@ -1,3 +1,6 @@
+import {VertexObjectBuffer} from './VertexObjectBuffer';
+import {voBuffer, voIndex} from './constants';
+
 export type TypedArray =
   | Float64Array
   | Float32Array
@@ -49,5 +52,11 @@ export interface VertexObjectDescription {
   indices?: number[];
   meshCount?: number;
   attributes: VertexAttributesType;
+  basePrototype?: Object | null | undefined;
   // TODO methods
+}
+
+export interface VertexObject {
+  [voBuffer]: VertexObjectBuffer;
+  [voIndex]: number;
 }

@@ -1,4 +1,5 @@
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {createVertexObjectPrototype} from './createVertexObjectPrototype';
 import {
   TypedArray,
   VertexAttributeDataType,
@@ -121,6 +122,12 @@ export class VertexObjectBuffer {
           this.capacity * this.descriptor.vertexCount * buffer.itemSize,
         );
       }
+    }
+    if (!this.descriptor.voPrototype) {
+      this.descriptor.voPrototype = createVertexObjectPrototype(
+        this,
+        this.descriptor.basePrototype,
+      );
     }
   }
 

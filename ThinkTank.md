@@ -47,6 +47,9 @@ const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, C
 const vo = geometry.vertexObjects.createVO(target)
 const vos = geometry.vertexObjects.createVOs(1000, targets)
 
+const group = geometry.vertexObjects.createGroup(1000) // ?
+group.free()
+
 const vo = geometry.baseVertexObjects.createVO()
 const vo = geometry.instancedVertexObjects.createVO()
 

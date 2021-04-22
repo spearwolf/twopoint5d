@@ -6,6 +6,9 @@ export class VertexObjectDescriptor {
 
   readonly attributes: Map<string, VertexAttributeDescriptor>;
   readonly bufferNames: Set<string>;
+  readonly basePrototype: Object | null | undefined;
+
+  voPrototype: Object;
 
   constructor(description: VertexObjectDescription) {
     this.description = description;
@@ -18,6 +21,11 @@ export class VertexObjectDescriptor {
         this.bufferNames.add(descriptor.bufferName);
       },
     );
+    this.basePrototype = description.basePrototype;
+    // this.voPrototype = createVertexObjectPrototype(
+    //   this,
+    //   description.basePrototype,
+    // );
   }
 
   /** Returns `vertexCount` or `1` */
