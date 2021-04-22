@@ -171,8 +171,25 @@ describe('VertexObjectBuffer', () => {
       itemSize: 5,
     });
 
-    vob.setAttributes({
-      foo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    vob.copyAttributes({
+      foo: new Uint8Array([
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+      ]),
       bar: [100, 101, 102, 103],
     });
 
@@ -250,7 +267,7 @@ describe('VertexObjectBuffer', () => {
     });
     const vob = new VertexObjectBuffer(descriptor, 2);
 
-    vob.setAttributes({
+    vob.copyAttributes({
       foo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
       bar: [100, 101, 102, 103],
     });
@@ -332,7 +349,7 @@ describe('VertexObjectBuffer', () => {
     });
     const vob = new VertexObjectBuffer(descriptor, 2);
 
-    vob.setAttributes({
+    vob.copyAttributes({
       foo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
       bar: [100, 101, 102, 103],
     });

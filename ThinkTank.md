@@ -4,23 +4,26 @@
 ### Define
 
 ```js
-
 {
     vertexCount: 4,
-    indices: [0, 1, 2, 0, 2, 3],        // optional
+    indices: [0, 1, 2, 0, 2, 3],        // [optional]
 
     meshCount: 1,                       // for instanced attributes
-
+                                        // open question: VertexBufferObject <- capacity <- meshCount > 1 ?
     attributes: {
         position: {
             components: ['x', 'y', 'z'],                // either components ..
             size: 3,                                    // .. or size
-            type: 'float32',                            // [optional] the default type
+
+            type: 'float32',                            // [optional] the default type is float32
             normalized: boolean,                        // [optional] default is not
+
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
+
             // get: () => any,                             // [optional] getter ? 'setPosition(...)'
             // set: (...args: any[]) => void,              // [optional] setter ? 'getPosition(...)'
-            // buffer -> {vertexCount}{meshCount}{usage}{type}
+
+            // buffer -> {vertexCount}{meshCount}{usage}{normalized}_{+optional:bufferName}?
          }
     }
 
@@ -30,7 +33,6 @@
         [methodName]() {}
     }
 }
-
 ```
 
 ### API
@@ -39,10 +41,17 @@
 
 const geometry = new VertexObjectGeometry(descriptor, CAPACITY = 1);
 const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+const geometry = new InstancedVertexObjectGeometry([instancedDescriptor], CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
 
-const vo = geometry.pool.createVO()
-const vo = geometry.basePool.createVO()
-const vos = geometry.instancedPool.createVOs(1000);
+const vo = geometry.vertexObjects.createVO(target)
+const vos = geometry.vertexObjects.createVOs(1000, targets)
+
+const vo = geometry.baseVertexObjects.createVO()
+const vo = geometry.instancedVertexObjects.createVO()
+
+const vo = geometry.getVertexObjects().createVO()
+const vo = geometry.getVertexObjects('foo').createVO()
 
 vo.setPosition()
 vo.x0_0
@@ -57,4 +66,3 @@ geometry.basePool.freeVO(vo)
 geometry.instancedPool.freeVOs(vos)
 
 ```
-

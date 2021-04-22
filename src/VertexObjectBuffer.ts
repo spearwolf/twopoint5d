@@ -134,12 +134,6 @@ export class VertexObjectBuffer {
     }
   }
 
-  static clone(vob: VertexObjectBuffer): VertexObjectBuffer {
-    const clone = new VertexObjectBuffer(vob, vob.capacity);
-    clone.copy(vob);
-    return clone;
-  }
-
   clone(): VertexObjectBuffer {
     const clone = new VertexObjectBuffer(this, this.capacity);
     clone.copy(this);
@@ -157,7 +151,10 @@ export class VertexObjectBuffer {
     }
   }
 
-  setAttributes(attributes: Record<string, number[]>, objectOffset = 0): void {
+  copyAttributes(
+    attributes: Record<string, ArrayLike<number>>,
+    objectOffset = 0,
+  ): void {
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
@@ -170,7 +167,7 @@ export class VertexObjectBuffer {
           while (idx < data.length) {
             for (let i = 0; i < vertexCount; i++) {
               buffer.typedArray.set(
-                data.slice(idx, idx + attrSize),
+                Array.prototype.slice.call(data, idx, idx + attrSize),
                 bufIdx + attr.offset,
               );
               idx += attrSize;
