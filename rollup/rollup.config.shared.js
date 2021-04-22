@@ -2,7 +2,6 @@
 /* eslint-env node */
 import path from 'path';
 
-import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
@@ -34,19 +33,6 @@ export default (build, buildConfig) => {
       commonjs(),
       resolve({
         extensions,
-      }),
-      babel({
-        extensions,
-        babelHelpers: 'runtime',
-        exclude: [/\/core-js\//, 'node_modules/@babel/**'],
-        plugins: [
-          [
-            '@babel/plugin-transform-runtime',
-            {
-              corejs: {version: 3, proposals: true},
-            },
-          ],
-        ],
       }),
       replace({
         preventAssignment: true,
