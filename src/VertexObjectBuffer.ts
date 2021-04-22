@@ -177,11 +177,11 @@ export class VertexObjectBuffer {
     }
   }
 
-  toAttributeArrays<T extends string[]>(
-    attributeNames: T,
+  toAttributeArrays(
+    attributeNames: string[],
     start = 0,
     end = this.capacity,
-  ): Record<keyof T, TypedArray> {
+  ): Record<string, TypedArray> {
     return Object.fromEntries(
       attributeNames.map((attrName) => {
         const attr = this.bufferAttributes.get(attrName);
