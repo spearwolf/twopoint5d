@@ -9,15 +9,15 @@ const makeSetAttributeValues = (
   attrOffset: number,
   attrSize: number,
 ) => {
+  // TODO only for attrSize > 1:
   return function setAttributeValues(this: VertexObject, numbers: number[]) {
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
+    const arr = this[voBuffer].buffers.get(bufferName).typedArray;
     for (let i = 0; i < vertexCount; i++) {
-      this[voBuffer].buffers
-        .get(bufferName)
-        .typedArray.set(
-          numbers.slice(i * attrSize, i * attrSize + attrSize),
-          idx + i * bufferItemSize,
-        );
+      arr.set(
+        numbers.slice(i * attrSize, i * attrSize + attrSize),
+        idx + i * bufferItemSize,
+      );
     }
   };
 };
@@ -30,15 +30,15 @@ export function createVertexObjectPrototype(
   const props = Object.fromEntries(
     descriptor.attributeNames.flatMap((attrName) => {
       const attr = descriptor.getAttribute(attrName);
-      // const attrSize = attr.size;
       const bufAttr = voBuffer.bufferAttributes.get(attrName);
       const buf = voBuffer.buffers.get(bufAttr.bufferName);
 
       const methods = [
         [
-          attrName,
+          attrName, // TODO get{AttrName}()?
           {
             get: () => 42,
+            // TODO as value?
             set: makeSetAttributeValues(
               bufAttr.bufferName,
               buf.itemSize,

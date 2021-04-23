@@ -8,7 +8,9 @@ export class VertexObjectDescriptor {
   readonly bufferNames: Set<string>;
   readonly basePrototype: Object | null | undefined;
 
-  voPrototype: Object;
+  voPrototype: Object; // initialization is delayed and is done by ..
+  // .. the first VertexObjectBuffer that uses this descriptor
+  // TODO add test for this case
 
   constructor(description: VertexObjectDescription) {
     this.description = description;
@@ -22,10 +24,6 @@ export class VertexObjectDescriptor {
       },
     );
     this.basePrototype = description.basePrototype;
-    // this.voPrototype = createVertexObjectPrototype(
-    //   this,
-    //   description.basePrototype,
-    // );
   }
 
   /** Returns `vertexCount` or `1` */
@@ -33,6 +31,10 @@ export class VertexObjectDescriptor {
     return this.description.vertexCount ?? 1;
   }
 
+  /**
+   * Calculate the instance count if your `meshCount` is greater than 1,
+   * otherwise return the given capacity
+   */
   getInstanceCount(capacity: number): number {
     const meshCount = this.description.meshCount ?? 1;
     return meshCount > 1 ? Math.ceil(capacity / meshCount) : capacity;
