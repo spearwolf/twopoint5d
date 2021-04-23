@@ -19,13 +19,9 @@
             normalized: boolean,                        // [optional] default is not
 
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
+            autoTouch: true                             // [optional] default is false
 
-            // setterName: 'setPosition' ?                 // [optional]
-            // getterName: 'getPosition' ?                 // [optional]
-            // get: () => any,                             // [optional] getter ? 'setPosition(...)'
-            // set: (...args: any[]) => void,              // [optional] setter ? 'getPosition(...)'
-
-            // buffer -> {vertexCount}{meshCount}{usage}{normalized}_{+optional:bufferName}?
+            // buffer -> {vertexCount}{meshCount}{usage}{normalized}{autoTouch}_{+optional:bufferName}?
          }
     }
 
@@ -46,17 +42,19 @@ const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, CAPACITY
 const geometry = new InstancedVertexObjectGeometry([instancedDescriptor], CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
 const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
 
-const vo = geometry.vertexObjects.createVO(target)
-const vos = geometry.vertexObjects.createVOs(1000, targets)
+const vo = geometry.pool.createVO(target)
+const vos = geometry.pool.createBatchVO(1000, target?)
 
-const group = geometry.vertexObjects.createGroup(1000) // ?
-group.free()
+const batch = geometry.pool.createBatchVO(1000) // ?
+batch.freeAll()
 
-const vo = geometry.baseVertexObjects.createVO()
-const vo = geometry.instancedVertexObjects.createVO()
+const vo = geometry.basePool.createVO()
+const vo = geometry.instancedPool.createVO()
+const vo = geometry.instancedPools[0].createVO()
 
-const vo = geometry.getVertexObjects().createVO()
-const vo = geometry.getVertexObjects('foo').createVO()
+const vo = geometry.getPool().createVO()
+const vo = geometry.getPool(0).createVO()
+const vo = geometry.getPool('foo').createVO()
 
 vo.setPosition()
 vo.x0_0
@@ -68,6 +66,11 @@ vo.copy(vo)
 
 geometry.pool.freeVO(vo)
 geometry.basePool.freeVO(vo)
-geometry.instancedPool.freeVOs(vos)
+geometry.instancedPool.freeVO(vo)
+
+geometry.touch('position', 'foo')
+geometry.touch({dynamic: false, stream: true, static: false})
+geometry.touch(true) // => touch all
+geometry.update()
 
 ```
