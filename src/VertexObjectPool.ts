@@ -1,7 +1,7 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {voBuffer, voIndex} from './constants';
-import {VertexObject} from './types';
+import {VertexObject, VertexObjectDescription} from './types';
 
 function createVertexObject(
   descriptor: VertexObjectDescriptor,
@@ -28,10 +28,16 @@ export class VertexObjectPool<VOT = VertexObject> {
   buffer: VertexObjectBuffer;
   usedCount: number;
 
-  constructor(descriptor: VertexObjectDescriptor, capacity: number) {
-    this.descriptor = descriptor;
+  constructor(
+    descriptor: VertexObjectDescriptor | VertexObjectDescription,
+    capacity: number,
+  ) {
+    this.descriptor =
+      descriptor instanceof VertexObjectDescriptor
+        ? descriptor
+        : new VertexObjectDescriptor(descriptor);
     this.capacity = capacity;
-    this.buffer = new VertexObjectBuffer(descriptor, capacity);
+    this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
     this.usedCount = 0;
   }
 

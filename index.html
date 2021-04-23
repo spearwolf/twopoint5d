@@ -1,25 +1,22 @@
 <html>
   <script type="module">
-    import {
-      VertexObjectDescriptor,
-      VertexObjectPool,
-    } from './build/three-vertex-objects.js';
+    import {VertexObjectPool} from './build/three-vertex-objects.js';
 
     class Foo {
-        hello() {
-            console.log('hello');
-        }
+      hello() {
+        console.log('hello');
+      }
     }
 
     window.myPool = new VertexObjectPool(
-      new VertexObjectDescriptor({
+      {
         vertexCount: 3,
         basePrototype: Foo.prototype,
         attributes: {
           foo: {size: 3},
           position: {components: ['x', 'y']},
         },
-      }),
+      },
       10,
     );
 
