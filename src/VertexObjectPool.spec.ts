@@ -43,11 +43,16 @@ describe('VertexObjectPool', () => {
   });
 
   test('createVO', () => {
-    const pool = new VertexObjectPool<{foo: number}>(descriptor, 100);
+    const pool = new VertexObjectPool<{foo: ArrayLike<number>}>(
+      descriptor,
+      100,
+    );
+
     const vo = pool.createVO();
+    vo.foo = [3, 2, 1, 0, 4, 5, 6, 7];
 
     expect(vo).toBeDefined();
     expect(vo[voBuffer]).toBe(pool.buffer);
-    expect(vo.foo).toBe(42);
+    expect(Array.from(vo.foo)).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
   });
 });

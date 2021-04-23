@@ -1,8 +1,9 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {voBuffer, voIndex} from './constants';
+import {createTypedArray} from './createTypedArray';
 import {VertexObject} from './types';
 
-const makeSetAttributeValues = (
+const makeAttributeGetter = (
   bufferName: string,
   bufferItemSize: number,
   vertexCount: number,
@@ -10,12 +11,38 @@ const makeSetAttributeValues = (
   attrSize: number,
 ) => {
   // TODO only for attrSize > 1:
-  return function setAttributeValues(this: VertexObject, numbers: number[]) {
+  return function getAttributeValues(this: VertexObject) {
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const arr = this[voBuffer].buffers.get(bufferName).typedArray;
+    const buf = this[voBuffer].buffers.get(bufferName);
+    const source = buf.typedArray;
+    const target = createTypedArray(buf.dataType, vertexCount * attrSize);
     for (let i = 0; i < vertexCount; i++) {
-      arr.set(
-        numbers.slice(i * attrSize, i * attrSize + attrSize),
+      target.set(
+        source.subarray(
+          idx + i * bufferItemSize,
+          idx + i * bufferItemSize + attrSize,
+        ),
+        i * attrSize,
+      );
+    }
+    return target;
+  };
+};
+
+const makeAttributeSetter = (
+  bufferName: string,
+  bufferItemSize: number,
+  vertexCount: number,
+  attrOffset: number,
+  attrSize: number,
+) => {
+  // TODO only for attrSize > 1:
+  return function setAttributeValues(this: VertexObject, values: number[]) {
+    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
+    const target = this[voBuffer].buffers.get(bufferName).typedArray;
+    for (let i = 0; i < vertexCount; i++) {
+      target.set(
+        values.slice(i * attrSize, i * attrSize + attrSize),
         idx + i * bufferItemSize,
       );
     }
@@ -37,9 +64,15 @@ export function createVertexObjectPrototype(
         [
           attrName, // TODO get{AttrName}()?
           {
-            get: () => 42,
             // TODO as value?
-            set: makeSetAttributeValues(
+            get: makeAttributeGetter(
+              bufAttr.bufferName,
+              buf.itemSize,
+              descriptor.vertexCount,
+              bufAttr.offset,
+              attr.size,
+            ),
+            set: makeAttributeSetter(
               bufAttr.bufferName,
               buf.itemSize,
               descriptor.vertexCount,

@@ -20,6 +20,8 @@
 
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
 
+            // setterName: 'setPosition' ?                 // [optional]
+            // getterName: 'getPosition' ?                 // [optional]
             // get: () => any,                             // [optional] getter ? 'setPosition(...)'
             // set: (...args: any[]) => void,              // [optional] setter ? 'getPosition(...)'
 
