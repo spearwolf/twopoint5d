@@ -1,7 +1,7 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {voBuffer, voIndex} from './constants';
-import {VertexObject, VertexObjectDescription} from './types';
+import {VO, VertexObjectDescription} from './types';
 
 function createVertexObject(
   descriptor: VertexObjectDescriptor,
@@ -21,7 +21,7 @@ function createVertexObject(
   return vo;
 }
 
-export class VertexObjectPool<VOT = VertexObject> {
+export class VertexObjectPool<VOType = VO> {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
 
@@ -45,7 +45,7 @@ export class VertexObjectPool<VOT = VertexObject> {
     return this.capacity - this.usedCount;
   }
 
-  createVO(): VOT & VertexObject {
+  createVO(): VOType & VO {
     if (this.usedCount < this.capacity - 1) {
       return createVertexObject(this.descriptor, this.buffer, this.usedCount++);
     }

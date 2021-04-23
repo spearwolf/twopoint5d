@@ -1,6 +1,14 @@
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectPool} from './VertexObjectPool';
 import {voBuffer} from './constants';
+import {VOAttrSetter, VOAttrGetter} from './types';
+
+interface MyVertexObject {
+  setFoo: VOAttrSetter;
+  getFoo: VOAttrGetter;
+  setBar: VOAttrSetter;
+  getBar: VOAttrGetter;
+}
 
 describe('VertexObjectPool', () => {
   let descriptor: VertexObjectDescriptor;
@@ -43,16 +51,15 @@ describe('VertexObjectPool', () => {
   });
 
   test('createVO', () => {
-    const pool = new VertexObjectPool<{foo: ArrayLike<number>}>(
-      descriptor,
-      100,
-    );
+    const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
     const vo = pool.createVO();
-    vo.foo = [3, 2, 1, 0, 4, 5, 6, 7];
+    vo.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
+    vo.setBar([100, 101, 102, 103]);
 
     expect(vo).toBeDefined();
     expect(vo[voBuffer]).toBe(pool.buffer);
-    expect(Array.from(vo.foo)).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+    expect(Array.from(vo.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+    expect(Array.from(vo.getBar())).toEqual([100, 101, 102, 103]);
   });
 });

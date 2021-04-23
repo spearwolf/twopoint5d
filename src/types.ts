@@ -56,7 +56,11 @@ export interface VertexObjectDescription {
   // TODO methods
 }
 
-export interface VertexObject {
+export interface VO {
   [voBuffer]: VertexObjectBuffer;
   [voIndex]: number;
 }
+
+export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
+
+export type VOAttrGetter = () => ArrayLike<number>;

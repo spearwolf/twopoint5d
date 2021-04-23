@@ -1,7 +1,12 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {voBuffer, voIndex} from './constants';
 import {createTypedArray} from './createTypedArray';
-import {VertexObject} from './types';
+import {VO} from './types';
+
+const toPascalCase = (str: string) =>
+  str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) =>
+    m1.toUpperCase(),
+  );
 
 const makeAttributeGetter = (
   bufferName: string,
@@ -11,7 +16,7 @@ const makeAttributeGetter = (
   attrSize: number,
 ) => {
   // TODO only for attrSize > 1:
-  return function getAttributeValues(this: VertexObject) {
+  return function getAttributeValues(this: VO) {
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
     const buf = this[voBuffer].buffers.get(bufferName);
     const source = buf.typedArray;
@@ -37,12 +42,21 @@ const makeAttributeSetter = (
   attrSize: number,
 ) => {
   // TODO only for attrSize > 1:
-  return function setAttributeValues(this: VertexObject, values: number[]) {
+  return function setAttributeValues(
+    this: VO,
+    ...values: number[] | [ArrayLike<number>]
+  ) {
+    const source =
+      values.length === 1 && Array.isArray(values[0]) ? values[0] : values;
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
     const target = this[voBuffer].buffers.get(bufferName).typedArray;
     for (let i = 0; i < vertexCount; i++) {
       target.set(
-        values.slice(i * attrSize, i * attrSize + attrSize),
+        Array.prototype.slice.call(
+          source,
+          i * attrSize,
+          i * attrSize + attrSize,
+        ),
         idx + i * bufferItemSize,
       );
     }
@@ -59,20 +73,27 @@ export function createVertexObjectPrototype(
       const attr = descriptor.getAttribute(attrName);
       const bufAttr = voBuffer.bufferAttributes.get(attrName);
       const buf = voBuffer.buffers.get(bufAttr.bufferName);
+      const AttrName = toPascalCase(attrName);
 
       const methods = [
         [
-          attrName, // TODO get{AttrName}()?
+          `get${AttrName}`,
           {
-            // TODO as value?
-            get: makeAttributeGetter(
+            enumerable: true,
+            value: makeAttributeGetter(
               bufAttr.bufferName,
               buf.itemSize,
               descriptor.vertexCount,
               bufAttr.offset,
               attr.size,
             ),
-            set: makeAttributeSetter(
+          },
+        ],
+        [
+          `set${AttrName}`,
+          {
+            enumerable: true,
+            value: makeAttributeSetter(
               bufAttr.bufferName,
               buf.itemSize,
               descriptor.vertexCount,
@@ -88,6 +109,8 @@ export function createVertexObjectPrototype(
           ...attr.components.map((component) => [
             component,
             {
+              enumerable: true,
+              // TODO make getter & setter
               get: () => 23,
             },
           ]),
