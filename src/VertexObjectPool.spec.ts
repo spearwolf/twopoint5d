@@ -1,5 +1,5 @@
 import {VertexObjectPool} from './VertexObjectPool';
-import {voBuffer} from './constants';
+import {voBuffer, voIndex} from './constants';
 import {VOAttrSetter, VOAttrGetter, VertexObjectDescription} from './types';
 
 interface MyVertexObject {
@@ -175,6 +175,43 @@ describe('VertexObjectPool', () => {
           4,
         ),
       ).toEqual([77, 99, 88, 66]);
+    });
+  });
+
+  describe('freeVO()', () => {
+    test('clears the internal buffer reference', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+      const vo = pool.createVO();
+
+      expect(pool.usedCount).toBe(1);
+      expect(vo[voBuffer]).toBe(pool.buffer);
+      expect(vo[voIndex]).toBe(0);
+
+      pool.freeVO(vo);
+
+      expect(pool.usedCount).toBe(0);
+      expect(vo[voBuffer]).toBeUndefined();
+      expect(vo[voIndex]).toBe(-1);
+    });
+
+    test('copies and re-link the internal buffers', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
+
+      vo1.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
+
+      expect(pool.usedCount).toBe(2);
+      expect(vo0[voIndex]).toBe(0);
+      expect(vo1[voIndex]).toBe(1);
+      expect(Array.from(vo0.getFoo())).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+      expect(Array.from(vo1.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+
+      pool.freeVO(vo0);
+
+      expect(pool.usedCount).toBe(1);
+      expect(vo1[voIndex]).toBe(0);
+      expect(Array.from(vo1.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
     });
   });
 });

@@ -56,13 +56,31 @@ export class VertexObjectPool<VOType = VO> {
     }
   }
 
+  /**
+   * The fastest variant is when the VO was the last one created,
+   * otherwise the underlying buffer(s) have to be recopied internally.
+   */
   freeVO(vo: VO): void {
-    const idx = vo[voIndex];
-    this.index[idx] = undefined;
-    // TODO relink!!! usedCount--
+    if (vo[voBuffer] === this.buffer) {
+      const idx = vo[voIndex];
+      if (idx >= 0) {
+        const lastUsedIdx = this.usedCount - 1;
+        if (idx === lastUsedIdx) {
+          this.index[idx] = undefined;
+        } else {
+          this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
+          const lastUsedVO = this.index[lastUsedIdx];
+          this.index[lastUsedIdx] = undefined;
+          lastUsedVO[voIndex] = idx;
+          this.index[idx] = lastUsedVO;
+        }
+        this.usedCount--;
+        vo[voBuffer] = undefined;
+        vo[voIndex] = -1;
+      }
+    }
   }
 
   // TODO createBatchVO()
-  // TODO freeVO()
   // TODO freeBatchVO()
 }
