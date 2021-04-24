@@ -102,78 +102,79 @@ describe('VertexObjectPool', () => {
     expect(pool.availableCount).toBe(100);
   });
 
-  test('createVO() with vertexCount > 1', () => {
-    const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+  describe('createVO()', () => {
+    test('vertexCount > 1', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
-    const vo = pool.createVO();
-    vo.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
-    vo.y1 = -1;
-    vo.x2 = -4;
-    vo.setBar([100, 101, 102, 103]);
-    vo.zack0 = 10;
-    vo.zack1 = 20;
-    vo.zack2 = 30;
-    vo.zack3 = 40;
+      const vo = pool.createVO();
+      vo.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
+      vo.y1 = -1;
+      vo.x2 = -4;
+      vo.setBar([100, 101, 102, 103]);
+      vo.zack0 = 10;
+      vo.zack1 = 20;
+      vo.zack2 = 30;
+      vo.zack3 = 40;
 
-    expect(vo).toBeDefined();
-    expect(vo[voBuffer]).toBe(pool.buffer);
+      expect(vo).toBeDefined();
+      expect(vo[voBuffer]).toBe(pool.buffer);
 
-    expect(Array.from(vo.getFoo())).toEqual([3, 2, 1, -1, -4, 5, 6, 7]);
-    expect(vo.x0).toBe(3);
-    expect(vo.y0).toBe(2);
-    expect(vo.x1).toBe(1);
-    expect(vo.y1).toBe(-1);
-    expect(vo.x2).toBe(-4);
-    expect(vo.y2).toBe(5);
-    expect(vo.x3).toBe(6);
-    expect(vo.y3).toBe(7);
-    expect(Array.from(vo.getBar())).toEqual([100, 101, 102, 103]);
-    expect(Array.from(vo.getZack())).toEqual([10, 20, 30, 40]);
-    expect(vo.zack0).toBe(10);
-    expect(vo.zack1).toBe(20);
-    expect(vo.zack2).toBe(30);
-    expect(vo.zack3).toBe(40);
-  });
+      expect(Array.from(vo.getFoo())).toEqual([3, 2, 1, -1, -4, 5, 6, 7]);
+      expect(vo.x0).toBe(3);
+      expect(vo.y0).toBe(2);
+      expect(vo.x1).toBe(1);
+      expect(vo.y1).toBe(-1);
+      expect(vo.x2).toBe(-4);
+      expect(vo.y2).toBe(5);
+      expect(vo.x3).toBe(6);
+      expect(vo.y3).toBe(7);
+      expect(Array.from(vo.getBar())).toEqual([100, 101, 102, 103]);
+      expect(Array.from(vo.getZack())).toEqual([10, 20, 30, 40]);
+      expect(vo.zack0).toBe(10);
+      expect(vo.zack1).toBe(20);
+      expect(vo.zack2).toBe(30);
+      expect(vo.zack3).toBe(40);
+    });
 
-  test('createVO() with vertexCount === 1', () => {
-    const pool = new VertexObjectPool<MyInstancedVertexObject>(
-      {meshCount: 1, attributes: descriptor.attributes},
-      100,
-    );
+    test('vertexCount = 1', () => {
+      const pool = new VertexObjectPool<MyInstancedVertexObject>(
+        {meshCount: 1, attributes: descriptor.attributes},
+        100,
+      );
 
-    const vo = pool.createVO();
-    vo.setFoo(3, 2);
-    vo.y = -2;
+      const vo = pool.createVO();
+      vo.setFoo(3, 2);
+      vo.y = -2;
 
-    expect(vo).toBeDefined();
-    expect(vo[voBuffer]).toBe(pool.buffer);
+      expect(vo).toBeDefined();
+      expect(vo[voBuffer]).toBe(pool.buffer);
 
-    expect(Array.from(vo.getFoo())).toEqual([3, -2]);
-    expect(vo.x).toBe(3);
-    expect(vo.y).toBe(-2);
+      expect(Array.from(vo.getFoo())).toEqual([3, -2]);
+      expect(vo.x).toBe(3);
+      expect(vo.y).toBe(-2);
 
-    expect(vo.bar).toBe(0);
-    expect(vo.zack).toBe(0);
+      expect(vo.bar).toBe(0);
+      expect(vo.zack).toBe(0);
 
-    vo.zack = 10;
+      vo.zack = 10;
 
-    expect(
-      Array.from(vo[voBuffer].buffers.get('dynamic_float32').typedArray).slice(
-        0,
-        3,
-      ),
-    ).toEqual([3, -2, 10]);
+      expect(
+        Array.from(
+          vo[voBuffer].buffers.get('dynamic_float32').typedArray,
+        ).slice(0, 3),
+      ).toEqual([3, -2, 10]);
 
-    vo.bar = 77;
-    vo.a = 99;
-    vo.b = 88;
-    vo.c = 66;
+      vo.bar = 77;
+      vo.a = 99;
+      vo.b = 88;
+      vo.c = 66;
 
-    expect(
-      Array.from(vo[voBuffer].buffers.get('static_float32').typedArray).slice(
-        0,
-        4,
-      ),
-    ).toEqual([77, 99, 88, 66]);
+      expect(
+        Array.from(vo[voBuffer].buffers.get('static_float32').typedArray).slice(
+          0,
+          4,
+        ),
+      ).toEqual([77, 99, 88, 66]);
+    });
   });
 });

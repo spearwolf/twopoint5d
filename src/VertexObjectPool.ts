@@ -48,6 +48,7 @@ export class VertexObjectPool<VOType = VO> {
   createVO(): VOType & VO {
     if (this.usedCount < this.capacity - 1) {
       return createVertexObject(this.descriptor, this.buffer, this.usedCount++);
+      // TODO remember this VO<>voIndex so that we can later relink the voIndex if needed
     }
   }
 
