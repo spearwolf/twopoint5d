@@ -10,38 +10,64 @@ const toPascalCase = (str: string) =>
 
 const makeAttributeGetter = (
   bufferName: string,
-  bufferItemSize: number,
-  vertexCount: number,
+  instanceOffset: number,
   attrOffset: number,
-  attrSize: number,
 ) => {
-  // TODO only for attrSize > 1:
-  return function getAttributeValues(this: VO) {
-    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
+  return function getAttribute(this: VO) {
+    const idx = this[voIndex] * instanceOffset + attrOffset;
     const buf = this[voBuffer].buffers.get(bufferName);
-    const source = buf.typedArray;
-    const target = createTypedArray(buf.dataType, vertexCount * attrSize);
-    for (let i = 0; i < vertexCount; i++) {
-      target.set(
-        source.subarray(
-          idx + i * bufferItemSize,
-          idx + i * bufferItemSize + attrSize,
-        ),
-        i * attrSize,
-      );
-    }
-    return target;
+    return buf.typedArray[idx];
   };
 };
 
 const makeAttributeSetter = (
+  bufferName: string,
+  instanceOffset: number,
+  attrOffset: number,
+) => {
+  return function setAttribute(this: VO, value: number) {
+    const idx = this[voIndex] * instanceOffset + attrOffset;
+    const buf = this[voBuffer].buffers.get(bufferName);
+    buf.typedArray[idx] = value;
+  };
+};
+
+const makeAttributeValuesGetter = (
   bufferName: string,
   bufferItemSize: number,
   vertexCount: number,
   attrOffset: number,
   attrSize: number,
 ) => {
-  // TODO only for attrSize > 1:
+  return function getAttributeValues(this: VO) {
+    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
+    const buf = this[voBuffer].buffers.get(bufferName);
+    const source = buf.typedArray;
+    const target = createTypedArray(buf.dataType, vertexCount * attrSize);
+    for (let i = 0; i < vertexCount; i++) {
+      if (attrSize === 1) {
+        target[i] = source[idx + i * bufferItemSize];
+      } else {
+        target.set(
+          source.subarray(
+            idx + i * bufferItemSize,
+            idx + i * bufferItemSize + attrSize,
+          ),
+          i * attrSize,
+        );
+      }
+    }
+    return target;
+  };
+};
+
+const makeAttributeValueSetter = (
+  bufferName: string,
+  bufferItemSize: number,
+  vertexCount: number,
+  attrOffset: number,
+  attrSize: number,
+) => {
   return function setAttributeValues(
     this: VO,
     ...values: number[] | [ArrayLike<number>]
@@ -51,14 +77,18 @@ const makeAttributeSetter = (
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
     const target = this[voBuffer].buffers.get(bufferName).typedArray;
     for (let i = 0; i < vertexCount; i++) {
-      target.set(
-        Array.prototype.slice.call(
-          source,
-          i * attrSize,
-          i * attrSize + attrSize,
-        ),
-        idx + i * bufferItemSize,
-      );
+      if (attrSize === 1) {
+        target[idx + i * bufferItemSize] = source[i];
+      } else {
+        target.set(
+          Array.prototype.slice.call(
+            source,
+            i * attrSize,
+            i * attrSize + attrSize,
+          ),
+          idx + i * bufferItemSize,
+        );
+      }
     }
   };
 };
@@ -75,46 +105,86 @@ export function createVertexObjectPrototype(
       const buf = voBuffer.buffers.get(bufAttr.bufferName);
       const AttrName = toPascalCase(attrName);
 
-      const methods = [
-        [
-          `get${AttrName}`,
+      const methods: any[] = [];
+      if (descriptor.vertexCount === 1 && attr.size === 1) {
+        methods.push([
+          attrName,
           {
             enumerable: true,
-            value: makeAttributeGetter(
+            get: makeAttributeGetter(
               bufAttr.bufferName,
               buf.itemSize,
-              descriptor.vertexCount,
               bufAttr.offset,
-              attr.size,
             ),
-          },
-        ],
-        [
-          `set${AttrName}`,
-          {
-            enumerable: true,
-            value: makeAttributeSetter(
+            set: makeAttributeSetter(
               bufAttr.bufferName,
               buf.itemSize,
-              descriptor.vertexCount,
               bufAttr.offset,
-              attr.size,
             ),
           },
-        ],
-      ];
-      if (attr.hasComponents) {
+        ]);
+      } else {
         methods.push(
-          // @ts-ignore
-          ...attr.components.map((component) => [
-            component,
+          [
+            `get${AttrName}`,
             {
               enumerable: true,
-              // TODO make getter & setter
-              get: () => 23,
+              value: makeAttributeValuesGetter(
+                bufAttr.bufferName,
+                buf.itemSize,
+                descriptor.vertexCount,
+                bufAttr.offset,
+                attr.size,
+              ),
             },
-          ]),
+          ],
+          [
+            `set${AttrName}`,
+            {
+              enumerable: true,
+              value: makeAttributeValueSetter(
+                bufAttr.bufferName,
+                buf.itemSize,
+                descriptor.vertexCount,
+                bufAttr.offset,
+                attr.size,
+              ),
+            },
+          ],
         );
+      }
+      if (attr.hasComponents) {
+        attr.components.forEach((component, componentIndex) => {
+          for (
+            let vertexIndex = 0;
+            vertexIndex < descriptor.vertexCount;
+            vertexIndex++
+          ) {
+            const instanceOffset = descriptor.vertexCount * buf.itemSize;
+            const attrOffset =
+              vertexIndex * buf.itemSize + bufAttr.offset + componentIndex;
+            if (descriptor.vertexCount > 1 || component !== attr.name) {
+              methods.push([
+                `${component}${
+                  descriptor.vertexCount === 1 ? '' : vertexIndex
+                }`,
+                {
+                  enumerable: true,
+                  get: makeAttributeGetter(
+                    bufAttr.bufferName,
+                    instanceOffset,
+                    attrOffset,
+                  ),
+                  set: makeAttributeSetter(
+                    bufAttr.bufferName,
+                    instanceOffset,
+                    attrOffset,
+                  ),
+                },
+              ]);
+            }
+          }
+        });
       }
       return methods;
     }),

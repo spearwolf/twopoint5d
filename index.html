@@ -1,4 +1,18 @@
 <html>
+  <style>
+    body {
+      background-color: #323c39;
+      color: #f0f0f0;
+      font-family: sans-serif;
+      font-size: 13px;
+      margin: 1em 2em;
+      line-height: 2;
+    }
+    em {
+      font-size: 84.615384%;
+      color: #ddd;
+    }
+  </style>
   <script type="module">
     import {VertexObjectPool} from './build/three-vertex-objects.js';
 
@@ -14,6 +28,19 @@
         basePrototype: Foo.prototype,
         attributes: {
           foo: {size: 3},
+          bar: {components: ['b']},
+          position: {components: ['x', 'y']},
+        },
+      },
+      10,
+    );
+
+    window.myInstancedPool = new VertexObjectPool(
+      {
+        meshCount: 1,
+        attributes: {
+          foo: {size: 3},
+          bar: {size: 1},
           position: {components: ['x', 'y']},
         },
       },
@@ -22,10 +49,17 @@
 
     console.log('hej-san!');
     console.log('myPool=', myPool);
+    console.log('myInstancedPool=', myInstancedPool);
+
     window.a = myPool.createVO();
     console.log('a=', a);
-    window.b = myPool.createVO();
+    window.b = myInstancedPool.createVO();
     console.log('b=', b);
   </script>
-  <body></body>
+  <body>
+    <p>
+      three-vertex-objects.js<br />
+      <em>please, open your console...</em>
+    </p>
+  </body>
 </html>
