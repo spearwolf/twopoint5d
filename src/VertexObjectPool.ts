@@ -24,6 +24,7 @@ function createVertexObject(
 export class VertexObjectPool<VOType = VO> {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
+  readonly index: Array<VOType & VO>;
 
   buffer: VertexObjectBuffer;
   usedCount: number;
@@ -39,6 +40,7 @@ export class VertexObjectPool<VOType = VO> {
     this.capacity = capacity;
     this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
     this.usedCount = 0;
+    this.index = new Array(capacity);
   }
 
   get availableCount(): number {
@@ -46,10 +48,18 @@ export class VertexObjectPool<VOType = VO> {
   }
 
   createVO(): VOType & VO {
-    if (this.usedCount < this.capacity - 1) {
-      return createVertexObject(this.descriptor, this.buffer, this.usedCount++);
-      // TODO remember this VO<>voIndex so that we can later relink the voIndex if needed
+    if (this.usedCount < this.capacity) {
+      const idx = this.usedCount++;
+      const vo = createVertexObject(this.descriptor, this.buffer, idx);
+      this.index[idx] = vo;
+      return vo;
     }
+  }
+
+  freeVO(vo: VO): void {
+    const idx = vo[voIndex];
+    this.index[idx] = undefined;
+    // TODO relink!!! usedCount--
   }
 
   // TODO createBatchVO()
