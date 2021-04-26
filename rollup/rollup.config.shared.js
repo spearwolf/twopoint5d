@@ -27,7 +27,7 @@ export default (build, buildConfig) => {
   return {
     input: 'src/index.ts',
     plugins: [
-      rewriteExternalsPlugin(['eventize-js']),
+      rewriteExternalsPlugin(['three', 'eventize-js']),
       typescript(),
       createBannerPlugin({...packageJson, version}),
       commonjs(),

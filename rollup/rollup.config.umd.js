@@ -13,6 +13,7 @@ export default rollupConfigShared(
       sourcemapFile: path.join(outputDir, `${name}.umd.js.map`),
       format: 'umd',
       globals: {
+        three: 'THREE',
         'eventize-js': 'eventize',
       },
     },
