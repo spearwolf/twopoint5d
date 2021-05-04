@@ -34,6 +34,9 @@ export class VertexObjectBuffer {
   readonly buffers: Map<string, Buffer>;
   readonly bufferAttributes: Map<string, BufferAttribute>;
 
+  /** buffer name -> list of buffer attributes */
+  readonly bufferNameAttributes: Map<string, BufferAttribute[]>;
+
   constructor(
     source: VertexObjectDescriptor | VertexObjectBuffer,
     public readonly capacity: number,
@@ -42,6 +45,7 @@ export class VertexObjectBuffer {
       this.descriptor = source.descriptor;
       this.attributeNames = source.attributeNames;
       this.bufferAttributes = source.bufferAttributes;
+      this.bufferNameAttributes = source.bufferNameAttributes;
       this.buffers = new Map();
 
       for (const [bufferName, buffer] of source.buffers) {
@@ -92,6 +96,15 @@ export class VertexObjectBuffer {
           buffer.dataType,
           this.capacity * this.descriptor.vertexCount * buffer.itemSize,
         );
+      }
+      this.bufferNameAttributes = new Map();
+      for (const bufAttr of this.bufferAttributes.values()) {
+        const {bufferName} = bufAttr;
+        if (this.bufferNameAttributes.has(bufferName)) {
+          this.bufferNameAttributes.get(bufferName).push(bufAttr);
+        } else {
+          this.bufferNameAttributes.set(bufferName, [bufAttr]);
+        }
       }
     }
     if (!this.descriptor.voPrototype) {

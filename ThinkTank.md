@@ -39,8 +39,9 @@
 
 const geometry = new VertexObjectGeometry(descriptor, CAPACITY = 1);
 const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
-const geometry = new InstancedVertexObjectGeometry([instancedDescriptor], CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
-const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+//const geometry = new InstancedVertexObjectGeometry([instancedDescriptor], CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+//const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+// -> VertexObjectDescriptor.merge(...) ?
 
 const vo = geometry.pool.createVO(target)
 const vos = geometry.pool.createBatchVO(1000, target?)
@@ -48,13 +49,13 @@ const vos = geometry.pool.createBatchVO(1000, target?)
 const batch = geometry.pool.createBatchVO(1000) // ?
 batch.freeAll()
 
-const vo = geometry.basePool.createVO()
+const vo = geometry.pool.createVO()
 const vo = geometry.instancedPool.createVO()
-const vo = geometry.instancedPools[0].createVO()
+//const vo = geometry.instancedPools[0].createVO()
 
-const vo = geometry.getPool().createVO()
-const vo = geometry.getPool(0).createVO()
-const vo = geometry.getPool('foo').createVO()
+//const vo = geometry.getPool().createVO()
+//const vo = geometry.getPool(0).createVO()
+//const vo = geometry.getPool('foo').createVO()
 
 vo.setPosition()
 vo.x0_0
@@ -65,7 +66,7 @@ vo.x0_1
 vo.copy(vo)
 
 geometry.pool.freeVO(vo)
-geometry.basePool.freeVO(vo)
+//geometry.basePool.freeVO(vo)
 geometry.instancedPool.freeVO(vo)
 
 geometry.touch('position', 'foo')

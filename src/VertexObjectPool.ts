@@ -27,7 +27,8 @@ export class VertexObjectPool<VOType = VO> {
   readonly index: Array<VOType & VO>;
 
   buffer: VertexObjectBuffer;
-  usedCount: number;
+
+  usedCount: number; // TODO update index array when setting usedCount (to a smaller value) ..
 
   constructor(
     descriptor: VertexObjectDescriptor | VertexObjectDescription,

@@ -79,6 +79,19 @@ describe('VertexObjectBuffer', () => {
       bufferName: 'static_float32',
       offset: 4,
     });
+
+    expect(
+      vob.bufferNameAttributes
+        .get('dynamic_float32')
+        .map((bufAttr) => bufAttr.attributeName)
+        .sort(),
+    ).toEqual(['foo']);
+    expect(
+      vob.bufferNameAttributes
+        .get('static_float32')
+        .map((bufAttr) => bufAttr.attributeName)
+        .sort(),
+    ).toEqual(['bar', 'plah', 'zack']);
   });
 
   test('construct with vertex-object-descriptor', () => {
@@ -146,6 +159,19 @@ describe('VertexObjectBuffer', () => {
       Float32Array,
     );
     expect(vob.buffers.get('dynamic_float32').typedArray.length).toBe(16);
+
+    expect(
+      vob.bufferNameAttributes
+        .get('dynamic_float32')
+        .map((bufAttr) => bufAttr.attributeName)
+        .sort(),
+    ).toEqual(['foo']);
+    expect(
+      vob.bufferNameAttributes
+        .get('static_float32')
+        .map((bufAttr) => bufAttr.attributeName)
+        .sort(),
+    ).toEqual(['bar', 'plah', 'zack']);
   });
 
   test('copyAttributes', () => {
