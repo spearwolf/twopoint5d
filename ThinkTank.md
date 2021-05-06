@@ -69,9 +69,9 @@ geometry.pool.freeVO(vo)
 //geometry.basePool.freeVO(vo)
 geometry.instancedPool.freeVO(vo)
 
-geometry.touch('position', 'foo')
-geometry.touch({dynamic: false, stream: true, static: false})
-geometry.touch(true) // => touch all
+geometry.touchAttributes('position', 'foo')
+geometry.touchBuffers({dynamic: false, stream: true, static: false})
+// geometry.touch(true) // => touch all
 geometry.update()
 
 ```

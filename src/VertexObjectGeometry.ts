@@ -8,12 +8,19 @@ import {
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectPool} from './VertexObjectPool';
 import {createIndicesArray} from './createIndicesArray';
-import {VertexObjectDescription} from './types';
+import {selectAttributes} from './selectAttributes';
+import {selectBuffers} from './selectBuffers';
+import {toDrawUsage} from './toDrawUsage';
+import {
+  BufferLike,
+  VertexAttributeUsageType,
+  VertexObjectDescription,
+} from './types';
 
 export class VertexObjectGeometry extends BufferGeometry {
   readonly pool: VertexObjectPool;
 
-  public buffers: Map<string, InterleavedBuffer | BufferAttribute>;
+  public buffers: Map<string, BufferLike>;
 
   constructor(
     source: VertexObjectPool | VertexObjectDescriptor | VertexObjectDescription,
@@ -30,12 +37,25 @@ export class VertexObjectGeometry extends BufferGeometry {
     return this.buffers != null;
   }
 
+  touchAttributes(...attrNames: string[]): void {
+    selectAttributes(this.pool, this.buffers, attrNames).forEach((buffer) => {
+      buffer.needsUpdate = true;
+    });
+  }
+
+  touchBuffers(
+    bufferTypes: {[Type in VertexAttributeUsageType]: boolean},
+  ): void {
+    selectBuffers(this.buffers, bufferTypes).forEach((buffer) => {
+      buffer.needsUpdate = true;
+    });
+  }
+
   update(): void {
     if (!this.attributesInitialized) {
       this.initializeAttributes();
     }
-    // TODO select buffers
-    // TODO touch/update buffers
+    // TODO autoTouch (<- attributes)
   }
 
   protected initializeAttributes(): void {
@@ -50,7 +70,6 @@ export class VertexObjectGeometry extends BufferGeometry {
         ),
       );
     }
-    // TODO set attributes...
     for (const buffer of this.pool.buffer.buffers.values()) {
       const attributes = this.pool.buffer.bufferNameAttributes.get(
         buffer.bufferName,
@@ -60,6 +79,7 @@ export class VertexObjectGeometry extends BufferGeometry {
           buffer.typedArray,
           buffer.itemSize,
         );
+        interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
         this.buffers.set(buffer.bufferName, interleavedBuffer);
         for (const bufAttr of attributes) {
           const attrDesc = this.pool.descriptor.attributes.get(
@@ -71,6 +91,7 @@ export class VertexObjectGeometry extends BufferGeometry {
             bufAttr.offset,
             attrDesc.normalizedData,
           );
+          attr.name = bufAttr.attributeName;
           this.setAttribute(attrDesc.name, attr);
         }
       } else {
@@ -83,6 +104,8 @@ export class VertexObjectGeometry extends BufferGeometry {
           buffer.itemSize,
           attrDesc.normalizedData,
         );
+        attr.setUsage(toDrawUsage(buffer.usageType));
+        attr.name = bufAttr.attributeName;
         this.buffers.set(buffer.bufferName, attr);
         this.setAttribute(attrDesc.name, attr);
       }

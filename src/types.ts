@@ -1,3 +1,11 @@
+import {
+  BufferAttribute,
+  DynamicDrawUsage,
+  InterleavedBuffer,
+  StaticDrawUsage,
+  StreamDrawUsage,
+} from 'three';
+
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {voBuffer, voIndex} from './constants';
 
@@ -64,3 +72,10 @@ export interface VO {
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
 
 export type VOAttrGetter = () => ArrayLike<number>;
+
+export type BufferLike = InterleavedBuffer | BufferAttribute;
+
+export type DrawUsageType =
+  | typeof DynamicDrawUsage
+  | typeof StaticDrawUsage
+  | typeof StreamDrawUsage;
