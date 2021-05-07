@@ -26,6 +26,10 @@ export class VertexAttributeDescriptor {
     return this.description.usage ?? 'static';
   }
 
+  get autoTouch(): boolean {
+    return this.description.autoTouch ?? this.usageType !== 'static';
+  }
+
   get size(): number {
     // @ts-ignore
     return this.description.size ?? this.description.components?.length ?? 1;

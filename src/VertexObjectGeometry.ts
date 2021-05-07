@@ -55,7 +55,11 @@ export class VertexObjectGeometry extends BufferGeometry {
     if (!this.attributesInitialized) {
       this.initializeAttributes();
     }
-    // TODO autoTouch (<- attributes)
+    const autoTouchAttrs = Array.from(this.pool.descriptor.attributes.values())
+      .filter((attr) => attr.autoTouch)
+      .map((attr) => attr.name);
+    // TODO cache autoTouch attribute names
+    this.touchAttributes(...autoTouchAttrs);
   }
 
   protected initializeAttributes(): void {

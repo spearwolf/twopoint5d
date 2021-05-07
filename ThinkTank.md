@@ -19,7 +19,7 @@
             normalized: boolean,                        // [optional] default is not
 
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
-            autoTouch: true                             // [optional] default is false
+            autoTouch: true                             // [optional] default 'static' is false otherwise true
 
             // buffer -> {vertexCount}{meshCount}{usage}{normalized}{autoTouch}_{+optional:bufferName}?
          }

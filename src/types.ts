@@ -39,6 +39,7 @@ export interface VADescription {
   type?: VertexAttributeDataType;
   normalized?: boolean;
   usage?: VertexAttributeUsageType;
+  autoTouch?: boolean;
 }
 
 export interface VAComponentsDescription extends VADescription {

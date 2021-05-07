@@ -49,4 +49,46 @@ describe('VertexAttributeDescriptor', () => {
     });
     expect(descriptor.usageType).toBe('static');
   });
+
+  test('autoTouch', () => {
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'static',
+      }).autoTouch,
+    ).toBe(false);
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'dynamic',
+      }).autoTouch,
+    ).toBe(true);
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'stream',
+      }).autoTouch,
+    ).toBe(true);
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'static',
+        autoTouch: true,
+      }).autoTouch,
+    ).toBe(true);
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'dynamic',
+        autoTouch: false,
+      }).autoTouch,
+    ).toBe(false);
+    expect(
+      new VertexAttributeDescriptor('foo', {
+        size: 1,
+        usage: 'stream',
+        autoTouch: false,
+      }).autoTouch,
+    ).toBe(false);
+  });
 });
