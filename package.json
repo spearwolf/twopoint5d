@@ -20,7 +20,8 @@
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "fix": "run-s --silent --print-label eslint:fix prettier:write",
-    "test": "cross-env NODE_ENV=test jest"
+    "test": "cross-env NODE_ENV=test jest",
+    "start": "servor . examples/hello-world.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
@@ -50,6 +51,7 @@
     "rollup": "^2.45.0",
     "rollup-plugin-size-snapshot": "^0.12.0",
     "rollup-plugin-terser": "^7.0.2",
+    "servor": "^4.0.2",
     "ts-jest": "^26.5.4",
     "ts-node": "^9.1.1",
     "tslib": "^2.2.0",
