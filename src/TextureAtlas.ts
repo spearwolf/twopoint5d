@@ -28,6 +28,10 @@ export class TextureAtlas {
   #frames: TextureAtlasFrame[] = [];
   #frameNames: Map<TextureAtlasFrameName, number> = new Map();
 
+  /**
+   * returns the frame id.
+   * the frame id starts at 0 and increases by 1 each time you add another frame.
+   */
   add(...args: TextureAtlasArgs | NamedTextureAtlasArgs): number {
     const id = this.#frames.length;
     if (isNamedTextureAtlasArgs(args)) {

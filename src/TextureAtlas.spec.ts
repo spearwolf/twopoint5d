@@ -43,7 +43,7 @@ describe('TextureAtlas', () => {
       const frameId1 = atlas.add(Bar, texCoords1);
 
       expect(frameId0).toBeGreaterThanOrEqual(0);
-      expect(frameId1).toBeGreaterThanOrEqual(0);
+      expect(frameId1).toBeGreaterThan(frameId0);
 
       expect(atlas.size).toBe(2);
 
@@ -64,7 +64,7 @@ describe('TextureAtlas', () => {
       const frameId1 = atlas.add(Bar, texCoords1, {bar: 456});
 
       expect(frameId0).toBeGreaterThanOrEqual(0);
-      expect(frameId1).toBeGreaterThanOrEqual(0);
+      expect(frameId1).toBeGreaterThan(frameId0);
 
       expect(atlas.size).toBe(2);
 
