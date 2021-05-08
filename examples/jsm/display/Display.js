@@ -89,7 +89,7 @@ export class Display {
 
       if (this.frameNo > 0) {
         // no need to emit this inside construction phase
-        this.#emitResize();
+        this.#emit('resize');
       }
     }
   }
@@ -105,22 +105,25 @@ export class Display {
     this.resize();
 
     if (this.frameNo === 0) {
-      this.#emitResize(); // always emit resize event before render the first frame!
+      this.#emit('resize'); // always emit resize event before render the first frame!
     }
 
     // if (this.autoClear) {
     //   this.renderer.clear();
     // }
 
-    this.#emitFrame();
+    this.#emit('frame');
 
     ++this.frameNo;
   }
 
   start() {
     this.pause = false;
-    this.#emitInit();
-    this.#emitStart();
+    if (!this.#initialized) {
+      this.#emit('init');
+      this.#initialized = true;
+    }
+    this.#emit('start');
 
     const renderFrame = (now) => {
       if (!this.pause) {
@@ -137,25 +140,6 @@ export class Display {
   stop() {
     window.cancelAnimationFrame(this.#rafID);
   }
-
-  #emitInit = () => {
-    if (!this.#initialized) {
-      this.#emit('init');
-      this.#initialized = true;
-    }
-  };
-
-  #emitStart = () => {
-    this.#emit('start');
-  };
-
-  #emitResize = () => {
-    this.#emit('resize');
-  };
-
-  #emitFrame = () => {
-    this.#emit('frame');
-  };
 
   #emit = (eventName) => {
     this.emit(eventName, {
