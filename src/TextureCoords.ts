@@ -31,7 +31,7 @@ const maxCoord = (
 };
 
 export class TextureCoords {
-  static readonly FLIP_HORIZONAL = 1;
+  static readonly FLIP_HORIZONTAL = 1;
   static readonly FLIP_VERTICAL = 2;
   static readonly FLIP_DIAGONAL = 4;
 
@@ -92,12 +92,12 @@ export class TextureCoords {
   }
 
   get flipH(): boolean {
-    return (this.flip & TextureCoords.FLIP_HORIZONAL) > 0;
+    return (this.flip & TextureCoords.FLIP_HORIZONTAL) > 0;
   }
 
   set flipH(flip: boolean) {
     this.flip =
-      (flip ? TextureCoords.FLIP_HORIZONAL : 0) |
+      (flip ? TextureCoords.FLIP_HORIZONTAL : 0) |
       (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_DIAGONAL));
   }
 
@@ -109,7 +109,7 @@ export class TextureCoords {
     this.flip =
       (flip ? TextureCoords.FLIP_VERTICAL : 0) |
       (this.flip &
-        (TextureCoords.FLIP_HORIZONAL | TextureCoords.FLIP_DIAGONAL));
+        (TextureCoords.FLIP_HORIZONTAL | TextureCoords.FLIP_DIAGONAL));
   }
 
   get flipD(): boolean {
@@ -120,7 +120,7 @@ export class TextureCoords {
     this.flip =
       (flip ? TextureCoords.FLIP_DIAGONAL : 0) |
       (this.flip &
-        (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_HORIZONAL));
+        (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_HORIZONTAL));
   }
 
   flipHorizontal(): TextureCoords {
