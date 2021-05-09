@@ -11,10 +11,6 @@
       font-size: 84.615384%;
       color: #ddd;
     }
-    #canvas-container {
-      width: 640px;
-      height: 400px;
-    }
   </style>
   <script type="importmap">
     {
@@ -31,7 +27,7 @@
         <em>please, open your console...</em>
       </p>
     </section>
-    <section id="canvas-container"></section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
     <script type="module">
       import {Color} from 'three';
       import {VertexObjectPool} from 'three-vertex-objects';
@@ -80,7 +76,7 @@
       window.display = new Display(document.getElementById('canvas-container'));
 
       display.on('init', ({renderer}) => {
-        renderer.setClearColor(new Color(0x000000), 1.0);
+        renderer.setClearColor(new Color(0x000000), 0.0);
       });
 
       display.start();
