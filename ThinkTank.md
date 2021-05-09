@@ -39,6 +39,7 @@
 
 const geometry = new VertexObjectGeometry(descriptor, CAPACITY = 1);
 const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
+const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, CAPACITY_INSTANCED, baseGeometry);
 //const geometry = new InstancedVertexObjectGeometry([instancedDescriptor], CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
 //const geometry = new InstancedVertexObjectGeometry({foo: instancedDescriptor}, CAPACITY_INSTANCED, baseDescriptor, CAPACITY_BASE = 1);
 // -> VertexObjectDescriptor.merge(...) ?
