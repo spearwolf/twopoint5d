@@ -33,6 +33,7 @@
     </section>
     <section id="canvas-container"></section>
     <script type="module">
+      import {Color} from 'three';
       import {VertexObjectPool} from 'three-vertex-objects';
       import {Display} from '/examples/jsm/display/Display.js';
 
@@ -76,7 +77,14 @@
       window.b = myInstancedPool.createVO();
       console.log('b=', b);
 
-      window.display = new Display(document.getElementById('canvas-container')).start();
+      window.display = new Display(document.getElementById('canvas-container'));
+
+      display.on('init', ({renderer}) => {
+        renderer.setClearColor(new Color(0x000000), 1.0);
+      });
+
+      display.start();
+
       console.log('display=', display);
     </script>
   </body>

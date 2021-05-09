@@ -181,6 +181,8 @@ export class Display {
     }
     this.#emit('start');
 
+    this.renderer.clear();
+
     const renderFrame = (now) => {
       if (!this.pause) {
         this.renderFrame(now);
