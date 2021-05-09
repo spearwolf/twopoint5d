@@ -5,12 +5,15 @@
       color: #f0f0f0;
       font-family: sans-serif;
       font-size: 13px;
-      margin: 1em 2em;
       line-height: 2;
     }
     em {
       font-size: 84.615384%;
       color: #ddd;
+    }
+    #canvas-container {
+      width: 640px;
+      height: 400px;
     }
   </style>
   <script type="importmap">
@@ -22,13 +25,13 @@
     }
   </script>
   <body>
-    <p>
-      three-vertex-objects.js<br />
-      <em>please, open your console...</em>
-    </p>
-    <div>
-      <canvas id="my-canvas"></canvas>
-    </div>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js<br />
+        <em>please, open your console...</em>
+      </p>
+    </section>
+    <section id="canvas-container"></section>
     <script type="module">
       import {VertexObjectPool} from 'three-vertex-objects';
       import {Display} from '/examples/jsm/display/Display.js';
@@ -73,7 +76,7 @@
       window.b = myInstancedPool.createVO();
       console.log('b=', b);
 
-      window.display = new Display(document.getElementById('my-canvas')).start();
+      window.display = new Display(document.getElementById('canvas-container')).start();
       console.log('display=', display);
     </script>
   </body>

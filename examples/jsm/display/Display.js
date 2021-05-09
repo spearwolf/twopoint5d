@@ -9,6 +9,8 @@ export class Display {
   #lastPixelRatio = -1;
   #rafID = -1;
   #initialized = false;
+  #fullscreenCssRules = undefined;
+  #fullscreenCssRulesMustBeRemoved = false;
 
   width = 0;
   height = 0;
@@ -19,30 +21,42 @@ export class Display {
 
   pause = false;
 
-  constructor(canvasOrRenderer, options) {
+  resizeToElement = undefined;
+
+  constructor(domElementOrRenderer, options) {
     eventize(this);
 
-    this.renderer =
-      canvasOrRenderer instanceof WebGLRenderer
-        ? canvasOrRenderer
-        : new WebGLRenderer({
-            canvas: canvasOrRenderer,
-            precision: 'highp',
-            preserveDrawingBuffer: false,
-            powerPreference: 'high-performance',
-            stencil: false,
-            alpha: true,
-            antialias: true,
-            ...options,
-          });
+    if (domElementOrRenderer instanceof WebGLRenderer) {
+      this.renderer = domElementOrRenderer;
+      this.resizeToElement = domElementOrRenderer.domElement;
+    } else if (domElementOrRenderer instanceof HTMLElement) {
+      let canvas;
+      if (domElementOrRenderer.tagName === 'CANVAS') {
+        canvas = domElementOrRenderer;
+      } else {
+        canvas = document.createElement('canvas');
+        domElementOrRenderer.appendChild(canvas);
+      }
+      this.resizeToElement = domElementOrRenderer;
+      this.renderer = new WebGLRenderer({
+        canvas,
+        precision: 'highp',
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance',
+        stencil: false,
+        alpha: true,
+        antialias: true,
+        ...options,
+      });
+    }
 
-    const {domElement} = this.renderer;
+    const {domElement: canvas} = this.renderer;
     Stylesheets.addRule(
-      domElement,
+      canvas,
       'three-vertex-objects__Display',
       'touch-action: none;',
     );
-    domElement.setAttribute('touch-action', 'none'); // => PEP polyfill
+    canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resize();
   }
@@ -55,23 +69,65 @@ export class Display {
     let wPx = 320;
     let hPx = 200;
 
-    const {domElement} = this.renderer;
-    const {width, height} = domElement.getBoundingClientRect();
+    let domElement = this.resizeToElement;
 
-    const styles = getComputedStyle(domElement, null);
-    const verticalMargin =
-      parseInt(styles.getPropertyValue('border-top-width') || 0, 10) +
-      parseInt(styles.getPropertyValue('border-bottom-width') || 0, 10) +
-      parseInt(styles.getPropertyValue('padding-top') || 0, 10) +
-      parseInt(styles.getPropertyValue('padding-bottom') || 0, 10);
-    const horizontalMargin =
-      parseInt(styles.getPropertyValue('border-right-width') || 0, 10) +
-      parseInt(styles.getPropertyValue('border-left-width') || 0, 10) +
-      parseInt(styles.getPropertyValue('padding-left') || 0, 10) +
-      parseInt(styles.getPropertyValue('padding-right') || 0, 10);
+    const canvasElement = this.renderer.domElement;
 
-    wPx = Math.floor(width - horizontalMargin);
-    hPx = Math.floor(height - verticalMargin);
+    let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
+
+    if (canvasElement.hasAttribute('resize-to')) {
+      const resizeTo = canvasElement.getAttribute('resize-to').trim();
+      if (resizeTo.match(/^:?(fullscreen|window)$/)) {
+        wPx = window.innerWidth;
+        hPx = window.innerHeight;
+        domElement = undefined;
+
+        let fullscreenCssRules = this.#fullscreenCssRules;
+        if (!fullscreenCssRules) {
+          fullscreenCssRules = Stylesheets.installRule(
+            'three-vertex-objects__fullscreen',
+            `
+              position: fixed;
+              top: 0;
+              left: 0;
+            `,
+          );
+          this.#fullscreenCssRules = fullscreenCssRules;
+        }
+        if (fullscreenCssRulesMustBeRemoved) {
+          fullscreenCssRulesMustBeRemoved = false;
+        } else {
+          canvasElement.classList.add(fullscreenCssRules);
+          this.#fullscreenCssRulesMustBeRemoved = true;
+        }
+      } else if (resizeTo) {
+        domElement = document.querySelector(resizeTo) ?? canvasElement;
+      }
+    }
+
+    if (fullscreenCssRulesMustBeRemoved) {
+      canvasElement.classList.remove(this.#fullscreenCssRules);
+      this.#fullscreenCssRulesMustBeRemoved = false;
+    }
+
+    if (domElement) {
+      const {width, height} = domElement.getBoundingClientRect();
+
+      const styles = getComputedStyle(domElement, null);
+      const verticalMargin =
+        parseInt(styles.getPropertyValue('border-top-width') || 0, 10) +
+        parseInt(styles.getPropertyValue('border-bottom-width') || 0, 10) +
+        parseInt(styles.getPropertyValue('padding-top') || 0, 10) +
+        parseInt(styles.getPropertyValue('padding-bottom') || 0, 10);
+      const horizontalMargin =
+        parseInt(styles.getPropertyValue('border-right-width') || 0, 10) +
+        parseInt(styles.getPropertyValue('border-left-width') || 0, 10) +
+        parseInt(styles.getPropertyValue('padding-left') || 0, 10) +
+        parseInt(styles.getPropertyValue('padding-right') || 0, 10);
+
+      wPx = Math.floor(width - horizontalMargin);
+      hPx = Math.floor(height - verticalMargin);
+    }
 
     const {pixelRatio} = this;
 
