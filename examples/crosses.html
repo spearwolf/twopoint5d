@@ -1,0 +1,172 @@
+<html>
+  <style>
+    body {
+      background-color: #203040;
+      color: #eee;
+      font-family: sans-serif;
+      font-size: 16px;
+      line-height: 2;
+    }
+    em {
+      font-size: 84.615384%;
+      color: #ddd;
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+        "three-vertex-objects": "/build/three-vertex-objects.js"
+      }
+    }
+  </script>
+  <body>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js<br />
+        <em>a <code>VertexObjectGeometry</code> example</em>
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import {
+        Color,
+        DoubleSide,
+        Matrix4,
+        Mesh,
+        MeshBasicMaterial,
+        PerspectiveCamera,
+        Scene,
+        Vector3,
+      } from 'three';
+      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      import {VertexObjectGeometry} from 'three-vertex-objects';
+      import {Display} from '/examples/jsm/display/Display.js';
+
+      class Cross {
+        make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2) {
+          // prettier-ignore
+          this.setPosition([
+            - width * innerSize, + height * innerSize, 0,
+            - width * innerSize, + height * outerSize, 0,
+            + width * innerSize, + height * outerSize, 0,
+            + width * innerSize, + height * innerSize, 0,
+            + width * outerSize, + height * innerSize, 0,
+            + width * outerSize, - height * innerSize, 0,
+            + width * innerSize, - height * innerSize, 0,
+            + width * innerSize, - height * outerSize, 0,
+            - width * innerSize, - height * outerSize, 0,
+            - width * innerSize, - height * innerSize, 0,
+            - width * outerSize, - height * innerSize, 0,
+            - width * outerSize, + height * innerSize, 0,
+          ]);
+        }
+
+        rotate(angle) {
+          const theta = (angle * 180) / Math.PI;
+          this.transform(new Matrix4().makeRotationZ(theta));
+        }
+
+        translate(x, y, z = 0) {
+          this.transform(new Matrix4().makeTranslation(x, y, z));
+        }
+
+        transform(transform) {
+          const v = new Vector3();
+          for (let i = 0; i < 12; i++) {
+            this.getVertexPosition(i, v);
+            v.applyMatrix4(transform);
+            this.setVertexPosition(i, v);
+          }
+        }
+
+        getVertexPosition(idx, target) {
+          target.x = this[`x${idx}`];
+          target.y = this[`y${idx}`];
+          target.z = this[`z${idx}`];
+        }
+
+        setVertexPosition(idx, position) {
+          this[`x${idx}`] = position.x;
+          this[`y${idx}`] = position.y;
+          this[`z${idx}`] = position.z;
+        }
+      }
+
+      const CrossDescriptor = {
+        vertexCount: 12,
+        indices: [0, 2, 1, 0, 3, 2, 10, 4, 11, 10, 5, 4, 7, 9, 8, 7, 6, 9],
+
+        attributes: {
+          position: {components: ['x', 'y', 'z']},
+        },
+
+        basePrototype: Cross.prototype,
+      };
+
+      function makeCrossMesh(capacity, size, offset = 1.2) {
+        const geometry = new VertexObjectGeometry(CrossDescriptor, capacity);
+
+        for (let i = 0; i < capacity; i++) {
+          const cross = geometry.pool.createVO();
+          cross.make(size, size);
+          cross.rotate(i * 45);
+          cross.translate(
+            i * size * offset - (capacity * size * offset) / 2,
+            0,
+          );
+        }
+
+        const material = new MeshBasicMaterial({
+          color: 0xffffff,
+          side: DoubleSide,
+        });
+
+        const mesh = new Mesh(geometry, material);
+        mesh.name = 'CrossMesh';
+
+        return mesh;
+      }
+
+      class Demo {
+        constructor(el) {
+          this.scene = new Scene();
+
+          this.display = new Display(el);
+          this.display.on(this);
+          this.display.start();
+        }
+
+        init({renderer, width, height}) {
+          renderer.setClearColor(new Color(0x000000), 0.0);
+
+          this.camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
+          this.camera.position.z = 30;
+
+          this.controls = new OrbitControls(this.camera, renderer.domElement);
+
+          this.crossMesh = makeCrossMesh(10, 10);
+          this.scene.add(this.crossMesh);
+        }
+
+        resize({width, height}) {
+          this.camera.aspect = width / height;
+          this.camera.updateProjectionMatrix();
+        }
+
+        frame({renderer}) {
+          this.crossMesh.geometry.update();
+
+          this.controls.update();
+
+          renderer.render(this.scene, this.camera);
+        }
+      }
+
+      const demo = new Demo(document.getElementById('canvas-container'));
+
+      console.dir(demo);
+    </script>
+  </body>
+</html>

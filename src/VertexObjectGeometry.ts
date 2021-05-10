@@ -31,6 +31,7 @@ export class VertexObjectGeometry extends BufferGeometry {
       source instanceof VertexObjectPool
         ? source
         : new VertexObjectPool(source, capacity);
+    this.name = 'VertexObjectGeometry';
   }
 
   get attributesInitialized(): boolean {
@@ -55,11 +56,19 @@ export class VertexObjectGeometry extends BufferGeometry {
     if (!this.attributesInitialized) {
       this.initializeAttributes();
     }
+
     const autoTouchAttrs = Array.from(this.pool.descriptor.attributes.values())
       .filter((attr) => attr.autoTouch)
       .map((attr) => attr.name);
-    // TODO cache autoTouch attribute names
+    // TODO cache autoTouch attribute names !
     this.touchAttributes(...autoTouchAttrs);
+
+    this.setDrawRange(
+      0,
+      this.pool.descriptor.hasIndices
+        ? this.pool.usedCount * this.pool.descriptor.indices.length
+        : this.pool.usedCount * this.pool.descriptor.vertexCount,
+    );
   }
 
   protected initializeAttributes(): void {
@@ -67,12 +76,12 @@ export class VertexObjectGeometry extends BufferGeometry {
     const {descriptor, capacity} = this.pool;
     if (descriptor.hasIndices) {
       const {indices} = descriptor;
-      this.setIndex(
-        new BufferAttribute(
-          createIndicesArray(indices, capacity),
-          indices.length,
-        ),
+      const bufAttr = new BufferAttribute(
+        createIndicesArray(indices, capacity),
+        3,
       );
+      bufAttr.count = capacity * indices.length;
+      this.setIndex(bufAttr);
     }
     for (const buffer of this.pool.buffer.buffers.values()) {
       const attributes = this.pool.buffer.bufferNameAttributes.get(
