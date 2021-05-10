@@ -1,5 +1,6 @@
 export * from './TextureAtlas';
 export * from './TextureCoords';
+export * from './TileSet';
 export * from './VertexAttributeDescriptor';
 export * from './VertexObjectBuffer';
 export * from './VertexObjectDescriptor';
