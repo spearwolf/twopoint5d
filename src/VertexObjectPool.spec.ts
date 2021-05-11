@@ -176,6 +176,16 @@ describe('VertexObjectPool', () => {
         ),
       ).toEqual([77, 99, 88, 66]);
     });
+
+    test('basePrototype', () => {
+      class BaseVO {}
+      const pool = new VertexObjectPool(
+        {...descriptor, basePrototype: BaseVO.prototype},
+        1,
+      );
+      const vo = pool.createVO();
+      expect(vo).toBeInstanceOf(BaseVO);
+    });
   });
 
   describe('freeVO()', () => {
