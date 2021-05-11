@@ -1,6 +1,6 @@
 <html>
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {
         background-color: #203040;
@@ -44,7 +44,10 @@
         Vector3,
       } from 'three';
       import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
-      import {VertexObjectGeometry} from 'three-vertex-objects';
+      import {
+        VertexObjectGeometry,
+        getDescriptorOf,
+      } from 'three-vertex-objects';
       import {Display} from '/examples/jsm/display/Display.js';
 
       class Cross {
@@ -77,7 +80,8 @@
 
         transform(transform) {
           const v = new Vector3();
-          for (let i = 0; i < 12; i++) {
+          const {vertexCount} = getDescriptorOf(this);
+          for (let i = 0; i < vertexCount; i++) {
             this.getVertexPosition(i, v);
             v.applyMatrix4(transform);
             this.setVertexPosition(i, v);

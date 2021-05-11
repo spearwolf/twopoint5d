@@ -1,3 +1,4 @@
+export * from './getDescriptorOf';
 export * from './TextureAtlas';
 export * from './TextureCoords';
 export * from './TileSet';
