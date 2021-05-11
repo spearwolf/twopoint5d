@@ -164,10 +164,6 @@ export class Display {
       this.#emit('resize'); // always emit resize event before render the first frame!
     }
 
-    // if (this.autoClear) {
-    //   this.renderer.clear();
-    // }
-
     this.#emit('frame');
 
     ++this.frameNo;
