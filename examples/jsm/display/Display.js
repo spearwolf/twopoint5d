@@ -145,7 +145,7 @@ export class Display {
 
       if (this.frameNo > 0) {
         // no need to emit this inside construction phase
-        this.#emit('resize');
+        this.emit('resize', this.getEmitArgs());
       }
     }
   }
@@ -161,10 +161,10 @@ export class Display {
     this.resize();
 
     if (this.frameNo === 0) {
-      this.#emit('resize'); // always emit resize event before render the first frame!
+      this.emit('resize', this.getEmitArgs()); // always emit resize event before render the first frame!
     }
 
-    this.#emit('frame');
+    this.emit('frame', this.getEmitArgs());
 
     ++this.frameNo;
   }
@@ -172,10 +172,10 @@ export class Display {
   start() {
     this.pause = false;
     if (!this.#initialized) {
-      this.#emit('init');
+      this.emit('init', this.getEmitArgs());
       this.#initialized = true;
     }
-    this.#emit('start');
+    this.emit('start', this.getEmitArgs());
 
     this.renderer.clear();
 
@@ -195,8 +195,8 @@ export class Display {
     window.cancelAnimationFrame(this.#rafID);
   }
 
-  #emit = (eventName) => {
-    this.emit(eventName, {
+  getEmitArgs() {
+    return {
       display: this,
       renderer: this.renderer,
       width: this.width,
@@ -204,6 +204,6 @@ export class Display {
       now: this.now,
       deltaTime: this.deltaTime,
       frameNo: this.frameNo,
-    });
-  };
+    };
+  }
 }

@@ -48,7 +48,8 @@
         VertexObjectGeometry,
         getDescriptorOf,
       } from 'three-vertex-objects';
-      import {Display} from '/examples/jsm/display/Display.js';
+      // import {Display} from '/examples/jsm/display/Display.js';
+      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
 
       class Cross {
         make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2) {
@@ -136,44 +137,25 @@
         return mesh;
       }
 
-      class Demo {
-        constructor(el) {
-          this.scene = new Scene();
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById('canvas-container'),
+      );
 
-          this.display = new Display(el);
-          this.display.on(this);
-          this.display.start();
-        }
+      let crossMesh;
 
-        init({renderer, width, height}) {
-          renderer.setClearColor(new Color(0x000000), 0.0);
+      demo.on('init', ({scene}) => {
+        crossMesh = makeCrossMesh(10, 10);
+        scene.add(crossMesh);
+      });
 
-          this.camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
-          this.camera.position.z = 30;
+      demo.on('frame', () => {
+        crossMesh.geometry.update();
+      });
 
-          this.controls = new OrbitControls(this.camera, renderer.domElement);
-
-          this.crossMesh = makeCrossMesh(10, 10);
-          this.scene.add(this.crossMesh);
-        }
-
-        resize({width, height}) {
-          this.camera.aspect = width / height;
-          this.camera.updateProjectionMatrix();
-        }
-
-        frame({renderer}) {
-          this.crossMesh.geometry.update();
-
-          this.controls.update();
-
-          renderer.render(this.scene, this.camera);
-        }
-      }
-
-      const demo = new Demo(document.getElementById('canvas-container'));
+      demo.start();
 
       console.dir(demo);
+      console.dir(crossMesh);
     </script>
   </body>
 </html>
