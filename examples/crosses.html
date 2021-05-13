@@ -37,7 +37,6 @@
         Color,
         DoubleSide,
         Matrix4,
-        Mesh,
         MeshBasicMaterial,
         PerspectiveCamera,
         Scene,
@@ -46,9 +45,9 @@
       import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
       import {
         VertexObjectGeometry,
+        VertexObjects,
         getDescriptorOf,
       } from 'three-vertex-objects';
-      // import {Display} from '/examples/jsm/display/Display.js';
       import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
 
       class Cross {
@@ -131,7 +130,7 @@
           side: DoubleSide,
         });
 
-        const mesh = new Mesh(geometry, material);
+        const mesh = new VertexObjects(geometry, material);
         mesh.name = 'CrossMesh';
 
         return mesh;
@@ -141,21 +140,13 @@
         document.getElementById('canvas-container'),
       );
 
-      let crossMesh;
-
       demo.on('init', ({scene}) => {
-        crossMesh = makeCrossMesh(10, 10);
-        scene.add(crossMesh);
-      });
-
-      demo.on('frame', () => {
-        crossMesh.geometry.update();
+        scene.add(makeCrossMesh(10, 10));
       });
 
       demo.start();
 
       console.dir(demo);
-      console.dir(crossMesh);
     </script>
   </body>
 </html>
