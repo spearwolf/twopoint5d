@@ -17,6 +17,8 @@ import {
   VertexObjectDescription,
 } from './types';
 
+type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
+
 export class VertexObjectGeometry extends BufferGeometry {
   readonly pool: VertexObjectPool;
 
@@ -44,12 +46,28 @@ export class VertexObjectGeometry extends BufferGeometry {
     });
   }
 
-  touchBuffers(
-    bufferTypes: {[Type in VertexAttributeUsageType]: boolean},
-  ): void {
+  touchBuffers(bufferTypes: TouchBuffersType): void {
     selectBuffers(this.buffers, bufferTypes).forEach((buffer) => {
       buffer.needsUpdate = true;
     });
+  }
+
+  touch(...args: Array<string | TouchBuffersType>): void {
+    const attrNames: string[] = [];
+    let buffers: TouchBuffersType;
+    args.forEach((arg) => {
+      if (typeof arg === 'string') {
+        attrNames.push(arg);
+      } else {
+        buffers = {...buffers, ...arg};
+      }
+    });
+    if (attrNames.length) {
+      this.touchAttributes(...attrNames);
+    }
+    if (buffers) {
+      this.touchBuffers(buffers);
+    }
   }
 
   update(): void {

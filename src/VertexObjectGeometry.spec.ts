@@ -1,3 +1,5 @@
+import sinon from 'sinon';
+
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectGeometry} from './VertexObjectGeometry';
 
@@ -28,6 +30,12 @@ describe('VertexObjectGeometry', () => {
         usage: 'dynamic',
       },
     },
+  });
+
+  const sandbox = sinon.createSandbox();
+
+  afterEach(() => {
+    sandbox.restore();
   });
 
   test('construct with descriptor', () => {
@@ -72,5 +80,27 @@ describe('VertexObjectGeometry', () => {
       4, 5, 6, 4, 6, 7,
       8, 9, 10, 8, 10, 11,
     ]);
+  });
+
+  test('touch() calls touchAttributes() and/or touchBuffers()', () => {
+    const capacity = 10;
+    const geometry = new VertexObjectGeometry(descriptor, capacity);
+    geometry.update();
+
+    const touchAttributes = sandbox.spy(geometry, 'touchAttributes');
+    const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
+
+    geometry.touch('strength', 'position', {dynamic: true});
+
+    expect(touchAttributes.callCount).toBe(1);
+    expect(touchAttributes.getCall(0).args).toHaveLength(2);
+    expect(touchAttributes.getCall(0).args).toEqual(
+      expect.arrayContaining(['position', 'strength']),
+    );
+
+    expect(touchBuffers.callCount).toBe(1);
+    expect(touchBuffers.getCall(0).args[0]).toMatchObject({dynamic: true});
+    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('static', true);
+    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
   });
 });
