@@ -65,17 +65,36 @@ export class VertexObjectGeometry extends BufferGeometry {
   }
 
   update(): void {
-    const autoTouchAttrs = Array.from(this.pool.descriptor.attributes.values())
-      .filter((attr) => attr.autoTouch)
-      .map((attr) => attr.name);
-    // TODO cache autoTouch attribute names !
-    this.touchAttributes(...autoTouchAttrs);
+    this.autoTouchAttributes();
+    this.updateDrawRange();
+  }
 
+  protected updateDrawRange(): void {
     this.setDrawRange(
       0,
       this.pool.descriptor.hasIndices
         ? this.pool.usedCount * this.pool.descriptor.indices.length
         : this.pool.usedCount * this.pool.descriptor.vertexCount,
     );
+  }
+
+  protected autoTouchAttributes(): void {
+    const autoTouchAttrs = this.getAutoTouchAttributeNames();
+    if (autoTouchAttrs.length) {
+      this.touchAttributes(...autoTouchAttrs);
+    }
+  }
+
+  #autoTouchAttrNames?: string[];
+
+  protected getAutoTouchAttributeNames(): string[] {
+    if (!this.#autoTouchAttrNames) {
+      this.#autoTouchAttrNames = Array.from(
+        this.pool.descriptor.attributes.values(),
+      )
+        .filter((attr) => attr.autoTouch)
+        .map((attr) => attr.name);
+    }
+    return this.#autoTouchAttrNames;
   }
 }
