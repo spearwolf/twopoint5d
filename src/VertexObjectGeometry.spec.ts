@@ -42,15 +42,7 @@ describe('VertexObjectGeometry', () => {
     const geometry = new VertexObjectGeometry(descriptor, 10);
 
     expect(geometry).toBeDefined();
-    expect(geometry.attributesInitialized).toBeFalsy();
-  });
-
-  test('update() initializes the attributes', () => {
-    const geometry = new VertexObjectGeometry(descriptor, 10);
-
-    geometry.update();
-
-    expect(geometry.attributesInitialized).toBeTruthy();
+    expect(geometry.buffers).toBeDefined();
 
     expect(geometry.buffers.get('dynamic_float32').array).toBe(
       geometry.pool.buffer.buffers.get('dynamic_float32').typedArray,
@@ -63,11 +55,9 @@ describe('VertexObjectGeometry', () => {
     );
   });
 
-  test('update() initializes the indices', () => {
+  test('index array buffer is created', () => {
     const capacity = 10;
     const geometry = new VertexObjectGeometry(descriptor, capacity);
-
-    geometry.update();
 
     expect(geometry.index).toBeDefined();
     expect(geometry.index.array.length).toBe(
@@ -85,7 +75,6 @@ describe('VertexObjectGeometry', () => {
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {
     const capacity = 10;
     const geometry = new VertexObjectGeometry(descriptor, capacity);
-    geometry.update();
 
     const touchAttributes = sandbox.spy(geometry, 'touchAttributes');
     const touchBuffers = sandbox.spy(geometry, 'touchBuffers');

@@ -13,7 +13,6 @@ export class VertexObjects extends Mesh {
   ) {
     super(geometry, material);
     this.name = 'VertexObjects';
-    this.geometry?.update();
   }
 
   onBeforeRender = (): void => {
