@@ -4,6 +4,11 @@
     <style>
       body {
         background-color: #391e39;
+        background: radial-gradient(
+          circle,
+          rgba(189, 70, 98, 1) 0%,
+          rgba(37, 4, 73, 1) 100%
+        );
         color: #eee;
         font-family: sans-serif;
         font-size: 16px;
@@ -40,7 +45,7 @@
     </script>
     <script id="fragmentShader" type="x-shader/x-fragment">
       void main()	{
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        gl_FragColor = vec4(1.0, 0.3, 0.6, 0.9);
       }
     </script>
   </head>
@@ -103,7 +108,8 @@
         },
       };
 
-      function makeMesh(capacity, size, offset = 1.2) {
+      function makeMesh(rows, columns, size, offset) {
+        const capacity = rows * columns;
         const geometry = new InstancedVertexObjectGeometry(
           InstancedQuadDescriptor,
           capacity,
@@ -112,14 +118,16 @@
 
         geometry.basePool.createVO().make();
 
-        for (let i = 0; i < capacity; i++) {
-          const cross = geometry.instancedPool.createVO();
-          cross.width = size;
-          cross.height = size;
-          cross.setInstancePosition([
-            i * size * offset - ((capacity - 1) * size * offset) / 2,
-            0,
-          ]);
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < columns; x++) {
+            const cross = geometry.instancedPool.createVO();
+            cross.width = 1.0 + Math.random() * (size - 1.0);
+            cross.height = 1.0 + Math.random() * (size - 1.0);
+            cross.setInstancePosition([
+              x * size * offset - ((columns - 1) * size * offset) / 2,
+              y * size * offset - ((rows - 1) * size * offset) / 2,
+            ]);
+          }
         }
 
         const material = new ShaderMaterial({
@@ -140,7 +148,7 @@
       );
 
       demo.on('init', ({scene}) => {
-        scene.add(makeMesh(10, 10));
+        scene.add(makeMesh(10, 20, 3.2, 1.2));
       });
 
       demo.start();
