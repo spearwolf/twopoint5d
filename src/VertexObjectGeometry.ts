@@ -27,10 +27,6 @@ export class VertexObjectGeometry extends BufferGeometry {
         ? source
         : new VertexObjectPool(source, capacity);
     this.name = 'VertexObjectGeometry';
-    this.initializeAttributes();
-  }
-
-  protected initializeAttributes(): void {
     initializeAttributes(this, this.pool, this.buffers);
   }
 
@@ -65,29 +61,29 @@ export class VertexObjectGeometry extends BufferGeometry {
   }
 
   update(): void {
-    this.autoTouchAttributes();
-    this.updateDrawRange();
+    this.#autoTouchAttributes();
+    this.#updateDrawRange();
   }
 
-  protected updateDrawRange(): void {
+  #updateDrawRange = (): void => {
     this.setDrawRange(
       0,
       this.pool.descriptor.hasIndices
         ? this.pool.usedCount * this.pool.descriptor.indices.length
         : this.pool.usedCount * this.pool.descriptor.vertexCount,
     );
-  }
+  };
 
-  protected autoTouchAttributes(): void {
-    const autoTouchAttrs = this.getAutoTouchAttributeNames();
+  #autoTouchAttributes = (): void => {
+    const autoTouchAttrs = this.#getAutoTouchAttributeNames();
     if (autoTouchAttrs.length) {
       this.touchAttributes(...autoTouchAttrs);
     }
-  }
+  };
 
   #autoTouchAttrNames?: string[];
 
-  protected getAutoTouchAttributeNames(): string[] {
+  #getAutoTouchAttributeNames = (): string[] => {
     if (!this.#autoTouchAttrNames) {
       this.#autoTouchAttrNames = Array.from(
         this.pool.descriptor.attributes.values(),
@@ -96,5 +92,5 @@ export class VertexObjectGeometry extends BufferGeometry {
         .map((attr) => attr.name);
     }
     return this.#autoTouchAttrNames;
-  }
+  };
 }

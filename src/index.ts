@@ -1,4 +1,5 @@
 export * from './getDescriptorOf';
+export * from './InstancedVertexObjectGeometry';
 export * from './TextureAtlas';
 export * from './TextureCoords';
 export * from './TileSet';
