@@ -67,13 +67,6 @@ export class InstancedVertexObjectGeometry extends InstancedBufferGeometry {
     );
   }
 
-  // @ts-ignore
-  get instanceCount(): number {
-    return this.instancedPool.usedCount;
-  }
-
-  set instanceCount(_count: number) {}
-
   touchAttributes(...attrNames: string[]): void {
     if (this.basePool) {
       selectAttributes(this.basePool, this.baseBuffers, attrNames).forEach(
@@ -140,15 +133,20 @@ export class InstancedVertexObjectGeometry extends InstancedBufferGeometry {
   update(): void {
     this.#autoTouchAttributes();
     this.#updateDrawRange();
+    this.instanceCount = this.instancedPool.usedCount;
   }
 
   #updateDrawRange = (): void => {
-    this.setDrawRange(
-      0,
-      this.basePool.descriptor.hasIndices
-        ? this.basePool.usedCount * this.basePool.descriptor.indices.length
-        : this.basePool.usedCount * this.basePool.descriptor.vertexCount,
-    );
+    if (this.basePool) {
+      this.setDrawRange(
+        0,
+        this.basePool.descriptor.hasIndices
+          ? this.basePool.usedCount * this.basePool.descriptor.indices.length
+          : this.basePool.usedCount * this.basePool.descriptor.vertexCount,
+      );
+    } else {
+      this.setDrawRange(0, Infinity);
+    }
   };
 
   #autoTouchAttributes = (): void => {

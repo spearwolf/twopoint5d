@@ -1,0 +1,151 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        background-color: #391e39;
+        color: #eee;
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 2;
+      }
+      em {
+        font-size: 84.615384%;
+        color: #ddd;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "three-vertex-objects": "/build/three-vertex-objects.js"
+        }
+      }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+      attribute vec2 quadSize;
+      attribute vec3 instancePosition;
+
+      void main() {
+        vec4 pos = vec4(
+          position.x * quadSize.x + instancePosition.x,
+          position.y * quadSize.y + instancePosition.y,
+          position.z + instancePosition.z,
+          1.0
+        );
+
+        gl_Position = projectionMatrix * modelViewMatrix * pos;
+      }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      void main()	{
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js<br />
+        <em>an <code>InstancedVertexObjectGeometry</code> example</em>
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import {
+        Color,
+        DoubleSide,
+        Matrix4,
+        PerspectiveCamera,
+        Scene,
+        ShaderMaterial,
+        Vector3,
+      } from 'three';
+      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      import {
+        getDescriptorOf,
+        InstancedVertexObjectGeometry,
+        VertexObjectGeometry,
+        VertexObjects,
+      } from 'three-vertex-objects';
+      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
+
+      class BaseQuad {
+        make(width = 0.5, height = 0.5) {
+          // prettier-ignore
+          this.setPosition([
+            - width, - height, 0,
+            - width, + height, 0,
+            + width, + height, 0,
+            + width, - height, 0,
+          ]);
+        }
+      }
+
+      const BaseQuadDescriptor = {
+        vertexCount: 4,
+        indices: [0, 2, 1, 0, 3, 2],
+
+        attributes: {
+          position: {components: ['x', 'y', 'z']},
+        },
+
+        basePrototype: BaseQuad.prototype,
+      };
+
+      const InstancedQuadDescriptor = {
+        meshCount: 1,
+
+        attributes: {
+          quadSize: {components: ['width', 'height']},
+          instancePosition: {components: ['x', 'y', 'z']},
+        },
+      };
+
+      function makeMesh(capacity, size, offset = 1.2) {
+        const geometry = new InstancedVertexObjectGeometry(
+          InstancedQuadDescriptor,
+          capacity,
+          BaseQuadDescriptor,
+        );
+
+        geometry.basePool.createVO().make();
+
+        for (let i = 0; i < capacity; i++) {
+          const cross = geometry.instancedPool.createVO();
+          cross.width = size;
+          cross.height = size;
+          cross.setInstancePosition([
+            i * size * offset - ((capacity - 1) * size * offset) / 2,
+            0,
+          ]);
+        }
+
+        const material = new ShaderMaterial({
+          vertexShader: document.getElementById('vertexShader').textContent,
+          fragmentShader: document.getElementById('fragmentShader').textContent,
+          transparent: true,
+          side: DoubleSide,
+        });
+
+        const mesh = new VertexObjects(geometry, material);
+        mesh.name = 'InstancedQuadsMesh';
+
+        return mesh;
+      }
+
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById('canvas-container'),
+      );
+
+      demo.on('init', ({scene}) => {
+        scene.add(makeMesh(10, 10));
+      });
+
+      demo.start();
+
+      console.log('InstancedQuadsMesh', demo.scene.children[0]);
+    </script>
+  </body>
+</html>

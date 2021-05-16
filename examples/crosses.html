@@ -120,7 +120,7 @@
           cross.make(size, size);
           cross.rotate(i * 45);
           cross.translate(
-            i * size * offset - (capacity * size * offset) / 2,
+            i * size * offset - ((capacity - 1) * size * offset) / 2,
             0,
           );
         }

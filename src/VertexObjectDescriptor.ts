@@ -31,9 +31,15 @@ export class VertexObjectDescriptor {
     return this.description.vertexCount ?? 1;
   }
 
+  /** Returns `meshCount` or `1` */
+  get meshCount(): number {
+    return this.description.meshCount ?? 1;
+  }
+
   /**
    * Calculate the instance count if your `meshCount` is greater than 1,
    * otherwise return the given capacity
+   * TODO remove?!
    */
   getInstanceCount(capacity: number): number {
     const meshCount = this.description.meshCount ?? 1;

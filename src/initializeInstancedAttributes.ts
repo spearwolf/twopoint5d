@@ -15,7 +15,7 @@ export function initializeInstancedAttributes(
   buffers: Map<string, BufferLike>,
 ): void {
   const {descriptor} = pool;
-  const meshPerAttribute = descriptor.getInstanceCount(pool.capacity);
+  const meshPerAttribute = descriptor.meshCount;
   for (const buffer of pool.buffer.buffers.values()) {
     const attributes = pool.buffer.bufferNameAttributes.get(buffer.bufferName);
     if (attributes.length > 1) {
