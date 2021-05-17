@@ -1,0 +1,206 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        background-color: #391e39;
+        background: radial-gradient(
+          circle,
+          rgba(189, 70, 98, 1) 0%,
+          rgba(37, 4, 73, 1) 100%
+        );
+        color: #eee;
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 2;
+      }
+      em {
+        font-size: 84.615384%;
+        color: #ddd;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "three-vertex-objects": "/build/three-vertex-objects.js"
+        }
+      }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+      attribute vec2 quadSize;
+      attribute vec3 instancePosition;
+      attribute vec4 texCoords;
+
+      varying vec2 vTexCoords;
+
+      void main() {
+        vec4 pos = vec4(
+          position.x * quadSize.x + instancePosition.x,
+          position.y * quadSize.y + instancePosition.y,
+          position.z + instancePosition.z,
+          1.0
+        );
+
+        gl_Position = projectionMatrix * modelViewMatrix * pos;
+
+        vTexCoords = vec2(
+          texCoords.x + (uv.x * texCoords.z),
+          texCoords.y + (uv.y * texCoords.w)
+        );
+      }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      uniform sampler2D colorMap;
+
+      varying vec2 vTexCoords;
+
+      void main()	{
+        gl_FragColor = texture2D(colorMap, vTexCoords);
+
+        gl_FragColor.a *= 0.75;
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js :: textured-quads<br />
+        <em
+          >an <code>InstancedVertexObjectGeometry</code> plus
+          <code>PowerOf2ImageLoader</code> example</em
+        >
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import {
+        Color,
+        DoubleSide,
+        Matrix4,
+        NearestFilter,
+        PerspectiveCamera,
+        Scene,
+        ShaderMaterial,
+        Texture,
+        Vector3,
+      } from 'three';
+      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      import {
+        getDescriptorOf,
+        InstancedVertexObjectGeometry,
+        PowerOf2ImageLoader,
+        VertexObjectGeometry,
+        VertexObjects,
+      } from 'three-vertex-objects';
+      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
+
+      class BaseQuad {
+        make(width = 0.5, height = 0.5) {
+          // prettier-ignore
+          this.setPosition([
+            - width, - height, 0,
+            - width, + height, 0,
+            + width, + height, 0,
+            + width, - height, 0,
+          ]);
+          // prettier-ignore
+          this.setUv([
+            0, 0,
+            0, 1,
+            1, 1,
+            1, 0,
+          ]);
+        }
+      }
+
+      const BaseQuadDescriptor = {
+        vertexCount: 4,
+        indices: [0, 2, 1, 0, 3, 2],
+
+        attributes: {
+          position: {components: ['x', 'y', 'z']},
+          uv: {size: 2},
+        },
+
+        basePrototype: BaseQuad.prototype,
+      };
+
+      const InstancedQuadDescriptor = {
+        meshCount: 1,
+
+        attributes: {
+          quadSize: {components: ['width', 'height']},
+          instancePosition: {components: ['x', 'y', 'z']},
+          texCoords: {size: 4},
+        },
+      };
+
+      function makeMesh(rows, columns, size, offset, texCoords, texture) {
+        const capacity = rows * columns;
+        const geometry = new InstancedVertexObjectGeometry(
+          InstancedQuadDescriptor,
+          capacity,
+          BaseQuadDescriptor,
+        );
+
+        geometry.basePool.createVO().make();
+
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < columns; x++) {
+            const quad = geometry.instancedPool.createVO();
+            quad.width = 1.0 + Math.random() * (size - 1.0);
+            quad.height = quad.width;
+            quad.setInstancePosition([
+              x * size * offset - ((columns - 1) * size * offset) / 2,
+              y * size * offset - ((rows - 1) * size * offset) / 2,
+            ]);
+            quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+          }
+        }
+
+        const material = new ShaderMaterial({
+          vertexShader: document.getElementById('vertexShader').textContent,
+          fragmentShader: document.getElementById('fragmentShader').textContent,
+          uniforms: {
+            colorMap: {
+              value: texture,
+            },
+          },
+          transparent: true,
+          side: DoubleSide,
+        });
+
+        const mesh = new VertexObjects(geometry, material);
+        mesh.name = 'InstancedQuadsMesh';
+
+        return mesh;
+      }
+
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById('canvas-container'),
+      );
+
+      const imageLoader = new PowerOf2ImageLoader();
+
+      imageLoader.load('/examples/assets/ball-pattern-rot.png', (data) => {
+        console.log('loaded power-of-2-image', data);
+
+        const texture = new Texture(data.imgEl);
+        texture.magFilter = NearestFilter;
+        texture.minFilter = NearestFilter;
+        texture.anisotropy = demo.renderer.capabilities.getMaxAnisotropy();
+        texture.needsUpdate = true;
+
+        demo.on('init', ({scene}) => {
+          scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, texture));
+        });
+
+        demo.start();
+
+        console.log('TexturedQuadsMesh', demo.scene.children[0]);
+      });
+    </script>
+  </body>
+</html>
