@@ -18,6 +18,21 @@
         font-size: 84.615384%;
         color: #ddd;
       }
+      #texture-preview {
+        background-color: rgba(86, 101, 115, 80%);
+        border: 5px solid #324168;
+        border-radius: 5px;
+        width: 150px;
+        height: 150px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+      }
+      #texture-preview > canvas,
+      #texture-preview > img {
+        width: 100%;
+      }
     </style>
     <script type="importmap">
       {
@@ -74,6 +89,7 @@
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
+    <div id="texture-preview"></div>
     <script type="module">
       import {
         Color,
@@ -107,10 +123,11 @@
           ]);
           // prettier-ignore
           this.setUv([
-            0, 0,
+            // flipY = false
             0, 1,
-            1, 1,
+            0, 0,
             1, 0,
+            1, 1,
           ]);
         }
       }
@@ -156,7 +173,12 @@
               x * size * offset - ((columns - 1) * size * offset) / 2,
               y * size * offset - ((rows - 1) * size * offset) / 2,
             ]);
-            quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+            quad.setTexCoords([
+              texCoords.s,
+              texCoords.t,
+              texCoords.u,
+              texCoords.v,
+            ]);
           }
         }
 
@@ -174,33 +196,40 @@
 
         const mesh = new VertexObjects(geometry, material);
         mesh.name = 'InstancedQuadsMesh';
+        mesh.frustumCulled = false;
 
         return mesh;
       }
 
       const demo = new PerspectiveOrbitDemo(
         document.getElementById('canvas-container'),
+        {antialias: false},
       );
 
       const imageLoader = new PowerOf2ImageLoader();
 
-      imageLoader.load('/examples/assets/ball-pattern-rot.png', (data) => {
-        console.log('loaded power-of-2-image', data);
+      imageLoader.load(
+        '/examples/assets/ball-pattern-rot--not-power-of-2.png',
+        (data) => {
+          console.log('loaded power-of-2-image', data);
 
-        const texture = new Texture(data.imgEl);
-        texture.magFilter = NearestFilter;
-        texture.minFilter = NearestFilter;
-        texture.anisotropy = demo.renderer.capabilities.getMaxAnisotropy();
-        texture.needsUpdate = true;
+          document.getElementById('texture-preview').appendChild(data.imgEl);
 
-        demo.on('init', ({scene}) => {
-          scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, texture));
-        });
+          const texture = new Texture(data.imgEl);
+          texture.magFilter = NearestFilter;
+          texture.minFilter = NearestFilter;
+          texture.flipY = false;
+          texture.needsUpdate = true;
 
-        demo.start();
+          demo.on('init', ({scene}) => {
+            scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, texture));
+          });
 
-        console.log('TexturedQuadsMesh', demo.scene.children[0]);
-      });
+          demo.start();
+
+          console.log('TexturedQuadsMesh', demo.scene.children[0]);
+        },
+      );
     </script>
   </body>
 </html>

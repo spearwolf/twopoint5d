@@ -43,13 +43,13 @@ export class PowerOf2ImageLoader {
           canvas.height = height;
           canvas.getContext('2d').drawImage(img, 0, 0);
 
-          const imgTexCoords = new TextureCoords(0, 0, img.width, img.height);
+          const imgTexCoords = new TextureCoords(0, 0, width, height);
           const texCoords = new TextureCoords(
             imgTexCoords,
             0,
             0,
-            width,
-            height,
+            img.width,
+            img.height,
           );
 
           onLoadCallback({imgEl: canvas, texCoords});
