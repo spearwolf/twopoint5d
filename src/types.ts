@@ -80,3 +80,8 @@ export type DrawUsageType =
   | typeof DynamicDrawUsage
   | typeof StaticDrawUsage
   | typeof StreamDrawUsage;
+
+export type TextureSource =
+  | HTMLImageElement
+  | HTMLCanvasElement
+  | HTMLVideoElement;

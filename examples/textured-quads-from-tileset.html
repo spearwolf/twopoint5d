@@ -1,0 +1,224 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        background-color: #391e39;
+        background: radial-gradient(
+          circle,
+          rgb(82 95 132) 0%,
+          rgb(149 188 199) 100%
+        );
+        color: #eee;
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 2;
+      }
+      em {
+        font-size: 84.615384%;
+        color: #ddd;
+      }
+      #texture-preview {
+        background-color: rgba(86, 101, 115, 80%);
+        border: 5px solid #324168;
+        border-radius: 5px;
+        width: 150px;
+        height: 150px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+      }
+      #texture-preview > canvas,
+      #texture-preview > img {
+        width: 100%;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "three-vertex-objects": "/build/three-vertex-objects.js"
+        }
+      }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+      attribute vec2 quadSize;
+      attribute vec3 instancePosition;
+      attribute vec4 texCoords;
+
+      varying vec2 vTexCoords;
+
+      void main() {
+        vec3 vertexPosition = position * vec3(quadSize.xy, 0.0) + instancePosition;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition, 1.0);
+
+        vTexCoords = texCoords.xy + (uv * texCoords.zw);
+      }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      uniform sampler2D colorMap;
+
+      varying vec2 vTexCoords;
+
+      void main()	{
+        gl_FragColor = texture2D(colorMap, vTexCoords);
+
+        gl_FragColor.a *= 0.75;
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js :: textured-quads<br />
+        <em
+          >an <code>InstancedVertexObjectGeometry</code> plus
+          <code>TileSetLoader</code> example</em
+        >
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <div id="texture-preview"></div>
+    <script type="module">
+      import {
+        Color,
+        DoubleSide,
+        Matrix4,
+        NearestFilter,
+        PerspectiveCamera,
+        Scene,
+        ShaderMaterial,
+        Texture,
+        Vector3,
+      } from 'three';
+      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      import {
+        getDescriptorOf,
+        InstancedVertexObjectGeometry,
+        TextureFactory,
+        TileSetLoader,
+        VertexObjectGeometry,
+        VertexObjects,
+      } from 'three-vertex-objects';
+      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
+
+      class BaseQuad {
+        make(width = 0.5, height = 0.5) {
+          // prettier-ignore
+          this.setPosition([
+            - width, - height, 0,
+            - width, + height, 0,
+            + width, + height, 0,
+            + width, - height, 0,
+          ]);
+          // prettier-ignore
+          this.setUv([
+            // flipY = false
+            0, 1,
+            0, 0,
+            1, 0,
+            1, 1,
+          ]);
+        }
+      }
+
+      const BaseQuadDescriptor = {
+        vertexCount: 4,
+        indices: [0, 2, 1, 0, 3, 2],
+
+        attributes: {
+          position: {components: ['x', 'y', 'z']},
+          uv: {size: 2},
+        },
+
+        basePrototype: BaseQuad.prototype,
+      };
+
+      const InstancedQuadDescriptor = {
+        meshCount: 1,
+
+        attributes: {
+          quadSize: {components: ['width', 'height']},
+          instancePosition: {components: ['x', 'y', 'z']},
+          texCoords: {size: 4},
+        },
+      };
+
+      function makeMesh(rows, columns, size, offset, tileset, texture) {
+        const capacity = rows * columns;
+        const geometry = new InstancedVertexObjectGeometry(
+          InstancedQuadDescriptor,
+          capacity,
+          BaseQuadDescriptor,
+        );
+
+        geometry.basePool.createVO().make();
+
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < columns; x++) {
+            const quad = geometry.instancedPool.createVO();
+            quad.width = 1.0 + Math.random() * (size - 1.0);
+            quad.height = quad.width;
+            quad.setInstancePosition([
+              x * size * offset - ((columns - 1) * size * offset) / 2,
+              y * size * offset - ((rows - 1) * size * offset) / 2,
+            ]);
+            const texCoords = tileset.atlas.randomFrame().coords;
+            quad.setTexCoords([
+              texCoords.s,
+              texCoords.t,
+              texCoords.u,
+              texCoords.v,
+            ]);
+          }
+        }
+
+        const material = new ShaderMaterial({
+          vertexShader: document.getElementById('vertexShader').textContent,
+          fragmentShader: document.getElementById('fragmentShader').textContent,
+          uniforms: {
+            colorMap: {
+              value: texture,
+            },
+          },
+          transparent: true,
+          side: DoubleSide,
+        });
+
+        const mesh = new VertexObjects(geometry, material);
+        mesh.name = 'InstancedQuadsMesh';
+        mesh.frustumCulled = false;
+
+        return mesh;
+      }
+
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById('canvas-container'),
+        {antialias: false},
+      );
+
+      const tilesetLoader = new TileSetLoader(new TextureFactory(0));
+
+      tilesetLoader.load(
+        '/examples/assets/nobinger-anim-sheet.png',
+        {tileWidth: 64, tileHeight: 64, margin: 1},
+        (data) => {
+          console.log('loaded tileset', data);
+
+          document.getElementById('texture-preview').appendChild(data.imgEl);
+
+          demo.on('init', ({scene}) => {
+            scene.add(makeMesh(16, 32, 3.5, 1, data.tileSet, data.texture));
+          });
+
+          demo.start();
+
+          console.log('TexturedQuadsMesh', demo.scene.children[0]);
+        },
+      );
+    </script>
+  </body>
+</html>
