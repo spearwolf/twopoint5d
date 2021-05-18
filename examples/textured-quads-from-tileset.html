@@ -29,9 +29,26 @@
         right: 20px;
         box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
       }
+      .tileset-image-title {
+        font-size: 13px;
+        text-shadow: 1px 1px #000;
+        display: none;
+      }
+      #texture-preview:hover > .tileset-image-title {
+        display: block;
+      }
       #texture-preview > canvas,
       #texture-preview > img {
         width: 100%;
+      }
+      #texture-preview:hover > canvas,
+      #texture-preview:hover > img {
+        box-shadow: 0 0 0 1px #fff, 0 0 10px rgba(255 255 255 / 80%);
+      }
+      #texture-preview > header {
+        position: absolute;
+        bottom: calc(100% - 4px);
+        left: 0;
       }
     </style>
     <script type="importmap">
@@ -81,7 +98,9 @@
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
-    <div id="texture-preview"></div>
+    <div id="texture-preview">
+      <header class="tileset-image-title">tileset image</header>
+    </div>
     <script type="module">
       import {
         Color,
@@ -209,6 +228,9 @@
           console.log('loaded tileset', data);
 
           document.getElementById('texture-preview').appendChild(data.imgEl);
+          document.querySelector(
+            '.tileset-image-title',
+          ).textContent = `tileset (${data.imgEl.width}x${data.imgEl.height})`;
 
           demo.on('init', ({scene}) => {
             scene.add(makeMesh(16, 32, 3.5, 1, data.tileSet, data.texture));
