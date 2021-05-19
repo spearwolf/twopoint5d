@@ -84,7 +84,7 @@ export class TextureFactory {
   textureLoader: TextureLoader;
 
   constructor(
-    maxAnisotrophyOrRenderer: number | WebGLRenderer,
+    maxAnisotrophyOrRenderer: number | WebGLRenderer = 0,
     defaultClassNames: Array<TextureOptionClasses> = ['nearest'],
     defaultOptions?: Partial<TextureOptions>,
   ) {
