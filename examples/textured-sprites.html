@@ -1,0 +1,249 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        background-color: #391e39;
+        background: radial-gradient(
+          circle,
+          rgb(82 95 132) 0%,
+          rgb(149 188 199) 100%
+        );
+        color: #eee;
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 2;
+      }
+      em {
+        font-size: 84.615384%;
+        color: #ddd;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "three-vertex-objects": "/build/three-vertex-objects.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>
+        three-vertex-objects.js :: textured-sprites<br />
+        <em>a <code>TexturedSprites</code> example</em>
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import {
+        Color,
+        DoubleSide,
+        Matrix4,
+        NearestFilter,
+        PerspectiveCamera,
+        Scene,
+        ShaderMaterial,
+        Texture,
+        Vector3,
+      } from 'three';
+      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      import {
+        getDescriptorOf,
+        InstancedVertexObjectGeometry,
+        TextureFactory,
+        TileSetLoader,
+        VertexObjectGeometry,
+        VertexObjects,
+      } from 'three-vertex-objects';
+      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
+      import {TexturedSpritesGeometry} from '/examples/jsm/textured-sprites/TexturedSpritesGeometry.js';
+      import {TexturedSpritesMaterial} from '/examples/jsm/textured-sprites/TexturedSpritesMaterial.js';
+      import {TexturedSprites} from '/examples/jsm/textured-sprites/TexturedSprites.js';
+
+      class BouncingSprites {
+        gravity = -45;
+        startSpeedX = 20;
+        startSpeedY = 40;
+        startSpeedBaseX = 10;
+        startSpeedBaseY = 10;
+        fallSpeed = 25;
+        fallBaseSpeed = 15;
+        upwindBaseSpeed = 0.5;
+        upwindSpeed = 0.6;
+        speedRotateFactor = 1;
+
+        sprites = [];
+
+        constructor(
+          spritePool,
+          textureAtlas,
+          width = 600,
+          height = 300,
+          spriteSize = 10,
+          initalSpriteCount = 256,
+        ) {
+          this.spritePool = spritePool;
+          this.textureAtlas = textureAtlas;
+          this.containerWidth = width;
+          this.containerHeight = height;
+          this.spriteSize = spriteSize;
+          this.initalSpriteCount = initalSpriteCount;
+        }
+
+        dispose() {
+          // TODO this.spriteGroup.voPool.free(this.sprites);
+        }
+
+        createSprites(count = this.initalSpriteCount, frameId = undefined) {
+          const [halfWidth, halfHeight] = [
+            this.containerWidth / 2,
+            this.containerHeight / 2,
+          ];
+
+          for (let i = 0; i < count; i++) {
+            const sprite = this.spritePool.createVO();
+
+            sprite.setQuadSize([this.spriteSize, this.spriteSize]);
+
+            const texCoords = (frameId != null
+              ? this.textureAtlas.get(frameId)
+              : this.textureAtlas.randomFrame()
+            ).coords;
+
+            sprite.setTexCoords([
+              texCoords.s,
+              texCoords.t,
+              texCoords.u,
+              texCoords.v,
+            ]);
+
+            sprite.setInstancePosition([
+              Math.random() * this.containerWidth - halfWidth,
+              Math.random() * this.containerHeight - halfHeight,
+              0,
+            ]);
+
+            sprite.speedX =
+              Math.random() * this.startSpeedX + this.startSpeedBaseX;
+            sprite.speedY =
+              Math.random() * this.startSpeedY -
+              this.startSpeedY / 2 +
+              this.startSpeedBaseY;
+
+            sprite.rotation = Math.random() * Math.PI * 2;
+            sprite.speedRotate =
+              Math.random() * Math.PI * this.speedRotateFactor;
+
+            this.sprites.push(sprite);
+          }
+        }
+
+        animate(delta) {
+          const deltaFactor = delta;
+
+          const gravity = this.gravity * deltaFactor;
+          const halfWidth = this.containerWidth / 2;
+          const halfHeight = this.containerHeight / 2;
+
+          this.sprites.forEach((sprite) => {
+            sprite.rotation += sprite.speedRotate * deltaFactor;
+
+            let {x, y, speedX, speedY} = sprite;
+
+            x += speedX * deltaFactor;
+            y += speedY * deltaFactor;
+
+            speedY += gravity;
+
+            const {width, height} = sprite;
+
+            if (x > halfWidth) {
+              // on the right edge
+              speedX = -Math.abs(speedX);
+              x = halfWidth;
+            } else if (x < -halfWidth) {
+              // on the left edge
+              speedX = Math.abs(speedX);
+              x = -halfWidth;
+            }
+
+            if (y > halfHeight) {
+              // on the top edge
+              speedY = -this.fallBaseSpeed;
+              y = halfHeight;
+              if (Math.random() > 0.5) {
+                speedY -= Math.random() * this.fallSpeed;
+              }
+            } else if (y < -halfHeight) {
+              // on the bottom edge
+              speedY =
+                Math.random() * this.upwindSpeed * this.containerHeight +
+                this.upwindBaseSpeed * this.containerHeight;
+              y = -halfHeight;
+            }
+
+            sprite.x = x;
+            sprite.y = y;
+
+            sprite.speedX = speedX;
+            sprite.speedY = speedY;
+          });
+        }
+      }
+
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById('canvas-container'),
+        {antialias: false},
+      );
+
+      const tilesetLoader = new TileSetLoader(new TextureFactory());
+
+      tilesetLoader.load(
+        '/examples/assets/nobinger-anim-sheet.png',
+        {tileWidth: 64, tileHeight: 64, margin: 1},
+        ({tileSet, texture}) => {
+          demo.on('init', ({scene}) => {
+            const CAPACITY = 333;
+            const geometry = new TexturedSpritesGeometry(CAPACITY);
+
+            const bouncingSprites = new BouncingSprites(
+              geometry.instancedPool,
+              tileSet.atlas,
+              200,
+              75,
+              7,
+              CAPACITY,
+            );
+
+            bouncingSprites.createSprites();
+
+            demo.on('frame', ({deltaTime}) => {
+              bouncingSprites.animate(deltaTime);
+            });
+
+            const material = new TexturedSpritesMaterial({
+              colorMap: texture,
+            });
+
+            material.depthTest = false;
+            material.depthWrite = false;
+
+            const mesh = new TexturedSprites(geometry, material);
+            mesh.frustumCulled = false;
+
+            scene.add(mesh);
+
+            console.log('bouncingSprites', bouncingSprites);
+          });
+
+          demo.start();
+
+          console.log('TexturedSpritesMesh', demo.scene.children[0]);
+        },
+      );
+    </script>
+  </body>
+</html>

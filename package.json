@@ -21,7 +21,7 @@
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "fix": "run-s --silent --print-label eslint:fix prettier:write",
     "test": "cross-env NODE_ENV=test jest",
-    "start": "servor . examples/textured-quads-from-tileset.html ---reload --browse"
+    "start": "servor . examples/textured-sprites.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
