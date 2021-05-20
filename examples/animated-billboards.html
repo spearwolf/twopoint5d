@@ -86,7 +86,7 @@
         startSpeedBaseY = 5;
         upwindBaseSpeed = 50;
         upwindSpeed = 90;
-        speedRotateFactor = -1.2;
+        speedRotateFactor = 1.2;
 
         sprites = [];
 
@@ -143,9 +143,7 @@
           }
         }
 
-        animate(delta) {
-          const deltaFactor = delta;
-
+        animate(deltaFactor) {
           const gravity = this.gravity * deltaFactor;
           const halfWidth = this.containerWidth / 2;
           const halfHeight = this.containerHeight / 2;
@@ -177,15 +175,14 @@
             }
 
             sprite.x0 = x0;
+            sprite.speedY = speedY;
 
             const r = this.radius + z0;
             const angle = (x0 * Math.PI) / 180.0;
+
             sprite.x = r * Math.sin(angle);
             sprite.y = y;
             sprite.z = r * Math.cos(angle);
-
-            sprite.speedX = speedX;
-            sprite.speedY = speedY;
           });
         }
       }
