@@ -25,10 +25,41 @@ const vertexShader = `
     return (vec2(column, row) + 0.5) / vec2(mapSize[0], mapSize[1]);
   }
 
+#ifdef RENDER_AS_BILLBOARDS
+
+  vec4 makeBillboard(in mat4 modelViewMatrix, in vec3 cameraPosition, in vec3 billboardPosition, in vec2 billboardSize, in vec2 vertexPosition) {
+    vec3 look = normalize(cameraPosition - billboardPosition);
+    vec3 cameraUp = vec3(modelViewMatrix[0].y, modelViewMatrix[1].y, modelViewMatrix[2].y);
+    vec3 billboardRight = cross(cameraUp, look);
+    vec3 billboardUp = cross(look, billboardRight);
+
+    return vec4(billboardPosition
+                + billboardRight * vertexPosition.x * billboardSize.x
+                + billboardUp * vertexPosition.y * billboardSize.y,
+                1.0);
+  }
+
+#endif
+
   void main() {
+
+#ifdef RENDER_AS_BILLBOARDS
+
+    vec4 vertexPosition = makeBillboard(
+                            modelViewMatrix,
+                            cameraPosition,
+                            instancePosition,
+                            quadSize,
+                            (rotateZ(rotation) * vec4(position, 1.0)).xy
+                          );
+
+#else
+
     vec4 vertexPosition = rotateZ(rotation)
                         * vec4(position * vec3(quadSize.xy, 0.0), 1.0)
                         + vec4(instancePosition, 1.0);
+
+#endif
 
     gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;
 
@@ -79,5 +110,15 @@ export class AnimatedSpritesMaterial extends ShaderMaterial {
       ...options,
     });
     this.name = 'AnimatedSpritesMaterial';
+  }
+
+  get renderAsBillboards() {
+    return 'RENDER_AS_BILLBOARDS' in this.defines && this.defines === 1;
+  }
+
+  set renderAsBillboards(renderAsBillboards) {
+    if (renderAsBillboards) {
+      Object.assign(this.defines, this.defines, {RENDER_AS_BILLBOARDS: 1});
+    }
   }
 }
