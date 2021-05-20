@@ -151,7 +151,7 @@ export class Display {
   }
 
   renderFrame(now = window.performance.now()) {
-    this.lastNow = this.now;
+    this.lastNow = this.lastNow === 0 ? now : this.now;
     this.now = now / 1000.0;
 
     if (this.frameNo > 0) {
@@ -173,6 +173,14 @@ export class Display {
     this.pause = false;
     if (!this.#initialized) {
       this.emit('init', this.getEmitArgs());
+      document?.addEventListener(
+        'visibilitychange',
+        () => {
+          this.pause = document.hidden;
+          this.lastNow = 0;
+        },
+        false,
+      );
       this.#initialized = true;
     }
     this.emit('start', this.getEmitArgs());
