@@ -8,11 +8,21 @@
         color: #eee;
         font-family: sans-serif;
         font-size: 16px;
-        line-height: 2;
+        line-height: 1.5;
+      }
+      .intro {
+        font-family: 'Arial Black', sans-serif;
+        font-size: 24px;
       }
       em {
+        font-family: Arial, sans-serif;
         font-size: 84.615384%;
-        color: #ddd;
+        color: #fff;
+      }
+      code {
+        font-family: 'Courier New', monospace;
+        font-style: normal;
+        font-size: 120%;
       }
     </style>
     <script type="importmap">
@@ -28,7 +38,7 @@
   <body>
     <section class="intro">
       <p>
-        three-vertex-objects.js :: animated-sprites<br />
+        three-vertex-objects :: animated-sprites<br />
         <em>an <code>AnimatedSprites</code> example</em>
       </p>
     </section>
@@ -187,7 +197,7 @@
 
             const anims = new FrameBasedAnimations();
             // prettier-ignore
-            const animId = anims.add('nobinger', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+            const animId = anims.add(undefined, 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
 
             const bouncingSprites = new BouncingSprites(
               geometry.instancedPool,
