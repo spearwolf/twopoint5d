@@ -1,3 +1,4 @@
+export * from './FrameBasedAnimations';
 export * from './getDescriptorOf';
 export * from './InstancedVertexObjectGeometry';
 export * from './PowerOf2ImageLoader';
