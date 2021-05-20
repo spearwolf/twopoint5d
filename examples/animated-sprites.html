@@ -76,8 +76,8 @@
         startSpeedY = 40;
         startSpeedBaseX = 20;
         startSpeedBaseY = 10;
-        upwindBaseSpeed = 0.5;
-        upwindSpeed = 0.6;
+        upwindBaseSpeed = 35;
+        upwindSpeed = 50;
         speedRotateFactor = -1.2;
 
         sprites = [];
@@ -94,10 +94,6 @@
           this.containerWidth = width;
           this.containerHeight = height;
           this.spriteSize = spriteSize;
-        }
-
-        dispose() {
-          // TODO this.spriteGroup.voPool.free(this.sprites);
         }
 
         createSprites(count, animId) {
@@ -157,17 +153,15 @@
 
             if (x > halfWidth) {
               // on the right edge
-              x = -halfWidth;
+              x -= this.containerWidth;
             } else if (x < -halfWidth) {
               // on the left edge
-              x = halfWidth;
+              x += this.containerWidth;
             }
 
             if (y < -halfHeight) {
               // on the bottom edge
-              speedY =
-                Math.random() * this.upwindSpeed * this.containerHeight +
-                this.upwindBaseSpeed * this.containerHeight;
+              speedY = Math.random() * this.upwindSpeed + this.upwindBaseSpeed;
               y = -halfHeight;
             }
 
