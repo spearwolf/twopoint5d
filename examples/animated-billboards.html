@@ -192,72 +192,71 @@
         {antialias: false},
       );
 
-      const tilesetLoader = new TileSetLoader(new TextureFactory());
+      demo.start(async ({scene, camera, width, height}) => {
+        camera.position.set(0, 70, -210);
 
-      tilesetLoader.load(
-        '/examples/assets/nobinger-anim-sheet.png',
-        {tileWidth: 64, tileHeight: 64, margin: 1},
-        ({tileSet, texture}) => {
-          demo.on('init', ({scene, camera, width, height}) => {
-            camera.position.set(0, 70, -210);
+        const CAPACITY = 400;
+        const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-            const CAPACITY = 400;
-            const geometry = new AnimatedSpritesGeometry(CAPACITY);
+        const tilesetLoader = new TileSetLoader(new TextureFactory());
+        const {
+          tileSet,
+          texture,
+        } = await tilesetLoader.loadAsync(
+          '/examples/assets/nobinger-anim-sheet.png',
+          {tileWidth: 64, tileHeight: 64, margin: 1},
+        );
 
-            const anims = new FrameBasedAnimations();
-            // prettier-ignore
-            const animId = anims.add(undefined, 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+        const anims = new FrameBasedAnimations();
+        // prettier-ignore
+        const animId = anims.add(undefined, 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
 
-            const bouncingSprites = new BouncingSprites(
-              geometry.instancedPool,
-              tileSet.atlas,
-              150,
-              100,
-              40,
-            );
+        const bouncingSprites = new BouncingSprites(
+          geometry.instancedPool,
+          tileSet.atlas,
+          150,
+          100,
+          40,
+        );
 
-            bouncingSprites.createSprites(CAPACITY, animId);
+        bouncingSprites.createSprites(CAPACITY, animId);
 
-            const material = new AnimatedSpritesMaterial({
-              colorMap: texture,
-              animsMap: anims.bakeDataTexture(),
-            });
+        const material = new AnimatedSpritesMaterial({
+          colorMap: texture,
+          animsMap: anims.bakeDataTexture(),
+        });
 
-            material.renderAsBillboards = true;
-            material.depthTest = true;
-            material.depthWrite = true;
+        material.renderAsBillboards = true;
+        material.depthTest = true;
+        material.depthWrite = true;
 
-            const mesh = new AnimatedSprites(geometry, material);
-            mesh.frustumCulled = false;
+        const mesh = new AnimatedSprites(geometry, material);
+        mesh.frustumCulled = false;
 
-            scene.add(mesh);
+        scene.add(mesh);
 
-            demo.on('frame', ({deltaTime, now}) => {
-              bouncingSprites.animate(deltaTime);
-              material.uniforms.time.value = now;
-            });
+        demo.on('frame', ({deltaTime, now}) => {
+          bouncingSprites.animate(deltaTime);
+          material.uniforms.time.value = now;
+        });
 
-            console.log(bouncingSprites);
+        console.log(bouncingSprites);
 
-            const cylinderGeometry = new CylinderGeometry(170, 170, 1, 180);
-            const cylinderMaterial = new MeshPhongMaterial({
-              color: 0x6080a0,
-              emissive: 0x223344,
-            });
-            const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
-            cylinder.position.set(0, -0.5, 0);
-            scene.add(cylinder);
+        const cylinderGeometry = new CylinderGeometry(170, 170, 1, 180);
+        const cylinderMaterial = new MeshPhongMaterial({
+          color: 0x6080a0,
+          emissive: 0x223344,
+        });
+        const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
+        cylinder.position.set(0, -0.5, 0);
+        scene.add(cylinder);
 
-            const mainLight = new PointLight(0xcccccc, 1.5, 250);
-            mainLight.position.y = 60;
-            scene.add(mainLight);
-          });
+        const mainLight = new PointLight(0xcccccc, 1.5, 250);
+        mainLight.position.y = 60;
+        scene.add(mainLight);
 
-          demo.start();
-
-          console.log(demo.scene.children[0]);
-        },
-      );
+        console.log(demo.scene.children[0]);
+      });
     </script>
   </body>
 </html>
