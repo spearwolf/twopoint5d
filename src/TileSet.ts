@@ -40,6 +40,11 @@ export interface TileSetOptions {
   firstId?: number;
 }
 
+/**
+ * The [[TileSet]] maps _tileIds_ to _frameIds_.
+ * Unlike the `frameId` of [[TextureAtlas]], the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
+ * The `frameId` range of a [[TileSet]] starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
+ */
 export class TileSet {
   readonly atlas: TextureAtlas;
   readonly baseCoords: TextureCoords;
