@@ -29,6 +29,9 @@ describe('TileSet', () => {
       tileHeight: 61,
       tileCount: 6,
       firstId: 4,
+      lastId: 9,
+      firstFrameId: 0,
+      lastFrameId: 5,
     });
     expect(tiles.frame(4)).toMatchObject({
       coords: {

@@ -27,6 +27,8 @@ import {TextureCoords} from './TextureCoords';
 // +---------------------------------------------+
 //
 
+const rand = (max: number) => (Math.random() * max) | 0;
+
 export interface TileSetOptions {
   tileWidth?: number;
   tileHeight?: number;
@@ -51,6 +53,10 @@ export class TileSet {
   readonly options: TileSetOptions;
 
   tileCount = 0;
+
+  /**
+   * The `frameId` of the _first_ tile
+   */
   firstFrameId = -1;
 
   constructor(
@@ -84,8 +90,25 @@ export class TileSet {
     return this.options?.tileHeight ?? this.baseCoords.height;
   }
 
+  /**
+   * The `tileId` of the _first_ tile
+   */
   get firstId(): number {
     return this.options?.firstId ?? 1;
+  }
+
+  /**
+   * The `tileId` of the _last_ tile
+   */
+  get lastId(): number {
+    return this.firstId + this.tileCount - 1;
+  }
+
+  /**
+   * The `frameId` of the _last_ tile
+   */
+  get lastFrameId(): number {
+    return this.firstFrameId + this.tileCount - 1;
   }
 
   get tileCountLimit(): number {
@@ -112,8 +135,20 @@ export class TileSet {
     );
   }
 
+  randomTileId(): number {
+    return this.firstId + rand(this.tileCount);
+  }
+
+  randomFrameId(): number {
+    return this.firstFrameId + rand(this.tileCount);
+  }
+
   frame(tileId: number): TextureAtlasFrame {
     return this.atlas.get(this.frameId(tileId));
+  }
+
+  randomFrame(): TextureAtlasFrame {
+    return this.atlas.get(this.randomFrameId());
   }
 
   #createTextureCoords = (): void => {
