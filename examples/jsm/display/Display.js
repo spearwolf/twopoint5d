@@ -169,8 +169,9 @@ export class Display {
     ++this.frameNo;
   }
 
-  start() {
+  async start(beforeStartCallback = undefined) {
     this.pause = false;
+
     if (!this.#initialized) {
       this.emit('init', this.getEmitArgs());
       document?.addEventListener(
@@ -183,6 +184,11 @@ export class Display {
       );
       this.#initialized = true;
     }
+
+    if (typeof beforeStartCallback === 'function') {
+      await beforeStartCallback(this.getEmitArgs());
+    }
+
     this.emit('start', this.getEmitArgs());
 
     this.renderer.clear();
