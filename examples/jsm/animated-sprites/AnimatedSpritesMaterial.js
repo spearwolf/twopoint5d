@@ -113,7 +113,7 @@ export class AnimatedSpritesMaterial extends ShaderMaterial {
   }
 
   get renderAsBillboards() {
-    return 'RENDER_AS_BILLBOARDS' in this.defines && this.defines === 1;
+    return this.defines?.RENDER_AS_BILLBOARDS === 1;
   }
 
   set renderAsBillboards(renderAsBillboards) {
