@@ -1,3 +1,4 @@
+export * from './fitIntoRectangle';
 export * from './FrameBasedAnimations';
 export * from './getDescriptorOf';
 export * from './InstancedVertexObjectGeometry';
