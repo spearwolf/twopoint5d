@@ -2,7 +2,8 @@
   "name": "three-vertex-objects-workspaces",
   "description": "three-vertex-objects project workspaces",
   "workspaces": [
-    "three-vertex-objects"
+    "three-vertex-objects",
+    "r3f-vertex-objects"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
