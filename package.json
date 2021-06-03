@@ -3,7 +3,8 @@
   "description": "three-vertex-objects project workspaces",
   "workspaces": [
     "three-vertex-objects",
-    "r3f-vertex-objects"
+    "r3f-vertex-objects",
+    "r3f-examples"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
