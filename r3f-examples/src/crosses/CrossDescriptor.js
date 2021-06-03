@@ -30,12 +30,13 @@ class Cross {
   }
 
   transform(transform) {
-    const v = new Vector3();
+    const tmp = new Vector3();
     const { vertexCount } = getDescriptorOf(this);
     for (let i = 0; i < vertexCount; i++) {
-      this.getVertexPosition(i, v);
-      v.applyMatrix4(transform);
-      this.setVertexPosition(i, v);
+      this.setVertexPosition(
+        i,
+        this.getVertexPosition(i, tmp).applyMatrix4(transform)
+      );
     }
   }
 
@@ -43,6 +44,7 @@ class Cross {
     target.x = this[`x${idx}`];
     target.y = this[`y${idx}`];
     target.z = this[`z${idx}`];
+    return target;
   }
 
   setVertexPosition(idx, position) {
