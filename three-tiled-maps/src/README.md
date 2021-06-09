@@ -6,4 +6,4 @@ For simplicity, it is assumed that the tiles are located in a 2D coordinate syst
 
 ![the tile coordinates system](./tile-coordinates.svg)
 
-The tile IDs are read out via the [IMap2dTileDataProvider](IMap2dTileDataPRovider.ts) interface.
+The tile IDs are read out via the [IMap2dTileDataProvider](IMap2dTileDataProvider.ts) interface.
