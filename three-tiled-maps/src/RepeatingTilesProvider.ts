@@ -12,8 +12,8 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
 
   #tileIds: number[][];
 
-  #rows: number = 0;
-  #cols: number = 0;
+  #rows = 0;
+  #cols = 0;
 
   get tileIds(): number[][] {
     return this.#tileIds;
