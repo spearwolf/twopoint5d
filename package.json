@@ -3,12 +3,13 @@
   "description": "three-vertex-objects project workspaces",
   "workspaces": [
     "three-vertex-objects",
+    "three-tiled-maps",
     "r3f-vertex-objects",
     "r3f-examples"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "build": "npm run build --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects",
+    "test": "npm run test --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects",
     "start": "servor . examples/animated-billboards.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
