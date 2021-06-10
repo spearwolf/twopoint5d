@@ -326,7 +326,7 @@ describe('RepeatingTilesProvider', () => {
                 [13, 14, 15, 16],
               ],
               'horizontal',
-            ).getTileIdsWithin(0, 0, 6, 6, new Uint32Array(36).fill(666)),
+            ).getTileIdsWithin(-4, 0, 6, 6, new Uint32Array(36).fill(666)),
           ),
         ).toEqual([
           1, 2, 3, 4, 1, 2,
@@ -347,7 +347,7 @@ describe('RepeatingTilesProvider', () => {
                 [13, 14, 15, 16],
               ],
               'horizontal',
-            ).getTileIdsWithin(2, -1, 6, 6, new Uint32Array(36).fill(666)),
+            ).getTileIdsWithin(6, -1, 6, 6, new Uint32Array(36).fill(666)),
           ),
         ).toEqual([
           0, 0, 0, 0, 0, 0,
@@ -356,6 +356,27 @@ describe('RepeatingTilesProvider', () => {
           11, 12, 9, 10, 11, 12,
           15, 16, 13, 14, 15, 16,
           0, 0, 0, 0, 0, 0,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1],
+                [5],
+                [9],
+                [13],
+              ],
+              'horizontal',
+            ).getTileIdsWithin(20, -3, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0,
+          1, 1, 1, 1, 1, 1,
+          5, 5, 5, 5, 5, 5,
+          9, 9, 9, 9, 9, 9,
         ]);
         // prettier-ignore
         expect(
@@ -434,6 +455,229 @@ describe('RepeatingTilesProvider', () => {
         ).toEqual([
           7, 8, 5,
           11, 12, 9,
+        ]);
+      });
+    });
+    describe('none', () => {
+      test('1x1 pattern', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(1).getTileIdsWithin(0, 0, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          1, 1, 1,
+          1, 1, 1,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(1).getTileIdsWithin(8, -11, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          1, 1, 1,
+          1, 1, 1,
+        ]);
+      });
+      test('2x1 pattern inside', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2]).getTileIdsWithin(0, 0, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          1, 2, 1,
+          1, 2, 1,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2]).getTileIdsWithin(-3, -1, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          2, 1, 2,
+          2, 1, 2,
+        ]);
+      });
+      test('4x1 pattern in-outside', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2, 3, 4]).getTileIdsWithin(0, 0, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          1, 2, 3,
+          1, 2, 3,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2, 3, 4]).getTileIdsWithin(2, -1, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          3, 4, 1,
+          3, 4, 1,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2, 3, 4]).getTileIdsWithin(-3, -1, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          2, 3, 4,
+          2, 3, 4,
+        ]);
+      });
+      test('4x4 pattern inside', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(-4, 0, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          1, 2, 3, 4, 1, 2,
+          5, 6, 7, 8, 5, 6,
+          9, 10, 11, 12, 9, 10,
+          13, 14, 15, 16, 13, 14,
+          1, 2, 3, 4, 1, 2,
+          5, 6, 7, 8, 5, 6,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(6, -1, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          15, 16, 13, 14, 15, 16,
+          3, 4, 1, 2, 3, 4,
+          7, 8, 5, 6, 7, 8,
+          11, 12, 9, 10, 11, 12,
+          15, 16, 13, 14, 15, 16,
+          3, 4, 1, 2, 3, 4,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1],
+                [5],
+                [9],
+                [13],
+              ],
+            ).getTileIdsWithin(20, -3, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          5, 5, 5, 5, 5, 5,
+          9, 9, 9, 9, 9, 9,
+          13, 13, 13, 13, 13, 13,
+          1, 1, 1, 1, 1, 1,
+          5, 5, 5, 5, 5, 5,
+          9, 9, 9, 9, 9, 9,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(2, -3, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          7, 8, 5, 6, 7, 8,
+          11, 12, 9, 10, 11, 12,
+          15, 16, 13, 14, 15, 16,
+          3, 4, 1, 2, 3, 4,
+          7, 8, 5, 6, 7, 8,
+          11, 12, 9, 10, 11, 12,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(2, 2, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          11, 12, 9, 10, 11, 12,
+          15, 16, 13, 14, 15, 16,
+          3, 4, 1, 2, 3, 4,
+          7, 8, 5, 6, 7, 8,
+          11, 12, 9, 10, 11, 12,
+          15, 16, 13, 14, 15, 16,
+        ]);
+      });
+      test('4x4 pattern in-outside', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(0, 0, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          1, 2, 3,
+          5, 6, 7,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(-2, 1, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          7, 8, 5,
+          11, 12, 9,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+            ).getTileIdsWithin(1, 1, 2, 2, new Uint32Array(4).fill(666)),
+          ),
+        ).toEqual([
+          6, 7,
+          10, 11,
         ]);
       });
     });

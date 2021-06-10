@@ -6,6 +6,8 @@ export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
 /**
  * The `RepeatingTilesProvider` repeats a 2D pattern of tile IDs endlessly.
  * If you want you can limit the repeat to only horizontal or only vertical.
+ *
+ * The tile IDs pattern always starts at (0,0)
  */
 export class RepeatingTilesProvider implements IMap2dTileDataProvider {
   limitToAxis: LimitToAxisType;
@@ -56,11 +58,16 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
   ): Uint32Array {
     target = target ?? new Uint32Array(width * height);
 
+    if (this.#cols === 0 || this.#rows === 0) {
+      target.fill(0);
+      return target;
+    }
+
     const right = left + width - 1;
     const bottom = top + height - 1;
 
     switch (this.limitToAxis) {
-      case 'vertical': {
+      case 'vertical':
         if (right < 0 || left >= this.#cols) {
           // === outside ===
           target.fill(0);
@@ -85,9 +92,8 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
           }
         }
         break;
-      }
 
-      case 'horizontal': {
+      case 'horizontal':
         if (bottom < 0 || top >= this.#rows) {
           // === outside ===
           target.fill(0);
@@ -102,19 +108,27 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
             const patternRow = y + top;
             const rowOffset = y * width;
             if (patternRow < this.#rows) {
-              let x = 0;
-              let col =
-                (left < 0
-                  ? left + Math.ceil(-left / this.#cols) * this.#cols
-                  : left) % this.#cols;
-              while (x < width) {
-                const tiles = this.tileIds[patternRow].slice(
-                  col,
-                  col + width - x,
+              if (this.#cols === 1) {
+                target.fill(
+                  this.tileIds[patternRow][0],
+                  rowOffset,
+                  rowOffset + width,
                 );
-                target.set(tiles, rowOffset + x);
-                x += tiles.length;
-                col = (col + x) % this.#cols;
+              } else {
+                let x = 0;
+                let col =
+                  (left < 0
+                    ? left + Math.ceil(-left / this.#cols) * this.#cols
+                    : left) % this.#cols;
+                while (x < width) {
+                  const tiles = this.tileIds[patternRow].slice(
+                    col,
+                    col + width - x,
+                  );
+                  target.set(tiles, rowOffset + x);
+                  x += tiles.length;
+                  col = (col + x) % this.#cols;
+                }
               }
             } else {
               target.fill(0, rowOffset);
@@ -123,7 +137,41 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
           }
         }
         break;
-      }
+
+      case 'none':
+        if (this.#cols === 1 && this.#rows === 1) {
+          target.fill(this.tileIds[0][0]);
+        } else {
+          const topOffset =
+            top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
+          for (let y = 0; y < height; y++) {
+            const patternRow = y + topOffset;
+            const rowOffset = y * width;
+            if (this.#cols === 1) {
+              target.fill(
+                this.tileIds[patternRow % this.#rows][0],
+                rowOffset,
+                rowOffset + width,
+              );
+            } else {
+              let x = 0;
+              let col =
+                (left < 0
+                  ? left + Math.ceil(-left / this.#cols) * this.#cols
+                  : left) % this.#cols;
+              while (x < width) {
+                const tiles = this.tileIds[patternRow % this.#rows].slice(
+                  col,
+                  col + width - x,
+                );
+                target.set(tiles, rowOffset + x);
+                x += tiles.length;
+                col = (col + x) % this.#cols;
+              }
+            }
+          }
+        }
+        break;
     }
 
     return target;
