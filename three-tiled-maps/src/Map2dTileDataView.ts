@@ -39,12 +39,62 @@ export class Map2dTileDataView {
     this.yOffset = yOffset;
   }
 
+  #tileLeft = (left: number) => {
+    return Math.floor((left - this.xOffset) / this.tileWidth);
+  };
+
+  #tileColumns = (tileLeft: number, width: number) => {
+    return Math.ceil(tileLeft + width / this.tileWidth) - tileLeft;
+  };
+
+  #tileTop = (top: number) => {
+    return Math.floor((top - this.yOffset) / this.tileHeight);
+  };
+
+  #tileRows = (tileTop: number, height: number) => {
+    return Math.ceil(tileTop + height / this.tileHeight) - tileTop;
+  };
+
+  getTileCoords(left: number, top: number, width: number, height: number) {
+    const tileLeft = this.#tileLeft(left);
+    const tileTop = this.#tileTop(top);
+    return [
+      tileLeft,
+      tileTop,
+      this.#tileColumns(tileLeft, width),
+      this.#tileRows(tileTop, height),
+    ];
+  }
+
   getTileIdsWithin(
-    _left: number,
-    _top: number,
-    _width: number,
-    _height: number,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
   ): TileIdArray {
-    throw new Error('TODO Map2dTileDataView.getTileIdsWithin()');
+    const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(
+      left,
+      top,
+      width,
+      height,
+    );
+
+    const tileIds: TileIdArray = {
+      top: tileTop * this.tileHeight,
+      left: tileLeft * this.tileWidth,
+      rows: tileRows,
+      columns: tileColumns,
+      data: new Uint32Array(tileRows * tileColumns),
+    };
+
+    this.provider.getTileIdsWithin(
+      tileLeft,
+      tileTop,
+      tileColumns,
+      tileRows,
+      tileIds.data,
+    );
+
+    return tileIds;
   }
 }
