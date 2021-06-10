@@ -9,6 +9,6 @@ export interface IMap2dTileDataProvider {
     top: number,
     width: number,
     height: number,
-    target?: Uint32Array
+    target?: Uint32Array,
   ): Uint32Array;
 }
