@@ -314,7 +314,7 @@ describe('RepeatingTilesProvider', () => {
           2, 3, 4,
         ]);
       });
-      test.skip('4x4 pattern inside', () => {
+      test('4x4 pattern inside', () => {
         // prettier-ignore
         expect(
           Array.from(
@@ -368,7 +368,28 @@ describe('RepeatingTilesProvider', () => {
                 [13, 14, 15, 16],
               ],
               'horizontal',
-            ).getTileIdsWithin(2, -4, 6, 6, new Uint32Array(36).fill(666)),
+            ).getTileIdsWithin(2, -3, 6, 6, new Uint32Array(36).fill(666)),
+          ),
+        ).toEqual([
+          0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0,
+          3, 4, 1, 2, 3, 4,
+          7, 8, 5, 6, 7, 8,
+          11, 12, 9, 10, 11, 12,
+        ]);
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider(
+              [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+              ],
+              'horizontal',
+            ).getTileIdsWithin(2, 2, 6, 6, new Uint32Array(36).fill(666)),
           ),
         ).toEqual([
           11, 12, 9, 10, 11, 12,
