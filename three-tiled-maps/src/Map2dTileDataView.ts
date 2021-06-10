@@ -1,9 +1,13 @@
 import {IMap2dTileDataProvider} from './IMap2dTileDataProvider';
 import {RepeatingTilesProvider} from './RepeatingTilesProvider';
 
-export interface TileIdArray {
+export interface TileIdDataArray {
   top: number;
   left: number;
+  width: number;
+  height: number;
+  tileWidth: number;
+  tileHeight: number;
   rows: number;
   columns: number;
   data: Uint32Array;
@@ -71,7 +75,7 @@ export class Map2dTileDataView {
     top: number,
     width: number,
     height: number,
-  ): TileIdArray {
+  ): TileIdDataArray {
     const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(
       left,
       top,
@@ -79,9 +83,13 @@ export class Map2dTileDataView {
       height,
     );
 
-    const tileIds: TileIdArray = {
+    const tileIds: TileIdDataArray = {
       top: tileTop * this.tileHeight,
       left: tileLeft * this.tileWidth,
+      width: tileColumns * this.tileWidth,
+      height: tileRows * this.tileHeight,
+      tileWidth: this.tileWidth,
+      tileHeight: this.tileHeight,
       rows: tileRows,
       columns: tileColumns,
       data: new Uint32Array(tileRows * tileColumns),
