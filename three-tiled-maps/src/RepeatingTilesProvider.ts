@@ -106,13 +106,13 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
           }
           for (let y = skipPatternRows; y < height; y++) {
             const patternRow = y + top;
-            const rowOffset = y * width;
+            const targetRowOffset = y * width;
             if (patternRow < this.#rows) {
               if (this.#cols === 1) {
                 target.fill(
                   this.tileIds[patternRow][0],
-                  rowOffset,
-                  rowOffset + width,
+                  targetRowOffset,
+                  targetRowOffset + width,
                 );
               } else {
                 let x = 0;
@@ -125,13 +125,13 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
                     col,
                     col + width - x,
                   );
-                  target.set(tiles, rowOffset + x);
+                  target.set(tiles, targetRowOffset + x);
                   x += tiles.length;
                   col = (col + x) % this.#cols;
                 }
               }
             } else {
-              target.fill(0, rowOffset);
+              target.fill(0, targetRowOffset);
               break;
             }
           }
@@ -145,13 +145,13 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
           const topOffset =
             top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
           for (let y = 0; y < height; y++) {
-            const patternRow = y + topOffset;
-            const rowOffset = y * width;
+            const patternRow = (y + topOffset) % this.#rows;
+            const targetRowOffset = y * width;
             if (this.#cols === 1) {
               target.fill(
-                this.tileIds[patternRow % this.#rows][0],
-                rowOffset,
-                rowOffset + width,
+                this.tileIds[patternRow][0],
+                targetRowOffset,
+                targetRowOffset + width,
               );
             } else {
               let x = 0;
@@ -160,11 +160,11 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
                   ? left + Math.ceil(-left / this.#cols) * this.#cols
                   : left) % this.#cols;
               while (x < width) {
-                const tiles = this.tileIds[patternRow % this.#rows].slice(
+                const tiles = this.tileIds[patternRow].slice(
                   col,
                   col + width - x,
                 );
-                target.set(tiles, rowOffset + x);
+                target.set(tiles, targetRowOffset + x);
                 x += tiles.length;
                 col = (col + x) % this.#cols;
               }
