@@ -90,12 +90,53 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
         break;
       }
 
-      case 'horizontal':
-        // outside
+      case 'horizontal': {
         if (bottom < 0 || top >= this.#rows) {
+          // === outside ===
           target.fill(0);
+        } else {
+          // === inside ===
+          const topOffset = -top;
+          let rowOffset = 0;
+          if (topOffset > 0) {
+            rowOffset = topOffset * width;
+            target.fill(0, 0, rowOffset);
+          }
+          let y = 0;
+          while (y < this.#rows && y < height) {
+            let x = 0;
+            let col =
+              (left < 0
+                ? left + Math.ceil(-left / this.#cols) * this.#cols
+                : left) % this.#cols;
+            while (x < width) {
+              const tiles = this.tileIds[y].slice(col, col + width - x);
+              try {
+                target.set(tiles, rowOffset + x + y * width);
+              } catch (err) {
+                console.log(
+                  'offset:',
+                  rowOffset + x + y * width,
+                  '--',
+                  rowOffset,
+                  x,
+                  y,
+                  'w:',
+                  width,
+                );
+                throw err;
+              }
+              x += tiles.length;
+              col = (col + x) % this.#cols;
+            }
+            ++y;
+          }
+          if (y < height) {
+            target.fill(0, (y + topOffset) * width);
+          }
         }
         break;
+      }
     }
 
     return target;
