@@ -19,31 +19,22 @@ describe('Map2dTileCoordsUtil', () => {
   });
   describe('getTileCoords()', () => {
     test('without offset', () => {
-      expect(
-        new Map2dTileCoordsUtil(32, 16).getTileCoords(4, 17, 70, 20),
-      ).toEqual([0, 1, 3, 2]);
-      expect(
-        new Map2dTileCoordsUtil(32, 16).getTileCoords(-32, -1, 32, 32),
-      ).toEqual([-1, -1, 1, 2]);
-      expect(
-        new Map2dTileCoordsUtil(16, 16).getTileCoords(8, 8, 16, 16),
-      ).toEqual([0, 0, 1, 1]);
+      expect(new Map2dTileCoordsUtil(32, 16).getTileCoords(4, 17, 70, 20)).toEqual([0, 1, 3, 2]);
+      expect(new Map2dTileCoordsUtil(32, 16).getTileCoords(-32, -1, 32, 32)).toEqual([
+        -1, -1, 1, 2,
+      ]);
+      expect(new Map2dTileCoordsUtil(16, 16).getTileCoords(8, 8, 16, 16)).toEqual([0, 0, 1, 1]);
     });
     test('with offset', () => {
-      expect(
-        new Map2dTileCoordsUtil(16, 16, 20, 20).getTileCoords(8, 8, 17, 17),
-      ).toEqual([-1, -1, 2, 2]);
+      expect(new Map2dTileCoordsUtil(16, 16, 20, 20).getTileCoords(8, 8, 17, 17)).toEqual([
+        -1, -1, 2, 2,
+      ]);
     });
   });
   describe('computeTilesWithinCoords()', () => {
     test('with offset', () => {
       expect(
-        new Map2dTileCoordsUtil(16, 16, 20, 20).computeTilesWithinCoords(
-          8,
-          8,
-          17,
-          17,
-        ),
+        new Map2dTileCoordsUtil(16, 16, 20, 20).computeTilesWithinCoords(8, 8, 17, 17),
       ).toMatchObject({
         top: 4,
         left: 4,

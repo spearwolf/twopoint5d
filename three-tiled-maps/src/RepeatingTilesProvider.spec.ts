@@ -33,12 +33,8 @@ describe('RepeatingTilesProvider', () => {
       expect(tiles.limitToAxis).toBe('none');
     });
     test('with limitToAxis', () => {
-      expect(new RepeatingTilesProvider(1, 'horizontal').limitToAxis).toBe(
-        'horizontal',
-      );
-      expect(new RepeatingTilesProvider(1, 'vertical').limitToAxis).toBe(
-        'vertical',
-      );
+      expect(new RepeatingTilesProvider(1, 'horizontal').limitToAxis).toBe('horizontal');
+      expect(new RepeatingTilesProvider(1, 'vertical').limitToAxis).toBe('vertical');
     });
   });
   describe('getTileIdsWithin()', () => {
