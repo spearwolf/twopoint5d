@@ -71,7 +71,7 @@ export class Map2dTileCoordsUtil {
       height,
     );
 
-    const coords: TilesWithinCoords = {
+    return {
       tileTop,
       tileLeft,
       top: tileTop * this.tileHeight + this.yOffset,
@@ -83,7 +83,5 @@ export class Map2dTileCoordsUtil {
       rows: tileRows,
       columns: tileColumns,
     };
-
-    return coords;
   }
 }
