@@ -1,0 +1,8 @@
+// Map2dLayer
+// ----------
+
+[<<THREE.Object3D>>Map2dLayer|+tileWidth;+tileHeight;+xOffset;+yOffset|+areaTiles;+renderer|render(x, y, width, height)]
+
+[Map2dLayer]<>-areaTiles*>[Map2dAreaTile;+top;+left;+width;+height]
+
+[Map2dLayer]-renderer >[<<Map2dLayerRenderer>>|beginRender();addTile(tile);updateTile(tile);removeTile(tile);endRender()]

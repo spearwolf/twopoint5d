@@ -28,3 +28,7 @@ The [Map2dTileCoordsUtil](./Map2dTileCoordsUtil.ts) does the mapping from 2D coo
 the origin of the 2D coordinate system is assumed to be in the upper left corner (with the y-axis pointing down).
 
 ![map2d-tile-coords-util cheat-sheet](./Map2dTileCoordsUtil.svg)
+
+### Map2DLayer
+
+![Map2dLayer class diagram](./Map2dLayer.svg)
