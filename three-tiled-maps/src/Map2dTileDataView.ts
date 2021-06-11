@@ -4,10 +4,10 @@ import {RepeatingTilesProvider} from './RepeatingTilesProvider';
 export interface TileIdDataArray {
   top: number;
   left: number;
-  width: number;
   height: number;
-  tileWidth: number;
+  width: number;
   tileHeight: number;
+  tileWidth: number;
   rows: number;
   columns: number;
   data: Uint32Array;
@@ -84,12 +84,12 @@ export class Map2dTileDataView {
     );
 
     const tileIds: TileIdDataArray = {
-      top: tileTop * this.tileHeight,
-      left: tileLeft * this.tileWidth,
-      width: tileColumns * this.tileWidth,
+      top: tileTop * this.tileHeight + this.yOffset,
+      left: tileLeft * this.tileWidth + this.xOffset,
       height: tileRows * this.tileHeight,
-      tileWidth: this.tileWidth,
+      width: tileColumns * this.tileWidth,
       tileHeight: this.tileHeight,
+      tileWidth: this.tileWidth,
       rows: tileRows,
       columns: tileColumns,
       data: new Uint32Array(tileRows * tileColumns),

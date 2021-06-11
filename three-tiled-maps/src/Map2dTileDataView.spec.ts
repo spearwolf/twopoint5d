@@ -49,4 +49,25 @@ describe('Map2dDataView', () => {
       ).toEqual([-1, -1, 2, 2]);
     });
   });
+  describe('getTileIdsWithin()', () => {
+    test('with offset', () => {
+      expect(
+        new Map2dTileDataView(16, 16, undefined, 20, 20).getTileIdsWithin(
+          8,
+          8,
+          17,
+          17,
+        ),
+      ).toMatchObject({
+        top: 4,
+        left: 4,
+        width: 32,
+        height: 32,
+        tileWidth: 16,
+        tileHeight: 16,
+        columns: 2,
+        rows: 2,
+      });
+    });
+  });
 });
