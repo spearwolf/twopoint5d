@@ -1,44 +1,32 @@
-import {IMap2dTileDataProvider} from './IMap2dTileDataProvider';
-import {RepeatingTilesProvider} from './RepeatingTilesProvider';
-
-export interface TileIdDataArray {
+export interface TilesWithinCoords {
   top: number;
   left: number;
   height: number;
   width: number;
+  tileTop: number;
+  tileLeft: number;
   tileHeight: number;
   tileWidth: number;
   rows: number;
   columns: number;
-  data: Uint32Array;
 }
 
 /**
- * The Map2dTileDataView provides a view into the tile data of a provider
- * and does the mapping from the 2D coordinates to the _tile_ coordinates.
+ * The Map2dTileCoordsUtil does the mapping from _2D_ coordinates to _tile_ coordinates.
  *
- * Just as is the case with the tile coordinates, the origin of the 2D coordinate system
- * is assumed to be in the upper left corner (with the y-axis pointing down).
+ * The origin of the 2D coordinate system is assumed
+ * to be in the upper left corner (with the y-axis pointing down).
  */
-export class Map2dTileDataView {
+export class Map2dTileCoordsUtil {
   tileWidth: number;
   tileHeight: number;
 
   xOffset: number;
   yOffset: number;
 
-  provider: IMap2dTileDataProvider;
-
-  constructor(
-    tileWidth: number,
-    tileHeight: number,
-    provider: IMap2dTileDataProvider = new RepeatingTilesProvider(),
-    xOffset = 0,
-    yOffset = 0,
-  ) {
+  constructor(tileWidth: number, tileHeight: number, xOffset = 0, yOffset = 0) {
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
-    this.provider = provider;
     this.xOffset = xOffset;
     this.yOffset = yOffset;
   }
@@ -70,12 +58,12 @@ export class Map2dTileDataView {
     ];
   }
 
-  getTileIdsWithin(
+  computeTilesWithinCoords(
     left: number,
     top: number,
     width: number,
     height: number,
-  ): TileIdDataArray {
+  ): TilesWithinCoords {
     const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(
       left,
       top,
@@ -83,7 +71,9 @@ export class Map2dTileDataView {
       height,
     );
 
-    const tileIds: TileIdDataArray = {
+    const coords: TilesWithinCoords = {
+      tileTop,
+      tileLeft,
       top: tileTop * this.tileHeight + this.yOffset,
       left: tileLeft * this.tileWidth + this.xOffset,
       height: tileRows * this.tileHeight,
@@ -92,17 +82,8 @@ export class Map2dTileDataView {
       tileWidth: this.tileWidth,
       rows: tileRows,
       columns: tileColumns,
-      data: new Uint32Array(tileRows * tileColumns),
     };
 
-    this.provider.getTileIdsWithin(
-      tileLeft,
-      tileTop,
-      tileColumns,
-      tileRows,
-      tileIds.data,
-    );
-
-    return tileIds;
+    return coords;
   }
 }

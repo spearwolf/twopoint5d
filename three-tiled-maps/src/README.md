@@ -23,9 +23,8 @@ If you want you can limit the repeat to only horizontal or only vertical.
 
 #### From Tile to 2D Coordinates
 
-The [Map2dTileDataView](./Map2dTileDataView.ts) provides a view into the tile data of a provider and does the mapping from the 2D coordinates to the _tile_ coordinates.
+The [Map2dTileCoordsUtil](./Map2dTileCoordsUtil.ts) does the mapping from 2D coordinates to _tile_ coordinates.
 
-Just as is the case with the tile coordinates, the origin of the 2D coordinate system
-is assumed to be in the upper left corner (with the y-axis pointing down).
+the origin of the 2D coordinate system is assumed to be in the upper left corner (with the y-axis pointing down).
 
-![map2d-tile-data-view cheat-sheet](./Map2dTileDataView.svg)
+![map2d-tile-coords-util cheat-sheet](./Map2dTileCoordsUtil.svg)
