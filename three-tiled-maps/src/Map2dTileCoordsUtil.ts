@@ -50,12 +50,7 @@ export class Map2dTileCoordsUtil {
   getTileCoords(left: number, top: number, width: number, height: number) {
     const tileLeft = this.#tileLeft(left);
     const tileTop = this.#tileTop(top);
-    return [
-      tileLeft,
-      tileTop,
-      this.#tileColumns(tileLeft, width),
-      this.#tileRows(tileTop, height),
-    ];
+    return [tileLeft, tileTop, this.#tileColumns(tileLeft, width), this.#tileRows(tileTop, height)];
   }
 
   computeTilesWithinCoords(
@@ -64,12 +59,7 @@ export class Map2dTileCoordsUtil {
     width: number,
     height: number,
   ): TilesWithinCoords {
-    const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(
-      left,
-      top,
-      width,
-      height,
-    );
+    const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(left, top, width, height);
 
     return {
       tileTop,
