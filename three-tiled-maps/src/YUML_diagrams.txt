@@ -1,8 +1,8 @@
 // Map2dLayer
 // ----------
 
-[Map2dLayer|+tileWidth;+tileHeight;+xOffset;+yOffset|+tiles;+renderer|renderViewRect(x, y, width, height)]
+[Map2dLayer|+tileWidth;+tileHeight;+xOffset;+yOffset|+tiles;+tilesRenderer|renderViewArea(x, y, width, height)]
 
 [Map2dLayer]<>-tiles*>[Map2dAreaTile;+top;+left;+width;+height]
 
-[Map2dLayer]-renderer >[<<Map2dLayerRenderer>>|beginRender();addTile(tile);updateTile(tile);removeTile(tile);endRender()]
+[Map2dLayer]-tilesRenderer >[<<Map2dLayerTilesRenderer>>|beginRender();addTile(tile);updateTile(tile);removeTile(tile);endRender()]
