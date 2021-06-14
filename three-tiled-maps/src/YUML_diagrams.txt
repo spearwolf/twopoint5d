@@ -3,6 +3,6 @@
 
 [*Map2dLayer*|+tileWidth;+tileHeight;+xOffset;+yOffset|+tiles;+tilesRenderer|renderViewArea(left, top, width, height)]
 
-[*Map2dLayer*]<>-tiles*>[*Map2dAreaTile*|+(x, y)|+viewLeft;+viewTop;+viewWidth;+viewHeight]
+[*Map2dLayer*]<>-tiles*>[*Map2dAreaTile*|+(x, y)|+view.left;+view.top;+view.width;+view.height]
 
-[*Map2dLayer*]-tilesRenderer >[<<Map2dLayerTilesRenderer>>|beginRender();addTile(tile);updateTile(tile);removeTile(tile);endRender()]
+[*Map2dLayer*]-tilesRenderer >[<<Map2dLayerTilesRenderer>>|beginRender(fullViewArea);removeTile(tile);addTile(tile);reuseTile(tile);endRender()]

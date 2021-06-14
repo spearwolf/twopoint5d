@@ -1,4 +1,4 @@
-import {ViewRect} from './types';
+import {AABB2} from './AABB2';
 
 export class Map2dAreaTile {
   static createID(x: number, y: number) {
@@ -10,16 +10,12 @@ export class Map2dAreaTile {
   readonly x: number;
   readonly y: number;
 
-  view: ViewRect = {
-    left: 0,
-    top: 0,
-    width: 0,
-    height: 0,
-  };
+  view: AABB2;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, view?: AABB2) {
     this.id = Map2dAreaTile.createID(x, y);
     this.x = x;
     this.y = y;
+    this.view = view ?? new AABB2();
   }
 }

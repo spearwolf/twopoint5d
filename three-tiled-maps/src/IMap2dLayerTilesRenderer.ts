@@ -1,14 +1,15 @@
+import {AABB2} from './AABB2';
 import {Map2dAreaTile} from './Map2dAreaTile';
 import {Map2dLayer} from './Map2dLayer';
 
 export interface IMap2dLayerTilesRenderer {
-  beginRender(layer: Map2dLayer): void;
+  beginRender(layer: Map2dLayer, viewArea: AABB2): void;
 
-  addTile(tile: Map2dAreaTile, layer: Map2dLayer): void;
-  updateTile(tile: Map2dAreaTile, layer: Map2dLayer): void;
-  removeTile(tile: Map2dAreaTile, layer: Map2dLayer): void;
+  addTile(tile: Map2dAreaTile): void;
+  reuseTile(tile: Map2dAreaTile): void;
+  removeTile(tile: Map2dAreaTile): void;
 
-  endRender(layer: Map2dLayer): void;
+  endRender(): void;
 
   dispose(): void;
 }

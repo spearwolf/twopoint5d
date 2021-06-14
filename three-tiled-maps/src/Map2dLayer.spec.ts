@@ -1,3 +1,4 @@
+import {AABB2} from './AABB2';
 import {IMap2dLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
 import {Map2dAreaTile} from './Map2dAreaTile';
 import {Map2dLayer} from './Map2dLayer';
@@ -34,11 +35,11 @@ describe('Map2dLayer', () => {
       const layer = new Map2dLayer(1, 1);
       expect(layer.tilesRenderer).toBeUndefined();
       const renderer: IMap2dLayerTilesRenderer = {
-        beginRender(_layer: Map2dLayer) {},
-        addTile(_tile: Map2dAreaTile, _layer: Map2dLayer) {},
-        updateTile(_tile: Map2dAreaTile, _layer: Map2dLayer) {},
-        removeTile(_tile: Map2dAreaTile, _layer: Map2dLayer) {},
-        endRender(_layer: Map2dLayer) {},
+        beginRender(_layer: Map2dLayer, _fullViewArea: AABB2) {},
+        addTile(_tile: Map2dAreaTile) {},
+        reuseTile(_tile: Map2dAreaTile) {},
+        removeTile(_tile: Map2dAreaTile) {},
+        endRender() {},
         dispose() {},
       };
       layer.tilesRenderer = renderer;
