@@ -6,3 +6,9 @@
 [*Map2dLayer*]<>-tiles*>[*Map2dAreaTile*|+(x, y)|+view.left;+view.top;+view.width;+view.height]
 
 [*Map2dLayer*]-tilesRenderer >[<<Map2dLayerTilesRenderer>>|beginRender(fullViewArea);removeTile(tile);addTile(tile);reuseTile(tile);endRender()]
+
+
+// Map2dLayer updating the view area
+// ---------------------------------------
+
+(start)->(beginRender)->(removeTile)->(addTile)->(reuseTile)->(endRender)->(end)
