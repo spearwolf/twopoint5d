@@ -43,7 +43,7 @@ export class BasicLayerTilesRenderer {
       console.log("endRender, serial=", this.renderSerial);
     }
     if (this.renderSerial) {
-      this.mesh.geometry.touch("quadSize", "texCoords");
+      this.mesh.geometry.touch("quadSize", "texCoords", "instancePosition");
     }
     ++this.frameSerial;
   }
