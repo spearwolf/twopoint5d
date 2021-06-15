@@ -1,0 +1,121 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        color: #fff;
+        background: linear-gradient(
+          to right bottom,
+          #0d1d3a 0,
+          #1a2f55 52%,
+          #365a83
+        );
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+      .intro {
+        font-family: "Arial Black", sans-serif;
+        font-size: 24px;
+      }
+      em {
+        font-family: Arial, sans-serif;
+        font-size: 84.615384%;
+        color: rgba(174, 221, 255, 0.8);
+      }
+      code {
+        font-family: "Courier New", monospace;
+        font-style: normal;
+        font-size: 120%;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
+          "three-tild-maps": "/three-tiled-maps/build/three-tiled-maps.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>
+        three-tiled-maps :: layer tiles renderer<br />
+        <em>an <code>IMap2dLayerTilesRenderer</code> example</em>
+      </p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import {
+        BoxGeometry,
+        EdgesGeometry,
+        LineSegments,
+        LineBasicMaterial,
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import { TextureFactory, TileSetLoader } from "three-vertex-objects";
+      import { RepeatingTilesProvider, Map2dLayer } from "three-tild-maps";
+      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
+      import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";
+
+      const demo = new PerspectiveOrbitDemo(
+        document.getElementById("canvas-container"),
+        { antialias: false }
+      );
+
+      demo.start(async ({ scene, camera, width, height }) => {
+        camera.position.set(0, 350, 500);
+        camera.far = 8000;
+
+        const geometry = new BoxGeometry(640, 20, 480);
+        const edges = new EdgesGeometry(geometry);
+        const line = new LineSegments(
+          edges,
+          new LineBasicMaterial({ color: 0xffffff })
+        );
+        scene.add(line);
+
+        // a. create repeating tiles data provider
+        // ------------------------------------------------------
+
+        const tilesData = new RepeatingTilesProvider([
+          [1, 2],
+          [3, 4],
+        ]);
+
+        // b. load tileset
+        // ------------------------------------------------------
+
+        const tileSetLoader = new TileSetLoader(new TextureFactory());
+        const { tileSet, texture } = await tileSetLoader.loadAsync(
+          "/examples/assets/map2d-debug-tiles_4x256x256.png",
+          { tileWidth: 256, tileHeight: 256 }
+        );
+
+        // c. create basic layer tiles renderer
+        // ------------------------------------------------------
+
+        const renderer = new BasicLayerTilesRenderer(
+          tilesData,
+          tileSet,
+          texture
+        );
+
+        scene.add(renderer.mesh);
+
+        console.log(renderer);
+
+        // d. create map2d layer
+        // ------------------------------------------------------
+
+        const map2dLayer = new Map2dLayer(320, 240);
+
+        map2dLayer.tilesRenderer = renderer;
+        map2dLayer.renderViewArea(-320, -240, 640, 480);
+      });
+    </script>
+  </body>
+</html>

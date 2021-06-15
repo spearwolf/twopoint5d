@@ -1,11 +1,11 @@
 class BaseSprite {
-  make(width = 0.5, height = 0.5) {
+  make(width = 0.5, height = 0.5, xOffset = 0, yOffset = 0) {
     // prettier-ignore
     this.setPosition([
-      - width, - height, 0,
-      - width, + height, 0,
-      + width, + height, 0,
-      + width, - height, 0,
+      - width + xOffset, - height + yOffset, 0,
+      - width + xOffset, + height + yOffset, 0,
+      + width + xOffset, + height + yOffset, 0,
+      + width + xOffset, - height + yOffset, 0,
     ]);
     // prettier-ignore
     this.setUv([
