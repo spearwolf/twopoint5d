@@ -37,6 +37,122 @@ describe('RepeatingTilesProvider', () => {
       expect(new RepeatingTilesProvider(1, 'vertical').limitToAxis).toBe('vertical');
     });
   });
+  describe('getTileIdAt()', () => {
+    test('vertical', () => {
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'vertical',
+        ).getTileIdAt(0, 0),
+      ).toEqual(1);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'vertical',
+        ).getTileIdAt(1, 11),
+      ).toEqual(4);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'vertical',
+        ).getTileIdAt(0, -5),
+      ).toEqual(3);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'vertical',
+        ).getTileIdAt(-5, 0),
+      ).toEqual(0);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'vertical',
+        ).getTileIdAt(2, 9),
+      ).toEqual(0);
+    });
+    test('horizontal', () => {
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'horizontal',
+        ).getTileIdAt(0, 0),
+      ).toEqual(1);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'horizontal',
+        ).getTileIdAt(10, 1),
+      ).toEqual(3);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'horizontal',
+        ).getTileIdAt(-5, 0),
+      ).toEqual(2);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'horizontal',
+        ).getTileIdAt(0, -5),
+      ).toEqual(0);
+      expect(
+        new RepeatingTilesProvider(
+          [
+            [1, 2],
+            [3, 4],
+          ],
+          'horizontal',
+        ).getTileIdAt(9, 2),
+      ).toEqual(0);
+    });
+    test('none', () => {
+      expect(
+        new RepeatingTilesProvider([
+          [1, 2],
+          [3, 4],
+        ]).getTileIdAt(0, 0),
+      ).toEqual(1);
+      expect(
+        new RepeatingTilesProvider([
+          [1, 2],
+          [3, 4],
+        ]).getTileIdAt(-1, 0),
+      ).toEqual(2);
+      expect(
+        new RepeatingTilesProvider([
+          [1, 2],
+          [3, 4],
+        ]).getTileIdAt(7, -4),
+      ).toEqual(2);
+    });
+  });
   describe('getTileIdsWithin()', () => {
     test('without target returns a new typed array', () => {
       const provider = new RepeatingTilesProvider();

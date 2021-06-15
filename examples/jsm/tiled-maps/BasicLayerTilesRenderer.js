@@ -1,25 +1,24 @@
-import { TexturedSpritesGeometry } from "../textured-sprites/TexturedSpritesGeometry.js";
-import { TexturedSpritesMaterial } from "../textured-sprites/TexturedSpritesMaterial.js";
-import { TexturedSprites } from "../textured-sprites/TexturedSprites.js";
+import {
+  TileSpritesGeometry,
+  TileSpritesMaterial,
+  TileSprites,
+} from "three-tiled-maps";
 
 export class BasicLayerTilesRenderer {
   constructor(tilesData, tileSet, texture, capacity = 1000) {
     this.tilesData = tilesData;
     this.tileSet = tileSet;
 
-    const geometry = new TexturedSpritesGeometry(
-      capacity,
-      [0.5, 0.5, 0.5, 0.5]
-    );
+    const geometry = new TileSpritesGeometry(capacity);
 
-    const material = new TexturedSpritesMaterial({
+    const material = new TileSpritesMaterial({
       colorMap: texture,
     });
 
     material.depthTest = true;
     material.depthWrite = true;
 
-    this.mesh = new TexturedSprites(geometry, material);
+    this.mesh = new TileSprites(geometry, material);
     this.mesh.frustumCulled = false;
 
     this.tiles = new Map();
@@ -62,18 +61,18 @@ export class BasicLayerTilesRenderer {
   }
 
   addTile(tile) {
+    const tileId = this.tilesData.getTileIdAt(tile.x, tile.y);
+
+    if (tileId === 0) {
+      return;
+    }
+
     const sprite = this.instancedPool.createVO();
 
     sprite.setQuadSize([tile.view.width, tile.view.height]);
-    sprite.setInstancePosition([tile.view.left, tile.view.top, 0]);
+    sprite.setInstancePosition([tile.view.left, 0, tile.view.top]);
 
-    const tileIds = this.tilesData.getTileIdsWithin(
-      tile.x + tile.view.width / 2,
-      tile.y + tile.view.height / 2,
-      1,
-      1
-    );
-    const frameId = this.tileSet.frameId(tileIds[0]);
+    const frameId = this.tileSet.frameId(tileId);
     const texCoords = this.tileSet.atlas.get(frameId).coords;
 
     sprite.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);

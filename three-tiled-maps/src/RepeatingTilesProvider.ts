@@ -43,6 +43,33 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
     this.limitToAxis = limitToAxis;
   }
 
+  getTileIdAt(col: number, row: number): number {
+    switch (this.limitToAxis) {
+      case 'vertical':
+        if (col >= 0 && col < this.#cols) {
+          row = row < 0 ? row + Math.ceil(-row / this.#rows) * this.#rows : row;
+          return this.#tileIds[row % this.#rows][col];
+        }
+        break;
+      case 'horizontal':
+        if (row >= 0 && row < this.#rows) {
+          col = col < 0 ? col + Math.ceil(-col / this.#cols) * this.#cols : col;
+          return this.#tileIds[row][col % this.#cols];
+        }
+        break;
+      case 'none':
+      default:
+        col = col < 0 ? col + Math.ceil(-col / this.#cols) * this.#cols : col;
+        row = row < 0 ? row + Math.ceil(-row / this.#rows) * this.#rows : row;
+        return this.#tileIds[row % this.#rows][col % this.#cols];
+    }
+    return 0;
+  }
+
+  /**
+   * Please bear in mind that all coordinates are given in _tile space_
+   * - therefore only integer numbers should be used here
+   */
   getTileIdsWithin(
     left: number,
     top: number,

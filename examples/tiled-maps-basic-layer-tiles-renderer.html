@@ -35,7 +35,7 @@
           "three": "/node_modules/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/node_modules/three/examples/jsm/controls/OrbitControls.js",
           "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
-          "three-tild-maps": "/three-tiled-maps/build/three-tiled-maps.js"
+          "three-tiled-maps": "/three-tiled-maps/build/three-tiled-maps.js"
         }
       }
     </script>
@@ -57,7 +57,7 @@
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import { TextureFactory, TileSetLoader } from "three-vertex-objects";
-      import { RepeatingTilesProvider, Map2dLayer } from "three-tild-maps";
+      import { RepeatingTilesProvider, Map2dLayer } from "three-tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
       import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";
 
@@ -111,7 +111,7 @@
         // d. create map2d layer
         // ------------------------------------------------------
 
-        const map2dLayer = new Map2dLayer(320, 240);
+        const map2dLayer = new Map2dLayer(160, 120);
 
         map2dLayer.tilesRenderer = renderer;
         map2dLayer.renderViewArea(-320, -240, 640, 480);
