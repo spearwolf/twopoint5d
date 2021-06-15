@@ -78,7 +78,7 @@
         );
         scene.add(line);
 
-        // a. create repeating tiles data provider
+        // a. create a tiles data provider
         // ------------------------------------------------------
 
         const tilesData = new RepeatingTilesProvider([
@@ -86,7 +86,7 @@
           [3, 4],
         ]);
 
-        // b. load tileset
+        // b. load a tileset
         // ------------------------------------------------------
 
         const tileSetLoader = new TileSetLoader(new TextureFactory());
@@ -95,7 +95,7 @@
           { tileWidth: 256, tileHeight: 256 }
         );
 
-        // c. create basic layer tiles renderer
+        // c. create the layer tiles renderer
         // ------------------------------------------------------
 
         const renderer = new BasicLayerTilesRenderer(
@@ -108,7 +108,7 @@
 
         console.log(renderer);
 
-        // d. create map2d layer
+        // d. create a map2d layer
         // ------------------------------------------------------
 
         const map2dLayer = new Map2dLayer(160, 120);
