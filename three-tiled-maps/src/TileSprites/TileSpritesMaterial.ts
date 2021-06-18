@@ -8,7 +8,7 @@ const vertexShader = `
   varying vec2 vTexCoords;
 
   void main() {
-    vec4 vertexPosition = vec4(position * vec3(quadSize.x, 0.0, quadSize.y), 1.0)
+    vec4 vertexPosition = vec4(position * vec3(quadSize.x, 0.0, quadSize.y), 0.0)
                         + vec4(instancePosition, 1.0);
 
     gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;

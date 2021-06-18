@@ -40,8 +40,8 @@ export const TileSpriteDescriptor: VertexObjectDescription = {
   meshCount: 1,
 
   attributes: {
-    quadSize: {components: ['width', 'height'], usage: 'dynamic', autoTouch: true},
-    texCoords: {size: 4, usage: 'dynamic', autoTouch: true},
-    instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: true},
+    instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: false},
+    texCoords: {size: 4, usage: 'dynamic', autoTouch: false},
+    quadSize: {components: ['width', 'height'], usage: 'dynamic', autoTouch: false},
   },
 };

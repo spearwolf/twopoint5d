@@ -185,7 +185,9 @@
         '/examples/assets/nobinger-anim-sheet.png',
         {tileWidth: 64, tileHeight: 64, margin: 1},
         ({tileSet, texture}) => {
-          demo.on('init', ({scene}) => {
+          demo.on('init', ({scene, camera}) => {
+            camera.position.set(0, 0, 50);
+
             const CAPACITY = 333;
             const geometry = new AnimatedSpritesGeometry(CAPACITY);
 

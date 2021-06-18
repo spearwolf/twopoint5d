@@ -56,12 +56,12 @@ const vertexShader = `
 #else
 
     vec4 vertexPosition = rotateZ(rotation)
-                        * vec4(position * vec3(quadSize.xy, 0.0), 1.0)
+                        * vec4(position * vec3(quadSize.xy, 0.0), 0.0)
                         + vec4(instancePosition, 1.0);
 
 #endif
 
-    gl_Position = projectionMatrix * modelViewMatrix * vertexPosition;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition.xyz, 1.0);
 
     // ---- texture coords from frame based animations meta data ---------------
     vec4 animMetaData = texture2D(animsMap, texCoordsFromIndex(animsMapSize, int(animId)));

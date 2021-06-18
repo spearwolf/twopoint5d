@@ -80,8 +80,8 @@
         constructor(
           spritePool,
           textureAtlas,
-          width = 600,
-          height = 300,
+          width = 300,
+          height = 150,
           spriteSize = 10,
           initalSpriteCount = 256,
         ) {
@@ -205,14 +205,16 @@
         '/examples/assets/nobinger-anim-sheet.png',
         {tileWidth: 64, tileHeight: 64, margin: 1},
         ({tileSet, texture}) => {
-          demo.on('init', ({scene}) => {
+          demo.on('init', ({scene, camera}) => {
+            camera.position.set(0, 0, 50);
+
             const CAPACITY = 333;
             const geometry = new TexturedSpritesGeometry(CAPACITY);
 
             const bouncingSprites = new BouncingSprites(
               geometry.instancedPool,
               tileSet.atlas,
-              200,
+              100,
               75,
               7,
               CAPACITY,

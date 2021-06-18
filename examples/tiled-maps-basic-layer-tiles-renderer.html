@@ -60,6 +60,7 @@
       import { RepeatingTilesProvider, Map2dLayer } from "three-tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
       import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";
+      import { makePoints } from "/examples/jsm/utils/makePoints.js";
 
       const demo = new PerspectiveOrbitDemo(
         document.getElementById("canvas-container"),
@@ -74,7 +75,7 @@
         const edges = new EdgesGeometry(geometry);
         const line = new LineSegments(
           edges,
-          new LineBasicMaterial({ color: 0xffffff })
+          new LineBasicMaterial({ color: 0xf0f0f0 })
         );
         scene.add(line);
 
@@ -111,10 +112,22 @@
         // d. create a map2d layer
         // ------------------------------------------------------
 
-        const map2dLayer = new Map2dLayer(160, 120);
+        const map2dLayer = new Map2dLayer(300, 300);
 
         map2dLayer.tilesRenderer = renderer;
         map2dLayer.renderViewArea(-320, -240, 640, 480);
+
+        // prettier-ignore
+        scene.add(makePoints([
+          -320, 23, -240,
+          0, 23, -240,
+          320, 23, -240,
+          320, 23, 0,
+          320, 23, 240,
+          0, 23, 240,
+          -320, 23, 240,
+          -320, 23, 0,
+        ]));
       });
     </script>
   </body>
