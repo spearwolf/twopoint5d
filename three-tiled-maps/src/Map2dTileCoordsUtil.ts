@@ -31,6 +31,9 @@ export class Map2dTileCoordsUtil {
     this.yOffset = yOffset;
   }
 
+  #left = (tileLeft: number) => tileLeft * this.tileWidth + this.xOffset;
+  #top = (tileTop: number) => tileTop * this.tileHeight + this.yOffset;
+
   #tileLeft = (left: number) => {
     return Math.floor((left - this.xOffset) / this.tileWidth);
   };
@@ -49,8 +52,10 @@ export class Map2dTileCoordsUtil {
 
   getTileCoords(left: number, top: number, width: number, height: number) {
     const tileLeft = this.#tileLeft(left);
+    const w = width + left - this.#left(tileLeft);
     const tileTop = this.#tileTop(top);
-    return [tileLeft, tileTop, this.#tileColumns(tileLeft, width), this.#tileRows(tileTop, height)];
+    const h = height + top - this.#top(tileTop);
+    return [tileLeft, tileTop, this.#tileColumns(tileLeft, w), this.#tileRows(tileTop, h)];
   }
 
   computeTilesWithinCoords(
@@ -64,8 +69,8 @@ export class Map2dTileCoordsUtil {
     return {
       tileTop,
       tileLeft,
-      top: tileTop * this.tileHeight + this.yOffset,
-      left: tileLeft * this.tileWidth + this.xOffset,
+      top: this.#top(tileTop),
+      left: this.#left(tileLeft),
       height: tileRows * this.tileHeight,
       width: tileColumns * this.tileWidth,
       tileHeight: this.tileHeight,
