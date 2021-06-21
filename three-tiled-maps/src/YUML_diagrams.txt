@@ -11,4 +11,4 @@
 // Map2dLayer updating the view area
 // ---------------------------------------
 
-(start)->(beginUpdate)->(removeTile)->(addTile)->(reuseTile)->(endUpdate)->(end)
+(start)->(beginUpdate)->(removeTile*)->(addTile*)->(reuseTile*)->(endUpdate)->(end)

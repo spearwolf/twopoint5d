@@ -40,7 +40,7 @@ The layer does not render the tiles itself, it only manages which tiles are visi
 
 ![Map2dLayer update](./Map2dLayer-renderViewArea.svg)
 
-Every time the _view area_ is updated, the [IMap2dLayerTilesRenderer](./IMap2dLayerTilesRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
+Every time the _view area_ is updated (by calling `map2dLayer.update()` in combination with changes to the map2d layer properties), the [IMap2dLayerTilesRenderer](./IMap2dLayerTilesRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
 
 ![Map2dLayer update view area](./Map2dLayer-update-view-area.svg)
 
