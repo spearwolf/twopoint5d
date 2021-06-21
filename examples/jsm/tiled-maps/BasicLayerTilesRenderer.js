@@ -23,7 +23,7 @@ export class BasicLayerTilesRenderer {
 
     this.tiles = new Map();
 
-    this.frameSerial = 0; // TODO remove me
+    this.renderSerial = 0;
   }
 
   get instancedPool() {
@@ -31,27 +31,25 @@ export class BasicLayerTilesRenderer {
   }
 
   beginRender(layer, fullViewArea) {
-    if (this.frameSerial < 2) {
-      console.log("beginRender", layer, fullViewArea);
-    }
+    console.log("beginRender", layer, fullViewArea);
+
     this.layer = layer;
+    this.mesh?.position.set(layer.xOffset, 0, layer.yOffset);
+
     this.renderSerial = 0;
   }
 
   endRender() {
-    if (this.frameSerial < 2) {
-      console.log("endRender, serial=", this.renderSerial);
-    }
+    console.log("endRender, serial=", this.renderSerial);
+
     if (this.renderSerial) {
       this.mesh.geometry.touch("quadSize", "texCoords", "instancePosition");
     }
-    ++this.frameSerial;
   }
 
   removeTile(tile) {
-    if (this.frameSerial < 2) {
-      console.log("removeTile", tile);
-    }
+    console.log("removeTile", tile);
+
     const sprite = this.tiles.get(tile.id);
     if (sprite) {
       this.instancedPool.freeVO(sprite);
@@ -81,14 +79,10 @@ export class BasicLayerTilesRenderer {
 
     ++this.renderSerial;
 
-    if (this.frameSerial < 2) {
-      console.log("addTile", tile, sprite);
-    }
+    console.log("addTile", tile, sprite);
   }
 
   reuseTile(tile) {
-    if (this.frameSerial < 2) {
-      console.log("reuseTile", tile);
-    }
+    console.log("reuseTile", tile);
   }
 }

@@ -5,21 +5,28 @@ import {Map2dTileCoordsUtil} from './Map2dTileCoordsUtil';
 
 export class Map2dLayer {
   #tileCoords: Map2dTileCoordsUtil;
+  #needsUpdate = true;
 
   get tileWidth() {
     return this.#tileCoords.tileWidth;
   }
 
   set tileWidth(width: number) {
-    this.#tileCoords.tileWidth = width;
+    if (this.#tileCoords.tileWidth !== width) {
+      this.#tileCoords.tileWidth = width;
+      this.#needsUpdate = true;
+    }
   }
 
   get tileHeight() {
     return this.#tileCoords.tileHeight;
   }
 
-  set tileHeight(width: number) {
-    this.#tileCoords.tileHeight = width;
+  set tileHeight(height: number) {
+    if (this.#tileCoords.tileHeight !== height) {
+      this.#tileCoords.tileHeight = height;
+      this.#needsUpdate = true;
+    }
   }
 
   get xOffset() {
@@ -27,7 +34,10 @@ export class Map2dLayer {
   }
 
   set xOffset(offset: number) {
-    this.#tileCoords.xOffset = offset;
+    if (this.#tileCoords.xOffset !== offset) {
+      this.#tileCoords.xOffset = offset;
+      this.#needsUpdate = true;
+    }
   }
 
   get yOffset() {
@@ -35,7 +45,10 @@ export class Map2dLayer {
   }
 
   set yOffset(offset: number) {
-    this.#tileCoords.yOffset = offset;
+    if (this.#tileCoords.yOffset !== offset) {
+      this.#tileCoords.yOffset = offset;
+      this.#needsUpdate = true;
+    }
   }
 
   tiles: Map2dAreaTile[] = [];
@@ -49,11 +62,15 @@ export class Map2dLayer {
 
   renderViewArea(left: number, top: number, width: number, height: number) {
     if (!this.tilesRenderer) return;
-    if (!this.#lastViewArea.is(left, top, width, height)) {
+    if (this.#needsUpdate || !this.#lastViewArea.is(left, top, width, height)) {
+      this.#needsUpdate = false;
       this.#lastViewArea.set(left, top, width, height);
-      const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
 
+      const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
       const fullViewArea = AABB2.from(tileCoords);
+      fullViewArea.top -= this.yOffset;
+      fullViewArea.left -= this.xOffset;
+
       const removeTiles: Map2dAreaTile[] = [];
       const reuseTiles: Map2dAreaTile[] = [];
       const createTilesState = new Uint8Array(tileCoords.rows * tileCoords.columns);

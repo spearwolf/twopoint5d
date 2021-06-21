@@ -45,5 +45,6 @@ describe('Map2dLayer', () => {
       layer.tilesRenderer = renderer;
       expect(layer.tilesRenderer).toBe(renderer);
     });
+    // TODO add renderViewArea() tests !!
   });
 });
