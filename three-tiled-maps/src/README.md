@@ -38,7 +38,7 @@ Which tiles are displayed is determined by the _view area_ (which is an [AABB2](
 
 The layer does not render the tiles itself, it only manages which tiles are visible, which are created and which can be removed (because they are outside the view area).
 
-![Map2dLayer renderViewArea](./Map2dLayer-renderViewArea.svg)
+![Map2dLayer update](./Map2dLayer-renderViewArea.svg)
 
 Every time the _view area_ is updated, the [IMap2dLayerTilesRenderer](./IMap2dLayerTilesRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
 

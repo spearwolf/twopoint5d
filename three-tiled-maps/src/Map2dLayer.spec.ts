@@ -35,7 +35,7 @@ describe('Map2dLayer', () => {
       const layer = new Map2dLayer(1, 1);
       expect(layer.tilesRenderer).toBeUndefined();
       const renderer: IMap2dLayerTilesRenderer = {
-        beginRender(
+        beginUpdate(
           _layer: Map2dLayer,
           _xOffset: number,
           _yOffset: number,
@@ -44,7 +44,7 @@ describe('Map2dLayer', () => {
         addTile(_tile: Map2dAreaTile) {},
         reuseTile(_tile: Map2dAreaTile) {},
         removeTile(_tile: Map2dAreaTile) {},
-        endRender() {},
+        endUpdate() {},
         dispose() {},
       };
       layer.tilesRenderer = renderer;

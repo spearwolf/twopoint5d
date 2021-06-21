@@ -30,8 +30,8 @@ export class BasicLayerTilesRenderer {
     return this.mesh?.geometry?.instancedPool;
   }
 
-  beginRender(layer, xOffset, yOffset, fullViewArea) {
-    console.log("beginRender", layer, xOffset, yOffset, fullViewArea);
+  beginUpdate(layer, xOffset, yOffset, fullViewArea) {
+    console.log("beginUpdate", layer, xOffset, yOffset, fullViewArea);
 
     this.layer = layer;
     this.mesh?.position.set(xOffset, 0, yOffset);
@@ -39,8 +39,8 @@ export class BasicLayerTilesRenderer {
     this.renderSerial = 0;
   }
 
-  endRender() {
-    console.log("endRender, serial=", this.renderSerial);
+  endUpdate() {
+    console.log("endUpdate, serial=", this.renderSerial);
 
     if (this.renderSerial) {
       this.mesh.geometry.touch("quadSize", "texCoords", "instancePosition");

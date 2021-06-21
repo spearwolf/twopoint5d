@@ -4,8 +4,59 @@ import {Map2dAreaTile} from './Map2dAreaTile';
 import {Map2dTileCoordsUtil} from './Map2dTileCoordsUtil';
 
 export class Map2dLayer {
+  #width = 320;
+  #height = 240;
+
+  #centerX = 0;
+  #centerY = 0;
+
   #tileCoords: Map2dTileCoordsUtil;
+
   #needsUpdate = true;
+
+  get width() {
+    return this.#width;
+  }
+
+  set width(width: number) {
+    if (this.#width !== width) {
+      this.#width = width;
+      this.#needsUpdate = true;
+    }
+  }
+
+  get height() {
+    return this.#height;
+  }
+
+  set height(height: number) {
+    if (this.#height !== height) {
+      this.#height = height;
+      this.#needsUpdate = true;
+    }
+  }
+
+  get centerX() {
+    return this.#centerX;
+  }
+
+  set centerX(x: number) {
+    if (this.#centerX !== x) {
+      this.#centerX = x;
+      this.#needsUpdate = true;
+    }
+  }
+
+  get centerY() {
+    return this.#centerY;
+  }
+
+  set centerY(y: number) {
+    if (this.#centerY !== y) {
+      this.#centerY = y;
+      this.#needsUpdate = true;
+    }
+  }
 
   get tileWidth() {
     return this.#tileCoords.tileWidth;
@@ -54,21 +105,22 @@ export class Map2dLayer {
   tiles: Map2dAreaTile[] = [];
   tilesRenderer: IMap2dLayerTilesRenderer;
 
-  #lastViewArea = new AABB2();
-
   constructor(tileWidth: number, tileHeight: number, xOffset = 0, yOffset = 0) {
     this.#tileCoords = new Map2dTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
-  renderViewArea(centerX: number, centerY: number, width: number, height: number) {
+  update() {
     if (!this.tilesRenderer) return;
 
-    const left = centerX - width / 2;
-    const top = centerY - height / 2;
+    if (this.#needsUpdate) {
+      const {width, height, centerX, centerY} = this;
 
-    if (this.#needsUpdate || !this.#lastViewArea.is(left, top, width, height)) {
+      if (width === 0 || height === 0) return;
+
       this.#needsUpdate = false;
-      this.#lastViewArea.set(left, top, width, height);
+
+      const left = centerX - width / 2;
+      const top = centerY - height / 2;
 
       const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
       const fullViewArea = AABB2.from(tileCoords);
@@ -115,11 +167,11 @@ export class Map2dLayer {
       const xOffset = this.xOffset - centerX;
       const yOffset = this.yOffset - centerY;
 
-      this.tilesRenderer.beginRender(this, xOffset, yOffset, fullViewArea);
+      this.tilesRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
       removeTiles.forEach((tile) => this.tilesRenderer.removeTile(tile));
       createTiles.forEach((tile) => this.tilesRenderer.addTile(tile));
       reuseTiles.forEach((tile) => this.tilesRenderer.reuseTile(tile));
-      this.tilesRenderer.endRender();
+      this.tilesRenderer.endUpdate();
     }
   }
 }

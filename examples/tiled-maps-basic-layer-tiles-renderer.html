@@ -113,11 +113,19 @@
         // ------------------------------------------------------
 
         const map2dLayer = new Map2dLayer(256, 256, -128, -128);
+
         map2dLayer.tilesRenderer = renderer;
 
-        demo.on("frame", () => {
-          map2dLayer.renderViewArea(0, 0, 640, 480);
-        });
+        map2dLayer.width = 640;
+        map2dLayer.height = 480;
+
+        map2dLayer.centerX = 0;
+        map2dLayer.centerY = 0;
+
+        demo.on("frame", () => map2dLayer.update());
+
+        window.map2dLayer = map2dLayer;
+        console.log("map2dLayer", map2dLayer);
 
         // prettier-ignore
         scene.add(makePoints([
@@ -141,9 +149,6 @@
           128, 11, 384,
           384, 11, 384,
         ]));
-
-        window.map2dLayer = map2dLayer;
-        console.log('map2dLayer', map2dLayer);
       });
     </script>
   </body>

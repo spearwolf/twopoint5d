@@ -1,14 +1,14 @@
 // Map2dLayer
 // ----------
 
-[*Map2dLayer*|+tileWidth;+tileHeight;+xOffset;+yOffset|+tiles;+tilesRenderer|renderViewArea(left, top, width, height)]
+[*Map2dLayer*|+width;+height;+centerX;+centerY|+tileWidth;+tileHeight;+xOffset;+yOffset|+tilesRenderer|update()]
 
-[*Map2dLayer*]<>-tiles*>[*Map2dAreaTile*|+(x, y)|+view.left;+view.top;+view.width;+view.height]
+[*Map2dLayer*]<>-tiles*>[*Map2dAreaTile*|+x; +y|+view.left;+view.top;+view.width;+view.height]
 
-[*Map2dLayer*]-tilesRenderer >[<<Map2dLayerTilesRenderer>>|beginRender(fullViewArea);removeTile(tile);addTile(tile);reuseTile(tile);endRender()]
+[*Map2dLayer*]-update >[<<IMap2dLayerTilesRenderer>>|beginUpdate(x, y, fullViewArea);removeTile(tile);addTile(tile);reuseTile(tile);endUpdate()]
 
 
 // Map2dLayer updating the view area
 // ---------------------------------------
 
-(start)->(beginRender)->(removeTile)->(addTile)->(reuseTile)->(endRender)->(end)
+(start)->(beginUpdate)->(removeTile)->(addTile)->(reuseTile)->(endUpdate)->(end)
