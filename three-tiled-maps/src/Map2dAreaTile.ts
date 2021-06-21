@@ -2,7 +2,7 @@ import {AABB2} from './AABB2';
 
 export class Map2dAreaTile {
   static createID(x: number, y: number) {
-    return `${y.toString(16)}_${x.toString(16)}`;
+    return `y${y.toString(16)}${x < 0 ? '' : 'x'}${x.toString(16)}`;
   }
 
   readonly id: string;

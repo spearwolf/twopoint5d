@@ -3,7 +3,7 @@ import {Map2dAreaTile} from './Map2dAreaTile';
 describe('Map2dAreaTile', () => {
   test('id', () => {
     const tile = new Map2dAreaTile(0, 0);
-    expect(tile.id).toBe('0_0');
+    expect(tile.id).toBe('y0x0');
   });
   test('x, y', () => {
     const tile = new Map2dAreaTile(8, 16);
