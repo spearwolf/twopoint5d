@@ -30,11 +30,11 @@ export class BasicLayerTilesRenderer {
     return this.mesh?.geometry?.instancedPool;
   }
 
-  beginRender(layer, fullViewArea) {
-    console.log("beginRender", layer, fullViewArea);
+  beginRender(layer, xOffset, yOffset, fullViewArea) {
+    console.log("beginRender", layer, xOffset, yOffset, fullViewArea);
 
     this.layer = layer;
-    this.mesh?.position.set(layer.xOffset, 0, layer.yOffset);
+    this.mesh?.position.set(xOffset, 0, yOffset);
 
     this.renderSerial = 0;
   }

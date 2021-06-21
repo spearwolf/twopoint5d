@@ -41,8 +41,8 @@ describe('Map2dTileCoordsUtil', () => {
       expect(
         new Map2dTileCoordsUtil(16, 16, 20, 20).computeTilesWithinCoords(8, 8, 17, 17),
       ).toMatchObject({
-        top: 4,
-        left: 4,
+        top: -16,
+        left: -16,
         width: 32,
         height: 32,
         tileTop: -1,

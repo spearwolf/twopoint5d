@@ -60,16 +60,18 @@ export class Map2dLayer {
     this.#tileCoords = new Map2dTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
-  renderViewArea(left: number, top: number, width: number, height: number) {
+  renderViewArea(centerX: number, centerY: number, width: number, height: number) {
     if (!this.tilesRenderer) return;
+
+    const left = centerX - width / 2;
+    const top = centerY - height / 2;
+
     if (this.#needsUpdate || !this.#lastViewArea.is(left, top, width, height)) {
       this.#needsUpdate = false;
       this.#lastViewArea.set(left, top, width, height);
 
       const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
       const fullViewArea = AABB2.from(tileCoords);
-      fullViewArea.top -= this.yOffset;
-      fullViewArea.left -= this.xOffset;
 
       const removeTiles: Map2dAreaTile[] = [];
       const reuseTiles: Map2dAreaTile[] = [];
@@ -110,7 +112,10 @@ export class Map2dLayer {
 
       this.tiles = reuseTiles.concat(createTiles);
 
-      this.tilesRenderer.beginRender(this, fullViewArea);
+      const xOffset = this.xOffset - centerX;
+      const yOffset = this.yOffset - centerY;
+
+      this.tilesRenderer.beginRender(this, xOffset, yOffset, fullViewArea);
       removeTiles.forEach((tile) => this.tilesRenderer.removeTile(tile));
       createTiles.forEach((tile) => this.tilesRenderer.addTile(tile));
       reuseTiles.forEach((tile) => this.tilesRenderer.reuseTile(tile));

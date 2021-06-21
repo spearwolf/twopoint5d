@@ -69,8 +69,8 @@ export class Map2dTileCoordsUtil {
     return {
       tileTop,
       tileLeft,
-      top: this.#top(tileTop),
-      left: this.#left(tileLeft),
+      top: this.#top(tileTop) - this.yOffset,
+      left: this.#left(tileLeft) - this.xOffset,
       height: tileRows * this.tileHeight,
       width: tileColumns * this.tileWidth,
       tileHeight: this.tileHeight,

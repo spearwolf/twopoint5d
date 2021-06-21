@@ -35,7 +35,12 @@ describe('Map2dLayer', () => {
       const layer = new Map2dLayer(1, 1);
       expect(layer.tilesRenderer).toBeUndefined();
       const renderer: IMap2dLayerTilesRenderer = {
-        beginRender(_layer: Map2dLayer, _fullViewArea: AABB2) {},
+        beginRender(
+          _layer: Map2dLayer,
+          _xOffset: number,
+          _yOffset: number,
+          _fullViewArea: AABB2,
+        ) {},
         addTile(_tile: Map2dAreaTile) {},
         reuseTile(_tile: Map2dAreaTile) {},
         removeTile(_tile: Map2dAreaTile) {},
