@@ -5,7 +5,8 @@
     "three-vertex-objects",
     "three-tiled-maps",
     "r3f-vertex-objects",
-    "r3f-examples"
+    "r3f-examples",
+    "bitmap-font-tool"
   ],
   "scripts": {
     "build": "npm run build --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects",

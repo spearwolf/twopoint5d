@@ -1,0 +1,11 @@
+{
+  "name": "bitmap-font-tool",
+  "version": "0.0.1",
+  "scripts": {},
+  "author": "Wolfger Schramm <wolfger@spearwolf.de>",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "sharp": "^0.28.3",
+    "zx": "^1.14.2"
+  }
+}
