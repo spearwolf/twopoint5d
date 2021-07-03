@@ -48,6 +48,11 @@ export class VertexObjectPool<VOType = VO> {
     return this.capacity - this.usedCount;
   }
 
+  clear(): void {
+    this.usedCount = 0;
+    this.index.fill(undefined);
+  }
+
   createVO(): VOType & VO {
     if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;
