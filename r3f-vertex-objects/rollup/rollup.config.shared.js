@@ -35,6 +35,7 @@ export default (build, buildConfig) => {
         '@react-three/fiber',
         'three',
         'three-vertex-objects',
+        'use-asset',
       ]),
       typescript(),
       createBannerPlugin({...packageJson, version}),
