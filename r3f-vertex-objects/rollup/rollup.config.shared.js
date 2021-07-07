@@ -34,6 +34,7 @@ export default (build, buildConfig) => {
         'react-dom',
         '@react-three/fiber',
         'three',
+        'three-tiled-maps',
         'three-vertex-objects',
         'use-asset',
       ]),
