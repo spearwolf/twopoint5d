@@ -6,6 +6,6 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "sharp": "^0.28.3",
-    "zx": "^1.14.2"
+    "zx": "^2.0.0"
   }
 }
