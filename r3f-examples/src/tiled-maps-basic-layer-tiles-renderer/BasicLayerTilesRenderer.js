@@ -7,20 +7,6 @@ import {
 export class BasicLayerTilesRenderer {
   constructor(capacity = 1000) {
     this.capacity = capacity;
-    // this.tilesData = tilesData;
-    // this.tileSet = tileSet;
-
-    // const geometry = new TileSpritesGeometry(capacity);
-
-    // const material = new TileSpritesMaterial({
-    //   colorMap: texture,
-    // });
-
-    // material.depthTest = true;
-    // material.depthWrite = true;
-
-    // this.mesh = new TileSprites(geometry, material);
-    // this.mesh.frustumCulled = false;
 
     this.tiles = new Map();
 

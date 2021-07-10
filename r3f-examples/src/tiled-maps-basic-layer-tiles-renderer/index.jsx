@@ -1,9 +1,8 @@
-import React from "react";
-import ReactDOM from "react-dom";
 import { Canvas } from "@react-three/fiber";
-import { WiredBox } from "./WiredBox";
+import React, { Suspense } from "react";
+import ReactDOM from "react-dom";
+import { WiredBox } from "../utils/WiredBox";
 import { BasicLayerTilesExample } from "./BasicLayerTilesExample";
-import { Suspense } from "react";
 
 ReactDOM.render(
   <Canvas

@@ -16,7 +16,10 @@ const TILE_PATTERN = [
 export const BasicLayerTilesExample = () => {
   const { tileSet, texture } = useTileSetLoader(
     "/assets/map2d-debug-tiles_4x256x256.png",
-    { tileWidth: 256, tileHeight: 256 }
+    {
+      tileWidth: 256,
+      tileHeight: 256,
+    }
   );
 
   return (
