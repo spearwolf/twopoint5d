@@ -1,7 +1,7 @@
 {
   "name": "r3f-examples",
   "scripts": {
-    "start": "parcel *.html"
+    "start": "parcel *.html assets/**/*"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",

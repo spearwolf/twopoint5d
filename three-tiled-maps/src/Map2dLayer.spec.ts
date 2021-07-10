@@ -44,6 +44,9 @@ describe('Map2dLayer', () => {
         addTile(_tile: Map2dAreaTile) {},
         reuseTile(_tile: Map2dAreaTile) {},
         removeTile(_tile: Map2dAreaTile) {},
+        getObject3D() {
+          return null;
+        },
         endUpdate() {},
         dispose() {},
       };

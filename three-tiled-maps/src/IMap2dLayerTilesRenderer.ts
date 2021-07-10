@@ -1,3 +1,5 @@
+import {Object3D} from 'three';
+
 import {AABB2} from './AABB2';
 import {Map2dAreaTile} from './Map2dAreaTile';
 import {Map2dLayer} from './Map2dLayer';
@@ -10,6 +12,8 @@ export interface IMap2dLayerTilesRenderer {
   removeTile(tile: Map2dAreaTile): void;
 
   endUpdate(): void;
+
+  getObject3D(): Object3D;
 
   dispose(): void;
 }
