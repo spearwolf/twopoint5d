@@ -1,12 +1,11 @@
 import { extend } from "@react-three/fiber";
+import { Map2D, Map2DLayer } from "r3f-tiled-maps";
 import { useTileSetLoader } from "r3f-vertex-objects";
-import { RepeatingTilesProvider, Map2dLayer } from "three-tiled-maps";
 import React from "react";
+import { RepeatingTilesProvider } from "three-tiled-maps";
 import { BasicLayerTilesRenderer } from "./BasicLayerTilesRenderer";
-import { Map2D } from "./Map2D";
-import { Map2DLayer } from "./Map2DLayer";
 
-extend({ BasicLayerTilesRenderer, RepeatingTilesProvider, Map2dLayer });
+extend({ BasicLayerTilesRenderer, RepeatingTilesProvider });
 
 const TILE_PATTERN = [
   [1, 2],

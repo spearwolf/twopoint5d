@@ -5,12 +5,13 @@
     "three-vertex-objects",
     "three-tiled-maps",
     "r3f-vertex-objects",
+    "r3f-tiled-maps",
     "r3f-examples",
     "bitmap-font-tool"
   ],
   "scripts": {
-    "build": "npm run build --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects",
-    "test": "npm run test --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects -- --passWithNoTests",
+    "build": "npm run build --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects --workspace=r3f-tiled-maps",
+    "test": "npm run test --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects --workspace=r3f-tiled-maps -- --passWithNoTests",
     "start": "servor . examples/tiled-maps-basic-layer-tiles-renderer.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
