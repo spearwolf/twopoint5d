@@ -27,3 +27,7 @@ export const Map2D = ({ children, ...props }) => {
     </map2d>
   );
 };
+
+Map2D.defaultProps = {
+  name: "Map2D",
+};

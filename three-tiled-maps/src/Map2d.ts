@@ -5,6 +5,14 @@ import {Map2dLayer} from './Map2dLayer';
 export class Map2d {
   readonly obj3d = new Object3D();
 
+  get name(): string {
+    return this.obj3d.name;
+  }
+
+  set name(name: string) {
+    this.obj3d.name = name;
+  }
+
   #layers: Array<Map2dLayer> = [];
 
   addLayer(layer: Map2dLayer) {
