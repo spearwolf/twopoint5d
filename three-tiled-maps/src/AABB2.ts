@@ -114,6 +114,20 @@ export class AABB2 {
   }
 
   /**
+   *
+   * @returns `true` if _aabb_ is completely within
+   */
+  isInsideAABB(aabb: AABB2) {
+    return (
+      this.isInside(aabb.top, aabb.left) &&
+      this.left <= aabb.right &&
+      aabb.right <= this.right &&
+      this.top <= aabb.bottom &&
+      aabb.bottom <= this.bottom
+    );
+  }
+
+  /**
    * @returns `true` if the two overlap
    */
   isIntersecting(aabb: AABB2) {

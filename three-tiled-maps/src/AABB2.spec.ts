@@ -174,6 +174,23 @@ describe('AABB2', () => {
     });
   });
 
+  it('isInside', () => {
+    expect(new AABB2(0, 0, 10, 10).isInside(1, 1)).toBeTruthy();
+    expect(new AABB2(0, 0, 10, 10).isInside(0, 0)).toBeTruthy();
+    expect(new AABB2(0, 0, 10, 10).isInside(10, 10)).toBeFalsy();
+    expect(new AABB2(0, 0, 10, 10).isInside(11, 10)).toBeFalsy();
+  });
+
+  it('isInsideAABB', () => {
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(2, 2, 4, 4))).toBeTruthy();
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(0, 0, 4, 4))).toBeTruthy();
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(0, 0, 10, 10))).toBeTruthy();
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(0, 0, 11, 10))).toBeFalsy();
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(0, 0, 10, 12))).toBeFalsy();
+    expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(-10, -10, 100, 100))).toBeFalsy();
+    expect(new AABB2(-10, -10, 100, 100).isInsideAABB(new AABB2(0, 0, 10, 10))).toBeTruthy();
+  });
+
   describe('quadrant helpers', () => {
     const A = new AABB2(-20, -20, 10, 10);
     const B = new AABB2(-5, -20, 10, 10);
