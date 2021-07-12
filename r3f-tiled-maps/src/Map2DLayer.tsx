@@ -51,6 +51,8 @@ export const Map2DLayer: FunctionComponent<Map2DLayerProps> = ({
   );
 };
 
+Map2DLayer.displayName = 'Map2DLayer';
+
 Map2DLayer.defaultProps = {
   width: 320,
   height: 240,

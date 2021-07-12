@@ -37,6 +37,8 @@ export const Map2D: FunctionComponent<Map2DProps> = ({children, ...props}) => {
   );
 };
 
+Map2D.displayName = 'Map2D';
+
 Map2D.defaultProps = {
   name: 'Map2D',
 };
