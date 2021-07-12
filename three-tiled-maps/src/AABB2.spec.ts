@@ -16,6 +16,164 @@ describe('AABB2', () => {
     it('centerY', () => assert.strictEqual(aabb.centerY, 0));
   });
 
+  it('is', () => {
+    expect(new AABB2(1, 2, 3, 4).is(1, 2, 3, 4)).toBeTruthy();
+    expect(new AABB2(1, 2, 3, 4).is(666, 2, 3, 4)).toBeFalsy();
+    expect(new AABB2(1, 2, 3, 4).is(1, 666, 3, 4)).toBeFalsy();
+    expect(new AABB2(1, 2, 3, 4).is(1, 2, 666, 4)).toBeFalsy();
+    expect(new AABB2(1, 2, 3, 4).is(1, 2, 3, 666)).toBeFalsy();
+  });
+
+  it('set', () => {
+    expect(new AABB2().set(1, 2, 3, 4).is(1, 2, 3, 4)).toBeTruthy();
+  });
+
+  it('clone', () => {
+    const aabb = new AABB2(5, 6, 7, 8);
+    const clone = aabb.clone();
+    expect(clone).not.toBe(aabb);
+    expect(clone.is(5, 6, 7, 8)).toBeTruthy();
+  });
+
+  it('copy', () => {
+    const copy = new AABB2().copy(new AABB2(7, 8, 9, 10));
+    expect(copy.is(7, 8, 9, 10)).toBeTruthy();
+  });
+
+  describe('from', () => {
+    it('without target', () => {
+      const aabb = AABB2.from({left: 2, top: 3, width: 4, height: 5});
+      expect(aabb).toBeInstanceOf(AABB2);
+      expect(aabb.is(2, 3, 4, 5)).toBeTruthy();
+    });
+    it('with target', () => {
+      const target = new AABB2();
+      const aabb = AABB2.from({left: 2, top: 3, width: 4, height: 5}, target);
+      expect(aabb).toBe(target);
+      expect(aabb.is(2, 3, 4, 5)).toBeTruthy();
+    });
+  });
+
+  describe('extend', () => {
+    describe('not overlapping', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      const other = new AABB2(20, 21, 3, 4);
+      it('should return self', () => {
+        expect(aabb.extend(other)).toBe(aabb);
+      });
+      it('left', () => {
+        expect(aabb.left).toBe(0);
+      });
+      it('right', () => {
+        expect(aabb.right).toBe(23);
+      });
+      it('top', () => {
+        expect(aabb.top).toBe(3);
+      });
+      it('bottom', () => {
+        expect(aabb.bottom).toBe(25);
+      });
+    });
+    describe('intersecting', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      const other = new AABB2(-5, 0, 6, 3);
+      it('should return self', () => {
+        expect(aabb.extend(other)).toBe(aabb);
+      });
+      it('left', () => {
+        expect(aabb.left).toBe(-5);
+      });
+      it('right', () => {
+        expect(aabb.right).toBe(10);
+      });
+      it('top', () => {
+        expect(aabb.top).toBe(0);
+      });
+      it('bottom', () => {
+        expect(aabb.bottom).toBe(21);
+      });
+    });
+    describe('overlaps (inside)', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      const other = new AABB2(1, 4, 7, 5);
+      it('should return self', () => {
+        expect(aabb.extend(other)).toBe(aabb);
+      });
+      it('left', () => {
+        expect(aabb.left).toBe(0);
+      });
+      it('right', () => {
+        expect(aabb.right).toBe(10);
+      });
+      it('top', () => {
+        expect(aabb.top).toBe(3);
+      });
+      it('bottom', () => {
+        expect(aabb.bottom).toBe(21);
+      });
+    });
+    describe('overlaps', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      const other = new AABB2(-10, -10, 100, 100);
+      it('should return self', () => {
+        expect(aabb.extend(other)).toBe(aabb);
+      });
+      it('left', () => {
+        expect(aabb.left).toBe(-10);
+      });
+      it('right', () => {
+        expect(aabb.right).toBe(90);
+      });
+      it('top', () => {
+        expect(aabb.top).toBe(-10);
+      });
+      it('bottom', () => {
+        expect(aabb.bottom).toBe(90);
+      });
+    });
+  });
+
+  describe('setters', () => {
+    it('centerX', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      aabb.centerX = 6;
+      expect(aabb).toMatchObject({
+        left: 1,
+        right: 11,
+        width: 10,
+        centerX: 6,
+      });
+    });
+    it('centerY', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      aabb.centerY = -5;
+      expect(aabb).toMatchObject({
+        top: -14,
+        bottom: 4,
+        height: 18,
+        centerY: -5,
+      });
+    });
+  });
+
+  describe('isEqual', () => {
+    it('self', () => {
+      const aabb = new AABB2(0, 3, 10, 18);
+      expect(aabb.isEqual(aabb)).toBeTruthy();
+    });
+    it('same values', () => {
+      const aabb0 = new AABB2(0, 3, 10, 18);
+      const aabb1 = new AABB2(0, 3, 10, 18);
+      expect(aabb0.isEqual(aabb1)).toBeTruthy();
+    });
+    it('different values', () => {
+      expect(new AABB2(0, 3, 10, 18).isEqual(new AABB2(666, 3, 10, 18))).toBeFalsy();
+      expect(new AABB2(0, 3, 10, 18).isEqual(new AABB2(0, 666, 10, 18))).toBeFalsy();
+      expect(new AABB2(0, 3, 10, 18).isEqual(new AABB2(0, 3, 666, 18))).toBeFalsy();
+      expect(new AABB2(0, 3, 10, 18).isEqual(new AABB2(0, 3, 10, 666))).toBeFalsy();
+    });
+  });
+
   describe('quadrant helpers', () => {
     const A = new AABB2(-20, -20, 10, 10);
     const B = new AABB2(-5, -20, 10, 10);

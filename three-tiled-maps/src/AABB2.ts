@@ -22,6 +22,18 @@ export class AABB2 {
     return this;
   }
 
+  clone() {
+    return new AABB2(this.left, this.top, this.width, this.height);
+  }
+
+  copy(aabb: AABB2) {
+    this.top = aabb.top;
+    this.left = aabb.left;
+    this.width = aabb.width;
+    this.height = aabb.height;
+    return this;
+  }
+
   static from(
     {
       top,
@@ -39,21 +51,28 @@ export class AABB2 {
     return target ? target.set(left, top, width, height) : new AABB2(left, top, width, height);
   }
 
-  clone() {
-    return new AABB2(this.left, this.top, this.width, this.height);
-  }
-
-  copy(aabb: AABB2) {
-    this.top = aabb.top;
-    this.left = aabb.left;
-    this.width = aabb.width;
-    this.height = aabb.height;
+  extend(other: AABB2) {
+    if (other.left < this.left) {
+      this.width += this.left - other.left;
+      this.left = other.left;
+    }
+    if (other.right > this.right) {
+      this.width = other.right - this.left;
+    }
+    if (other.top < this.top) {
+      this.height += this.top - other.top;
+      this.top = other.top;
+    }
+    if (other.bottom > this.bottom) {
+      this.height = other.bottom - this.top;
+    }
     return this;
   }
 
   get right() {
     return this.left + this.width;
   }
+
   get bottom() {
     return this.top + this.height;
   }
@@ -61,8 +80,17 @@ export class AABB2 {
   get centerX() {
     return this.left + this.width / 2;
   }
+
+  set centerX(x: number) {
+    this.left += x - this.centerX;
+  }
+
   get centerY() {
     return this.top + this.height / 2;
+  }
+
+  set centerY(y: number) {
+    this.top += y - this.centerY;
   }
 
   is(left: number, top: number, width: number, height: number) {
