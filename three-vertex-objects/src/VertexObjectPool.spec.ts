@@ -201,27 +201,50 @@ describe('VertexObjectPool', () => {
 
       expect(pool.usedCount).toBe(0);
       expect(vo[voBuffer]).toBeUndefined();
-      expect(vo[voIndex]).toBe(-1);
     });
 
-    test('copies and re-link the internal buffers', () => {
+    test('copies and re-link the underlying internal buffers', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+
       const vo0 = pool.createVO();
       const vo1 = pool.createVO();
+      const vo2 = pool.createVO();
 
-      vo1.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
+      vo1.setFoo(30, 20, 10, 0, 40, 50, 60, 70);
+      vo2.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
 
-      expect(pool.usedCount).toBe(2);
+      expect(pool.usedCount).toBe(3);
+
       expect(vo0[voIndex]).toBe(0);
       expect(vo1[voIndex]).toBe(1);
+      expect(vo2[voIndex]).toBe(2);
+
       expect(Array.from(vo0.getFoo())).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
-      expect(Array.from(vo1.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+      expect(Array.from(vo1.getFoo())).toEqual([30, 20, 10, 0, 40, 50, 60, 70]);
+      expect(Array.from(vo2.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
 
       pool.freeVO(vo0);
 
-      expect(pool.usedCount).toBe(1);
-      expect(vo1[voIndex]).toBe(0);
-      expect(Array.from(vo1.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+      expect(pool.usedCount).toBe(2);
+
+      expect(vo1[voIndex]).toBe(1);
+      expect(vo2[voIndex]).toBe(0);
+
+      expect(Array.from(vo1.getFoo())).toEqual([30, 20, 10, 0, 40, 50, 60, 70]);
+      expect(Array.from(vo2.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+
+      const vo3 = pool.createVO();
+      vo3.setFoo(33, 22, 11, 0, 44, 55, 66, 77);
+
+      expect(pool.usedCount).toBe(3);
+
+      expect(vo1[voIndex]).toBe(1);
+      expect(vo2[voIndex]).toBe(0);
+      expect(vo3[voIndex]).toBe(2);
+
+      expect(Array.from(vo1.getFoo())).toEqual([30, 20, 10, 0, 40, 50, 60, 70]);
+      expect(Array.from(vo2.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
+      expect(Array.from(vo3.getFoo())).toEqual([33, 22, 11, 0, 44, 55, 66, 77]);
     });
   });
 });
