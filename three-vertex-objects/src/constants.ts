@@ -1,3 +1,4 @@
 export const voBuffer = Symbol('voBuffer');
 export const voIndex = Symbol('voIndex');
-export const bIndex = Symbol('bIndex');
+export const voIndex0 = Symbol('voIndex0');
+export const voBatchSize = Symbol('voBatchSize');
