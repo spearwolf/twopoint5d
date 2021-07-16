@@ -109,17 +109,15 @@ export class VertexObjectPool<VOType = VO> {
   freeVO(vo: VO): void {
     if (vo[voBuffer] === this.buffer && !vo[voBatch]) {
       const idx = vo[voIndex];
-      if (idx >= 0) {
-        const lastUsedIdx = this.usedCount - 1;
-        if (idx !== lastUsedIdx) {
-          this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
-          this.#bufferIndices[lastUsedIdx] = idx;
-          this.addFreeIndex(vo[voIndex0], 1);
-        }
-        this.usedCount--;
-        vo[voBuffer] = undefined;
-        vo[voBatch] = undefined;
+      const lastUsedIdx = this.usedCount - 1;
+      if (idx !== lastUsedIdx) {
+        this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
+        this.#bufferIndices[lastUsedIdx] = idx;
+        this.addFreeIndex(vo[voIndex0], 1);
       }
+      this.usedCount--;
+      vo[voBuffer] = undefined;
+      vo[voBatch] = undefined;
     }
   }
 
