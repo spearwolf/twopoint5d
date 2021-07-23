@@ -55,14 +55,13 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
           const tileKey = Map2dSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
-          let tileSet = this.#tiles.get(tileKey);
+          const tileSet = this.#tiles.get(tileKey);
           if (tileSet) {
-            tileSet.add(renderable);
-          } else {
-            tileSet = new Set<Renderable>();
-            this.#tiles.set(tileKey, tileSet);
+            tileSet.delete(renderable);
+            if (tileSet.size === 0) {
+              this.#tiles.delete(tileKey);
+            }
           }
-          tileSet.add(renderable);
         }
       }
     }
