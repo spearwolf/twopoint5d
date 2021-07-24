@@ -1,3 +1,4 @@
+# A Grid of Tiles
 
 ## Tiled Maps
 
@@ -23,7 +24,7 @@ If you want you can limit the repeat to only horizontal or only vertical.
 
 ### From Tile to 2D Coordinates
 
-The [Map2dTileCoordsUtil](./Map2dTileCoordsUtil.ts) does the mapping from 2D coordinates to _tile_ coordinates.
+The [Map2dTileCoordsUtil](./Map2dTileCoordsUtil.ts) does the mapping from 2D _world_ coordinates to _tile_ coordinates.
 
 the origin of the 2D coordinate system is assumed to be in the upper left corner (with the y-axis pointing down).
 
