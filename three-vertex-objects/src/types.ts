@@ -7,7 +7,7 @@ import {
 } from 'three';
 
 import {VertexObjectBuffer} from './VertexObjectBuffer';
-import {voIndex0, voBuffer, voIndex, voBatch} from './constants';
+import {voBuffer, voIndex} from './constants';
 
 export type TypedArray =
   | Float64Array
@@ -70,8 +70,6 @@ export type VOBatchType = [size: number, start: number];
 export interface VO {
   [voBuffer]: VertexObjectBuffer;
   [voIndex]: number;
-  [voIndex0]: number;
-  [voBatch]?: VOBatchType;
 }
 
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;

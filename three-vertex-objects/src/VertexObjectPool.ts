@@ -1,34 +1,23 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
-import {voIndex0, voBuffer, voIndex, voBatch} from './constants';
-import {VertexObjectDescription, VO, VOBatchType} from './types';
+import {voBuffer, voIndex} from './constants';
+import {VO, VertexObjectDescription} from './types';
 
 const createVertexObject = (
   descriptor: VertexObjectDescriptor,
   buffer: VertexObjectBuffer,
-  bufferIndex: number,
-  batch: VOBatchType | undefined,
-  getVoIndex: () => number,
+  objectIndex: number,
 ) =>
   Object.create(descriptor.voPrototype, {
     [voBuffer]: {
       value: buffer,
       writable: true,
     },
-    [voIndex0]: {
-      value: bufferIndex,
-      writable: true,
-    },
     [voIndex]: {
-      get: getVoIndex,
-    },
-    [voBatch]: {
-      value: batch,
+      value: objectIndex,
       writable: true,
     },
   });
-
-type FreeIndexType = [index: number, size: number];
 
 export class VertexObjectPool<VOType = VO> {
   readonly descriptor: VertexObjectDescriptor;
@@ -36,12 +25,8 @@ export class VertexObjectPool<VOType = VO> {
 
   buffer: VertexObjectBuffer;
 
-  usedCount: number;
-
-  readonly #bufferIndices: Uint32Array;
-
-  readonly #nextFreeIndex: FreeIndexType[];
-  #nextFreeIndexCount: number;
+  #index: Array<VOType & VO>;
+  #usedCount = 0;
 
   constructor(
     descriptor: VertexObjectDescriptor | VertexObjectDescription,
@@ -51,54 +36,38 @@ export class VertexObjectPool<VOType = VO> {
       descriptor instanceof VertexObjectDescriptor
         ? descriptor
         : new VertexObjectDescriptor(descriptor);
-
     this.capacity = capacity;
-    this.usedCount = 0;
-
     this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
-    this.#bufferIndices = new Uint32Array(capacity);
-    this.#nextFreeIndex = [];
-    this.#nextFreeIndexCount = 0;
+    this.usedCount = 0;
+    this.#index = new Array(capacity);
   }
 
-  // TODO resize!
+  get usedCount(): number {
+    return this.#usedCount;
+  }
+
+  set usedCount(value: number) {
+    // TODO test
+    if (value < this.#usedCount) {
+      this.#index.fill(undefined, value, this.#usedCount);
+    }
+    this.#usedCount = value < this.capacity ? value : this.capacity;
+  }
 
   get availableCount(): number {
-    return this.capacity - this.usedCount;
+    return this.capacity - this.#usedCount;
   }
 
   clear(): void {
     this.usedCount = 0;
-    this.#nextFreeIndex.length = 0;
-    this.#nextFreeIndexCount = 0;
   }
 
   createVO(): VOType & VO {
-    if (this.usedCount < this.capacity) {
-      const voIndex = this.usedCount++;
-      const bufferIndex =
-        this.findNextFreeIndex(1) ?? voIndex + this.#nextFreeIndexCount;
-      if (bufferIndex < this.capacity) {
-        return this.makeVertexObject(bufferIndex, voIndex);
-      }
-      // TODO else: time to defrag buffer!?
-    }
-  }
-
-  createBatchVO(batchSize: number): (VOType & VO)[] {
-    if (this.usedCount + batchSize <= this.capacity) {
-      const voIndex = this.usedCount++;
-      const bufferIndex =
-        this.findNextFreeIndex(batchSize) ?? voIndex + this.#nextFreeIndexCount;
-      if (bufferIndex + batchSize < this.capacity) {
-        const vos: (VOType & VO)[] = [];
-        const batch: VOBatchType = [batchSize, bufferIndex];
-        for (let i = 0; i < batchSize; i++) {
-          vos.push(this.makeVertexObject(bufferIndex + i, voIndex + i, batch));
-        }
-        return vos;
-      }
-      // TODO else: time to defrag buffer or resize #bufferIndices!?
+    if (this.#usedCount < this.capacity) {
+      const idx = this.usedCount++;
+      const vo = createVertexObject(this.descriptor, this.buffer, idx);
+      this.#index[idx] = vo;
+      return vo;
     }
   }
 
@@ -107,51 +76,31 @@ export class VertexObjectPool<VOType = VO> {
    * otherwise the underlying buffer(s) have to be recopied internally.
    */
   freeVO(vo: VO): void {
-    if (vo[voBuffer] === this.buffer && !vo[voBatch]) {
+    if (vo[voBuffer] === this.buffer) {
       const idx = vo[voIndex];
-      const lastUsedIdx = this.usedCount - 1;
-      if (idx !== lastUsedIdx) {
+      const lastUsedIdx = this.#usedCount - 1;
+      if (idx === lastUsedIdx) {
+        this.#index[idx] = undefined;
+      } else {
         this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
-        this.#bufferIndices[lastUsedIdx] = idx;
-        this.addFreeIndex(vo[voIndex0], 1);
+        const lastUsedVO = this.#index[lastUsedIdx];
+        lastUsedVO[voIndex] = idx;
+        this.#index[idx] = lastUsedVO;
       }
       this.usedCount--;
       vo[voBuffer] = undefined;
-      vo[voBatch] = undefined;
     }
   }
 
-  // TODO freeBatchVO()
-
-  private makeVertexObject(
-    bufferIndex: number,
-    voIndex: number,
-    batch?: VOBatchType,
-  ): VOType & VO {
-    this.#bufferIndices[bufferIndex] = voIndex;
-    return createVertexObject(
-      this.descriptor,
-      this.buffer,
-      bufferIndex,
-      batch,
-      () => this.#bufferIndices[bufferIndex],
-    ) as VOType & VO;
-  }
-
-  private findNextFreeIndex(batchSize: number) {
-    for (let i = 0, len = this.#nextFreeIndex.length; i < len; i++) {
-      const freeIndex = this.#nextFreeIndex[i];
-      if (freeIndex[1] === batchSize) {
-        this.#nextFreeIndex.splice(i, 1);
-        this.#nextFreeIndexCount -= batchSize;
-        return freeIndex[0];
+  /* TODO test & usage check
+  getVO(idx: number): (VOType & VO) | undefined {
+    if (idx < this.#usedCount) {
+      let vo = this.#index[idx];
+      if (vo == null) {
+        vo = createVertexObject(this.descriptor, this.buffer, idx);
       }
+      return vo;
     }
-    return undefined;
   }
-
-  private addFreeIndex(index: number, batchSize: number) {
-    this.#nextFreeIndex.push([index, batchSize]);
-    this.#nextFreeIndexCount += batchSize;
-  }
+  */
 }
