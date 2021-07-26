@@ -47,11 +47,6 @@ const geometry = new VertexObjectInstancedGeometry(instancedDescriptor, CAPACITY
 // -> VertexObjectDescriptor.merge(...) ?
 
 const vo = geometry.pool.createVO(target)
-const vos = geometry.pool.createBatchVO(1000, target?)
-
-const batch = geometry.pool.createBatchVO(1000) // ?
-batch.freeAll()
-
 const vo = geometry.pool.createVO()
 const vo = geometry.instancedPool.createVO()
 //const vo = geometry.instancedPools[0].createVO()
