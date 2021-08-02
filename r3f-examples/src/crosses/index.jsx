@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { Canvas } from "@react-three/fiber";
 import { Crosses } from "./Crosses";
+import { ResponsiveCanvas } from "r3f-vertex-objects";
 
 const makeCrosses = (geometry) => {
   console.log("vertexObjectGeometry", geometry);
@@ -22,10 +22,10 @@ const makeCrosses = (geometry) => {
 };
 
 ReactDOM.render(
-  <Canvas dpr={window.devicePixelRatio}>
+  <ResponsiveCanvas>
     <ambientLight />
     <pointLight position={[10, 10, 10]} />
     <Crosses capacity={10} color={0x990033} onCreateGeometry={makeCrosses} />
-  </Canvas>,
+  </ResponsiveCanvas>,
   document.getElementById("root")
 );
