@@ -23,8 +23,6 @@ const makeCrosses = (geometry) => {
 
 ReactDOM.render(
   <ResponsiveCanvas>
-    <ambientLight />
-    <pointLight position={[10, 10, 10]} />
     <Crosses capacity={10} color={0x990033} onCreateGeometry={makeCrosses} />
   </ResponsiveCanvas>,
   document.getElementById("root")
