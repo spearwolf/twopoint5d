@@ -12,6 +12,7 @@
   "scripts": {
     "build": "npm run build --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects --workspace=r3f-tiled-maps",
     "test": "npm run test --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects --workspace=r3f-tiled-maps -- --passWithNoTests",
+    "clean": "npm run clean --workspace=three-vertex-objects --workspace=three-tiled-maps --workspace=r3f-vertex-objects --workspace=r3f-tiled-maps",
     "start": "servor . examples/tiled-maps-basic-layer-tiles-renderer.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
