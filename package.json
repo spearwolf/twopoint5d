@@ -22,5 +22,8 @@
     "servor": "^4.0.2"
   },
   "version": "0.0.0",
-  "packageManager": "yarn@3.0.0"
+  "packageManager": "yarn@3.0.0",
+  "dependencies": {
+    "node-gyp": "^8.1.0"
+  }
 }
