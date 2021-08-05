@@ -1650,7 +1650,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-three/fiber@npm:^7.0.4, @react-three/fiber@npm:^7.0.6":
+"@react-three/fiber@npm:^7.0.6":
   version: 7.0.6
   resolution: "@react-three/fiber@npm:7.0.6"
   dependencies:
@@ -1675,7 +1675,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-commonjs@npm:^19.0.0":
+"@rollup/plugin-commonjs@npm:^19.0.2":
   version: 19.0.2
   resolution: "@rollup/plugin-commonjs@npm:19.0.2"
   dependencies:
@@ -1692,7 +1692,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-node-resolve@npm:^13.0.0":
+"@rollup/plugin-node-resolve@npm:^13.0.4":
   version: 13.0.4
   resolution: "@rollup/plugin-node-resolve@npm:13.0.4"
   dependencies:
@@ -1720,7 +1720,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-typescript@npm:^8.2.1":
+"@rollup/plugin-typescript@npm:^8.2.5":
   version: 8.2.5
   resolution: "@rollup/plugin-typescript@npm:8.2.5"
   dependencies:
@@ -2024,7 +2024,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react-reconciler@npm:^0.26.2":
+"@types/react-reconciler@npm:^0.26.3":
   version: 0.26.3
   resolution: "@types/react-reconciler@npm:0.26.3"
   dependencies:
@@ -2033,7 +2033,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react@npm:*, @types/react@npm:^17.0.14":
+"@types/react@npm:*, @types/react@npm:^17.0.15":
   version: 17.0.15
   resolution: "@types/react@npm:17.0.15"
   dependencies:
@@ -2076,7 +2076,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/three@npm:^0.130.0":
+"@types/three@npm:^0.130.1":
   version: 0.130.1
   resolution: "@types/three@npm:0.130.1"
   checksum: c9d5c535f02bd4b7c1bc04af0cd5301474862a6d4fc67f69f5f0b61eb88e1f2faa5bf5fda0cbd9f1ee9703da85f48b5c6a66dedb71bd9cd4671c03e96529e9b7
@@ -2108,7 +2108,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript-eslint/eslint-plugin@npm:^4.28.2":
+"@typescript-eslint/eslint-plugin@npm:^4.29.0":
   version: 4.29.0
   resolution: "@typescript-eslint/eslint-plugin@npm:4.29.0"
   dependencies:
@@ -2145,7 +2145,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript-eslint/parser@npm:^4.28.2":
+"@typescript-eslint/parser@npm:^4.29.0":
   version: 4.29.0
   resolution: "@typescript-eslint/parser@npm:4.29.0"
   dependencies:
@@ -4129,7 +4129,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"core-js@npm:^3.15.2":
+"core-js@npm:^3.16.0":
   version: 3.16.0
   resolution: "core-js@npm:3.16.0"
   checksum: e215cf057fadd86e5386d8042c1bd0ddab1c7811d8f66d272c356ba9bae34c0897c3f5a80d19f93fd74cff832652354a0feb0c817234a066ae9177e28c6d865a
@@ -5077,7 +5077,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^7.30.0":
+"eslint@npm:^7.32.0":
   version: 7.32.0
   resolution: "eslint@npm:7.32.0"
   dependencies:
@@ -9493,7 +9493,7 @@ fsevents@^1.2.7:
     react-dom: ^17.0.2
     rimraf: ^3.0.2
     servor: ^4.0.2
-    three: ">=0.126"
+    three: ^0.131.3
     three-tiled-maps: "workspace:three-tiled-maps"
     three-vertex-objects: "workspace:three-vertex-objects"
     webpack: ^5.48.0
@@ -9507,22 +9507,22 @@ fsevents@^1.2.7:
   version: 0.0.0-use.local
   resolution: "r3f-tiled-maps@workspace:r3f-tiled-maps"
   dependencies:
-    "@react-three/fiber": ^7.0.4
-    "@rollup/plugin-commonjs": ^19.0.0
-    "@rollup/plugin-node-resolve": ^13.0.0
+    "@react-three/fiber": ^7.0.6
+    "@rollup/plugin-commonjs": ^19.0.2
+    "@rollup/plugin-node-resolve": ^13.0.4
     "@rollup/plugin-replace": ^2.4.2
-    "@rollup/plugin-typescript": ^8.2.1
+    "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
-    "@types/react": ^17.0.14
+    "@types/react": ^17.0.15
     "@types/react-dom": ^17.0.9
-    "@types/react-reconciler": ^0.26.2
+    "@types/react-reconciler": ^0.26.3
     "@types/sinon": ^10.0.2
-    "@types/three": ^0.130.0
-    "@typescript-eslint/eslint-plugin": ^4.28.2
-    "@typescript-eslint/parser": ^4.28.2
-    core-js: ^3.15.2
+    "@types/three": ^0.130.1
+    "@typescript-eslint/eslint-plugin": ^4.29.0
+    "@typescript-eslint/parser": ^4.29.0
+    core-js: ^3.16.0
     cross-env: ^7.0.3
-    eslint: ^7.30.0
+    eslint: ^7.32.0
     eslint-config-prettier: ^8.3.0
     eslint-config-problems: ^5.0.0
     eslint-plugin-import: ^2.23.4
@@ -9536,15 +9536,15 @@ fsevents@^1.2.7:
     react: ^17.0.2
     react-dom: ^17.0.2
     rimraf: ^3.0.2
-    rollup: ^2.53.0
+    rollup: ^2.56.0
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
-    sinon: ^11.1.1
-    three: ^0.130.1
+    sinon: ^11.1.2
+    three: ^0.131.3
     three-tiled-maps: "workspace:*"
     three-vertex-objects: "workspace:*"
-    ts-jest: ^27.0.3
-    ts-node: ^10.0.0
+    ts-jest: ^27.0.4
+    ts-node: ^10.1.0
     tslib: ^2.3.0
     typescript: ^4.3.5
     use-asset: ^1.0.4
@@ -9555,22 +9555,22 @@ fsevents@^1.2.7:
   version: 0.0.0-use.local
   resolution: "r3f-vertex-objects@workspace:r3f-vertex-objects"
   dependencies:
-    "@react-three/fiber": ^7.0.4
-    "@rollup/plugin-commonjs": ^19.0.0
-    "@rollup/plugin-node-resolve": ^13.0.0
+    "@react-three/fiber": ^7.0.6
+    "@rollup/plugin-commonjs": ^19.0.2
+    "@rollup/plugin-node-resolve": ^13.0.4
     "@rollup/plugin-replace": ^2.4.2
-    "@rollup/plugin-typescript": ^8.2.1
+    "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
-    "@types/react": ^17.0.14
+    "@types/react": ^17.0.15
     "@types/react-dom": ^17.0.9
-    "@types/react-reconciler": ^0.26.2
+    "@types/react-reconciler": ^0.26.3
     "@types/sinon": ^10.0.2
-    "@types/three": ^0.130.0
-    "@typescript-eslint/eslint-plugin": ^4.28.2
-    "@typescript-eslint/parser": ^4.28.2
-    core-js: ^3.15.2
+    "@types/three": ^0.130.1
+    "@typescript-eslint/eslint-plugin": ^4.29.0
+    "@typescript-eslint/parser": ^4.29.0
+    core-js: ^3.16.0
     cross-env: ^7.0.3
-    eslint: ^7.30.0
+    eslint: ^7.32.0
     eslint-config-prettier: ^8.3.0
     eslint-config-problems: ^5.0.0
     eslint-plugin-import: ^2.23.4
@@ -9584,14 +9584,14 @@ fsevents@^1.2.7:
     react-dom: ^17.0.2
     react-merge-refs: ^1.1.0
     rimraf: ^3.0.2
-    rollup: ^2.53.1
+    rollup: ^2.56.0
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
-    sinon: ^11.1.1
+    sinon: ^11.1.2
     source-map-explorer: ^2.5.2
-    three: ^0.130.1
+    three: ^0.131.3
     three-vertex-objects: "workspace:*"
-    ts-jest: ^27.0.3
+    ts-jest: ^27.0.4
     ts-node: ^10.1.0
     tslib: ^2.3.0
     typescript: ^4.3.5
@@ -10133,7 +10133,7 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"rollup@npm:^2.53.0, rollup@npm:^2.53.1":
+"rollup@npm:^2.56.0":
   version: 2.56.0
   resolution: "rollup@npm:2.56.0"
   dependencies:
@@ -10538,7 +10538,7 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"sinon@npm:^11.1.1":
+"sinon@npm:^11.1.2":
   version: 11.1.2
   resolution: "sinon@npm:11.1.2"
   dependencies:
@@ -11345,19 +11345,19 @@ resolve@^2.0.0-next.3:
   version: 0.0.0-use.local
   resolution: "three-tiled-maps@workspace:three-tiled-maps"
   dependencies:
-    "@rollup/plugin-commonjs": ^19.0.0
-    "@rollup/plugin-node-resolve": ^13.0.0
+    "@rollup/plugin-commonjs": ^19.0.2
+    "@rollup/plugin-node-resolve": ^13.0.4
     "@rollup/plugin-replace": ^2.4.2
-    "@rollup/plugin-typescript": ^8.2.1
+    "@rollup/plugin-typescript": ^8.2.5
     "@types/assert": ^1.5.5
     "@types/jest": ^26.0.24
     "@types/sinon": ^10.0.2
-    "@types/three": ^0.130.0
-    "@typescript-eslint/eslint-plugin": ^4.28.2
-    "@typescript-eslint/parser": ^4.28.2
-    core-js: ^3.15.2
+    "@types/three": ^0.130.1
+    "@typescript-eslint/eslint-plugin": ^4.29.0
+    "@typescript-eslint/parser": ^4.29.0
+    core-js: ^3.16.0
     cross-env: ^7.0.3
-    eslint: ^7.30.0
+    eslint: ^7.32.0
     eslint-config-prettier: ^8.3.0
     eslint-config-problems: ^5.0.0
     eslint-plugin-import: ^2.23.4
@@ -11368,13 +11368,13 @@ resolve@^2.0.0-next.3:
     npm-run-all: ^4.1.5
     prettier: ^2.3.2
     rimraf: ^3.0.2
-    rollup: ^2.53.1
+    rollup: ^2.56.0
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
-    sinon: ^11.1.1
-    three: ^0.130.1
+    sinon: ^11.1.2
+    three: ^0.131.3
     three-vertex-objects: "workspace:*"
-    ts-jest: ^27.0.3
+    ts-jest: ^27.0.4
     ts-node: ^10.1.0
     tslib: ^2.3.0
     typescript: ^4.3.5
@@ -11394,18 +11394,18 @@ resolve@^2.0.0-next.3:
   version: 0.0.0-use.local
   resolution: "three-vertex-objects@workspace:three-vertex-objects"
   dependencies:
-    "@rollup/plugin-commonjs": ^19.0.0
-    "@rollup/plugin-node-resolve": ^13.0.0
+    "@rollup/plugin-commonjs": ^19.0.2
+    "@rollup/plugin-node-resolve": ^13.0.4
     "@rollup/plugin-replace": ^2.4.2
-    "@rollup/plugin-typescript": ^8.2.1
+    "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
     "@types/sinon": ^10.0.2
-    "@types/three": ^0.130.0
-    "@typescript-eslint/eslint-plugin": ^4.28.2
-    "@typescript-eslint/parser": ^4.28.2
-    core-js: ^3.15.2
+    "@types/three": ^0.130.1
+    "@typescript-eslint/eslint-plugin": ^4.29.0
+    "@typescript-eslint/parser": ^4.29.0
+    core-js: ^3.16.0
     cross-env: ^7.0.3
-    eslint: ^7.30.0
+    eslint: ^7.32.0
     eslint-config-prettier: ^8.3.0
     eslint-config-problems: ^5.0.0
     eslint-plugin-import: ^2.23.4
@@ -11414,30 +11414,23 @@ resolve@^2.0.0-next.3:
     npm-run-all: ^4.1.5
     prettier: ^2.3.2
     rimraf: ^3.0.2
-    rollup: ^2.53.0
+    rollup: ^2.56.0
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
-    sinon: ^11.1.1
+    sinon: ^11.1.2
     source-map-explorer: ^2.5.2
-    three: ^0.130.1
-    ts-jest: ^27.0.3
-    ts-node: ^10.0.0
+    three: ^0.131.3
+    ts-jest: ^27.0.4
+    ts-node: ^10.1.0
     tslib: ^2.3.0
     typescript: ^4.3.5
   languageName: unknown
   linkType: soft
 
-"three@npm:>=0.126":
+"three@npm:^0.131.3":
   version: 0.131.3
   resolution: "three@npm:0.131.3"
   checksum: 947308298088de498c61ebbcbc5d9ae2b1acdd876855f4b3bd98214797706b96902d136eab330d8a8ae93c0edb6ac2324442b1c00abccb50bf55f7db98ea60ec
-  languageName: node
-  linkType: hard
-
-"three@npm:^0.130.1":
-  version: 0.130.1
-  resolution: "three@npm:0.130.1"
-  checksum: 02208e409a261baff54644e526a91c2dd1482036c7c331ebdb555468a8c17baffccc607b8371d437ff2fe5557d028825313db2274ef35740cf93cbe16ad1e7d9
   languageName: node
   linkType: hard
 
@@ -11569,7 +11562,7 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"ts-jest@npm:^27.0.3":
+"ts-jest@npm:^27.0.4":
   version: 27.0.4
   resolution: "ts-jest@npm:27.0.4"
   dependencies:
@@ -11602,7 +11595,7 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"ts-node@npm:^10.0.0, ts-node@npm:^10.1.0":
+"ts-node@npm:^10.1.0":
   version: 10.1.0
   resolution: "ts-node@npm:10.1.0"
   dependencies:

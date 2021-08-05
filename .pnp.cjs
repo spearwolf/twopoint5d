@@ -3809,7 +3809,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       ],
       [
         "three",
-        "npm:0.130.1"
+        "npm:0.131.3"
       ],
       [
         "three-tiled-maps",
@@ -7061,7 +7061,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["react-use-measure", "virtual:974422bc7b27469586e0c35f21c712092a0ef0aa29f9068c2fbd2ae20ba75a08f063fa243fa7ba840b160aa68f5690415012e33726023e396fc823c9ccc0db2b#npm:2.0.4"],
             ["resize-observer-polyfill", "npm:1.5.1"],
             ["scheduler", "npm:0.20.2"],
-            ["three", "npm:0.130.1"],
+            ["three", "npm:0.131.3"],
             ["use-asset", "virtual:4c9e19b1c326e9408a7e5eef02aa5a793c8e800b1ab6c4e33d6ef6a62ce6f091d26f3c20b4508e5b654e230205449059c3ba97b1a8196293ef0d9bcc1a6450ed#npm:1.0.4"],
             ["utility-types", "npm:3.10.0"],
             ["zustand", "virtual:974422bc7b27469586e0c35f21c712092a0ef0aa29f9068c2fbd2ae20ba75a08f063fa243fa7ba840b160aa68f5690415012e33726023e396fc823c9ccc0db2b#npm:3.5.7"]
@@ -16249,7 +16249,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rollup-plugin-size-snapshot", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:0.12.0"],
             ["rollup-plugin-terser", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:7.0.2"],
             ["sinon", "npm:11.1.2"],
-            ["three", "npm:0.130.1"],
+            ["three", "npm:0.131.3"],
             ["three-tiled-maps", "workspace:three-tiled-maps"],
             ["three-vertex-objects", "workspace:three-vertex-objects"],
             ["ts-jest", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:27.0.4"],
@@ -16300,7 +16300,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rollup-plugin-terser", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:7.0.2"],
             ["sinon", "npm:11.1.2"],
             ["source-map-explorer", "npm:2.5.2"],
-            ["three", "npm:0.130.1"],
+            ["three", "npm:0.131.3"],
             ["three-vertex-objects", "workspace:three-vertex-objects"],
             ["ts-jest", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:27.0.4"],
             ["ts-node", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:10.1.0"],
@@ -18298,13 +18298,6 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         }]
       ]],
       ["three", [
-        ["npm:0.130.1", {
-          "packageLocation": "./.yarn/cache/three-npm-0.130.1-e3bf8a6dfc-02208e409a.zip/node_modules/three/",
-          "packageDependencies": [
-            ["three", "npm:0.130.1"]
-          ],
-          "linkType": "HARD",
-        }],
         ["npm:0.131.3", {
           "packageLocation": "./.yarn/cache/three-npm-0.131.3-a5c7e208a1-9473082980.zip/node_modules/three/",
           "packageDependencies": [
@@ -18345,7 +18338,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rollup-plugin-size-snapshot", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:0.12.0"],
             ["rollup-plugin-terser", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:7.0.2"],
             ["sinon", "npm:11.1.2"],
-            ["three", "npm:0.130.1"],
+            ["three", "npm:0.131.3"],
             ["three-vertex-objects", "workspace:three-vertex-objects"],
             ["ts-jest", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:27.0.4"],
             ["ts-node", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:10.1.0"],
@@ -18385,7 +18378,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rollup-plugin-terser", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:7.0.2"],
             ["sinon", "npm:11.1.2"],
             ["source-map-explorer", "npm:2.5.2"],
-            ["three", "npm:0.130.1"],
+            ["three", "npm:0.131.3"],
             ["ts-jest", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:27.0.4"],
             ["ts-node", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:10.1.0"],
             ["tslib", "npm:2.3.0"],

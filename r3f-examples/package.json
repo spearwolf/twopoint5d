@@ -13,7 +13,7 @@
     "r3f-vertex-objects": "workspace:r3f-vertex-objects",
     "react": "17.0.2",
     "react-dom": "^17.0.2",
-    "three": ">=0.126",
+    "three": "^0.131.3",
     "three-tiled-maps": "workspace:three-tiled-maps",
     "three-vertex-objects": "workspace:three-vertex-objects"
   },
