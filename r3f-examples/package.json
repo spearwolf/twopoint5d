@@ -1,13 +1,14 @@
 {
   "name": "r3f-examples",
   "scripts": {
-    "start": "parcel *.html assets/**/*"
+    "start": "webpack serve --mode development",
+    "build": "webpack build --mode production",
+    "clean": "rimraf .cache dist public/bundle-*.js*"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
   "dependencies": {
     "@react-three/fiber": "^7.0.6",
-    "parcel-bundler": "^1.12.5",
     "r3f-tiled-maps": "workspace:r3f-tiled-maps",
     "r3f-vertex-objects": "workspace:r3f-vertex-objects",
     "react": "17.0.2",
@@ -15,5 +16,17 @@
     "three": ">=0.126",
     "three-tiled-maps": "workspace:three-tiled-maps",
     "three-vertex-objects": "workspace:three-vertex-objects"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.15.0",
+    "@babel/preset-env": "^7.15.0",
+    "@babel/preset-react": "^7.14.5",
+    "babel-loader": "^8.2.2",
+    "rimraf": "^3.0.2",
+    "servor": "^4.0.2",
+    "webpack": "^5.48.0",
+    "webpack-bundle-analyzer": "^4.4.2",
+    "webpack-cli": "^4.7.2",
+    "webpack-dev-server": "^3.11.2"
   }
 }
