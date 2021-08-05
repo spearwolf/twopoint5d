@@ -1684,7 +1684,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-three/fiber@npm:^7.0.4":
+"@react-three/fiber@npm:^7.0.4, @react-three/fiber@npm:^7.0.6":
   version: 7.0.6
   resolution: "@react-three/fiber@npm:7.0.6"
   dependencies:
@@ -10259,19 +10259,19 @@ fsevents@^1.2.7:
   version: 0.0.0-use.local
   resolution: "r3f-examples@workspace:r3f-examples"
   dependencies:
-    "@react-three/fiber": ^7.0.4
+    "@react-three/fiber": ^7.0.6
     parcel-bundler: ^1.12.5
-    r3f-tiled-maps: "workspace:*"
-    r3f-vertex-objects: "workspace:*"
-    react: ^17.0.2
+    r3f-tiled-maps: "workspace:r3f-tiled-maps"
+    r3f-vertex-objects: "workspace:r3f-vertex-objects"
+    react: 17.0.2
     react-dom: ^17.0.2
-    three: ^0.130.1
-    three-tiled-maps: "workspace:*"
-    three-vertex-objects: "workspace:*"
+    three: ">=0.126"
+    three-tiled-maps: "workspace:three-tiled-maps"
+    three-vertex-objects: "workspace:three-vertex-objects"
   languageName: unknown
   linkType: soft
 
-"r3f-tiled-maps@workspace:*, r3f-tiled-maps@workspace:r3f-tiled-maps":
+"r3f-tiled-maps@workspace:r3f-tiled-maps":
   version: 0.0.0-use.local
   resolution: "r3f-tiled-maps@workspace:r3f-tiled-maps"
   dependencies:
@@ -10473,7 +10473,7 @@ fsevents@^1.2.7:
   languageName: node
   linkType: hard
 
-"react@npm:^17.0.2":
+"react@npm:17.0.2, react@npm:^17.0.2":
   version: 17.0.2
   resolution: "react@npm:17.0.2"
   dependencies:
@@ -12215,6 +12215,13 @@ resolve@^2.0.0-next.3:
     typescript: ^4.3.5
   languageName: unknown
   linkType: soft
+
+"three@npm:>=0.126":
+  version: 0.131.3
+  resolution: "three@npm:0.131.3"
+  checksum: 947308298088de498c61ebbcbc5d9ae2b1acdd876855f4b3bd98214797706b96902d136eab330d8a8ae93c0edb6ac2324442b1c00abccb50bf55f7db98ea60ec
+  languageName: node
+  linkType: hard
 
 "three@npm:^0.130.1":
   version: 0.130.1
