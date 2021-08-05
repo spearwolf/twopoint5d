@@ -25,7 +25,8 @@
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
   "dependencies": {
-    "three": "^0.130.1"
+    "three": "^0.130.1",
+    "three-tiled-maps": "workspace:*"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^19.0.0",
