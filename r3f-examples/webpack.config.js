@@ -17,12 +17,6 @@ module.exports = {
   },
   resolve: {
     extensions: ['*', '.js', '.jsx'],
-    alias: {
-      'three-vertex-objects': path.join(__dirname, '../three-vertex-objects/build/three-vertex-objects.js'),
-      'three-tiled-maps': path.join(__dirname, '../three-tiled-maps/build/three-tiled-maps.js'),
-      'r3f-vertex-objects': path.join(__dirname, '../r3f-vertex-objects/build/r3f-vertex-objects.js'),
-      'r3f-tiled-maps': path.join(__dirname, '../r3f-tiled-maps/build/r3f-tiled-maps.js'),
-    },
   },
   output: {
     path: path.resolve(__dirname, './public'),
