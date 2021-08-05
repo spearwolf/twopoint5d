@@ -15,7 +15,7 @@
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "analyze:js": "source-map-explorer build/r3f-vertex-objects.js",
     "analyze:umd": "source-map-explorer build/r3f-vertex-objects.umd.js",
-    "build": "run-s --silent build:*",
+    "build": "run-s --silent build:js build:umd build:types",
     "clean": "rimraf -r build types",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
@@ -30,6 +30,7 @@
     "@react-three/fiber": "^7.0.4",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-merge-refs": "^1.1.0",
     "three": "^0.130.1",
     "three-vertex-objects": "workspace:*",
     "use-asset": "^1.0.4"

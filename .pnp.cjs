@@ -3195,6 +3195,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["@types/assert", [
+        ["npm:1.5.5", {
+          "packageLocation": "./.yarn/cache/@types-assert-npm-1.5.5-2568e21217-2c5cd8bbc7.zip/node_modules/@types/assert/",
+          "packageDependencies": [
+            ["@types/assert", "npm:1.5.5"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["@types/babel__core", [
         ["npm:7.1.15", {
           "packageLocation": "./.yarn/cache/@types-babel__core-npm-7.1.15-317a2aada0-3ea0163696.zip/node_modules/@types/babel__core/",
@@ -12858,6 +12867,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["prettier", "npm:2.3.2"],
             ["react", "npm:17.0.2"],
             ["react-dom", "virtual:4c9e19b1c326e9408a7e5eef02aa5a793c8e800b1ab6c4e33d6ef6a62ce6f091d26f3c20b4508e5b654e230205449059c3ba97b1a8196293ef0d9bcc1a6450ed#npm:17.0.2"],
+            ["react-merge-refs", "npm:1.1.0"],
             ["rimraf", "npm:3.0.2"],
             ["rollup", "npm:2.56.0"],
             ["rollup-plugin-size-snapshot", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:0.12.0"],
@@ -14911,10 +14921,12 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         ["workspace:three-tiled-maps", {
           "packageLocation": "./three-tiled-maps/",
           "packageDependencies": [
+            ["three-tiled-maps", "workspace:three-tiled-maps"],
             ["@rollup/plugin-commonjs", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:19.0.2"],
             ["@rollup/plugin-node-resolve", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:13.0.4"],
             ["@rollup/plugin-replace", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:2.4.2"],
             ["@rollup/plugin-typescript", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:8.2.5"],
+            ["@types/assert", "npm:1.5.5"],
             ["@types/jest", "npm:26.0.24"],
             ["@types/sinon", "npm:10.0.2"],
             ["@types/three", "npm:0.130.1"],
@@ -14938,7 +14950,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rollup-plugin-terser", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:7.0.2"],
             ["sinon", "npm:11.1.2"],
             ["three", "npm:0.130.1"],
-            ["three-tiled-maps", "workspace:three-tiled-maps"],
+            ["three-vertex-objects", "workspace:three-vertex-objects"],
             ["ts-jest", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:27.0.4"],
             ["ts-node", "virtual:18b45ce51b19ba3541cfbcdde8384d71711c402cd6a4565d689bddd3fc9741e13cb54ba752c082488b945215c10fb82eb572ddf60191c91820ecac8cb82874e5#npm:10.1.0"],
             ["tslib", "npm:2.3.0"],

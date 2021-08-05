@@ -1852,6 +1852,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/assert@npm:^1.5.5":
+  version: 1.5.5
+  resolution: "@types/assert@npm:1.5.5"
+  checksum: 2c5cd8bbc7279d7d77466a930a6a20507141896dbdbac231fcf2bbf147c1fc7ffacf05a2d7bef59a818e2c99bb319aa344c95fc567ce0a7521640d2990307b87
+  languageName: node
+  linkType: hard
+
 "@types/babel__core@npm:^7.0.0, @types/babel__core@npm:^7.1.14":
   version: 7.1.15
   resolution: "@types/babel__core@npm:7.1.15"
@@ -10343,6 +10350,7 @@ fsevents@^1.2.7:
     prettier: ^2.3.2
     react: ^17.0.2
     react-dom: ^17.0.2
+    react-merge-refs: ^1.1.0
     rimraf: ^3.0.2
     rollup: ^2.53.1
     rollup-plugin-size-snapshot: ^0.12.0
@@ -12130,6 +12138,7 @@ resolve@^2.0.0-next.3:
     "@rollup/plugin-node-resolve": ^13.0.0
     "@rollup/plugin-replace": ^2.4.2
     "@rollup/plugin-typescript": ^8.2.1
+    "@types/assert": ^1.5.5
     "@types/jest": ^26.0.24
     "@types/sinon": ^10.0.2
     "@types/three": ^0.130.0
@@ -12153,7 +12162,7 @@ resolve@^2.0.0-next.3:
     rollup-plugin-terser: ^7.0.2
     sinon: ^11.1.1
     three: ^0.130.1
-    three-tiled-maps: "workspace:*"
+    three-vertex-objects: "workspace:*"
     ts-jest: ^27.0.3
     ts-node: ^10.1.0
     tslib: ^2.3.0

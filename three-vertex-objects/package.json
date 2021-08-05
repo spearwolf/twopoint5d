@@ -15,7 +15,7 @@
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "analyze:js": "source-map-explorer build/three-vertex-objects.js",
     "analyze:umd": "source-map-explorer build/three-vertex-objects.umd.js",
-    "build": "run-s --silent build:*",
+    "build": "run-s --silent build:js build:umd build:types",
     "clean": "rimraf -r build types",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
