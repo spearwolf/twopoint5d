@@ -14,8 +14,6 @@ extends:
   - plugin:import/errors
   - plugin:import/warnings
   - plugin:prettier/recommended
-  - plugin:react/recommended
-  - plugin:react-hooks/recommended
 
 env:
   jest: true
@@ -26,7 +24,7 @@ settings:
     node:
       extensions:
         - .ts
-        - .tsx
+        - .js
 
 rules:
   no-fallthrough: off
@@ -34,7 +32,6 @@ rules:
   prefer-rest-params: off
   eqeqeq: [2, "smart"]
   "@typescript-eslint/explicit-function-return-type": off
-  "@typescript-eslint/explicit-module-boundary-types": off
   "@typescript-eslint/no-explicit-any": off
   "@typescript-eslint/no-var-requires": off
   "@typescript-eslint/ban-ts-ignore": off
@@ -43,9 +40,8 @@ rules:
   "@typescript-eslint/interface-name-prefix": off
   "@typescript-eslint/no-empty-interface": off
   "@typescript-eslint/no-empty-function": off
+  "no-use-before-define": off
   "@typescript-eslint/no-use-before-define": [2, {"functions": false}]
   "@typescript-eslint/no-unused-vars": [2, {vars: "all", args: "after-used", argsIgnorePattern: "^_"}]
   "@typescript-eslint/consistent-type-assertions": [2, {assertionStyle: "as", objectLiteralTypeAssertions: "allow-as-parameter"}]
   import/order: [2, {newlines-between: "always-and-inside-groups", alphabetize: {order: "asc"}, groups: ["builtin", "external", "internal", "parent", "sibling", "index", "unknown"]}]
-  react/prop-types: off
-  react/react-in-jsx-scope: off

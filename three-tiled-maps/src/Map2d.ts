@@ -15,13 +15,13 @@ export class Map2d {
 
   #layers: Array<Map2dLayer> = [];
 
-  addLayer(layer: Map2dLayer) {
+  addLayer(layer: Map2dLayer): void {
     if (this.#layers.indexOf(layer) === -1) {
       this.#layers.push(layer);
     }
   }
 
-  removeLayer(layer: Map2dLayer) {
+  removeLayer(layer: Map2dLayer): void {
     const idx = this.#layers.indexOf(layer);
     if (idx !== -1) {
       this.#layers.splice(idx, 1);
@@ -32,7 +32,7 @@ export class Map2d {
     }
   }
 
-  update() {
+  update(): void {
     this.#layers.forEach((layer) => {
       const layerObj3d = this.#getObject3D(layer);
       if (layerObj3d) {
@@ -44,5 +44,5 @@ export class Map2d {
     });
   }
 
-  #getObject3D = (layer: Map2dLayer) => layer.tilesRenderer?.getObject3D();
+  #getObject3D = (layer: Map2dLayer): Object3D => layer.tilesRenderer?.getObject3D();
 }

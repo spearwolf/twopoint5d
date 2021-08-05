@@ -3,6 +3,7 @@ import {
   TileSetLoader,
   TileSetOptions,
 } from 'three-vertex-objects';
+// eslint-disable-next-line import/no-unresolved
 import {useAsset} from 'use-asset';
 
 export function useTileSetLoader(

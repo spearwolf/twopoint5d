@@ -22,6 +22,8 @@ env:
   browser: true
 
 settings:
+  react:
+    version: detect
   import/resolver:
     node:
       extensions:

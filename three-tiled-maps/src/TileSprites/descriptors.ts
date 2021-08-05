@@ -6,7 +6,7 @@ export interface TileBaseSprite {
 }
 
 export class TileBaseSprite {
-  make(width = 1, height = 1, xOffset = 0, zOffset = 0) {
+  make(width = 1, height = 1, xOffset = 0, zOffset = 0): void {
     // prettier-ignore
     this.setPosition([
       xOffset,         0, zOffset,

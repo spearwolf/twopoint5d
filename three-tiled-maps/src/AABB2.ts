@@ -14,7 +14,7 @@ export class AABB2 {
     this.height = height;
   }
 
-  set(left: number, top: number, width: number, height: number) {
+  set(left: number, top: number, width: number, height: number): AABB2 {
     this.top = top;
     this.left = left;
     this.width = width;
@@ -22,11 +22,11 @@ export class AABB2 {
     return this;
   }
 
-  clone() {
+  clone(): AABB2 {
     return new AABB2(this.left, this.top, this.width, this.height);
   }
 
-  copy(aabb: AABB2) {
+  copy(aabb: AABB2): AABB2 {
     this.top = aabb.top;
     this.left = aabb.left;
     this.width = aabb.width;
@@ -51,7 +51,7 @@ export class AABB2 {
     return target ? target.set(left, top, width, height) : new AABB2(left, top, width, height);
   }
 
-  extend(other: AABB2) {
+  extend(other: AABB2): AABB2 {
     if (other.left < this.left) {
       this.width += this.left - other.left;
       this.left = other.left;
@@ -69,15 +69,15 @@ export class AABB2 {
     return this;
   }
 
-  get right() {
+  get right(): number {
     return this.left + this.width;
   }
 
-  get bottom() {
+  get bottom(): number {
     return this.top + this.height;
   }
 
-  get centerX() {
+  get centerX(): number {
     return this.left + this.width / 2;
   }
 
@@ -85,7 +85,7 @@ export class AABB2 {
     this.left += x - this.centerX;
   }
 
-  get centerY() {
+  get centerY(): number {
     return this.top + this.height / 2;
   }
 
@@ -93,11 +93,11 @@ export class AABB2 {
     this.top += y - this.centerY;
   }
 
-  is(left: number, top: number, width: number, height: number) {
+  is(left: number, top: number, width: number, height: number): boolean {
     return this.top === top && this.left === left && this.width === width && this.height === height;
   }
 
-  isEqual(aabb: AABB2) {
+  isEqual(aabb: AABB2): boolean {
     return (
       this.top === aabb.top &&
       this.left === aabb.left &&
@@ -109,7 +109,7 @@ export class AABB2 {
   /**
    * @returns `true` if point is within
    */
-  isInside(x: number, y: number) {
+  isInside(x: number, y: number): boolean {
     return this.left <= x && x < this.right && this.top <= y && y < this.bottom;
   }
 
@@ -117,7 +117,7 @@ export class AABB2 {
    *
    * @returns `true` if _aabb_ is completely within
    */
-  isInsideAABB(aabb: AABB2) {
+  isInsideAABB(aabb: AABB2): boolean {
     return (
       this.isInside(aabb.top, aabb.left) &&
       this.left <= aabb.right &&
@@ -130,7 +130,7 @@ export class AABB2 {
   /**
    * @returns `true` if the two overlap
    */
-  isIntersecting(aabb: AABB2) {
+  isIntersecting(aabb: AABB2): boolean {
     return !(
       aabb.right <= this.left ||
       aabb.left >= this.right ||
@@ -139,19 +139,19 @@ export class AABB2 {
     );
   }
 
-  isNorthWest(x: number, y: number) {
+  isNorthWest(x: number, y: number): boolean {
     return (this.right <= x || this.left < x) && (this.top < y || this.bottom <= y);
   }
 
-  isNorthEast(x: number, y: number) {
+  isNorthEast(x: number, y: number): boolean {
     return (this.right > x || this.left >= x) && (this.top < y || this.bottom <= y);
   }
 
-  isSouthEast(x: number, y: number) {
+  isSouthEast(x: number, y: number): boolean {
     return (this.right > x || this.left >= x) && (this.top >= y || this.bottom > y);
   }
 
-  isSouthWest(x: number, y: number) {
+  isSouthWest(x: number, y: number): boolean {
     return (this.right <= x || this.left < x) && (this.top >= y || this.bottom > y);
   }
 }

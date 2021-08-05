@@ -14,7 +14,7 @@ export class Map2dLayer {
 
   #needsUpdate = true;
 
-  get width() {
+  get width(): number {
     return this.#width;
   }
 
@@ -25,7 +25,7 @@ export class Map2dLayer {
     }
   }
 
-  get height() {
+  get height(): number {
     return this.#height;
   }
 
@@ -36,7 +36,7 @@ export class Map2dLayer {
     }
   }
 
-  get centerX() {
+  get centerX(): number {
     return this.#centerX;
   }
 
@@ -47,7 +47,7 @@ export class Map2dLayer {
     }
   }
 
-  get centerY() {
+  get centerY(): number {
     return this.#centerY;
   }
 
@@ -58,7 +58,7 @@ export class Map2dLayer {
     }
   }
 
-  get tileWidth() {
+  get tileWidth(): number {
     return this.#tileCoords.tileWidth;
   }
 
@@ -69,7 +69,7 @@ export class Map2dLayer {
     }
   }
 
-  get tileHeight() {
+  get tileHeight(): number {
     return this.#tileCoords.tileHeight;
   }
 
@@ -80,7 +80,7 @@ export class Map2dLayer {
     }
   }
 
-  get xOffset() {
+  get xOffset(): number {
     return this.#tileCoords.xOffset;
   }
 
@@ -91,7 +91,7 @@ export class Map2dLayer {
     }
   }
 
-  get yOffset() {
+  get yOffset(): number {
     return this.#tileCoords.yOffset;
   }
 
@@ -109,7 +109,7 @@ export class Map2dLayer {
     this.#tileCoords = new Map2dTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
-  update() {
+  update(): void {
     if (!this.tilesRenderer) return;
 
     if (this.#needsUpdate) {

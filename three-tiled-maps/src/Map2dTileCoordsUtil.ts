@@ -31,26 +31,31 @@ export class Map2dTileCoordsUtil {
     this.yOffset = yOffset;
   }
 
-  #left = (tileLeft: number) => tileLeft * this.tileWidth + this.xOffset;
-  #top = (tileTop: number) => tileTop * this.tileHeight + this.yOffset;
+  #left = (tileLeft: number): number => tileLeft * this.tileWidth + this.xOffset;
+  #top = (tileTop: number): number => tileTop * this.tileHeight + this.yOffset;
 
-  #tileLeft = (left: number) => {
+  #tileLeft = (left: number): number => {
     return Math.floor((left - this.xOffset) / this.tileWidth);
   };
 
-  #tileColumns = (tileLeft: number, width: number) => {
+  #tileColumns = (tileLeft: number, width: number): number => {
     return Math.ceil(tileLeft + width / this.tileWidth) - tileLeft;
   };
 
-  #tileTop = (top: number) => {
+  #tileTop = (top: number): number => {
     return Math.floor((top - this.yOffset) / this.tileHeight);
   };
 
-  #tileRows = (tileTop: number, height: number) => {
+  #tileRows = (tileTop: number, height: number): number => {
     return Math.ceil(tileTop + height / this.tileHeight) - tileTop;
   };
 
-  getTileCoords(left: number, top: number, width: number, height: number) {
+  getTileCoords(
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+  ): [tileLeft: number, tileTop: number, columns: number, rows: number] {
     const tileLeft = this.#tileLeft(left);
     const w = width + left - this.#left(tileLeft);
     const tileTop = this.#tileTop(top);

@@ -7,7 +7,7 @@ import {AABB2} from './AABB2';
  * Used in {@link Map2dLayer} for identifying tiles.
  */
 export class Map2dAreaTile {
-  static createID(x: number, y: number) {
+  static createID(x: number, y: number): string {
     return `y${y.toString(16)}${x < 0 ? '' : 'x'}${x.toString(16)}`;
   }
 

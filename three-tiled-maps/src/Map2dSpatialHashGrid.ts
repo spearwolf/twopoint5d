@@ -17,7 +17,7 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
     this.#tileCoordsUtil = new Map2dTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
-  add(...renderables: Array<Renderable>) {
+  add(...renderables: Array<Renderable>): Map2dSpatialHashGrid<Renderable> {
     for (const renderable of renderables) {
       const {left, top, width, height} = renderable.aabb;
       const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(
@@ -43,7 +43,7 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
     return this;
   }
 
-  remove(...renderables: Array<Renderable>) {
+  remove(...renderables: Array<Renderable>): Map2dSpatialHashGrid<Renderable> {
     for (const renderable of renderables) {
       const {left, top, width, height} = renderable.aabb;
       const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(
