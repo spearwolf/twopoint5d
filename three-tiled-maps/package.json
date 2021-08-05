@@ -35,6 +35,7 @@
     "@rollup/plugin-typescript": "^8.2.5",
     "@types/assert": "^1.5.5",
     "@types/jest": "^26.0.24",
+    "@types/node": "^16.4.12",
     "@types/sinon": "^10.0.2",
     "@types/three": "^0.130.1",
     "@typescript-eslint/eslint-plugin": "^4.29.0",

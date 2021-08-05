@@ -1994,7 +1994,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:^16.0":
+"@types/node@npm:*, @types/node@npm:^16.0, @types/node@npm:^16.4.12":
   version: 16.4.12
   resolution: "@types/node@npm:16.4.12"
   checksum: 1489aeba890629ca2ed9b8f04fb77f185123810afd3d518cf87c2a18a43a43f7d954550ae3572f3dac7e634f7db67e259ceb7ca25cb584ba0bcc023b0bfca2c9
@@ -9513,6 +9513,7 @@ fsevents@^1.2.7:
     "@rollup/plugin-replace": ^2.4.2
     "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
+    "@types/node": ^16.4.12
     "@types/react": ^17.0.15
     "@types/react-dom": ^17.0.9
     "@types/react-reconciler": ^0.26.3
@@ -9561,6 +9562,7 @@ fsevents@^1.2.7:
     "@rollup/plugin-replace": ^2.4.2
     "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
+    "@types/node": ^16.4.12
     "@types/react": ^17.0.15
     "@types/react-dom": ^17.0.9
     "@types/react-reconciler": ^0.26.3
@@ -11351,6 +11353,7 @@ resolve@^2.0.0-next.3:
     "@rollup/plugin-typescript": ^8.2.5
     "@types/assert": ^1.5.5
     "@types/jest": ^26.0.24
+    "@types/node": ^16.4.12
     "@types/sinon": ^10.0.2
     "@types/three": ^0.130.1
     "@typescript-eslint/eslint-plugin": ^4.29.0
@@ -11400,6 +11403,7 @@ resolve@^2.0.0-next.3:
     "@rollup/plugin-replace": ^2.4.2
     "@rollup/plugin-typescript": ^8.2.5
     "@types/jest": ^26.0.24
+    "@types/node": ^16.4.12
     "@types/sinon": ^10.0.2
     "@types/three": ^0.130.1
     "@typescript-eslint/eslint-plugin": ^4.29.0
