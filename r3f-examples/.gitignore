@@ -1,3 +1,4 @@
 node_modules
 dist
 .cache
+public/bundle-report.html
