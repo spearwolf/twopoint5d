@@ -1,5 +1,6 @@
 node_modules
 build
+!examples/libs/three/build
 dist
 .size-snapshot.json
 .cache
