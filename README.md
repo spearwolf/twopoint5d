@@ -7,15 +7,15 @@
 
 | library | description |
 |-|-|
-| [three-vertex-objects](./three-vertex-objects/) | the base library which provides an api for the definition and management of [vertex objects](./ThinkTank.md) based on [three.js](https://threejs.org/) |
-| [three-tiled-maps](./three-tiled-maps/) | a library that builds on the concept of _vertex objects_ an api for rendering [2D maps](./three-tiled-maps/src/README.md) |
-| [r3f-vertex-objects](./r3f-vertex-objects/) | a library that contains components, hooks and helpers which simplifies the use of the __three-vertex-objects__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
-| [r3f-tiled-maps](./r3f-tiled-maps/) | a library that contains components, hooks and helpers which simplifies the use of the __three-tiled-maps__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
+| [`three-vertex-objects`](./three-vertex-objects/) | the base library which provides an api for the definition and management of [vertex objects](./ThinkTank.md) based on [three.js](https://threejs.org/) |
+| [`three-tiled-maps`](./three-tiled-maps/) | a library that builds on the concept of _vertex objects_ an api for rendering [2D maps](./three-tiled-maps/src/README.md) |
+| [`r3f-vertex-objects`](./r3f-vertex-objects/) | a library that contains components, hooks and helpers which simplifies the use of the __three-vertex-objects__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
+| [`r3f-tiled-maps`](./r3f-tiled-maps/) | a library that contains components, hooks and helpers which simplifies the use of the __three-tiled-maps__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
 
 | API usage examples | description |
 |-|-|
-| [examples](./examples/) | API usage examples for the __three-vertex-objects__ and __three-tiled-maps__ libraries. just plain javascript here, no framework is used. |
-| [r3f-examples](./r3f-examples/) | API usage examples for the __r3f-vertex-objects__ and __r3f-tiled-maps__ libraries based upon __react__ and __react-three-fiber__ |
+| [`examples`](./examples/) | API usage examples for the __three-vertex-objects__ and __three-tiled-maps__ libraries. just plain javascript here, no framework is used. |
+| [`r3f-examples`](./r3f-examples/) | API usage examples for the __r3f-vertex-objects__ and __r3f-tiled-maps__ libraries based upon __react__ and __react-three-fiber__ |
 
 
 ## Getting started
