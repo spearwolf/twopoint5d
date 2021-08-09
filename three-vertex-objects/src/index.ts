@@ -7,6 +7,7 @@ export * from './ShaderTool';
 export * from './TextureAtlas';
 export * from './TextureCoords';
 export * from './TextureFactory';
+export * from './TexturePackerJson';
 export * from './TileSet';
 export * from './TileSetLoader';
 export * from './VertexAttributeDescriptor';
