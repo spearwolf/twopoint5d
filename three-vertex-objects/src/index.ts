@@ -2,6 +2,7 @@ export * from './fitIntoRectangle';
 export * from './FrameBasedAnimations';
 export * from './getDescriptorOf';
 export * from './InstancedVertexObjectGeometry';
+export * from './Plane';
 export * from './PowerOf2ImageLoader';
 export * from './ShaderTool';
 export * from './TextureAtlas';
