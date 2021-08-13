@@ -28,11 +28,12 @@ export interface TexturePackerJsonData {
 export class TexturePackerJson {
   static parse(
     data: TexturePackerJsonData,
+    parentCoords?: TextureCoords,
     target?: TextureAtlas,
   ): [atlas: TextureAtlas, meta: TexturePackerMetaData] {
     target ??= new TextureAtlas();
 
-    const parentCoords = new TextureCoords(
+    parentCoords ??= new TextureCoords(
       0,
       0,
       data.meta.size.w,
