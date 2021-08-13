@@ -13,10 +13,10 @@ export function useTextureFactoryLoader(
 ) {
   return useAsset(
     ([url, options]: [string, Array<TextureOptionClasses>]) => {
-      const tilesetLoader = new TextureFactoryLoader(
+      const loader = new TextureFactoryLoader(
         textureFactory ?? new TextureFactory(),
       );
-      return tilesetLoader.loadAsync(url, options);
+      return loader.loadAsync(url, options);
     },
     [url, options],
   );
