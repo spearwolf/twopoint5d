@@ -1,7 +1,7 @@
 import {OrthographicCamera, Vector2} from 'three';
 
 import {IProjection} from './IProjection';
-import {Plane} from './Plane';
+import {ProjectionPlane} from './ProjectionPlane';
 import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
 
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
@@ -12,7 +12,7 @@ export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
 
 export class OrthographicProjection implements IProjection {
   viewSpecs: OrthographicProjectionSpecs;
-  projectionPlane: Plane;
+  projectionPlane: ProjectionPlane;
 
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();
@@ -25,7 +25,10 @@ export class OrthographicProjection implements IProjection {
 
   #distanceToProjectionPlane: number;
 
-  constructor(projectionPlane?: Plane, specs?: OrthographicProjectionSpecs) {
+  constructor(
+    projectionPlane?: ProjectionPlane,
+    specs?: OrthographicProjectionSpecs,
+  ) {
     this.projectionPlane = projectionPlane;
     this.viewSpecs = specs;
   }

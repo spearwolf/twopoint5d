@@ -1,7 +1,7 @@
 import {OrthographicCamera} from 'three';
 
 import {OrthographicProjection} from './OrthographicProjection';
-import {Plane} from './Plane';
+import {ProjectionPlane} from './ProjectionPlane';
 
 describe('OrthographicProjection', () => {
   describe('construction', () => {
@@ -11,7 +11,7 @@ describe('OrthographicProjection', () => {
     });
 
     it('with plane and specs', () => {
-      const projection = new OrthographicProjection(Plane.get('xy'), {
+      const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
         fit: 'contain',
         width: 640,
       });
@@ -22,7 +22,7 @@ describe('OrthographicProjection', () => {
   });
 
   it('updateViewRect + getViewRect', () => {
-    const projection = new OrthographicProjection(Plane.get('xy'), {
+    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
     });
@@ -31,7 +31,7 @@ describe('OrthographicProjection', () => {
   });
 
   it('getZoom', () => {
-    const projection = new OrthographicProjection(Plane.get('xy'), {
+    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
       distanceToProjectionPlane: 300,
@@ -45,7 +45,7 @@ describe('OrthographicProjection', () => {
   });
 
   it('createCamera', () => {
-    const projection = new OrthographicProjection(Plane.get('xy'), {
+    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
     });
