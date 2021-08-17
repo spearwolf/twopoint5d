@@ -65,8 +65,6 @@ export interface VertexObjectDescription {
   // TODO methods
 }
 
-export type VOBatchType = [size: number, start: number];
-
 export interface VO {
   [voBuffer]: VertexObjectBuffer;
   [voIndex]: number;
