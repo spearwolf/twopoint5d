@@ -1,3 +1,4 @@
+export * from './constants';
 export * from './findNextPowerOf2';
 export * from './fitIntoRectangle';
 export * from './FrameBasedAnimations';
@@ -6,8 +7,8 @@ export * from './InstancedVertexObjectGeometry';
 export * from './IProjection';
 export * from './OrthographicProjection';
 export * from './ParallaxProjection';
-export * from './Plane';
 export * from './PowerOf2ImageLoader';
+export * from './ProjectionPlane';
 export * from './ShaderTool';
 export * from './TextureAtlas';
 export * from './TextureCoords';
@@ -16,12 +17,10 @@ export * from './TextureFactoryLoader';
 export * from './TexturePackerJson';
 export * from './TileSet';
 export * from './TileSetLoader';
+export * from './types';
 export * from './VertexAttributeDescriptor';
 export * from './VertexObjectBuffer';
 export * from './VertexObjectDescriptor';
 export * from './VertexObjectGeometry';
 export * from './VertexObjectPool';
 export * from './VertexObjects';
-
-export * from './constants';
-export * from './types';

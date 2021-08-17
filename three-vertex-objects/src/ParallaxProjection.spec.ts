@@ -1,7 +1,7 @@
 import {PerspectiveCamera} from 'three';
 
 import {ParallaxProjection} from './ParallaxProjection';
-import {Plane} from './Plane';
+import {ProjectionPlane} from './ProjectionPlane';
 
 describe('ParallaxProjection', () => {
   describe('construction', () => {
@@ -11,7 +11,7 @@ describe('ParallaxProjection', () => {
     });
 
     it('with plane and specs', () => {
-      const projection = new ParallaxProjection(Plane.get('xy'), {
+      const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
         fit: 'contain',
         width: 640,
       });
@@ -22,7 +22,7 @@ describe('ParallaxProjection', () => {
   });
 
   it('updateViewRect + getViewRect', () => {
-    const projection = new ParallaxProjection(Plane.get('xy'), {
+    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
     });
@@ -31,7 +31,7 @@ describe('ParallaxProjection', () => {
   });
 
   it('getZoom', () => {
-    const projection = new ParallaxProjection(Plane.get('xy'), {
+    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
       distanceToProjectionPlane: 300,
@@ -48,7 +48,7 @@ describe('ParallaxProjection', () => {
   });
 
   it('createCamera', () => {
-    const projection = new ParallaxProjection(Plane.get('xy'), {
+    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
       fit: 'contain',
       width: 640,
     });

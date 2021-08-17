@@ -1,6 +1,6 @@
 import {Camera} from 'three';
 
-import {Plane} from './Plane';
+import {ProjectionPlane} from './ProjectionPlane';
 
 export interface IProjection {
   updateViewRect(width: number, height: number): void;
@@ -11,7 +11,7 @@ export interface IProjection {
     pixelRatioVertical: number,
   ];
 
-  get projectionPlane(): Plane;
+  get projectionPlane(): ProjectionPlane;
   getZoom(distanceToProjectionPlane: number): number;
 
   createCamera(): Camera;
