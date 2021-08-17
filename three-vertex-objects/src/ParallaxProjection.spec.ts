@@ -11,10 +11,13 @@ describe('ParallaxProjection', () => {
     });
 
     it('with plane and specs', () => {
-      const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
-        fit: 'contain',
-        width: 640,
-      });
+      const projection = new ParallaxProjection(
+        ProjectionPlane.get('xy|bottom-left'),
+        {
+          fit: 'contain',
+          width: 640,
+        },
+      );
       expect(projection).toBeDefined();
       expect(projection.viewSpecs).toBeDefined();
       expect(projection.projectionPlane).toBeDefined();
@@ -22,20 +25,26 @@ describe('ParallaxProjection', () => {
   });
 
   it('updateViewRect + getViewRect', () => {
-    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-    });
+    const projection = new ParallaxProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+      },
+    );
     projection.updateViewRect(800, 600);
     expect(projection.getViewRect()).toEqual([640, 480, 1.25, 1.25]);
   });
 
   it('getZoom', () => {
-    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-      distanceToProjectionPlane: 300,
-    });
+    const projection = new ParallaxProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+        distanceToProjectionPlane: 300,
+      },
+    );
     projection.updateViewRect(800, 600);
 
     expect(projection.getZoom(300)).toEqual(0);
@@ -48,10 +57,13 @@ describe('ParallaxProjection', () => {
   });
 
   it('createCamera', () => {
-    const projection = new ParallaxProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-    });
+    const projection = new ParallaxProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+      },
+    );
     projection.updateViewRect(800, 600);
     expect(projection.createCamera()).toBeInstanceOf(PerspectiveCamera);
   });

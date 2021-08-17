@@ -6,7 +6,11 @@ import {
   Object3D,
 } from 'three';
 
-export type ProjectionPlaneDescription = 'xy' | 'xz';
+export type ProjectionPlaneDescription =
+  | 'xy|bottom-left'
+  | 'xy|top-left'
+  | 'xz|bottom-left'
+  | 'xz|top-left';
 
 /**
  * A [two dimensional surface](https://threejs.org/docs/index.html?q=plane#api/en/math/Plane) with an additional up vector.
@@ -15,30 +19,32 @@ export type ProjectionPlaneDescription = 'xy' | 'xz';
  * and thus also decisive for the direction of the coordinate system on the projection plane.
  */
 export class ProjectionPlane {
-  static XY = 'xy';
-  static XZ = 'xz';
-
   plane: THREE_Plane;
-  upVector: Vector3;
+  up: Vector3;
 
   constructor(
     planeDescription: ProjectionPlaneDescription | THREE_Plane,
-    upVector?: Vector3,
+    up?: Vector3,
   ) {
-    if (planeDescription === 'xy') {
+    if (planeDescription === 'xy|bottom-left') {
       this.plane = new THREE_Plane(new Vector3(0, 0, 1));
-      this.upVector = upVector?.clone() ?? new Vector3(0, 1, 0);
-    } else if (planeDescription === 'xz') {
-      // xz
+      this.up = up?.clone() ?? new Vector3(0, 1, 0);
+    } else if (planeDescription === 'xy|top-left') {
+      this.plane = new THREE_Plane(new Vector3(0, 0, -1));
+      this.up = up?.clone() ?? new Vector3(0, -1, 0);
+    } else if (planeDescription === 'xz|top-left') {
       this.plane = new THREE_Plane(new Vector3(0, 1, 0));
-      this.upVector = upVector?.clone() ?? new Vector3(0, 0, -1);
+      this.up = up?.clone() ?? new Vector3(0, 0, -1);
+    } else if (planeDescription === 'xz|bottom-left') {
+      this.plane = new THREE_Plane(new Vector3(0, -1, 0));
+      this.up = up?.clone() ?? new Vector3(0, 0, 1);
     } else {
       // custom projection plane
       this.plane = planeDescription.clone();
-      if (upVector == null) {
-        throw new Error('upVector is mandatory for a custom projection plane');
+      if (up == null) {
+        throw new Error('up is mandatory for a custom projection plane');
       }
-      this.upVector = upVector.clone();
+      this.up = up.clone();
     }
   }
 
@@ -51,7 +57,7 @@ export class ProjectionPlane {
   }
 
   clone(): ProjectionPlane {
-    return new ProjectionPlane(this.plane.clone(), this.upVector.clone());
+    return new ProjectionPlane(this.plane.clone(), this.up.clone());
   }
 
   applyRotation(obj3d: Object3D): void {
@@ -60,7 +66,7 @@ export class ProjectionPlane {
         new Matrix4().lookAt(
           this.getPointByDistance(1),
           this.getPointByDistance(0),
-          this.upVector,
+          this.up,
         ),
       ),
     );
@@ -83,13 +89,13 @@ export class ProjectionPlane {
   }
 
   getRight(target?: Vector3): Vector3 {
-    return this.getForward(target).cross(this.upVector);
+    return this.getForward(target).cross(this.up);
   }
 
   getPoint(x: number, y: number, target?: Vector3): Vector3 {
     target = this.getOrigin(target);
     target.add(this.getRight().setLength(x));
-    target.add(this.upVector.clone().setLength(y));
+    target.add(this.up.clone().setLength(y));
     return target;
   }
 }

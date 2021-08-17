@@ -11,10 +11,13 @@ describe('OrthographicProjection', () => {
     });
 
     it('with plane and specs', () => {
-      const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
-        fit: 'contain',
-        width: 640,
-      });
+      const projection = new OrthographicProjection(
+        ProjectionPlane.get('xy|bottom-left'),
+        {
+          fit: 'contain',
+          width: 640,
+        },
+      );
       expect(projection).toBeDefined();
       expect(projection.viewSpecs).toBeDefined();
       expect(projection.projectionPlane).toBeDefined();
@@ -22,20 +25,26 @@ describe('OrthographicProjection', () => {
   });
 
   it('updateViewRect + getViewRect', () => {
-    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-    });
+    const projection = new OrthographicProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+      },
+    );
     projection.updateViewRect(800, 600);
     expect(projection.getViewRect()).toEqual([640, 480, 1.25, 1.25]);
   });
 
   it('getZoom', () => {
-    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-      distanceToProjectionPlane: 300,
-    });
+    const projection = new OrthographicProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+        distanceToProjectionPlane: 300,
+      },
+    );
     projection.updateViewRect(800, 600);
 
     expect(projection.getZoom(666)).toEqual(1);
@@ -45,10 +54,13 @@ describe('OrthographicProjection', () => {
   });
 
   it('createCamera', () => {
-    const projection = new OrthographicProjection(ProjectionPlane.get('xy'), {
-      fit: 'contain',
-      width: 640,
-    });
+    const projection = new OrthographicProjection(
+      ProjectionPlane.get('xy|bottom-left'),
+      {
+        fit: 'contain',
+        width: 640,
+      },
+    );
     projection.updateViewRect(800, 600);
     expect(projection.createCamera()).toBeInstanceOf(OrthographicCamera);
   });
