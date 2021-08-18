@@ -4,12 +4,18 @@ import {IProjection} from './IProjection';
 import {ProjectionPlane} from './ProjectionPlane';
 import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
 
+/**
+ * @category Projection
+ */
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
   distanceToProjectionPlane?: number;
   near?: number;
   far?: number;
 };
 
+/**
+ * @category Projection
+ */
 export class OrthographicProjection implements IProjection {
   viewSpecs: OrthographicProjectionSpecs;
   projectionPlane: ProjectionPlane;

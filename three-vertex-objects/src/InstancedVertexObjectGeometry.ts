@@ -20,6 +20,9 @@ type TouchInstancedBuffersType = {
   instanced?: TouchBuffersType;
 };
 
+/**
+ * @category Vertex Objects
+ */
 export class InstancedVertexObjectGeometry extends InstancedBufferGeometry {
   readonly basePool?: VertexObjectPool;
   readonly baseBuffers?: Map<string, BufferLike>;

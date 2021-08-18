@@ -4,6 +4,9 @@ import {
   VertexAttributeUsageType,
 } from './types';
 
+/**
+ * @category Vertex Objects
+ */
 export class VertexAttributeDescriptor {
   private readonly description: VertexAttributeDescription;
 

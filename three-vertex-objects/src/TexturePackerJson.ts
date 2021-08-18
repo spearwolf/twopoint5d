@@ -1,6 +1,9 @@
 import {TextureAtlas} from './TextureAtlas';
 import {TextureCoords} from './TextureCoords';
 
+/**
+ * @category Texture Mapping
+ */
 export interface TexturePackerFrameData {
   frame: {
     x: number;
@@ -10,6 +13,9 @@ export interface TexturePackerFrameData {
   };
 }
 
+/**
+ * @category Texture Mapping
+ */
 export interface TexturePackerMetaData {
   image: string;
   size: {
@@ -18,6 +24,9 @@ export interface TexturePackerMetaData {
   };
 }
 
+/**
+ * @category Texture Mapping
+ */
 export interface TexturePackerJsonData {
   frames: {
     [frameName: string]: TexturePackerFrameData;
@@ -25,6 +34,9 @@ export interface TexturePackerJsonData {
   meta: TexturePackerMetaData;
 }
 
+/**
+ * @category Texture Mapping
+ */
 export class TexturePackerJson {
   static parse(
     data: TexturePackerJsonData,

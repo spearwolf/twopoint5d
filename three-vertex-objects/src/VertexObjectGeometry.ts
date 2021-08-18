@@ -13,6 +13,9 @@ import {
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
+/**
+ * @category Vertex Objects
+ */
 export class VertexObjectGeometry extends BufferGeometry {
   readonly pool: VertexObjectPool;
   readonly buffers: Map<string, BufferLike> = new Map();

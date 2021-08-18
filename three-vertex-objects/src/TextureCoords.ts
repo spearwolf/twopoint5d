@@ -30,6 +30,9 @@ const maxCoord = (
   return coord / texCoords[sizeKey];
 };
 
+/**
+ * @category Texture Mapping
+ */
 export class TextureCoords {
   static readonly FLIP_HORIZONTAL = 1;
   static readonly FLIP_VERTICAL = 2;

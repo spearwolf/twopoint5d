@@ -6,6 +6,9 @@ import {TextureFactory} from './TextureFactory';
 import {TileSet, TileSetOptions} from './TileSet';
 import {TextureSource} from './types';
 
+/**
+ * @category Texture Mapping
+ */
 export interface TileSetData {
   tileSet: TileSet;
   texture: Texture;
@@ -16,6 +19,9 @@ export interface TileSetData {
 type OnLoadCallback = (tileSetData: TileSetData) => void;
 type OnErrorCallback = ((event: Event) => void) | undefined;
 
+/**
+ * @category Texture Mapping
+ */
 export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;

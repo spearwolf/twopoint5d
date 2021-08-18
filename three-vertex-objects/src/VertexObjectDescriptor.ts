@@ -1,6 +1,9 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor';
 import {VertexObjectDescription} from './types';
 
+/**
+ * @category Vertex Objects
+ */
 export class VertexObjectDescriptor {
   private readonly description: VertexObjectDescription;
 

@@ -5,6 +5,9 @@ import {TextureCoords} from './TextureCoords';
 import {TextureFactory, TextureOptionClasses} from './TextureFactory';
 import {TextureSource} from './types';
 
+/**
+ * @category Texture Mapping
+ */
 export interface TextureData {
   texture: Texture;
   imgEl: TextureSource;
@@ -14,6 +17,9 @@ export interface TextureData {
 type OnLoadCallback = (textureData: TextureData) => void;
 type OnErrorCallback = ((event: Event) => void) | undefined;
 
+/**
+ * @category Texture Mapping
+ */
 export class TextureFactoryLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;

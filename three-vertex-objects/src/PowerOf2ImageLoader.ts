@@ -4,6 +4,9 @@ import {TextureCoords} from './TextureCoords';
 import {findNextPowerOf2} from './findNextPowerOf2';
 import {isPowerOf2} from './isPowerOf2';
 
+/**
+ * @category Texture Mapping
+ */
 export interface ImageWithTexCoords {
   imgEl: HTMLImageElement | HTMLCanvasElement;
   texCoords: TextureCoords;
@@ -12,6 +15,9 @@ export interface ImageWithTexCoords {
 type OnImageLoadCallback = (image: ImageWithTexCoords) => void;
 type OnErrorCallback = ((event: Event) => void) | undefined;
 
+/**
+ * @category Texture Mapping
+ */
 export class PowerOf2ImageLoader {
   #imageLoader?: ImageLoader;
 

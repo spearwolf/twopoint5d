@@ -6,4 +6,11 @@ module.exports = {
   excludePrivate: true,
   out: 'build/docs',
   theme: 'minimal',
+  categoryOrder: [
+    'Vertex Objects',
+    'Texture Mapping',
+    'Projection',
+    '*',
+    'Other',
+  ],
 };

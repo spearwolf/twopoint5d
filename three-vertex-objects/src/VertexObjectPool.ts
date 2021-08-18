@@ -19,6 +19,9 @@ const createVertexObject = (
     },
   });
 
+/**
+ * @category Vertex Objects
+ */
 export class VertexObjectPool<VOType = VO> {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;

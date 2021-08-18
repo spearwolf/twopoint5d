@@ -1,6 +1,10 @@
 import {Vector2} from 'three';
 
+
 // TODO add anchorPosition: 'top center' ...
+/**
+ * @category Projection
+ */
 export type FitIntoRectangleSpecs =
   | {
       fit?: 'fill';
@@ -29,6 +33,9 @@ export type FitIntoRectangleSpecs =
       maxPixelZoom?: number;
     };
 
+/**
+ * @category Projection
+ */
 export function fitIntoRectangle(
   rect: Vector2,
   specs: FitIntoRectangleSpecs,

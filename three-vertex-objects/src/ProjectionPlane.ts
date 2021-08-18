@@ -6,6 +6,9 @@ import {
   Object3D,
 } from 'three';
 
+/**
+ * @category Projection
+ */
 export type ProjectionPlaneDescription =
   | 'xy|bottom-left'
   | 'xy|top-left'
@@ -17,6 +20,8 @@ export type ProjectionPlaneDescription =
  *
  * The idea behind the up vector is, that it is used for a camera directed to this plane
  * and thus also decisive for the direction of the coordinate system on the projection plane.
+ *
+ * @category Projection
  */
 export class ProjectionPlane {
   plane: THREE_Plane;

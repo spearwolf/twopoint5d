@@ -7,6 +7,9 @@ import {findNextPowerOf2} from './findNextPowerOf2';
 
 type AnimName = string | symbol;
 
+/**
+ * @category Texture Mapping
+ */
 export interface FrameBasedAnimDef {
   frames: TextureCoords[];
   duration: number;
@@ -63,6 +66,9 @@ const renderFloatsBuffer = (
   return floatsBuffer;
 };
 
+/**
+ * @category Texture Mapping
+ */
 export class FrameBasedAnimations {
   static MaxTextureSize = 16384;
 

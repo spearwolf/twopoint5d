@@ -1,7 +1,13 @@
 import {TextureCoords} from './TextureCoords';
 
+/**
+ * @category Texture Mapping
+ */
 export type TextureAtlasFrameData = Record<string, any>;
 
+/**
+ * @category Texture Mapping
+ */
 export interface TextureAtlasFrame {
   coords: TextureCoords;
   data?: TextureAtlasFrameData;
@@ -24,6 +30,9 @@ const isNamedTextureAtlasArgs = (
 
 const rand = (max: number) => (Math.random() * max) | 0;
 
+/**
+ * @category Texture Mapping
+ */
 export class TextureAtlas {
   #frames: TextureAtlasFrame[] = [];
   #frameNames: Map<TextureAtlasFrameName, number> = new Map();

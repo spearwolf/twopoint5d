@@ -25,6 +25,9 @@ interface Buffer {
   // THREE->bufferAttribute?
 }
 
+/**
+ * @category Vertex Objects
+ */
 export class VertexObjectBuffer {
   readonly descriptor: VertexObjectDescriptor;
 
