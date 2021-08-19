@@ -1,5 +1,9 @@
-/** @internal */
+/**
+ * @category Vertex Objects
+ */
 export const voBuffer = Symbol('voBuffer');
 
-/** @internal */
+/**
+ * @category Vertex Objects
+ */
 export const voIndex = Symbol('voIndex');

@@ -11448,6 +11448,7 @@ resolve@^2.0.0-next.3:
     ts-jest: ^27.0.4
     ts-node: ^10.1.0
     tslib: ^2.3.0
+    typedoc: ^0.21.6
     typescript: ^4.3.5
   peerDependencies:
     three: ^0.131.3
@@ -11849,6 +11850,26 @@ resolve@^2.0.0-next.3:
   bin:
     typedoc: bin/typedoc
   checksum: 1d69ecfc436712ccf5658e63c1665de44b1480593e2627e2ebe1e0f88823866f112ffa0358ee51ddb51a8500994f3600453daacee7ebacf21ccade1ceecc6be1
+  languageName: node
+  linkType: hard
+
+"typedoc@npm:^0.21.6":
+  version: 0.21.6
+  resolution: "typedoc@npm:0.21.6"
+  dependencies:
+    glob: ^7.1.7
+    handlebars: ^4.7.7
+    lunr: ^2.3.9
+    marked: ^2.1.1
+    minimatch: ^3.0.0
+    progress: ^2.0.3
+    shiki: ^0.9.3
+    typedoc-default-themes: ^0.12.10
+  peerDependencies:
+    typescript: 4.0.x || 4.1.x || 4.2.x || 4.3.x
+  bin:
+    typedoc: bin/typedoc
+  checksum: 0c24e6566492b8e7dd92dd201c10cecf09cb8b828a8c8e9b09fe091d47cee9d559d7eb2745a7137462bdd84726eb25208a2c594987d98fa9c8913118589993cc
   languageName: node
   linkType: hard
 
