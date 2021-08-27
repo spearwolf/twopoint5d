@@ -2,7 +2,7 @@ This repository contains the implementation of **three-vertex-objects**, which i
 
 three-vertex-objects is the next iteration of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
 
-This repository is structured as a monorepo, which is based on [yarn v2+](https://yarnpkg.com/).
+This repository is structured as a monorepo; based on upon [yarn workspaces](https://yarnpkg.com/features/workspaces).
 
 ## What is included
 
