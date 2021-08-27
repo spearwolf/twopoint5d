@@ -1,6 +1,8 @@
 # three-vertex-objects
 
-is a typescript library for creating realtime 2.5D graphics in HTML5 ![game-dev](https://img.shields.io/badge/game-dev-red) ![pixelart](https://img.shields.io/badge/pixel-art-green) ![creative-coding](https://img.shields.io/badge/creative-coding-blue)
+![game-dev](https://img.shields.io/badge/game-dev-red) ![pixelart](https://img.shields.io/badge/pixel-art-green) ![creative-coding](https://img.shields.io/badge/creative-coding-blue)
+
+is a typescript library for creating realtime 2.5D graphics in HTML5
 
 it's based on the fantastic [three.js](https://threejs.org/) library which itself is build upon WebGL
 
