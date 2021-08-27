@@ -1,13 +1,14 @@
-# three-vertex-objects
+This repository contains the implementation of **three-vertex-objects**, which is itself composed of two main libraries ([three-vertex-objects](./three-vertex-objects/) and [three-tiled-maps](./three-tiled-maps/)), along with support libraries ([r3f-vertex-objects](./r3f-vertex-objects/) and [r3f-tiled-maps](./r3f-tiled-maps/)), tests, and samples.
 
-- is the next iteration of the [picimo](https://github.com/spearwolf/picimo) library
-- is a monorepo, [yarn v2+](https://yarnpkg.com/) is used as toolchain
+three-vertex-objects is the next iteration of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
+
+This repository is structured as a monorepo, which is based on [yarn v2+](https://yarnpkg.com/).
 
 ## What is included
 
 | library | description |
 |-|-|
-| [`three-vertex-objects`](./three-vertex-objects/) | the base library which provides an api for the definition and management of [vertex objects](./ThinkTank.md) based on [three.js](https://threejs.org/) |
+| [`three-vertex-objects`](./three-vertex-objects/) | the main library which provides an api for the definition and management of [vertex objects](./ThinkTank.md) based on [three.js](https://threejs.org/) |
 | [`three-tiled-maps`](./three-tiled-maps/) | a library that builds on the concept of _vertex objects_ an api for rendering [2D maps](./three-tiled-maps/src/README.md) |
 | [`r3f-vertex-objects`](./r3f-vertex-objects/) | a library that contains components, hooks and helpers which simplifies the use of the __three-vertex-objects__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
 | [`r3f-tiled-maps`](./r3f-tiled-maps/) | a library that contains components, hooks and helpers which simplifies the use of the __three-tiled-maps__ library within [react-three-fiber](https://github.com/pmndrs/react-three-fiber) |
