@@ -1,6 +1,6 @@
 # three-tiled-maps
 
-is a typescript library for rendering 2d tiled maps with WebGL *\#gamedev* *\#pixelart* *\#creative-coding*
+is a typescript library for rendering 2D tiled maps with WebGL *\#gamedev* *\#pixelart* *\#creative-coding*
 
 it's based on the [three-vertex-objects](https://github.com/spearwolf/three-vertex-objects/tree/master/three-vertex-objects) library which itself is build upon [three.js](https://threejs.org/)
 
