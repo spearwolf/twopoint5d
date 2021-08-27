@@ -51,7 +51,7 @@ Start the examples that can be found under [examples/](./examples/)
 $ yarn start
 ```
 
-Start the __react__ examples that can be found under [r3f-examples/](./r3f-examples/)
+Start the [react-three-fiber](https://github.com/pmndrs/react-three-fiber) examples that can be found under [r3f-examples/](./r3f-examples/)
 
 ```sh
 $ cd r3f-examples
