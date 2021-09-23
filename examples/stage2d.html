@@ -1,0 +1,76 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        background-color: #323c39;
+        color: #f0f0f0;
+        font-family: sans-serif;
+        font-size: 13px;
+        line-height: 2;
+      }
+      em {
+        font-size: 84.615384%;
+        color: #ddd;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/examples/libs/three/build/three.module.js",
+          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
+          "three-stages": "/three-stages/build/three-stages.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <section class="intro">
+      <p>three-vertex-objects.js :: hello Stage2D<br /></p>
+    </section>
+    <canvas id="canvas-container" resize-to="window"></canvas>
+    <script type="module">
+      import { Color, Sprite, SpriteMaterial, TextureLoader } from "three";
+      import { TextureFactory } from "three-vertex-objects";
+      import { Stage2D, ParallaxProjection } from "three-stages";
+      import { Display } from "/examples/jsm/display/Display.js";
+
+      window.display = new Display(document.getElementById("canvas-container"));
+
+      window.stage2d = new Stage2D(
+        new ParallaxProjection("xy|bottom-left", { pixelZoom: 4 })
+      );
+
+      const textureFactory = new TextureFactory(display.renderer, [
+        "nearest",
+        "flipy",
+      ]);
+
+      const textureImage = textureFactory.load(
+        "/examples/assets/ball-pattern-rot--not-power-of-2.png"
+      );
+      const material = new SpriteMaterial({ map: textureImage });
+      const sprite = new Sprite(material);
+
+      sprite.scale.set(100, 100, 0); // => should result in a 400x400 (css pixels) pixelart/crisp image
+      stage2d.scene.add(sprite);
+
+      display.on("init", ({ renderer }) => {
+        renderer.setClearColor(new Color(0x000000), 0.0);
+      });
+
+      display.on("resize", ({ width, height }) => {
+        stage2d.resize(width, height);
+      });
+
+      display.on("frame", ({ renderer }) => {
+        stage2d.renderFrame(renderer);
+      });
+
+      display.start();
+
+      console.log("display=", display);
+      console.log("stage=", stage2d);
+    </script>
+  </body>
+</html>
