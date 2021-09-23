@@ -4,8 +4,11 @@
   "description": "2d stages and projections for three.js",
   "main": "build/three-stages.umd.js",
   "module": "build/three-stages.js",
-  "exports": "./build/three-stages.js",
-  "types": "./build/types/index.d.ts",
+  "types": "build/types/index.d.ts",
+  "exports": {
+    "import": "./build/three-stages.js",
+    "require": "./build/three-stages.umd.js"
+  },
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
     "watch:js": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.esm.js",

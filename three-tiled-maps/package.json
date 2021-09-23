@@ -4,8 +4,11 @@
   "description": "tiled maps renderer framework based upon three.js and three-vertex-objects",
   "main": "build/three-tiled-maps.umd.js",
   "module": "build/three-tiled-maps.js",
-  "exports": "./build/three-tiled-maps.js",
-  "types": "./build/types/index.d.ts",
+  "types": "build/types/index.d.ts",
+  "exports": {
+    "import": "./build/three-tiled-maps.js",
+    "require": "./build/three-tiled-maps.umd.js"
+  },
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
     "watch:js": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.esm.js",

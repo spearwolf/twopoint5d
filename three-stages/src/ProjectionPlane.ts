@@ -1,10 +1,4 @@
-import {
-  Plane as THREE_Plane,
-  Quaternion,
-  Vector3,
-  Matrix4,
-  Object3D,
-} from 'three';
+import {Plane as THREE_Plane, Quaternion, Vector3, Matrix4, Object3D} from 'three';
 
 /**
  * @category Projection
@@ -27,10 +21,7 @@ export class ProjectionPlane {
   plane: THREE_Plane;
   up: Vector3;
 
-  constructor(
-    planeDescription: ProjectionPlaneDescription | THREE_Plane,
-    up?: Vector3,
-  ) {
+  constructor(planeDescription: ProjectionPlaneDescription | THREE_Plane, up?: Vector3) {
     if (planeDescription === 'xy|bottom-left') {
       this.plane = new THREE_Plane(new Vector3(0, 0, 1));
       this.up = up?.clone() ?? new Vector3(0, 1, 0);
@@ -53,12 +44,8 @@ export class ProjectionPlane {
     }
   }
 
-  static get(
-    plane: ProjectionPlane | ProjectionPlaneDescription,
-  ): ProjectionPlane {
-    return plane instanceof ProjectionPlane
-      ? plane
-      : new ProjectionPlane(plane);
+  static get(plane: ProjectionPlane | ProjectionPlaneDescription): ProjectionPlane {
+    return plane instanceof ProjectionPlane ? plane : new ProjectionPlane(plane);
   }
 
   clone(): ProjectionPlane {
@@ -68,19 +55,13 @@ export class ProjectionPlane {
   applyRotation(obj3d: Object3D): void {
     obj3d.applyQuaternion(
       new Quaternion().setFromRotationMatrix(
-        new Matrix4().lookAt(
-          this.getPointByDistance(1),
-          this.getPointByDistance(0),
-          this.up,
-        ),
+        new Matrix4().lookAt(this.getPointByDistance(1), this.getPointByDistance(0), this.up),
       ),
     );
   }
 
   getPointByDistance(distanceToPlane: number, target?: Vector3): Vector3 {
-    return this.getOrigin(target).add(
-      this.plane.normal.clone().multiplyScalar(distanceToPlane),
-    );
+    return this.getOrigin(target).add(this.plane.normal.clone().multiplyScalar(distanceToPlane));
   }
 
   getOrigin(target?: Vector3): Vector3 {

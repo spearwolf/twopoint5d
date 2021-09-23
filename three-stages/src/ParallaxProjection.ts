@@ -33,20 +33,13 @@ export class ParallaxProjection implements IProjection {
   #aspect: number;
   #fovy: number;
 
-  constructor(
-    projectionPlane?: ProjectionPlane,
-    specs?: ParallaxProjectionSpecs,
-  ) {
+  constructor(projectionPlane?: ProjectionPlane, specs?: ParallaxProjectionSpecs) {
     this.projectionPlane = projectionPlane;
     this.viewSpecs = specs;
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(
-      new Vector2(width, height),
-      this.viewSpecs,
-      this.#viewRect,
-    );
+    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
 
     this.#halfHeight = this.#viewRect.height / 2;
 
@@ -55,16 +48,12 @@ export class ParallaxProjection implements IProjection {
     this.#near = this.viewSpecs.near ?? 0.1;
     this.#far = this.viewSpecs.far ?? 100000;
 
-    this.#distanceToProjectionPlane =
-      this.viewSpecs.distanceToProjectionPlane ?? 300;
+    this.#distanceToProjectionPlane = this.viewSpecs.distanceToProjectionPlane ?? 300;
 
     this.#aspect = this.#viewRect.width / this.#viewRect.height;
 
     this.#fovy =
-      (2 *
-        Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) *
-        180) /
-      Math.PI;
+      (2 * Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) * 180) / Math.PI;
   }
 
   getViewRect(): [
@@ -73,27 +62,15 @@ export class ParallaxProjection implements IProjection {
     pixelRatioHorizontal: number,
     pixelRatioVertical: number,
   ] {
-    return [
-      this.#viewRect.width,
-      this.#viewRect.height,
-      this.#pixelRatio.x,
-      this.#pixelRatio.y,
-    ];
+    return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
   }
 
   createCamera(): PerspectiveCamera {
-    const camera = new PerspectiveCamera(
-      this.#fovy,
-      this.#aspect,
-      this.#near,
-      this.#far,
-    );
+    const camera = new PerspectiveCamera(this.#fovy, this.#aspect, this.#near, this.#far);
 
     this.projectionPlane.applyRotation(camera);
 
-    camera.position.copy(
-      this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane),
-    );
+    camera.position.copy(this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
     camera.updateProjectionMatrix();
     return camera;
@@ -110,8 +87,6 @@ export class ParallaxProjection implements IProjection {
     if (distanceToProjectionPlane === 0) return 1;
 
     const d = this.#distanceToProjectionPlane - distanceToProjectionPlane;
-    return (
-      (Math.tan(((this.#fovy / 2) * Math.PI) / 180) * d) / this.#halfHeight
-    );
+    return (Math.tan(((this.#fovy / 2) * Math.PI) / 180) * d) / this.#halfHeight;
   }
 }

@@ -4,9 +4,7 @@ import {ProjectionPlane} from './ProjectionPlane';
 
 describe('ProjectionPlane', () => {
   it('has predefined "xy" plane', () => {
-    expect(ProjectionPlane.get('xy|bottom-left')).toBeInstanceOf(
-      ProjectionPlane,
-    );
+    expect(ProjectionPlane.get('xy|bottom-left')).toBeInstanceOf(ProjectionPlane);
   });
 
   it('has predefined "xz" plane', () => {

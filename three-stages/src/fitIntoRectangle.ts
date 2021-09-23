@@ -1,7 +1,7 @@
 import {Vector2} from 'three';
 
-
 // TODO add anchorPosition: 'top center' ...
+
 /**
  * @category Projection
  */
@@ -65,15 +65,9 @@ export function fitIntoRectangle(
         target.set(specs.width, specs.height);
       }
     }
-    if (
-      'minPixelZoom' in specs &&
-      rect.width / target.width < specs.minPixelZoom
-    ) {
+    if ('minPixelZoom' in specs && rect.width / target.width < specs.minPixelZoom) {
       target.copy(rect).divideScalar(specs.minPixelZoom);
-    } else if (
-      'maxPixelZoom' in specs &&
-      rect.width / target.width > specs.maxPixelZoom
-    ) {
+    } else if ('maxPixelZoom' in specs && rect.width / target.width > specs.maxPixelZoom) {
       target.copy(rect).divideScalar(specs.maxPixelZoom);
     }
   }

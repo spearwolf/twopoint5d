@@ -31,20 +31,13 @@ export class OrthographicProjection implements IProjection {
 
   #distanceToProjectionPlane: number;
 
-  constructor(
-    projectionPlane?: ProjectionPlane,
-    specs?: OrthographicProjectionSpecs,
-  ) {
+  constructor(projectionPlane?: ProjectionPlane, specs?: OrthographicProjectionSpecs) {
     this.projectionPlane = projectionPlane;
     this.viewSpecs = specs;
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(
-      new Vector2(width, height),
-      this.viewSpecs,
-      this.#viewRect,
-    );
+    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
 
     this.#halfWidth = this.#viewRect.width / 2;
     this.#halfHeight = this.#viewRect.height / 2;
@@ -54,8 +47,7 @@ export class OrthographicProjection implements IProjection {
     this.#near = this.viewSpecs.near ?? 0.1;
     this.#far = this.viewSpecs.far ?? 100000;
 
-    this.#distanceToProjectionPlane =
-      this.viewSpecs.distanceToProjectionPlane ?? 100;
+    this.#distanceToProjectionPlane = this.viewSpecs.distanceToProjectionPlane ?? 100;
   }
 
   getViewRect(): [
@@ -64,12 +56,7 @@ export class OrthographicProjection implements IProjection {
     pixelRatioHorizontal: number,
     pixelRatioVertical: number,
   ] {
-    return [
-      this.#viewRect.width,
-      this.#viewRect.height,
-      this.#pixelRatio.x,
-      this.#pixelRatio.y,
-    ];
+    return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
   }
 
   createCamera(): OrthographicCamera {
@@ -84,9 +71,7 @@ export class OrthographicProjection implements IProjection {
 
     this.projectionPlane.applyRotation(camera);
 
-    camera.position.copy(
-      this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane),
-    );
+    camera.position.copy(this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
     camera.updateProjectionMatrix();
     return camera;

@@ -4,8 +4,11 @@
   "description": "three-vertex-objects",
   "main": "build/three-vertex-objects.umd.js",
   "module": "build/three-vertex-objects.js",
-  "exports": "./build/three-vertex-objects.js",
-  "types": "./build/types/index.d.ts",
+  "types": "build/types/index.d.ts",
+  "exports": {
+    "import": "./build/three-vertex-objects.js",
+    "require": "./build/three-vertex-objects.umd.js"
+  },
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
     "watch:js": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.esm.js",
