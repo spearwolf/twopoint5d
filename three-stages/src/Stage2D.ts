@@ -42,7 +42,8 @@ export class Stage2D {
     const {scene, camera} = this;
     if (scene && camera) {
       renderer.render(scene, camera);
-    } else if (!camera && ++this.#noCameraErrorCount > 100) {
+    } else if (!camera && ++this.#noCameraErrorCount === 100) {
+      this.#noCameraErrorCount = -1000;
       // eslint-disable-next-line no-console
       console.warn(
         'Stage2D has no camera and therefore cannot be rendered! normally this only happens if you forget to call the resize() method ..',
