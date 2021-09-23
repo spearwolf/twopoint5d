@@ -1,6 +1,6 @@
 # three-stages
 
-is a three.js companion library that make ist easy to create a 2D _stage_ with a _projection_.
+> stages and responsive design aware 2d projections
 
 it's based on the [three-vertex-objects](https://github.com/spearwolf/three-vertex-objects/tree/master/three-vertex-objects) library which itself is build upon [three.js](https://threejs.org/)
 
