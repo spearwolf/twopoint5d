@@ -5,7 +5,7 @@ module.exports = {
   excludeInternal: true,
   excludePrivate: true,
   out: 'build/docs',
-  theme: 'minimal',
+  theme: 'default',
   categoryOrder: [
     'Vertex Objects',
     'Texture Mapping',
