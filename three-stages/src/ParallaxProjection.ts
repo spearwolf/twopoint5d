@@ -1,7 +1,7 @@
 import {PerspectiveCamera, Vector2} from 'three';
 
 import {IProjection} from './IProjection';
-import {ProjectionPlane} from './ProjectionPlane';
+import {ProjectionPlane, ProjectionPlaneDescription} from './ProjectionPlane';
 import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
 
 /**
@@ -33,8 +33,12 @@ export class ParallaxProjection implements IProjection {
   #aspect: number;
   #fovy: number;
 
-  constructor(projectionPlane?: ProjectionPlane, specs?: ParallaxProjectionSpecs) {
-    this.projectionPlane = projectionPlane;
+  constructor(
+    projectionPlane?: ProjectionPlane | ProjectionPlaneDescription,
+    specs?: ParallaxProjectionSpecs,
+  ) {
+    this.projectionPlane =
+      typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
     this.viewSpecs = specs;
   }
 
