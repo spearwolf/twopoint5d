@@ -37,7 +37,7 @@ const fragmentShader = `
 `;
 
 interface TexturedSpritesMaterialParameters extends ShaderMaterialParameters {
-  colorMap: Texture;
+  colorMap?: Texture;
 }
 
 export class TexturedSpritesMaterial extends ShaderMaterial {
