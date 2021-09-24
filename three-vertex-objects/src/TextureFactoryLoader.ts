@@ -24,10 +24,7 @@ export class TextureFactoryLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;
 
-  constructor(
-    textureFatory: TextureFactory,
-    imageLoader?: PowerOf2ImageLoader,
-  ) {
+  constructor(textureFatory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
     this.textureFactory = textureFatory;
     this.imageLoader = imageLoader ?? new PowerOf2ImageLoader();
   }
@@ -54,10 +51,7 @@ export class TextureFactoryLoader {
     );
   }
 
-  loadAsync(
-    url: string,
-    textureClasses: Array<TextureOptionClasses>,
-  ): Promise<TextureData> {
+  loadAsync(url: string, textureClasses: Array<TextureOptionClasses>): Promise<TextureData> {
     return new Promise((resolve, reject) => {
       this.load(url, textureClasses, resolve, reject);
     });

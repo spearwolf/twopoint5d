@@ -11,11 +11,7 @@ export function selectBuffers(
   for (const [usageType, needsUpdate] of Object.entries(bufferTypes)) {
     if (needsUpdate === true) {
       const drawUsage = toDrawUsage(usageType as VertexAttributeUsageType);
-      results.push(
-        ...Array.from(buffers.values()).filter(
-          (buffer) => buffer.usage === drawUsage,
-        ),
-      );
+      results.push(...Array.from(buffers.values()).filter((buffer) => buffer.usage === drawUsage));
     }
   }
   return results;

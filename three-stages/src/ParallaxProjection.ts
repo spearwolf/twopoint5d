@@ -33,12 +33,8 @@ export class ParallaxProjection implements IProjection {
   #aspect: number;
   #fovy: number;
 
-  constructor(
-    projectionPlane?: ProjectionPlane | ProjectionPlaneDescription,
-    specs?: ParallaxProjectionSpecs,
-  ) {
-    this.projectionPlane =
-      typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
+  constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
+    this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
     this.viewSpecs = specs;
   }
 
@@ -56,16 +52,10 @@ export class ParallaxProjection implements IProjection {
 
     this.#aspect = this.#viewRect.width / this.#viewRect.height;
 
-    this.#fovy =
-      (2 * Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) * 180) / Math.PI;
+    this.#fovy = (2 * Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) * 180) / Math.PI;
   }
 
-  getViewRect(): [
-    width: number,
-    height: number,
-    pixelRatioHorizontal: number,
-    pixelRatioVertical: number,
-  ] {
+  getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number] {
     return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
   }
 

@@ -31,12 +31,8 @@ export class OrthographicProjection implements IProjection {
 
   #distanceToProjectionPlane: number;
 
-  constructor(
-    projectionPlane?: ProjectionPlane | ProjectionPlaneDescription,
-    specs?: OrthographicProjectionSpecs,
-  ) {
-    this.projectionPlane =
-      typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
+  constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: OrthographicProjectionSpecs) {
+    this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
     this.viewSpecs = specs;
   }
 
@@ -54,12 +50,7 @@ export class OrthographicProjection implements IProjection {
     this.#distanceToProjectionPlane = this.viewSpecs.distanceToProjectionPlane ?? 100;
   }
 
-  getViewRect(): [
-    width: number,
-    height: number,
-    pixelRatioHorizontal: number,
-    pixelRatioVertical: number,
-  ] {
+  getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number] {
     return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
   }
 

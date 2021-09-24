@@ -24,7 +24,7 @@
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
-    "fix": "run-s --silent --print-label eslint:fix prettier:write",
+    "fix": "run-s --silent --print-label prettier:write eslint:fix",
     "docs": "yarn typedoc",
     "test": "cross-env NODE_ENV=test jest"
   },

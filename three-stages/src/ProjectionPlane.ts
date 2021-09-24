@@ -3,11 +3,7 @@ import {Plane as THREE_Plane, Quaternion, Vector3, Matrix4, Object3D} from 'thre
 /**
  * @category Projection
  */
-export type ProjectionPlaneDescription =
-  | 'xy|bottom-left'
-  | 'xy|top-left'
-  | 'xz|bottom-left'
-  | 'xz|top-left';
+export type ProjectionPlaneDescription = 'xy|bottom-left' | 'xy|top-left' | 'xz|bottom-left' | 'xz|top-left';
 
 /**
  * A [two dimensional surface](https://threejs.org/docs/index.html?q=plane#api/en/math/Plane) with an additional up vector.

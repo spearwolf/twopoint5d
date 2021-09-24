@@ -43,9 +43,7 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'static',
     });
-    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(
-      Float32Array,
-    );
+    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(Float32Array);
     expect(vob.buffers.get('static_float32').typedArray.length).toBe(20);
 
     expect(vob.buffers.get('dynamic_float32')).toMatchObject({
@@ -54,9 +52,7 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'dynamic',
     });
-    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(
-      Float32Array,
-    );
+    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(Float32Array);
     expect(vob.buffers.get('dynamic_float32').typedArray.length).toBe(8);
 
     expect(vob.bufferAttributes.get('foo')).toEqual({
@@ -131,12 +127,8 @@ describe('VertexObjectBuffer', () => {
     expect(vob.attributeNames).toBe(vob0.attributeNames);
     expect(vob.bufferAttributes).toBe(vob0.bufferAttributes);
 
-    expect(vob.buffers.get('static_float32')).not.toBe(
-      vob0.buffers.get('static_float32'),
-    );
-    expect(vob.buffers.get('dynamic_float32')).not.toBe(
-      vob0.buffers.get('dynamic_float32'),
-    );
+    expect(vob.buffers.get('static_float32')).not.toBe(vob0.buffers.get('static_float32'));
+    expect(vob.buffers.get('dynamic_float32')).not.toBe(vob0.buffers.get('dynamic_float32'));
 
     expect(vob.buffers.get('static_float32')).toMatchObject({
       bufferName: 'static_float32',
@@ -144,9 +136,7 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'static',
     });
-    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(
-      Float32Array,
-    );
+    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(Float32Array);
     expect(vob.buffers.get('static_float32').typedArray.length).toBe(40);
 
     expect(vob.buffers.get('dynamic_float32')).toMatchObject({
@@ -155,9 +145,7 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'dynamic',
     });
-    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(
-      Float32Array,
-    );
+    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(Float32Array);
     expect(vob.buffers.get('dynamic_float32').typedArray.length).toBe(16);
 
     expect(

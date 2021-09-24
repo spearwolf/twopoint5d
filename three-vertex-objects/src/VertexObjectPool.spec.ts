@@ -137,10 +137,7 @@ describe('VertexObjectPool', () => {
     });
 
     test('vertexCount = 1', () => {
-      const pool = new VertexObjectPool<MyInstancedVertexObject>(
-        {meshCount: 1, attributes: descriptor.attributes},
-        100,
-      );
+      const pool = new VertexObjectPool<MyInstancedVertexObject>({meshCount: 1, attributes: descriptor.attributes}, 100);
 
       const vo = pool.createVO();
       vo.setFoo(3, 2);
@@ -158,31 +155,19 @@ describe('VertexObjectPool', () => {
 
       vo.zack = 10;
 
-      expect(
-        Array.from(
-          vo[voBuffer].buffers.get('dynamic_float32').typedArray,
-        ).slice(0, 3),
-      ).toEqual([3, -2, 10]);
+      expect(Array.from(vo[voBuffer].buffers.get('dynamic_float32').typedArray).slice(0, 3)).toEqual([3, -2, 10]);
 
       vo.bar = 77;
       vo.a = 99;
       vo.b = 88;
       vo.c = 66;
 
-      expect(
-        Array.from(vo[voBuffer].buffers.get('static_float32').typedArray).slice(
-          0,
-          4,
-        ),
-      ).toEqual([77, 99, 88, 66]);
+      expect(Array.from(vo[voBuffer].buffers.get('static_float32').typedArray).slice(0, 4)).toEqual([77, 99, 88, 66]);
     });
 
     test('basePrototype', () => {
       class BaseVO {}
-      const pool = new VertexObjectPool(
-        {...descriptor, basePrototype: BaseVO.prototype},
-        1,
-      );
+      const pool = new VertexObjectPool({...descriptor, basePrototype: BaseVO.prototype}, 1);
       const vo = pool.createVO();
       expect(vo).toBeInstanceOf(BaseVO);
     });

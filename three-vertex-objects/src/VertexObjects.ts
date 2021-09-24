@@ -15,10 +15,7 @@ export interface VertexObjects {
  * @category Vertex Objects
  */
 export class VertexObjects extends Mesh {
-  constructor(
-    geometry?: VertexObjectGeometry | InstancedVertexObjectGeometry,
-    material?: Material | Material[],
-  ) {
+  constructor(geometry?: VertexObjectGeometry | InstancedVertexObjectGeometry, material?: Material | Material[]) {
     super(geometry, material);
     this.name = 'VertexObjects';
   }

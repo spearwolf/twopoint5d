@@ -98,12 +98,7 @@ export class AABB2 {
   }
 
   isEqual(aabb: AABB2): boolean {
-    return (
-      this.top === aabb.top &&
-      this.left === aabb.left &&
-      this.width === aabb.width &&
-      this.height === aabb.height
-    );
+    return this.top === aabb.top && this.left === aabb.left && this.width === aabb.width && this.height === aabb.height;
   }
 
   /**
@@ -131,12 +126,7 @@ export class AABB2 {
    * @returns `true` if the two overlap
    */
   isIntersecting(aabb: AABB2): boolean {
-    return !(
-      aabb.right <= this.left ||
-      aabb.left >= this.right ||
-      aabb.bottom <= this.top ||
-      aabb.top >= this.bottom
-    );
+    return !(aabb.right <= this.left || aabb.left >= this.right || aabb.bottom <= this.top || aabb.top >= this.bottom);
   }
 
   isNorthWest(x: number, y: number): boolean {

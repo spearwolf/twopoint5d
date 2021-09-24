@@ -1,11 +1,4 @@
-import {
-  NearestFilter,
-  TextureFilter,
-  Texture,
-  TextureLoader,
-  LinearFilter,
-  WebGLRenderer,
-} from 'three';
+import {NearestFilter, TextureFilter, Texture, TextureLoader, LinearFilter, WebGLRenderer} from 'three';
 
 import {TextureSource} from './types';
 
@@ -114,13 +107,7 @@ export class TextureFactory {
       {},
       this.#defaultOptions,
       ...classNames
-        .map(
-          (className) =>
-            [TextureClassPriority[className], TextureClasses[className]] as [
-              number,
-              Partial<TextureOptions>,
-            ],
-        )
+        .map((className) => [TextureClassPriority[className], TextureClasses[className]] as [number, Partial<TextureOptions>])
         .sort(([a], [b]) => b - a)
         .map(([, opts]) => opts),
     );
@@ -128,18 +115,12 @@ export class TextureFactory {
     return options;
   }
 
-  create(
-    source: TextureSource,
-    ...classNames: Array<TextureOptionClasses>
-  ): Texture {
+  create(source: TextureSource, ...classNames: Array<TextureOptionClasses>): Texture {
     const texture = new Texture(source);
     return this.update(texture, ...classNames);
   }
 
-  update(
-    texture: Texture,
-    ...classNames: Array<TextureOptionClasses>
-  ): Texture {
+  update(texture: Texture, ...classNames: Array<TextureOptionClasses>): Texture {
     Object.assign(texture, this.getOptions(classNames));
     texture.needsUpdate = true;
     return texture;

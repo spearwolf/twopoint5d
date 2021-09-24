@@ -19,13 +19,11 @@ export class VertexObjectDescriptor {
     this.description = description;
     this.attributes = new Map();
     this.bufferNames = new Set();
-    Object.entries(this.description.attributes).forEach(
-      ([attrName, attrDesc]) => {
-        const descriptor = new VertexAttributeDescriptor(attrName, attrDesc);
-        this.attributes.set(attrName, descriptor);
-        this.bufferNames.add(descriptor.bufferName);
-      },
-    );
+    Object.entries(this.description.attributes).forEach(([attrName, attrDesc]) => {
+      const descriptor = new VertexAttributeDescriptor(attrName, attrDesc);
+      this.attributes.set(attrName, descriptor);
+      this.bufferNames.add(descriptor.bufferName);
+    });
     this.basePrototype = description.basePrototype;
   }
 

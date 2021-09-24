@@ -64,17 +64,9 @@ export class TileSet {
    */
   firstFrameId = -1;
 
-  constructor(
-    ...args:
-      | [TextureAtlas, TextureCoords, TileSetOptions?]
-      | [TextureCoords, TileSetOptions?]
-  ) {
+  constructor(...args: [TextureAtlas, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
-      const [atlas, baseCoords, options] = args as [
-        TextureAtlas,
-        TextureCoords,
-        TileSetOptions,
-      ];
+      const [atlas, baseCoords, options] = args as [TextureAtlas, TextureCoords, TileSetOptions];
       this.atlas = atlas;
       this.baseCoords = baseCoords;
       this.options = options;
@@ -133,11 +125,7 @@ export class TileSet {
   }
 
   frameId(tileId: number): number {
-    return (
-      ((((tileId - this.firstId) % this.tileCount) + this.tileCount) %
-        this.tileCount) +
-      this.firstFrameId
-    );
+    return ((((tileId - this.firstId) % this.tileCount) + this.tileCount) % this.tileCount) + this.firstFrameId;
   }
 
   randomTileId(): number {
@@ -169,13 +157,7 @@ export class TileSet {
     let tileCount = 0;
 
     while (1) {
-      const coords = new TextureCoords(
-        this.baseCoords,
-        x + padding,
-        y + padding,
-        this.tileWidth,
-        this.tileHeight,
-      );
+      const coords = new TextureCoords(this.baseCoords, x + padding, y + padding, this.tileWidth, this.tileHeight);
 
       const frameId = this.atlas.add(coords);
 

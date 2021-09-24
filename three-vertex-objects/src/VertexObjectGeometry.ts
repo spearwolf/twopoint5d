@@ -5,11 +5,7 @@ import {VertexObjectPool} from './VertexObjectPool';
 import {initializeAttributes} from './initializeAttributes';
 import {selectAttributes} from './selectAttributes';
 import {selectBuffers} from './selectBuffers';
-import {
-  BufferLike,
-  VertexAttributeUsageType,
-  VertexObjectDescription,
-} from './types';
+import {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
@@ -20,15 +16,9 @@ export class VertexObjectGeometry extends BufferGeometry {
   readonly pool: VertexObjectPool;
   readonly buffers: Map<string, BufferLike> = new Map();
 
-  constructor(
-    source: VertexObjectPool | VertexObjectDescriptor | VertexObjectDescription,
-    capacity: number,
-  ) {
+  constructor(source: VertexObjectPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super();
-    this.pool =
-      source instanceof VertexObjectPool
-        ? source
-        : new VertexObjectPool(source, capacity);
+    this.pool = source instanceof VertexObjectPool ? source : new VertexObjectPool(source, capacity);
     this.name = 'VertexObjectGeometry';
     initializeAttributes(this, this.pool, this.buffers);
   }
@@ -88,9 +78,7 @@ export class VertexObjectGeometry extends BufferGeometry {
 
   #getAutoTouchAttributeNames = (): string[] => {
     if (!this.#autoTouchAttrNames) {
-      this.#autoTouchAttrNames = Array.from(
-        this.pool.descriptor.attributes.values(),
-      )
+      this.#autoTouchAttrNames = Array.from(this.pool.descriptor.attributes.values())
         .filter((attr) => attr.autoTouch)
         .map((attr) => attr.name);
     }

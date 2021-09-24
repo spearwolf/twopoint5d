@@ -20,12 +20,7 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
   add(...renderables: Array<Renderable>): Map2dSpatialHashGrid<Renderable> {
     for (const renderable of renderables) {
       const {left, top, width, height} = renderable.aabb;
-      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(
-        left,
-        top,
-        width,
-        height,
-      );
+      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
           const tileKey = Map2dSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
@@ -46,12 +41,7 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
   remove(...renderables: Array<Renderable>): Map2dSpatialHashGrid<Renderable> {
     for (const renderable of renderables) {
       const {left, top, width, height} = renderable.aabb;
-      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(
-        left,
-        top,
-        width,
-        height,
-      );
+      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
           const tileKey = Map2dSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
@@ -70,12 +60,7 @@ export class Map2dSpatialHashGrid<Renderable extends IMap2dRenderable> {
 
   findWithin(aabb: AABB2): Set<Renderable> | undefined {
     const {left, top, width, height} = aabb;
-    const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(
-      left,
-      top,
-      width,
-      height,
-    );
+    const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
     return this.getTiles(tileLeft, tileTop, tileColumns, tileRows);
   }
 

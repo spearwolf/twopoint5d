@@ -37,18 +37,13 @@ describe('selectBuffers', () => {
     geometry.update();
 
     expect(selectBuffers(geometry.buffers, {dynamic: true})).toEqual(
-      expect.arrayContaining([
-        geometry.buffers.get('dynamic_float32'),
-        geometry.buffers.get('dynamic_uint32'),
-      ]),
+      expect.arrayContaining([geometry.buffers.get('dynamic_float32'), geometry.buffers.get('dynamic_uint32')]),
     );
     expect(selectBuffers(geometry.buffers, {dynamic: true})).not.toEqual(
       expect.arrayContaining([geometry.buffers.get('static_float32')]),
     );
 
-    expect(selectBuffers(geometry.buffers, {static: true})).toMatchObject([
-      geometry.buffers.get('static_float32'),
-    ]);
+    expect(selectBuffers(geometry.buffers, {static: true})).toMatchObject([geometry.buffers.get('static_float32')]);
 
     expect(selectBuffers(geometry.buffers, {stream: true})).toEqual([]);
     expect(selectBuffers(geometry.buffers, {})).toEqual([]);

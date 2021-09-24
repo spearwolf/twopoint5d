@@ -1,4 +1,4 @@
-import sinon from 'sinon';
+import {createSandbox} from 'sinon';
 
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectGeometry} from './VertexObjectGeometry';
@@ -32,7 +32,7 @@ describe('VertexObjectGeometry', () => {
     },
   });
 
-  const sandbox = sinon.createSandbox();
+  const sandbox = createSandbox();
 
   afterEach(() => {
     sandbox.restore();
@@ -44,15 +44,9 @@ describe('VertexObjectGeometry', () => {
     expect(geometry).toBeDefined();
     expect(geometry.buffers).toBeDefined();
 
-    expect(geometry.buffers.get('dynamic_float32').array).toBe(
-      geometry.pool.buffer.buffers.get('dynamic_float32').typedArray,
-    );
-    expect(geometry.buffers.get('static_float32').array).toBe(
-      geometry.pool.buffer.buffers.get('static_float32').typedArray,
-    );
-    expect(geometry.buffers.get('dynamic_uint32').array).toBe(
-      geometry.pool.buffer.buffers.get('dynamic_uint32').typedArray,
-    );
+    expect(geometry.buffers.get('dynamic_float32').array).toBe(geometry.pool.buffer.buffers.get('dynamic_float32').typedArray);
+    expect(geometry.buffers.get('static_float32').array).toBe(geometry.pool.buffer.buffers.get('static_float32').typedArray);
+    expect(geometry.buffers.get('dynamic_uint32').array).toBe(geometry.pool.buffer.buffers.get('dynamic_uint32').typedArray);
   });
 
   test('index array buffer is created', () => {
@@ -60,9 +54,7 @@ describe('VertexObjectGeometry', () => {
     const geometry = new VertexObjectGeometry(descriptor, capacity);
 
     expect(geometry.index).toBeDefined();
-    expect(geometry.index.array.length).toBe(
-      descriptor.indices.length * capacity,
-    );
+    expect(geometry.index.array.length).toBe(descriptor.indices.length * capacity);
 
     // prettier-ignore
     expect(Array.from(geometry.index.array).slice(0, descriptor.indices.length * 3)).toEqual([
@@ -83,9 +75,7 @@ describe('VertexObjectGeometry', () => {
 
     expect(touchAttributes.callCount).toBe(1);
     expect(touchAttributes.getCall(0).args).toHaveLength(2);
-    expect(touchAttributes.getCall(0).args).toEqual(
-      expect.arrayContaining(['position', 'strength']),
-    );
+    expect(touchAttributes.getCall(0).args).toEqual(expect.arrayContaining(['position', 'strength']));
 
     expect(touchBuffers.callCount).toBe(1);
     expect(touchBuffers.getCall(0).args[0]).toMatchObject({dynamic: true});

@@ -1,9 +1,6 @@
 import {TypedArray, VertexAttributeDataType} from './types';
 
-export function createTypedArray(
-  dataType: VertexAttributeDataType,
-  size: number,
-): TypedArray {
+export function createTypedArray(dataType: VertexAttributeDataType, size: number): TypedArray {
   switch (dataType) {
     case 'float64':
       return new Float64Array(size);

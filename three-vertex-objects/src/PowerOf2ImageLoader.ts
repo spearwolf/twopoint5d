@@ -32,11 +32,7 @@ export class PowerOf2ImageLoader {
     this.#imageLoader = loader;
   }
 
-  load(
-    url: string,
-    onLoadCallback: OnImageLoadCallback,
-    onErrorCallback?: OnErrorCallback,
-  ): void {
+  load(url: string, onLoadCallback: OnImageLoadCallback, onErrorCallback?: OnErrorCallback): void {
     this.imageLoader.load(
       url,
       (img: HTMLImageElement) => {
@@ -50,13 +46,7 @@ export class PowerOf2ImageLoader {
           canvas.getContext('2d').drawImage(img, 0, 0);
 
           const imgTexCoords = new TextureCoords(0, 0, width, height);
-          const texCoords = new TextureCoords(
-            imgTexCoords,
-            0,
-            0,
-            img.width,
-            img.height,
-          );
+          const texCoords = new TextureCoords(imgTexCoords, 0, 0, img.width, img.height);
 
           onLoadCallback({imgEl: canvas, texCoords});
         } else {

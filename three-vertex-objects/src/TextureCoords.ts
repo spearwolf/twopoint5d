@@ -1,8 +1,4 @@
-const minCoord = (
-  current: TextureCoords,
-  scalarKey: 'x' | 'y',
-  sizeKey: 'width' | 'height',
-) => {
+const minCoord = (current: TextureCoords, scalarKey: 'x' | 'y', sizeKey: 'width' | 'height') => {
   let texCoords: TextureCoords = current;
   let scalar = 0;
 
@@ -14,11 +10,7 @@ const minCoord = (
   return scalar / texCoords[sizeKey];
 };
 
-const maxCoord = (
-  current: TextureCoords,
-  scalarKey: 'x' | 'y',
-  sizeKey: 'width' | 'height',
-) => {
+const maxCoord = (current: TextureCoords, scalarKey: 'x' | 'y', sizeKey: 'width' | 'height') => {
   let texCoords: TextureCoords = current;
   let coord = current[sizeKey];
 
@@ -51,13 +43,7 @@ export class TextureCoords {
   constructor(
     ...args:
       | undefined
-      | [
-          parent: TextureCoords,
-          x?: number,
-          y?: number,
-          width?: number,
-          height?: number,
-        ]
+      | [parent: TextureCoords, x?: number, y?: number, width?: number, height?: number]
       | [x?: number, y?: number, width?: number, height?: number]
   ) {
     if (args[0] instanceof TextureCoords) {
@@ -100,8 +86,7 @@ export class TextureCoords {
 
   set flipH(flip: boolean) {
     this.flip =
-      (flip ? TextureCoords.FLIP_HORIZONTAL : 0) |
-      (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_DIAGONAL));
+      (flip ? TextureCoords.FLIP_HORIZONTAL : 0) | (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_DIAGONAL));
   }
 
   get flipV(): boolean {
@@ -110,9 +95,7 @@ export class TextureCoords {
 
   set flipV(flip: boolean) {
     this.flip =
-      (flip ? TextureCoords.FLIP_VERTICAL : 0) |
-      (this.flip &
-        (TextureCoords.FLIP_HORIZONTAL | TextureCoords.FLIP_DIAGONAL));
+      (flip ? TextureCoords.FLIP_VERTICAL : 0) | (this.flip & (TextureCoords.FLIP_HORIZONTAL | TextureCoords.FLIP_DIAGONAL));
   }
 
   get flipD(): boolean {
@@ -121,9 +104,7 @@ export class TextureCoords {
 
   set flipD(flip: boolean) {
     this.flip =
-      (flip ? TextureCoords.FLIP_DIAGONAL : 0) |
-      (this.flip &
-        (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_HORIZONTAL));
+      (flip ? TextureCoords.FLIP_DIAGONAL : 0) | (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_HORIZONTAL));
   }
 
   flipHorizontal(): TextureCoords {

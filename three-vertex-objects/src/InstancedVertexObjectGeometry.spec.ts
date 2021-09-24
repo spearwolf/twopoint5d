@@ -1,4 +1,4 @@
-import sinon from 'sinon';
+import {createSandbox} from 'sinon';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry';
 
@@ -39,19 +39,14 @@ describe('InstancedVertexObjectGeometry', () => {
     },
   });
 
-  const sandbox = sinon.createSandbox();
+  const sandbox = createSandbox();
 
   afterEach(() => {
     sandbox.restore();
   });
 
   test('construct with base and instanced descriptor', () => {
-    const geometry = new InstancedVertexObjectGeometry(
-      instancedDescriptor,
-      10,
-      baseDescriptor,
-      1,
-    );
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
 
     expect(geometry).toBeDefined();
     expect(geometry.baseBuffers).toBeDefined();
@@ -73,17 +68,10 @@ describe('InstancedVertexObjectGeometry', () => {
 
   test('index array buffer is created', () => {
     const capacity = 10;
-    const geometry = new InstancedVertexObjectGeometry(
-      instancedDescriptor,
-      1,
-      baseDescriptor,
-      capacity,
-    );
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor, capacity);
 
     expect(geometry.index).toBeDefined();
-    expect(geometry.index.array.length).toBe(
-      baseDescriptor.indices.length * capacity,
-    );
+    expect(geometry.index.array.length).toBe(baseDescriptor.indices.length * capacity);
 
     // prettier-ignore
     expect(Array.from(geometry.index.array).slice(0, baseDescriptor.indices.length * 3)).toEqual([
@@ -94,11 +82,7 @@ describe('InstancedVertexObjectGeometry', () => {
   });
 
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {
-    const geometry = new InstancedVertexObjectGeometry(
-      instancedDescriptor,
-      1,
-      baseDescriptor,
-    );
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor);
 
     const touchAttributes = sandbox.spy(geometry, 'touchAttributes');
     const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
@@ -107,9 +91,7 @@ describe('InstancedVertexObjectGeometry', () => {
 
     expect(touchAttributes.callCount).toBe(1);
     expect(touchAttributes.getCall(0).args).toHaveLength(2);
-    expect(touchAttributes.getCall(0).args).toEqual(
-      expect.arrayContaining(['position', 'strength']),
-    );
+    expect(touchAttributes.getCall(0).args).toEqual(expect.arrayContaining(['position', 'strength']));
 
     expect(touchBuffers.callCount).toBe(1);
     expect(touchBuffers.getCall(0).args[0]).toMatchObject({

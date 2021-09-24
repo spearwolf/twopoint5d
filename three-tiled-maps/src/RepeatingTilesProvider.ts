@@ -70,13 +70,7 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
    * Please bear in mind that all coordinates are given in _tile space_
    * - therefore only integer numbers should be used here
    */
-  getTileIdsWithin(
-    left: number,
-    top: number,
-    width: number,
-    height: number,
-    target?: Uint32Array,
-  ): Uint32Array {
+  getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array {
     target = target ?? new Uint32Array(width * height);
 
     if (this.#cols === 0 || this.#rows === 0) {
@@ -129,9 +123,7 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
                 target.fill(this.tileIds[patternRow][0], targetRowOffset, targetRowOffset + width);
               } else {
                 let x = 0;
-                let col =
-                  (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) %
-                  this.#cols;
+                let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
                 while (x < width) {
                   const tiles = this.tileIds[patternRow].slice(col, col + width - x);
                   target.set(tiles, targetRowOffset + x);
@@ -159,8 +151,7 @@ export class RepeatingTilesProvider implements IMap2dTileDataProvider {
               target.fill(this.tileIds[patternRow][0], targetRowOffset, targetRowOffset + width);
             } else {
               let x = 0;
-              let col =
-                (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
+              let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
               while (x < width) {
                 const tiles = this.tileIds[patternRow].slice(col, col + width - x);
                 target.set(tiles, targetRowOffset + x);

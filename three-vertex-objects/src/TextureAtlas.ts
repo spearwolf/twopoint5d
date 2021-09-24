@@ -17,15 +17,9 @@ type TextureAtlasArgs = [coords: TextureCoords, data?: TextureAtlasFrameData];
 
 type TextureAtlasFrameName = string | symbol;
 
-type NamedTextureAtlasArgs = [
-  name: TextureAtlasFrameName,
-  coords: TextureCoords,
-  data?: TextureAtlasFrameData,
-];
+type NamedTextureAtlasArgs = [name: TextureAtlasFrameName, coords: TextureCoords, data?: TextureAtlasFrameData];
 
-const isNamedTextureAtlasArgs = (
-  args: TextureAtlasArgs | NamedTextureAtlasArgs,
-): args is NamedTextureAtlasArgs =>
+const isNamedTextureAtlasArgs = (args: TextureAtlasArgs | NamedTextureAtlasArgs): args is NamedTextureAtlasArgs =>
   typeof args[0] === 'string' || typeof args[0] === 'symbol';
 
 const rand = (max: number) => (Math.random() * max) | 0;
@@ -76,9 +70,7 @@ export class TextureAtlas {
     const frameNames = Array.from(this.#frameNames.keys());
     if (match != null) {
       const regex = typeof match === 'string' ? new RegExp(match) : match;
-      return frameNames.filter(
-        (name) => typeof name === 'string' && regex.test(name),
-      );
+      return frameNames.filter((name) => typeof name === 'string' && regex.test(name));
     }
     return frameNames;
   }

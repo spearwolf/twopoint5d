@@ -141,9 +141,7 @@ describe('TextureCoords', () => {
       });
     });
     test('has parent', () => {
-      expect(
-        new TextureCoords(new TextureCoords(0, 0, 320, 160), 9, 11, 300, 140),
-      ).toMatchObject({
+      expect(new TextureCoords(new TextureCoords(0, 0, 320, 160), 9, 11, 300, 140)).toMatchObject({
         x: 9,
         y: 11,
         width: 300,

@@ -9,11 +9,5 @@
 export interface IMap2dTileDataProvider {
   getTileIdAt(col: number, row: number): number;
 
-  getTileIdsWithin(
-    left: number,
-    top: number,
-    width: number,
-    height: number,
-    target?: Uint32Array,
-  ): Uint32Array;
+  getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array;
 }

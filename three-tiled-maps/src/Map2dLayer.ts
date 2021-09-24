@@ -150,12 +150,7 @@ export class Map2dLayer {
             const tile = new Map2dAreaTile(
               tileX,
               tileY,
-              new AABB2(
-                tileX * tileCoords.tileWidth,
-                tileY * tileCoords.tileHeight,
-                tileCoords.tileWidth,
-                tileCoords.tileHeight,
-              ),
+              new AABB2(tileX * tileCoords.tileWidth, tileY * tileCoords.tileHeight, tileCoords.tileWidth, tileCoords.tileHeight),
             );
             createTiles.push(tile);
           }

@@ -17,21 +17,13 @@ describe('fitIntoRectangle', () => {
   });
   it('contain & width', () => {
     const target = new Vector2();
-    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 400}, target)).toBe(
-      target,
-    );
+    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 400}, target)).toBe(target);
     expect(target.width).toBe(400);
     expect(target.height).toBe(250);
   });
   it('contain & width & minPixelZoom', () => {
     const target = new Vector2();
-    expect(
-      fitIntoRectangle(
-        new Vector2(640, 400),
-        {fit: 'contain', width: 400, minPixelZoom: 2},
-        target,
-      ),
-    ).toBe(target);
+    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 400, minPixelZoom: 2}, target)).toBe(target);
     expect(target.width).toBe(320);
     expect(target.height).toBe(200);
 
@@ -45,13 +37,7 @@ describe('fitIntoRectangle', () => {
   });
   it('contain & width & maxPixelZoom', () => {
     const target = new Vector2();
-    expect(
-      fitIntoRectangle(
-        new Vector2(640, 400),
-        {fit: 'contain', width: 100, maxPixelZoom: 7},
-        target,
-      ),
-    ).toBe(target);
+    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, maxPixelZoom: 7}, target)).toBe(target);
     expect(target.width).toBe(100);
     expect(target.height).toBe(62.5);
 
@@ -65,9 +51,7 @@ describe('fitIntoRectangle', () => {
   });
   it('contain & height', () => {
     const target = new Vector2();
-    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', height: 100}, target)).toBe(
-      target,
-    );
+    expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', height: 100}, target)).toBe(target);
     expect(target.width).toBe(160);
     expect(target.height).toBe(100);
   });

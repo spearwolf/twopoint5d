@@ -26,20 +26,12 @@ export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;
 
-  constructor(
-    textureFatory: TextureFactory,
-    imageLoader?: PowerOf2ImageLoader,
-  ) {
+  constructor(textureFatory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
     this.textureFactory = textureFatory;
     this.imageLoader = imageLoader ?? new PowerOf2ImageLoader();
   }
 
-  load(
-    url: string,
-    tileSetOptions: TileSetOptions,
-    onLoadCallback: OnLoadCallback,
-    onErrorCallback?: OnErrorCallback,
-  ): void {
+  load(url: string, tileSetOptions: TileSetOptions, onLoadCallback: OnLoadCallback, onErrorCallback?: OnErrorCallback): void {
     this.imageLoader.load(
       url,
       (imageData) => {

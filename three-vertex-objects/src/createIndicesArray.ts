@@ -1,7 +1,4 @@
-export function createIndicesArray(
-  indices: number[],
-  count: number,
-): Uint32Array {
+export function createIndicesArray(indices: number[], count: number): Uint32Array {
   const itemCount = indices.length;
   const arr = new Uint32Array(count * itemCount);
   const stride = Math.max(...indices) + 1;

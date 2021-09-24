@@ -1,8 +1,4 @@
-import {
-  VertexAttributeDataType,
-  VertexAttributeDescription,
-  VertexAttributeUsageType,
-} from './types';
+import {VertexAttributeDataType, VertexAttributeDescription, VertexAttributeUsageType} from './types';
 
 /**
  * @category Vertex Objects
@@ -49,8 +45,6 @@ export class VertexAttributeDescriptor {
   }
 
   get bufferName(): string {
-    return `${this.usageType}_${this.dataType}${
-      this.normalizedData ? 'N' : ''
-    }`;
+    return `${this.usageType}_${this.dataType}${this.normalizedData ? 'N' : ''}`;
   }
 }

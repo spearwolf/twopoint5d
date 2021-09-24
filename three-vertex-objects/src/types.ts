@@ -1,10 +1,4 @@
-import {
-  BufferAttribute,
-  DynamicDrawUsage,
-  InterleavedBuffer,
-  StaticDrawUsage,
-  StreamDrawUsage,
-} from 'three';
+import {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsage, StreamDrawUsage} from 'three';
 
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {voBuffer, voIndex} from './constants';
@@ -71,9 +65,7 @@ export interface VASizeDescription extends VADescription {
 /**
  * @category Vertex Objects
  */
-export type VertexAttributeDescription =
-  | VAComponentsDescription
-  | VASizeDescription;
+export type VertexAttributeDescription = VAComponentsDescription | VASizeDescription;
 
 /**
  * @category Vertex Objects
@@ -118,15 +110,9 @@ export type BufferLike = InterleavedBuffer | BufferAttribute;
 /**
  * @category Vertex Objects
  */
-export type DrawUsageType =
-  | typeof DynamicDrawUsage
-  | typeof StaticDrawUsage
-  | typeof StreamDrawUsage;
+export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
 /**
  * @category Texture Mapping
  */
-export type TextureSource =
-  | HTMLImageElement
-  | HTMLCanvasElement
-  | HTMLVideoElement;
+export type TextureSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;

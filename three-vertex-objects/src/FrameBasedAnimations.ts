@@ -19,32 +19,20 @@ export interface FrameBasedAnimDef {
 
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
 
-const getBufferSize = (
-  animationsMap: AnimationsMap,
-  maxTextureSize = 16384,
-) => {
+const getBufferSize = (animationsMap: AnimationsMap, maxTextureSize = 16384) => {
   const anims = Array.from(animationsMap.values());
-  const totalFramesCount = anims.reduce(
-    (sum, anim) => sum + anim.frames.length,
-    0,
-  );
+  const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
   const minBufSize = anims.length + totalFramesCount;
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
-    throw new Error(
-      'TODO too many animation frames - we need better way here to calculate a corresponding buffer size!',
-    );
+    throw new Error('TODO too many animation frames - we need better way here to calculate a corresponding buffer size!');
   }
 
   return bufSize;
 };
 
-const renderFloatsBuffer = (
-  floatsBuffer: Float32Array,
-  names: AnimName[],
-  animations: AnimationsMap,
-) => {
+const renderFloatsBuffer = (floatsBuffer: Float32Array, names: AnimName[], animations: AnimationsMap) => {
   let curOffset = names.length;
 
   floatsBuffer.set(
@@ -57,9 +45,7 @@ const renderFloatsBuffer = (
   );
 
   floatsBuffer.set(
-    names.flatMap((name) =>
-      animations.get(name).frames.flatMap(({s, t, u, v}) => [s, t, u, v]),
-    ),
+    names.flatMap((name) => animations.get(name).frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
     names.length * 4,
   );
 
@@ -86,25 +72,9 @@ export class FrameBasedAnimations {
           // TODO support frameRate (fps) option as an alternative to duration
           texCoords: TextureCoords[],
         ]
-      | [
-          name: AnimName | undefined,
-          duration: number,
-          atlas: TextureAtlas,
-          frameNameQuery?: string,
-        ]
-      | [
-          name: AnimName | undefined,
-          duration: number,
-          tileSet: TileSet,
-          firstTileId?: number,
-          tileCount?: number,
-        ]
-      | [
-          name: AnimName | undefined,
-          duration: number,
-          tileSet: TileSet,
-          tileIds: number[],
-        ]
+      | [name: AnimName | undefined, duration: number, atlas: TextureAtlas, frameNameQuery?: string]
+      | [name: AnimName | undefined, duration: number, tileSet: TileSet, firstTileId?: number, tileCount?: number]
+      | [name: AnimName | undefined, duration: number, tileSet: TileSet, tileIds: number[]]
   ): number {
     let [name] = args;
 
@@ -133,11 +103,7 @@ export class FrameBasedAnimations {
         const firstTileId = (args[3] as number | undefined) ?? tileSet.firstId;
         const tileCount: number = args[4] ?? tileSet.tileCount;
         frames = [];
-        for (
-          let tileId = firstTileId;
-          tileId < firstTileId + tileCount;
-          tileId++
-        ) {
+        for (let tileId = firstTileId; tileId < firstTileId + tileCount; tileId++) {
           frames.push(tileSet.frame(tileId).coords);
         }
       }
@@ -162,16 +128,9 @@ export class FrameBasedAnimations {
   }
 
   bakeDataTexture(): DataTexture {
-    const bufSize = getBufferSize(
-      this.#animations,
-      FrameBasedAnimations.MaxTextureSize,
-    );
+    const bufSize = getBufferSize(this.#animations, FrameBasedAnimations.MaxTextureSize);
 
-    const floatsBuffer = renderFloatsBuffer(
-      new Float32Array(bufSize * 4),
-      this.#names,
-      this.#animations,
-    );
+    const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations);
 
     return new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);
   }

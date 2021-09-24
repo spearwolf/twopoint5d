@@ -45,18 +45,10 @@ export class TexturePackerJson {
   ): [atlas: TextureAtlas, meta: TexturePackerMetaData] {
     target ??= new TextureAtlas();
 
-    parentCoords ??= new TextureCoords(
-      0,
-      0,
-      data.meta.size.w,
-      data.meta.size.h,
-    );
+    parentCoords ??= new TextureCoords(0, 0, data.meta.size.w, data.meta.size.h);
 
     for (const [name, {frame}] of Object.entries(data.frames)) {
-      target.add(
-        name,
-        new TextureCoords(parentCoords, frame.x, frame.y, frame.w, frame.h),
-      );
+      target.add(name, new TextureCoords(parentCoords, frame.x, frame.y, frame.w, frame.h));
     }
 
     return [target, data.meta];

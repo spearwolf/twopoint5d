@@ -30,15 +30,9 @@ describe('VertexObjectDescriptor', () => {
     expect(descriptor.getInstanceCount(3)).toBe(3);
     expect(descriptor.hasIndices).toBeTruthy();
     expect(descriptor.indices).toEqual([0, 1, 2, 0, 2, 3]);
-    expect(Array.from(descriptor.attributeNames.values())).toEqual(
-      expect.arrayContaining(['foo', 'bar', 'plah']),
-    );
-    expect(Array.from(descriptor.bufferNames.values())).toEqual(
-      expect.arrayContaining(['dynamic_float32', 'static_float32']),
-    );
-    expect(descriptor.getAttribute('foo')).toBeInstanceOf(
-      VertexAttributeDescriptor,
-    );
+    expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar', 'plah']));
+    expect(Array.from(descriptor.bufferNames.values())).toEqual(expect.arrayContaining(['dynamic_float32', 'static_float32']));
+    expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar').name).toBe('bar');
   });
 
@@ -64,15 +58,9 @@ describe('VertexObjectDescriptor', () => {
     expect(descriptor.getInstanceCount(3)).toBe(2);
     expect(descriptor.hasIndices).toBeFalsy();
     expect(descriptor.indices).toEqual([]);
-    expect(Array.from(descriptor.attributeNames.values())).toEqual(
-      expect.arrayContaining(['foo', 'bar']),
-    );
-    expect(Array.from(descriptor.bufferNames.values())).toMatchObject([
-      'static_float32',
-    ]);
-    expect(descriptor.getAttribute('foo')).toBeInstanceOf(
-      VertexAttributeDescriptor,
-    );
+    expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar']));
+    expect(Array.from(descriptor.bufferNames.values())).toMatchObject(['static_float32']);
+    expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar').name).toBe('bar');
   });
 
@@ -95,15 +83,9 @@ describe('VertexObjectDescriptor', () => {
     expect(descriptor.vertexCount).toBe(1);
     expect(descriptor.hasIndices).toBeFalsy();
     expect(descriptor.indices).toEqual([]);
-    expect(Array.from(descriptor.attributeNames.values())).toEqual(
-      expect.arrayContaining(['foo', 'bar']),
-    );
-    expect(Array.from(descriptor.bufferNames.values())).toEqual(
-      expect.arrayContaining(['dynamic_float32', 'static_float32']),
-    );
-    expect(descriptor.getAttribute('foo')).toBeInstanceOf(
-      VertexAttributeDescriptor,
-    );
+    expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar']));
+    expect(Array.from(descriptor.bufferNames.values())).toEqual(expect.arrayContaining(['dynamic_float32', 'static_float32']));
+    expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar').name).toBe('bar');
   });
 });

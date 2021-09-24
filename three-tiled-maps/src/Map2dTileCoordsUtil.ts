@@ -63,12 +63,7 @@ export class Map2dTileCoordsUtil {
     return [tileLeft, tileTop, this.#tileColumns(tileLeft, w), this.#tileRows(tileTop, h)];
   }
 
-  computeTilesWithinCoords(
-    left: number,
-    top: number,
-    width: number,
-    height: number,
-  ): TilesWithinCoords {
+  computeTilesWithinCoords(left: number, top: number, width: number, height: number): TilesWithinCoords {
     const [tileLeft, tileTop, tileColumns, tileRows] = this.getTileCoords(left, top, width, height);
 
     return {

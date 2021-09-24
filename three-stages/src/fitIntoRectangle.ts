@@ -36,11 +36,7 @@ export type FitIntoRectangleSpecs =
 /**
  * @category Projection
  */
-export function fitIntoRectangle(
-  rect: Vector2,
-  specs: FitIntoRectangleSpecs,
-  target: Vector2 = new Vector2(),
-): Vector2 {
+export function fitIntoRectangle(rect: Vector2, specs: FitIntoRectangleSpecs, target: Vector2 = new Vector2()): Vector2 {
   if ('pixelZoom' in specs) {
     target.copy(rect).divideScalar(specs.pixelZoom);
   } else if (specs.fit === 'fill') {

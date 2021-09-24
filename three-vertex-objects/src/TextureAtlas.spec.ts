@@ -147,9 +147,7 @@ describe('TextureAtlas', () => {
       const names = atlas.frameNames();
 
       expect(Array.isArray(names)).toBeTruthy();
-      expect(names).toEqual(
-        expect.arrayContaining(['foo', Bar, 'img_001', 'img_002']),
-      );
+      expect(names).toEqual(expect.arrayContaining(['foo', Bar, 'img_001', 'img_002']));
     });
   });
   test('randomFrameId', () => {

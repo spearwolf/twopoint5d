@@ -100,13 +100,9 @@ function mat4(
   as = asFloat,
 ): string {
   const toStr = as || ((x) => `${x}`);
-  return `mat4(${toStr(m00)}, ${toStr(m01)}, ${toStr(m02)}, ${toStr(
-    m03,
-  )}, ${toStr(m10)}, ${toStr(m11)}, ${toStr(m12)}, ${toStr(m13)}, ${toStr(
-    m20,
-  )}, ${toStr(m21)}, ${toStr(m22)}, ${toStr(m23)}, ${toStr(m30)}, ${toStr(
-    m31,
-  )}, ${toStr(m32)}, ${toStr(m33)})`;
+  return `mat4(${toStr(m00)}, ${toStr(m01)}, ${toStr(m02)}, ${toStr(m03)}, ${toStr(m10)}, ${toStr(m11)}, ${toStr(m12)}, ${toStr(
+    m13,
+  )}, ${toStr(m20)}, ${toStr(m21)}, ${toStr(m22)}, ${toStr(m23)}, ${toStr(m30)}, ${toStr(m31)}, ${toStr(m32)}, ${toStr(m33)})`;
 }
 
 const rotate = (funcName = 'rotate', x = 0.0, y = 0.0, z = 1.0): string => `

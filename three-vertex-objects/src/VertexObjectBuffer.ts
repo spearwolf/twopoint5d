@@ -1,11 +1,7 @@
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {createTypedArray} from './createTypedArray';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype';
-import {
-  TypedArray,
-  VertexAttributeDataType,
-  VertexAttributeUsageType,
-} from './types';
+import {TypedArray, VertexAttributeDataType, VertexAttributeUsageType} from './types';
 
 interface BufferAttribute {
   bufferName: string;
@@ -40,10 +36,7 @@ export class VertexObjectBuffer {
   /** buffer name -> list of buffer attributes */
   readonly bufferNameAttributes: Map<string, BufferAttribute[]>;
 
-  constructor(
-    source: VertexObjectDescriptor | VertexObjectBuffer,
-    public readonly capacity: number,
-  ) {
+  constructor(source: VertexObjectDescriptor | VertexObjectBuffer, public readonly capacity: number) {
     if (source instanceof VertexObjectBuffer) {
       this.descriptor = source.descriptor;
       this.attributeNames = source.attributeNames;
@@ -57,19 +50,14 @@ export class VertexObjectBuffer {
           itemSize: buffer.itemSize,
           dataType: buffer.dataType,
           usageType: buffer.usageType,
-          typedArray: createTypedArray(
-            buffer.dataType,
-            this.capacity * this.descriptor.vertexCount * buffer.itemSize,
-          ),
+          typedArray: createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
         });
       }
     } else {
       this.descriptor = source;
       this.buffers = new Map();
       this.bufferAttributes = new Map();
-      this.attributeNames = Object.freeze(
-        Array.from(this.descriptor.attributeNames).sort(),
-      );
+      this.attributeNames = Object.freeze(Array.from(this.descriptor.attributeNames).sort());
 
       for (const attributeName of this.attributeNames) {
         const attribute = this.descriptor.getAttribute(attributeName);
@@ -95,10 +83,7 @@ export class VertexObjectBuffer {
         });
       }
       for (const buffer of this.buffers.values()) {
-        buffer.typedArray = createTypedArray(
-          buffer.dataType,
-          this.capacity * this.descriptor.vertexCount * buffer.itemSize,
-        );
+        buffer.typedArray = createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize);
       }
       this.bufferNameAttributes = new Map();
       for (const bufAttr of this.bufferAttributes.values()) {
@@ -111,20 +96,14 @@ export class VertexObjectBuffer {
       }
     }
     if (!this.descriptor.voPrototype) {
-      this.descriptor.voPrototype = createVertexObjectPrototype(
-        this,
-        this.descriptor.basePrototype,
-      );
+      this.descriptor.voPrototype = createVertexObjectPrototype(this, this.descriptor.basePrototype);
     }
   }
 
   copy(otherVob: VertexObjectBuffer, objectOffset = 0): void {
     const {vertexCount} = this.descriptor;
     for (const {bufferName, typedArray, itemSize} of this.buffers.values()) {
-      typedArray.set(
-        otherVob.buffers.get(bufferName).typedArray,
-        objectOffset * vertexCount * itemSize,
-      );
+      typedArray.set(otherVob.buffers.get(bufferName).typedArray, objectOffset * vertexCount * itemSize);
     }
   }
 
@@ -137,18 +116,11 @@ export class VertexObjectBuffer {
   copyWithin(target: number, start: number, end = this.capacity): void {
     const {vertexCount} = this.descriptor;
     for (const {typedArray, itemSize} of this.buffers.values()) {
-      typedArray.copyWithin(
-        target * vertexCount * itemSize,
-        start * vertexCount * itemSize,
-        end * vertexCount * itemSize,
-      );
+      typedArray.copyWithin(target * vertexCount * itemSize, start * vertexCount * itemSize, end * vertexCount * itemSize);
     }
   }
 
-  copyAttributes(
-    attributes: Record<string, ArrayLike<number>>,
-    objectOffset = 0,
-  ): void {
+  copyAttributes(attributes: Record<string, ArrayLike<number>>, objectOffset = 0): void {
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
@@ -159,10 +131,7 @@ export class VertexObjectBuffer {
         let bufIdx = objectOffset * vertexCount * buffer.itemSize;
         while (idx < data.length) {
           for (let i = 0; i < vertexCount; i++) {
-            buffer.typedArray.set(
-              Array.prototype.slice.call(data, idx, idx + attrSize),
-              bufIdx + attr.offset,
-            );
+            buffer.typedArray.set(Array.prototype.slice.call(data, idx, idx + attrSize), bufIdx + attr.offset);
             idx += attrSize;
             bufIdx += buffer.itemSize;
           }
@@ -171,11 +140,7 @@ export class VertexObjectBuffer {
     }
   }
 
-  toAttributeArrays(
-    attributeNames: string[],
-    start = 0,
-    end = this.capacity,
-  ): Record<string, TypedArray> {
+  toAttributeArrays(attributeNames: string[], start = 0, end = this.capacity): Record<string, TypedArray> {
     return Object.fromEntries(
       attributeNames.map((attrName) => {
         const attr = this.bufferAttributes.get(attrName);
@@ -184,20 +149,14 @@ export class VertexObjectBuffer {
           const {vertexCount} = this.descriptor;
           const attrSize = this.descriptor.getAttribute(attrName).size;
 
-          const targetArray = createTypedArray(
-            buffer.dataType,
-            (end - start) * vertexCount * attrSize,
-          );
+          const targetArray = createTypedArray(buffer.dataType, (end - start) * vertexCount * attrSize);
 
           let targetIdx = 0;
           let bufferIdx = start * vertexCount * buffer.itemSize + attr.offset;
 
           for (let objIdx = start; objIdx < end; objIdx++) {
             for (let i = 0; i < vertexCount; i++) {
-              targetArray.set(
-                buffer.typedArray.subarray(bufferIdx, bufferIdx + attrSize),
-                targetIdx,
-              );
+              targetArray.set(buffer.typedArray.subarray(bufferIdx, bufferIdx + attrSize), targetIdx);
               targetIdx += attrSize;
               bufferIdx += buffer.itemSize;
             }
