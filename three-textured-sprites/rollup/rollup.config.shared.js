@@ -14,50 +14,45 @@ import {makeVersionWithBuild} from './makeVersionWithBuild';
 import {rewriteExternalsPlugin} from './rewriteExternalsPlugin';
 
 const projectDir = path.resolve(path.join(path.dirname(__filename), '..'));
-const outputDir = path.join(projectDir, 'build');
-
 const packageJson = require(path.join(projectDir, 'package.json'));
+const outputDir = path.join(projectDir, packageJson.rollupBuild.outputDir);
 
-const extensions = ['.ts', '.tsx', '.json'];
+const extensions = ['.js', '.jsx', '.ts', '.tsx', '.json'];
+
+const externals = packageJson.rollupBuild?.externals ?? [];
 
 export default (build, buildConfig) => {
-  const version = makeVersionWithBuild(build)(packageJson.version);
+  const version = makeVersionWithBuild(packageJson.rollupBuild[build].buildName)(packageJson.version);
   const overrideConfig = buildConfig({outputDir, version, packageJson});
 
-  return {
-    input: 'src/index.ts',
-    plugins: [
-      rewriteExternalsPlugin([
-        'eventize-js',
-        'react',
-        /react[/-].*/,
-        'react-dom',
-        '@react-three/fiber',
-        'three',
-        'three-vertex-objects',
-      ]),
-      typescript(),
-      createBannerPlugin({...packageJson, version}),
-      commonjs(),
-      resolve({
-        extensions,
-      }),
-      replace({
-        preventAssignment: true,
-        NODE_ENV: JSON.stringify('production'),
-      }),
-      terser({
-        output: {comments: /^!/},
-        ecma: 2017,
-        safari10: true,
-        compress: {
-          global_defs: {
-            DEBUG: false,
-          },
+  const plugins = [
+    rewriteExternalsPlugin(externals),
+    typescript(),
+    createBannerPlugin({...packageJson, version}),
+    commonjs(),
+    resolve({
+      extensions,
+    }),
+    replace({
+      preventAssignment: true,
+      NODE_ENV: JSON.stringify('production'),
+    }),
+    terser({
+      output: {comments: /^!/},
+      ecma: 2017,
+      safari10: true,
+      compress: {
+        global_defs: {
+          DEBUG: false,
         },
-      }),
-      sizeSnapshot(),
-    ],
+      },
+    }),
+    sizeSnapshot(),
+  ];
+
+  return {
+    plugins,
+    input: 'src/index.ts',
     ...overrideConfig,
   };
 };

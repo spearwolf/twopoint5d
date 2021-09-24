@@ -1,5 +1,5 @@
 {
-  "name": "three-textured-sprites",
+  "name": "@spearwolf/three-textured-sprites",
   "version": "0.0.1",
   "description": "textured 2d sprites for three.js",
   "main": "build/three-textured-sprites.umd.js",
@@ -8,6 +8,42 @@
   "exports": {
     "import": "./build/three-textured-sprites.js",
     "require": "./build/three-textured-sprites.umd.js"
+  },
+  "rollupBuild": {
+    "outputDir": "build",
+    "outputName": "three-textured-sprites",
+    "externals": [
+      "eventize-js",
+      "three",
+      "three-stages",
+      "three-tiled-maps",
+      "three-vertex-objects"
+    ],
+    "esm": {
+      "buildName": "es2017"
+    },
+    "umd": {
+      "buildName": "umd",
+      "globals": {
+        "eventize-js": "eventize"
+      }
+    }
+  },
+  "homepage": "https://github.com/spearwolf/three-vertex-objects/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spearwolf/three-vertex-objects.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spearwolf/three-vertex-objects/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
   },
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
@@ -25,8 +61,6 @@
     "fix": "run-s --silent --print-label prettier:write eslint:fix",
     "test": "cross-env NODE_ENV=test jest --passWithNoTests"
   },
-  "author": "Wolfger Schramm <wolfger@spearwolf.de>",
-  "license": "Apache-2.0",
   "peerDependencies": {
     "three": "^0.132.2",
     "three-vertex-objects": "*"
