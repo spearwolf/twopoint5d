@@ -1,29 +1,41 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import {WebGLRenderer} from 'three';
+import eventize, {Eventize} from 'eventize-js';
+import {WebGLRenderer, WebGLRendererParameters} from 'three';
 
-import eventize from '../../libs/eventize.js';
+import {Stylesheets} from './Stylesheets';
 
-import {Stylesheets} from '../utils/Stylesheets.js';
+export interface DisplayEventArgs {
+  display: Display;
+  renderer: WebGLRenderer;
+  width: number;
+  height: number;
+  now: number;
+  deltaTime: number;
+  frameNo: number;
+}
+
+export interface Display extends Eventize {}
 
 export class Display {
   #lastPixelRatio = -1;
   #rafID = -1;
   #initialized = false;
-  #fullscreenCssRules = undefined;
+  #fullscreenCssRules: string = undefined;
   #fullscreenCssRulesMustBeRemoved = false;
 
   width = 0;
   height = 0;
 
   now = 0;
+  lastNow = 0;
   deltaTime = 0;
   frameNo = 0;
 
   pause = false;
 
-  resizeToElement = undefined;
+  resizeToElement: HTMLElement = undefined;
+  renderer: WebGLRenderer;
 
-  constructor(domElementOrRenderer, options) {
+  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options: Partial<Omit<WebGLRendererParameters, 'canvas'>>) {
     eventize(this);
 
     if (domElementOrRenderer instanceof WebGLRenderer) {
@@ -51,21 +63,17 @@ export class Display {
     }
 
     const {domElement: canvas} = this.renderer;
-    Stylesheets.addRule(
-      canvas,
-      'three-vertex-objects__Display',
-      'touch-action: none;',
-    );
+    Stylesheets.addRule(canvas, 'three-display__Display', 'touch-action: none;');
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resize();
   }
 
-  get pixelRatio() {
+  get pixelRatio(): number {
     return window.devicePixelRatio ?? 0;
   }
 
-  resize() {
+  resize(): void {
     let wPx = 320;
     let hPx = 200;
 
@@ -85,7 +93,7 @@ export class Display {
         let fullscreenCssRules = this.#fullscreenCssRules;
         if (!fullscreenCssRules) {
           fullscreenCssRules = Stylesheets.installRule(
-            'three-vertex-objects__fullscreen',
+            'three-display__fullscreen',
             `
               position: fixed;
               top: 0;
@@ -115,15 +123,15 @@ export class Display {
 
       const styles = getComputedStyle(domElement, null);
       const verticalMargin =
-        parseInt(styles.getPropertyValue('border-top-width') || 0, 10) +
-        parseInt(styles.getPropertyValue('border-bottom-width') || 0, 10) +
-        parseInt(styles.getPropertyValue('padding-top') || 0, 10) +
-        parseInt(styles.getPropertyValue('padding-bottom') || 0, 10);
+        parseInt(styles.getPropertyValue('border-top-width') || '0', 10) +
+        parseInt(styles.getPropertyValue('border-bottom-width') || '0', 10) +
+        parseInt(styles.getPropertyValue('padding-top') || '0', 10) +
+        parseInt(styles.getPropertyValue('padding-bottom') || '0', 10);
       const horizontalMargin =
-        parseInt(styles.getPropertyValue('border-right-width') || 0, 10) +
-        parseInt(styles.getPropertyValue('border-left-width') || 0, 10) +
-        parseInt(styles.getPropertyValue('padding-left') || 0, 10) +
-        parseInt(styles.getPropertyValue('padding-right') || 0, 10);
+        parseInt(styles.getPropertyValue('border-right-width') || '0', 10) +
+        parseInt(styles.getPropertyValue('border-left-width') || '0', 10) +
+        parseInt(styles.getPropertyValue('padding-left') || '0', 10) +
+        parseInt(styles.getPropertyValue('padding-right') || '0', 10);
 
       wPx = Math.floor(width - horizontalMargin);
       hPx = Math.floor(height - verticalMargin);
@@ -131,11 +139,7 @@ export class Display {
 
     const {pixelRatio} = this;
 
-    if (
-      pixelRatio !== this.#lastPixelRatio ||
-      wPx !== this.width ||
-      hPx !== this.height
-    ) {
+    if (pixelRatio !== this.#lastPixelRatio || wPx !== this.width || hPx !== this.height) {
       this.width = wPx;
       this.height = hPx;
       this.#lastPixelRatio = pixelRatio;
@@ -150,11 +154,14 @@ export class Display {
     }
   }
 
-  renderFrame(now = window.performance.now()) {
-    this.lastNow = this.lastNow === 0 ? now : this.now;
-    this.now = now / 1000.0;
-
-    if (this.frameNo > 0) {
+  renderFrame(now = window.performance.now()): void {
+    if (this.frameNo === 0 || this.lastNow === 0) {
+      this.now = now / 1000.0;
+      this.lastNow = this.now;
+      this.deltaTime = 0;
+    } else if (this.frameNo > 0) {
+      this.lastNow = this.now;
+      this.now = now / 1000.0;
       this.deltaTime = this.now - this.lastNow;
     }
 
@@ -169,7 +176,7 @@ export class Display {
     ++this.frameNo;
   }
 
-  async start(beforeStartCallback = undefined) {
+  async start(beforeStartCallback?: (args: DisplayEventArgs) => Promise<void> | void): Promise<Display> {
     this.pause = false;
 
     if (!this.#initialized) {
@@ -193,7 +200,7 @@ export class Display {
 
     this.renderer.clear();
 
-    const renderFrame = (now) => {
+    const renderFrame = (now: number) => {
       if (!this.pause) {
         this.renderFrame(now);
       }
@@ -205,11 +212,11 @@ export class Display {
     return this;
   }
 
-  stop() {
+  stop(): void {
     window.cancelAnimationFrame(this.#rafID);
   }
 
-  getEmitArgs() {
+  getEmitArgs(): DisplayEventArgs {
     return {
       display: this,
       renderer: this.renderer,

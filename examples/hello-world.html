@@ -18,7 +18,9 @@
     <script type="importmap">
       {
         "imports": {
+          "eventize-js": "/examples/libs/eventize.js",
           "three": "/examples/libs/three/build/three.module.js",
+          "@spearwolf/three-display": "/three-display/build/three-display.js",
           "@spearwolf/three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js"
         }
       }
@@ -35,7 +37,7 @@
     <script type="module">
       import {Color} from 'three';
       import {VertexObjectPool} from '@spearwolf/three-vertex-objects';
-      import {Display} from '/examples/jsm/display/Display.js';
+      import {Display} from '@spearwolf/three-display';
 
       class Foo {
         hello() {

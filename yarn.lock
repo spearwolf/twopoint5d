@@ -875,6 +875,52 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@spearwolf/three-display@workspace:three-display":
+  version: 0.0.0-use.local
+  resolution: "@spearwolf/three-display@workspace:three-display"
+  dependencies:
+    "@rollup/plugin-commonjs": ^20.0.0
+    "@rollup/plugin-node-resolve": ^13.0.5
+    "@rollup/plugin-replace": ^3.0.0
+    "@rollup/plugin-typescript": ^8.2.5
+    "@spearwolf/three-vertex-objects": "workspace:*"
+    "@types/assert": ^1.5.6
+    "@types/jest": ^27.0.2
+    "@types/node": ^16.9.6
+    "@types/sinon": ^10.0.3
+    "@types/three": ^0.132.0
+    "@typescript-eslint/eslint-plugin": ^4.31.2
+    "@typescript-eslint/parser": ^4.31.2
+    core-js: ^3.18.0
+    cross-env: ^7.0.3
+    eslint: ^7.32.0
+    eslint-config-prettier: ^8.3.0
+    eslint-config-problems: ^5.0.0
+    eslint-plugin-import: ^2.24.2
+    eslint-plugin-prettier: ^4.0.0
+    eslint-plugin-react: ^7.26.0
+    eslint-plugin-react-hooks: ^4.2.0
+    eventize-js: 2.0.0-beta.2
+    jest: ^27.2.1
+    npm-run-all: ^4.1.5
+    prettier: ^2.4.1
+    rimraf: ^3.0.2
+    rollup: ^2.57.0
+    rollup-plugin-size-snapshot: ^0.12.0
+    rollup-plugin-terser: ^7.0.2
+    sinon: ^11.1.2
+    three: ^0.132.2
+    ts-jest: ^27.0.5
+    ts-node: ^10.2.1
+    tslib: ^2.3.1
+    typedoc: ^0.22.4
+    typescript: ^4.4.3
+  peerDependencies:
+    "@spearwolf/three-vertex-objects": "*"
+    three: ^0.132.2
+  languageName: unknown
+  linkType: soft
+
 "@spearwolf/three-stages@workspace:three-stages":
   version: 0.0.0-use.local
   resolution: "@spearwolf/three-stages@workspace:three-stages"
@@ -3697,6 +3743,13 @@ __metadata:
   version: 2.0.3
   resolution: "esutils@npm:2.0.3"
   checksum: 22b5b08f74737379a840b8ed2036a5fb35826c709ab000683b092d9054e5c2a82c27818f12604bfc2a9a76b90b6834ef081edbc1c7ae30d1627012e067c6ec87
+  languageName: node
+  linkType: hard
+
+"eventize-js@npm:2.0.0-beta.2":
+  version: 2.0.0-beta.2
+  resolution: "eventize-js@npm:2.0.0-beta.2"
+  checksum: 3947e45703f58fb29c823f0d90fd55a583bb952c4207343a2e7534125bb6d34e6e4243cd069b7974504263339b2ae4dbf0f97b73a32ef76004ab60b65d94f805
   languageName: node
   linkType: hard
 
