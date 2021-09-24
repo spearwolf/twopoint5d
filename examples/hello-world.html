@@ -19,7 +19,7 @@
       {
         "imports": {
           "three": "/examples/libs/three/build/three.module.js",
-          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js"
+          "@spearwolf/three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js"
         }
       }
     </script>
@@ -34,7 +34,7 @@
     <canvas id="canvas-container" resize-to="window"></canvas>
     <script type="module">
       import {Color} from 'three';
-      import {VertexObjectPool} from 'three-vertex-objects';
+      import {VertexObjectPool} from '@spearwolf/three-vertex-objects';
       import {Display} from '/examples/jsm/display/Display.js';
 
       class Foo {

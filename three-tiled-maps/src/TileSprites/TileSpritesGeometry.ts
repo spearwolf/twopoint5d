@@ -1,4 +1,4 @@
-import {InstancedVertexObjectGeometry, VertexObjectPool, VO} from 'three-vertex-objects';
+import {InstancedVertexObjectGeometry, VertexObjectPool, VO} from '@spearwolf/three-vertex-objects';
 
 import {TileBaseSprite, TileBaseSpriteDescriptor, TileSpriteDescriptor} from './descriptors';
 

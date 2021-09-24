@@ -1,4 +1,4 @@
-import {InstancedVertexObjectGeometry} from 'three-vertex-objects';
+import {InstancedVertexObjectGeometry} from '@spearwolf/three-vertex-objects';
 
 import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite';
 import {InstancedSprite, InstancedSpriteDescriptor} from './InstancedSprite';

@@ -1,4 +1,4 @@
-import {VertexObjectDescription, VO} from 'three-vertex-objects';
+import {VertexObjectDescription, VO} from '@spearwolf/three-vertex-objects';
 
 export interface BaseSprite extends VO {
   setPosition(position: number[]): void;

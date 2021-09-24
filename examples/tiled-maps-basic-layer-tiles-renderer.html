@@ -36,7 +36,7 @@
         "imports": {
           "three": "/examples/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/libs/three/examples/jsm/controls/OrbitControls.js",
-          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
+          "@spearwolf/three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
           "@spearwolf/three-tiled-maps": "/three-tiled-maps/build/three-tiled-maps.js"
         }
       }
@@ -58,7 +58,7 @@
         LineBasicMaterial,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import { TextureFactory, TileSetLoader } from "three-vertex-objects";
+      import { TextureFactory, TileSetLoader } from "@spearwolf/three-vertex-objects";
       import { RepeatingTilesProvider, Map2dLayer } from "@spearwolf/three-tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
       import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";

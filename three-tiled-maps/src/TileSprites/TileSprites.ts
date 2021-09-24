@@ -1,4 +1,4 @@
-import {VertexObjects} from 'three-vertex-objects';
+import {VertexObjects} from '@spearwolf/three-vertex-objects';
 
 import {TileSpritesGeometry} from './TileSpritesGeometry';
 import {TileSpritesMaterial} from './TileSpritesMaterial';

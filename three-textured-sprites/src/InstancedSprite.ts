@@ -1,4 +1,4 @@
-import {TextureAtlasFrame, VertexObjectDescription, VO} from 'three-vertex-objects';
+import {TextureAtlasFrame, VertexObjectDescription, VO} from '@spearwolf/three-vertex-objects';
 
 export interface InstancedSprite extends VO {
   rotation: number;

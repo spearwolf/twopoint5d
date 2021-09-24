@@ -1,4 +1,4 @@
-import {VertexObjectDescription} from 'three-vertex-objects';
+import {VertexObjectDescription} from '@spearwolf/three-vertex-objects';
 
 export interface TileBaseSprite {
   setPosition(position: number[]): void;

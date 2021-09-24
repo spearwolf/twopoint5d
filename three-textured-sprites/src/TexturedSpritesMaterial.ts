@@ -1,5 +1,5 @@
 import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
-import {ShaderTool} from 'three-vertex-objects';
+import {ShaderTool} from '@spearwolf/three-vertex-objects';
 
 const vertexShader = `
   attribute vec2 quadSize;
