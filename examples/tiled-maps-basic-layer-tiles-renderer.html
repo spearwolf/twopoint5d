@@ -1,7 +1,9 @@
+<!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
+      body { height: 100vh; overflow-y: hidden; }
       body {
         color: #fff;
         background: linear-gradient(
@@ -35,7 +37,7 @@
           "three": "/examples/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/libs/three/examples/jsm/controls/OrbitControls.js",
           "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
-          "three-tiled-maps": "/three-tiled-maps/build/three-tiled-maps.js"
+          "@spearwolf/three-tiled-maps": "/three-tiled-maps/build/three-tiled-maps.js"
         }
       }
     </script>
@@ -57,7 +59,7 @@
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import { TextureFactory, TileSetLoader } from "three-vertex-objects";
-      import { RepeatingTilesProvider, Map2dLayer } from "three-tiled-maps";
+      import { RepeatingTilesProvider, Map2dLayer } from "@spearwolf/three-tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
       import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";
       import { makePoints } from "/examples/jsm/utils/makePoints.js";

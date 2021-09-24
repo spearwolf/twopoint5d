@@ -14,7 +14,7 @@
     "outputName": "three-stages",
     "externals": [
       "@spearwolf/three-textured-sprites",
-      "three-tiled-maps",
+      "@spearwolf/three-tiled-maps",
       "three-vertex-objects",
       "three"
     ],
@@ -27,7 +27,9 @@
       "globals": {
         "eventize-js": "eventize",
         "three": "THREE",
-        "three-vertex-objects": "threeVertexObjects"
+        "three-vertex-objects": "threeVertexObjects",
+        "@spearwolf/three-textured-sprites": "threeTexturedSprites",
+        "@spearwolf/three-tiled-maps": "threeTiledMaps"
       }
     }
   },

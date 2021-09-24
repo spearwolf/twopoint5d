@@ -14,7 +14,7 @@
     "outputName": "three-textured-sprites",
     "externals": [
       "@spearwolf/three-stages",
-      "three-tiled-maps",
+      "@spearwolf/three-tiled-maps",
       "three-vertex-objects",
       "three"
     ],
@@ -25,8 +25,11 @@
       "name": "threeTexturedSprites",
       "buildName": "umd",
       "globals": {
+        "eventize-js": "eventize",
         "three": "THREE",
-        "three-vertex-objects": "threeVertexObjects"
+        "three-vertex-objects": "threeVertexObjects",
+        "@spearwolf/three-stages": "threeStages",
+        "@spearwolf/three-tiled-maps": "threeTiledMaps"
       }
     }
   },

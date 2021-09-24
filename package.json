@@ -29,7 +29,7 @@
     "fix:three-tiled-maps": "yarn three-tiled-maps fix",
     "fix:three-stages": "yarn three-stages fix",
     "fix:three-textured-sprites": "yarn three-textured-sprites fix",
-    "build": "run-s build:three-vertex-objects build:three-tiled-maps build:three-stages build:three-textured-sprites",
+    "build": "npm-run-all --serial build:three-vertex-objects --parallel build:three-tiled-maps build:three-stages build:three-textured-sprites",
     "test": "run-s test:three-vertex-objects test:three-tiled-maps test:three-stages test:three-textured-sprites",
     "clean": "run-p clean:three-vertex-objects clean:three-tiled-maps clean:three-stages clean:three-textured-sprites",
     "fix": "run-p fix:three-vertex-objects fix:three-tiled-maps fix:three-stages fix:three-textured-sprites",

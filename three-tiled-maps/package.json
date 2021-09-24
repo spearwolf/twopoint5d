@@ -1,5 +1,5 @@
 {
-  "name": "three-tiled-maps",
+  "name": "@spearwolf/three-tiled-maps",
   "version": "0.0.1",
   "description": "tiled maps renderer framework based upon three.js and three-vertex-objects",
   "main": "build/three-tiled-maps.umd.js",
@@ -9,11 +9,51 @@
     "import": "./build/three-tiled-maps.js",
     "require": "./build/three-tiled-maps.umd.js"
   },
+  "rollupBuild": {
+    "outputDir": "build",
+    "outputName": "three-tiled-maps",
+    "externals": [
+      "@spearwolf/three-stages",
+      "@spearwolf/three-textured-sprites",
+      "three-vertex-objects",
+      "three"
+    ],
+    "esm": {
+      "buildName": "es2017"
+    },
+    "umd": {
+      "name": "threeTiledMaps",
+      "buildName": "umd",
+      "globals": {
+        "eventize-js": "eventize",
+        "three": "THREE",
+        "three-vertex-objects": "threeVertexObjects",
+        "@spearwolf/three-stages": "threeStages",
+        "@spearwolf/three-textured-sprites": "threeTexturedSprites"
+      }
+    }
+  },
+  "homepage": "https://github.com/spearwolf/three-vertex-objects/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spearwolf/three-vertex-objects.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spearwolf/three-vertex-objects/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
+  },
   "scripts": {
-    "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
-    "watch:js": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.esm.js",
-    "build:umd": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.umd.js",
-    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.umd.js",
+    "build:js": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.esm.js",
+    "watch:js": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.esm.js",
+    "build:umd": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.umd.js",
+    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.umd.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "build": "run-s --silent build:js build:umd build:types",
@@ -26,8 +66,6 @@
     "docs": "yarn typedoc",
     "test": "cross-env NODE_ENV=test jest"
   },
-  "author": "Wolfger Schramm <wolfger@spearwolf.de>",
-  "license": "Apache-2.0",
   "peerDependencies": {
     "three": "^0.132.2",
     "three-vertex-objects": "*"
