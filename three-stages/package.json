@@ -22,10 +22,12 @@
       "buildName": "es2017"
     },
     "umd": {
+      "name": "threeStages",
       "buildName": "umd",
       "globals": {
         "eventize-js": "eventize",
-        "three": "THREE"
+        "three": "THREE",
+        "three-vertex-objects": "threeVertexObjects"
       }
     }
   },
@@ -46,10 +48,10 @@
     "url": "https://www.spearwolf.de"
   },
   "scripts": {
-    "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
-    "watch:js": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.esm.js",
-    "build:umd": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.umd.js",
-    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ./rollup/rollup.config.umd.js",
+    "build:js": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.esm.js",
+    "watch:js": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.esm.js",
+    "build:umd": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.umd.js",
+    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.umd.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "build": "run-s --silent build:js build:umd build:types",

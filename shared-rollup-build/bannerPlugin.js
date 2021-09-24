@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-export default ({name, description, version}) => ({
+export default ({ name, description, version }) => ({
   banner: `/*!
 @file ${name} - ${description}
 @author Wolfger Schramm <wolfger@spearwolf.de>

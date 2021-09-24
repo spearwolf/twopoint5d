@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-
 export function rewriteExternalsPlugin(externals) {
   return {
-    name: 'rollup-plugin-rewrite-externals',
+    name: "rollup-plugin-rewrite-externals",
     resolveId(source) {
       for (const ext of externals) {
         let regex;
@@ -15,10 +13,10 @@ export function rewriteExternalsPlugin(externals) {
           id = source;
         }
         if (
-          (typeof regex === 'string' && regex === source) ||
-          (typeof regex?.test === 'function' && regex.test(source))
+          (typeof regex === "string" && regex === source) ||
+          (typeof regex?.test === "function" && regex.test(source))
         ) {
-          return {id, external: true};
+          return { id, external: true };
         }
       }
       return null;
