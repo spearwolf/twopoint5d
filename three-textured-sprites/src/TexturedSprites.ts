@@ -8,5 +8,6 @@ export class TexturedSprites extends VertexObjects {
     super(geometry, material);
 
     this.name = '@spearwolf/three-textured-sprites';
+    this.frustumCulled = false;
   }
 }
