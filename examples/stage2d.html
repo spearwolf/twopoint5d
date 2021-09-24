@@ -19,7 +19,7 @@
         "imports": {
           "three": "/examples/libs/three/build/three.module.js",
           "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
-          "three-stages": "/three-stages/build/three-stages.js"
+          "@spearwolf/three-stages": "/three-stages/build/three-stages.js"
         }
       }
     </script>
@@ -32,7 +32,7 @@
     <script type="module">
       import { Color, Sprite, SpriteMaterial, TextureLoader } from "three";
       import { TextureFactory } from "three-vertex-objects";
-      import { Stage2D, ParallaxProjection } from "three-stages";
+      import { Stage2D, ParallaxProjection } from "@spearwolf/three-stages";
       import { Display } from "/examples/jsm/display/Display.js";
 
       window.display = new Display(document.getElementById("canvas-container"));

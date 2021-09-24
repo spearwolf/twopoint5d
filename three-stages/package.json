@@ -1,5 +1,5 @@
 {
-  "name": "three-stages",
+  "name": "@spearwolf/three-stages",
   "version": "0.0.1",
   "description": "2d stages and projections for three.js",
   "main": "build/three-stages.umd.js",
@@ -8,6 +8,42 @@
   "exports": {
     "import": "./build/three-stages.js",
     "require": "./build/three-stages.umd.js"
+  },
+  "rollupBuild": {
+    "outputDir": "build",
+    "outputName": "three-stages",
+    "externals": [
+      "@spearwolf/three-textured-sprites",
+      "three-tiled-maps",
+      "three-vertex-objects",
+      "three"
+    ],
+    "esm": {
+      "buildName": "es2017"
+    },
+    "umd": {
+      "buildName": "umd",
+      "globals": {
+        "eventize-js": "eventize",
+        "three": "THREE"
+      }
+    }
+  },
+  "homepage": "https://github.com/spearwolf/three-vertex-objects/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spearwolf/three-vertex-objects.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spearwolf/three-vertex-objects/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
   },
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
@@ -26,8 +62,6 @@
     "docs": "yarn typedoc",
     "test": "cross-env NODE_ENV=test jest"
   },
-  "author": "Wolfger Schramm <wolfger@spearwolf.de>",
-  "license": "Apache-2.0",
   "peerDependencies": {
     "three": "^0.132.2",
     "three-vertex-objects": "*"

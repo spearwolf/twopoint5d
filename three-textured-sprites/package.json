@@ -13,11 +13,10 @@
     "outputDir": "build",
     "outputName": "three-textured-sprites",
     "externals": [
-      "eventize-js",
-      "three",
-      "three-stages",
+      "@spearwolf/three-stages",
       "three-tiled-maps",
-      "three-vertex-objects"
+      "three-vertex-objects",
+      "three"
     ],
     "esm": {
       "buildName": "es2017"
@@ -25,7 +24,7 @@
     "umd": {
       "buildName": "umd",
       "globals": {
-        "eventize-js": "eventize"
+        "three": "THREE"
       }
     }
   },
