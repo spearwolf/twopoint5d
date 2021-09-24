@@ -1,21 +1,14 @@
 import {InstancedVertexObjectGeometry} from 'three-vertex-objects';
 
-import {
-  BaseSprite,
-  BaseSpriteDescriptor,
-  InstancedSprite,
-  InstancedSpriteDescriptor,
-} from './descriptors';
+import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite';
+import {InstancedSprite, InstancedSpriteDescriptor} from './InstancedSprite';
 
-export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<
-  InstancedSprite,
-  BaseSprite
-> {
+export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<InstancedSprite, BaseSprite> {
   constructor(
     capacity = 100,
-    makeBaseSpriteArgs:
-      | [width: number, height: number]
-      | [width: number, height: number, xOffset: number, yOffset: number] = [0.5, 0.5],
+    makeBaseSpriteArgs: [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number] = [
+      0.5, 0.5,
+    ],
   ) {
     super(InstancedSpriteDescriptor, capacity, BaseSpriteDescriptor);
 

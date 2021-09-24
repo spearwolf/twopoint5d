@@ -39,16 +39,3 @@ export const BaseSpriteDescriptor: VertexObjectDescription = {
 
   basePrototype: BaseSprite.prototype,
 };
-
-export interface InstancedSprite extends VO {}
-
-export const InstancedSpriteDescriptor: VertexObjectDescription = {
-  meshCount: 1,
-
-  attributes: {
-    quadSize: {components: ['width', 'height']},
-    texCoords: {size: 4},
-    instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'},
-    rotation: {size: 1, usage: 'dynamic'},
-  },
-};

@@ -24,7 +24,8 @@
         "imports": {
           "three": "/examples/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/libs/three/examples/jsm/controls/OrbitControls.js",
-          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js"
+          "three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
+          "three-textured-sprites": "/three-textured-sprites/build/three-textured-sprites.js"
         }
       }
     </script>
@@ -48,8 +49,8 @@
         ShaderMaterial,
         Texture,
         Vector3,
-      } from 'three';
-      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
         getDescriptorOf,
         InstancedVertexObjectGeometry,
@@ -57,11 +58,13 @@
         TileSetLoader,
         VertexObjectGeometry,
         VertexObjects,
-      } from 'three-vertex-objects';
-      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
-      import {TexturedSpritesGeometry} from '/examples/jsm/textured-sprites/TexturedSpritesGeometry.js';
-      import {TexturedSpritesMaterial} from '/examples/jsm/textured-sprites/TexturedSpritesMaterial.js';
-      import {TexturedSprites} from '/examples/jsm/textured-sprites/TexturedSprites.js';
+      } from "three-vertex-objects";
+      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
+      import {
+        TexturedSprites,
+        TexturedSpritesGeometry,
+        TexturedSpritesMaterial,
+      } from "three-textured-sprites";
 
       class BouncingSprites {
         gravity = -45;
@@ -83,7 +86,7 @@
           width = 300,
           height = 150,
           spriteSize = 10,
-          initalSpriteCount = 256,
+          initalSpriteCount = 256
         ) {
           this.spritePool = spritePool;
           this.textureAtlas = textureAtlas;
@@ -106,25 +109,18 @@
           for (let i = 0; i < count; i++) {
             const sprite = this.spritePool.createVO();
 
-            sprite.setQuadSize([this.spriteSize, this.spriteSize]);
+            sprite.setSize(this.spriteSize, this.spriteSize);
 
-            const texCoords = (frameId != null
-              ? this.textureAtlas.get(frameId)
-              : this.textureAtlas.randomFrame()
-            ).coords;
-
-            sprite.setTexCoords([
-              texCoords.s,
-              texCoords.t,
-              texCoords.u,
-              texCoords.v,
-            ]);
-
-            sprite.setInstancePosition([
+            sprite.setPosition(
               Math.random() * this.containerWidth - halfWidth,
-              Math.random() * this.containerHeight - halfHeight,
-              0,
-            ]);
+              Math.random() * this.containerHeight - halfHeight
+            );
+
+            sprite.setFrame(
+              frameId != null
+                ? this.textureAtlas.get(frameId)
+                : this.textureAtlas.randomFrame()
+            );
 
             sprite.speedX =
               Math.random() * this.startSpeedX + this.startSpeedBaseX;
@@ -151,14 +147,14 @@
           this.sprites.forEach((sprite) => {
             sprite.rotation += sprite.speedRotate * deltaFactor;
 
-            let {x, y, speedX, speedY} = sprite;
+            let { x, y, speedX, speedY } = sprite;
 
             x += speedX * deltaFactor;
             y += speedY * deltaFactor;
 
             speedY += gravity;
 
-            const {width, height} = sprite;
+            const { width, height } = sprite;
 
             if (x > halfWidth) {
               // on the right edge
@@ -195,17 +191,17 @@
       }
 
       const demo = new PerspectiveOrbitDemo(
-        document.getElementById('canvas-container'),
-        {antialias: false},
+        document.getElementById("canvas-container"),
+        { antialias: false }
       );
 
       const tilesetLoader = new TileSetLoader(new TextureFactory());
 
       tilesetLoader.load(
-        '/examples/assets/nobinger-anim-sheet.png',
-        {tileWidth: 64, tileHeight: 64, margin: 1},
-        ({tileSet, texture}) => {
-          demo.on('init', ({scene, camera}) => {
+        "/examples/assets/nobinger-anim-sheet.png",
+        { tileWidth: 64, tileHeight: 64, margin: 1 },
+        ({ tileSet, texture }) => {
+          demo.on("init", ({ scene, camera }) => {
             camera.position.set(0, 0, 50);
 
             const CAPACITY = 333;
@@ -217,12 +213,12 @@
               100,
               75,
               7,
-              CAPACITY,
+              CAPACITY
             );
 
             bouncingSprites.createSprites();
 
-            demo.on('frame', ({deltaTime}) => {
+            demo.on("frame", ({ deltaTime }) => {
               bouncingSprites.animate(deltaTime);
             });
 
@@ -238,13 +234,13 @@
 
             scene.add(mesh);
 
-            console.log('bouncingSprites', bouncingSprites);
+            console.log("bouncingSprites", bouncingSprites);
           });
 
           demo.start();
 
-          console.log('TexturedSpritesMesh', demo.scene.children[0]);
-        },
+          console.log("TexturedSpritesMesh", demo.scene.children[0]);
+        }
       );
     </script>
   </body>
