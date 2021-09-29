@@ -1,4 +1,4 @@
-import eventize, {Eventize} from 'eventize-js';
+import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer, WebGLRendererParameters} from 'three';
 
 import {Stylesheets} from './Stylesheets';
@@ -16,9 +16,12 @@ export interface DisplayEventArgs {
 export interface Display extends Eventize {}
 
 export class Display {
-  #lastPixelRatio = -1;
-  #rafID = -1;
+  #pause = false;
   #initialized = false;
+
+  #rafID = -1;
+  #lastPixelRatio = -1;
+
   #fullscreenCssRules: string = undefined;
   #fullscreenCssRulesMustBeRemoved = false;
 
@@ -29,8 +32,6 @@ export class Display {
   lastNow = 0;
   deltaTime = 0;
   frameNo = 0;
-
-  pause = false;
 
   resizeToElement: HTMLElement = undefined;
   renderer: WebGLRenderer;
@@ -67,6 +68,22 @@ export class Display {
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resize();
+  }
+
+  get pause(): boolean {
+    return this.#pause;
+  }
+
+  set pause(pause: boolean) {
+    if (this.#initialized) {
+      if (pause && !this.#pause) {
+        this.stop();
+      } else if (!pause && this.#pause) {
+        this.start();
+      }
+    } else {
+      this.#pause = pause;
+    }
   }
 
   get pixelRatio(): number {
@@ -155,6 +172,8 @@ export class Display {
   }
 
   renderFrame(now = window.performance.now()): void {
+    if (this.#pause) return;
+
     if (this.frameNo === 0 || this.lastNow === 0) {
       this.now = now / 1000.0;
       this.lastNow = this.now;
@@ -177,7 +196,7 @@ export class Display {
   }
 
   async start(beforeStartCallback?: (args: DisplayEventArgs) => Promise<void> | void): Promise<Display> {
-    this.pause = false;
+    this.#pause = false;
 
     if (!this.#initialized) {
       this.emit('init', this.getEmitArgs());
@@ -186,6 +205,7 @@ export class Display {
         () => {
           this.pause = document.hidden;
           this.lastNow = 0;
+          this.emit(this.pause ? 'hide' : 'show', this.getEmitArgs());
         },
         false,
       );
@@ -201,7 +221,7 @@ export class Display {
     this.renderer.clear();
 
     const renderFrame = (now: number) => {
-      if (!this.pause) {
+      if (!this.#pause) {
         this.renderFrame(now);
       }
       this.#rafID = window.requestAnimationFrame(renderFrame);
@@ -214,6 +234,8 @@ export class Display {
 
   stop(): void {
     window.cancelAnimationFrame(this.#rafID);
+    this.#pause = true;
+    this.lastNow = 0;
   }
 
   getEmitArgs(): DisplayEventArgs {

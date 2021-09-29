@@ -12,11 +12,9 @@ import createBannerPlugin from "./bannerPlugin";
 import { makeVersionWithBuild } from "./makeVersionWithBuild";
 import { rewriteExternalsPlugin } from "./rewriteExternalsPlugin";
 
-// const projectDir = path.resolve(path.join(path.dirname(__filename), ".."));
 const projectDir = path.resolve(
   path.dirname(process.env.ROLLUP_BUILD_PROJECT_DIR || ".")
 );
-console.log("rollup-build project-dir:", projectDir);
 
 const packageJson = require(path.join(projectDir, "package.json"));
 const outputDir = path.join(projectDir, packageJson.rollupBuild.outputDir);

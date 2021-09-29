@@ -22,7 +22,7 @@
       "name": "threeVertexObjects",
       "buildName": "umd",
       "globals": {
-        "eventize-js": "eventize",
+        "@spearwolf/eventize": "eventize",
         "three": "THREE"
       }
     }

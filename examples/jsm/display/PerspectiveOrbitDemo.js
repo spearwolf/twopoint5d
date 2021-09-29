@@ -1,5 +1,5 @@
 import { Display } from "@spearwolf/three-display";
-import { Priority } from "eventize-js";
+import { Priority } from "@spearwolf/eventize";
 import { Color, PerspectiveCamera, Scene } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -33,6 +33,8 @@ export class PerspectiveOrbitDemo extends Display {
       controls.update();
       renderer.render(scene, camera);
     });
+
+    window.display = this;
   }
 
   getEmitArgs() {
