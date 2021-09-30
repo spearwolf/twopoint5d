@@ -7,8 +7,8 @@ export class Stage2D {
   camera: Camera;
   scene: Scene;
 
-  parentWidth = 0;
-  parentHeight = 0;
+  containerWidth = 0;
+  containerHeight = 0;
 
   width = 0;
   height = 0;
@@ -19,9 +19,9 @@ export class Stage2D {
   }
 
   resize(width: number, height: number): void {
-    if (width !== this.parentWidth || height !== this.parentHeight) {
-      this.parentWidth = width;
-      this.parentHeight = height;
+    if (width !== this.containerWidth || height !== this.containerHeight) {
+      this.containerWidth = width;
+      this.containerHeight = height;
 
       this.projection.updateViewRect(width, height);
       const [w, h] = this.projection.getViewRect();
