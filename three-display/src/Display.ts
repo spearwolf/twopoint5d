@@ -218,8 +218,6 @@ export class Display {
 
     this.emit('start', this.getEmitArgs());
 
-    this.renderer.clear();
-
     const renderFrame = (now: number) => {
       if (!this.#pause) {
         this.renderFrame(now);
@@ -236,6 +234,7 @@ export class Display {
     window.cancelAnimationFrame(this.#rafID);
     this.#pause = true;
     this.lastNow = 0;
+    this.deltaTime = 0;
   }
 
   getEmitArgs(): DisplayEventArgs {
