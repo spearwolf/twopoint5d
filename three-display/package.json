@@ -13,6 +13,7 @@
     "outputDir": "build",
     "outputName": "three-display",
     "externals": [
+      "@spearwolf/eventize",
       "@spearwolf/three-stages",
       "@spearwolf/three-vertex-objects",
       "three"
