@@ -1,5 +1,5 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer, WebGLRendererParameters} from 'three';
+import eventize, {Eventize} from '@spearwolf/eventize';
 
 import {Stylesheets} from './Stylesheets';
 
@@ -12,6 +12,12 @@ export interface DisplayEventArgs {
   deltaTime: number;
   frameNo: number;
 }
+
+export type ResizeCallbackFn = (display: Display) => [width: number, height: number];
+
+export type DisplayParameters = Partial<Omit<WebGLRendererParameters, 'canvas'>> & {
+  resizeTo?: ResizeCallbackFn;
+};
 
 export interface Display extends Eventize {}
 
@@ -34,10 +40,14 @@ export class Display {
   frameNo = 0;
 
   resizeToElement: HTMLElement = undefined;
+  resizeToCallback: ResizeCallbackFn = undefined;
+
   renderer: WebGLRenderer;
 
-  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options: Partial<Omit<WebGLRendererParameters, 'canvas'>>) {
+  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
+
+    this.resizeToCallback = options?.resizeTo;
 
     if (domElementOrRenderer instanceof WebGLRenderer) {
       this.renderer = domElementOrRenderer;
@@ -135,7 +145,13 @@ export class Display {
       this.#fullscreenCssRulesMustBeRemoved = false;
     }
 
-    if (domElement) {
+    if (this.resizeToCallback) {
+      const size = this.resizeToCallback(this);
+      if (size) {
+        wPx = size[0];
+        hPx = size[1];
+      }
+    } else if (domElement) {
       const {width, height} = domElement.getBoundingClientRect();
 
       const styles = getComputedStyle(domElement, null);
