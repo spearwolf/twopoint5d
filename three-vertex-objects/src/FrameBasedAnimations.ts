@@ -123,7 +123,7 @@ export class FrameBasedAnimations {
     return id;
   }
 
-  animId(name: string): number {
+  animId(name: AnimName): number {
     return this.#animations.get(name).id;
   }
 
