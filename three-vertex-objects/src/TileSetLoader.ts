@@ -1,9 +1,9 @@
-import {Texture} from 'three';
+import {TileSet, TileSetOptions} from './TileSet';
 
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
+import {Texture} from 'three';
 import {TextureCoords} from './TextureCoords';
 import {TextureFactory} from './TextureFactory';
-import {TileSet, TileSetOptions} from './TileSet';
 import {TextureSource} from './types';
 
 /**
@@ -36,6 +36,8 @@ export class TileSetLoader {
       url,
       (imageData) => {
         const texture = new Texture(imageData.imgEl);
+        texture.name = url;
+
         this.textureFactory.update(texture);
 
         const tileSet = new TileSet(imageData.texCoords, tileSetOptions);
