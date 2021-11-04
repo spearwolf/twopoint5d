@@ -2,15 +2,17 @@
 
 ![creative-coding](https://img.shields.io/badge/creative-coding-blue) ![game-dev](https://img.shields.io/badge/game-dev-red)
 
-is a typescript library for creating realtime 2.5D graphics in HTML5
+is a typescript library that allows you to create and render multiple and instanced geometries with just a single draw call.
+such vertex objects are defined by a descriptor &mdash; for creation and usage there is a super easy and satisfying to use object-based api.
 
-it's based on the fantastic [three.js](https://threejs.org/) library which itself is build upon WebGL
+it's based on the fantastic [three.js](https://threejs.org/) library which itself is build upon _WebGL_.
 
-the main features of this library are centered around the definition, creation and life-cycle management of _vertex objects_
+the main features of this library are centered around the definition, creation and life-cycle management of _vertex objects_,
+in addition there are some more helpers and classes to ease the texture handling, respectively the loading of texture-atlas definitions.
 
 ## Vertex Objects
 
-are like freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) whose attributes, vertex and fragment shaders are completely freely definable &mdash; but the management and organization of the underlying geometry data attribute arrays is taken away from you
+are like particles or freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) whose attributes, vertex and fragment shaders are completely freely definable &mdash; but the management and organization of the underlying geometry data attribute arrays is taken away from you
 
 examples can be found here:
 - [animated-billboards](https://github.com/spearwolf/three-vertex-objects/tree/master/examples/animated-billboards.html)
@@ -34,7 +36,7 @@ examples can be found here:
 - [textured-sprites](https://github.com/spearwolf/three-vertex-objects/tree/master/examples/textured-sprites.html)
 
 
-## Cheat Sheet: Vertex Object Descriptors
+## CHEAT SHEET: Vertex Object Descriptors
 
 ### Define
 
