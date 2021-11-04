@@ -1,4 +1,4 @@
-This repository contains the implementation of **three-vertex-objects**, which on the one hand contains the main library ([three-vertex-objects](./three-vertex-objects/), but also some specialized companion libraries, as well as tests and examples.
+This repository contains the implementation of **three-vertex-objects**, which on the one hand contains the main library (&rarr; [three-vertex-objects](./three-vertex-objects/)), but also some specialized companion libraries, as well as tests and examples.
 
 three-vertex-objects is the next iteration (in the evolutionary sense) of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
 
