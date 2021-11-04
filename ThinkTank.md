@@ -20,9 +20,6 @@
 
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
             autoTouch: true                             // [optional] if usage == 'static' then default is false otherwise true
-
-            // buffer -> {vertexCount}{meshCount}{usage}{normalized}{autoTouch}_{+optional:bufferName}?
-            // TODO implement bufferName ?
          }
     }
 
