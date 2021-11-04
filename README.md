@@ -14,7 +14,7 @@ This repository is structured as a monorepo; based on [yarn workspaces](https://
 
 | API usage examples | description |
 |-|-|
-| [`examples`](./examples/) | examples for the use of the [three-vertex-objects](./three-vertex-objects/) and companion libraries. just plain and native javascript here, no complicated build setup is needed (instead browser native [import-maps](https://caniuse.com/import-maps) are used) |
+| [`examples`](./examples/) | simple code examples for usage of [three-vertex-objects](./three-vertex-objects/) and companion libraries. just plain and native javascript here, no complicated build setup is needed (instead browser native [import-maps](https://caniuse.com/import-maps) are used) |
 
 
 ## Getting started
