@@ -64,6 +64,13 @@ export class VertexObjectPool<VOType = VO> {
     }
   }
 
+  createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIdx: number] {
+    const firstObjectIdx = this.#usedCount;
+    const objectCount = this.buffer.copyAttributes(attributes, firstObjectIdx);
+    this.#usedCount += objectCount;
+    return [objectCount, firstObjectIdx];
+  }
+
   /**
    * The fastest variant is when the VO was the last one created,
    * otherwise the underlying buffer(s) have to be recopied internally.
@@ -85,15 +92,12 @@ export class VertexObjectPool<VOType = VO> {
     }
   }
 
-  /* TODO test & usage check
   getVO(idx: number): (VOType & VO) | undefined {
-    if (idx < this.#usedCount) {
-      let vo = this.#index[idx];
-      if (vo == null) {
-        vo = createVertexObject(this.descriptor, this.buffer, idx);
-      }
-      return vo;
+    let vo = this.#index[idx];
+    if (vo == null && idx < this.#usedCount) {
+      vo = createVertexObject(this.descriptor, this.buffer, idx);
+      this.#index[idx] = vo;
     }
+    return vo;
   }
-  */
 }

@@ -231,5 +231,30 @@ describe('VertexObjectPool', () => {
       expect(Array.from(vo2.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
       expect(Array.from(vo3.getFoo())).toEqual([33, 22, 11, 0, 44, 55, 66, 77]);
     });
+
+    test('create vertex objects from attributes data', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+
+      const [objectCount, firstObjectIdx] = pool.createFromAttributes({
+        bar: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+      });
+
+      expect(objectCount).toEqual(3);
+      expect(firstObjectIdx).toEqual(0);
+
+      expect(
+        pool.createFromAttributes({
+          bar: [1, 1, 1, 1, 2, 2, 2, 2, 3, 33, 333, 3333],
+          zack: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 55, 555, 5555],
+        }),
+      ).toEqual([5, objectCount]);
+
+      expect(pool.usedCount).toEqual(8);
+
+      expect(Array.from(pool.getVO(2).getBar())).toEqual([3, 3, 3, 3]);
+      expect(Array.from(pool.getVO(3).getBar())).toEqual([1, 1, 1, 1]);
+      expect(Array.from(pool.getVO(5).getBar())).toEqual([3, 33, 333, 3333]);
+      expect(Array.from(pool.getVO(7).getZack())).toEqual([5, 55, 555, 5555]);
+    });
   });
 });

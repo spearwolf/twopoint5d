@@ -185,11 +185,13 @@ describe('VertexObjectBuffer', () => {
       itemSize: 5,
     });
 
-    // prettier-ignore
-    vob.copyAttributes({
-      foo: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
-      bar: [100, 101, 102, 103],
-    });
+    expect(
+      vob.copyAttributes({
+        // prettier-ignore
+        foo: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
+        bar: [100, 101, 102, 103],
+      }),
+    ).toEqual(2);
 
     // prettier-ignore
     expect(Array.from(vob.buffers.get('static_float32').typedArray)).toEqual([
@@ -259,10 +261,12 @@ describe('VertexObjectBuffer', () => {
     });
     const vob = new VertexObjectBuffer(descriptor, 2);
 
-    vob.copyAttributes({
-      foo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-      bar: [100, 101, 102, 103],
-    });
+    expect(
+      vob.copyAttributes({
+        foo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        bar: [100, 101, 102, 103],
+      }),
+    ).toEqual(2);
 
     vob.copyWithin(1, 0, 1);
 
@@ -270,7 +274,7 @@ describe('VertexObjectBuffer', () => {
 
     // prettier-ignore
     expect(Array.from(vob1.buffers.get('static_float32').typedArray)).toEqual([
-      1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0, 
+      1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
     ]);
 

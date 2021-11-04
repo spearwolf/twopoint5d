@@ -120,24 +120,31 @@ export class VertexObjectBuffer {
     }
   }
 
-  copyAttributes(attributes: Record<string, ArrayLike<number>>, objectOffset = 0): void {
+  copyAttributes(attributes: Record<string, ArrayLike<number>>, objectOffset = 0): number {
+    let copiedObjCount = 0;
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
+        let attrObjCount = 0;
         const buffer = this.buffers.get(attr.bufferName);
         const {vertexCount} = this.descriptor;
         const attrSize = this.descriptor.getAttribute(attrName).size;
         let idx = 0;
         let bufIdx = objectOffset * vertexCount * buffer.itemSize;
-        while (idx < data.length) {
+        while (idx < data.length && attrObjCount + objectOffset < this.capacity) {
           for (let i = 0; i < vertexCount; i++) {
             buffer.typedArray.set(Array.prototype.slice.call(data, idx, idx + attrSize), bufIdx + attr.offset);
             idx += attrSize;
             bufIdx += buffer.itemSize;
           }
+          ++attrObjCount;
+        }
+        if (attrObjCount > copiedObjCount) {
+          copiedObjCount = attrObjCount;
         }
       }
     }
+    return copiedObjCount;
   }
 
   toAttributeArrays(attributeNames: string[], start = 0, end = this.capacity): Record<string, TypedArray> {
