@@ -1,6 +1,6 @@
 This repository contains the implementation of **three-vertex-objects**, which on the one hand contains the main library (&rarr; [three-vertex-objects](./three-vertex-objects/)), but also some specialized companion libraries, as well as tests and examples.
 
-_three-vertex-objects_ is the next iteration (in a evolutionary sense) of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
+_three-vertex-objects_ is the next iteration (in an evolutionary sense) of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
 
 This repository is structured as a monorepo; based on [yarn workspaces](https://yarnpkg.com/features/workspaces).
 
