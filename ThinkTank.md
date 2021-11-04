@@ -8,18 +8,18 @@
     vertexCount: 4,
     indices: [0, 1, 2, 0, 2, 3],        // [optional]
 
-    meshCount: 1,                       // for instanced attributes
-                                        // open question: VertexBufferObject <- capacity <- meshCount > 1 ?
+    meshCount: 1,                       // for instanced attributes (use instead of vertexCount)
+                                        // not yet fully thought through: VertexBufferObject <- capacity <- meshCount > 1 ?
     attributes: {
-        position: {
-            components: ['x', 'y', 'z'],                // either components ..
-            size: 3,                                    // .. or size
+        position: {                                     // attribute name
+            components: ['x', 'y', 'z'],                // either define components ..
+            size: 3,                                    // .. or set number of anonymous components
 
             type: 'float32',                            // [optional] the default type is float32
             normalized: boolean,                        // [optional] default is not
 
             usage: 'static' | 'dynamic' | 'stream',     // [optional] default is 'static'
-            autoTouch: true                             // [optional] default 'static' is false otherwise true
+            autoTouch: true                             // [optional] if usage == 'static' then default is false otherwise true
 
             // buffer -> {vertexCount}{meshCount}{usage}{normalized}{autoTouch}_{+optional:bufferName}?
          }
