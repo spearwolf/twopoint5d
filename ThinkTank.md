@@ -37,7 +37,6 @@
 ### API
 
 ```js
-
 const geometry = new VertexObjectGeometry(descriptor, CAPACITY = 1);
 
 const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, INSTANCED_CAPACITY, baseDescriptor, BASE_CAPACITY = 1);
@@ -65,8 +64,14 @@ geometry.touchBuffers({dynamic: false, stream: true, static: false})
 geometry.touch('position', {dynamic: true}, ...)  // yes, you can mix it here if you want
 
 geometry.update()  // automatically called by VertexObjects
+```
 
+### Usage
+
+```js
 const mesh = new VertexObjects(geometry, material)
+
 mesh.frustumCalled = false  // can be very helpful in the development ;)
+
 scene.add(mesh)
 ```
