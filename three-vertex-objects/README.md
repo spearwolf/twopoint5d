@@ -10,6 +10,8 @@ it's based on the fantastic [three.js](https://threejs.org/) library which itsel
 the main features of this library are centered around the definition, creation and life-cycle management of _vertex objects_,
 in addition there are some more helpers and classes to ease the texture handling, respectively the loading of texture-atlas definitions.
 
+> ATTENTION: this library is a kind of _meta_ library. there is nothing in this library that three.js doesn't already allow you to do out of the box: however, this library gives you tools that allow you to work with complex particle-like and instanced geometries in a super elegant way!
+
 ## Vertex Objects
 
 are like particles or freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) whose attributes, vertex and fragment shaders are completely freely definable &mdash; but the management and organization of the underlying geometry data attribute arrays is taken away from you
@@ -21,7 +23,7 @@ examples can be found here:
 - [crosses](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/crosses.html)
 - [textured-quads-from-tileset](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-quads-from-tileset.html)
 - [textured-quads](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-quads.html)
-- [textured-sprites](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-sprites.html) &mdash; [vertex object descriptor](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/jsm/textured-sprites/)
+- [textured-sprites](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-sprites.html)
 
 
 ## Texture Mapping
