@@ -10,7 +10,7 @@ it's based on the fantastic [three.js](https://threejs.org/) library which itsel
 the main features of this library are centered around the definition, creation and life-cycle management of _vertex objects_,
 in addition there are some more helpers and classes to ease the texture handling, respectively the loading of texture-atlas definitions.
 
-> ATTENTION: this library is a kind of _meta_ library. there is nothing in this library that three.js doesn't already allow you to do out of the box: however, this library gives you tools that allow you to work with complex particle-like and instanced geometries in a super elegant way!
+> ATTENTION: this library is a kind of _meta_ library. there is nothing in this library that three.js doesn't already allow you to do out of the box: however, this library gives you highly specialized tools that allow you to work with complex particle-like and instanced geometries in a super elegant way!
 
 ## Vertex Objects
 
