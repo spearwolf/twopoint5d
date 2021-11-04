@@ -1,6 +1,6 @@
 # three-vertex-objects
 
-![game-dev](https://img.shields.io/badge/game-dev-red) ![pixelart](https://img.shields.io/badge/pixel-art-green) ![creative-coding](https://img.shields.io/badge/creative-coding-blue)
+![game-dev](https://img.shields.io/badge/game-dev-red) ![creative-coding](https://img.shields.io/badge/creative-coding-blue)
 
 is a typescript library for creating realtime 2.5D graphics in HTML5
 
