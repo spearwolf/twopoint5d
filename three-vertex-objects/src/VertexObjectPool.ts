@@ -1,7 +1,9 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {voBuffer, voIndex} from './constants';
-import {VO, VertexObjectDescription} from './types';
+import {VertexObjectDescription, VO} from './types';
+
+import {VertexObjectBuffersData} from '.';
 
 const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexObjectBuffer, objectIndex: number) =>
   Object.create(descriptor.voPrototype, {
@@ -19,6 +21,11 @@ const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexOb
  * @category Vertex Objects
  */
 export class VertexObjectPool<VOType = VO> {
+  static setVoIndex(vo: VO, idx: number): VO {
+    vo[voIndex] = idx;
+    return vo;
+  }
+
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
 
@@ -27,12 +34,19 @@ export class VertexObjectPool<VOType = VO> {
   #index: Array<VOType & VO>;
   #usedCount = 0;
 
-  constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
+  constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
-    this.capacity = capacity;
-    this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
-    this.usedCount = 0;
-    this.#index = new Array(capacity);
+    if (typeof capacityOrData === 'number') {
+      const capacity = capacityOrData;
+      this.capacity = capacity;
+      this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
+    } else {
+      const buffersData = capacityOrData;
+      this.capacity = buffersData.capacity;
+      this.#usedCount = buffersData.usedCount;
+      this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
+    }
+    this.#index = new Array(this.capacity);
   }
 
   get usedCount(): number {
@@ -99,5 +113,15 @@ export class VertexObjectPool<VOType = VO> {
       this.#index[idx] = vo;
     }
     return vo;
+  }
+
+  toBuffersData(): VertexObjectBuffersData {
+    return {
+      capacity: this.capacity,
+      usedCount: this.usedCount,
+      buffers: Object.fromEntries(
+        Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray]),
+      ),
+    };
   }
 }

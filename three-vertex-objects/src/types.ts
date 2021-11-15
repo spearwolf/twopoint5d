@@ -116,3 +116,12 @@ export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | t
  * @category Texture Mapping
  */
 export type TextureSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+
+/**
+ * @category Vertex Objects
+ */
+export interface VertexObjectBuffersData {
+  capacity: number;
+  usedCount: number;
+  buffers: Record<string, TypedArray>;
+}

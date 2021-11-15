@@ -2,6 +2,7 @@ import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {createTypedArray} from './createTypedArray';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype';
 import {TypedArray, VertexAttributeDataType, VertexAttributeUsageType} from './types';
+import {VertexObjectBuffersData} from '.';
 
 interface BufferAttribute {
   bufferName: string;
@@ -26,6 +27,7 @@ interface Buffer {
  */
 export class VertexObjectBuffer {
   readonly descriptor: VertexObjectDescriptor;
+  readonly capacity: number;
 
   /** the names are always sorted the same way */
   readonly attributeNames: readonly string[];
@@ -36,7 +38,15 @@ export class VertexObjectBuffer {
   /** buffer name -> list of buffer attributes */
   readonly bufferNameAttributes: Map<string, BufferAttribute[]>;
 
-  constructor(source: VertexObjectDescriptor | VertexObjectBuffer, public readonly capacity: number) {
+  constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
+    let buffersData: VertexObjectBuffersData | undefined;
+    if (typeof capacityOrBuffersData === 'number') {
+      this.capacity = capacityOrBuffersData;
+    } else {
+      buffersData = capacityOrBuffersData;
+      this.capacity = buffersData.capacity;
+    }
+
     if (source instanceof VertexObjectBuffer) {
       this.descriptor = source.descriptor;
       this.attributeNames = source.attributeNames;
@@ -82,9 +92,13 @@ export class VertexObjectBuffer {
           offset,
         });
       }
+
       for (const buffer of this.buffers.values()) {
-        buffer.typedArray = createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize);
+        buffer.typedArray =
+          buffersData?.buffers[buffer.bufferName] ??
+          createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize);
       }
+
       this.bufferNameAttributes = new Map();
       for (const bufAttr of this.bufferAttributes.values()) {
         const {bufferName} = bufAttr;
@@ -95,6 +109,7 @@ export class VertexObjectBuffer {
         }
       }
     }
+
     if (!this.descriptor.voPrototype) {
       this.descriptor.voPrototype = createVertexObjectPrototype(this, this.descriptor.basePrototype);
     }
