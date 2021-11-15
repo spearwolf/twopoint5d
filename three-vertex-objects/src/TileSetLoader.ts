@@ -1,9 +1,9 @@
-import {TileSet, TileSetOptions} from './TileSet';
+import {Texture} from 'three';
 
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
-import {Texture} from 'three';
 import {TextureCoords} from './TextureCoords';
 import {TextureFactory} from './TextureFactory';
+import {TileSet, TileSetOptions} from './TileSet';
 import {TextureSource} from './types';
 
 /**
@@ -26,8 +26,8 @@ export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;
 
-  constructor(textureFatory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
-    this.textureFactory = textureFatory;
+  constructor(textureFactory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
+    this.textureFactory = textureFactory;
     this.imageLoader = imageLoader ?? new PowerOf2ImageLoader();
   }
 
