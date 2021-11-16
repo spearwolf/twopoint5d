@@ -3,7 +3,7 @@
 ![creative-coding](https://img.shields.io/badge/creative-coding-red) ![game-dev](https://img.shields.io/badge/game-dev-green) ![demoOrDie](https://img.shields.io/badge/demo-or_die-blue)
 
 is a typescript library that allows you to create and render multiple and (optionally) instanced geometries with just a single draw call.
-such _vertex objects_ are defined by a descriptor &mdash; for creation and usage there is a super easy and satisfying to use object-based api.
+such _vertex objects_ are defined by a descriptor &mdash; for creation and usage there is a super easy and oddly satisfying to use object-based api.
 
 it's based on the fantastic [three.js](https://threejs.org/) library which itself is build upon _WebGL_.
 
