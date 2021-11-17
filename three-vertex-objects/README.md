@@ -3,18 +3,18 @@
 ![creative-coding](https://img.shields.io/badge/creative-coding-red) ![game-dev](https://img.shields.io/badge/game-dev-green) ![demoOrDie](https://img.shields.io/badge/demo-or_die-blue)
 
 is a typescript library that allows you to create and render multiple and (optionally) instanced geometries with just a single draw call.
-such _vertex objects_ are defined by a descriptor &mdash; for creation and usage there is a super easy and satisfying to use object-based api.
+such _vertex objects_ are defined by a descriptor &mdash; for creation and usage there is a super easy and oddly satisfying to use object-based api.
 
 it's based on the fantastic [three.js](https://threejs.org/) library which itself is build upon _WebGL_.
 
 the main features of this library are centered around the definition, creation and life-cycle management of _vertex objects_,
 in addition there are some more helpers and classes to ease the texture handling, respectively the loading of texture-atlas definitions.
 
-> ATTENTION: this library is a kind of _meta_ library. there is nothing in this library that three.js doesn't already allow you to do out of the box: however, this library gives you highly specialized tools that allow you to work with complex particle-like and instanced geometries in a super elegant way!
+> IMPORTANT: this library is a kind of _meta_ library. there is nothing in this library that three.js doesn't already allow you to do out of the box: however, this library gives you highly specialized tools that allow you to work with complex particle-like and instanced geometries in a super elegant way. a whole bunch of unnecessary boilerplate code is taken away from you and you can concentrate on the creative part of shader development 😃
 
 ## Vertex Objects
 
-are like particles or freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) whose attributes, vertex and fragment shaders are completely freely definable &mdash; but the management and organization of the underlying geometry data attribute arrays is taken away from you
+are like particles or freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(computer_graphics)) whose attributes, vertex and fragment shaders are ~~left to you~~ completely freely definable &mdash; but the management and organization of the underlying geometry data attribute typed array buffers is taken away from you
 
 examples can be found here:
 - [animated-billboards](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/animated-billboards.html)
