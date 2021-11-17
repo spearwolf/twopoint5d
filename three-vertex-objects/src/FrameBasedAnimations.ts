@@ -17,12 +17,19 @@ export interface FrameBasedAnimDef {
   id: number;
 }
 
+/**
+ * @category Texture Mapping
+ */
+export interface BakeTextureOptions {
+  includeTextureSize: boolean;
+}
+
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
 
-const getBufferSize = (animationsMap: AnimationsMap, maxTextureSize = 16384) => {
+const getBufferSize = (animationsMap: AnimationsMap, sizePerTexture = 1, maxTextureSize = 16384) => {
   const anims = Array.from(animationsMap.values());
   const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
-  const minBufSize = anims.length + totalFramesCount;
+  const minBufSize = anims.length + totalFramesCount * sizePerTexture;
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
@@ -32,20 +39,29 @@ const getBufferSize = (animationsMap: AnimationsMap, maxTextureSize = 16384) => 
   return bufSize;
 };
 
-const renderFloatsBuffer = (floatsBuffer: Float32Array, names: AnimName[], animations: AnimationsMap) => {
+const renderFloatsBuffer = (
+  floatsBuffer: Float32Array,
+  names: AnimName[],
+  animations: AnimationsMap,
+  includeTextureSize: boolean,
+) => {
   let curOffset = names.length;
 
   floatsBuffer.set(
     names.flatMap((name) => {
       const {frames, duration} = animations.get(name);
       const offset = curOffset;
-      curOffset += frames.length;
+      curOffset += frames.length * (includeTextureSize ? 2 : 1);
       return [frames.length, duration, offset, 0];
     }),
   );
 
   floatsBuffer.set(
-    names.flatMap((name) => animations.get(name).frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
+    includeTextureSize
+      ? names.flatMap((name) =>
+          animations.get(name).frames.flatMap(({s, t, u, v, width, height}) => [s, t, u, v, width, height, 0, 0]),
+        )
+      : names.flatMap((name) => animations.get(name).frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
     names.length * 4,
   );
 
@@ -60,7 +76,7 @@ export class FrameBasedAnimations {
 
   #animations: AnimationsMap = new Map();
 
-  // we can not just use animations.keys() here, because we need a consitent name <-> id mapping
+  // we can not just use animations.keys() here, because we need a consistent name <-> id mapping
   #names: AnimName[] = [];
 
   add(
@@ -127,10 +143,12 @@ export class FrameBasedAnimations {
     return this.#animations.get(name).id;
   }
 
-  bakeDataTexture(): DataTexture {
-    const bufSize = getBufferSize(this.#animations, FrameBasedAnimations.MaxTextureSize);
+  bakeDataTexture(options?: BakeTextureOptions): DataTexture {
+    const includeTextureSize = Boolean(options?.includeTextureSize);
 
-    const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations);
+    const bufSize = getBufferSize(this.#animations, includeTextureSize ? 2 : 1, FrameBasedAnimations.MaxTextureSize);
+
+    const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations, includeTextureSize);
 
     return new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);
   }
