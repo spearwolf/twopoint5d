@@ -1,7 +1,22 @@
-import {WebGLRenderer, WebGLRendererParameters} from 'three';
+/* eslint-disable no-lonely-if */
 import eventize, {Eventize} from '@spearwolf/eventize';
-
+import {WebGLRenderer, WebGLRendererParameters} from 'three';
 import {Stylesheets} from './Stylesheets';
+import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
+
+const CANVAS_MAX_RESOLUTION = 8192;
+let canvasMaxResolutionWarningWasShown = false;
+
+function showCanvasMaxResolutionWarning(w: number, h: number) {
+  if (!canvasMaxResolutionWarningWasShown) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `Oops, the canvas width or height should not bigger than ${CANVAS_MAX_RESOLUTION} pixels (${w}x${h} was requested).`,
+      'If you need more, please create a PR ;) https://github.com/spearwolf/three-vertex-objects',
+    );
+    canvasMaxResolutionWarningWasShown = true;
+  }
+}
 
 export interface DisplayEventArgs {
   display: Display;
@@ -26,7 +41,7 @@ export class Display {
   #initialized = false;
 
   #rafID = -1;
-  #lastPixelRatio = -1;
+  #lastResizeHash = '';
 
   #fullscreenCssRules: string = undefined;
   #fullscreenCssRulesMustBeRemoved = false;
@@ -101,12 +116,12 @@ export class Display {
   }
 
   resize(): void {
-    let wPx = 320;
-    let hPx = 200;
-
-    let domElement = this.resizeToElement;
+    let wPx = 300;
+    let hPx = 150;
 
     const canvasElement = this.renderer.domElement;
+
+    let sizeRefElement = this.resizeToElement;
 
     let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
 
@@ -115,7 +130,7 @@ export class Display {
       if (resizeTo.match(/^:?(fullscreen|window)$/)) {
         wPx = window.innerWidth;
         hPx = window.innerHeight;
-        domElement = undefined;
+        sizeRefElement = undefined;
 
         let fullscreenCssRules = this.#fullscreenCssRules;
         if (!fullscreenCssRules) {
@@ -136,7 +151,7 @@ export class Display {
           this.#fullscreenCssRulesMustBeRemoved = true;
         }
       } else if (resizeTo) {
-        domElement = document.querySelector(resizeTo) ?? canvasElement;
+        sizeRefElement = document.querySelector(resizeTo) ?? canvasElement;
       }
     }
 
@@ -151,34 +166,65 @@ export class Display {
         wPx = size[0];
         hPx = size[1];
       }
-    } else if (domElement) {
-      const {width, height} = domElement.getBoundingClientRect();
+    } else if (sizeRefElement) {
+      const sizeRefStyle = getComputedStyle(sizeRefElement, null);
+      const resizeToHorizontalInnerMargin = getHorizontalInnerMargin(sizeRefStyle);
+      const resizeToVerticalInnerMargin = getVerticalInnerMargin(sizeRefStyle);
 
-      const styles = getComputedStyle(domElement, null);
-      const verticalMargin =
-        parseInt(styles.getPropertyValue('border-top-width') || '0', 10) +
-        parseInt(styles.getPropertyValue('border-bottom-width') || '0', 10) +
-        parseInt(styles.getPropertyValue('padding-top') || '0', 10) +
-        parseInt(styles.getPropertyValue('padding-bottom') || '0', 10);
-      const horizontalMargin =
-        parseInt(styles.getPropertyValue('border-right-width') || '0', 10) +
-        parseInt(styles.getPropertyValue('border-left-width') || '0', 10) +
-        parseInt(styles.getPropertyValue('padding-left') || '0', 10) +
-        parseInt(styles.getPropertyValue('padding-right') || '0', 10);
+      const elementSize = sizeRefElement.getBoundingClientRect();
 
-      wPx = Math.floor(width - horizontalMargin);
-      hPx = Math.floor(height - verticalMargin);
+      wPx = elementSize.width - resizeToHorizontalInnerMargin;
+      hPx = elementSize.height - resizeToVerticalInnerMargin;
+    }
+
+    if (wPx < 0) {
+      wPx = 0;
+    }
+    if (hPx < 0) {
+      hPx = 0;
+    }
+
+    if (wPx > CANVAS_MAX_RESOLUTION) {
+      wPx = CANVAS_MAX_RESOLUTION;
+      showCanvasMaxResolutionWarning(wPx, hPx);
+    }
+    if (hPx > CANVAS_MAX_RESOLUTION) {
+      hPx = CANVAS_MAX_RESOLUTION;
+      showCanvasMaxResolutionWarning(wPx, hPx);
+    }
+
+    let cssWidth = wPx;
+    let cssHeight = hPx;
+
+    const canvasStyle = getComputedStyle(canvasElement, null);
+    const canvasIsContentBox = getIsContentBox(canvasStyle);
+    const canvasHorizontalInnerMargin = getHorizontalInnerMargin(canvasStyle);
+    const canvasVerticalInnerMargin = getVerticalInnerMargin(canvasStyle);
+
+    if (canvasIsContentBox && canvasElement !== sizeRefElement) {
+      wPx -= canvasHorizontalInnerMargin;
+      hPx -= canvasVerticalInnerMargin;
+      cssWidth -= canvasHorizontalInnerMargin;
+      cssHeight -= canvasVerticalInnerMargin;
+    } else if (!canvasIsContentBox && canvasElement === sizeRefElement) {
+      cssWidth += canvasHorizontalInnerMargin;
+      cssHeight += canvasVerticalInnerMargin;
     }
 
     const {pixelRatio} = this;
+    const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio}`;
 
-    if (pixelRatio !== this.#lastPixelRatio || wPx !== this.width || hPx !== this.height) {
+    if (resizeHash !== this.#lastResizeHash) {
+      this.#lastResizeHash = resizeHash;
+
       this.width = wPx;
       this.height = hPx;
-      this.#lastPixelRatio = pixelRatio;
 
-      this.renderer.setPixelRatio(this.pixelRatio);
-      this.renderer.setSize(wPx, hPx);
+      this.renderer.setPixelRatio(pixelRatio);
+      this.renderer.setSize(wPx, hPx, false);
+
+      canvasElement.style.width = `${cssWidth}px`;
+      canvasElement.style.height = `${cssHeight}px`;
 
       if (this.frameNo > 0) {
         // no need to emit this inside construction phase
