@@ -32,6 +32,25 @@ export function getHorizontalInnerMargin(style: CSSStyleDeclaration): number {
   return getVerticalBorder(style) + getHorizontalPadding(style);
 }
 
+export function getContentAreaSize(
+  element: HTMLElement,
+  style?: CSSStyleDeclaration,
+): {width: number; height: number; style: CSSStyleDeclaration} {
+  style ??= getComputedStyle(element, null);
+
+  const elementSize = element.getBoundingClientRect();
+
+  const horizontalInnerMargin = getHorizontalInnerMargin(style);
+  const verticalInnerMargin = getVerticalInnerMargin(style);
+
+  return {
+    style,
+    width: elementSize.width - horizontalInnerMargin,
+    height: elementSize.height - verticalInnerMargin,
+  };
+}
+
+/*
 export function getVerticalMargin(style: CSSStyleDeclaration): number {
   return parseInt(style.getPropertyValue('margin-top') || '0', 10) + parseInt(style.getPropertyValue('margin-bottom') || '0', 10);
 }
@@ -39,6 +58,7 @@ export function getVerticalMargin(style: CSSStyleDeclaration): number {
 export function getHorizontalMargin(style: CSSStyleDeclaration): number {
   return parseInt(style.getPropertyValue('margin-left') || '0', 10) + parseInt(style.getPropertyValue('margin-right') || '0', 10);
 }
+*/
 
 export function getIsContentBox(style: CSSStyleDeclaration): boolean {
   return style.getPropertyValue('box-sizing') === 'content-box';

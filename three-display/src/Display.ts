@@ -1,7 +1,7 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer, WebGLRendererParameters} from 'three';
 import {Stylesheets} from './Stylesheets';
-import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
+import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -178,14 +178,9 @@ export class Display {
         hPx = size[1];
       }
     } else if (sizeRefElement) {
-      const sizeRefStyle = getComputedStyle(sizeRefElement, null);
-      const resizeToHorizontalInnerMargin = getHorizontalInnerMargin(sizeRefStyle);
-      const resizeToVerticalInnerMargin = getVerticalInnerMargin(sizeRefStyle);
-
-      const elementSize = sizeRefElement.getBoundingClientRect();
-
-      wPx = elementSize.width - resizeToHorizontalInnerMargin;
-      hPx = elementSize.height - resizeToVerticalInnerMargin;
+      const area = getContentAreaSize(sizeRefElement);
+      wPx = area.width;
+      hPx = area.height;
     }
 
     let cssWidth = wPx;
