@@ -72,8 +72,18 @@ export class Display {
       if (domElementOrRenderer.tagName === 'CANVAS') {
         canvas = domElementOrRenderer;
       } else {
+        const container = document.createElement('div');
+        Stylesheets.addRule(
+          container,
+          'three-display__Container',
+          // we create another container div here to avoid the if container-has-no-discrete-size
+          // then line-height-and-font-height-styles-give-weird-client-rect-behaviour issue
+          'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;',
+        );
+        domElementOrRenderer.appendChild(container);
+
         canvas = document.createElement('canvas');
-        domElementOrRenderer.appendChild(canvas);
+        container.appendChild(canvas);
       }
       this.resizeToElement = domElementOrRenderer;
       this.renderer = new WebGLRenderer({
@@ -177,22 +187,6 @@ export class Display {
       hPx = elementSize.height - resizeToVerticalInnerMargin;
     }
 
-    if (wPx < 0) {
-      wPx = 0;
-    }
-    if (hPx < 0) {
-      hPx = 0;
-    }
-
-    if (wPx > CANVAS_MAX_RESOLUTION) {
-      wPx = CANVAS_MAX_RESOLUTION;
-      showCanvasMaxResolutionWarning(wPx, hPx);
-    }
-    if (hPx > CANVAS_MAX_RESOLUTION) {
-      hPx = CANVAS_MAX_RESOLUTION;
-      showCanvasMaxResolutionWarning(wPx, hPx);
-    }
-
     let cssWidth = wPx;
     let cssHeight = hPx;
 
@@ -209,6 +203,34 @@ export class Display {
     } else if (!canvasIsContentBox && canvasElement === sizeRefElement) {
       cssWidth += canvasHorizontalInnerMargin;
       cssHeight += canvasVerticalInnerMargin;
+    }
+
+    wPx = Math.floor(wPx);
+    hPx = Math.floor(hPx);
+    cssWidth = Math.floor(cssWidth);
+    cssHeight = Math.floor(cssHeight);
+
+    if (wPx < 0) {
+      wPx = 0;
+    }
+    if (hPx < 0) {
+      hPx = 0;
+    }
+
+    if (cssWidth < 0) {
+      cssWidth = 0;
+    }
+    if (cssHeight < 0) {
+      cssHeight = 0;
+    }
+
+    if (wPx > CANVAS_MAX_RESOLUTION) {
+      wPx = CANVAS_MAX_RESOLUTION;
+      showCanvasMaxResolutionWarning(wPx, hPx);
+    }
+    if (hPx > CANVAS_MAX_RESOLUTION) {
+      hPx = CANVAS_MAX_RESOLUTION;
+      showCanvasMaxResolutionWarning(wPx, hPx);
     }
 
     const {pixelRatio} = this;

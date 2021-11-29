@@ -51,8 +51,6 @@
 
       .canvasContainer {
         padding: 5px;
-        line-height: 0;
-        font-size: 0;
       }
       .gridCell.canvasContainer:hover,
       .gridCell:hover .canvasContainer {
@@ -80,7 +78,6 @@
         width: calc(100% - 14px);
         height: calc(100% - 14px);
       }
-
     </style>
     <script type="importmap">
       {
@@ -113,7 +110,9 @@
         </div>
       </div>
       <div class="gridCell">
-        <div class="canvasContainer content-box size-100 create-canvas-here"></div>
+        <div
+          class="canvasContainer content-box size-100 create-canvas-here"
+        ></div>
         <div class="gridInfo">
           <b>div</b>.size-100%.content-box
           <span class="canvasSizeInfo"></span>
@@ -136,7 +135,9 @@
         </div>
       </div>
       <div class="gridCell">
-        <div class="canvasContainer size-100 border-box create-canvas-here"></div>
+        <div
+          class="canvasContainer size-100 border-box create-canvas-here"
+        ></div>
         <div class="gridInfo">
           <b>div</b>.size-100%.border-box
           <span class="canvasSizeInfo"></span>
@@ -157,7 +158,9 @@
         }
         canvasSizeInfo = canvasSizeInfo.querySelector(".canvasSizeInfo");
         return (width, height, pixelRatio) => {
-          canvasSizeInfo.textContent = `${width|0}x${height|0}x${pixelRatio}`;
+          canvasSizeInfo.textContent = `${width | 0}x${
+            height | 0
+          }x${pixelRatio}`;
         };
       }
 
