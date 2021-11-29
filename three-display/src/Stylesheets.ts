@@ -21,7 +21,19 @@ export class Stylesheets {
     const className = `${name}-${postFixID}`;
     const selector = `.${className}`;
 
-    Stylesheets.getGlobalSheet().addRule(selector, css);
+    let ruleExists = false;
+
+    const sheet = Stylesheets.getGlobalSheet();
+    for (const rule of Array.from(sheet.cssRules) as CSSStyleRule[]) {
+      if (selector === rule.selectorText) {
+        ruleExists = true;
+        break;
+      }
+    }
+
+    if (!ruleExists) {
+      sheet.insertRule(`${selector} {${css}}`);
+    }
 
     return className;
   }
