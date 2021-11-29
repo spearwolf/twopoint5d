@@ -1,18 +1,17 @@
-/* eslint-disable no-lonely-if */
 import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer, WebGLRendererParameters} from 'three';
 import {Stylesheets} from './Stylesheets';
 import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
 
-const CANVAS_MAX_RESOLUTION = 8192;
 let canvasMaxResolutionWarningWasShown = false;
 
 function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
     // eslint-disable-next-line no-console
     console.warn(
-      `Oops, the canvas width or height should not bigger than ${CANVAS_MAX_RESOLUTION} pixels (${w}x${h} was requested).`,
-      'If you need more, please create a PR ;) https://github.com/spearwolf/three-vertex-objects',
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      `Oops, the canvas width or height should not bigger than ${Display.MaxResolution} pixels (${w}x${h} was requested).`,
+      'If you need more, please set Display.MaxResolution before you create a Display!',
     );
     canvasMaxResolutionWarningWasShown = true;
   }
@@ -37,6 +36,8 @@ export type DisplayParameters = Partial<Omit<WebGLRendererParameters, 'canvas'>>
 export interface Display extends Eventize {}
 
 export class Display {
+  static MaxResolution = 8192;
+
   #pause = false;
   #initialized = false;
 
@@ -224,12 +225,12 @@ export class Display {
       cssHeight = 0;
     }
 
-    if (wPx > CANVAS_MAX_RESOLUTION) {
-      wPx = CANVAS_MAX_RESOLUTION;
+    if (wPx > Display.MaxResolution) {
+      wPx = Display.MaxResolution;
       showCanvasMaxResolutionWarning(wPx, hPx);
     }
-    if (hPx > CANVAS_MAX_RESOLUTION) {
-      hPx = CANVAS_MAX_RESOLUTION;
+    if (hPx > Display.MaxResolution) {
+      hPx = Display.MaxResolution;
       showCanvasMaxResolutionWarning(wPx, hPx);
     }
 
