@@ -1,7 +1,8 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
-import {WebGLRenderer, WebGLRendererParameters} from 'three';
+import {WebGLRenderer} from 'three';
 import {Stylesheets} from './Stylesheets';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
+import {DisplayEventArgs, DisplayParameters, ResizeCallback} from './types';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -16,22 +17,6 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
     canvasMaxResolutionWarningWasShown = true;
   }
 }
-
-export interface DisplayEventArgs {
-  display: Display;
-  renderer: WebGLRenderer;
-  width: number;
-  height: number;
-  now: number;
-  deltaTime: number;
-  frameNo: number;
-}
-
-export type ResizeCallbackFn = (display: Display) => [width: number, height: number];
-
-export type DisplayParameters = Partial<Omit<WebGLRendererParameters, 'canvas'>> & {
-  resizeTo?: ResizeCallbackFn;
-};
 
 export interface Display extends Eventize {}
 
@@ -56,7 +41,7 @@ export class Display {
   frameNo = 0;
 
   resizeToElement: HTMLElement = undefined;
-  resizeToCallback: ResizeCallbackFn = undefined;
+  resizeToCallback: ResizeCallback = undefined;
 
   renderer: WebGLRenderer;
 
