@@ -1,5 +1,7 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
+import {Chronometer} from './Chronometer';
+import {DisplayStateMachine} from './DisplayStateMachine';
 import {Stylesheets} from './Stylesheets';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
 import {DisplayEventArgs, DisplayParameters, ResizeCallback} from './types';
@@ -23,8 +25,9 @@ export interface Display extends Eventize {}
 export class Display {
   static MaxResolution = 8192;
 
-  #pause = false;
-  #initialized = false;
+  #chronometer = new Chronometer(0);
+
+  #stateMachine = new DisplayStateMachine();
 
   #rafID = -1;
   #lastResizeHash = '';
@@ -35,9 +38,6 @@ export class Display {
   width = 0;
   height = 0;
 
-  now = 0;
-  lastNow = 0;
-  deltaTime = 0;
   frameNo = 0;
 
   resizeToElement: HTMLElement = undefined;
@@ -47,6 +47,8 @@ export class Display {
 
   constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
+
+    this.#chronometer.stop();
 
     this.resizeToCallback = options?.resizeTo;
 
@@ -89,22 +91,61 @@ export class Display {
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resize();
+
+    // TODO dispose event listener
+    document?.addEventListener(
+      'visibilitychange',
+      () => {
+        this.#stateMachine.documentIsVisible = !document.hidden;
+      },
+      false,
+    );
+
+    this.#stateMachine.on({
+      [DisplayStateMachine.Init]: () => this.emit('init', this.getEmitArgs()),
+      [DisplayStateMachine.Restart]: () => this.emit('restart', this.getEmitArgs()),
+
+      [DisplayStateMachine.Start]: () => {
+        this.#chronometer.start();
+        this.#chronometer.update();
+
+        const renderFrame = (now: number) => {
+          if (!this.pause) {
+            this.renderFrame(now);
+          }
+
+          this.#rafID = window.requestAnimationFrame(renderFrame);
+        };
+
+        this.#rafID = window.requestAnimationFrame(renderFrame);
+
+        this.emit('start', this.getEmitArgs());
+      },
+
+      [DisplayStateMachine.Pause]: () => {
+        window.cancelAnimationFrame(this.#rafID);
+
+        this.#chronometer.stop();
+
+        this.emit('pause', this.getEmitArgs());
+      },
+    });
+  }
+
+  get now(): number {
+    return this.#chronometer.time;
+  }
+
+  get deltaTime(): number {
+    return this.#chronometer.deltaTime;
   }
 
   get pause(): boolean {
-    return this.#pause;
+    return this.#stateMachine.state === DisplayStateMachine.PAUSED;
   }
 
   set pause(pause: boolean) {
-    if (this.#initialized) {
-      if (pause && !this.#pause) {
-        this.stop();
-      } else if (!pause && this.#pause) {
-        this.start();
-      }
-    } else {
-      this.#pause = pause;
-    }
+    this.#stateMachine.pausedByUser = pause;
   }
 
   get pixelRatio(): number {
@@ -237,17 +278,7 @@ export class Display {
   }
 
   renderFrame(now = window.performance.now()): void {
-    if (this.#pause) return;
-
-    if (this.frameNo === 0 || this.lastNow === 0) {
-      this.now = now / 1000.0;
-      this.lastNow = this.now;
-      this.deltaTime = 0;
-    } else if (this.frameNo > 0) {
-      this.lastNow = this.now;
-      this.now = now / 1000.0;
-      this.deltaTime = this.now - this.lastNow;
-    }
+    this.#chronometer.update(now / 1000);
 
     this.resize();
 
@@ -261,45 +292,49 @@ export class Display {
   }
 
   async start(beforeStartCallback?: (args: DisplayEventArgs) => Promise<void> | void): Promise<Display> {
-    this.#pause = false;
+    // this.#pause = false;
 
-    if (!this.#initialized) {
-      this.emit('init', this.getEmitArgs());
-      document?.addEventListener(
-        'visibilitychange',
-        () => {
-          this.pause = document.hidden;
-          this.lastNow = 0;
-          this.emit(this.pause ? 'hide' : 'show', this.getEmitArgs());
-        },
-        false,
-      );
-      this.#initialized = true;
-    }
+    // if (!this.#initialized) {
+    //   this.emit('init', this.getEmitArgs());
+    //   document?.addEventListener(
+    //     'visibilitychange',
+    //     () => {
+    //       this.pause = document.hidden;
+    //       this.lastNow = 0;
+    //       this.emit(this.pause ? 'hide' : 'show', this.getEmitArgs());
+    //     },
+    //     false,
+    //   );
+    //   this.#initialized = true;
+    // }
 
     if (typeof beforeStartCallback === 'function') {
       await beforeStartCallback(this.getEmitArgs());
     }
 
-    this.emit('start', this.getEmitArgs());
+    this.#stateMachine.pausedByUser = false;
+    this.#stateMachine.start();
 
-    const renderFrame = (now: number) => {
-      if (!this.#pause) {
-        this.renderFrame(now);
-      }
-      this.#rafID = window.requestAnimationFrame(renderFrame);
-    };
+    // this.emit('start', this.getEmitArgs());
 
-    this.#rafID = window.requestAnimationFrame(renderFrame);
+    // const renderFrame = (now: number) => {
+    //   if (!this.#pause) {
+    //     this.renderFrame(now);
+    //   }
+    //   this.#rafID = window.requestAnimationFrame(renderFrame);
+    // };
+
+    // this.#rafID = window.requestAnimationFrame(renderFrame);
 
     return this;
   }
 
   stop(): void {
-    window.cancelAnimationFrame(this.#rafID);
-    this.#pause = true;
-    this.lastNow = 0;
-    this.deltaTime = 0;
+    // window.cancelAnimationFrame(this.#rafID);
+    // this.#pause = true;
+    this.#stateMachine.pausedByUser = true;
+    // this.lastNow = 0;
+    // this.deltaTime = 0;
   }
 
   getEmitArgs(): DisplayEventArgs {

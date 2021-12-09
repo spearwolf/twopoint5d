@@ -1,4 +1,4 @@
-const getCurrentTime = (time?: number) => (typeof time === 'number' && !isNaN(time) ? time : performance.now());
+const getCurrentTime = (time?: number) => (typeof time === 'number' && !isNaN(time) ? time : performance.now() / 1000);
 
 export class Chronometer {
   #timeStart: number;
