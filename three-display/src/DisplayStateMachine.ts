@@ -51,7 +51,7 @@ export class DisplayStateMachine {
   }
 
   set elementIsInsideViewport(elementIsInsideViewport: boolean) {
-    if (elementIsInsideViewport !== this.#documentIsVisible) {
+    if (elementIsInsideViewport !== this.#elementIsInsideViewport) {
       this.#elementIsInsideViewport = elementIsInsideViewport;
       this.#elementIsInsideViewportChanged();
     }
@@ -61,7 +61,7 @@ export class DisplayStateMachine {
     switch (this.state) {
       case DisplayStateMachine.RUNNING:
         if (this.#pausedByUser) {
-          this.pause();
+          this.#pause();
         }
         break;
 
@@ -80,7 +80,7 @@ export class DisplayStateMachine {
         if (this.#documentIsVisible) {
           this.start();
         } else {
-          this.pause();
+          this.#pause();
         }
         break;
     }
@@ -93,37 +93,51 @@ export class DisplayStateMachine {
         if (this.#elementIsInsideViewport) {
           this.start();
         } else {
-          this.pause();
+          this.#pause();
         }
         break;
     }
   };
 
-  pause(): void {
+  #pause = (): void => {
     if (this.state !== DisplayStateMachine.PAUSED) {
       this.state = DisplayStateMachine.PAUSED;
       this.emit(DisplayStateMachine.Pause);
     }
-  }
+  };
+
+  #initMustBeCalled = true;
+
+  #initOrRestart = (): void => {
+    if (this.#initMustBeCalled) {
+      this.#initMustBeCalled = false;
+      this.emit(DisplayStateMachine.Init);
+    } else {
+      this.emit(DisplayStateMachine.Restart);
+    }
+  };
 
   start(): void {
-    if (
-      this.state !== DisplayStateMachine.RUNNING &&
-      !this.#pausedByUser &&
-      this.#documentIsVisible &&
-      this.#elementIsInsideViewport
-    ) {
+    if (this.state !== DisplayStateMachine.RUNNING) {
+      const isPaused = this.#pausedByUser || !this.#documentIsVisible || !this.#elementIsInsideViewport;
+
       switch (this.state) {
         case DisplayStateMachine.NEW:
-          this.emit(DisplayStateMachine.Init);
-          this.state = DisplayStateMachine.RUNNING;
-          this.emit(DisplayStateMachine.Start);
+          if (!isPaused) {
+            this.#initOrRestart();
+            this.state = DisplayStateMachine.RUNNING;
+            this.emit(DisplayStateMachine.Start);
+          } else {
+            this.#pause();
+          }
           break;
 
         case DisplayStateMachine.PAUSED:
-          this.emit(DisplayStateMachine.Restart);
-          this.state = DisplayStateMachine.RUNNING;
-          this.emit(DisplayStateMachine.Start);
+          if (!isPaused) {
+            this.#initOrRestart();
+            this.state = DisplayStateMachine.RUNNING;
+            this.emit(DisplayStateMachine.Start);
+          }
           break;
       }
     }
