@@ -92,18 +92,9 @@ export class Display {
 
     this.resize();
 
-    // TODO dispose event listener
-    document?.addEventListener(
-      'visibilitychange',
-      () => {
-        this.#stateMachine.documentIsVisible = !document.hidden;
-      },
-      false,
-    );
-
     this.#stateMachine.on({
-      [DisplayStateMachine.Init]: () => this.emit('init', this.getEmitArgs()),
-      [DisplayStateMachine.Restart]: () => this.emit('restart', this.getEmitArgs()),
+      [DisplayStateMachine.Init]: () => this.#emitEvent('init'),
+      [DisplayStateMachine.Restart]: () => this.#emitEvent('restart'),
 
       [DisplayStateMachine.Start]: () => {
         this.#chronometer.start();
@@ -119,7 +110,7 @@ export class Display {
 
         this.#rafID = window.requestAnimationFrame(renderFrame);
 
-        this.emit('start', this.getEmitArgs());
+        this.#emitEvent('start');
       },
 
       [DisplayStateMachine.Pause]: () => {
@@ -127,9 +118,22 @@ export class Display {
 
         this.#chronometer.stop();
 
-        this.emit('pause', this.getEmitArgs());
+        this.#emitEvent('pause');
       },
     });
+
+    if (typeof document !== 'undefined') {
+      const onDocVisibilityChange = () => {
+        this.#stateMachine.documentIsVisible = !document.hidden;
+      };
+
+      document.addEventListener('visibilitychange', onDocVisibilityChange, false);
+      this.once('dispose', () => {
+        document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
+      });
+
+      onDocVisibilityChange();
+    }
   }
 
   get now(): number {
@@ -272,7 +276,7 @@ export class Display {
 
       if (this.frameNo > 0) {
         // no need to emit this inside construction phase
-        this.emit('resize', this.getEmitArgs());
+        this.#emitEvent('resize');
       }
     }
   }
@@ -283,69 +287,54 @@ export class Display {
     this.resize();
 
     if (this.frameNo === 0) {
-      this.emit('resize', this.getEmitArgs()); // always emit resize event before render the first frame!
+      this.#emitEvent('resize'); // always emit resize event before render the first frame!
     }
 
-    this.emit('frame', this.getEmitArgs());
+    this.#emitEvent('frame');
 
     ++this.frameNo;
   }
 
   async start(beforeStartCallback?: (args: DisplayEventArgs) => Promise<void> | void): Promise<Display> {
-    // this.#pause = false;
-
-    // if (!this.#initialized) {
-    //   this.emit('init', this.getEmitArgs());
-    //   document?.addEventListener(
-    //     'visibilitychange',
-    //     () => {
-    //       this.pause = document.hidden;
-    //       this.lastNow = 0;
-    //       this.emit(this.pause ? 'hide' : 'show', this.getEmitArgs());
-    //     },
-    //     false,
-    //   );
-    //   this.#initialized = true;
-    // }
-
     if (typeof beforeStartCallback === 'function') {
-      await beforeStartCallback(this.getEmitArgs());
+      await beforeStartCallback(this.getEventArgs());
     }
 
     this.#stateMachine.pausedByUser = false;
     this.#stateMachine.start();
 
-    // this.emit('start', this.getEmitArgs());
-
-    // const renderFrame = (now: number) => {
-    //   if (!this.#pause) {
-    //     this.renderFrame(now);
-    //   }
-    //   this.#rafID = window.requestAnimationFrame(renderFrame);
-    // };
-
-    // this.#rafID = window.requestAnimationFrame(renderFrame);
-
     return this;
   }
 
   stop(): void {
-    // window.cancelAnimationFrame(this.#rafID);
-    // this.#pause = true;
     this.#stateMachine.pausedByUser = true;
-    // this.lastNow = 0;
-    // this.deltaTime = 0;
   }
 
-  getEmitArgs(): DisplayEventArgs {
+  dispose(): void {
+    this.stop();
+    this.emit('dispose');
+    this.off();
+    this.renderer.dispose();
+    delete this.renderer;
+  }
+
+  /** this is a public method so it's easy to override if you want */
+  getEventArgs(): DisplayEventArgs {
     return {
       display: this,
       renderer: this.renderer,
+
       width: this.width,
       height: this.height,
+
       now: this.now,
       deltaTime: this.deltaTime,
+
       frameNo: this.frameNo,
     };
   }
+
+  #emitEvent = (eventName: string): void => {
+    this.emit(eventName, this.getEventArgs());
+  };
 }

@@ -37,9 +37,9 @@ export class PerspectiveOrbitDemo extends Display {
     window.display = this;
   }
 
-  getEmitArgs() {
+  getEventArgs() {
     return {
-      ...super.getEmitArgs(),
+      ...super.getEventArgs(),
       scene: this.scene,
       camera: this.camera,
       controls: this.controls,
