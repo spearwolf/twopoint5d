@@ -8,8 +8,8 @@
         background-color: rgb(46 64 82);
         background: radial-gradient(
           circle,
-          rgb(160 60 170) 0%,
-          rgb(46 64 82) 42%
+          rgb(120 71 117) 0%,
+          rgb(38 46 54) 42%
         );
         color: #eee;
         font-family: sans-serif;
@@ -246,13 +246,13 @@
 
         console.log(bouncingSprites);
 
-        const cylinderGeometry = new CylinderGeometry(170, 170, 1, 180);
+        const cylinderGeometry = new CylinderGeometry(170, 170, 3, 180);
         const cylinderMaterial = new MeshPhongMaterial({
-          color: 0x6080a0,
-          emissive: 0x223344,
+          color: 0x8394a5,
+          emissive: 0x1f2133, // 0x223344, // 1f2133
         });
         const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
-        cylinder.position.set(0, -0.5, 0);
+        cylinder.position.set(0, -1.5, 0);
         scene.add(cylinder);
 
         const mainLight = new PointLight(0xcccccc, 1.5, 250);
