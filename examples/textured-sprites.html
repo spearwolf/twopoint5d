@@ -226,10 +226,9 @@
               bouncingSprites.animate(deltaTime);
             });
 
-            const material = new TexturedSpritesMaterial({
-              colorMap: texture,
-            });
+            const material = new TexturedSpritesMaterial();
 
+            material.colorMap = texture;
             material.depthTest = false;
             material.depthWrite = false;
 

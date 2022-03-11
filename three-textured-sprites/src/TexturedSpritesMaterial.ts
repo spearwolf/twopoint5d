@@ -1,5 +1,5 @@
+import {ShaderTool, unpick} from '@spearwolf/three-vertex-objects';
 import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
-import {ShaderTool} from '@spearwolf/three-vertex-objects';
 
 const vertexShader = `
   attribute vec2 quadSize;
@@ -41,20 +41,28 @@ interface TexturedSpritesMaterialParameters extends ShaderMaterialParameters {
 }
 
 export class TexturedSpritesMaterial extends ShaderMaterial {
-  constructor({colorMap, ...options}: TexturedSpritesMaterialParameters) {
+  constructor(options?: TexturedSpritesMaterialParameters) {
     super({
       vertexShader,
       fragmentShader,
       uniforms: {
         colorMap: {
-          value: colorMap,
+          value: options?.colorMap,
         },
       },
       transparent: true,
       side: DoubleSide,
-      ...options,
+      ...unpick(options, 'colorMap'),
     });
 
-    this.name = options.name ?? '@spearwolf/three-textured-sprites:TexturedSpritesMaterial';
+    this.name = options?.name ?? '@spearwolf/three-textured-sprites:TexturedSpritesMaterial';
+  }
+
+  get colorMap(): Texture | undefined {
+    return this.uniforms.colorMap.value;
+  }
+
+  set colorMap(colorMap: Texture | undefined) {
+    this.uniforms.colorMap.value = colorMap;
   }
 }
