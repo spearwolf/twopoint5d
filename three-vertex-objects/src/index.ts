@@ -13,6 +13,7 @@ export * from './TexturePackerJson';
 export * from './TileSet';
 export * from './TileSetLoader';
 export * from './types';
+export * from './unpick';
 export * from './VertexAttributeDescriptor';
 export * from './VertexObjectBuffer';
 export * from './VertexObjectDescriptor';
