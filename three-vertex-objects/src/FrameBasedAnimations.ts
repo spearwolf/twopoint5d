@@ -150,6 +150,9 @@ export class FrameBasedAnimations {
 
     const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations, includeTextureSize);
 
-    return new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);
+    const dataTexture = new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);
+    dataTexture.needsUpdate = true;
+
+    return dataTexture;
   }
 }
