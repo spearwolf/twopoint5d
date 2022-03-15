@@ -13,7 +13,10 @@ export class Stage2D {
   width = 0;
   height = 0;
 
-  constructor(projection: IProjection, scene?: Scene) {
+  /**
+   * Without `projection` or `scene` it won`t work, but you can also set them after the constructor
+   */
+  constructor(projection?: IProjection, scene?: Scene) {
     this.projection = projection;
     this.scene = scene ?? new Scene();
   }
