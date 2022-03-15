@@ -4,6 +4,8 @@ import {Display} from '@spearwolf/three-display';
 
 ## State and Events
 
-> NOTE(2021-11-30): this is the goal - but it is not yet fully implemented
+> NOTE(2022-03-15): all states and transitions from the diagram are implemented -
+_except_ the _element-is-inside-viewport_ check -
+the feature hasn't been built yet and actually hasn't been thought through to the end of whether it's needed at all.
 
 ![Display state and events](./docs/display-state-and-events.svg)
