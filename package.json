@@ -8,7 +8,8 @@
     "three-stages",
     "three-textured-sprites",
     "three-display",
-    "r3f-kobold"
+    "r3f-kobold",
+    "r3f-examples"
   ],
   "scripts": {
     "three-vertex-objects": "cd three-vertex-objects && yarn",
