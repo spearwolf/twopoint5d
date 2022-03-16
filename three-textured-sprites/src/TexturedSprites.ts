@@ -1,5 +1,5 @@
-import {Material} from 'three';
 import {VertexObjects} from '@spearwolf/three-vertex-objects';
+import {Material} from 'three';
 
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry';
 

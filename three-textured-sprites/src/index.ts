@@ -1,5 +1,5 @@
 export * from './BaseSprite';
-export * from './InstancedSprite';
+export * from './TexturedInstancedSprite';
 export * from './TexturedSprites';
 export * from './TexturedSpritesGeometry';
 export * from './TexturedSpritesMaterial';

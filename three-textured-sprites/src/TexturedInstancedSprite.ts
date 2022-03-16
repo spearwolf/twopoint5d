@@ -1,6 +1,6 @@
 import {TextureAtlasFrame, VertexObjectDescription, VO} from '@spearwolf/three-vertex-objects';
 
-export interface InstancedSprite extends VO {
+export interface TexturedInstancedSprite extends VO {
   rotation: number;
 
   setQuadSize(quadSize: [width: number, height: number]): void;
@@ -8,7 +8,7 @@ export interface InstancedSprite extends VO {
   setInstancePosition(position: [x: number, y: number, z: number]): void;
 }
 
-export class InstancedSprite {
+export class TexturedInstancedSprite {
   setSize(width: number, height: number): void {
     this.setQuadSize([width, height]);
   }
@@ -23,7 +23,7 @@ export class InstancedSprite {
   }
 }
 
-export const InstancedSpriteDescriptor: VertexObjectDescription = {
+export const TexturedInstancedSpriteDescriptor: VertexObjectDescription = {
   meshCount: 1,
 
   attributes: {
@@ -33,5 +33,5 @@ export const InstancedSpriteDescriptor: VertexObjectDescription = {
     rotation: {size: 1, usage: 'dynamic'},
   },
 
-  basePrototype: InstancedSprite.prototype,
+  basePrototype: TexturedInstancedSprite.prototype,
 };
