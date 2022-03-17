@@ -6,6 +6,10 @@ module.exports = {
       import: "./src/hello/index.jsx",
       dependOn: "libs",
     },
+    crosses: {
+      import: "./src/crosses/index.jsx",
+      dependOn: "libs",
+    },
     // ["tiled-maps-basic-layer-tiles-renderer"]: {
     //   import: "./src/tiled-maps-basic-layer-tiles-renderer/index.jsx",
     //   dependOn: "libs",
