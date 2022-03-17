@@ -1,4 +1,4 @@
-import {useFrame} from '@react-three/fiber';
+import {RootState, useFrame} from '@react-three/fiber';
 import {useCallback, useLayoutEffect, useRef, useState} from 'react';
 
 const valuesSortedByKeys = (obj: any) =>
@@ -6,37 +6,46 @@ const valuesSortedByKeys = (obj: any) =>
     .sort()
     .map((key) => obj[key]);
 
-export type FrameStateMachineParams = Record<string, unknown>;
+type FrameStateMachineParams = Record<string, unknown>;
+type NoNullParams<Params extends Record<string, unknown>> = {[K in keyof Params]: NonNullable<Params[K]>};
 
-export interface FrameStateMachineCallbacks {
+type FrameStateMachineCallbackArgs<Params extends FrameStateMachineParams> = Omit<NoNullParams<Params>, 'state' | 'delta'> & {
+  state: RootState;
+  delta: number;
+};
+
+interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   renderPriority?: number;
 
-  init?: (args: FrameStateMachineParams) => void;
-  frame: (args: FrameStateMachineParams) => void;
-  dispose?: (args: FrameStateMachineParams) => void;
+  init?: (args: FrameStateMachineCallbackArgs<Params>) => void;
+  frame: (args: FrameStateMachineCallbackArgs<Params>) => void;
+  dispose?: (args: Params) => void;
 }
 
-export const useFrameStateMachine = (callbacks: FrameStateMachineCallbacks, dependencies: FrameStateMachineParams = {}) => {
+export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
+  callbacks: FrameStateMachineCallbacks<Params>,
+  dependencies: Params = {} as Params,
+) => {
   const callbacksRef = useRef(callbacks);
-  const dependenciesRef = useRef<Record<string, unknown>>(dependencies);
+  const dependenciesRef = useRef<Params>(dependencies);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  useLayoutEffect(() => void (callbacksRef.current = callbacks), [callbacks]);
-  useLayoutEffect(() => void (dependenciesRef.current = dependencies), [dependencies]);
+  useLayoutEffect((): void => void (callbacksRef.current = callbacks), [callbacks]);
+  useLayoutEffect((): void => void (dependenciesRef.current = dependencies), [dependencies]);
 
   const dependencyValues = valuesSortedByKeys(dependencies);
 
   const onFrame = useCallback(
-    (state, delta) => {
+    (state: RootState, delta: number) => {
       if (dependencyValues.length === 0 || dependencyValues.every((dep) => dep != null)) {
         if (!isInitialized) {
           if (callbacksRef.current?.init) {
-            callbacksRef.current.init({...dependenciesRef.current, state, delta});
+            callbacksRef.current.init({...(dependenciesRef.current as NoNullParams<Params>), state, delta});
           }
           setIsInitialized(true);
         }
         if (callbacksRef.current?.frame) {
-          callbacksRef.current.frame({...dependenciesRef.current, state, delta});
+          callbacksRef.current.frame({...(dependenciesRef.current as NoNullParams<Params>), state, delta});
         }
       }
     },
