@@ -13,12 +13,15 @@ export const forwardRefValue = (ref: MutableRefObject<any>) => {
 const isForwardRefValue = (ref: any): ref is MutableRefObject<any> => forwardRefValues.has(ref);
 
 type FrameStateMachineParams = Record<string, unknown>;
-type NoNullParams<Params extends Record<string, unknown>> = {[K in keyof Params]: NonNullable<Params[K]>};
+type NonNullParams<Params extends FrameStateMachineParams> = {[Key in keyof Params]: NonNullable<Params[Key]>};
 
-type FrameStateMachineCallbackArgs<Params extends FrameStateMachineParams> = Omit<NoNullParams<Params>, 'state' | 'delta'> & {
+interface UseFrameParams {
   state: RootState;
   delta: number;
-};
+}
+
+type FrameStateMachineCallbackArgs<Params extends FrameStateMachineParams> = Omit<NonNullParams<Params>, keyof UseFrameParams> &
+  UseFrameParams;
 
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   renderPriority?: number;
@@ -28,17 +31,17 @@ interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   dispose?: (args: Params) => void;
 }
 
-const constructArgs = <Params extends FrameStateMachineParams>(args: Params): NoNullParams<Params> =>
+const constructArgs = <Params extends FrameStateMachineParams>(args: Params): NonNullParams<Params> =>
   Object.fromEntries(
     Object.entries(args).map(([key, value]) => [key, isForwardRefValue(value) ? value.current : value]),
-  ) as NoNullParams<Params>;
+  ) as NonNullParams<Params>;
 
 export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacks<Params>,
   dependencies: Params = {} as Params,
-) => {
+): void => {
   const callbacksRef = useRef(callbacks);
-  const dependenciesRef = useRef<Params>(dependencies);
+  const dependenciesRef = useRef(dependencies);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useLayoutEffect((): void => void (callbacksRef.current = callbacks), [callbacks]);
