@@ -18,6 +18,7 @@
     "isolatedModules": true,
     "allowJs": false,
     "jsx": "react-jsx",
+    "skipLibCheck": true,
 
     "strict": true,
     "strictNullChecks": false,

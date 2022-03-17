@@ -2,13 +2,14 @@
   "name": "@spearwolf/r3f-kobold",
   "version": "0.0.1",
   "description": "sprites library based on react-three-fiber",
-  "main": "build/r3f-kobold.umd.js",
+  "main": "build/r3f-kobold.cjs.js",
   "module": "build/r3f-kobold.js",
   "types": "build/types/index.d.ts",
   "exports": {
     "import": "./build/r3f-kobold.js",
-    "require": "./build/r3f-kobold.umd.js"
+    "require": "./build/r3f-kobold.cjs.js"
   },
+  "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
     "outputName": "r3f-kobold",
@@ -26,17 +27,8 @@
     "esm": {
       "buildName": "es2017"
     },
-    "umd": {
-      "name": "r3fKobold",
-      "buildName": "umd",
-      "globals": {
-        "@spearwolf/eventize": "eventize",
-        "three": "THREE",
-        "@spearwolf/three-vertex-objects": "threeVertexObjects",
-        "@spearwolf/three-stages": "threeStages",
-        "@spearwolf/three-tiled-maps": "threeTiledMaps",
-        "@spearwolf/three-textured-sprites": "threeTexturedSprites"
-      }
+    "cjs": {
+      "buildName": "cjs"
     }
   },
   "homepage": "https://github.com/spearwolf/three-vertex-objects/",
@@ -58,11 +50,11 @@
   "scripts": {
     "build:js": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.esm.js",
     "watch:js": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.esm.js",
-    "build:umd": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.umd.js",
-    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.umd.js",
+    "build:cjs": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.cjs.js",
+    "watch:cjs": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.cjs.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
-    "build": "run-s --silent build:js build:umd build:types",
+    "build": "run-s --silent build:js build:cjs build:types",
     "clean": "rimraf -r build types",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
@@ -76,7 +68,6 @@
     "@spearwolf/three-textured-sprites": "*",
     "@spearwolf/three-vertex-objects": "*",
     "react": "^17.0.2",
-    "react-dom": "^17.0.2",
     "three": "^0.138.3",
     "use-asset": "^1.0.4"
   },
@@ -94,7 +85,6 @@
     "@types/jest": "^27.4.1",
     "@types/node": "^17.0.21",
     "@types/react": "^17.0.40",
-    "@types/react-dom": "^17.0.13",
     "@types/react-reconciler": "^0.26.4",
     "@types/sinon": "^10.0.11",
     "@types/three": "^0.138.0",
