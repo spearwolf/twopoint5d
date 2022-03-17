@@ -29,7 +29,7 @@ describe('useFrameStateMachine hook', () => {
     expect(typeof useFrameStateMachine).toBe('function');
   });
 
-  test('init() callback', async () => {
+  test('callbacks are called in the correct sequence', async () => {
     const callbacks = {
       init: jest.fn(),
       frame: jest.fn(),
