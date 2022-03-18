@@ -213,25 +213,23 @@
         { antialias: false }
       );
 
-      const imageLoader = new TextureImageLoader();
+      const { imgEl, texture, texCoords } =
+        await new TextureImageLoader().loadAsync(
+          "/examples/assets/ball-pattern-rot--not-power-of-2.png",
+          ["nearest", "no-flipy"]
+        );
 
-      imageLoader.load(
-        "/examples/assets/ball-pattern-rot--not-power-of-2.png",
-        ["nearest", "no-flipy"],
-        (data) => {
-          console.log("loaded texture-image", data);
+      console.log("loaded texture-image", { imgEl, texCoords, texture });
 
-          document.getElementById("texture-preview").appendChild(data.imgEl);
+      document.getElementById("texture-preview").appendChild(imgEl);
 
-          demo.on("init", ({ scene }) => {
-            scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, data.texture));
-          });
+      demo.on("init", ({ scene }) => {
+        scene.add(makeMesh(16, 32, 3.5, 1, texCoords, texture));
+      });
 
-          demo.start();
+      demo.start();
 
-          console.log("TexturedQuadsMesh", demo.scene.children[0]);
-        }
-      );
+      console.log("TexturedQuadsMesh", demo.scene.children[0]);
     </script>
   </body>
 </html>
