@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: #391e39;
         background: radial-gradient(
@@ -55,14 +58,7 @@
         Vector3,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import {
-        getDescriptorOf,
-        InstancedVertexObjectGeometry,
-        TextureFactory,
-        TileSetLoader,
-        VertexObjectGeometry,
-        VertexObjects,
-      } from "@spearwolf/three-vertex-objects";
+      import { TileSetLoader } from "@spearwolf/three-vertex-objects";
       import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
       import {
         TexturedSprites,
@@ -199,51 +195,48 @@
         { antialias: false }
       );
 
-      const tilesetLoader = new TileSetLoader(new TextureFactory());
-
-      tilesetLoader.load(
+      const { tileSet, texture } = await new TileSetLoader().loadAsync(
         "/examples/assets/nobinger-anim-sheet.png",
-        { tileWidth: 64, tileHeight: 64, margin: 1 },
-        ({ tileSet, texture }) => {
-          demo.on("init", ({ scene, camera }) => {
-            camera.position.set(0, 0, 50);
-
-            const CAPACITY = 333;
-            const geometry = new TexturedSpritesGeometry(CAPACITY);
-
-            const bouncingSprites = new BouncingSprites(
-              geometry.instancedPool,
-              tileSet.atlas,
-              100,
-              75,
-              7,
-              CAPACITY
-            );
-
-            bouncingSprites.createSprites();
-
-            demo.on("frame", ({ deltaTime }) => {
-              bouncingSprites.animate(deltaTime);
-            });
-
-            const material = new TexturedSpritesMaterial();
-
-            material.colorMap = texture;
-            material.depthTest = false;
-            material.depthWrite = false;
-
-            const mesh = new TexturedSprites(geometry, material);
-
-            scene.add(mesh);
-
-            console.log("bouncingSprites", bouncingSprites);
-          });
-
-          demo.start();
-
-          console.log("TexturedSpritesMesh", demo.scene.children[0]);
-        }
+        { tileWidth: 64, tileHeight: 64, margin: 1 }
       );
+
+      demo.on("init", ({ scene, camera }) => {
+        camera.position.set(0, 0, 50);
+
+        const CAPACITY = 333;
+        const geometry = new TexturedSpritesGeometry(CAPACITY);
+
+        const bouncingSprites = new BouncingSprites(
+          geometry.instancedPool,
+          tileSet.atlas,
+          100,
+          75,
+          7,
+          CAPACITY
+        );
+
+        bouncingSprites.createSprites();
+
+        demo.on("frame", ({ deltaTime }) => {
+          bouncingSprites.animate(deltaTime);
+        });
+
+        const material = new TexturedSpritesMaterial();
+
+        material.colorMap = texture;
+        material.depthTest = false;
+        material.depthWrite = false;
+
+        const mesh = new TexturedSprites(geometry, material);
+
+        scene.add(mesh);
+
+        console.log("bouncingSprites", bouncingSprites);
+      });
+
+      demo.start();
+
+      console.log("TexturedSpritesMesh", demo.scene.children[0]);
     </script>
   </body>
 </html>

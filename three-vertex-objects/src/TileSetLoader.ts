@@ -1,5 +1,4 @@
 import {Texture} from 'three';
-
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
 import {TextureCoords} from './TextureCoords';
 import {TextureFactory} from './TextureFactory';
@@ -26,9 +25,12 @@ export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;
 
-  constructor(textureFactory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
+  constructor(
+    textureFactory: TextureFactory = new TextureFactory(),
+    imageLoader: PowerOf2ImageLoader = new PowerOf2ImageLoader(),
+  ) {
     this.textureFactory = textureFactory;
-    this.imageLoader = imageLoader ?? new PowerOf2ImageLoader();
+    this.imageLoader = imageLoader;
   }
 
   load(url: string, tileSetOptions: TileSetOptions, onLoadCallback: OnLoadCallback, onErrorCallback?: OnErrorCallback): void {
