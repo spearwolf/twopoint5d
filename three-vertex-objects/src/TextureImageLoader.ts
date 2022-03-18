@@ -41,7 +41,7 @@ export class TextureImageLoader {
       url,
       (imageData) => {
         const texture = new Texture(imageData.imgEl);
-        this.textureFactory.update(texture, ...(textureClasses || []));
+        this.textureFactory.update(texture, ...(textureClasses ?? []));
 
         onLoadCallback({
           texture,

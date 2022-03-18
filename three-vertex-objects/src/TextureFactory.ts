@@ -10,9 +10,11 @@ export interface TextureOptions {
   minFilter: TextureFilter;
   anisotrophy: number;
   flipY: boolean;
+  // TODO encoding @see https://threejs.org/docs/#api/en/constants/Textures
 }
 
 const TextureClasses = {
+  // TODO encoding classses
   anisotrophy: {
     anisotrophy: Infinity,
   },

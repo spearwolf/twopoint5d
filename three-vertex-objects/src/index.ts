@@ -6,6 +6,7 @@ export * from './InstancedVertexObjectGeometry';
 export * from './PowerOf2ImageLoader';
 export * from './ShaderTool';
 export * from './TextureAtlas';
+export * from './TextureAtlasLoader';
 export * from './TextureCoords';
 export * from './TextureFactory';
 export * from './TextureImageLoader';
