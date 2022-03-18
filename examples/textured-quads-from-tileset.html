@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: #391e39;
         background: radial-gradient(
@@ -116,8 +119,8 @@
         ShaderMaterial,
         Texture,
         Vector3,
-      } from 'three';
-      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
         getDescriptorOf,
         InstancedVertexObjectGeometry,
@@ -125,58 +128,13 @@
         TileSetLoader,
         VertexObjectGeometry,
         VertexObjects,
-      } from '@spearwolf/three-vertex-objects';
-      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
-
-      class BaseQuad {
-        make(width = 0.5, height = 0.5) {
-          // prettier-ignore
-          this.setPosition([
-            - width, - height, 0,
-            - width, + height, 0,
-            + width, + height, 0,
-            + width, - height, 0,
-          ]);
-          // prettier-ignore
-          this.setUv([
-            // flipY = false
-            0, 1,
-            0, 0,
-            1, 0,
-            1, 1,
-          ]);
-        }
-      }
-
-      const BaseQuadDescriptor = {
-        vertexCount: 4,
-        indices: [0, 2, 1, 0, 3, 2],
-
-        attributes: {
-          position: {components: ['x', 'y', 'z']},
-          uv: {size: 2},
-        },
-
-        basePrototype: BaseQuad.prototype,
-      };
-
-      const InstancedQuadDescriptor = {
-        meshCount: 1,
-
-        attributes: {
-          quadSize: {components: ['width', 'height']},
-          instancePosition: {components: ['x', 'y', 'z']},
-          texCoords: {size: 4},
-        },
-      };
+      } from "@spearwolf/three-vertex-objects";
+      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
+      import { InstancedQuadsGeometry } from "/examples/jsm/instanced-quads/InstancedQuadsGeometry.js";
 
       function makeMesh(rows, columns, size, offset, tileset, texture) {
         const capacity = rows * columns;
-        const geometry = new InstancedVertexObjectGeometry(
-          InstancedQuadDescriptor,
-          capacity,
-          BaseQuadDescriptor,
-        );
+        const geometry = new InstancedQuadsGeometry(capacity);
 
         geometry.basePool.createVO().make();
 
@@ -200,8 +158,8 @@
         }
 
         const material = new ShaderMaterial({
-          vertexShader: document.getElementById('vertexShader').textContent,
-          fragmentShader: document.getElementById('fragmentShader').textContent,
+          vertexShader: document.getElementById("vertexShader").textContent,
+          fragmentShader: document.getElementById("fragmentShader").textContent,
           uniforms: {
             colorMap: {
               value: texture,
@@ -212,38 +170,38 @@
         });
 
         const mesh = new VertexObjects(geometry, material);
-        mesh.name = 'InstancedQuadsMesh';
+        mesh.name = "InstancedQuadsMesh";
         mesh.frustumCulled = false;
 
         return mesh;
       }
 
       const demo = new PerspectiveOrbitDemo(
-        document.getElementById('canvas-container'),
-        {antialias: false},
+        document.getElementById("canvas-container"),
+        { antialias: false }
       );
 
       const tilesetLoader = new TileSetLoader(new TextureFactory());
 
       tilesetLoader.load(
-        '/examples/assets/nobinger-anim-sheet.png',
-        {tileWidth: 64, tileHeight: 64, margin: 1},
+        "/examples/assets/nobinger-anim-sheet.png",
+        { tileWidth: 64, tileHeight: 64, margin: 1 },
         (data) => {
-          console.log('loaded tileset', data);
+          console.log("loaded tileset", data);
 
-          document.getElementById('texture-preview').appendChild(data.imgEl);
+          document.getElementById("texture-preview").appendChild(data.imgEl);
           document.querySelector(
-            '.tileset-image-title',
+            ".tileset-image-title"
           ).textContent = `tileset (${data.imgEl.width}x${data.imgEl.height})`;
 
-          demo.on('init', ({scene}) => {
+          demo.on("init", ({ scene }) => {
             scene.add(makeMesh(16, 32, 3.5, 1, data.tileSet, data.texture));
           });
 
           demo.start();
 
-          console.log('TexturedQuadsMesh', demo.scene.children[0]);
-        },
+          console.log("TexturedQuadsMesh", demo.scene.children[0]);
+        }
       );
     </script>
   </body>
