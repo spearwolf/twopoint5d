@@ -8,7 +8,7 @@ export * from './ShaderTool';
 export * from './TextureAtlas';
 export * from './TextureCoords';
 export * from './TextureFactory';
-export * from './TextureFactoryLoader';
+export * from './TextureImageLoader';
 export * from './TexturePackerJson';
 export * from './TileSet';
 export * from './TileSetLoader';

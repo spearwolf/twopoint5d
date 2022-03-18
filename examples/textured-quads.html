@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: #391e39;
         background: radial-gradient(
@@ -87,8 +90,8 @@
       <p>
         three-vertex-objects.js :: textured-quads<br />
         <em
-          >an <code>InstancedVertexObjectGeometry</code> plus
-          <code>PowerOf2ImageLoader</code> example</em
+          >an <code>InstancedVertexObjectGeometry</code> &amp;
+          <code>TextureImageLoader</code> example</em
         >
       </p>
     </section>
@@ -105,16 +108,16 @@
         ShaderMaterial,
         Texture,
         Vector3,
-      } from 'three';
-      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
         getDescriptorOf,
         InstancedVertexObjectGeometry,
-        PowerOf2ImageLoader,
+        TextureImageLoader,
         VertexObjectGeometry,
         VertexObjects,
-      } from '@spearwolf/three-vertex-objects';
-      import {PerspectiveOrbitDemo} from '/examples/jsm/display/PerspectiveOrbitDemo.js';
+      } from "@spearwolf/three-vertex-objects";
+      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
 
       class BaseQuad {
         make(width = 0.5, height = 0.5) {
@@ -141,8 +144,8 @@
         indices: [0, 2, 1, 0, 3, 2],
 
         attributes: {
-          position: {components: ['x', 'y', 'z']},
-          uv: {size: 2},
+          position: { components: ["x", "y", "z"] },
+          uv: { size: 2 },
         },
 
         basePrototype: BaseQuad.prototype,
@@ -152,9 +155,9 @@
         meshCount: 1,
 
         attributes: {
-          quadSize: {components: ['width', 'height']},
-          instancePosition: {components: ['x', 'y', 'z']},
-          texCoords: {size: 4},
+          quadSize: { components: ["width", "height"] },
+          instancePosition: { components: ["x", "y", "z"] },
+          texCoords: { size: 4 },
         },
       };
 
@@ -163,7 +166,7 @@
         const geometry = new InstancedVertexObjectGeometry(
           InstancedQuadDescriptor,
           capacity,
-          BaseQuadDescriptor,
+          BaseQuadDescriptor
         );
 
         geometry.basePool.createVO().make();
@@ -187,8 +190,8 @@
         }
 
         const material = new ShaderMaterial({
-          vertexShader: document.getElementById('vertexShader').textContent,
-          fragmentShader: document.getElementById('fragmentShader').textContent,
+          vertexShader: document.getElementById("vertexShader").textContent,
+          fragmentShader: document.getElementById("fragmentShader").textContent,
           uniforms: {
             colorMap: {
               value: texture,
@@ -199,40 +202,35 @@
         });
 
         const mesh = new VertexObjects(geometry, material);
-        mesh.name = 'InstancedQuadsMesh';
+        mesh.name = "InstancedQuadsMesh";
         mesh.frustumCulled = false;
 
         return mesh;
       }
 
       const demo = new PerspectiveOrbitDemo(
-        document.getElementById('canvas-container'),
-        {antialias: false},
+        document.getElementById("canvas-container"),
+        { antialias: false }
       );
 
-      const imageLoader = new PowerOf2ImageLoader();
+      const imageLoader = new TextureImageLoader();
 
       imageLoader.load(
-        '/examples/assets/ball-pattern-rot--not-power-of-2.png',
+        "/examples/assets/ball-pattern-rot--not-power-of-2.png",
+        ["nearest", "no-flipy"],
         (data) => {
-          console.log('loaded power-of-2-image', data);
+          console.log("loaded texture-image", data);
 
-          document.getElementById('texture-preview').appendChild(data.imgEl);
+          document.getElementById("texture-preview").appendChild(data.imgEl);
 
-          const texture = new Texture(data.imgEl);
-          texture.magFilter = NearestFilter;
-          texture.minFilter = NearestFilter;
-          texture.flipY = false;
-          texture.needsUpdate = true;
-
-          demo.on('init', ({scene}) => {
-            scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, texture));
+          demo.on("init", ({ scene }) => {
+            scene.add(makeMesh(16, 32, 3.5, 1, data.texCoords, data.texture));
           });
 
           demo.start();
 
-          console.log('TexturedQuadsMesh', demo.scene.children[0]);
-        },
+          console.log("TexturedQuadsMesh", demo.scene.children[0]);
+        }
       );
     </script>
   </body>

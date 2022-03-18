@@ -1,5 +1,4 @@
 import {Texture} from 'three';
-
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
 import {TextureCoords} from './TextureCoords';
 import {TextureFactory, TextureOptionClasses} from './TextureFactory';
@@ -8,25 +7,28 @@ import {TextureSource} from './types';
 /**
  * @category Texture Mapping
  */
-export interface TextureData {
+export interface TextureImage {
   texture: Texture;
   imgEl: TextureSource;
   texCoords: TextureCoords;
 }
 
-type OnLoadCallback = (textureData: TextureData) => void;
+type OnLoadCallback = (textureData: TextureImage) => void;
 type OnErrorCallback = ((event: Event) => void) | undefined;
 
 /**
  * @category Texture Mapping
  */
-export class TextureFactoryLoader {
+export class TextureImageLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;
 
-  constructor(textureFatory: TextureFactory, imageLoader?: PowerOf2ImageLoader) {
-    this.textureFactory = textureFatory;
-    this.imageLoader = imageLoader ?? new PowerOf2ImageLoader();
+  constructor(
+    textureFactory: TextureFactory = new TextureFactory(),
+    imageLoader: PowerOf2ImageLoader = new PowerOf2ImageLoader(),
+  ) {
+    this.textureFactory = textureFactory;
+    this.imageLoader = imageLoader;
   }
 
   load(
@@ -51,7 +53,7 @@ export class TextureFactoryLoader {
     );
   }
 
-  loadAsync(url: string, textureClasses: Array<TextureOptionClasses>): Promise<TextureData> {
+  loadAsync(url: string, textureClasses: Array<TextureOptionClasses>): Promise<TextureImage> {
     return new Promise((resolve, reject) => {
       this.load(url, textureClasses, resolve, reject);
     });
