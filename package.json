@@ -18,6 +18,7 @@
     "three-textured-sprites": "cd three-textured-sprites && yarn",
     "three-display": "cd three-display && yarn",
     "r3f-kobold": "cd r3f-kobold && yarn",
+    "r3f-examples": "cd r3f-examples && yarn start",
     "build:three-vertex-objects": "yarn three-vertex-objects build",
     "build:three-tiled-maps": "yarn three-tiled-maps build",
     "build:three-stages": "yarn three-stages build",

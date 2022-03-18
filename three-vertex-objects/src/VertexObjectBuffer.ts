@@ -2,6 +2,7 @@ import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {createTypedArray} from './createTypedArray';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype';
 import {TypedArray, VertexAttributeDataType, VertexAttributeUsageType} from './types';
+
 import {VertexObjectBuffersData} from '.';
 
 interface BufferAttribute {
