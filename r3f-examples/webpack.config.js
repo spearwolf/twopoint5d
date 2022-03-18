@@ -2,10 +2,6 @@ const path = require("path");
 
 module.exports = {
   entry: {
-    hello: {
-      import: "./src/hello/index.jsx",
-      dependOn: "libs",
-    },
     crosses: {
       import: "./src/crosses/index.jsx",
       dependOn: "libs",
