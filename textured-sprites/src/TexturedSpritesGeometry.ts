@@ -12,7 +12,7 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
   ) {
     super(TexturedInstancedSpriteDescriptor, capacity, BaseSpriteDescriptor);
 
-    this.name = '@spearwolf/three-textured-sprites:TexturedSpritesGeometry';
+    this.name = '@spearwolf/textured-sprites:TexturedSpritesGeometry';
 
     this.basePool.createVO().make(...makeBaseSpriteArgs);
   }

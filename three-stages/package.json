@@ -13,7 +13,7 @@
     "outputDir": "build",
     "outputName": "three-stages",
     "externals": [
-      "@spearwolf/three-textured-sprites",
+      "@spearwolf/textured-sprites",
       "@spearwolf/three-tiled-maps",
       "@spearwolf/vertex-objects",
       "three"
@@ -28,7 +28,7 @@
         "@spearwolf/eventize": "eventize",
         "three": "THREE",
         "@spearwolf/vertex-objects": "vertexObjects",
-        "@spearwolf/three-textured-sprites": "threeTexturedSprites",
+        "@spearwolf/textured-sprites": "texturedSprites",
         "@spearwolf/three-tiled-maps": "threeTiledMaps"
       }
     }

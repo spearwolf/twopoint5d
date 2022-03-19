@@ -1,17 +1,17 @@
 {
-  "name": "@spearwolf/three-textured-sprites",
+  "name": "@spearwolf/textured-sprites",
   "version": "0.0.1",
   "description": "textured 2d sprites for three.js",
-  "main": "build/three-textured-sprites.umd.js",
-  "module": "build/three-textured-sprites.js",
+  "main": "build/textured-sprites.umd.js",
+  "module": "build/textured-sprites.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/three-textured-sprites.js",
-    "require": "./build/three-textured-sprites.umd.js"
+    "import": "./build/textured-sprites.js",
+    "require": "./build/textured-sprites.umd.js"
   },
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "three-textured-sprites",
+    "outputName": "textured-sprites",
     "externals": [
       "@spearwolf/three-stages",
       "@spearwolf/three-tiled-maps",
@@ -22,7 +22,7 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "threeTexturedSprites",
+      "name": "texturedSprites",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",

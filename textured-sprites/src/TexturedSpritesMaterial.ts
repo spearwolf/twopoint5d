@@ -55,7 +55,7 @@ export class TexturedSpritesMaterial extends ShaderMaterial {
       ...unpick(options, 'colorMap'),
     });
 
-    this.name = options?.name ?? '@spearwolf/three-textured-sprites:TexturedSpritesMaterial';
+    this.name = options?.name ?? '@spearwolf/textured-sprites:TexturedSpritesMaterial';
   }
 
   get colorMap(): Texture | undefined {
