@@ -21,7 +21,7 @@
           "@spearwolf/eventize": "/examples/libs/eventize.js",
           "three": "/examples/libs/three/build/three.module.js",
           "@spearwolf/three-display": "/three-display/build/three-display.js",
-          "@spearwolf/three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js"
+          "@spearwolf/vertex-objects": "/vertex-objects/build/vertex-objects.js"
         }
       }
     </script>
@@ -29,14 +29,14 @@
   <body>
     <section class="intro">
       <p>
-        three-vertex-objects.js<br />
+        vertex-objects.js<br />
         <em>please, open your console...</em>
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
     <script type="module">
       import {Color} from 'three';
-      import {VertexObjectPool} from '@spearwolf/three-vertex-objects';
+      import {VertexObjectPool} from '@spearwolf/vertex-objects';
       import {Display} from '@spearwolf/three-display';
 
       class Foo {

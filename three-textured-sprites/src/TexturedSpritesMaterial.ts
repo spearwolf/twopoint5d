@@ -1,4 +1,4 @@
-import {ShaderTool, unpick} from '@spearwolf/three-vertex-objects';
+import {ShaderTool, unpick} from '@spearwolf/vertex-objects';
 import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
 
 const vertexShader = `

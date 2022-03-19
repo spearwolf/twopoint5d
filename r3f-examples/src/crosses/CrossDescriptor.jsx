@@ -1,4 +1,4 @@
-import { getDescriptorOf } from "@spearwolf/three-vertex-objects";
+import { getDescriptorOf } from "@spearwolf/vertex-objects";
 import { Matrix4, Vector3 } from "three";
 
 class Cross {

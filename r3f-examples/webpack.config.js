@@ -12,7 +12,7 @@ module.exports = {
     // },
     libs: [
       "three",
-      "@spearwolf/three-vertex-objects",
+      "@spearwolf/vertex-objects",
       "@spearwolf/three-textured-sprites",
       "@spearwolf/three-stages",
       "@spearwolf/three-tiled-maps",

@@ -1,4 +1,4 @@
-# three-vertex-objects
+# vertex-objects
 
 ![creative-coding](https://img.shields.io/badge/creative-coding-red) ![game-dev](https://img.shields.io/badge/game-dev-green) ![demoOrDie](https://img.shields.io/badge/demo-or_die-blue)
 

@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-unresolved
-import {InstancedVertexObjectGeometry} from '@spearwolf/three-vertex-objects';
+import {InstancedVertexObjectGeometry} from '@spearwolf/vertex-objects';
 
 import {
   BaseSpriteDescriptor,

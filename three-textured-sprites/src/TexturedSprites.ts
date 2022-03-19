@@ -1,4 +1,4 @@
-import {VertexObjects} from '@spearwolf/three-vertex-objects';
+import {VertexObjects} from '@spearwolf/vertex-objects';
 import {Material} from 'three';
 
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry';

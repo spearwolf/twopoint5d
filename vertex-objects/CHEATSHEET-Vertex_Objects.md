@@ -1,4 +1,4 @@
-# @spearwolf/three-vertex-objects
+# @spearwolf/vertex-objects
 
 ## Vertex Objects
 

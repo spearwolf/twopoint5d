@@ -1,17 +1,17 @@
 {
-  "name": "@spearwolf/three-vertex-objects",
+  "name": "@spearwolf/vertex-objects",
   "version": "0.0.1",
-  "description": "three-vertex-objects",
-  "main": "build/three-vertex-objects.umd.js",
-  "module": "build/three-vertex-objects.js",
+  "description": "vertex-objects",
+  "main": "build/vertex-objects.umd.js",
+  "module": "build/vertex-objects.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/three-vertex-objects.js",
-    "require": "./build/three-vertex-objects.umd.js"
+    "import": "./build/vertex-objects.js",
+    "require": "./build/vertex-objects.umd.js"
   },
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "three-vertex-objects",
+    "outputName": "vertex-objects",
     "externals": [
       "three"
     ],
@@ -19,7 +19,7 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "threeVertexObjects",
+      "name": "vertexObjects",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",
@@ -50,8 +50,8 @@
     "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.umd.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
-    "analyze:js": "source-map-explorer build/three-vertex-objects.js",
-    "analyze:umd": "source-map-explorer build/three-vertex-objects.umd.js",
+    "analyze:js": "source-map-explorer build/vertex-objects.js",
+    "analyze:umd": "source-map-explorer build/vertex-objects.umd.js",
     "build": "run-s --silent build:js build:umd build:types",
     "clean": "rimraf -r build types",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",

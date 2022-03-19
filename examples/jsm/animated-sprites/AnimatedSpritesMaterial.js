@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import {DoubleSide, ShaderMaterial} from 'three';
 // eslint-disable-next-line import/no-unresolved
-import {ShaderTool} from '@spearwolf/three-vertex-objects';
+import {ShaderTool} from '@spearwolf/vertex-objects';
 
 const vertexShader = `
   attribute vec2 quadSize;

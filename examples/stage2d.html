@@ -26,7 +26,7 @@
         "imports": {
           "three": "/examples/libs/three/build/three.module.js",
           "@spearwolf/eventize": "/examples/libs/eventize.js",
-          "@spearwolf/three-vertex-objects": "/three-vertex-objects/build/three-vertex-objects.js",
+          "@spearwolf/vertex-objects": "/vertex-objects/build/vertex-objects.js",
           "@spearwolf/three-stages": "/three-stages/build/three-stages.js",
           "@spearwolf/three-display": "/three-display/build/three-display.js"
         }
@@ -36,11 +36,11 @@
   <body>
     <canvas id="canvas-container" resize-to="window"></canvas>
     <section class="intro">
-      <p>three-vertex-objects.js :: hello Stage2D<br /></p>
+      <p>vertex-objects.js :: hello Stage2D<br /></p>
     </section>
     <script type="module">
       import { Color, Sprite, SpriteMaterial, TextureLoader } from "three";
-      import { TextureFactory } from "@spearwolf/three-vertex-objects";
+      import { TextureFactory } from "@spearwolf/vertex-objects";
       import { Stage2D, ParallaxProjection } from "@spearwolf/three-stages";
       import { Display } from "@spearwolf/three-display";
 

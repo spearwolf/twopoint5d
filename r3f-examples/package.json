@@ -13,7 +13,7 @@
     "@spearwolf/three-stages": "workspace:*",
     "@spearwolf/three-textured-sprites": "workspace:*",
     "@spearwolf/three-tiled-maps": "workspace:*",
-    "@spearwolf/three-vertex-objects": "workspace:*",
+    "@spearwolf/vertex-objects": "workspace:*",
     "react": "17.0.2",
     "react-dom": "^17.0.2",
     "three": "^0.138.3"

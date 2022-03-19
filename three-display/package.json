@@ -15,7 +15,7 @@
     "externals": [
       "@spearwolf/eventize",
       "@spearwolf/three-stages",
-      "@spearwolf/three-vertex-objects",
+      "@spearwolf/vertex-objects",
       "three"
     ],
     "esm": {
@@ -27,7 +27,7 @@
       "globals": {
         "three": "THREE",
         "@spearwolf/eventize": "eventize",
-        "@spearwolf/three-vertex-objects": "threeVertexObjects",
+        "@spearwolf/vertex-objects": "vertexObjects",
         "@spearwolf/three-stages": "threeStages"
       }
     }
@@ -65,7 +65,7 @@
     "test": "cross-env NODE_ENV=test jest --passWithNoTests"
   },
   "peerDependencies": {
-    "@spearwolf/three-vertex-objects": "*",
+    "@spearwolf/vertex-objects": "*",
     "three": "^0.132.2"
   },
   "devDependencies": {
@@ -73,7 +73,7 @@
     "@rollup/plugin-node-resolve": "^13.1.3",
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.3.1",
-    "@spearwolf/three-vertex-objects": "workspace:*",
+    "@spearwolf/vertex-objects": "workspace:*",
     "@types/assert": "^1.5.6",
     "@types/jest": "^27.4.1",
     "@types/node": "^17.0.21",

@@ -18,7 +18,7 @@
       "@spearwolf/three-stages",
       "@spearwolf/three-textured-sprites",
       "@spearwolf/three-tiled-maps",
-      "@spearwolf/three-vertex-objects",
+      "@spearwolf/vertex-objects",
       "react-dom",
       "react",
       "three",
@@ -66,7 +66,7 @@
   "peerDependencies": {
     "@react-three/fiber": "^7.0.26",
     "@spearwolf/three-textured-sprites": "*",
-    "@spearwolf/three-vertex-objects": "*",
+    "@spearwolf/vertex-objects": "*",
     "react": "^17.0.2",
     "three": "^0.138.3",
     "use-asset": "^1.0.4"
@@ -79,7 +79,7 @@
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.3.1",
     "@spearwolf/three-textured-sprites": "workspace:*",
-    "@spearwolf/three-vertex-objects": "workspace:*",
+    "@spearwolf/vertex-objects": "workspace:*",
     "@testing-library/react": "^12.1.4",
     "@types/assert": "^1.5.6",
     "@types/jest": "^27.4.1",

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 export const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
-export const globalStylesID = `three-vertex-objects--${postFixID}`;
+export const globalStylesID = `vertex-objects--${postFixID}`;
 
 let sheet = null;
 

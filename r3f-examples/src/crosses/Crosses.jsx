@@ -2,7 +2,7 @@ import { extend } from "@react-three/fiber";
 import {
   VertexObjectGeometry,
   VertexObjects
-} from "@spearwolf/three-vertex-objects";
+} from "@spearwolf/vertex-objects";
 import { DoubleSide } from "three";
 import { CrossDescriptor } from "./CrossDescriptor";
 
