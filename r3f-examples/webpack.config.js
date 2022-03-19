@@ -16,7 +16,7 @@ module.exports = {
       "@spearwolf/three-textured-sprites",
       "@spearwolf/three-stages",
       "@spearwolf/three-tiled-maps",
-      "@spearwolf/r3f-kobold",
+      "@spearwolf/kobolde",
       "@react-three/fiber",
       "react-dom",
       "react",

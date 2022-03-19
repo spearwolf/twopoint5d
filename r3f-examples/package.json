@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@react-three/fiber": "^7.0.26",
-    "@spearwolf/r3f-kobold": "workspace:*",
+    "@spearwolf/kobolde": "workspace:*",
     "@spearwolf/three-stages": "workspace:*",
     "@spearwolf/three-textured-sprites": "workspace:*",
     "@spearwolf/three-tiled-maps": "workspace:*",

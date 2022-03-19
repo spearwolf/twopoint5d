@@ -1,18 +1,18 @@
 {
-  "name": "@spearwolf/r3f-kobold",
+  "name": "@spearwolf/kobolde",
   "version": "0.0.1",
   "description": "sprites library based on react-three-fiber",
-  "main": "build/r3f-kobold.cjs.js",
-  "module": "build/r3f-kobold.js",
+  "main": "build/kobolde.cjs.js",
+  "module": "build/kobolde.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/r3f-kobold.js",
-    "require": "./build/r3f-kobold.cjs.js"
+    "import": "./build/kobolde.js",
+    "require": "./build/kobolde.cjs.js"
   },
   "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "r3f-kobold",
+    "outputName": "kobolde",
     "externals": [
       "@react-three/fiber",
       "@spearwolf/three-stages",

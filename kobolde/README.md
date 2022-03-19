@@ -1,3 +1,3 @@
-# r3f-kobold
+# kobolde
 
 > *sprites* library based on react-three-fiber
