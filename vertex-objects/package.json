@@ -9,6 +9,7 @@
     "import": "./build/vertex-objects.js",
     "require": "./build/vertex-objects.umd.js"
   },
+  "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
     "outputName": "vertex-objects",
@@ -63,7 +64,7 @@
     "test": "cross-env NODE_ENV=test jest"
   },
   "peerDependencies": {
-    "three": "^0.132.2"
+    "three": "^0.138.3"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.2",

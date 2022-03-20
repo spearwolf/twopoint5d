@@ -7,6 +7,7 @@
 
     "declaration": true,
     "declarationDir": "build/types",
+    "skipLibCheck": true,
 
     "noEmitOnError": true,
     "noErrorTruncation": true,
@@ -18,7 +19,6 @@
     "isolatedModules": true,
     "allowJs": false,
     "jsx": "react-jsx",
-    "skipLibCheck": true,
 
     "strict": true,
     "strictNullChecks": false,

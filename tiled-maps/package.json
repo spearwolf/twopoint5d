@@ -9,6 +9,7 @@
     "import": "./build/tiled-maps.js",
     "require": "./build/tiled-maps.umd.js"
   },
+  "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
     "outputName": "tiled-maps",
@@ -68,7 +69,7 @@
   },
   "peerDependencies": {
     "@spearwolf/vertex-objects": "*",
-    "three": "^0.132.2"
+    "three": "^0.138.3"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.2",

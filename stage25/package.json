@@ -9,6 +9,7 @@
     "import": "./build/stage25.js",
     "require": "./build/stage25.umd.js"
   },
+  "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
     "outputName": "stage25",
@@ -68,7 +69,7 @@
   },
   "peerDependencies": {
     "@spearwolf/vertex-objects": "*",
-    "three": "^0.132.2"
+    "three": "^0.138.3"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.2",

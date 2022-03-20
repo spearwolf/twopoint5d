@@ -84,7 +84,7 @@
     "@types/assert": "^1.5.6",
     "@types/jest": "^27.4.1",
     "@types/node": "^17.0.21",
-    "@types/react": "^17.0.40",
+    "@types/react": "^17.0.41",
     "@types/react-reconciler": "^0.26.4",
     "@types/sinon": "^10.0.11",
     "@types/three": "^0.138.0",

@@ -9,6 +9,7 @@
     "import": "./build/display3.js",
     "require": "./build/display3.umd.js"
   },
+  "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
     "outputName": "display3",
@@ -66,7 +67,7 @@
   },
   "peerDependencies": {
     "@spearwolf/vertex-objects": "*",
-    "three": "^0.132.2"
+    "three": "^0.138.3"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.2",
