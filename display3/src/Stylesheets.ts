@@ -1,5 +1,5 @@
 export const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
-export const globalStylesID = `three-display--${postFixID}`;
+export const globalStylesID = `display3--${postFixID}`;
 
 let sheet: CSSStyleSheet = null;
 

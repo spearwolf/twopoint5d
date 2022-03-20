@@ -1,5 +1,5 @@
 ```js
-import {Display} from '@spearwolf/three-display';
+import {Display} from '@spearwolf/display3';
 ```
 
 ## State and Events

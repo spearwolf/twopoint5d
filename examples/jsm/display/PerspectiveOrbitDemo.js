@@ -1,4 +1,4 @@
-import { Display } from "@spearwolf/three-display";
+import { Display } from "@spearwolf/display3";
 import { Priority } from "@spearwolf/eventize";
 import { Color, PerspectiveCamera, Scene } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";

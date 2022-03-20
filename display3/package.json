@@ -1,17 +1,17 @@
 {
-  "name": "@spearwolf/three-display",
+  "name": "@spearwolf/display3",
   "version": "0.0.1",
   "description": "a display for your three.js app",
-  "main": "build/three-display.umd.js",
-  "module": "build/three-display.js",
+  "main": "build/display3.umd.js",
+  "module": "build/display3.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/three-display.js",
-    "require": "./build/three-display.umd.js"
+    "import": "./build/display3.js",
+    "require": "./build/display3.umd.js"
   },
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "three-display",
+    "outputName": "display3",
     "externals": [
       "@spearwolf/eventize",
       "@spearwolf/stage25",
@@ -22,7 +22,7 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "threeDisplay",
+      "name": "display3",
       "buildName": "umd",
       "globals": {
         "three": "THREE",
