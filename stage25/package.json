@@ -1,17 +1,17 @@
 {
-  "name": "@spearwolf/three-stages",
+  "name": "@spearwolf/stage25",
   "version": "0.0.1",
   "description": "2d stages and projections for three.js",
-  "main": "build/three-stages.umd.js",
-  "module": "build/three-stages.js",
+  "main": "build/stage25.umd.js",
+  "module": "build/stage25.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/three-stages.js",
-    "require": "./build/three-stages.umd.js"
+    "import": "./build/stage25.js",
+    "require": "./build/stage25.umd.js"
   },
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "three-stages",
+    "outputName": "stage25",
     "externals": [
       "@spearwolf/textured-sprites",
       "@spearwolf/three-tiled-maps",
@@ -22,7 +22,7 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "threeStages",
+      "name": "stage25",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",

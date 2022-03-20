@@ -15,7 +15,7 @@
     "outputName": "kobolde",
     "externals": [
       "@react-three/fiber",
-      "@spearwolf/three-stages",
+      "@spearwolf/stage25",
       "@spearwolf/textured-sprites",
       "@spearwolf/three-tiled-maps",
       "@spearwolf/vertex-objects",

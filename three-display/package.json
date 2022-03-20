@@ -14,7 +14,7 @@
     "outputName": "three-display",
     "externals": [
       "@spearwolf/eventize",
-      "@spearwolf/three-stages",
+      "@spearwolf/stage25",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -28,7 +28,7 @@
         "three": "THREE",
         "@spearwolf/eventize": "eventize",
         "@spearwolf/vertex-objects": "vertexObjects",
-        "@spearwolf/three-stages": "threeStages"
+        "@spearwolf/stage25": "stage25"
       }
     }
   },
