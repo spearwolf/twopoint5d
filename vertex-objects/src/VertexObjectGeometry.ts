@@ -23,6 +23,11 @@ export class VertexObjectGeometry extends BufferGeometry {
     initializeAttributes(this, this.pool, this.buffers);
   }
 
+  dispose(): void {
+    this.pool.clear();
+    super.dispose();
+  }
+
   touchAttributes(...attrNames: string[]): void {
     selectAttributes(this.pool, this.buffers, attrNames).forEach((buffer) => {
       buffer.needsUpdate = true;

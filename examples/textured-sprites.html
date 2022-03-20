@@ -96,10 +96,6 @@
           this.initalSpriteCount = initalSpriteCount;
         }
 
-        dispose() {
-          // TODO this.spriteGroup.voPool.free(this.sprites);
-        }
-
         createSprites(count = this.initalSpriteCount, frameId = undefined) {
           const [halfWidth, halfHeight] = [
             this.containerWidth / 2,

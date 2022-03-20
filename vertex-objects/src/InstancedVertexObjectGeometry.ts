@@ -55,6 +55,12 @@ export class InstancedVertexObjectGeometry<
     initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers);
   }
 
+  dispose(): void {
+    this.basePool?.clear();
+    this.instancedPool.clear();
+    super.dispose();
+  }
+
   touchAttributes(...attrNames: string[]): void {
     if (this.basePool) {
       selectAttributes(this.basePool, this.baseBuffers, attrNames).forEach((buffer) => {
