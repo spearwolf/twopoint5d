@@ -1,23 +1,27 @@
-This repository contains the implementation of **vertex-objects**, which on the one hand contains the main library (&rarr; [vertex-objects](./vertex-objects/)), but also some specialized companion libraries, as well as tests and examples.
+# three-vertex-objects
 
-_three-vertex-objects_ is the next iteration (in an evolutionary sense) of the [picimo](https://github.com/spearwolf/picimo) library, freeing itself from the corners and edges that have grown over time.
-
-This repository is structured as a monorepo; based on [yarn workspaces](https://yarnpkg.com/features/workspaces).
+...
 
 ## What is included
 
-| library | description |
-|-|-|
-| [three&#x2011;vertex&#x2011;objects](./vertex-objects/) | the main library which provides an api for the definition and management of [vertex objects](./ThinkTank.md) based on [three.js](https://threejs.org/) |
-| [three&#x2011;tiled&#x2011;maps](./tiled-maps/) | a library that builds on the concept of [vertex objects](./ThinkTank.md) an api for rendering [2D maps](./tiled-maps/src/README.md) (very experimental and not in a finalized state &mdash; still in progress) |
-| [three&#x2011;stages](./stage25/) | _stages_ and responsive design aware _projections_ help you to deal with viewport dimensions and cameras |
+| package | status |  description |
+|-|-|-|
+| [@spearwolf/vertex&#x2011;objects](./packages/vertex-objects/) | :heavy_check_mark: _READY FOR USE_ | describe, create and render [three.js &rarr; buffer geometries](https://threejs.org/) containing lots of instances of _sprites_. render at light speed (just one _webgl draw call_ per _sprite group_) and manage your sprites with your own _object based_ api |
+| [@spearwolf/tiled&#x2011;maps](./packages/tiled-maps/) | :warning: :hammer_and_pick: *WORK IN PROGRESS* | create and render _2d-maps_ (with _vertex-objects_) that are laid out in a 2d spatial grid map data structure |
+| [@spearwolf/display3](./packages/display3/) | :heavy_check_mark: _READY FOR USE_ | cosy boilerplate for creating a _three.js canvas_ and dealing with the _init_, _resize_ and _frame_ event loop. nice starting point for your _three.js_ demos, there is no other dependency than the _three.js_ package itself |
+| [@spearwolf/stage25](./packages/stage25/) | :heavy_check_mark: _READY FOR USE_ | ... |
+| [@spearwolf/textured&#x2011;sprites](./packages/textured-sprites/)| :heavy_check_mark: *READY FOR USE :rocket: NEW FEATURES ON THE WAY* | ... |
+| [@spearwolf/kobolde](./packages/kobolde/) | :warning: :hammer_and_pick: *WORK IN PROGRESS* :rocket: *NEW FEATURES ON THE WAY* | ... |
 
 | API usage examples | description |
 |-|-|
-| [`examples`](./examples/) | simple code examples for usage of [vertex-objects](./vertex-objects/) and companion libraries. just plain and native javascript here, no complicated build setup is needed (instead browser native [import-maps](https://caniuse.com/import-maps) are used) |
+| [examples](./examples/) | ... |
+| [r3f&#x2011;examples](./r3f-examples/) | ... |
 
 
 ## Getting started
+
+this repository is structured as a monorepo; based on [yarn workspaces](https://yarnpkg.com/features/workspaces)
 
 ### 1. Install dependencies
 
@@ -30,16 +34,8 @@ $ yarn
 ### 2. Build and test everything
 
 ```sh
-$ yarn build
-$ yarn test
+$ yarn cbt  # => yarn clean && yarn build && yarn test
 ```
-
-there is also a shortcut for `clean` &rarr; `build` &rarr; `test`
-
-```sh
-$ yarn cbt
-```
-
 
 ### 3. Run examples
 

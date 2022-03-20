@@ -1,21 +1,21 @@
 {
-  "name": "@spearwolf/textured-sprites",
+  "name": "@spearwolf/tiled-maps",
   "version": "0.0.1",
-  "description": "textured 2d sprites for three.js",
-  "main": "build/textured-sprites.umd.js",
-  "module": "build/textured-sprites.js",
+  "description": "tiled maps renderer framework based upon three.js and vertex-objects",
+  "main": "build/tiled-maps.umd.js",
+  "module": "build/tiled-maps.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/textured-sprites.js",
-    "require": "./build/textured-sprites.umd.js"
+    "import": "./build/tiled-maps.js",
+    "require": "./build/tiled-maps.umd.js"
   },
   "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "textured-sprites",
+    "outputName": "tiled-maps",
     "externals": [
       "@spearwolf/stage25",
-      "@spearwolf/tiled-maps",
+      "@spearwolf/textured-sprites",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -23,14 +23,14 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "texturedSprites",
+      "name": "tiledMaps",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",
         "three": "THREE",
         "@spearwolf/vertex-objects": "vertexObjects",
         "@spearwolf/stage25": "stage25",
-        "@spearwolf/tiled-maps": "tiledMaps"
+        "@spearwolf/textured-sprites": "texturedSprites"
       }
     }
   },
@@ -51,10 +51,10 @@
     "url": "https://www.spearwolf.de"
   },
   "scripts": {
-    "build:js": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.esm.js",
-    "watch:js": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.esm.js",
-    "build:umd": "cross-env NODE_ENV=production rollup -c ../shared-rollup-build/rollup.config.umd.js",
-    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../shared-rollup-build/rollup.config.umd.js",
+    "build:js": "cross-env NODE_ENV=production rollup -c ../../shared-rollup-build/rollup.config.esm.js",
+    "watch:js": "cross-env NODE_ENV=production rollup -w -c ../../shared-rollup-build/rollup.config.esm.js",
+    "build:umd": "cross-env NODE_ENV=production rollup -c ../../shared-rollup-build/rollup.config.umd.js",
+    "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../../shared-rollup-build/rollup.config.umd.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "build": "run-s --silent build:js build:umd build:types",
@@ -63,8 +63,9 @@
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
-    "fix": "run-s --silent --print-label prettier:write eslint:fix",
-    "test": "cross-env NODE_ENV=test jest --passWithNoTests"
+    "fix": "run-s --silent --print-label eslint:fix prettier:write",
+    "docs": "yarn typedoc",
+    "test": "cross-env NODE_ENV=test jest"
   },
   "peerDependencies": {
     "@spearwolf/vertex-objects": "*",
