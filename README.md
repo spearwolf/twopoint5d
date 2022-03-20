@@ -7,11 +7,11 @@
 | package | status |  description |
 |-|-|-|
 | [@spearwolf/vertex&#x2011;objects](./packages/vertex-objects/) | :heavy_check_mark:&#x202f;_READY&#x202f;FOR&#x202f;USE_ | describe, create and render [three.js &rarr; buffer geometries](https://threejs.org/) containing lots of instances of _sprites_. render at light speed (just one _webgl draw call_ per _sprite group_) and manage your sprites with your own _object based_ api |
-| [@spearwolf/tiled&#x2011;maps](./packages/tiled-maps/) | :warning:&#x202f;:hammer_and_pick:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* | create and render _2d-maps_ (with _vertex-objects_) that are laid out in a 2d spatial grid map data structure |
+| [@spearwolf/tiled&#x2011;maps](./packages/tiled-maps/) | :warning:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* | create and render _2d-maps_ (with _vertex-objects_) that are laid out in a 2d spatial grid map data structure |
 | [@spearwolf/display3](./packages/display3/) | :heavy_check_mark:&#x202f;_READY&#x202f;FOR&#x202f;USE_ | cosy boilerplate for creating a _three.js canvas_ and dealing with the _init_, _resize_ and _frame_ event loop. nice starting point for your _three.js_ demos, there is no other dependency than the _three.js_ package itself |
 | [@spearwolf/stage25](./packages/stage25/) | :heavy_check_mark:&#x202f;_READY&#x202f;FOR&#x202f;USE_ | ... |
 | [@spearwolf/textured&#x2011;sprites](./packages/textured-sprites/)| :heavy_check_mark:&#x202f;*READY&#x202f;FOR&#x202f;USE :rocket:&#x202f;NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
-| [@spearwolf/kobolde](./packages/kobolde/) | :warning:&#x202f;:hammer_and_pick:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* :rocket:&#x202f;*NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
+| [@spearwolf/kobolde](./packages/kobolde/) | :warning:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* :rocket:&#x202f;*NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
 
 | API usage examples | description |
 |-|-|
