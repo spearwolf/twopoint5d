@@ -17,7 +17,7 @@
       "@react-three/fiber",
       "@spearwolf/stage25",
       "@spearwolf/textured-sprites",
-      "@spearwolf/three-tiled-maps",
+      "@spearwolf/tiled-maps",
       "@spearwolf/vertex-objects",
       "react-dom",
       "react",

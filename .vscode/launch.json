@@ -7,7 +7,7 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "three-tiled-maps: jest run current",
+      "name": "tiled-maps: jest run current",
       "skipFiles": ["<node_internals>/**"],
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
@@ -17,9 +17,9 @@
       "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
       "args": [
         "--rootDir",
-        "${workspaceFolder}/three-tiled-maps/",
+        "${workspaceFolder}/tiled-maps/",
         "--config",
-        "three-tiled-maps/jest.config.ts",
+        "tiled-maps/jest.config.ts",
         "--runInBand",
         "--no-cache",
         "--verbose",

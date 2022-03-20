@@ -2472,9 +2472,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@spearwolf/three-tiled-maps@workspace:*, @spearwolf/three-tiled-maps@workspace:three-tiled-maps":
+"@spearwolf/tiled-maps@workspace:*, @spearwolf/tiled-maps@workspace:tiled-maps":
   version: 0.0.0-use.local
-  resolution: "@spearwolf/three-tiled-maps@workspace:three-tiled-maps"
+  resolution: "@spearwolf/tiled-maps@workspace:tiled-maps"
   dependencies:
     "@rollup/plugin-commonjs": ^21.0.2
     "@rollup/plugin-node-resolve": ^13.1.3
@@ -10409,7 +10409,7 @@ fsevents@^1.2.7:
     "@spearwolf/kobolde": "workspace:*"
     "@spearwolf/stage25": "workspace:*"
     "@spearwolf/textured-sprites": "workspace:*"
-    "@spearwolf/three-tiled-maps": "workspace:*"
+    "@spearwolf/tiled-maps": "workspace:*"
     "@spearwolf/vertex-objects": "workspace:*"
     babel-loader: ^8.2.3
     eslint: ^8.11.0

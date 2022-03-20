@@ -2,7 +2,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
   TileSprites,
-} from "@spearwolf/three-tiled-maps";
+} from "@spearwolf/tiled-maps";
 
 export class BasicLayerTilesRenderer {
   constructor(tilesData, tileSet, texture, capacity = 1000) {

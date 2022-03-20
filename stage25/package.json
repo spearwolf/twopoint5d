@@ -14,7 +14,7 @@
     "outputName": "stage25",
     "externals": [
       "@spearwolf/textured-sprites",
-      "@spearwolf/three-tiled-maps",
+      "@spearwolf/tiled-maps",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -29,7 +29,7 @@
         "three": "THREE",
         "@spearwolf/vertex-objects": "vertexObjects",
         "@spearwolf/textured-sprites": "texturedSprites",
-        "@spearwolf/three-tiled-maps": "threeTiledMaps"
+        "@spearwolf/tiled-maps": "tiledMaps"
       }
     }
   },

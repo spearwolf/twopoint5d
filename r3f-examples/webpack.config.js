@@ -15,7 +15,7 @@ module.exports = {
       "@spearwolf/vertex-objects",
       "@spearwolf/textured-sprites",
       "@spearwolf/stage25",
-      "@spearwolf/three-tiled-maps",
+      "@spearwolf/tiled-maps",
       "@spearwolf/kobolde",
       "@react-three/fiber",
       "react-dom",

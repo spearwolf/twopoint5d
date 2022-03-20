@@ -1,17 +1,17 @@
 {
-  "name": "@spearwolf/three-tiled-maps",
+  "name": "@spearwolf/tiled-maps",
   "version": "0.0.1",
   "description": "tiled maps renderer framework based upon three.js and vertex-objects",
-  "main": "build/three-tiled-maps.umd.js",
-  "module": "build/three-tiled-maps.js",
+  "main": "build/tiled-maps.umd.js",
+  "module": "build/tiled-maps.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/three-tiled-maps.js",
-    "require": "./build/three-tiled-maps.umd.js"
+    "import": "./build/tiled-maps.js",
+    "require": "./build/tiled-maps.umd.js"
   },
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "three-tiled-maps",
+    "outputName": "tiled-maps",
     "externals": [
       "@spearwolf/stage25",
       "@spearwolf/textured-sprites",
@@ -22,7 +22,7 @@
       "buildName": "es2017"
     },
     "umd": {
-      "name": "threeTiledMaps",
+      "name": "tiledMaps",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",
