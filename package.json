@@ -48,7 +48,7 @@
     "fix": "run-p fix:vertex-objects fix:tiled-maps fix:stage25 fix:textured-sprites fix:display3 fix:kobolde",
     "cbt": "run-s clean build test",
     "r3f-examples": "cd r3f-examples && yarn start",
-    "start": "servor . examples/tiled-maps-basic-layer-tiles-renderer.html ---reload --browse"
+    "start": "servor . ./examples/vanilla/tiled-maps-basic-layer-tiles-renderer.html ---reload --browse"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",

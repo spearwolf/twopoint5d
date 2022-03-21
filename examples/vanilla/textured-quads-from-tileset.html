@@ -11,8 +11,8 @@
         background-color: #391e39;
         background: radial-gradient(
           circle,
-          rgba(189, 70, 98, 1) 0%,
-          rgba(37, 4, 73, 1) 100%
+          rgb(82 95 132) 0%,
+          rgb(149 188 199) 100%
         );
         color: #eee;
         font-family: sans-serif;
@@ -34,17 +34,34 @@
         right: 20px;
         box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
       }
+      .tileset-image-title {
+        font-size: 13px;
+        text-shadow: 1px 1px #000;
+        display: none;
+      }
+      #texture-preview:hover > .tileset-image-title {
+        display: block;
+      }
       #texture-preview > canvas,
       #texture-preview > img {
         width: 100%;
+      }
+      #texture-preview:hover > canvas,
+      #texture-preview:hover > img {
+        box-shadow: 0 0 0 1px #fff, 0 0 10px rgba(255 255 255 / 80%);
+      }
+      #texture-preview > header {
+        position: absolute;
+        bottom: calc(100% - 4px);
+        left: 0;
       }
     </style>
     <script type="importmap">
       {
         "imports": {
-          "@spearwolf/eventize": "/examples/libs/eventize.js",
-          "three": "/examples/libs/three/build/three.module.js",
-          "three/examples/jsm/controls/OrbitControls.js": "/examples/libs/three/examples/jsm/controls/OrbitControls.js",
+          "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
+          "three": "/examples/vanilla/libs/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
           "@spearwolf/display3": "/packages/display3/build/display3.js",
           "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js"
         }
@@ -58,19 +75,11 @@
       varying vec2 vTexCoords;
 
       void main() {
-        vec4 pos = vec4(
-          position.x * quadSize.x + instancePosition.x,
-          position.y * quadSize.y + instancePosition.y,
-          position.z + instancePosition.z,
-          1.0
-        );
+        vec3 vertexPosition = position * vec3(quadSize.xy, 0.0) + instancePosition;
 
-        gl_Position = projectionMatrix * modelViewMatrix * pos;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition, 1.0);
 
-        vTexCoords = vec2(
-          texCoords.x + (uv.x * texCoords.z),
-          texCoords.y + (uv.y * texCoords.w)
-        );
+        vTexCoords = texCoords.xy + (uv * texCoords.zw);
       }
     </script>
     <script id="fragmentShader" type="x-shader/x-fragment">
@@ -88,15 +97,17 @@
   <body>
     <section class="intro">
       <p>
-        vertex-objects.js :: textured-quads<br />
+        vertex-objects.js :: textured-quads-from-tileset<br />
         <em
           >an <code>InstancedVertexObjectGeometry</code> &amp;
-          <code>TextureImageLoader</code> example</em
+          <code>TileSetLoader</code> example</em
         >
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
-    <div id="texture-preview"></div>
+    <div id="texture-preview">
+      <header class="tileset-image-title">tileset image</header>
+    </div>
     <script type="module">
       import {
         Color,
@@ -113,14 +124,15 @@
       import {
         getDescriptorOf,
         InstancedVertexObjectGeometry,
-        TextureImageLoader,
+        TextureFactory,
+        TileSetLoader,
         VertexObjectGeometry,
         VertexObjects,
       } from "@spearwolf/vertex-objects";
-      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
-      import { InstancedQuadsGeometry } from "/examples/jsm/instanced-quads/InstancedQuadsGeometry.js";
+      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
+      import { InstancedQuadsGeometry } from "/examples/vanilla/jsm/instanced-quads/InstancedQuadsGeometry.js";
 
-      function makeMesh(rows, columns, size, offset, texCoords, texture) {
+      function makeMesh(rows, columns, size, offset, tileset, texture) {
         const capacity = rows * columns;
         const geometry = new InstancedQuadsGeometry(capacity);
 
@@ -135,6 +147,7 @@
               x * size * offset - ((columns - 1) * size * offset) / 2,
               y * size * offset - ((rows - 1) * size * offset) / 2,
             ]);
+            const texCoords = tileset.atlas.randomFrame().coords;
             quad.setTexCoords([
               texCoords.s,
               texCoords.t,
@@ -168,23 +181,28 @@
         { antialias: false }
       );
 
-      const { imgEl, texture, texCoords } =
-        await new TextureImageLoader().loadAsync(
-          "/examples/assets/ball-pattern-rot--not-power-of-2.png",
-          ["nearest"]
-        );
+      const tilesetLoader = new TileSetLoader(new TextureFactory());
 
-      console.log("loaded texture-image", { imgEl, texCoords, texture });
+      tilesetLoader.load(
+        "/examples/assets/nobinger-anim-sheet.png",
+        { tileWidth: 64, tileHeight: 64, margin: 1 },
+        (data) => {
+          console.log("loaded tileset", data);
 
-      document.getElementById("texture-preview").appendChild(imgEl);
+          document.getElementById("texture-preview").appendChild(data.imgEl);
+          document.querySelector(
+            ".tileset-image-title"
+          ).textContent = `tileset (${data.imgEl.width}x${data.imgEl.height})`;
 
-      demo.on("init", ({ scene }) => {
-        scene.add(makeMesh(16, 32, 3.5, 1, texCoords, texture));
-      });
+          demo.on("init", ({ scene }) => {
+            scene.add(makeMesh(16, 32, 3.5, 1, data.tileSet, data.texture));
+          });
 
-      demo.start();
+          demo.start();
 
-      console.log("TexturedQuadsMesh", demo.scene.children[0]);
+          console.log("TexturedQuadsMesh", demo.scene.children[0]);
+        }
+      );
     </script>
   </body>
 </html>

@@ -34,9 +34,9 @@
     <script type="importmap">
       {
         "imports": {
-          "@spearwolf/eventize": "/examples/libs/eventize.js",
-          "three": "/examples/libs/three/build/three.module.js",
-          "three/examples/jsm/controls/OrbitControls.js": "/examples/libs/three/examples/jsm/controls/OrbitControls.js",
+          "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
+          "three": "/examples/vanilla/libs/three/build/three.module.js",
+          "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
           "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
           "@spearwolf/display3": "/packages/display3/build/display3.js",
           "@spearwolf/tiled-maps": "/packages/tiled-maps/build/tiled-maps.js"
@@ -62,9 +62,9 @@
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import { TextureFactory, TileSetLoader } from "@spearwolf/vertex-objects";
       import { RepeatingTilesProvider, Map2dLayer } from "@spearwolf/tiled-maps";
-      import { PerspectiveOrbitDemo } from "/examples/jsm/display/PerspectiveOrbitDemo.js";
-      import { BasicLayerTilesRenderer } from "/examples/jsm/tiled-maps/BasicLayerTilesRenderer.js";
-      import { makePoints } from "/examples/jsm/utils/makePoints.js";
+      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
+      import { BasicLayerTilesRenderer } from "/examples/vanilla/jsm/tiled-maps/BasicLayerTilesRenderer.js";
+      import { makePoints } from "/examples/vanilla/jsm/utils/makePoints.js";
 
       const demo = new PerspectiveOrbitDemo(
         document.getElementById("canvas-container"),
