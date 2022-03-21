@@ -10408,9 +10408,9 @@ fsevents@^1.2.7:
   languageName: node
   linkType: hard
 
-"r3f-examples@workspace:r3f-examples":
+"r3f@workspace:examples/r3f":
   version: 0.0.0-use.local
-  resolution: "r3f-examples@workspace:r3f-examples"
+  resolution: "r3f@workspace:examples/r3f"
   dependencies:
     "@babel/core": ^7.17.8
     "@babel/eslint-parser": ^7.17.0

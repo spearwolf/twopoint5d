@@ -15,8 +15,8 @@
 
 | API usage examples | description |
 |-|-|
-| [examples](./examples/) | ... |
-| [r3f&#x2011;examples](./r3f-examples/) | ... |
+| [examples/vanilla](./examples/vanilla/) | vanilla js examples (no build step required) |
+| [examples/r3f](./examples/r3f/) | [@react-three/fiber](https://github.com/pmndrs/react-three-fiber) based examples; all the goodness of *react*, *three.js* and *vertex-objects* together :rocket: |
 
 
 ## Getting started

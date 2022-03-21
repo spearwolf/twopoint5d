@@ -1,5 +1,5 @@
 {
-  "name": "r3f-examples",
+  "name": "r3f",
   "scripts": {
     "start": "webpack serve --mode development",
     "build": "webpack build --mode production",
