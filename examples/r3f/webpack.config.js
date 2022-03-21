@@ -1,3 +1,4 @@
+/* eslint-env node */
 const path = require("path");
 
 module.exports = {
@@ -6,11 +7,12 @@ module.exports = {
       import: "./src/crosses/index.jsx",
       dependOn: "libs",
     },
-    // ["tiled-maps-basic-layer-tiles-renderer"]: {
-    //   import: "./src/tiled-maps-basic-layer-tiles-renderer/index.jsx",
-    //   dependOn: "libs",
-    // },
+    "textured-sprites": {
+      import: "./src/textured-sprites/index.jsx",
+      dependOn: "libs",
+    },
     libs: [
+      "regenerator-runtime/runtime",
       "three",
       "@spearwolf/vertex-objects",
       "@spearwolf/textured-sprites",
@@ -36,9 +38,12 @@ module.exports = {
   },
   output: {
     path: path.resolve(__dirname, "./public"),
-    filename: "bundle-[name].js",
+    filename: "[name].js",
   },
   devServer: {
-    static: path.resolve(__dirname, "./public"),
+    static: [
+      path.resolve(__dirname, "./public"),
+      path.resolve(__dirname, "../.."),
+    ],
   },
 };

@@ -17,9 +17,9 @@
       "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
       "args": [
         "--rootDir",
-        "${workspaceFolder}/tiled-maps/",
+        "${workspaceFolder}/packages/tiled-maps/",
         "--config",
-        "tiled-maps/jest.config.ts",
+        "packages/tiled-maps/jest.config.ts",
         "--runInBand",
         "--no-cache",
         "--verbose",
