@@ -18,14 +18,15 @@ export class BouncingSprites {
     this.spriteSize = spriteSize;
   }
 
-  init({ geometry, tileSet, capacity, mesh }) {
-    console.log("BouncingSprites.init", this, mesh);
+  init({ geometry, atlas, capacity }) {
+    console.log("BouncingSprites.init()", this);
 
     this.spritePool = geometry.instancedPool;
-    this.textureAtlas = tileSet.atlas;
+    this.textureAtlas = atlas;
     this.initalSpriteCount = capacity;
 
     this.createSprites();
+    geometry.touch({ static: true });
   }
 
   createSprites(count = this.initalSpriteCount, frameId = undefined) {

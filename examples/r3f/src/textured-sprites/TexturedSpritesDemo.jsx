@@ -13,9 +13,8 @@ extend({ TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial });
 
 export const TexturedSpritesDemo = ({ capacity }) => {
   const geometry = useRef();
-  const mesh = useRef();
 
-  const [bouncingSprites] = useState(new BouncingSprites());
+  const [bouncingSprites] = useState(new BouncingSprites(150, 75, 5));
 
   const { tileSet, texture } = useTileSet(
     "/examples/assets/nobinger-anim-sheet.png",
@@ -28,24 +27,21 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   useFrameStateMachine(bouncingSprites, {
     geometry: forwardRefValue(geometry),
-    mesh: forwardRefValue(mesh),
-    tileSet,
+    atlas: tileSet?.atlas,
     capacity,
   });
 
   return (
-    <texturedSprites ref={mesh}>
+    <texturedSprites>
       <texturedSpritesGeometry
         args={[capacity]}
         ref={geometry}
       ></texturedSpritesGeometry>
-      {texture && (
-        <texturedSpritesMaterial
-          colorMap={texture}
-          depthTest={false}
-          depthWrite={false}
-        ></texturedSpritesMaterial>
-      )}
+      <texturedSpritesMaterial
+        colorMap={texture}
+        depthTest={false}
+        depthWrite={false}
+      ></texturedSpritesMaterial>
     </texturedSprites>
   );
 };

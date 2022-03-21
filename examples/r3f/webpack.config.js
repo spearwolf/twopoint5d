@@ -41,9 +41,14 @@ module.exports = {
     filename: "[name].js",
   },
   devServer: {
+    liveReload: true,
+    hot: false,
     static: [
       path.resolve(__dirname, "./public"),
-      path.resolve(__dirname, "../.."),
+      {
+        directory: path.resolve(__dirname, "../../examples/assets"),
+        publicPath: "/examples/assets",
+      },
     ],
   },
 };
