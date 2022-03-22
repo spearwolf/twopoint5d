@@ -4,26 +4,23 @@ import {
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
   useFrameStateMachine,
+  useTextureAtlas,
 } from "@spearwolf/kobolde";
 import { useRef } from "react";
 import { BouncingSprites } from "./BouncingSprites";
-import { useTileSet } from "./useTileSet";
 
 export const TexturedSpritesDemo = ({ capacity }) => {
-  const { tileSet, texture } = useTileSet(
-    "/examples/assets/nobinger-anim-sheet.png",
-    {
-      tileHeight: 64,
-      tileWidth: 64,
-      margin: 1,
-    }
+  const { texture, atlas } = useTextureAtlas(
+    "/examples/assets/lab-walls-tiles.json",
+    ["nearest"],
+    { overrideImageUrl: "/examples/assets/lab-walls-tiles.png" }
   );
 
   const geometry = useRef();
 
   useFrameStateMachine(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
-    atlas: tileSet?.atlas,
+    atlas,
     capacity,
   });
 

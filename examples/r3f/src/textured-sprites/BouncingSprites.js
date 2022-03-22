@@ -1,3 +1,4 @@
+const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export class BouncingSprites {
   gravity = -45;
   startSpeedX = 20;
@@ -11,6 +12,7 @@ export class BouncingSprites {
   speedRotateFactor = 1;
 
   sprites = [];
+  frames = undefined;
 
   constructor(width = 100, height = 75, spriteSize = 7) {
     this.containerWidth = width;
@@ -25,13 +27,17 @@ export class BouncingSprites {
     this.textureAtlas = atlas;
     this.initalSpriteCount = capacity;
 
+    this.frames = atlas
+      .frameNames(/numbers32/)
+      .map((name) => atlas.frame(name));
+
     this.createSprites();
     geometry.touch({ static: true });
 
     console.log("bouncingSprites.init()", this);
   }
 
-  createSprites(count = this.initalSpriteCount, frameId = undefined) {
+  createSprites(count = this.initalSpriteCount) {
     const [halfWidth, halfHeight] = [
       this.containerWidth / 2,
       this.containerHeight / 2,
@@ -48,9 +54,7 @@ export class BouncingSprites {
       );
 
       sprite.setFrame(
-        frameId != null
-          ? this.textureAtlas.get(frameId)
-          : this.textureAtlas.randomFrame()
+        this.frames ? sample(this.frames) : this.textureAtlas.randomFrame()
       );
 
       sprite.speedX = Math.random() * this.startSpeedX + this.startSpeedBaseX;

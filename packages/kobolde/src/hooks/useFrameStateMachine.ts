@@ -58,9 +58,10 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   const [isInitialized, setIsInitialized] = useState(false);
 
   useLayoutEffect((): void => {
-    callbacksRef.current = callbacks;
     if (isInitialized && !isLazyCallbacks(callbacks)) {
       stateMachineRef.current = callbacks;
+    } else {
+      callbacksRef.current = callbacks;
     }
   }, [callbacks, isInitialized]);
 

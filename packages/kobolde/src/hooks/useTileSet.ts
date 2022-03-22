@@ -1,8 +1,18 @@
-import { TileSetLoader } from "@spearwolf/vertex-objects";
-import { useEffect, useState } from "react";
+import {TileSetData, TileSetLoader} from '@spearwolf/vertex-objects';
+import {useState} from 'react';
+import {useAsyncEffect} from './useAsyncEffect';
 
-export const useTileSet = (tileSetUrl, options) => {
-  const [tileSetData, setTileSetData] = useState({});
+export interface UseTileSetParams {
+  tileWidth?: number;
+  tileHeight?: number;
+  margin?: number;
+  spacing?: number;
+  padding?: number;
+  tileCount?: number;
+}
+
+export const useTileSet = (tileSetUrl: string, options?: UseTileSetParams): Partial<TileSetData> => {
+  const [tileSetData, setTileSetData] = useState<Partial<TileSetData>>({});
 
   const tileWidth = options?.tileWidth;
   const tileHeight = options?.tileHeight;
@@ -11,8 +21,9 @@ export const useTileSet = (tileSetUrl, options) => {
   const padding = options?.padding;
   const tileCount = options?.tileCount;
 
-  useEffect(async () => {
+  useAsyncEffect(async () => {
     if (tileSetUrl && tileWidth > 0 && tileHeight > 0) {
+      // TODO handle updates on margin,spacing,... ?
       const data = await new TileSetLoader().loadAsync(tileSetUrl, {
         tileWidth,
         tileHeight,
