@@ -1,17 +1,17 @@
 import {InstancedVertexObjectGeometry} from '@spearwolf/vertex-objects';
+import {AnimatedSprite, AnimatedSpriteDescriptor} from './AnimatedSprite';
 import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite';
-import {TexturedSprite, TexturedSpriteDescriptor} from './TexturedSprite';
 
-export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<TexturedSprite, BaseSprite> {
+export class AnimatedSpritesGeometry extends InstancedVertexObjectGeometry<AnimatedSprite, BaseSprite> {
   constructor(
     capacity = 100,
     makeBaseSpriteArgs: [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number] = [
       0.5, 0.5,
     ],
   ) {
-    super(TexturedSpriteDescriptor, capacity, BaseSpriteDescriptor);
+    super(AnimatedSpriteDescriptor, capacity, BaseSpriteDescriptor);
 
-    this.name = '@spearwolf/textured-sprites:TexturedSpritesGeometry';
+    this.name = '@spearwolf/textured-sprites:AnimatedSpritesGeometry';
 
     this.basePool.createVO().make(...makeBaseSpriteArgs);
   }

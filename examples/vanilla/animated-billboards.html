@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: rgb(46 64 82);
         background: radial-gradient(
@@ -17,7 +20,7 @@
         line-height: 1.5;
       }
       .intro {
-        font-family: 'Arial Black', sans-serif;
+        font-family: "Arial Black", sans-serif;
         font-size: 24px;
       }
       em {
@@ -26,7 +29,7 @@
         color: #fff;
       }
       code {
-        font-family: 'Courier New', monospace;
+        font-family: "Courier New", monospace;
         font-style: normal;
         font-size: 120%;
       }
@@ -38,7 +41,8 @@
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
           "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js"
+          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
+          "@spearwolf/textured-sprites": "/packages/textured-sprites/build/textured-sprites.js"
         }
       }
     </script>
@@ -66,8 +70,8 @@
         ShaderMaterial,
         Texture,
         Vector3,
-      } from 'three';
-      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
         FrameBasedAnimations,
         getDescriptorOf,
@@ -76,11 +80,13 @@
         TileSetLoader,
         VertexObjectGeometry,
         VertexObjects,
-      } from '@spearwolf/vertex-objects';
-      import {PerspectiveOrbitDemo} from '/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js';
-      import {AnimatedSpritesGeometry} from '/examples/vanilla/jsm/animated-sprites/AnimatedSpritesGeometry.js';
-      import {AnimatedSpritesMaterial} from '/examples/vanilla/jsm/animated-sprites/AnimatedSpritesMaterial.js';
-      import {AnimatedSprites} from '/examples/vanilla/jsm/animated-sprites/AnimatedSprites.js';
+      } from "@spearwolf/vertex-objects";
+      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
+      import {
+        AnimatedSprites,
+        AnimatedSpritesGeometry,
+        AnimatedSpritesMaterial,
+      } from "@spearwolf/textured-sprites";
 
       class BouncingSprites {
         gravity = -130;
@@ -100,7 +106,7 @@
           radius,
           height,
           depth,
-          spriteSize = 10,
+          spriteSize = 10
         ) {
           this.spritePool = spritePool;
           this.textureAtlas = textureAtlas;
@@ -132,7 +138,7 @@
             sprite.z0 = Math.random() * this.containerDepth - halfDepth;
 
             sprite.speedX = -Math.abs(
-              Math.random() * this.startSpeedX + this.startSpeedBaseX,
+              Math.random() * this.startSpeedX + this.startSpeedBaseX
             );
             sprite.speedY =
               Math.random() * this.startSpeedY -
@@ -155,14 +161,14 @@
           this.sprites.forEach((sprite) => {
             sprite.rotation += sprite.speedRotate * deltaFactor;
 
-            let {x0, y, z0, speedX, speedY} = sprite;
+            let { x0, y, z0, speedX, speedY } = sprite;
 
             x0 += speedX * deltaFactor;
             y += speedY * deltaFactor;
 
             speedY += gravity;
 
-            const {width, height} = sprite;
+            const { width, height } = sprite;
 
             if (x0 > halfWidth) {
               // on the right edge
@@ -192,54 +198,53 @@
       }
 
       const demo = new PerspectiveOrbitDemo(
-        document.getElementById('canvas-container'),
-        {antialias: false},
+        document.getElementById("canvas-container"),
+        { antialias: false }
       );
 
-      demo.start(async ({scene, camera, width, height}) => {
+      demo.start(async ({ scene, camera, width, height }) => {
         camera.position.set(0, 70, -210);
 
         const CAPACITY = 400;
         const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-        const tilesetLoader = new TileSetLoader(new TextureFactory());
-        const {
-          tileSet,
-          texture,
-        } = await tilesetLoader.loadAsync(
-          '/examples/assets/nobinger-anim-sheet.png',
-          {tileWidth: 64, tileHeight: 64, margin: 1},
+        const { tileSet, texture } = await new TileSetLoader().loadAsync(
+          "/examples/assets/nobinger-anim-sheet.png",
+          { tileWidth: 64, tileHeight: 64, margin: 1 }
         );
 
         const anims = new FrameBasedAnimations();
-        // prettier-ignore
-        const animId = anims.add(undefined, 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+        const animId = anims.add(
+          "anim0",
+          0.66,
+          tileSet,
+          [1, 2, 3, 4, 5, 4, 3, 2]
+        );
 
         const bouncingSprites = new BouncingSprites(
           geometry.instancedPool,
           tileSet.atlas,
           150,
           100,
-          40,
+          40
         );
 
         bouncingSprites.createSprites(CAPACITY, animId);
 
-        const material = new AnimatedSpritesMaterial({
-          colorMap: texture,
-          animsMap: anims.bakeDataTexture(),
-        });
+        const material = new AnimatedSpritesMaterial();
+
+        material.colorMap = texture;
+        material.animsMap = anims.bakeDataTexture();
 
         material.renderAsBillboards = true;
         material.depthTest = true;
         material.depthWrite = true;
 
         const mesh = new AnimatedSprites(geometry, material);
-        mesh.frustumCulled = false;
 
         scene.add(mesh);
 
-        demo.on('frame', ({deltaTime, now}) => {
+        demo.on("frame", ({ deltaTime, now }) => {
           bouncingSprites.animate(deltaTime);
           material.uniforms.time.value = now;
         });

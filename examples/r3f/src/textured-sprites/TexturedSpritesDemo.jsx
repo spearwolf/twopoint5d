@@ -14,7 +14,7 @@ extend({ TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial });
 export const TexturedSpritesDemo = ({ capacity }) => {
   const geometry = useRef();
 
-  const [bouncingSprites] = useState(new BouncingSprites(150, 75, 5));
+  const [bouncingSprites] = useState(() => new BouncingSprites(150, 75, 5));
 
   const { tileSet, texture } = useTileSet(
     "/examples/assets/nobinger-anim-sheet.png",

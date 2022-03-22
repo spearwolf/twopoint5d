@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import {DoubleSide, ShaderMaterial} from 'three';
-// eslint-disable-next-line import/no-unresolved
-import {ShaderTool} from '@spearwolf/vertex-objects';
+import {ShaderTool, unpick} from '@spearwolf/vertex-objects';
+import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
 
 const vertexShader = `
   attribute vec2 quadSize;
@@ -86,20 +84,26 @@ const fragmentShader = `
   }
 `;
 
+interface AnimatedSpritesMaterialParameters extends ShaderMaterialParameters {
+  colorMap?: Texture;
+  animsMap?: Texture;
+  time?: number;
+}
+
 export class AnimatedSpritesMaterial extends ShaderMaterial {
-  constructor({colorMap, animsMap, ...options}) {
+  constructor(options?: AnimatedSpritesMaterialParameters) {
     super({
       vertexShader,
       fragmentShader,
       uniforms: {
         colorMap: {
-          value: colorMap,
+          value: options?.colorMap,
         },
         animsMap: {
-          value: animsMap,
+          value: options?.animsMap,
         },
         animsMapSize: {
-          value: [animsMap.image.width, animsMap.image.height],
+          value: [options?.animsMap?.image.width ?? 0, options?.animsMap?.image.height ?? 0],
         },
         time: {
           value: 0,
@@ -107,16 +111,34 @@ export class AnimatedSpritesMaterial extends ShaderMaterial {
       },
       transparent: true,
       side: DoubleSide,
-      ...options,
+      ...unpick(options, 'colorMap', 'animsMap', 'time'),
     });
-    this.name = 'AnimatedSpritesMaterial';
+
+    this.name = options?.name ?? '@spearwolf/textured-sprites:AnimatedSpritesMaterial';
   }
 
-  get renderAsBillboards() {
+  get colorMap(): Texture | undefined {
+    return this.uniforms.colorMap.value;
+  }
+
+  set colorMap(colorMap: Texture | undefined) {
+    this.uniforms.colorMap.value = colorMap;
+  }
+
+  get animsMap(): Texture | undefined {
+    return this.uniforms.animsMap.value;
+  }
+
+  set animsMap(animsMap: Texture | undefined) {
+    this.uniforms.animsMap.value = animsMap;
+    this.uniforms.animsMapSize.value = animsMap ? [animsMap.image.width, animsMap.image.height] : [0, 0];
+  }
+
+  get renderAsBillboards(): boolean {
     return this.defines?.RENDER_AS_BILLBOARDS === 1;
   }
 
-  set renderAsBillboards(renderAsBillboards) {
+  set renderAsBillboards(renderAsBillboards: boolean) {
     if (renderAsBillboards) {
       Object.assign(this.defines, this.defines, {RENDER_AS_BILLBOARDS: 1});
     }

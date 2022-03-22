@@ -18,7 +18,7 @@ are like particles or freestyle [sprites](https://en.wikipedia.org/wiki/Sprite_(
 
 examples can be found here:
 - [animated-billboards](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/animated-billboards.html)
-- [animated-sprites](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/animated-sprites.html) &mdash; [vertex object descriptor](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/jsm/animated-sprites/)
+- [animated-sprites](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/animated-sprites.html)
 - [instanced-quads](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/instanced-quads.html)
 - [crosses](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/crosses.html)
 - [textured-quads-from-tileset](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-quads-from-tileset.html)
