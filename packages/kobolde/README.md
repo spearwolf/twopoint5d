@@ -39,9 +39,9 @@ export default () => {
 
       <TexturedSprites>
         <TexturedSpritesGeometry ref={geometry} />
-        <TexturedSpriteMaterial>
+        <TexturedSpritesMaterial>
           <TextureRef name="foo-atlas" attach="colorMap" />
-        </TexturedSpriteMaterial>
+        </TexturedSpritesMaterial>
       </TexturedSprites>
     </Stage2D>
   );
