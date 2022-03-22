@@ -5,17 +5,13 @@ import {
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
 } from "@spearwolf/textured-sprites";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { BouncingSprites } from "./BouncingSprites";
 import { useTileSet } from "./useTileSet";
 
 extend({ TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial });
 
 export const TexturedSpritesDemo = ({ capacity }) => {
-  const geometry = useRef();
-
-  const [bouncingSprites] = useState(() => new BouncingSprites(150, 75, 5));
-
   const { tileSet, texture } = useTileSet(
     "/examples/assets/nobinger-anim-sheet.png",
     {
@@ -25,7 +21,9 @@ export const TexturedSpritesDemo = ({ capacity }) => {
     }
   );
 
-  useFrameStateMachine(bouncingSprites, {
+  const geometry = useRef();
+
+  useFrameStateMachine(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
     atlas: tileSet?.atlas,
     capacity,

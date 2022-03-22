@@ -24,11 +24,19 @@ type FrameStateMachineCallbackArgs<Params extends FrameStateMachineParams> = Omi
   UseFrameParams;
 
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
-  renderPriority?: number;
-
   init?: (args: FrameStateMachineCallbackArgs<Params>) => void;
   frame: (args: FrameStateMachineCallbackArgs<Params>) => void;
   dispose?: (args: Params) => void;
+}
+
+interface FrameStateMachineLazyCallbacks<Params extends FrameStateMachineParams> {
+  (args: FrameStateMachineCallbackArgs<Params>): FrameStateMachineCallbacksWithRenderPriority<Params>;
+  renderPriority?: number;
+}
+
+interface FrameStateMachineCallbacksWithRenderPriority<Params extends FrameStateMachineParams>
+  extends FrameStateMachineCallbacks<Params> {
+  renderPriority?: number;
 }
 
 const constructArgs = <Params extends FrameStateMachineParams>(args: Params): NonNullParams<Params> =>
@@ -36,11 +44,16 @@ const constructArgs = <Params extends FrameStateMachineParams>(args: Params): No
     Object.entries(args).map(([key, value]) => [key, isForwardRefValue(value) ? value.current : value]),
   ) as NonNullParams<Params>;
 
+const isLazyCallbacks = <Params extends FrameStateMachineParams>(
+  callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
+): callbacks is FrameStateMachineLazyCallbacks<Params> => typeof callbacks === 'function';
+
 export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
-  callbacks: FrameStateMachineCallbacks<Params>,
+  callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
 ): void => {
   const callbacksRef = useRef(callbacks);
+  const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
   const dependenciesRef = useRef(dependencies);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -55,13 +68,18 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
       const args = constructArgs(dependenciesRef.current);
       const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => dep != null);
       if (argsAllSettled) {
+        const methodArgs = {...args, state, delta};
         if (!isInitialized) {
-          if (callbacksRef.current?.init) {
-            callbacksRef.current.init({...args, state, delta});
+          stateMachineRef.current = isLazyCallbacks(callbacksRef.current)
+            ? callbacksRef.current(methodArgs)
+            : callbacksRef.current;
+
+          if (stateMachineRef.current?.init) {
+            stateMachineRef.current.init(methodArgs);
           }
           setIsInitialized(true);
-        } else if (callbacksRef.current?.frame) {
-          callbacksRef.current.frame({...args, state, delta});
+        } else if (stateMachineRef.current?.frame) {
+          stateMachineRef.current.frame(methodArgs);
         }
       }
     },
@@ -70,8 +88,8 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
 
   useLayoutEffect(
     () => () => {
-      if (callbacksRef.current?.dispose) {
-        callbacksRef.current.dispose(constructArgs(dependenciesRef.current));
+      if (stateMachineRef.current?.dispose) {
+        stateMachineRef.current.dispose(constructArgs(dependenciesRef.current));
       }
     },
     [],

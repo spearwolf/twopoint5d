@@ -82,7 +82,52 @@ describe('useFrameStateMachine hook', () => {
     expect(args.mesh).toBe(mesh);
     expect(args.state).toBeUndefined();
     expect(args.delta).toBeUndefined();
+  });
 
-    renderer.unmount();
+  test('lazy callbacks', async () => {
+    const callbacks = {
+      init: jest.fn(),
+      frame: jest.fn(),
+      dispose: jest.fn(),
+    };
+
+    const lazyCallbacks = jest.fn();
+    lazyCallbacks.mockReturnValueOnce(callbacks).mockReturnValue(undefined);
+
+    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={lazyCallbacks} />);
+    const mesh = renderer.scene.findByType('Mesh').instance;
+
+    expect(mesh).toBeDefined();
+    expect(mesh.type).toBe('Mesh');
+
+    expect(lazyCallbacks).not.toBeCalled();
+    expect(callbacks.init).not.toBeCalled();
+    expect(callbacks.frame).not.toBeCalled();
+    expect(callbacks.dispose).not.toBeCalled();
+
+    await ReactThreeTestRenderer.act(async () => {
+      renderer.advanceFrames(1, 1);
+    });
+
+    expect(lazyCallbacks).toBeCalledTimes(1);
+    expect(callbacks.init).toBeCalledTimes(1);
+    expect(callbacks.frame).not.toBeCalled();
+    expect(callbacks.dispose).not.toBeCalled();
+
+    let args = lazyCallbacks.mock.calls[0][0];
+    expect(args.mesh).toBe(mesh);
+    expect(args.state).toBeDefined();
+    expect(args.delta).toBe(1);
+
+    args = callbacks.init.mock.calls[0][0];
+    expect(args.mesh).toBe(mesh);
+    expect(args.state).toBeDefined();
+    expect(args.delta).toBe(1);
+
+    await ReactThreeTestRenderer.act(async () => {
+      renderer.advanceFrames(5, 2);
+    });
+
+    expect(lazyCallbacks).toBeCalledTimes(1);
   });
 });
