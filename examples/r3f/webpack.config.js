@@ -2,6 +2,7 @@
 const path = require("path");
 
 module.exports = {
+  mode: "development",
   entry: {
     crosses: {
       import: "./src/crosses/index.jsx",

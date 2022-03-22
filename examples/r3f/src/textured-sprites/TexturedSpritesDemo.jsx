@@ -1,15 +1,13 @@
-import { extend } from "@react-three/fiber";
-import { forwardRefValue, useFrameStateMachine } from "@spearwolf/kobolde";
 import {
+  forwardRefValue,
   TexturedSprites,
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
-} from "@spearwolf/textured-sprites";
+  useFrameStateMachine,
+} from "@spearwolf/kobolde";
 import { useRef } from "react";
 import { BouncingSprites } from "./BouncingSprites";
 import { useTileSet } from "./useTileSet";
-
-extend({ TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial });
 
 export const TexturedSpritesDemo = ({ capacity }) => {
   const { tileSet, texture } = useTileSet(
@@ -30,16 +28,16 @@ export const TexturedSpritesDemo = ({ capacity }) => {
   });
 
   return (
-    <texturedSprites>
-      <texturedSpritesGeometry
-        args={[capacity]}
+    <TexturedSprites>
+      <TexturedSpritesGeometry
+        capacity={capacity}
         ref={geometry}
-      ></texturedSpritesGeometry>
-      <texturedSpritesMaterial
+      ></TexturedSpritesGeometry>
+      <TexturedSpritesMaterial
         colorMap={texture}
         depthTest={false}
         depthWrite={false}
-      ></texturedSpritesMaterial>
-    </texturedSprites>
+      ></TexturedSpritesMaterial>
+    </TexturedSprites>
   );
 };

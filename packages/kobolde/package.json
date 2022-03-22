@@ -21,6 +21,7 @@
       "@spearwolf/vertex-objects",
       "react-dom",
       "react",
+      "react/jsx-runtime",
       "three",
       "use-asset"
     ],

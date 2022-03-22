@@ -5,7 +5,7 @@ import { TexturedSpritesDemo } from "./TexturedSpritesDemo";
 
 ReactDOM.render(
   <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 50] }}>
-    <TexturedSpritesDemo capacity={300} />
+    <TexturedSpritesDemo capacity={500} />
     <OrbitControls />
   </Canvas>,
   document.getElementById("root")
