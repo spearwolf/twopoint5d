@@ -1,6 +1,6 @@
-# kobolde
+# @spearwolf/kobolde
 
-welcome to `@spearwolf/kobolde` &mdash; the *sprite* :space_invader: :joystick: engine on top of[react-three-fiber](https://github.com/pmndrs/react-three-fiber). the idea is roughly the following:
+welcome to *kobolde* &mdash; the *sprite* :space_invader::joystick: engine on top of [react-three-fiber](https://github.com/pmndrs/react-three-fiber). the idea is roughly the following:
 
 ```jsx
 export default () => {
@@ -23,11 +23,11 @@ export default () => {
         // your code goes here
       },
     },
-    { geometry: geometry.current, textureAtlas }
+    { geometry: forwardRefValue(geometry), textureAtlas }
   );
 
   return (
-    <Stage2D renderToTexture="my-buffer">
+    <Stage2D renderToTexture="stage0">
       <ParallaxProjection
         attach="projection"
         width="640"
