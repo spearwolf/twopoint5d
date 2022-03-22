@@ -51,13 +51,19 @@ const isLazyCallbacks = <Params extends FrameStateMachineParams>(
 export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
-): void => {
+): MutableRefObject<FrameStateMachineCallbacks<Params>> => {
   const callbacksRef = useRef(callbacks);
   const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
   const dependenciesRef = useRef(dependencies);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  useLayoutEffect((): void => void (callbacksRef.current = callbacks), [callbacks]);
+  useLayoutEffect((): void => {
+    callbacksRef.current = callbacks;
+    if (isInitialized && !isLazyCallbacks(callbacks)) {
+      stateMachineRef.current = callbacks;
+    }
+  }, [callbacks, isInitialized]);
+
   useLayoutEffect((): void => void (dependenciesRef.current = dependencies), [dependencies]);
 
   const sortedDepKeys = useMemo(() => sortedKeys(dependencies), []);
@@ -96,4 +102,6 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   );
 
   useFrame(onFrame, callbacks.renderPriority ?? 0);
+
+  return stateMachineRef;
 };
