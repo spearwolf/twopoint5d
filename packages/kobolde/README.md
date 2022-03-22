@@ -1,4 +1,4 @@
-# @spearwolf/kobolde
+# kobolde
 
 welcome to *kobolde* &mdash; the *sprite* :space_invader::joystick: engine on top of [react-three-fiber](https://github.com/pmndrs/react-three-fiber). the idea is roughly the following:
 
