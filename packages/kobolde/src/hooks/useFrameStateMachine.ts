@@ -20,17 +20,19 @@ interface UseFrameParams {
   delta: number;
 }
 
-type FrameStateMachineCallbackArgs<Params extends FrameStateMachineParams> = Omit<NonNullParams<Params>, keyof UseFrameParams> &
+type FrameStateMachineInitArgs<Params extends FrameStateMachineParams> = Omit<NonNullParams<Params>, keyof UseFrameParams> &
   UseFrameParams;
 
+type FrameStateMachineFrameArgs<Params extends FrameStateMachineParams> = Params & UseFrameParams;
+
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
-  init?: (args: FrameStateMachineCallbackArgs<Params>) => void;
-  frame: (args: FrameStateMachineCallbackArgs<Params>) => void;
+  init?: (args: FrameStateMachineInitArgs<Params>) => void;
+  frame: (args: FrameStateMachineFrameArgs<Params>) => void;
   dispose?: (args: Params) => void;
 }
 
 interface FrameStateMachineLazyCallbacks<Params extends FrameStateMachineParams> {
-  (args: FrameStateMachineCallbackArgs<Params>): FrameStateMachineCallbacksWithRenderPriority<Params>;
+  (args: FrameStateMachineInitArgs<Params>): FrameStateMachineCallbacksWithRenderPriority<Params>;
   renderPriority?: number;
 }
 
@@ -74,20 +76,19 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
     (state: RootState, delta: number) => {
       const args = constructArgs(dependenciesRef.current);
       const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => dep != null);
-      if (argsAllSettled) {
-        const methodArgs = {...args, state, delta};
-        if (!isInitialized) {
-          stateMachineRef.current = isLazyCallbacks(callbacksRef.current)
-            ? callbacksRef.current(methodArgs)
-            : callbacksRef.current;
-
-          if (stateMachineRef.current?.init) {
-            stateMachineRef.current.init(methodArgs);
-          }
-          setIsInitialized(true);
-        } else if (stateMachineRef.current?.frame) {
+      const methodArgs = {...args, state, delta};
+      if (isInitialized) {
+        if (stateMachineRef.current?.frame) {
           stateMachineRef.current.frame(methodArgs);
         }
+      } else if (argsAllSettled) {
+        stateMachineRef.current = isLazyCallbacks(callbacksRef.current) ? callbacksRef.current(methodArgs) : callbacksRef.current;
+
+        if (stateMachineRef.current?.init) {
+          stateMachineRef.current.init(methodArgs);
+        }
+
+        setIsInitialized(true);
       }
     },
     [isInitialized, ...depValues],
