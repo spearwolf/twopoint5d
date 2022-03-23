@@ -21,21 +21,33 @@ export const useTileSet = (tileSetUrl: string, options?: UseTileSetParams): Part
   const padding = options?.padding;
   const tileCount = options?.tileCount;
 
-  useAsyncEffect(async () => {
-    if (tileSetUrl && tileWidth > 0 && tileHeight > 0) {
-      // TODO handle updates on margin,spacing,... ?
-      const data = await new TileSetLoader().loadAsync(tileSetUrl, {
-        tileWidth,
-        tileHeight,
-        margin,
-        spacing,
-        padding,
-        tileCount,
-      });
-      setTileSetData(data);
-      // TODO dispose?!
-    }
-  }, [tileSetUrl, tileWidth, tileHeight, margin, spacing, padding, tileCount]);
+  useAsyncEffect(
+    async () =>
+      tileSetUrl && tileWidth > 0 && tileHeight > 0
+        ? new TileSetLoader().loadAsync(tileSetUrl, {
+            tileWidth,
+            tileHeight,
+            margin,
+            spacing,
+            padding,
+            tileCount,
+          })
+        : undefined,
+    {
+      next(data) {
+        setTileSetData(data ?? {});
+      },
+      cancel(data) {
+        console.log('cancel tileset', data);
+        data.texture?.dispose();
+      },
+      dispose(data) {
+        console.log('dispose tileset', data);
+        data.texture?.dispose();
+      },
+    },
+    [tileSetUrl, tileWidth, tileHeight, margin, spacing, padding, tileCount],
+  );
 
   return tileSetData;
 };

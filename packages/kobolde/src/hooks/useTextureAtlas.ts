@@ -11,16 +11,28 @@ export const useTextureAtlas = (
 
   const overrideImageUrl = options?.overrideImageUrl;
 
-  useAsyncEffect(async () => {
-    if (url) {
-      // TODO handle updates ... ?
-      const data = await new TextureAtlasLoader().loadAsync(url, textureClasses, {
-        overrideImageUrl,
-      });
-      setAtlasData(data);
-      // TODO dispose?!
-    }
-  }, [url, overrideImageUrl]);
+  useAsyncEffect(
+    async () =>
+      url
+        ? new TextureAtlasLoader().loadAsync(url, textureClasses, {
+            overrideImageUrl,
+          })
+        : undefined,
+    {
+      next(data) {
+        setAtlasData(data ?? {});
+      },
+      cancel(data) {
+        console.log('cancel texture-atlas', data);
+        data.texture?.dispose();
+      },
+      dispose(data) {
+        console.log('dispose texture-atlas', data);
+        data.texture?.dispose();
+      },
+    },
+    [url, overrideImageUrl],
+  );
 
   return atlasData;
 };
