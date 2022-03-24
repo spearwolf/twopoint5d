@@ -3,8 +3,6 @@ import {Camera, Scene, WebGLRenderer} from 'three';
 import {IProjection} from './IProjection';
 
 export class Stage2D {
-  projection: IProjection;
-  camera: Camera;
   scene: Scene;
 
   containerWidth = 0;
@@ -12,6 +10,33 @@ export class Stage2D {
 
   width = 0;
   height = 0;
+
+  #projection?: IProjection;
+
+  get projection(): IProjection | undefined {
+    return this.#projection;
+  }
+
+  set projection(projection: IProjection | undefined) {
+    if (this.#projection !== projection) {
+      this.#projection = projection;
+      this.#cameraFromProjection = undefined;
+      if (projection) {
+        this.#updateProjection(this.containerWidth, this.containerHeight);
+      }
+    }
+  }
+
+  #cameraFromProjection?: Camera;
+  #cameraUserOverride?: Camera;
+
+  get camera(): Camera | undefined {
+    return this.#cameraUserOverride ?? this.#cameraFromProjection;
+  }
+
+  set camera(camera: Camera | undefined) {
+    this.#cameraUserOverride = camera;
+  }
 
   /**
    * Without `projection` or `scene` it won`t work, but you can also set them after the constructor
@@ -26,18 +51,25 @@ export class Stage2D {
       this.containerWidth = width;
       this.containerHeight = height;
 
-      this.projection.updateViewRect(width, height);
-      const [w, h] = this.projection.getViewRect();
-      this.width = w;
-      this.height = h;
-
-      if (this.camera != null) {
-        this.projection.updateCamera(this.camera);
-      } else {
-        this.camera = this.projection.createCamera();
+      if (this.projection) {
+        this.#updateProjection(width, height);
       }
     }
   }
+
+  #updateProjection = (width: number, height: number): void => {
+    this.projection.updateViewRect(width, height);
+    const [w, h] = this.projection.getViewRect();
+
+    this.width = w;
+    this.height = h;
+
+    if (this.#cameraFromProjection != null) {
+      this.projection.updateCamera(this.#cameraFromProjection);
+    } else {
+      this.#cameraFromProjection = this.projection.createCamera();
+    }
+  };
 
   #noCameraErrorCount = 0;
 
