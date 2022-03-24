@@ -29,11 +29,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
   return (
     <>
       <Stage2D>
-        <ParallaxProjection
-          attach="projection"
-          projectionPlane="xy|bottom-left"
-          pixelZoom={2}
-        />
+        <ParallaxProjection projectionPlane="xy|bottom-left" pixelZoom={2} />
       </Stage2D>
 
       <TexturedSprites>
