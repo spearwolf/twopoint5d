@@ -5,6 +5,8 @@ import {
   TexturedSpritesMaterial,
   useFrameStateMachine,
   useTextureAtlas,
+  Stage2D,
+  ParallaxProjection,
 } from "picimo";
 import { useRef } from "react";
 import { BouncingSprites } from "./BouncingSprites";
@@ -25,16 +27,26 @@ export const TexturedSpritesDemo = ({ capacity }) => {
   });
 
   return (
-    <TexturedSprites>
-      <TexturedSpritesGeometry
-        capacity={capacity}
-        ref={geometry}
-      ></TexturedSpritesGeometry>
-      <TexturedSpritesMaterial
-        colorMap={texture}
-        depthTest={false}
-        depthWrite={false}
-      ></TexturedSpritesMaterial>
-    </TexturedSprites>
+    <>
+      <Stage2D>
+        <ParallaxProjection
+          attach="projection"
+          projectionPlane="xy|bottom-left"
+          pixelZoom={2}
+        />
+      </Stage2D>
+
+      <TexturedSprites>
+        <TexturedSpritesGeometry
+          capacity={capacity}
+          ref={geometry}
+        ></TexturedSpritesGeometry>
+        <TexturedSpritesMaterial
+          colorMap={texture}
+          depthTest={false}
+          depthWrite={false}
+        ></TexturedSpritesMaterial>
+      </TexturedSprites>
+    </>
   );
 };

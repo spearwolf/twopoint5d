@@ -1,3 +1,5 @@
+export * from './components/ParallaxProjection';
+export * from './components/Stage2D';
 export * from './components/TexturedSprites';
 export * from './components/TexturedSpritesGeometry';
 export * from './components/TexturedSpritesMaterial';
