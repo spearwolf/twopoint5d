@@ -1,18 +1,18 @@
 {
-  "name": "@spearwolf/kobolde",
+  "name": "picimo",
   "version": "0.0.1",
   "description": "sprites library based on react-three-fiber",
-  "main": "build/kobolde.cjs.js",
-  "module": "build/kobolde.js",
+  "main": "build/picimo.cjs.js",
+  "module": "build/picimo.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/kobolde.js",
-    "require": "./build/kobolde.cjs.js"
+    "import": "./build/picimo.js",
+    "require": "./build/picimo.cjs.js"
   },
   "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "kobolde",
+    "outputName": "picimo",
     "externals": [
       "@react-three/fiber",
       "@spearwolf/stage25",

@@ -1,6 +1,10 @@
-# kobolde
+# **picimo**
 
-welcome to *kobolde* &mdash; the *sprite* :space_invader::joystick: engine on top of [react-three-fiber](https://github.com/pmndrs/react-three-fiber). the idea is roughly the following:
+Welcome to *picimo* &mdash; the *sprite* :space_invader::joystick: engine on top of [three.js]() + [react]() &#8658; [react-three-fiber](https://github.com/pmndrs/react-three-fiber)!
+
+> *pic&mdash;i&ndash;mo* is an acronym for _**pictures in motion**_
+
+The idea is roughly the following:
 
 ```jsx
 export default () => {
@@ -49,3 +53,4 @@ export default () => {
 ```
 
 have fun!
+:wink:

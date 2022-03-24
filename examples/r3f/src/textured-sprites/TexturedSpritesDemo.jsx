@@ -5,7 +5,7 @@ import {
   TexturedSpritesMaterial,
   useFrameStateMachine,
   useTextureAtlas,
-} from "@spearwolf/kobolde";
+} from "picimo";
 import { useRef } from "react";
 import { BouncingSprites } from "./BouncingSprites";
 

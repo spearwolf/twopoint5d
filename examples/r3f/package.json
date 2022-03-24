@@ -9,11 +9,11 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@react-three/fiber": "^7.0.26",
-    "@spearwolf/kobolde": "workspace:*",
     "@spearwolf/stage25": "workspace:*",
     "@spearwolf/textured-sprites": "workspace:*",
     "@spearwolf/tiled-maps": "workspace:*",
     "@spearwolf/vertex-objects": "workspace:*",
+    "picimo": "workspace:*",
     "react": "17.0.2",
     "react-dom": "^17.0.2",
     "three": "^0.138.3"

@@ -11,7 +11,7 @@
 | [@spearwolf/display3](./packages/display3/) | :heavy_check_mark:&#x202f;_READY&#x202f;FOR&#x202f;USE_ | cosy boilerplate for creating a _three.js canvas_ and dealing with the _init_, _resize_ and _frame_ event loop. nice starting point for your _three.js_ demos, there is no other dependency than the _three.js_ package itself |
 | [@spearwolf/stage25](./packages/stage25/) | :heavy_check_mark:&#x202f;_READY&#x202f;FOR&#x202f;USE_ | ... |
 | [@spearwolf/textured&#x2011;sprites](./packages/textured-sprites/)| :heavy_check_mark:&#x202f;*READY&#x202f;FOR&#x202f;USE :rocket:&#x202f;NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
-| [@spearwolf/kobolde](./packages/kobolde/) | :warning:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* :rocket:&#x202f;*NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
+| [picimo](./packages/picimo/) | :warning:&#x202f;*WORK&#x202f;IN&#x202f;PROGRESS* :rocket:&#x202f;*NEW&#x202f;FEATURES&#x202f;ON&#x202f;THE&#x202f;WAY* | ... |
 
 | API usage examples | description |
 |-|-|
