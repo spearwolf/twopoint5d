@@ -5,11 +5,33 @@ import {IProjection} from './IProjection';
 export class Stage2D {
   scene: Scene;
 
-  containerWidth = 0;
-  containerHeight = 0;
+  /**
+   * Get the *scene* name
+   */
+  get name(): string {
+    return this.scene.name;
+  }
 
-  width = 0;
-  height = 0;
+  /**
+   * Set the *scene* name
+   */
+  set name(name: string) {
+    this.scene.name = name;
+  }
+
+  #containerWidth = 0;
+  #containerHeight = 0;
+
+  #width = 0;
+  #height = 0;
+
+  get width(): number {
+    return this.#width;
+  }
+
+  get height(): number {
+    return this.#height;
+  }
 
   #projection?: IProjection;
 
@@ -22,7 +44,7 @@ export class Stage2D {
       this.#projection = projection;
       this.#cameraFromProjection = undefined;
       if (projection) {
-        this.#updateProjection(this.containerWidth, this.containerHeight);
+        this.#updateProjection(this.#containerWidth, this.#containerHeight);
       }
     }
   }
@@ -39,7 +61,14 @@ export class Stage2D {
   }
 
   /**
-   * Without `projection` or `scene` it won`t work, but you can also set them after the constructor
+   * A _stage_ should have a _projection_, otherwise it would be a _scene_.
+   *
+   * But the _projection_ can be set later by a setter (and yes, it works without if you set your own _camera_).
+   *
+   * A _camera_ is automatically created by the _projection_, but you can also explicitly set your own _camera_,
+   * which will be used instead. Note that a _projection_ will try to adjust the _camera_ settings after a `resize()` call,
+   * no matter if it is a custom _camera_ or a _camera_ created by the _projection_.
+   *
    */
   constructor(projection?: IProjection, scene?: Scene) {
     this.projection = projection;
@@ -47,9 +76,9 @@ export class Stage2D {
   }
 
   resize(width: number, height: number): void {
-    if (width !== this.containerWidth || height !== this.containerHeight) {
-      this.containerWidth = width;
-      this.containerHeight = height;
+    if (width !== this.#containerWidth || height !== this.#containerHeight) {
+      this.#containerWidth = width;
+      this.#containerHeight = height;
 
       if (this.projection) {
         this.#updateProjection(width, height);
@@ -61,11 +90,11 @@ export class Stage2D {
     this.projection.updateViewRect(width, height);
     const [w, h] = this.projection.getViewRect();
 
-    this.width = w;
-    this.height = h;
+    this.#width = w;
+    this.#height = h;
 
-    if (this.#cameraFromProjection != null) {
-      this.projection.updateCamera(this.#cameraFromProjection);
+    if (this.camera != null) {
+      this.projection.updateCamera(this.camera);
     } else {
       this.#cameraFromProjection = this.projection.createCamera();
     }
