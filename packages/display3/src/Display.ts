@@ -63,7 +63,7 @@ export class Display {
         const container = document.createElement('div');
         Stylesheets.addRule(
           container,
-          'three-display__Container',
+          'display3__Container',
           // we create another container div here to avoid the if container-has-no-discrete-size
           // then line-height-and-font-height-styles-give-weird-client-rect-behaviour issue
           'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;',
@@ -87,7 +87,7 @@ export class Display {
     }
 
     const {domElement: canvas} = this.renderer;
-    Stylesheets.addRule(canvas, 'three-display__Display', 'touch-action: none;');
+    Stylesheets.addRule(canvas, 'display3__Display', 'touch-action: none;');
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resize();
@@ -176,7 +176,7 @@ export class Display {
         let fullscreenCssRules = this.#fullscreenCssRules;
         if (!fullscreenCssRules) {
           fullscreenCssRules = Stylesheets.installRule(
-            'three-display__fullscreen',
+            'display3__fullscreen',
             `
               position: fixed;
               top: 0;
