@@ -34,5 +34,10 @@ export const useTextureAtlas = (
     [url, overrideImageUrl],
   );
 
+  // TODO update on textureClasses
+  // - add textureFactory to TextureAtlasData -> TextureAtlasLoaderResult
+  // - update texture
+  // - effect deps: [atlasData.texture, atlasData.textureFactory, textureClasses?.join()]
+
   return atlasData;
 };

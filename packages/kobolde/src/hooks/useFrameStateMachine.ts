@@ -27,6 +27,7 @@ type FrameStateMachineFrameArgs<Params extends FrameStateMachineParams> = Params
 
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   init?: (args: FrameStateMachineInitArgs<Params>) => void;
+  // TODO update(changes)
   frame: (args: FrameStateMachineFrameArgs<Params>) => void;
   dispose?: (args: Params) => void;
 }
@@ -75,7 +76,8 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   const onFrame = useCallback(
     (state: RootState, delta: number) => {
       const args = constructArgs(dependenciesRef.current);
-      const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => dep != null);
+      // all settled is when all values are truthy
+      const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => Boolean(dep));
       const methodArgs = {...args, state, delta};
       if (isInitialized) {
         if (stateMachineRef.current?.frame) {
