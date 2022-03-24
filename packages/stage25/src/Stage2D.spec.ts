@@ -7,7 +7,7 @@ describe('Stage2D', () => {
     expect(stage.scene).toBeDefined();
   });
 
-  it('resize will create a camera', () => {
+  it('after call to resize() a camera is created (by projection)', () => {
     const stage = new Stage2D(new ParallaxProjection('xz|top-left', {pixelZoom: 2}));
     stage.resize(320, 240);
 
