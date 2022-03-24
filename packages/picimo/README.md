@@ -13,9 +13,11 @@ export default () => {
 
   useFrameStateMachine(
     {
-      // renderPriority: 0,
-
       init({ geometry, textureAtlas, state, delta }) {
+        // your code goes here
+      },
+
+      update({ geometry: { current, previous }, textureAtlas.. }) {
         // your code goes here
       },
 
@@ -53,4 +55,5 @@ export default () => {
 ```
 
 have fun!
-:wink:
+
+:rocket:
