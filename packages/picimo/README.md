@@ -1,6 +1,6 @@
 # **picimo**
 
-Welcome to *picimo* &mdash; the *sprite* :space_invader::joystick: engine on top of [three.js]() + [react]() &#8658; [react-three-fiber](https://github.com/pmndrs/react-three-fiber)!
+Welcome to *picimo* &mdash; the *sprite* :space_invader::joystick: engine _on top of_ { [three.js]() + [react]() &#8658; [react-three-fiber](https://github.com/pmndrs/react-three-fiber) }
 
 > *pic&mdash;i&ndash;mo* is an acronym for _**pictures in motion**_
 
