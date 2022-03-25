@@ -1,7 +1,7 @@
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D';
 
-export function useStage2DSize() {
+export function useStageSize() {
   const parentStage = useContext(Stage2DContext);
 
   const parentStageWidth = parentStage?.width ?? 0;

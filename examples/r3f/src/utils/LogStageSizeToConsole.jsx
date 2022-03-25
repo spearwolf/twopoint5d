@@ -1,8 +1,8 @@
-import { useStage2DSize } from "picimo";
+import { useStageSize } from "picimo";
 import { useEffect } from "react";
 
-export const LogStage2DSizeToConsole = () => {
-  const [width, height] = useStage2DSize();
+export const LogStageSizeToConsole = () => {
+  const [width, height] = useStageSize();
 
   useEffect(() => {
     console.log("stage size is", width, height);
