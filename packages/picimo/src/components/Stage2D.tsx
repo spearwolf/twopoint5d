@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber, useThree} from '@react-three/fiber';
 import {Stage2D as __Stage2D} from '@spearwolf/stage25';
-import {forwardRef, Ref, useEffect, useState} from 'react';
+import {createContext, forwardRef, Ref, useContext, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Stage2D: __Stage2D});
@@ -14,20 +14,59 @@ declare global {
   }
 }
 
+export const Stage2DContext = createContext<__Stage2D>(undefined);
+Stage2DContext.displayName = 'Stage2DContext';
+
 export type Stage2DParams = {} & JSX.IntrinsicElements['stage2D'];
 
-function Component({children, ...props}: Stage2DParams, ref: Ref<__Stage2D>) {
+function Component({scene, projection, children, ...props}: Stage2DParams, ref: Ref<__Stage2D>) {
   const canvasSize = useThree((state) => state.size);
-  const [stage, setStage] = useState<__Stage2D>();
+  const [stage, setStage] = useState<__Stage2D>(null);
+
+  const [initialScene] = useState(scene);
+  const [initialProjection] = useState(projection);
+
+  const parentStage = useContext(Stage2DContext);
 
   useEffect(() => {
-    stage?.resize(canvasSize.width, canvasSize.height);
-    console.log('canvas-size', canvasSize.width, canvasSize.height, stage);
-  }, [stage, canvasSize.width, canvasSize.height]);
+    if (!stage) return;
+
+    if (parentStage) {
+      stage.resize(parentStage.width, parentStage.height);
+    } else {
+      stage.resize(canvasSize.width, canvasSize.height);
+    }
+
+    console.log('stage', {
+      width: stage.width,
+      height: stage.height,
+      containerWidth: stage.containerWidth,
+      containerHeight: stage.containerHeight,
+      stage,
+      parentStage,
+    });
+
+    return parentStage?.on('resize', ({width, height}) => {
+      stage.resize(width, height);
+
+      console.log('stage[parentStage:resize]', {
+        width: stage.width,
+        height: stage.height,
+        containerWidth: stage.containerWidth,
+        containerHeight: stage.containerHeight,
+        stage,
+        parentStage,
+      });
+    });
+  }, [stage, parentStage, canvasSize.width, canvasSize.height]);
+
+  const scenePrimitive = (scene || stage?.scene) ?? null;
 
   return (
-    <stage2D ref={mergeRefs(setStage, ref)} {...props}>
-      {children}
+    <stage2D args={[initialProjection, initialScene]} ref={mergeRefs(setStage, ref)} {...props}>
+      <Stage2DContext.Provider value={stage}>
+        {stage && scenePrimitive && <primitive object={scenePrimitive}>{children}</primitive>}
+      </Stage2DContext.Provider>
     </stage2D>
   );
 }

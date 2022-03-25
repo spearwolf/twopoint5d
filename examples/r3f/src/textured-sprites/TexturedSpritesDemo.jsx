@@ -1,14 +1,16 @@
 import {
   forwardRefValue,
+  ParallaxProjection,
+  Stage2D,
   TexturedSprites,
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
   useFrameStateMachine,
   useTextureAtlas,
-  Stage2D,
-  ParallaxProjection,
 } from "picimo";
 import { useRef } from "react";
+import { LogStage2DSizeToConsole } from "../utils/LogStage2DSizeToConsole";
+import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
 
 export const TexturedSpritesDemo = ({ capacity }) => {
@@ -28,8 +30,10 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   return (
     <>
-      <Stage2D>
+      <Stage2D name="stage0">
         <ParallaxProjection plane="xy" origin="bottom left" pixelZoom={2} />
+        <WiredBox width={150} height={50} depth={50} />
+        <LogStage2DSizeToConsole />
       </Stage2D>
 
       <TexturedSprites>

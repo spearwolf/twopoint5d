@@ -1,6 +1,9 @@
+import eventize, {Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
 import {IProjection} from './IProjection';
+
+export interface Stage2D extends Eventize {}
 
 export class Stage2D {
   scene: Scene;
@@ -21,6 +24,14 @@ export class Stage2D {
 
   #containerWidth = 0;
   #containerHeight = 0;
+
+  get containerWidth(): number {
+    return this.#containerWidth;
+  }
+
+  get containerHeight(): number {
+    return this.#containerHeight;
+  }
 
   #width = 0;
   #height = 0;
@@ -71,8 +82,12 @@ export class Stage2D {
    *
    */
   constructor(projection?: IProjection, scene?: Scene) {
+    eventize(this);
+
     this.projection = projection;
     this.scene = scene ?? new Scene();
+
+    // TODO set up vector of the scene??
   }
 
   resize(width: number, height: number): void {
@@ -90,6 +105,8 @@ export class Stage2D {
     this.projection.updateViewRect(width, height);
     const [w, h] = this.projection.getViewRect();
 
+    const prevWidth = this.#width;
+    const prevHeight = this.#height;
     this.#width = w;
     this.#height = h;
 
@@ -97,6 +114,10 @@ export class Stage2D {
       this.projection.updateCamera(this.camera);
     } else {
       this.#cameraFromProjection = this.projection.createCamera();
+    }
+
+    if (prevWidth !== w || prevHeight !== h) {
+      this.emit('resize', this);
     }
   };
 

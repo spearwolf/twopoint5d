@@ -66,6 +66,7 @@
     "test": "cross-env NODE_ENV=test jest --passWithNoTests"
   },
   "peerDependencies": {
+    "@spearwolf/eventize": "^2.0.0-beta.2",
     "@spearwolf/vertex-objects": "*",
     "three": "^0.138.3"
   },

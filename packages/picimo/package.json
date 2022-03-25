@@ -15,6 +15,7 @@
     "outputName": "picimo",
     "externals": [
       "@react-three/fiber",
+      "@spearwolf/eventize",
       "@spearwolf/stage25",
       "@spearwolf/textured-sprites",
       "@spearwolf/tiled-maps",
@@ -66,6 +67,7 @@
   },
   "peerDependencies": {
     "@react-three/fiber": "^7.0.26",
+    "@spearwolf/eventize": "^2.0.0-beta.2",
     "@spearwolf/textured-sprites": "*",
     "@spearwolf/vertex-objects": "*",
     "react": "^17.0.2",
@@ -79,6 +81,7 @@
     "@rollup/plugin-node-resolve": "^13.1.3",
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.3.1",
+    "@spearwolf/eventize": "^2.0.0-beta.2",
     "@spearwolf/textured-sprites": "workspace:*",
     "@spearwolf/vertex-objects": "workspace:*",
     "@testing-library/react": "^12.1.4",
