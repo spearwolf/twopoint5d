@@ -48,6 +48,12 @@ export class ProjectionPlane {
     return new ProjectionPlane(this.plane.clone(), this.up.clone());
   }
 
+  equals(projectionPlane: ProjectionPlane): boolean {
+    if (projectionPlane === this) return true;
+    if (projectionPlane == null) return false;
+    return this.plane.equals(projectionPlane.plane) && this.up.equals(projectionPlane.up);
+  }
+
   applyRotation(obj3d: Object3D): void {
     obj3d.applyQuaternion(
       new Quaternion().setFromRotationMatrix(

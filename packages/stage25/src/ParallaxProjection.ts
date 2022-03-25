@@ -17,7 +17,7 @@ export type ParallaxProjectionSpecs = FitIntoRectangleSpecs & {
  * @category Projection
  */
 export class ParallaxProjection implements IProjection {
-  viewSpecs: ParallaxProjectionSpecs;
+  viewSpecs: Partial<ParallaxProjectionSpecs>;
   projectionPlane: ProjectionPlane;
 
   #viewRect = new Vector2();
@@ -35,11 +35,11 @@ export class ParallaxProjection implements IProjection {
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
     this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
-    this.viewSpecs = specs;
+    this.viewSpecs = specs ?? {};
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
+    fitIntoRectangle(new Vector2(width, height), this.viewSpecs as any, this.#viewRect);
 
     this.#halfHeight = this.#viewRect.height / 2;
 
