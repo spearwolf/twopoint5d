@@ -1,6 +1,7 @@
-import {extend, ReactThreeFiber, useThree} from '@react-three/fiber';
+import {extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
 import {Stage2D as __Stage2D} from '@spearwolf/stage25';
-import {createContext, forwardRef, Ref, useContext, useEffect, useState} from 'react';
+import {createContext, forwardRef, Ref, useCallback, useContext, useEffect, useState} from 'react';
+import {WebGLRenderer} from 'three';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Stage2D: __Stage2D});
@@ -17,11 +18,16 @@ declare global {
 export const Stage2DContext = createContext<__Stage2D>(undefined);
 Stage2DContext.displayName = 'Stage2DContext';
 
-export type Stage2DParams = {} & JSX.IntrinsicElements['stage2D'];
+export type Stage2DParams = {
+  renderPriority?: number;
+  noAutoClear?: boolean;
+} & JSX.IntrinsicElements['stage2D'];
 
-function Component({scene, projection, children, ...props}: Stage2DParams, ref: Ref<__Stage2D>) {
+function Component({scene, projection, renderPriority, noAutoClear, children, ...props}: Stage2DParams, ref: Ref<__Stage2D>) {
   const canvasSize = useThree((state) => state.size);
+
   const [stage, setStage] = useState<__Stage2D>(null);
+  const scenePrimitive = (scene || stage?.scene) ?? null;
 
   const [initialScene] = useState(scene);
   const [initialProjection] = useState(projection);
@@ -60,7 +66,22 @@ function Component({scene, projection, children, ...props}: Stage2DParams, ref: 
     });
   }, [stage, parentStage, canvasSize.width, canvasSize.height]);
 
-  const scenePrimitive = (scene || stage?.scene) ?? null;
+  const renderFrame = useCallback(
+    (gl: WebGLRenderer) => {
+      // TODO StageRenderer -> StageDirector...
+      if (stage && !parentStage) {
+        const wasPreviouslyAutoClear = gl.autoClear;
+        gl.autoClear = !noAutoClear;
+
+        gl.render(stage.scene, stage.camera);
+
+        gl.autoClear = wasPreviouslyAutoClear;
+      }
+    },
+    [stage, parentStage, noAutoClear],
+  );
+
+  useFrame(({gl}) => renderFrame(gl), renderPriority ?? 0);
 
   return (
     <stage2D args={[initialProjection, initialScene]} ref={mergeRefs(setStage, ref)} {...props}>

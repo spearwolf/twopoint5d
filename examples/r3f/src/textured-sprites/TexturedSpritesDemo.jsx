@@ -30,23 +30,37 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   return (
     <>
-      <Stage2D name="stage0">
-        <ParallaxProjection plane="xy" origin="bottom left" pixelZoom={2} />
-        <WiredBox width={150} height={50} depth={50} />
+      <Stage2D name="stage0" renderPriority={1}>
+        <ParallaxProjection plane="xy" pixelZoom={1} />
+
         <LogStageSizeToConsole />
+
+        <WiredBox width={600} height={200} depth={50} />
       </Stage2D>
 
-      <TexturedSprites>
-        <TexturedSpritesGeometry
-          capacity={capacity}
-          ref={geometry}
-        ></TexturedSpritesGeometry>
-        <TexturedSpritesMaterial
-          colorMap={texture}
-          depthTest={false}
-          depthWrite={false}
-        ></TexturedSpritesMaterial>
-      </TexturedSprites>
+      <Stage2D name="stage1" noAutoClear renderPriority={2}>
+        <ParallaxProjection
+          plane="xy"
+          origin="bottom left"
+          width={200}
+          height={100}
+          fit="contain"
+        />
+
+        <LogStageSizeToConsole />
+
+        <TexturedSprites>
+          <TexturedSpritesGeometry
+            capacity={capacity}
+            ref={geometry}
+          ></TexturedSpritesGeometry>
+          <TexturedSpritesMaterial
+            colorMap={texture}
+            depthTest={false}
+            depthWrite={false}
+          ></TexturedSpritesMaterial>
+        </TexturedSprites>
+      </Stage2D>
     </>
   );
 };

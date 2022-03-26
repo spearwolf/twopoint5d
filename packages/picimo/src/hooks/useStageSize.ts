@@ -1,6 +1,12 @@
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D';
 
+/**
+ * Use this hook if you simply want to know the stage size.
+ * Note that it can happen that this hook is triggered even if there are no changes in the size.
+ * If you want to implement an effect that should only be called when the size changes,
+ * then use the `useStageResize(callback)` hook instead.
+ */
 export function useStageSize() {
   const parentStage = useContext(Stage2DContext);
 
