@@ -20,13 +20,10 @@ const useCameraFromStageAsDefault = () => {
     interactiveStage.current?.camera
   );
 
-  useEffect(
-    () =>
-      interactiveStage.current?.on(
-        "afterCameraChanged",
-        ({ camera }) => void setDefaultCamera(camera)
-      ),
-    []
+  useEffect(() =>
+    interactiveStage.current?.on("afterCameraChanged", ({ camera }) => {
+      if (camera) setDefaultCamera(camera);
+    })
   );
 
   const setThreeDefault = useThree((state) => state.set);
