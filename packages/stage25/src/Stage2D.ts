@@ -68,8 +68,16 @@ export class Stage2D {
   }
 
   set camera(camera: Camera | undefined) {
-    this.#cameraUserOverride = camera;
+    this.#updateCamera(() => void (this.#cameraUserOverride = camera));
   }
+
+  #updateCamera = (updateCallback: () => void) => {
+    const prevCamera = this.camera;
+    updateCallback();
+    if (prevCamera !== this.camera) {
+      this.emit('afterCameraChanged', this, prevCamera);
+    }
+  };
 
   /**
    * A _stage_ should have a _projection_, otherwise it would be a _scene_.
@@ -113,7 +121,7 @@ export class Stage2D {
     if (this.camera != null) {
       this.projection.updateCamera(this.camera);
     } else {
-      this.#cameraFromProjection = this.projection.createCamera();
+      this.#updateCamera(() => void (this.#cameraFromProjection = this.projection.createCamera()));
     }
 
     if (prevWidth !== w || prevHeight !== h) {
