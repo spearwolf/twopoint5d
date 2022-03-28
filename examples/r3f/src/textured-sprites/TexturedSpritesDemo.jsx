@@ -1,4 +1,3 @@
-import { useThree } from "@react-three/fiber";
 import {
   forwardRefValue,
   ParallaxProjection,
@@ -9,33 +8,10 @@ import {
   useFrameStateMachine,
   useTextureAtlas,
 } from "picimo";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
 import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
-
-const useCameraFromStageAsDefault = () => {
-  const interactiveStage = useRef();
-  const [defaultCamera, setDefaultCamera] = useState(
-    interactiveStage.current?.camera
-  );
-
-  useEffect(() =>
-    interactiveStage.current?.on("afterCameraChanged", ({ camera }) => {
-      if (camera) setDefaultCamera(camera);
-    })
-  );
-
-  const setThreeDefault = useThree((state) => state.set);
-
-  useEffect(() => {
-    if (defaultCamera) {
-      setThreeDefault({ camera: defaultCamera });
-    }
-  }, [defaultCamera, setThreeDefault]);
-
-  return interactiveStage;
-};
 
 export const TexturedSpritesDemo = ({ capacity }) => {
   const { texture, atlas } = useTextureAtlas(
@@ -52,8 +28,6 @@ export const TexturedSpritesDemo = ({ capacity }) => {
     capacity,
   });
 
-  const stageRef = useCameraFromStageAsDefault();
-
   return (
     <>
       <Stage2D name="stage0" renderPriority={1}>
@@ -64,7 +38,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         <WiredBox width={600} height={200} depth={50} />
       </Stage2D>
 
-      <Stage2D name="stage1" ref={stageRef} noAutoClear renderPriority={2}>
+      <Stage2D name="stage1" noAutoClear defaultCamera renderPriority={2}>
         <ParallaxProjection
           plane="xy"
           origin="bottom left"
