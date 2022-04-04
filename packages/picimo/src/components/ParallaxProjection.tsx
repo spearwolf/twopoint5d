@@ -64,19 +64,11 @@ function Component(
     near,
     far,
     attach,
-    attachArray,
-    attachFns,
-    attachObject,
     children,
     ...props
   }: ParallaxProjectionParams,
   ref: Ref<__ParallaxProjection>,
 ) {
-  const attachProps = {attach, attachArray, attachFns, attachObject};
-  if (!Object.values(attachProps).some((val) => val)) {
-    attachProps.attach = 'projection';
-  }
-
   const [initialProjectionPlane, setInitialProjectionPlane] = useState(
     readProjectionPlane({projectionPlane, plane: plane ?? DEFAULT_PLANE, origin: origin ?? DEFAULT_ORIGIN}),
   );
@@ -103,6 +95,7 @@ function Component(
   return (
     <parallaxProjection
       args={[initialProjectionPlane]}
+      attach={attach ?? 'projection'}
       ref={mergeRefs(setProjection, ref)}
       viewSpecs-width={width}
       viewSpecs-height={height}
@@ -113,7 +106,6 @@ function Component(
       viewSpecs-distanceToProjectionPlane={distanceToProjectionPlane}
       viewSpecs-near={near}
       viewSpecs-far={far}
-      {...attachProps}
       {...props}
     >
       {children}

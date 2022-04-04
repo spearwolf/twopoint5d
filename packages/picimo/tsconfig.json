@@ -17,7 +17,7 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
-    "allowJs": false,
+    "allowJs": true,
     "jsx": "react-jsx",
 
     "strict": true,
