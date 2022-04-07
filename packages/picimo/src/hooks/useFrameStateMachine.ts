@@ -70,15 +70,21 @@ const getChanges = <Params extends FrameStateMachineParams>(
   ];
 };
 
+interface InternalState<Params extends FrameStateMachineParams> {
+  callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>;
+  dependencies: Params;
+  lastArgs?: Record<string, any>;
+}
+
 export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
 ): MutableRefObject<FrameStateMachineCallbacks<Params>> => {
-  // TODO just use only 1x useRef here
-  const callbacksRef = useRef(callbacks);
   const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
-  const dependenciesRef = useRef(dependencies);
-  const lastArgs = useRef<Record<string, any>>();
+  const stateRef = useRef<InternalState<Params>>({
+    callbacks,
+    dependencies,
+  });
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -86,42 +92,44 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
     if (isInitialized && !isLazyCallbacks(callbacks)) {
       stateMachineRef.current = callbacks;
     } else {
-      callbacksRef.current = callbacks;
+      stateRef.current.callbacks = callbacks;
     }
   }, [callbacks, isInitialized]);
 
-  useLayoutEffect((): void => void (dependenciesRef.current = dependencies), [dependencies]);
+  useLayoutEffect((): void => void (stateRef.current.dependencies = dependencies), [dependencies]);
 
   const sortedDepKeys = useMemo(() => sortedKeys(dependencies), []);
   const depValues = sortedDepKeys.map((key) => dependencies[key]);
 
   const onFrame = useCallback(
     (state: RootState, delta: number) => {
-      const args = constructArgs(dependenciesRef.current);
+      const args = constructArgs(stateRef.current.dependencies);
       // all settled is when all values are truthy
       const argsAllSettled = Object.entries(args).every(([, dep]) => Boolean(dep));
       const methodArgs = {...args, state, delta};
       if (isInitialized) {
         if (stateMachineRef.current?.update) {
-          const [hasChanges, changes] = getChanges(args as Params, lastArgs.current as Params);
+          const [hasChanges, changes] = getChanges(args as Params, stateRef.current.lastArgs as Params);
           if (hasChanges) {
             stateMachineRef.current.update(changes);
           }
         }
 
-        lastArgs.current = args;
+        stateRef.current.lastArgs = args;
 
         if (stateMachineRef.current?.frame) {
           stateMachineRef.current.frame(methodArgs);
         }
       } else if (argsAllSettled) {
-        stateMachineRef.current = isLazyCallbacks(callbacksRef.current) ? callbacksRef.current(methodArgs) : callbacksRef.current;
+        stateMachineRef.current = isLazyCallbacks(stateRef.current.callbacks)
+          ? stateRef.current.callbacks(methodArgs)
+          : stateRef.current.callbacks;
 
         if (stateMachineRef.current?.init) {
           stateMachineRef.current.init(methodArgs);
         }
 
-        lastArgs.current = args;
+        stateRef.current.lastArgs = args;
 
         setIsInitialized(true);
       }
@@ -132,7 +140,7 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   useLayoutEffect(
     () => () => {
       if (stateMachineRef.current?.dispose) {
-        stateMachineRef.current.dispose(constructArgs(dependenciesRef.current));
+        stateMachineRef.current.dispose(constructArgs(stateRef.current.dependencies));
       }
     },
     [],
