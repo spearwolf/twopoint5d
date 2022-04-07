@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import { Crosses } from "./Crosses";
 
 const makeCrosses = (geometry) => {
@@ -21,10 +21,11 @@ const makeCrosses = (geometry) => {
   }
 };
 
-ReactDOM.render(
+const root = createRoot(document.getElementById("root"));
+
+root.render(
   <Canvas dpr={[1, 2]}>
     <Crosses capacity={10} color={0x990033} onCreateGeometry={makeCrosses} />
     <OrbitControls />
-  </Canvas>,
-  document.getElementById("root")
+  </Canvas>
 );

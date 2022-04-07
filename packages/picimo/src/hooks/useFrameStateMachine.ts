@@ -14,6 +14,9 @@ const isForwardRefValue = (ref: any): ref is MutableRefObject<any> => forwardRef
 
 type FrameStateMachineParams = Record<string, unknown>;
 type NonNullParams<Params extends FrameStateMachineParams> = {[Key in keyof Params]: NonNullable<Params[Key]>};
+type ParamChanges<Params extends FrameStateMachineParams> = {
+  [Key in keyof Params]: {currentValue: Params[Key]; previousValue: Params[Key]};
+};
 
 interface UseFrameParams {
   state: RootState;
@@ -27,7 +30,7 @@ type FrameStateMachineFrameArgs<Params extends FrameStateMachineParams> = Params
 
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   init?: (args: FrameStateMachineInitArgs<Params>) => void;
-  // TODO update(changes)
+  update?: (changes: ParamChanges<Params>) => void;
   frame: (args: FrameStateMachineFrameArgs<Params>) => void;
   dispose?: (args: Params) => void;
 }
@@ -51,13 +54,32 @@ const isLazyCallbacks = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
 ): callbacks is FrameStateMachineLazyCallbacks<Params> => typeof callbacks === 'function';
 
+const getChanges = <Params extends FrameStateMachineParams>(
+  args: Params,
+  lastArgs: Params,
+): [hasChanges: boolean, changes: ParamChanges<Params>] => {
+  const changes = Object.entries(args).filter(([key, val]) => val !== lastArgs[key]);
+  const hasChanges = changes.length > 0;
+  return [
+    hasChanges,
+    hasChanges
+      ? (Object.fromEntries(
+          changes.map(([key, currentValue]) => [key, {currentValue, previousValue: lastArgs[key]}]),
+        ) as any as ParamChanges<Params>)
+      : undefined,
+  ];
+};
+
 export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
 ): MutableRefObject<FrameStateMachineCallbacks<Params>> => {
+  // TODO just use only 1x useRef here
   const callbacksRef = useRef(callbacks);
   const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
   const dependenciesRef = useRef(dependencies);
+  const lastArgs = useRef<Record<string, any>>();
+
   const [isInitialized, setIsInitialized] = useState(false);
 
   useLayoutEffect((): void => {
@@ -77,9 +99,18 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
     (state: RootState, delta: number) => {
       const args = constructArgs(dependenciesRef.current);
       // all settled is when all values are truthy
-      const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => Boolean(dep));
+      const argsAllSettled = Object.entries(args).every(([, dep]) => Boolean(dep));
       const methodArgs = {...args, state, delta};
       if (isInitialized) {
+        if (stateMachineRef.current?.update) {
+          const [hasChanges, changes] = getChanges(args as Params, lastArgs.current as Params);
+          if (hasChanges) {
+            stateMachineRef.current.update(changes);
+          }
+        }
+
+        lastArgs.current = args;
+
         if (stateMachineRef.current?.frame) {
           stateMachineRef.current.frame(methodArgs);
         }
@@ -89,6 +120,8 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
         if (stateMachineRef.current?.init) {
           stateMachineRef.current.init(methodArgs);
         }
+
+        lastArgs.current = args;
 
         setIsInitialized(true);
       }

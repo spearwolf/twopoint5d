@@ -70,6 +70,10 @@ export class BouncingSprites {
     }
   }
 
+  update(args) {
+    console.log("update", args);
+  }
+
   frame({ delta }) {
     const deltaFactor = delta;
 
