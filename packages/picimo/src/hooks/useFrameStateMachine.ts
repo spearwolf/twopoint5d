@@ -10,6 +10,9 @@ export const forwardRefValue = (ref: MutableRefObject<any>) => {
   return ref;
 };
 
+// TODO resolveValue(promise)
+// TODO nullableValue(unknown)
+
 const isForwardRefValue = (ref: any): ref is MutableRefObject<any> => forwardRefValues.has(ref);
 
 type FrameStateMachineParams = Record<string, unknown>;
@@ -107,26 +110,29 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
       // all settled is when all values are truthy
       const argsAllSettled = Object.entries(args).every(([, dep]) => Boolean(dep));
       const methodArgs = {...args, state, delta};
+
+      let stateMachine_ = stateMachineRef.current;
+
       if (isInitialized) {
-        if (stateMachineRef.current?.update) {
+        if (stateMachine_?.update) {
           const [hasChanges, changes] = getChanges(args as Params, stateRef.current.lastArgs as Params);
           if (hasChanges) {
-            stateMachineRef.current.update(changes);
+            stateMachine_.update(changes);
           }
         }
 
         stateRef.current.lastArgs = args;
 
-        if (stateMachineRef.current?.frame) {
-          stateMachineRef.current.frame(methodArgs);
+        if (stateMachine_?.frame) {
+          stateMachine_.frame(methodArgs);
         }
       } else if (argsAllSettled) {
-        stateMachineRef.current = isLazyCallbacks(stateRef.current.callbacks)
-          ? stateRef.current.callbacks(methodArgs)
-          : stateRef.current.callbacks;
+        const _callbacks = stateRef.current.callbacks;
 
-        if (stateMachineRef.current?.init) {
-          stateMachineRef.current.init(methodArgs);
+        stateMachineRef.current = stateMachine_ = isLazyCallbacks(_callbacks) ? _callbacks(methodArgs) : _callbacks;
+
+        if (stateMachine_?.init) {
+          stateMachine_.init(methodArgs);
         }
 
         stateRef.current.lastArgs = args;
