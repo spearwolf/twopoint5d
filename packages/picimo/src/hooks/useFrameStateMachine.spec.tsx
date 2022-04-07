@@ -4,15 +4,14 @@ import '@react-three/fiber';
 import ReactThreeTestRenderer from '@react-three/test-renderer';
 import {useRef} from 'react';
 import {Mesh} from 'three';
-
-import {useFrameStateMachine, forwardRefValue} from './useFrameStateMachine';
+import {forwardRefValue, useFrameStateMachine} from './useFrameStateMachine';
 
 // TODO test useFrameStateMachine(callbacks, /* without-extra-params */)
 
-const TestMesh = ({callbacks}: any) => {
+const TestMesh = ({extraValue, callbacks}: any) => {
   const meshRef = useRef<Mesh>();
 
-  useFrameStateMachine(callbacks, {mesh: forwardRefValue(meshRef)});
+  useFrameStateMachine(callbacks, {mesh: forwardRefValue(meshRef), extraValue, foo: 'plah!'});
 
   return (
     <mesh ref={meshRef}>
@@ -22,7 +21,9 @@ const TestMesh = ({callbacks}: any) => {
   );
 };
 
-const TestScene = ({showMesh, callbacks}: any) => <>{showMesh && <TestMesh callbacks={callbacks} />}</>;
+const TestScene = ({showMesh, extraValue, callbacks}: any) => (
+  <>{showMesh && <TestMesh callbacks={callbacks} extraValue={extraValue} />}</>
+);
 
 describe('useFrameStateMachine hook', () => {
   test('hook function exists', () => {
@@ -32,17 +33,19 @@ describe('useFrameStateMachine hook', () => {
   test('callbacks are called in the correct sequence', async () => {
     const callbacks = {
       init: jest.fn(),
+      update: jest.fn(),
       frame: jest.fn(),
       dispose: jest.fn(),
     };
 
-    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={callbacks} />);
+    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={callbacks} extraValue="abc" />);
     const mesh = renderer.scene.findByType('Mesh').instance;
 
     expect(mesh).toBeDefined();
     expect(mesh.type).toBe('Mesh');
 
     expect(callbacks.init).not.toBeCalled();
+    expect(callbacks.update).not.toBeCalled();
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
@@ -51,6 +54,7 @@ describe('useFrameStateMachine hook', () => {
     });
 
     expect(callbacks.init).toBeCalledTimes(1);
+    expect(callbacks.update).not.toBeCalled();
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
@@ -64,6 +68,7 @@ describe('useFrameStateMachine hook', () => {
     });
 
     expect(callbacks.init).toBeCalledTimes(1);
+    expect(callbacks.update).not.toBeCalled();
     expect(callbacks.frame).toBeCalledTimes(5);
     expect(callbacks.dispose).not.toBeCalled();
 
@@ -72,9 +77,21 @@ describe('useFrameStateMachine hook', () => {
     expect(args.state).toBeDefined();
     expect(args.delta).toBe(2);
 
+    // await renderer.update(<TestScene showMesh callbacks={callbacks} extraValue="xyz" />);
+
+    // await ReactThreeTestRenderer.act(async () => {
+    //   renderer.advanceFrames(1, 1);
+    // });
+
+    // expect(callbacks.init).toBeCalledTimes(1);
+    // expect(callbacks.update).toBeCalled();
+    // expect(callbacks.frame).toBeCalledTimes(6);
+    // expect(callbacks.dispose).not.toBeCalled();
+
     await renderer.update(<TestScene callbacks={callbacks} />);
 
     expect(callbacks.init).toBeCalledTimes(1);
+    // expect(callbacks.update).toBeCalledTimes(1);
     expect(callbacks.frame).toBeCalledTimes(5);
     expect(callbacks.dispose).toBeCalledTimes(1);
 
@@ -94,7 +111,7 @@ describe('useFrameStateMachine hook', () => {
     const lazyCallbacks = jest.fn();
     lazyCallbacks.mockReturnValueOnce(callbacks).mockReturnValue(undefined);
 
-    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={lazyCallbacks} />);
+    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={lazyCallbacks} extraValue={42} />);
     const mesh = renderer.scene.findByType('Mesh').instance;
 
     expect(mesh).toBeDefined();

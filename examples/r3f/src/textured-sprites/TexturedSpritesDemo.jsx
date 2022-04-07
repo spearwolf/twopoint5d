@@ -8,7 +8,7 @@ import {
   useFrameStateMachine,
   useTextureAtlas,
 } from "picimo";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
 import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
@@ -22,11 +22,20 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   const geometry = useRef();
 
+  const [tick, setTick] = useState(1);
+
   useFrameStateMachine(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
     atlas,
     capacity,
+    tick,
   });
+
+  useEffect(() => {
+    if (tick < 5) {
+      setTimeout(() => setTick(tick + 1), 1000);
+    }
+  }, [tick]);
 
   return (
     <>

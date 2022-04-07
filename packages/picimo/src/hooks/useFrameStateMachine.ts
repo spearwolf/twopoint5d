@@ -27,7 +27,7 @@ type FrameStateMachineFrameArgs<Params extends FrameStateMachineParams> = Params
 
 interface FrameStateMachineCallbacks<Params extends FrameStateMachineParams> {
   init?: (args: FrameStateMachineInitArgs<Params>) => void;
-  // TODO update(changes)
+  update?: (args: Params) => void;
   frame: (args: FrameStateMachineFrameArgs<Params>) => void;
   dispose?: (args: Params) => void;
 }
@@ -58,6 +58,7 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   const callbacksRef = useRef(callbacks);
   const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
   const dependenciesRef = useRef(dependencies);
+  const lastArgs = useRef<Record<string, any>>();
   const [isInitialized, setIsInitialized] = useState(false);
 
   useLayoutEffect((): void => {
@@ -72,14 +73,36 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
 
   const sortedDepKeys = useMemo(() => sortedKeys(dependencies), []);
   const depValues = sortedDepKeys.map((key) => dependencies[key]);
+  // console.log(
+  //   'sortedDepKeys',
+  //   sortedDepKeys,
+  //   'depValues',
+  //   depValues.map((val) => (typeof val === 'object' ? '<object>' : val)),
+  // );
 
   const onFrame = useCallback(
     (state: RootState, delta: number) => {
       const args = constructArgs(dependenciesRef.current);
       // all settled is when all values are truthy
-      const argsAllSettled = args.length === 0 || Object.entries(args).every(([, dep]) => Boolean(dep));
+      const argsAllSettled = Object.entries(args).every(([, dep]) => Boolean(dep));
       const methodArgs = {...args, state, delta};
       if (isInitialized) {
+        if (stateMachineRef.current?.update) {
+          // console.log(
+          //   'lastArgs',
+          //   Object.fromEntries(
+          //     Object.entries(lastArgs.current).map(([key, val]) => [key, typeof val === 'object' ? '<object>' : val]),
+          //   ),
+          //   'args',
+          //   Object.fromEntries(Object.entries(args).map(([key, val]) => [key, typeof val === 'object' ? '<object>' : val])),
+          // );
+          if (Object.entries(lastArgs.current).some(([key, lastValue]) => args[key] !== lastValue)) {
+            stateMachineRef.current.update(args); // args --> changes
+          }
+        }
+
+        lastArgs.current = args;
+
         if (stateMachineRef.current?.frame) {
           stateMachineRef.current.frame(methodArgs);
         }
@@ -89,6 +112,12 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
         if (stateMachineRef.current?.init) {
           stateMachineRef.current.init(methodArgs);
         }
+
+        lastArgs.current = args;
+        // console.log(
+        //   'args[0]',
+        //   Object.fromEntries(Object.entries(args).map(([key, val]) => [key, typeof val === 'object' ? '<object>' : val])),
+        // );
 
         setIsInitialized(true);
       }
