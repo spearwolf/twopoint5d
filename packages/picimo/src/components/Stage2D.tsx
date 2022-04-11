@@ -10,7 +10,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      stage2D: ReactThreeFiber.Object3DNode<__Stage2D, typeof __Stage2D & JSX.IntrinsicElements['primitive']>;
+      stage2D: ReactThreeFiber.Node<__Stage2D, typeof __Stage2D>;
     }
   }
 }
@@ -18,14 +18,14 @@ declare global {
 export const Stage2DContext = createContext<__Stage2D>(undefined);
 Stage2DContext.displayName = 'Stage2DContext';
 
-export type Stage2DParams = {
+export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
   renderPriority?: number;
   noAutoClear?: boolean;
   defaultCamera?: boolean;
-} & JSX.IntrinsicElements['stage2D'];
+};
 
 function Component(
-  {scene, projection, renderPriority, noAutoClear, defaultCamera, children, ...props}: Stage2DParams,
+  {scene, projection, renderPriority, noAutoClear, defaultCamera, children, ...props}: Stage2DProps,
   ref: Ref<__Stage2D>,
 ) {
   const canvasSize = useThree((state) => state.size);
@@ -114,4 +114,4 @@ function Component(
 
 Component.displayName = 'Stage2D';
 
-export const Stage2D = forwardRef<__Stage2D, Stage2DParams>(Component);
+export const Stage2D = forwardRef<__Stage2D, Stage2DProps>(Component);

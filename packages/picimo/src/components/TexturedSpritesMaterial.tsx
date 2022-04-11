@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
 import {TexturedSpritesMaterial as __TexturedSpritesMaterial} from '@spearwolf/textured-sprites';
-import {forwardRef, Ref} from 'react';
+import {ForwardedRef, forwardRef} from 'react';
 
 extend({TexturedSpritesMaterial: __TexturedSpritesMaterial});
 
@@ -8,19 +8,16 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      texturedSpritesMaterial: ReactThreeFiber.Object3DNode<
-        __TexturedSpritesMaterial,
-        typeof __TexturedSpritesMaterial & JSX.IntrinsicElements['shaderMaterial']
-      >;
+      texturedSpritesMaterial: ReactThreeFiber.MaterialNode<__TexturedSpritesMaterial, typeof __TexturedSpritesMaterial>;
     }
   }
 }
 
-export type TexturedSpritesMaterialParams = JSX.IntrinsicElements['texturedSpritesMaterial'];
+export type TexturedSpritesMaterialProps = JSX.IntrinsicElements['texturedSpritesMaterial'];
 
-function Component({children, ...props}: TexturedSpritesMaterialParams, ref: Ref<__TexturedSpritesMaterial>) {
+function Component({children, ...props}: TexturedSpritesMaterialProps, ref: ForwardedRef<__TexturedSpritesMaterial>) {
   return (
-    <texturedSpritesMaterial ref={ref} {...props}>
+    <texturedSpritesMaterial ref={ref as any} {...props}>
       {children}
     </texturedSpritesMaterial>
   );
@@ -28,4 +25,4 @@ function Component({children, ...props}: TexturedSpritesMaterialParams, ref: Ref
 
 Component.displayName = 'TexturedSpritesMaterial';
 
-export const TexturedSpritesMaterial = forwardRef<__TexturedSpritesMaterial, TexturedSpritesMaterialParams>(Component);
+export const TexturedSpritesMaterial = forwardRef<__TexturedSpritesMaterial, TexturedSpritesMaterialProps>(Component);

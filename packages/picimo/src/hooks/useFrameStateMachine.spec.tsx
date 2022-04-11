@@ -14,7 +14,7 @@ const TestMesh = ({extraValue, callbacks}: any) => {
   useFrameStateMachine(callbacks, {mesh: forwardRefValue(meshRef), extraValue, foo: 'plah!'});
 
   return (
-    <mesh ref={meshRef}>
+    <mesh ref={meshRef as any}>
       <boxGeometry args={[1, 1, 1]} />
       <meshBasicMaterial color={0xffff00} />
     </mesh>

@@ -10,37 +10,34 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      parallaxProjection: ReactThreeFiber.Object3DNode<
-        __ParallaxProjection,
-        typeof __ParallaxProjection & JSX.IntrinsicElements['primitive']
-      >;
+      parallaxProjection: ReactThreeFiber.Node<__ParallaxProjection, typeof __ParallaxProjection>;
     }
   }
 }
 
-export type ProjectionPlaneParams = {
+export type ProjectionPlaneProps = {
   projectionPlane?: ProjectionPlane;
   plane: 'xy' | 'XY' | 'xz' | 'XZ';
   origin?: 'bottom left' | 'top left' | 'left bottom' | 'left top';
 };
 
-export type ParallaxProjectionParams = {
-  width?: number;
-  height?: number;
-  fit?: 'fill' | 'contain';
-  pixelZoom?: number;
-  minPixelZoom?: number;
-  maxPixelZoom?: number;
-  distanceToProjectionPlane?: number;
-  near?: number;
-  far?: number;
-} & ProjectionPlaneParams &
-  JSX.IntrinsicElements['parallaxProjection'];
+export type ParallaxProjectionParams = JSX.IntrinsicElements['parallaxProjection'] &
+  ProjectionPlaneProps & {
+    width?: number;
+    height?: number;
+    fit?: 'fill' | 'contain';
+    pixelZoom?: number;
+    minPixelZoom?: number;
+    maxPixelZoom?: number;
+    distanceToProjectionPlane?: number;
+    near?: number;
+    far?: number;
+  };
 
 const parseProjectionOrigin = (origin: string): 'bottom-left' | 'top-left' =>
   origin.indexOf('top') === -1 ? 'bottom-left' : 'top-left';
 
-const readProjectionPlane = (params: ProjectionPlaneParams): ProjectionPlane | ProjectionPlaneDescription =>
+const readProjectionPlane = (params: ProjectionPlaneProps): ProjectionPlane | ProjectionPlaneDescription =>
   (params as {projectionPlane: ProjectionPlane}).projectionPlane ??
   `${(params as {plane: string}).plane.toLowerCase() === 'xy' ? 'xy' : 'xz'}|${parseProjectionOrigin(
     (params as {origin: string}).origin,
