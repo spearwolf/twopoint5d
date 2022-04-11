@@ -71,7 +71,11 @@ export class TextureAtlasLoader {
     );
   }
 
-  loadAsync(url: string, textureClasses?: Array<TextureOptionClasses>, options?: TextureAtlasLoadOptions): Promise<TextureImage> {
+  loadAsync(
+    url: string,
+    textureClasses?: Array<TextureOptionClasses>,
+    options?: TextureAtlasLoadOptions,
+  ): Promise<TextureAtlasData> {
     return new Promise((resolve, reject) => {
       this.load(url, textureClasses, options, resolve, reject);
     });

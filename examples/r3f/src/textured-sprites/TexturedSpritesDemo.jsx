@@ -7,6 +7,8 @@ import {
   TexturedSpritesMaterial,
   useFrameStateMachine,
   useTextureAtlas,
+  TextureAtlas,
+  TextureRef,
 } from "picimo";
 import { useEffect, useRef, useState } from "react";
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
@@ -14,7 +16,7 @@ import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
 
 export const TexturedSpritesDemo = ({ capacity }) => {
-  const { texture, atlas } = useTextureAtlas(
+  const { atlas } = useTextureAtlas(
     "/examples/assets/lab-walls-tiles.json",
     ["nearest"],
     { overrideImageUrl: "/examples/assets/lab-walls-tiles.png" }
@@ -39,6 +41,13 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   return (
     <>
+      <TextureAtlas
+        name="atlas0"
+        url="/examples/assets/lab-walls-tiles.json"
+        nearest
+        overrideImageUrl="/examples/assets/lab-walls-tiles.png"
+      />
+
       <Stage2D name="stage0" renderPriority={1}>
         <ParallaxProjection plane="xy" pixelZoom={1} />
 
@@ -63,11 +72,9 @@ export const TexturedSpritesDemo = ({ capacity }) => {
             capacity={capacity}
             ref={geometry}
           ></TexturedSpritesGeometry>
-          <TexturedSpritesMaterial
-            colorMap={texture}
-            depthTest={false}
-            depthWrite={false}
-          ></TexturedSpritesMaterial>
+          <TexturedSpritesMaterial depthTest={false} depthWrite={false}>
+            <TextureRef name="atlas0" attach="colorMap" />
+          </TexturedSpritesMaterial>
         </TexturedSprites>
       </Stage2D>
     </>
