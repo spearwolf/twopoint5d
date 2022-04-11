@@ -44,6 +44,7 @@ module.exports = {
   devServer: {
     liveReload: true,
     hot: false,
+    allowedHosts: 'all',
     static: [
       path.resolve(__dirname, "./public"),
       {

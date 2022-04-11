@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
 import {Stage2D as __Stage2D} from '@spearwolf/stage25';
-import {createContext, forwardRef, Ref, useCallback, useContext, useEffect, useState} from 'react';
+import {createContext, ForwardedRef, forwardRef, useCallback, useContext, useEffect, useState} from 'react';
 import {Camera, WebGLRenderer} from 'three';
 import {mergeRefs} from '../utils/mergeRefs';
 
@@ -26,7 +26,7 @@ export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
 
 function Component(
   {scene, projection, renderPriority, noAutoClear, defaultCamera, children, ...props}: Stage2DProps,
-  ref: Ref<__Stage2D>,
+  ref: ForwardedRef<__Stage2D>,
 ) {
   const canvasSize = useThree((state) => state.size);
   const setThreeDefault = useThree((state) => state.set);
@@ -63,26 +63,26 @@ function Component(
       stage.resize(canvasSize.width, canvasSize.height);
     }
 
-    console.log('stage', {
-      width: stage.width,
-      height: stage.height,
-      containerWidth: stage.containerWidth,
-      containerHeight: stage.containerHeight,
-      stage,
-      parentStage,
-    });
+    // console.log('stage', {
+    //   width: stage.width,
+    //   height: stage.height,
+    //   containerWidth: stage.containerWidth,
+    //   containerHeight: stage.containerHeight,
+    //   stage,
+    //   parentStage,
+    // });
 
     return parentStage?.on('resize', ({width, height}) => {
       stage.resize(width, height);
 
-      console.log('stage[parentStage:resize]', {
-        width: stage.width,
-        height: stage.height,
-        containerWidth: stage.containerWidth,
-        containerHeight: stage.containerHeight,
-        stage,
-        parentStage,
-      });
+      // console.log('stage[parentStage:resize]', {
+      //   width: stage.width,
+      //   height: stage.height,
+      //   containerWidth: stage.containerWidth,
+      //   containerHeight: stage.containerHeight,
+      //   stage,
+      //   parentStage,
+      // });
     });
   }, [stage, parentStage, canvasSize.width, canvasSize.height]);
 

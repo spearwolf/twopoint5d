@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
 import {ParallaxProjection as __ParallaxProjection, ProjectionPlane, ProjectionPlaneDescription} from '@spearwolf/stage25';
-import {forwardRef, Ref, useContext, useEffect, useState} from 'react';
+import {ForwardedRef, forwardRef, useContext, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 import {Stage2DContext} from './Stage2D';
 
@@ -64,7 +64,7 @@ function Component(
     children,
     ...props
   }: ParallaxProjectionParams,
-  ref: Ref<__ParallaxProjection>,
+  ref: ForwardedRef<__ParallaxProjection>,
 ) {
   const [initialProjectionPlane, setInitialProjectionPlane] = useState(
     readProjectionPlane({projectionPlane, plane: plane ?? DEFAULT_PLANE, origin: origin ?? DEFAULT_ORIGIN}),

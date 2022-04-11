@@ -22,7 +22,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   const geometry = useRef();
 
-  const [tick, setTick] = useState(1);
+  const [tick, setTick] = useState(0);
 
   useFrameStateMachine(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),

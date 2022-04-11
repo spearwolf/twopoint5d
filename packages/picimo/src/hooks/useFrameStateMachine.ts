@@ -107,8 +107,8 @@ export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
   const onFrame = useCallback(
     (state: RootState, delta: number) => {
       const args = constructArgs(stateRef.current.dependencies);
-      // all settled is when all values are truthy
-      const argsAllSettled = Object.entries(args).every(([, dep]) => Boolean(dep));
+      // all settled is when all values are != null
+      const argsAllSettled = Object.entries(args).every(([, dep]) => dep != null);
       const methodArgs = {...args, state, delta};
 
       let stateMachine_ = stateMachineRef.current;
