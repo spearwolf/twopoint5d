@@ -88,7 +88,7 @@ function Component(
         : undefined,
     {
       next(data) {
-        textureStore.createAsset(name, 'atlas', data);
+        textureStore.insertAsset(name, 'atlas', data);
         setTextureAtlas(data);
       },
       cancel(data) {

@@ -46,30 +46,33 @@ export class TextureStore {
     eventize(this);
   }
 
-  createAsset(name: AssetName, type: AssetType, data: any) {
-    if (this.#assets.has(name)) {
-      throw new Error(`duplicate asset "${name.toString()}"`);
+  insertAsset(name: AssetName, type: AssetType, data: any) {
+    let item: AssetItem = this.#assets.get(name);
+
+    if (item) {
+      item.type = type;
+      item.data = data;
+    } else {
+      item = {
+        name,
+        type,
+        data,
+        refCount: 0,
+      };
+
+      this.#assets.set(name, item);
     }
 
-    const item: AssetItem = {
-      name,
-      type,
-      data,
-      refCount: 0,
-    };
+    console.log('[TextureStore] asset:insert', item);
 
-    this.#assets.set(name, item);
-
-    console.log('[TextureStore] asset:create', item);
-
-    this.emit('asset:create', item.name);
+    this.emit('asset:insert', item.name);
   }
 
   getTextureRef(name: AssetName): Texture | undefined {
     const item = this.#assets.get(name);
     if (item) {
       item.refCount++;
-      console.log('[TextureStore] increase asset refCount to', item.refCount, 'for', item.name);
+      console.log('[TextureStore] increase refCount to', item.refCount, 'for asset', item.name);
       return asTexture(item);
     }
     return undefined;
@@ -78,7 +81,7 @@ export class TextureStore {
   disposeTextureRef(name: AssetName): void {
     const item = this.#assets.get(name);
     if (item && item.refCount > 0) {
-      console.log('[TextureStore] decrease asset refCount to', item.refCount, 'for', item.name);
+      console.log('[TextureStore] decrease refCount to', item.refCount, 'for asset', item.name);
       if (--item.refCount === 0) {
         asTexture(item)?.dispose();
       }

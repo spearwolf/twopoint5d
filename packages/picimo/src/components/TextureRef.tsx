@@ -16,7 +16,7 @@ function Component({name, children, ...props}: TextureRefProps, ref: ForwardedRe
     if (tex) {
       setTexture(tex);
     }
-    return textureStore.on(['asset:create', 'asset:update'], (assetName: AssetName) => {
+    return textureStore.on('asset:insert', (assetName: AssetName) => {
       if (name === assetName) {
         setTexture(textureStore.getTextureRef(name));
       }
