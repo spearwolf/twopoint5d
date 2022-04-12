@@ -70,6 +70,9 @@ export default () => {
 - [x] `<TexturedSprites>`
 - [x] `<TexturedSpritesGeometry>`
 - [x] `<TexturedSpritesMaterial>`
+- [ ] `<AnimatedSprites>`
+- [ ] `<AnimatedSpritesGeometry>`
+- [ ] `<AnimatedSpritesMaterial>`
 - [x] `<TextureRef>`
 - [x] `useTextureRef()`
 - [x] `<TextureStore>`
