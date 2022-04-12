@@ -62,15 +62,18 @@ export default () => {
 - [ ] `<OrthographicProjection>`
 - [ ] `<IsometricProjection>`
 - [x] `<TextureAtlas>`
-  - [x] `useTextureAtlas()`
+- [x] `useTextureAtlas()`
+- [x] `useTextureLoader()`
 - [ ] `<TileSet>`
-  - [x] `useTileSet()`
+- [x] `useTileSet()`
+- [x] `useTileSetLoader()`
 - [x] `<TexturedSprites>`
 - [x] `<TexturedSpritesGeometry>`
 - [x] `<TexturedSpritesMaterial>`
 - [x] `<TextureRef>`
-  - [x] `useTextureRef()`
+- [x] `useTextureRef()`
 - [x] `<TextureStore>`
+- [ ] stage *director/composer* &rarr; stage *effects/layers*
 
 
 :rocket: have fun!
