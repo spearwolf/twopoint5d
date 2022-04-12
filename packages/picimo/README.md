@@ -54,6 +54,23 @@ export default () => {
 };
 ```
 
-have fun!
+## Implementation State
 
-:rocket:
+- [x] `<Stage2D>`
+  - [ ] `renderToTexture` property
+- [x] `<ParallaxProjection>`
+- [ ] `<OrthographicProjection>`
+- [ ] `<IsometricProjection>`
+- [x] `<TextureAtlas>`
+  - [x] `useTextureAtlas()`
+- [ ] `<TileSet>`
+  - [x] `useTileSet()`
+- [x] `<TexturedSprites>`
+- [x] `<TexturedSpritesGeometry>`
+- [x] `<TexturedSpritesMaterial>`
+- [x] `<TextureRef>`
+  - [x] `useTextureRef()`
+- [x] `<TextureStore>`
+
+
+:rocket: have fun!
