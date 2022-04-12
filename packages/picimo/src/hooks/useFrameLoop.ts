@@ -79,7 +79,7 @@ interface InternalState<Params extends FrameStateMachineParams> {
   lastArgs?: Record<string, any>;
 }
 
-export const useFrameStateMachine = <Params extends FrameStateMachineParams>(
+export const useFrameLoop = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
 ): MutableRefObject<FrameStateMachineCallbacks<Params>> => {

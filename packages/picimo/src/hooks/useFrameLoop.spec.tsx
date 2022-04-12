@@ -4,14 +4,14 @@ import '@react-three/fiber';
 import ReactThreeTestRenderer from '@react-three/test-renderer';
 import {useRef} from 'react';
 import {Mesh} from 'three';
-import {forwardRefValue, useFrameStateMachine} from './useFrameStateMachine';
+import {forwardRefValue, useFrameLoop} from './useFrameLoop';
 
 // TODO test useFrameStateMachine(callbacks, /* without-extra-params */)
 
 const TestMesh = ({extraValue, callbacks}: any) => {
   const meshRef = useRef<Mesh>();
 
-  useFrameStateMachine(callbacks, {mesh: forwardRefValue(meshRef), extraValue, foo: 'plah!'});
+  useFrameLoop(callbacks, {mesh: forwardRefValue(meshRef), extraValue, foo: 'plah!'});
 
   return (
     <mesh ref={meshRef as any}>
@@ -27,7 +27,7 @@ const TestScene = ({showMesh, extraValue, callbacks}: any) => (
 
 describe('useFrameStateMachine hook', () => {
   test('hook function exists', () => {
-    expect(typeof useFrameStateMachine).toBe('function');
+    expect(typeof useFrameLoop).toBe('function');
   });
 
   test('callbacks are called in the correct sequence', async () => {

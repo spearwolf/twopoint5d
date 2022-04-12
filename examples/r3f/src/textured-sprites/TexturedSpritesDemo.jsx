@@ -7,7 +7,7 @@ import {
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
   TextureRef,
-  useFrameStateMachine,
+  useFrameLoop,
   useTextureAtlas,
 } from "picimo";
 import { useEffect, useRef, useState } from "react";
@@ -22,7 +22,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
 
   const [tick, setTick] = useState(0);
 
-  useFrameStateMachine(() => new BouncingSprites(150, 75, 5), {
+  useFrameLoop(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
     atlas,
     capacity,

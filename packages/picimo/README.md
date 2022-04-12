@@ -11,7 +11,7 @@ export default () => {
   const geometry = useRef();
   const textureAtlas = useTextureAtlas("foo-atlas");
 
-  useFrameStateMachine(
+  useFrameLoop(
     {
       init({ geometry, textureAtlas, state, delta }) {
         // your code goes here
