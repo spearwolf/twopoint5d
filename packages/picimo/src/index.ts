@@ -10,5 +10,5 @@ export * from './hooks/useAsyncEffect';
 export * from './hooks/useFrameStateMachine';
 export * from './hooks/useStageResize';
 export * from './hooks/useStageSize';
-export * from './hooks/useTextureAtlas';
+export * from './hooks/useTextureAtlasLoader';
 export * from './hooks/useTileSet';

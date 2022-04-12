@@ -2,7 +2,7 @@ import {TextureAtlasData, TextureAtlasLoader, TextureAtlasLoadOptions, TextureOp
 import {useState} from 'react';
 import {useAsyncEffect} from './useAsyncEffect';
 
-export const useTextureAtlas = (
+export const useTextureAtlasLoader = (
   url: string,
   textureClasses?: Array<TextureOptionClasses>,
   options?: TextureAtlasLoadOptions,
@@ -28,7 +28,7 @@ export const useTextureAtlas = (
       },
       dispose(data) {
         console.log('dispose texture-atlas', data);
-        data.texture?.dispose();
+        data.texture?.dispose(); // XXX maybe we should do this in the TextureStore only ?
       },
     },
     [url, overrideImageUrl],

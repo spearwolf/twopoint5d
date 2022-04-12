@@ -6,7 +6,7 @@ import {
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
   useFrameStateMachine,
-  useTextureAtlas,
+  useTextureAtlasLoader,
   TextureAtlas,
   TextureRef,
 } from "picimo";
@@ -16,7 +16,7 @@ import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
 
 export const TexturedSpritesDemo = ({ capacity }) => {
-  const { atlas } = useTextureAtlas(
+  const { atlas } = useTextureAtlasLoader(
     "/examples/assets/lab-walls-tiles.json",
     ["nearest"],
     { overrideImageUrl: "/examples/assets/lab-walls-tiles.png" }
