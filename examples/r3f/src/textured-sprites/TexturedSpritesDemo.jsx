@@ -2,13 +2,13 @@ import {
   forwardRefValue,
   ParallaxProjection,
   Stage2D,
+  TextureAtlas,
   TexturedSprites,
   TexturedSpritesGeometry,
   TexturedSpritesMaterial,
-  useFrameStateMachine,
-  useTextureAtlasLoader,
-  TextureAtlas,
   TextureRef,
+  useFrameStateMachine,
+  useTextureAtlas,
 } from "picimo";
 import { useEffect, useRef, useState } from "react";
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
@@ -16,13 +16,9 @@ import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
 
 export const TexturedSpritesDemo = ({ capacity }) => {
-  const { atlas } = useTextureAtlasLoader(
-    "/examples/assets/lab-walls-tiles.json",
-    ["nearest"],
-    { overrideImageUrl: "/examples/assets/lab-walls-tiles.png" }
-  );
-
   const geometry = useRef();
+
+  const atlas = useTextureAtlas("atlas0");
 
   const [tick, setTick] = useState(0);
 

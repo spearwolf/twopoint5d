@@ -1,36 +1,14 @@
 import '@react-three/fiber';
-import {ForwardedRef, forwardRef, useContext, useEffect, useState} from 'react';
+import {ForwardedRef, forwardRef} from 'react';
 import {Texture} from 'three';
-import {AssetName, TextureStoreContext} from '../context/TextureStore';
+import {useTextureRef} from '../hooks/useTextureRef';
 
 export type TextureRefProps = JSX.IntrinsicElements['texture'] & {
   name: string | symbol;
 };
 
 function Component({name, children, ...props}: TextureRefProps, ref: ForwardedRef<Texture>) {
-  const textureStore = useContext(TextureStoreContext);
-  const [texture, setTexture] = useState<Texture>();
-
-  useEffect(() => {
-    const tex = textureStore.getTextureRef(name);
-    if (tex) {
-      setTexture(tex);
-    }
-    return textureStore.on('asset:insert', (assetName: AssetName) => {
-      if (name === assetName) {
-        setTexture(textureStore.getTextureRef(name));
-      }
-    });
-  }, [textureStore, name]);
-
-  useEffect(
-    () => () => {
-      if (texture) {
-        textureStore?.disposeTextureRef(texture.name);
-      }
-    },
-    [textureStore, texture],
-  );
+  const texture = useTextureRef(name);
 
   return texture ? (
     <primitive object={texture} ref={ref} {...props}>

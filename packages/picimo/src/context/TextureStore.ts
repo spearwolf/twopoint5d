@@ -1,5 +1,5 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
-import {TextureAtlasData, TileSetData} from '@spearwolf/vertex-objects';
+import {TextureAtlas, TextureAtlasData, TileSet, TileSetData} from '@spearwolf/vertex-objects';
 import {createContext} from 'react';
 import {Texture} from 'three';
 
@@ -24,7 +24,7 @@ export type AssetItem = {
     }
 );
 
-export const asTexture = (item: AssetItem): Texture | undefined => {
+const asTexture = (item: AssetItem): Texture | undefined => {
   switch (item.type) {
     case 'texture':
       return item.data;
@@ -34,6 +34,29 @@ export const asTexture = (item: AssetItem): Texture | undefined => {
 
     case 'atlas':
       return item.data.texture;
+  }
+};
+
+const asTextureAtlas = (item: AssetItem): TextureAtlas | undefined => {
+  switch (item.type) {
+    case 'tileset':
+      return item.data.tileSet.atlas;
+
+    case 'atlas':
+      return item.data.atlas;
+
+    default:
+      return undefined;
+  }
+};
+
+const asTileSet = (item: AssetItem): TileSet | undefined => {
+  switch (item.type) {
+    case 'tileset':
+      return item.data.tileSet;
+
+    default:
+      return undefined;
   }
 };
 
@@ -76,6 +99,16 @@ export class TextureStore {
       return asTexture(item);
     }
     return undefined;
+  }
+
+  getTextureAtlas(name: AssetName): TextureAtlas | undefined {
+    const item = this.#assets.get(name);
+    return item ? asTextureAtlas(item) : undefined;
+  }
+
+  getTileSet(name: AssetName): TileSet | undefined {
+    const item = this.#assets.get(name);
+    return item ? asTileSet(item) : undefined;
   }
 
   disposeTextureRef(name: AssetName): void {
