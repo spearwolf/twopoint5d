@@ -1,0 +1,102 @@
+{"frames": {
+
+"cloud1":
+{
+	"frame": {"x":512,"y":229,"w":512,"h":301},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":301},
+	"sourceSize": {"w":512,"h":301},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud2":
+{
+	"frame": {"x":0,"y":1257,"w":1024,"h":470},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":1024,"h":470},
+	"sourceSize": {"w":1024,"h":470},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud3":
+{
+	"frame": {"x":0,"y":229,"w":512,"h":250},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":250},
+	"sourceSize": {"w":512,"h":250},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud4":
+{
+	"frame": {"x":512,"y":857,"w":512,"h":400},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":400},
+	"sourceSize": {"w":512,"h":400},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud5":
+{
+	"frame": {"x":512,"y":530,"w":512,"h":327},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":327},
+	"sourceSize": {"w":512,"h":327},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud6":
+{
+	"frame": {"x":0,"y":530,"w":512,"h":315},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":315},
+	"sourceSize": {"w":512,"h":315},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud7":
+{
+	"frame": {"x":0,"y":857,"w":512,"h":354},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":354},
+	"sourceSize": {"w":512,"h":354},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud8":
+{
+	"frame": {"x":768,"y":0,"w":256,"h":229},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":229},
+	"sourceSize": {"w":256,"h":229},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud9":
+{
+	"frame": {"x":512,"y":0,"w":256,"h":215},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":215},
+	"sourceSize": {"w":256,"h":215},
+	"pivot": {"x":0.5,"y":0.5}
+},
+"cloud10":
+{
+	"frame": {"x":0,"y":0,"w":512,"h":161},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":512,"h":161},
+	"sourceSize": {"w":512,"h":161},
+	"pivot": {"x":0.5,"y":0.5}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "clouds.png",
+	"format": "RGBA8888",
+	"size": {"w":1024,"h":2048},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:a65e44155f70412f02b4180f242610b0:d936f81b6be30d403d2481cf03a193f6:e96b5453eed6fb7cc3a8e55168758fa4$"
+}
+}

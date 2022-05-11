@@ -12,6 +12,10 @@ module.exports = {
       import: "./src/textured-sprites/index.jsx",
       dependOn: "libs",
     },
+    clouds: {
+      import: "./src/clouds/index.jsx",
+      dependOn: "libs",
+    },
     libs: [
       "regenerator-runtime/runtime",
       "three",
