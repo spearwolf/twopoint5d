@@ -1,6 +1,24 @@
 /* eslint-disable no-console */
 
 export class CloudSprites {
+  capacity = 100;
+
+  gap = 5;
+
+  speed = 20;
+
+  width = 1920;
+  height = 1080;
+
+  xOffset = 0;
+  yOffset = 0;
+  zOffset = 0;
+
+  geometry = null;
+  atlas = null;
+
+  #sprites = [];
+
   get spritePool() {
     return this.geometry.instancedPool;
   }
@@ -27,10 +45,10 @@ export class CloudSprites {
   }
 
   #animateClouds(delta) {
-    const spritesCount = this.sprites.length;
+    const spritesCount = this.#sprites.length;
 
     for (let i = 0; i < spritesCount; i++) {
-      const { sprite } = this.sprites[i];
+      const { sprite } = this.#sprites[i];
 
       sprite.z += this.speed * delta;
 
@@ -41,8 +59,6 @@ export class CloudSprites {
   }
 
   #createClouds() {
-    this.sprites = [];
-
     let z = this.zRangeMin;
 
     for (let i = 0; i < this.capacity; i++) {
@@ -57,7 +73,7 @@ export class CloudSprites {
         z
       );
 
-      this.sprites.push({ frame, sprite });
+      this.#sprites.push({ frame, sprite });
 
       z += this.gap;
     }
