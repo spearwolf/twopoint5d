@@ -3,9 +3,10 @@
  * https://jestjs.io/docs/en/configuration.html
  */
 
-export default {
+// eslint-disable-next-line no-undef
+module.exports = {
   // All imported modules in your tests should be mocked automatically
-  automock: false,
+  // automock: false,
 
   // Stop running tests after `n` failures
   // bail: 0,
@@ -71,7 +72,7 @@ export default {
   // ],
 
   // An array of file extensions your modules use
-  moduleFileExtensions: ['js', 'jsx', 'json', 'ts', 'tsx'],
+  moduleFileExtensions: ['js', 'json', 'ts'],
 
   // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
   // moduleNameMapper: {},
@@ -115,14 +116,12 @@ export default {
 
   // A list of paths to directories that Jest should use to search for files in
   // roots: ['<rootDir>', './tests'],
-  roots: ['./src'],
 
   // Allows you to use a custom runner instead of Jest's default test runner
   // runner: "jest-runner",
 
   // The paths to modules that run some code to configure or set up the testing environment before each test
   // setupFiles: [],
-  setupFiles: ['./src/setup-tests.js'],
 
   // A list of paths to modules that run some code to configure or set up the testing framework before each test
   // setupFilesAfterEnv: [],
@@ -134,7 +133,7 @@ export default {
   // snapshotSerializers: [],
 
   // The test environment that will be used for testing
-  testEnvironment: 'jest-environment-jsdom',
+  // testEnvironment: "jest-environment-jsdom",
 
   // Options that will be passed to the testEnvironment
   // testEnvironmentOptions: {},
@@ -170,7 +169,7 @@ export default {
 
   // A map from regular expressions to paths to transformers
   transform: {
-    '\\.[jt]sx?$': ['ts-jest'],
+    '\\.[jt]s$': ['ts-jest'],
   },
 
   // An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation
