@@ -1,8 +1,6 @@
-export class CloudSprites {
-  constructor(props) {
-    Object.assign(this, props);
-  }
+/* eslint-disable no-console */
 
+export class CloudSprites {
   get spritePool() {
     return this.geometry.instancedPool;
   }
@@ -19,27 +17,22 @@ export class CloudSprites {
     return this.zRangeMax - this.zRangeMin;
   }
 
-  init(props) {
-    Object.assign(this, props);
-
+  init() {
     this.#createClouds();
-
-    console.log("cloud-sprites", this);
+    console.log("cloud-sprites::init", this);
   }
 
-  frame(props) {
-    Object.assign(this, props);
-
-    this.#animateClouds();
+  frame(state, delta) {
+    this.#animateClouds(delta);
   }
 
-  #animateClouds() {
+  #animateClouds(delta) {
     const spritesCount = this.sprites.length;
 
     for (let i = 0; i < spritesCount; i++) {
       const { sprite } = this.sprites[i];
 
-      sprite.z += this.speed * this.delta;
+      sprite.z += this.speed * delta;
 
       if (sprite.z > this.zRangeMax) {
         sprite.z -= this.zRange;

@@ -9,6 +9,7 @@ import {
   useTextureAtlas,
 } from "picimo";
 import { useRef } from "react";
+import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";
 import { CloudSprites } from "./CloudSprites";
 
 const fragmentShader = `
@@ -35,7 +36,7 @@ export const Clouds = ({
 
   const atlas = useTextureAtlas("clouds");
 
-  useFrameLoop(() => new CloudSprites(), {
+  useFrameLoop(createFrameLoopComponent(CloudSprites), {
     geometry: forwardRefValue(geometry),
     atlas,
     capacity,
