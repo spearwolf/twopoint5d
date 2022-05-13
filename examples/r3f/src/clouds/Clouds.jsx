@@ -9,18 +9,9 @@ import {
   useTextureAtlas,
 } from "picimo";
 import { useRef } from "react";
+import { FrontSide } from "three";
 import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";
 import { CloudSprites } from "./CloudSprites";
-
-const fragmentShader = `
-  uniform sampler2D colorMap;
-
-  varying vec2 vTexCoords;
-
-  void main() {
-    gl_FragColor = texture2D(colorMap, vTexCoords);
-  }
-`;
 
 export const Clouds = ({
   capacity,
@@ -33,11 +24,13 @@ export const Clouds = ({
   speed,
 }) => {
   const geometry = useRef();
+  const material = useRef();
 
   const atlas = useTextureAtlas("clouds");
 
   useFrameLoop(createFrameLoopComponent(CloudSprites), {
     geometry: forwardRefValue(geometry),
+    material: forwardRefValue(material),
     atlas,
     capacity,
     gap,
@@ -64,9 +57,11 @@ export const Clouds = ({
           ref={geometry}
         ></TexturedSpritesGeometry>
         <TexturedSpritesMaterial
+          ref={material}
           depthTest={false}
           depthWrite={false}
-          fragmentShader={fragmentShader}
+          side={FrontSide}
+          chunks-discard_by_alpha_fragment={""}
         >
           <TextureRef name="clouds" attach="colorMap" />
         </TexturedSpritesMaterial>

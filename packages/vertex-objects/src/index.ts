@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './CustomChunksShaderMaterial';
 export * from './findNextPowerOf2';
 export * from './FrameBasedAnimations';
 export * from './getDescriptorOf';

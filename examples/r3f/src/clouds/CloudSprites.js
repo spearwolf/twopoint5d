@@ -1,5 +1,7 @@
 /* eslint-disable no-console */
 
+import { updateUniformValue } from "../utils/updateUniformValue";
+
 export class CloudSprites {
   capacity = 100;
 
@@ -15,6 +17,7 @@ export class CloudSprites {
   zOffset = 0;
 
   geometry = null;
+  material = null;
   atlas = null;
 
   #sprites = [];
@@ -37,11 +40,34 @@ export class CloudSprites {
 
   init() {
     this.#createClouds();
+    this.#updateUniforms();
+
     console.log("cloud-sprites::init", this);
+  }
+
+  update(changes) {
+    if (["capacity", "gap", "zOffset"].some((key) => key in changes)) {
+      this.#updateUniformZRange();
+    }
   }
 
   frame(state, delta) {
     this.#animateClouds(delta);
+  }
+
+  #updateUniforms() {
+    this.#updateUniformZRange();
+  }
+
+  #updateUniformZRange() {
+    const { zRange, zRangeMin, zRangeMax } = this;
+
+    updateUniformValue(this.material, "fadeInOutZRange", [
+      zRangeMin,
+      zRangeMin + zRange * 0.1,
+      zRangeMax,
+      zRangeMax - zRange * 0.1,
+    ]);
   }
 
   #animateClouds(delta) {
