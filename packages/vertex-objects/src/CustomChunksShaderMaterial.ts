@@ -21,13 +21,7 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
         set(target: any, propKey: string, value, receiver) {
           if (!(propKey in target) || target[propKey] !== value) {
             ++material.#version;
-
-            if (
-              material.replaceVertexShaderChunks.indexOf(propKey) !== -1 ||
-              material.replaceFragmentShaderChunks.indexOf(propKey) !== -1
-            ) {
-              material.needsUpdate = true;
-            }
+            material.needsUpdate = true;
 
             if (value) {
               Reflect.set(target, propKey, value, receiver);
