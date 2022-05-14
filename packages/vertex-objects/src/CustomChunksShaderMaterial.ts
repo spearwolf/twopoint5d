@@ -9,7 +9,11 @@ export interface CustomShaderChunks {
 export class CustomChunksShaderMaterial extends ShaderMaterial {
   readonly #uuid = MathUtils.generateUUID();
 
-  #version = 0;
+  #chunksSerial = 0;
+
+  customProgramCacheKey(): string {
+    return `${this.#uuid},${this.#chunksSerial}`;
+  }
 
   replaceVertexShaderChunks: string[] = [];
   replaceFragmentShaderChunks: string[] = [];
@@ -20,7 +24,7 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
       {
         set(target: any, propKey: string, value, receiver) {
           if (!(propKey in target) || target[propKey] !== value) {
-            ++material.#version;
+            ++material.#chunksSerial;
             material.needsUpdate = true;
 
             if (value) {
@@ -36,18 +40,14 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
       },
     ))(this);
 
-  #customChunkNames(): string[] {
-    return Object.keys(this.chunks).filter(
-      (name) => this.replaceVertexShaderChunks.indexOf(name) === -1 && this.replaceFragmentShaderChunks.indexOf(name) === -1,
+  #customChunks(): [string, string][] {
+    return Object.entries(this.chunks).filter(
+      ([name]) => this.replaceVertexShaderChunks.indexOf(name) === -1 && this.replaceFragmentShaderChunks.indexOf(name) === -1,
     );
   }
 
-  customProgramCacheKey(): string {
-    return `${this.#uuid},${this.#version},${this.#customChunkNames().join(',')}`;
-  }
-
   onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
-    const customChunks = this.#customChunkNames().map((customChunkName) => [customChunkName, this.chunks[customChunkName]]);
+    const customChunks = this.#customChunks();
 
     const replaceChunk = (shaderType: 'vertexShader' | 'fragmentShader') => (chunkName: string) => {
       shader[shaderType] = customChunks.reduce(
