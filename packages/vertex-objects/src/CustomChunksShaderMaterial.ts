@@ -14,10 +14,6 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
   replaceVertexShaderChunks: string[] = [];
   replaceFragmentShaderChunks: string[] = [];
 
-  customProgramCacheKey(): string {
-    return `${this.#uuid},${this.#version},${this.replaceVertexShaderChunks.concat(this.replaceFragmentShaderChunks).join(',')}`;
-  }
-
   readonly chunks: CustomShaderChunks = ((material) =>
     new Proxy(
       {},
@@ -46,9 +42,24 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
       },
     ))(this);
 
+  #customChunkNames(): string[] {
+    return Object.keys(this.chunks).filter(
+      (name) => this.replaceVertexShaderChunks.indexOf(name) === -1 && this.replaceFragmentShaderChunks.indexOf(name) === -1,
+    );
+  }
+
+  customProgramCacheKey(): string {
+    return `${this.#uuid},${this.#version},${this.#customChunkNames().join(',')}`;
+  }
+
   onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
+    const customChunks = this.#customChunkNames().map((customChunkName) => [customChunkName, this.chunks[customChunkName]]);
+
     const replaceChunk = (shaderType: 'vertexShader' | 'fragmentShader') => (chunkName: string) => {
-      shader[shaderType] = shader[shaderType].replace(`#include <${chunkName}>`, this.chunks[chunkName] ?? '');
+      shader[shaderType] = customChunks.reduce(
+        (source, [customChunkName, customChunkValue]) => source.replace(`#include <${customChunkName}>`, customChunkValue),
+        shader[shaderType].replace(`#include <${chunkName}>`, this.chunks[chunkName] ?? ''),
+      );
     };
 
     this.replaceVertexShaderChunks.forEach(replaceChunk('vertexShader'));
