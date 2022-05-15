@@ -46,6 +46,8 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
     );
   }
 
+  logShadersToConsole = false;
+
   onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
     const customChunks = this.#customChunks();
 
@@ -58,5 +60,16 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
 
     this.replaceVertexShaderChunks.forEach(replaceChunk('vertexShader'));
     this.replaceFragmentShaderChunks.forEach(replaceChunk('fragmentShader'));
+
+    if (this.logShadersToConsole) {
+      console.groupCollapsed(`CustomChunksShaderMaterial.onBeforeCompile(), name= ${this.name ?? this.uuid}`);
+      console.group('vertexShader');
+      console.log(shader.vertexShader);
+      console.groupEnd();
+      console.group('fragmentShader');
+      console.log(shader.fragmentShader);
+      console.groupEnd();
+      console.groupEnd();
+    }
   }
 }

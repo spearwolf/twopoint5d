@@ -19,6 +19,8 @@ const vertexShader = `
                         * vec4(position * vec3(quadSize.xy, 0.0), 0.0)
                         + vec4(instancePosition, 1.0);
 
+    #include <after_vertexPosition_vertex>
+
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition.xyz, 1.0);
 
     vTexCoords = texCoords.xy + (uv * texCoords.zw);
@@ -63,18 +65,19 @@ export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
       vertexShader,
       fragmentShader,
       uniforms: {
+        ...options?.uniforms,
         colorMap: {
           value: options?.colorMap,
         },
       },
       transparent: true,
       side: DoubleSide,
-      ...unpick(options, 'colorMap'),
+      ...unpick(options, 'colorMap', 'uniforms'),
     });
 
     this.name = options?.name ?? '@spearwolf/textured-sprites:TexturedSpritesMaterial';
 
-    this.replaceVertexShaderChunks = ['extra_pars_vertex', 'post_main_vertex'];
+    this.replaceVertexShaderChunks = ['extra_pars_vertex', 'after_vertexPosition_vertex', 'post_main_vertex'];
     this.replaceFragmentShaderChunks = ['extra_pars_fragment', 'discard_by_alpha_fragment', 'post_main_fragment'];
 
     this.chunks.discard_by_alpha_fragment = fragmentDiscardByAlpha;

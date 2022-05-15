@@ -19,12 +19,14 @@ root.render(
 
       <Clouds
         capacity={200}
-        gap={5}
-        speed={20}
+        gap={10}
+        speed={40}
         width={1920}
         height={400}
         yOffset={-400}
-        zOffset={-200}
+        zOffset={-660}
+        fadeInRange={0.1}
+        fadeOutRange={0.1}
       />
     </Stage2D>
     <OrbitControls />

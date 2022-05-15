@@ -1,7 +1,5 @@
 /* eslint-disable no-console */
 
-import { updateUniformValue } from "../utils/updateUniformValue";
-
 export class CloudSprites {
   capacity = 100;
 
@@ -15,6 +13,9 @@ export class CloudSprites {
   xOffset = 0;
   yOffset = 0;
   zOffset = 0;
+
+  fadeInRange = 0.1;
+  fadeOutRange = 0.2;
 
   geometry = null;
   material = null;
@@ -62,12 +63,12 @@ export class CloudSprites {
   #updateUniformZRange() {
     const { zRange, zRangeMin, zRangeMax } = this;
 
-    updateUniformValue(this.material, "fadeInOutZRange", [
+    this.material.uniforms.fadeInOutZRange.value = [
       zRangeMin,
-      zRangeMin + zRange * 0.1,
+      zRangeMin + zRange * this.fadeInRange,
+      zRangeMax - zRange * this.fadeOutRange,
       zRangeMax,
-      zRangeMax - zRange * 0.1,
-    ]);
+    ];
   }
 
   #animateClouds(delta) {
