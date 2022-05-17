@@ -1,5 +1,6 @@
 import {
   forwardRefValue,
+  ShaderChunks,
   TextureAtlas,
   TexturedSprites,
   TexturedSpritesGeometry,
@@ -11,7 +12,6 @@ import {
 import { useEffect, useRef } from "react";
 import { FrontSide } from "three";
 import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";
-import { ShaderChunks } from "../utils/ShaderChunks";
 import { CloudSprites } from "./CloudSprites";
 
 const ShaderLib = {
