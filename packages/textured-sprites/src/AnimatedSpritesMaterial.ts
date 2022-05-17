@@ -113,15 +113,7 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
 
     this.replaceFragmentShaderChunks = ['extra_pars_fragment', 'discard_by_alpha_fragment', 'post_main_fragment'];
 
-    [
-      'discard_by_alpha_fragment',
-      'rotateZ_vertex',
-      'makeBillboard_fn_vertex',
-      'vertexPosition_makeBillboard_instanced_vertex',
-      'vertexPosition_instanced_vertex',
-    ].forEach((shader) => {
-      this.chunks[shader] = ShaderLib[shader];
-    });
+    this.addStaticChunks(ShaderLib);
   }
 
   get colorMap(): Texture | undefined {
@@ -146,10 +138,6 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
   }
 
   set renderAsBillboards(renderAsBillboards: boolean) {
-    if (renderAsBillboards) {
-      Object.assign(this.defines, this.defines, {RENDER_AS_BILLBOARDS: 1});
-    } else if (this.defines) {
-      delete this.defines.RENDER_AS_BILLBOARDS;
-    }
+    this.updateBoolDefine('RENDER_AS_BILLBOARDS', renderAsBillboards);
   }
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import { useEffect, useRef, useState } from "react";
 
 export const ShaderChunks = ({ chunks }) => {
   const primitiveRef = useRef({});
@@ -7,19 +7,7 @@ export const ShaderChunks = ({ chunks }) => {
 
   useEffect(() => {
     if (material && typeof chunks === "object") {
-      const prevChunks = Object.fromEntries(
-        Object.keys(chunks).map((name) => [name, material.chunks[name]])
-      );
-
-      Object.entries(chunks).forEach(([name, value]) => {
-        material.chunks[name] = value;
-      });
-
-      return () => {
-        Object.entries(prevChunks).forEach(([name, value]) => {
-          material.chunks[name] = value;
-        });
-      };
+      return material.addStaticChunks(chunks);
     }
   }, [material, chunks]);
 
