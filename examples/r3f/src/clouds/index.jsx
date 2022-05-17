@@ -20,7 +20,7 @@ root.render(
       <Clouds
         capacity={200}
         gap={10}
-        speed={40}
+        speed={90}
         width={1920}
         height={400}
         yOffset={-400}

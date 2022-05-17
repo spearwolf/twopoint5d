@@ -1,5 +1,6 @@
-import {ShaderTool, unpick, CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters} from '@spearwolf/vertex-objects';
+import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '@spearwolf/vertex-objects';
 import {DoubleSide, Texture} from 'three';
+import ShaderLib from './ShaderLib';
 
 const vertexShader = `
 
@@ -12,12 +13,19 @@ const vertexShader = `
 
   #include <extra_pars_vertex>
 
-  ${ShaderTool.rotateZ()}
+  #include <rotateZ_vertex>
+
+  #ifdef RENDER_AS_BILLBOARDS
+  #include <makeBillboard_fn_vertex>
+  #endif
 
   void main() {
-    vec4 vertexPosition = rotateZ(rotation)
-                        * vec4(position * vec3(quadSize.xy, 0.0), 0.0)
-                        + vec4(instancePosition, 1.0);
+
+    #ifdef RENDER_AS_BILLBOARDS
+    #include <vertexPosition_makeBillboard_instanced_vertex>
+    #else
+    #include <vertexPosition_instanced_vertex>
+    #endif
 
     #include <after_vertexPosition_vertex>
 
@@ -47,14 +55,6 @@ const fragmentShader = `
 
 `;
 
-const fragmentDiscardByAlpha = `
-
-  if (gl_FragColor.a == 0.0) {
-    discard;
-  }
-
-`;
-
 interface TexturedSpritesMaterialParameters extends CustomChunksShaderMaterialParameters {
   colorMap?: Texture;
 }
@@ -77,10 +77,27 @@ export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
 
     this.name = options?.name ?? '@spearwolf/textured-sprites:TexturedSpritesMaterial';
 
-    this.replaceVertexShaderChunks = ['extra_pars_vertex', 'after_vertexPosition_vertex', 'post_main_vertex'];
+    this.replaceVertexShaderChunks = [
+      'extra_pars_vertex',
+      'rotateZ_vertex',
+      'makeBillboard_fn_vertex',
+      'vertexPosition_makeBillboard_instanced_vertex',
+      'vertexPosition_instanced_vertex',
+      'after_vertexPosition_vertex',
+      'post_main_vertex',
+    ];
+
     this.replaceFragmentShaderChunks = ['extra_pars_fragment', 'discard_by_alpha_fragment', 'post_main_fragment'];
 
-    this.chunks.discard_by_alpha_fragment = fragmentDiscardByAlpha;
+    [
+      'discard_by_alpha_fragment',
+      'rotateZ_vertex',
+      'makeBillboard_fn_vertex',
+      'vertexPosition_makeBillboard_instanced_vertex',
+      'vertexPosition_instanced_vertex',
+    ].forEach((shader) => {
+      this.chunks[shader] = ShaderLib[shader];
+    });
   }
 
   get colorMap(): Texture | undefined {
@@ -89,5 +106,17 @@ export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
 
   set colorMap(colorMap: Texture | undefined) {
     this.uniforms.colorMap.value = colorMap;
+  }
+
+  get renderAsBillboards(): boolean {
+    return this.defines?.RENDER_AS_BILLBOARDS === 1;
+  }
+
+  set renderAsBillboards(renderAsBillboards: boolean) {
+    if (renderAsBillboards) {
+      Object.assign(this.defines, this.defines, {RENDER_AS_BILLBOARDS: 1});
+    } else if (this.defines) {
+      delete this.defines.RENDER_AS_BILLBOARDS;
+    }
   }
 }

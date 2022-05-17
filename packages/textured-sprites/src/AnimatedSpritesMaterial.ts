@@ -1,5 +1,6 @@
-import {ShaderTool, unpick} from '@spearwolf/vertex-objects';
-import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
+import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '@spearwolf/vertex-objects';
+import {DoubleSide, Texture} from 'three';
+import ShaderLib from './ShaderLib';
 
 const vertexShader = `
   attribute vec2 quadSize;
@@ -15,7 +16,9 @@ const vertexShader = `
 
   varying vec2 vTexCoords;
 
-  ${ShaderTool.rotateZ()}
+  #include <extra_pars_vertex>
+
+  #include <rotateZ_vertex>
 
   vec2 texCoordsFromIndex(in vec2 mapSize, in int ndx) {
     int column = int(mod(float(ndx), float(mapSize[0])));
@@ -23,41 +26,19 @@ const vertexShader = `
     return (vec2(column, row) + 0.5) / vec2(mapSize[0], mapSize[1]);
   }
 
-#ifdef RENDER_AS_BILLBOARDS
-
-  vec4 makeBillboard(in mat4 modelViewMatrix, in vec3 cameraPosition, in vec3 billboardPosition, in vec2 billboardSize, in vec2 vertexPosition) {
-    vec3 look = normalize(cameraPosition - billboardPosition);
-    vec3 cameraUp = vec3(modelViewMatrix[0].y, modelViewMatrix[1].y, modelViewMatrix[2].y);
-    vec3 billboardRight = cross(cameraUp, look);
-    vec3 billboardUp = cross(look, billboardRight);
-
-    return vec4(billboardPosition
-                + billboardRight * vertexPosition.x * billboardSize.x
-                + billboardUp * vertexPosition.y * billboardSize.y,
-                1.0);
-  }
-
-#endif
+  #ifdef RENDER_AS_BILLBOARDS
+  #include <makeBillboard_fn_vertex>
+  #endif
 
   void main() {
 
-#ifdef RENDER_AS_BILLBOARDS
+    #ifdef RENDER_AS_BILLBOARDS
+    #include <vertexPosition_makeBillboard_instanced_vertex>
+    #else
+    #include <vertexPosition_instanced_vertex>
+    #endif
 
-    vec4 vertexPosition = makeBillboard(
-                            modelViewMatrix,
-                            cameraPosition,
-                            instancePosition,
-                            quadSize,
-                            (rotateZ(rotation) * vec4(position, 1.0)).xy
-                          );
-
-#else
-
-    vec4 vertexPosition = rotateZ(rotation)
-                        * vec4(position * vec3(quadSize.xy, 0.0), 0.0)
-                        + vec4(instancePosition, 1.0);
-
-#endif
+    #include <after_vertexPosition_vertex>
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition.xyz, 1.0);
 
@@ -67,6 +48,8 @@ const vertexShader = `
     vec4 texCoords = texture2D(animsMap, texCoordsFromIndex(animsMapSize, int(animMetaData.z) + frameIndex));
 
     vTexCoords = texCoords.xy + (uv * texCoords.zw);
+
+    #include <post_main_vertex>
   }
 `;
 
@@ -75,27 +58,29 @@ const fragmentShader = `
 
   varying vec2 vTexCoords;
 
+  #include <extra_pars_fragment>
+
   void main() {
     gl_FragColor = texture2D(colorMap, vTexCoords);
 
-    if (gl_FragColor.a == 0.0) {
-      discard;
-    }
+    #include <discard_by_alpha_fragment>
+    #include <post_main_fragment>
   }
 `;
 
-interface AnimatedSpritesMaterialParameters extends ShaderMaterialParameters {
+interface AnimatedSpritesMaterialParameters extends CustomChunksShaderMaterialParameters {
   colorMap?: Texture;
   animsMap?: Texture;
   time?: number;
 }
 
-export class AnimatedSpritesMaterial extends ShaderMaterial {
+export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
   constructor(options?: AnimatedSpritesMaterialParameters) {
     super({
       vertexShader,
       fragmentShader,
       uniforms: {
+        ...options?.uniforms,
         colorMap: {
           value: options?.colorMap,
         },
@@ -111,10 +96,32 @@ export class AnimatedSpritesMaterial extends ShaderMaterial {
       },
       transparent: true,
       side: DoubleSide,
-      ...unpick(options, 'colorMap', 'animsMap', 'time'),
+      ...unpick(options, 'uniforms', 'colorMap', 'animsMap', 'time'),
     });
 
     this.name = options?.name ?? '@spearwolf/textured-sprites:AnimatedSpritesMaterial';
+
+    this.replaceVertexShaderChunks = [
+      'extra_pars_vertex',
+      'rotateZ_vertex',
+      'makeBillboard_fn_vertex',
+      'vertexPosition_makeBillboard_instanced_vertex',
+      'vertexPosition_instanced_vertex',
+      'after_vertexPosition_vertex',
+      'post_main_vertex',
+    ];
+
+    this.replaceFragmentShaderChunks = ['extra_pars_fragment', 'discard_by_alpha_fragment', 'post_main_fragment'];
+
+    [
+      'discard_by_alpha_fragment',
+      'rotateZ_vertex',
+      'makeBillboard_fn_vertex',
+      'vertexPosition_makeBillboard_instanced_vertex',
+      'vertexPosition_instanced_vertex',
+    ].forEach((shader) => {
+      this.chunks[shader] = ShaderLib[shader];
+    });
   }
 
   get colorMap(): Texture | undefined {
@@ -141,6 +148,8 @@ export class AnimatedSpritesMaterial extends ShaderMaterial {
   set renderAsBillboards(renderAsBillboards: boolean) {
     if (renderAsBillboards) {
       Object.assign(this.defines, this.defines, {RENDER_AS_BILLBOARDS: 1});
+    } else if (this.defines) {
+      delete this.defines.RENDER_AS_BILLBOARDS;
     }
   }
 }
