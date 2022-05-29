@@ -22,11 +22,12 @@ Stage2DContext.displayName = 'Stage2DContext';
 export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
   renderPriority?: number;
   noAutoClear?: boolean;
+  noAutoRender?: boolean;
   defaultCamera?: boolean;
 };
 
 function Component(
-  {scene, projection, renderPriority, noAutoClear, defaultCamera, name, children, ...props}: Stage2DProps,
+  {scene, projection, renderPriority, noAutoClear, noAutoRender, defaultCamera, name, children, ...props}: Stage2DProps,
   ref: ForwardedRef<__Stage2D>,
 ) {
   const canvasSize = useThree((state) => state.size);
@@ -97,8 +98,7 @@ function Component(
 
   const renderFrame = useCallback(
     (gl: WebGLRenderer) => {
-      // TODO StageRenderer -> StageDirector...
-      if (stage && !parentStage) {
+      if (!noAutoRender && stage && !parentStage) {
         const wasPreviouslyAutoClear = gl.autoClear;
         gl.autoClear = !noAutoClear;
 
@@ -107,7 +107,7 @@ function Component(
         gl.autoClear = wasPreviouslyAutoClear;
       }
     },
-    [stage, parentStage, noAutoClear],
+    [stage, parentStage, noAutoClear, noAutoRender],
   );
 
   useFrame(({gl}) => renderFrame(gl), renderPriority ?? 0);
