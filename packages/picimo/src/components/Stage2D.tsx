@@ -2,6 +2,7 @@ import {extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
 import {Stage2D as __Stage2D} from '@spearwolf/stage25';
 import {createContext, ForwardedRef, forwardRef, useCallback, useContext, useEffect, useState} from 'react';
 import {Camera, WebGLRenderer} from 'three';
+import {StageRendererContext} from '../context/StageRenderer';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Stage2D: __Stage2D});
@@ -25,7 +26,7 @@ export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
 };
 
 function Component(
-  {scene, projection, renderPriority, noAutoClear, defaultCamera, children, ...props}: Stage2DProps,
+  {scene, projection, renderPriority, noAutoClear, defaultCamera, name, children, ...props}: Stage2DProps,
   ref: ForwardedRef<__Stage2D>,
 ) {
   const canvasSize = useThree((state) => state.size);
@@ -40,6 +41,14 @@ function Component(
   const [stageCamera, setStageCamera] = useState<Camera>(stage?.camera);
 
   const parentStage = useContext(Stage2DContext);
+  const stageRenderer = useContext(StageRendererContext);
+
+  useEffect(() => {
+    if (stage && stageRenderer && name) {
+      stageRenderer.addStage(name, stage);
+      return () => stageRenderer.removeStage(name);
+    }
+  }, [stage, stageRenderer, name]);
 
   useEffect(() => {
     if (stage?.camera) {
@@ -104,7 +113,7 @@ function Component(
   useFrame(({gl}) => renderFrame(gl), renderPriority ?? 0);
 
   return (
-    <stage2D args={[initialProjection, initialScene]} ref={mergeRefs(setStage, ref)} {...props}>
+    <stage2D args={[initialProjection, initialScene]} ref={mergeRefs(setStage, ref)} name={name} {...props}>
       <Stage2DContext.Provider value={stage}>
         {stage && scenePrimitive && <primitive object={scenePrimitive}>{children}</primitive>}
       </Stage2DContext.Provider>
