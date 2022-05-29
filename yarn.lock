@@ -2704,7 +2704,7 @@ __metadata:
     "@spearwolf/vertex-objects": "workspace:*"
     "@types/assert": ^1.5.6
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/sinon": ^10.0.11
     "@types/three": ^0.140.0
     "@typescript-eslint/eslint-plugin": ^5.26.0
@@ -2723,11 +2723,11 @@ __metadata:
     npm-run-all: ^4.1.5
     prettier: ^2.6.2
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     sinon: ^14.0.0
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
@@ -2736,7 +2736,7 @@ __metadata:
   peerDependencies:
     "@spearwolf/eventize": ^2.0.0-beta.2
     "@spearwolf/vertex-objects": "*"
-    three: ^0.140.2
+    three: ^0.141.0
   languageName: unknown
   linkType: soft
 
@@ -2759,7 +2759,7 @@ __metadata:
     "@spearwolf/vertex-objects": "workspace:*"
     "@types/assert": ^1.5.6
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/sinon": ^10.0.11
     "@types/three": ^0.140.0
     "@typescript-eslint/eslint-plugin": ^5.26.0
@@ -2778,11 +2778,11 @@ __metadata:
     npm-run-all: ^4.1.5
     prettier: ^2.6.2
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     sinon: ^14.0.0
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
@@ -2791,7 +2791,7 @@ __metadata:
   peerDependencies:
     "@spearwolf/eventize": 2.0.0-beta.2
     "@spearwolf/vertex-objects": "*"
-    three: ^0.140.2
+    three: ^0.141.0
   languageName: unknown
   linkType: soft
 
@@ -2806,7 +2806,7 @@ __metadata:
     "@spearwolf/vertex-objects": "workspace:*"
     "@types/assert": ^1.5.6
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/sinon": ^10.0.11
     "@types/three": ^0.140.0
     "@typescript-eslint/eslint-plugin": ^5.26.0
@@ -2825,11 +2825,11 @@ __metadata:
     npm-run-all: ^4.1.5
     prettier: ^2.6.2
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     sinon: ^14.0.0
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
@@ -2837,7 +2837,7 @@ __metadata:
     typescript: ^4.7.2
   peerDependencies:
     "@spearwolf/vertex-objects": "*"
-    three: ^0.140.2
+    three: ^0.141.0
   languageName: unknown
   linkType: soft
 
@@ -2863,7 +2863,7 @@ __metadata:
     "@spearwolf/vertex-objects": "workspace:*"
     "@types/assert": ^1.5.6
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/sinon": ^10.0.11
     "@types/three": ^0.140.0
     "@typescript-eslint/eslint-plugin": ^5.26.0
@@ -2882,11 +2882,11 @@ __metadata:
     npm-run-all: ^4.1.5
     prettier: ^2.6.2
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     sinon: ^14.0.0
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
@@ -2894,7 +2894,7 @@ __metadata:
     typescript: ^4.7.2
   peerDependencies:
     "@spearwolf/vertex-objects": "*"
-    three: ^0.140.2
+    three: ^0.141.0
   languageName: unknown
   linkType: soft
 
@@ -2907,7 +2907,7 @@ __metadata:
     "@rollup/plugin-replace": ^4.0.0
     "@rollup/plugin-typescript": ^8.3.2
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/sinon": ^10.0.11
     "@types/three": ^0.140.0
     "@typescript-eslint/eslint-plugin": ^5.26.0
@@ -2924,19 +2924,19 @@ __metadata:
     npm-run-all: ^4.1.5
     prettier: ^2.6.2
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     sinon: ^14.0.0
     source-map-explorer: ^2.5.2
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
     typedoc: ^0.22.15
     typescript: ^4.7.2
   peerDependencies:
-    three: ^0.140.2
+    three: ^0.141.0
   languageName: unknown
   linkType: soft
 
@@ -2956,9 +2956,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@testing-library/react@npm:^13.2.0":
-  version: 13.2.0
-  resolution: "@testing-library/react@npm:13.2.0"
+"@testing-library/react@npm:^13.3.0":
+  version: 13.3.0
+  resolution: "@testing-library/react@npm:13.3.0"
   dependencies:
     "@babel/runtime": ^7.12.5
     "@testing-library/dom": ^8.5.0
@@ -2966,7 +2966,7 @@ __metadata:
   peerDependencies:
     react: ^18.0.0
     react-dom: ^18.0.0
-  checksum: 29f4a97c932a7fd78a55791a0ae0ba8d33c5241acbade98b6714440981e6e3d86a243e0b22161d3323b549ce059c175ae56d6b5053ad44083ab6e40ca211f19e
+  checksum: 98fd8616a7cae0ecfcbe97b5b3c5b91fbafccf449c04875395ccc0e3f0b139e53b3261b9536ec2169a5e2883a1be2098907209064061fe0c2ff21dfbc785dd40
   languageName: node
   linkType: hard
 
@@ -3268,10 +3268,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^17.0.35":
-  version: 17.0.35
-  resolution: "@types/node@npm:17.0.35"
-  checksum: 7a24946ae7fd20267ed92466384f594e448bfb151081158d565cc635d406ecb29ea8fb85fcd2a1f71efccf26fb5bd3c6f509bde56077eb8b832b847a6664bc62
+"@types/node@npm:^17.0.36":
+  version: 17.0.36
+  resolution: "@types/node@npm:17.0.36"
+  checksum: 11055fde0a1e1421113849b5e32c7022911efc0be670729947bf0162970e79962d804b1eb8a9afb291380cac97cf0e684511415d586ae5fe1560322c940fe188
   languageName: node
   linkType: hard
 
@@ -10731,10 +10731,10 @@ fsevents@^1.2.7:
     "@spearwolf/eventize": ^2.0.0-beta.2
     "@spearwolf/textured-sprites": "workspace:*"
     "@spearwolf/vertex-objects": "workspace:*"
-    "@testing-library/react": ^13.2.0
+    "@testing-library/react": ^13.3.0
     "@types/assert": ^1.5.6
     "@types/jest": ^27.5.1
-    "@types/node": ^17.0.35
+    "@types/node": ^17.0.36
     "@types/react": ^18.0.9
     "@types/react-reconciler": ^0.26.7
     "@types/sinon": ^10.0.11
@@ -10758,12 +10758,12 @@ fsevents@^1.2.7:
     react: ^18.1.0
     react-dom: ^18.1.0
     rimraf: ^3.0.2
-    rollup: ^2.74.1
+    rollup: ^2.75.1
     rollup-plugin-size-snapshot: ^0.12.0
     rollup-plugin-terser: ^7.0.2
     scheduler: ^0.22.0
     sinon: ^14.0.0
-    three: ^0.140.2
+    three: ^0.141.0
     ts-jest: ^28.0.3
     ts-node: ^10.8.0
     tslib: ^2.4.0
@@ -10777,7 +10777,7 @@ fsevents@^1.2.7:
     "@spearwolf/textured-sprites": "*"
     "@spearwolf/vertex-objects": "*"
     react: ^18.1.0
-    three: ^0.140.2
+    three: ^0.141.0
     use-asset: ^1.0.0
   languageName: unknown
   linkType: soft
@@ -11133,7 +11133,7 @@ fsevents@^1.2.7:
     regenerator-runtime: ^0.13.9
     rimraf: ^3.0.2
     servor: ^4.0.2
-    three: ^0.140.2
+    three: ^0.141.0
     webpack: ^5.72.1
     webpack-cli: ^4.9.2
     webpack-dev-server: ^4.9.0
@@ -11676,9 +11676,9 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"rollup@npm:^2.74.1":
-  version: 2.74.1
-  resolution: "rollup@npm:2.74.1"
+"rollup@npm:^2.75.1":
+  version: 2.75.1
+  resolution: "rollup@npm:2.75.1"
   dependencies:
     fsevents: ~2.3.2
   dependenciesMeta:
@@ -11686,7 +11686,7 @@ resolve@^2.0.0-next.3:
       optional: true
   bin:
     rollup: dist/bin/rollup
-  checksum: c34dc78317aa0a153010061e5954225b3e18f4013feb9c0476f6878dc3485ac765c28b7849441e4a2ab69c337892bc66399fb7d4b239b94f4758adfdb1f99440
+  checksum: a48d2df765cc87c2d351e9df2ce3483cdc406e583cee271af2c38fe9371ccbae8484f0c50af4ac9293667c3eded082297008934712079d53798ec2841eef0339
   languageName: node
   linkType: hard
 
@@ -12935,10 +12935,10 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"three@npm:^0.140.2":
-  version: 0.140.2
-  resolution: "three@npm:0.140.2"
-  checksum: 67b2733c4177ba0555a16a99e833340586d7a5b1dc4ac2ce7a376c55542cbc6acf72d785ce55b887597551bcf6e209213bcacb0b2c990db66f56ba4991601acb
+"three@npm:^0.141.0":
+  version: 0.141.0
+  resolution: "three@npm:0.141.0"
+  checksum: d161350b5134f2db616c7081d625c84235a1d50658b9f9c6ffe94143ddb77944b1c1b6831ad0be00037f8c744c8c60ee8d740ea4d48844b54f4525ee73a2d44f
   languageName: node
   linkType: hard
 

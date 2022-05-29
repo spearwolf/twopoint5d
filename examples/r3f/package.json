@@ -18,7 +18,7 @@
     "picimo": "workspace:*",
     "react": "18.1.0",
     "react-dom": "^18.1.0",
-    "three": "^0.140.2"
+    "three": "^0.141.0"
   },
   "devDependencies": {
     "@babel/core": "^7.18.2",
