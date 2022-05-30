@@ -8,6 +8,8 @@ export interface Stage2D extends Eventize {}
 export class Stage2D {
   scene: Scene;
 
+  autoClear = true;
+
   /**
    * Get the *scene* name
    */
@@ -134,7 +136,10 @@ export class Stage2D {
   renderFrame(renderer: WebGLRenderer): void {
     const {scene, camera} = this;
     if (scene && camera) {
+      const wasPreviouslyAutoClear = renderer.autoClear;
+      renderer.autoClear = this.autoClear;
       renderer.render(scene, camera);
+      renderer.autoClear = wasPreviouslyAutoClear;
     } else if (!camera && ++this.#noCameraErrorCount === 100) {
       this.#noCameraErrorCount = -1000;
       // eslint-disable-next-line no-console

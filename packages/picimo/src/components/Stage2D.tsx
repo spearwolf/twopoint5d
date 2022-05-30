@@ -73,38 +73,16 @@ function Component(
       stage.resize(canvasSize.width, canvasSize.height);
     }
 
-    // console.log('stage', {
-    //   width: stage.width,
-    //   height: stage.height,
-    //   containerWidth: stage.containerWidth,
-    //   containerHeight: stage.containerHeight,
-    //   stage,
-    //   parentStage,
-    // });
-
     return parentStage?.on('resize', ({width, height}) => {
       stage.resize(width, height);
-
-      // console.log('stage[parentStage:resize]', {
-      //   width: stage.width,
-      //   height: stage.height,
-      //   containerWidth: stage.containerWidth,
-      //   containerHeight: stage.containerHeight,
-      //   stage,
-      //   parentStage,
-      // });
     });
   }, [stage, parentStage, canvasSize.width, canvasSize.height]);
 
   const renderFrame = useCallback(
-    (gl: WebGLRenderer) => {
+    (renderer: WebGLRenderer) => {
       if (!noAutoRender && stage && !parentStage) {
-        const wasPreviouslyAutoClear = gl.autoClear;
-        gl.autoClear = !noAutoClear;
-
-        gl.render(stage.scene, stage.camera);
-
-        gl.autoClear = wasPreviouslyAutoClear;
+        stage.autoClear = !noAutoClear;
+        stage.renderFrame(renderer);
       }
     },
     [stage, parentStage, noAutoClear, noAutoRender],
