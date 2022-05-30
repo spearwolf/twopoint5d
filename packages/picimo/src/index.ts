@@ -1,3 +1,4 @@
+export * from './components/GetStage2D';
 export * from './components/ParallaxProjection';
 export * from './components/ShaderChunks';
 export * from './components/Stage2D';
@@ -9,6 +10,7 @@ export * from './components/TextureRef';
 export * from './components/TextureStore';
 export * from './hooks/useAsyncEffect';
 export * from './hooks/useFrameLoop';
+export * from './hooks/useStage2D';
 export * from './hooks/useStageResize';
 export * from './hooks/useStageSize';
 export * from './hooks/useTextureAtlas';
