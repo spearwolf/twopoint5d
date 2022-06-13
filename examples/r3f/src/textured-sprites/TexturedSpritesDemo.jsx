@@ -1,5 +1,8 @@
+import { Effects } from "@react-three/drei";
+import { extend } from "@react-three/fiber";
 import {
   forwardRefValue,
+  GetStage2D,
   ParallaxProjection,
   Stage2D,
   TextureAtlas,
@@ -11,9 +14,14 @@ import {
   useTextureAtlas,
 } from "picimo";
 import { useEffect, useRef, useState } from "react";
+import { Vector2 } from "three";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
 import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
+
+extend({ RenderPass, UnrealBloomPass });
 
 export const TexturedSpritesDemo = ({ capacity }) => {
   const geometry = useRef();
@@ -44,7 +52,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         overrideImageUrl="/examples/assets/lab-walls-tiles.png"
       />
 
-      <Stage2D name="stage0" renderPriority={1}>
+      <Stage2D name="stage0" noAutoRender renderPriority={0}>
         <ParallaxProjection plane="xy" pixelZoom={1} />
 
         <LogStageSizeToConsole />
@@ -52,7 +60,13 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         <WiredBox width={600} height={200} depth={50} />
       </Stage2D>
 
-      <Stage2D name="stage1" noAutoClear defaultCamera renderPriority={2}>
+      <Stage2D
+        name="stage1"
+        noAutoRender
+        noAutoClear
+        defaultCamera
+        renderPriority={0}
+      >
         <ParallaxProjection
           plane="xy"
           origin="bottom left"
@@ -73,6 +87,22 @@ export const TexturedSpritesDemo = ({ capacity }) => {
           </TexturedSpritesMaterial>
         </TexturedSprites>
       </Stage2D>
+
+      <GetStage2D name="stage1">
+        {(stage) => (
+          <Effects disableRenderPass={true}>
+            <renderPass args={[stage.scene, stage.camera]} />
+            <unrealBloomPass
+              args={[
+                new Vector2(window.innerWidth, window.innerHeight),
+                1.5,
+                0.4,
+                0.85,
+              ]}
+            />
+          </Effects>
+        )}
+      </GetStage2D>
     </>
   );
 };

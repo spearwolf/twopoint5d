@@ -26,6 +26,10 @@ export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
   defaultCamera?: boolean;
 };
 
+// TODO Stage2D -> createPortal
+// - https://github.com/pmndrs/drei/blob/master/src/core/RenderTexture.tsx
+// - https://github.com/pmndrs/react-three-fiber/blob/master/packages/fiber/src/core/index.tsx#L389
+
 function Component(
   {scene, projection, renderPriority, noAutoClear, noAutoRender, defaultCamera, name, children, ...props}: Stage2DProps,
   ref: ForwardedRef<__Stage2D>,
