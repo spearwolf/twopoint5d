@@ -2,6 +2,11 @@ import eventize, {Eventize} from '@spearwolf/eventize';
 import {Stage2D} from '@spearwolf/stage25';
 import {createContext} from 'react';
 
+const STAGE_RENDERER = 'StageRenderer';
+
+export const REGISTER = 'register';
+export const UNREGISTER = 'unregister';
+
 export interface StageRenderer extends Eventize {}
 
 export class StageRenderer {
@@ -10,28 +15,30 @@ export class StageRenderer {
   constructor() {
     eventize(this);
 
-    this.on('addStage', (name, stage) => {
+    // XXX remove me
+    this.on(REGISTER, (name, stage) => {
       // eslint-disable-next-line no-console
-      console.log('StageRenderer:addStage', name, stage);
+      console.log(`${STAGE_RENDERER}:${REGISTER}`, name, stage);
     });
 
-    this.on('removeStage', (name, stage) => {
+    // XXX remove me
+    this.on(UNREGISTER, (name, stage) => {
       // eslint-disable-next-line no-console
-      console.log('StageRenderer:removeStage', name, stage);
+      console.log(`${STAGE_RENDERER}:${UNREGISTER}`, name, stage);
     });
   }
 
-  addStage(name: string, stage: Stage2D): void {
+  register(name: string, stage: Stage2D): void {
     const prevStage = this.#stages.get(name);
     this.#stages.set(name, stage);
     if (stage !== prevStage) {
-      this.emit('addStage', name, stage, prevStage);
+      this.emit(REGISTER, name, stage, prevStage);
     }
   }
 
-  removeStage(name: string): void {
+  unregister(name: string): void {
     if (this.#stages.has(name)) {
-      this.emit('removeStage', name, this.#stages.get(name));
+      this.emit(UNREGISTER, name, this.#stages.get(name));
     }
     this.#stages.delete(name);
   }
@@ -45,6 +52,6 @@ const defaultStageRenderer = new StageRenderer();
 
 export const StageRendererContext = createContext(defaultStageRenderer);
 
-StageRendererContext.displayName = 'StageRenderer';
+StageRendererContext.displayName = STAGE_RENDERER;
 
 export default StageRendererContext;
