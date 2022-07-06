@@ -110,9 +110,9 @@ export class InstancedVertexObjectGeometry<
   }
 
   update(): void {
+    this.instanceCount = this.instancedPool.usedCount;
     this.#autoTouchAttributes();
     this.#updateDrawRange();
-    this.instanceCount = this.instancedPool.usedCount;
   }
 
   #updateDrawRange = (): void => {
@@ -128,7 +128,16 @@ export class InstancedVertexObjectGeometry<
     }
   };
 
+  #firstAutoTouch = true;
+
   #autoTouchAttributes = (): void => {
+    if (this.instanceCount === 0) return;
+
+    if (this.#firstAutoTouch) {
+      this.touchBuffers({static: true});
+      this.#firstAutoTouch = false;
+    }
+
     const autoTouchAttrs = this.#getAutoTouchAttributeNames();
     if (autoTouchAttrs.length) {
       this.touchAttributes(...autoTouchAttrs);

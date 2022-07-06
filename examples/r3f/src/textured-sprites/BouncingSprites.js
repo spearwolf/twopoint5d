@@ -32,7 +32,6 @@ export class BouncingSprites {
       .map((name) => atlas.frame(name));
 
     this.createSprites();
-    geometry.touch({ static: true });
 
     console.log("bouncingSprites.init()", this);
   }

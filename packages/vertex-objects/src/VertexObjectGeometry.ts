@@ -72,21 +72,30 @@ export class VertexObjectGeometry extends BufferGeometry {
     );
   };
 
-  #autoTouchAttributes = (): void => {
+  #firstAutoTouch = true;
+
+  #autoTouchAttributes() {
+    if (this.pool.usedCount === 0) return;
+
+    if (this.#firstAutoTouch) {
+      this.touchBuffers({static: true});
+      this.#firstAutoTouch = false;
+    }
+
     const autoTouchAttrs = this.#getAutoTouchAttributeNames();
     if (autoTouchAttrs.length) {
       this.touchAttributes(...autoTouchAttrs);
     }
-  };
+  }
 
   #autoTouchAttrNames?: string[];
 
-  #getAutoTouchAttributeNames = (): string[] => {
+  #getAutoTouchAttributeNames(): string[] {
     if (!this.#autoTouchAttrNames) {
       this.#autoTouchAttrNames = Array.from(this.pool.descriptor.attributes.values())
         .filter((attr) => attr.autoTouch)
         .map((attr) => attr.name);
     }
     return this.#autoTouchAttrNames;
-  };
+  }
 }

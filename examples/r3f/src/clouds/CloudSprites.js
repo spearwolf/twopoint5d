@@ -104,7 +104,5 @@ export class CloudSprites {
 
       z += this.gap;
     }
-
-    this.geometry.touch({ static: true });
   }
 }
