@@ -26,35 +26,35 @@ root.render(
         fit="contain"
       />
 
-      <Clouds
-        capacity={200}
-        gap={10}
-        speed={90}
-        width={1920}
-        height={400}
-        yOffset={-400}
-        zOffset={-660}
-        fadeInRange={0.1}
-        fadeOutRange={0.1}
-      />
-    </Stage2D>
+        <Clouds
+          capacity={200}
+          gap={10}
+          speed={90}
+          width={1920}
+          height={400}
+          yOffset={-400}
+          zOffset={-660}
+          fadeInRange={0.1}
+          fadeOutRange={0.1}
+        />
+      </Stage2D>
 
-    <OrbitControls />
+      <OrbitControls />
 
-    <GetStage2D name="stage1">
-      {(stage) => (
-        <Effects disableRenderPass={false}>
-          {/* <renderPass args={[stage.scene, stage.camera]} clear={false} /> */}
-          {/* <unrealBloomPass
-            args={[
-              new Vector2(window.innerWidth, window.innerHeight),
-              1.5,
-              0.4,
-              0.85,
-            ]}
-          /> */}
-        </Effects>
-      )}
-    </GetStage2D>
-  </Canvas>
-);
+      <GetStage2D name="stage1">
+        {(stage) => (
+          <Effects disableRenderPass={false}>
+            {/* <renderPass args={[stage.scene, stage.camera]} clear={false} /> */}
+            {/* <unrealBloomPass
+              args={[
+                new Vector2(window.innerWidth, window.innerHeight),
+                1.5,
+                0.4,
+                0.85,
+              ]}
+            /> */}
+          </Effects>
+        )}
+      </GetStage2D>
+    </Canvas>
+  );

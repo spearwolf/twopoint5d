@@ -25,7 +25,7 @@ const root = createRoot(document.getElementById("root"));
 
 root.render(
   <Canvas dpr={[1, 2]}>
-    <Environment preset="dawn" />
+    <Environment files="/examples/assets/environments/PXL_20220220_113620937.PHOTOSPHERE_4096x2048.jpg" background />
     <Crosses capacity={10} color={0x990033} onCreateGeometry={makeCrosses} />
     <OrbitControls />
   </Canvas>
