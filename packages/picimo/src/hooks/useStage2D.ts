@@ -1,6 +1,6 @@
 import {Stage2D} from '@spearwolf/stage25';
 import {useContext, useEffect, useState} from 'react';
-import {StageRendererContext} from '../context/StageRenderer';
+import {REGISTER, StageRendererContext, UNREGISTER} from '../context/StageRenderer';
 
 export function useStage2D(name: string): Stage2D | undefined {
   const stageRenderer = useContext(StageRendererContext);
@@ -16,12 +16,12 @@ export function useStage2D(name: string): Stage2D | undefined {
       }
 
       return stageRenderer.on({
-        addStage(stageName: string, addedStage: Stage2D) {
+        [REGISTER](stageName: string, addedStage: Stage2D) {
           if (stageName === name && stage !== addedStage) {
             setStage(addedStage);
           }
         },
-        removeStage(stageName: string) {
+        [UNREGISTER](stageName: string) {
           if (stageName === name && stage) {
             setStage(undefined);
           }

@@ -1,8 +1,8 @@
-import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { Canvas } from "@react-three/fiber";
+import { ParallaxProjection, Stage2D } from "picimo";
 import { createRoot } from "react-dom/client";
 import { Clouds } from "./Clouds";
-import { ParallaxProjection, Stage2D } from "picimo";
 
 const root = createRoot(document.getElementById("root"));
 
@@ -29,6 +29,7 @@ root.render(
         fadeOutRange={0.1}
       />
     </Stage2D>
+
     <OrbitControls />
   </Canvas>
 );

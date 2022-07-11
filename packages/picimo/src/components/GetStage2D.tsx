@@ -3,15 +3,20 @@ import {ReactNode} from 'react';
 import {useStage2D} from '../hooks/useStage2D';
 
 export interface GetStage2DProps {
-  name: string;
-  children: (stage: Stage2D | undefined) => ReactNode;
+  /**
+   * If you use an array, make sure that the array always has the same number of elements.
+   * Otherwise the react hooks rules will be violated.
+   */
+  name: string | string[];
+  children: (...stages: Stage2D[]) => ReactNode;
   fallback?: ReactNode;
 }
 
 export function GetStage2D({name, children, fallback}: GetStage2DProps) {
-  const stage = useStage2D(name);
+  const stageNames = Array.isArray(name) ? name : [name];
+  const stages = stageNames.map((stageName) => useStage2D(stageName));
 
-  return stage ? children(stage) : fallback ?? null;
+  return stages.every((stage) => stage != null) ? children(...stages) : fallback ?? null;
 }
 
 GetStage2D.displayName = 'GetStage2D';

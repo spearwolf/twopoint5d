@@ -1,3 +1,4 @@
+import {Stage2D} from '@spearwolf/stage25';
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D';
 
@@ -25,7 +26,7 @@ export function useStageSize() {
     if (parentStage) {
       updateSize(parentStage.width, parentStage.height);
 
-      return parentStage.on('resize', (stage) => {
+      return parentStage.on('resize', (stage: Stage2D) => {
         updateSize(stage.width, stage.height);
       });
     }
