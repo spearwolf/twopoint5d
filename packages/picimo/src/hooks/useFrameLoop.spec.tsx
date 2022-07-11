@@ -25,7 +25,7 @@ const TestScene = ({showMesh, extraValue, callbacks}: any) => (
   <>{showMesh && <TestMesh callbacks={callbacks} extraValue={extraValue} />}</>
 );
 
-describe('useFrameStateMachine hook', () => {
+describe('useFrameLoop hook', () => {
   test('hook function exists', () => {
     expect(typeof useFrameLoop).toBe('function');
   });
