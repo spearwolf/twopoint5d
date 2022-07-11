@@ -10,10 +10,16 @@ export const forwardRefValue = (ref: MutableRefObject<any>) => {
   return ref;
 };
 
-// TODO resolveValue(promise)
-// TODO nullableValue(unknown)
-
 const isForwardRefValue = (ref: any): ref is MutableRefObject<any> => forwardRefValues.has(ref);
+
+const isNullable$ = Symbol('isNullable');
+
+interface NullableValue<T> {
+  [isNullable$]: true;
+  value: T | null;
+}
+
+export const nullableValue = <T>(value: T | null | undefined): NullableValue<T> => ({[isNullable$]: true, value});
 
 type FrameStateMachineParams = Record<string, unknown>;
 type NonNullParams<Params extends FrameStateMachineParams> = {[Key in keyof Params]: NonNullable<Params[Key]>};
@@ -50,8 +56,18 @@ interface FrameStateMachineCallbacksWithRenderPriority<Params extends FrameState
 
 const constructArgs = <Params extends FrameStateMachineParams>(args: Params): NonNullParams<Params> =>
   Object.fromEntries(
-    Object.entries(args).map(([key, value]) => [key, isForwardRefValue(value) ? value.current : value]),
+    Object.entries(args).map(([key, value]) => [
+      key,
+      isForwardRefValue(value)
+        ? value.current
+        : (value as NullableValue<any>)?.[isNullable$]
+        ? (value as NullableValue<any>).value
+        : value,
+    ]),
   ) as NonNullParams<Params>;
+
+const constructNullableFlags = <Params extends FrameStateMachineParams>(args: Params): boolean[] =>
+  Object.entries(args).map(([, value]) => Boolean((value as NullableValue<any>)?.[isNullable$]));
 
 const isLazyCallbacks = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
@@ -107,8 +123,9 @@ export const useFrameLoop = <Params extends FrameStateMachineParams>(
   const onFrame = useCallback(
     (state: RootState, delta: number) => {
       const args = constructArgs(stateRef.current.dependencies);
+      const nullables = constructNullableFlags(stateRef.current.dependencies);
       // all settled is when all values are != null
-      const argsAllSettled = Object.entries(args).every(([, dep]) => dep != null);
+      const argsAllSettled = Object.entries(args).every(([, dep], idx) => nullables[idx] || dep != null);
       const methodArgs = {...args, state, delta};
 
       let stateMachine_ = stateMachineRef.current;

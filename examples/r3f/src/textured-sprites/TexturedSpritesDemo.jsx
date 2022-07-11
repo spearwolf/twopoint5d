@@ -3,6 +3,7 @@ import { extend } from "@react-three/fiber";
 import {
   forwardRefValue,
   GetStage2D,
+  nullableValue,
   ParallaxProjection,
   Stage2D,
   TextureAtlas,
@@ -29,17 +30,21 @@ export const TexturedSpritesDemo = ({ capacity }) => {
   const atlas = useTextureAtlas("atlas0");
 
   const [tick, setTick] = useState(0);
+  const [tack, setTack] = useState(null);
 
   useFrameLoop(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
     atlas,
     capacity,
     tick,
+    tack: nullableValue(tack),
   });
 
   useEffect(() => {
     if (tick < 5) {
       setTimeout(() => setTick(tick + 1), 1000);
+    } else {
+      setTack({ isTack: true });
     }
   }, [tick]);
 
