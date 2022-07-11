@@ -36,7 +36,6 @@ export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
   defaultCamera?: boolean;
 };
 
-// TODO Stage2D -> createPortal
 // - https://github.com/pmndrs/drei/blob/master/src/core/RenderTexture.tsx
 // - https://github.com/pmndrs/react-three-fiber/blob/master/packages/fiber/src/core/index.tsx#L389
 // - https://docs.pmnd.rs/react-three-fiber/tutorials/v8-migration-guide#createportal-creates-a-state-enclave
