@@ -1,4 +1,4 @@
-import { Environment, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { createRoot } from "react-dom/client";
 import { Crosses } from "./Crosses";
@@ -25,7 +25,6 @@ const root = createRoot(document.getElementById("root"));
 
 root.render(
   <Canvas dpr={[1, 2]}>
-    <Environment files="/examples/assets/environments/PXL_20220220_113620937.PHOTOSPHERE_4096x2048.jpg" background />
     <Crosses capacity={10} color={0x990033} onCreateGeometry={makeCrosses} />
     <OrbitControls />
   </Canvas>

@@ -14,14 +14,14 @@ import {
   useTextureAtlas,
 } from "picimo";
 import { useEffect, useRef, useState } from "react";
-import { Vector2 } from "three";
+import { FilmPass } from "three/examples/jsm/postprocessing/FilmPass";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
+
 import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
 import { WiredBox } from "../utils/WiredBox";
 import { BouncingSprites } from "./BouncingSprites";
 
-extend({ RenderPass, UnrealBloomPass });
+extend({ RenderPass, FilmPass });
 
 export const TexturedSpritesDemo = ({ capacity }) => {
   const geometry = useRef();
@@ -52,7 +52,7 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         overrideImageUrl="/examples/assets/lab-walls-tiles.png"
       />
 
-      <Stage2D name="stage0" noAutoRender renderPriority={1}>
+      <Stage2D name="stage0" noAutoRender noAutoClear>
         <ParallaxProjection plane="xy" pixelZoom={1} />
 
         <LogStageSizeToConsole />
@@ -60,18 +60,12 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         <WiredBox width={600} height={200} depth={50} />
       </Stage2D>
 
-      <Stage2D
-        name="stage1"
-        noAutoRender
-        noAutoClear
-        defaultCamera
-        renderPriority={2}
-      >
+      <Stage2D name="stage1" noAutoRender noAutoClear defaultCamera>
         <ParallaxProjection
           plane="xy"
           origin="bottom left"
-          width={200}
-          height={100}
+          width={150}
+          height={150}
           fit="contain"
         />
 
@@ -88,19 +82,21 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         </TexturedSprites>
       </Stage2D>
 
-      <GetStage2D name="stage1">
-        {(stage) => (
-          <Effects disableRenderPass={true}>
-            <renderPass args={[stage.scene, stage.camera]} />
-            <unrealBloomPass
-              args={[
-                new Vector2(window.innerWidth, window.innerHeight),
-                1.5,
-                0.4,
-                0.85,
-              ]}
-            />
-          </Effects>
+      <GetStage2D name="stage0">
+        {(stage0) => (
+          <GetStage2D name="stage1">
+            {(stage1) => (
+              <Effects disableRenderPass={true}>
+                <renderPass args={[stage0.scene, stage0.camera]} />
+                <renderPass
+                  clear={false}
+                  clearDepth={true}
+                  args={[stage1.scene, stage1.camera, undefined, false, false]}
+                />
+                <filmPass args={[1, 0.5, 10, 0]} />
+              </Effects>
+            )}
+          </GetStage2D>
         )}
       </GetStage2D>
     </>
