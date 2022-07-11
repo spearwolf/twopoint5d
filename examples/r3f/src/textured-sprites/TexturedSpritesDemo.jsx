@@ -82,21 +82,17 @@ export const TexturedSpritesDemo = ({ capacity }) => {
         </TexturedSprites>
       </Stage2D>
 
-      <GetStage2D name="stage0">
-        {(stage0) => (
-          <GetStage2D name="stage1">
-            {(stage1) => (
-              <Effects disableRenderPass={true}>
-                <renderPass args={[stage0.scene, stage0.camera]} />
-                <renderPass
-                  clear={false}
-                  clearDepth={true}
-                  args={[stage1.scene, stage1.camera, undefined, false, false]}
-                />
-                <filmPass args={[1, 0.5, 10, 0]} />
-              </Effects>
-            )}
-          </GetStage2D>
+      <GetStage2D name={["stage0", "stage1"]}>
+        {(stage0, stage1) => (
+          <Effects disableRenderPass={true}>
+            <renderPass args={[stage0.scene, stage0.camera]} />
+            <renderPass
+              clear={false}
+              clearDepth={true}
+              args={[stage1.scene, stage1.camera, undefined, false, false]}
+            />
+            <filmPass args={[1, 0.5, 10, 0]} />
+          </Effects>
         )}
       </GetStage2D>
     </>
