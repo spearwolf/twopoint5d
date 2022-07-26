@@ -93,12 +93,17 @@ export class TextureStore {
 
   getTextureRef(name: AssetName): Texture | undefined {
     const item = this.#assets.get(name);
+    return item ? asTexture(item) : undefined;
+  }
+
+  incTextureRefCount(name: AssetName): number {
+    const item = this.#assets.get(name);
     if (item) {
       item.refCount++;
       console.log('[TextureStore] increase refCount to', item.refCount, 'for asset', item.name);
-      return asTexture(item);
+      return item.refCount;
     }
-    return undefined;
+    return -1;
   }
 
   getTextureAtlas(name: AssetName): TextureAtlas | undefined {
