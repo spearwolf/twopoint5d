@@ -55,7 +55,9 @@ export default () => {
 ```
 
 
-## Implementation State
+## API Overview
+
+_is checked when implemented and ready to use_
 
 ### stages
 
@@ -93,7 +95,13 @@ export default () => {
 - [ ] `<AnimatedSprites>`
 - [ ] `<AnimatedSpritesGeometry>`
 - [ ] `<AnimatedSpritesMaterial>`
+
+### utils
+
+- [x] `useAsyncEffect()`
+- [x] `useFrameLoop()`
 - [x] `<ShaderChunks>`
+
 
 
 :rocket: have fun!
