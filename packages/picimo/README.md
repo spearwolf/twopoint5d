@@ -17,7 +17,7 @@ export default () => {
         // your code goes here
       },
 
-      update({ geometry: { current, previous }, textureAtlas.. }) {
+      update({ geometry: { currentValue, previousValue }, textureAtlas.. }) {
         // your code goes here
       },
 
@@ -54,29 +54,46 @@ export default () => {
 };
 ```
 
+
 ## Implementation State
+
+### stages
 
 - [x] `<Stage2D>`
   - [ ] `renderToTexture` property
+  - [x] `<GetStage2D>`
+  - [x] `useStage2D()`
+  - [x] `useStageSize()`
+  - [x] `useStageResize()`
+- [ ] stage *director/composer* &rarr; stage *effects/layers*
+
+### projections
+
 - [x] `<ParallaxProjection>`
 - [ ] `<OrthographicProjection>`
 - [ ] `<IsometricProjection>`
+
+### textures
+
 - [x] `<TextureAtlas>`
 - [x] `useTextureAtlas()`
 - [x] `useTextureLoader()`
 - [ ] `<TileSet>`
 - [x] `useTileSet()`
 - [x] `useTileSetLoader()`
+- [x] `<TextureRef>`
+- [x] `useTextureRef()`
+- [x] `<TextureStore>`
+
+### sprites
+
 - [x] `<TexturedSprites>`
 - [x] `<TexturedSpritesGeometry>`
 - [x] `<TexturedSpritesMaterial>`
 - [ ] `<AnimatedSprites>`
 - [ ] `<AnimatedSpritesGeometry>`
 - [ ] `<AnimatedSpritesMaterial>`
-- [x] `<TextureRef>`
-- [x] `useTextureRef()`
-- [x] `<TextureStore>`
-- [ ] stage *director/composer* &rarr; stage *effects/layers*
+- [x] `<ShaderChunks>`
 
 
 :rocket: have fun!
