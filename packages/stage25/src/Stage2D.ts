@@ -82,13 +82,17 @@ export class Stage2D {
   };
 
   /**
-   * A _stage_ should have a _projection_, otherwise it would be a _scene_.
+   * A _stage_ consists of a _scene_ and a _camera_, which is created from a _projection_.
+   * A _stage_ also has a _dimension_ (`width` and `height`), which is calculated from the _projection_
+   * and the dimension of the surrounding container (which is usually the _canvas_).
    *
-   * But the _projection_ can be set later by a setter (and yes, it works without if you set your own _camera_).
+   * The _projection_ can be set later by a setter (and yes, it works without if you set your own _camera_).
    *
    * A _camera_ is automatically created by the _projection_, but you can also explicitly set your own _camera_,
    * which will be used instead. Note that a _projection_ will try to adjust the _camera_ settings after a `resize()` call,
    * no matter if it is a custom _camera_ or a _camera_ created by the _projection_.
+   *
+   * A _stage_ can be rendered using the `renderFrame(renderer)` method.
    *
    */
   constructor(projection?: IProjection, scene?: Scene) {
