@@ -40,6 +40,8 @@ A collection of microlibraries in the shape of a monorepo. Most of these are cen
 
 ## Examples
 
+Almost all of these examples serve to show individual aspects and usage of the respective api. Therefore, don't expect any visual masterpieces at this point. This is given to the user of the libraries as an exercise :wink:
+
 - [examples/vanilla](./examples/vanilla/)
   - vanilla three.js examples (no build step required)
   - start with: `$ yarn examples:vanilla`
