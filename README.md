@@ -17,13 +17,14 @@ A collection of microlibraries in the shape of a monorepo. Most of these are cen
   - :heavy_check_mark: api is stable and ready to use
 - [@spearwolf/stage25](./packages/stage25/)
   - create responsive three.js scenes by creating a _projection_ description
-  - supports _orthogonal_ and _parallax_ projections (more to come)
+  - supports _orthogonal_ and _parallax_ (aka _perspective_) projections (more to come)
   - :heavy_check_mark: api is stable and ready to use
 - [@spearwolf/textured&#x2011;sprites](./packages/textured-sprites/)
   - create and render textured 2D sprites
   - load texture atlases
   - animations
   - render as billboards (optional)
+  - based on @spearwolf/vertex&#x2011;objects
   - :heavy_check_mark::rocket: ready to use but the api is still in progress
 - [@spearwolf/tiled&#x2011;maps](./packages/tiled-maps/)
   - create and render visual tiled maps which are laid out in [a 2D spatial grid map data structure](./packages/tiled-maps/README.md)
