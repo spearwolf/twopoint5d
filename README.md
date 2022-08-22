@@ -7,11 +7,11 @@ A collection of microlibraries in the shape of a monorepo. Most of these are cen
 ### three.js
 
 - [@spearwolf/vertex&#x2011;objects](./packages/vertex-objects/)
-  - provides an object based abstraction over instanced buffer geometries. build them with your own api.
-  - create, update and delete instances with ease.
+  - provides an object based abstraction over instanced buffer geometries. build them with your own api
+  - create, update and delete instances with ease
   - :heavy_check_mark: api is stable and ready to use
 - [@spearwolf/display3](./packages/display3/)
-  - cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the _init_, _resize_ and _frame_ event loop.
+  - cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop
   - nice starting point for your three.js demos
   - there is no other dependency than the three.js package itself
   - :heavy_check_mark: api is stable and ready to use
