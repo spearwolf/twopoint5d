@@ -146,9 +146,9 @@ function Component(
               // https://docs.pmnd.rs/react-three-fiber/api/hooks#usethree
 
               // TODO
-              // - dynamic size changes?
+              // - dynamic size changes? dpr?
               // - events/compute() -> raycasting?
-              size: {width: stage.width, height: stage.height},
+              size: {width: stage.width, height: stage.height, top: 0, left: 0},
             },
           )}
       </Stage2DContext.Provider>
