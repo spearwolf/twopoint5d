@@ -49,7 +49,6 @@
     "fix:display3": "yarn display3 fix",
     "fix:picimo": "yarn picimo fix",
     "publish:vertex-objects": "yarn vertex-objects npm publish --access public --tolerate-republish",
-    "publishAll": "run-s publish:vertex-objects",
     "build": "npm-run-all --serial build:vertex-objects --parallel build:tiled-maps build:stage25 build:textured-sprites build:display3 --serial build:picimo",
     "test": "run-s test:vertex-objects test:tiled-maps test:stage25 test:textured-sprites test:display3 test:picimo",
     "clean": "run-p clean:vertex-objects clean:tiled-maps clean:stage25 clean:textured-sprites clean:display3 clean:picimo",

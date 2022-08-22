@@ -37,9 +37,6 @@
   "bugs": {
     "url": "https://github.com/spearwolf/three-vertex-objects/issues"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
