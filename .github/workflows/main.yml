@@ -27,7 +27,7 @@ jobs:
       - run: yarn test
         name: Run tests
 
-      - name: Publish packages
-        run: yarn publishAll
+      - name: Publish @spearwolf/vertex-objects
+        run: yarn publish:vertex-objects --otp ${NPM_AUTH_TOKEN}
         env:
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+          NPM_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
