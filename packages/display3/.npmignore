@@ -7,6 +7,7 @@ rollup
 .prettierrc.yaml
 .size-snapshot.json
 jest.config.ts
+jest.config.cjs
 tsconfig.json
 *.spec.ts
 *.spec.d.ts
