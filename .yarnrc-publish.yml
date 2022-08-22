@@ -1,5 +1,0 @@
-email: wolfger@spearwolf.de
-username: spearwolf
-npmRegistries:
-  "https://registry.yarnpkg.com":
-    npmAuthToken: ${NODE_AUTH_TOKEN}
