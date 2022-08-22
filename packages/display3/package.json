@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/display3",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "a display for your three.js app",
   "main": "build/display3.umd.js",
   "module": "build/display3.js",
@@ -15,7 +15,6 @@
     "outputName": "display3",
     "externals": [
       "@spearwolf/eventize",
-      "@spearwolf/stage25",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -26,10 +25,9 @@
       "name": "display3",
       "buildName": "umd",
       "globals": {
-        "three": "THREE",
         "@spearwolf/eventize": "eventize",
         "@spearwolf/vertex-objects": "vertexObjects",
-        "@spearwolf/stage25": "stage25"
+        "three": "THREE"
       }
     }
   },
@@ -76,6 +74,7 @@
     "@rollup/plugin-node-resolve": "^13.3.0",
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.3.4",
+    "@spearwolf/eventize": "^2.0.1",
     "@spearwolf/vertex-objects": "workspace:*",
     "@types/assert": "^1.5.6",
     "@types/jest": "^28.1.7",
@@ -108,8 +107,5 @@
     "tslib": "^2.4.0",
     "typedoc": "^0.23.10",
     "typescript": "^4.7.4"
-  },
-  "dependencies": {
-    "@spearwolf/eventize": "^2.0.1"
   }
 }

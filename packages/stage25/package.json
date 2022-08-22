@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/stage25",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "2d stages and projections for three.js",
   "main": "build/stage25.umd.js",
   "module": "build/stage25.js",
@@ -14,8 +14,7 @@
     "outputDir": "build",
     "outputName": "stage25",
     "externals": [
-      "@spearwolf/textured-sprites",
-      "@spearwolf/tiled-maps",
+      "@spearwolf/eventize",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -26,11 +25,9 @@
       "name": "stage25",
       "buildName": "umd",
       "globals": {
-        "three": "THREE",
         "@spearwolf/eventize": "eventize",
         "@spearwolf/vertex-objects": "vertexObjects",
-        "@spearwolf/textured-sprites": "texturedSprites",
-        "@spearwolf/tiled-maps": "tiledMaps"
+        "three": "THREE"
       }
     }
   },

@@ -1,6 +1,6 @@
 {
   "name": "picimo",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "sprites library based on react-three-fiber",
   "main": "build/picimo.cjs.js",
   "module": "build/picimo.js",
@@ -16,6 +16,7 @@
     "externals": [
       "@react-three/fiber",
       "@spearwolf/eventize",
+      "@spearwolf/display3",
       "@spearwolf/stage25",
       "@spearwolf/textured-sprites",
       "@spearwolf/tiled-maps",
@@ -71,7 +72,7 @@
     "@spearwolf/eventize": "^2.0.1",
     "@spearwolf/textured-sprites": "*",
     "@spearwolf/vertex-objects": "*",
-    "react": "^18.1.0",
+    "react": "^18.2.0",
     "three": "^0.143",
     "use-asset": "^1.0.0"
   },

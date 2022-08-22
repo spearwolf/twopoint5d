@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/vertex-objects",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "vertex-objects",
   "main": "build/vertex-objects.umd.js",
   "module": "build/vertex-objects.js",
@@ -23,7 +23,6 @@
       "name": "vertexObjects",
       "buildName": "umd",
       "globals": {
-        "@spearwolf/eventize": "eventize",
         "three": "THREE"
       }
     }

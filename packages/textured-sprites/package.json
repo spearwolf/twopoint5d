@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/textured-sprites",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "textured 2d sprites for three.js",
   "main": "build/textured-sprites.umd.js",
   "module": "build/textured-sprites.js",
@@ -14,8 +14,6 @@
     "outputDir": "build",
     "outputName": "textured-sprites",
     "externals": [
-      "@spearwolf/stage25",
-      "@spearwolf/tiled-maps",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -26,11 +24,8 @@
       "name": "texturedSprites",
       "buildName": "umd",
       "globals": {
-        "@spearwolf/eventize": "eventize",
-        "three": "THREE",
         "@spearwolf/vertex-objects": "vertexObjects",
-        "@spearwolf/stage25": "stage25",
-        "@spearwolf/tiled-maps": "tiledMaps"
+        "three": "THREE"
       }
     }
   },
