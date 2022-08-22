@@ -16,7 +16,7 @@ A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a
   - there is no other dependency than the three.js package itself
   - :heavy_check_mark: api is stable and ready to use
 - [@spearwolf/stage25](./packages/stage25/)
-  - create responsive three.js scenes by creating a _projection_ description
+  - create responsive three.js scenes by describing a _projection_
   - supports _orthogonal_ and _parallax_ (aka _perspective_) projections (more to come)
   - :heavy_check_mark: api is stable and ready to use
 - [@spearwolf/textured&#x2011;sprites](./packages/textured-sprites/)
