@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: ./.github/workflows/prepare_workspace.yml
+      - uses: ./.github/workflows/prepare_workspace
 
       - run: yarn test
         name: Run tests
