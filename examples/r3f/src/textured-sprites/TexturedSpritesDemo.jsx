@@ -13,7 +13,7 @@ import {
   TextureRef,
   useFrameLoop,
   useTextureAtlas,
-} from "picimo";
+} from "@spearwolf/picimo";
 import { useEffect, useRef, useState } from "react";
 import { FilmPass } from "three/examples/jsm/postprocessing/FilmPass";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";

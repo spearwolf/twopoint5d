@@ -23,7 +23,7 @@ module.exports = {
       "@spearwolf/textured-sprites",
       "@spearwolf/stage25",
       "@spearwolf/tiled-maps",
-      "picimo",
+      "@spearwolf/picimo",
       "@react-three/fiber",
       "react-dom",
       "react",

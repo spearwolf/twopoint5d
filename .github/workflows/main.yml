@@ -54,3 +54,6 @@ jobs:
 
       - name: Publish @spearwolf/textured-sprites
         run: yarn publish:textured-sprites
+
+      - name: Publish @spearwolf/picimo
+        run: yarn publish:picimo

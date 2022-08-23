@@ -1,4 +1,4 @@
-import { Stage2DContext, useStageResize } from "picimo";
+import { Stage2DContext, useStageResize } from "@spearwolf/picimo";
 import { useContext } from "react";
 
 export const LogStageSizeToConsole = () => {

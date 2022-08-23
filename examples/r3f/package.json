@@ -11,11 +11,11 @@
     "@react-three/drei": "^9.23.2",
     "@react-three/fiber": "^8.4.0",
     "@spearwolf/eventize": "^2.0.1",
+    "@spearwolf/picimo": "workspace:*",
     "@spearwolf/stage25": "workspace:*",
     "@spearwolf/textured-sprites": "workspace:*",
     "@spearwolf/tiled-maps": "workspace:*",
     "@spearwolf/vertex-objects": "workspace:*",
-    "picimo": "workspace:*",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.143"

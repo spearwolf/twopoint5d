@@ -52,6 +52,7 @@
     "publish:display3": "yarn display3 npm publish --tolerate-republish",
     "publish:stage25": "yarn stage25 npm publish --tolerate-republish",
     "publish:textured-sprites": "yarn textured-sprites npm publish --tolerate-republish",
+    "publish:picimo": "yarn picimo npm publish --tolerate-republish",
     "build": "npm-run-all --serial build:vertex-objects --parallel build:tiled-maps build:stage25 build:textured-sprites build:display3 --serial build:picimo",
     "test": "run-s test:vertex-objects test:tiled-maps test:stage25 test:textured-sprites test:display3 test:picimo",
     "clean": "run-p clean:vertex-objects clean:tiled-maps clean:stage25 clean:textured-sprites clean:display3 clean:picimo",
