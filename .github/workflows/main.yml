@@ -4,6 +4,9 @@ on:
   push:
     branches: [ "main" ]
 
+env:
+  NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
+
 jobs:
   test:
     name: Run tests
@@ -42,20 +45,12 @@ jobs:
 
       - name: Publish @spearwolf/vertex-objects
         run: yarn publish:vertex-objects
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
 
       - name: Publish @spearwolf/display3
         run: yarn publish:display3
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
 
       - name: Publish @spearwolf/stage25
         run: yarn publish:stage25
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
 
       - name: Publish @spearwolf/textured-sprites
         run: yarn publish:textured-sprites
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}

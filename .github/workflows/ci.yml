@@ -9,15 +9,31 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v3
         with:
           node-version: 16
+          cache: 'yarn'
 
-      - name: Install dependencies
-        run: yarn
+      - run: yarn
+        name: Install dependencies
 
-      - name: Build packages
-        run: yarn build
+      - run: yarn test
+        name: Run tests
 
-      - name: Run tests
-        run: yarn test
+  build:
+    name: Build packages
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+
+      - run: yarn --immutable
+        name: Install dependencies
+
+      - run: yarn build
+        name: Build packages
