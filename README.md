@@ -1,4 +1,4 @@
-# @spearwolf/three-vertex-objects
+![@spearwolf/three-vertex-objects cover](cover.png)
 
 A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a monorepo. Most of these are centered around building 2.5D websites, demos and games with three.js and @react-three/fiber. Some of them are already quite stable, others are still experimental.
 
@@ -43,7 +43,7 @@ A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a
 - create and render visual tiled maps which are laid out in [a 2D spatial grid map data structure](./packages/tiled-maps/README.md)
 - based on @spearwolf/vertex&#x2011;objects
 - :warning: work in progress
-  
+
 ### @react-three/fiber
 
 #### [picimo](./packages/picimo/)
