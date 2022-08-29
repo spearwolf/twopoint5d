@@ -127,7 +127,11 @@ export function createVertexObjectPrototype(
   });
 
   if (methods) {
-    entries.push(...Object.entries(methods));
+    entries.push(
+      ...Object.entries(methods)
+        .filter(([_key, val]) => typeof val === 'function')
+        .map(([key, value]) => [key, {value}]),
+    );
   }
 
   const proto = basePrototype ?? Object.prototype;

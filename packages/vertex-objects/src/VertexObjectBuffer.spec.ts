@@ -1,3 +1,4 @@
+import {VO} from './types';
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectPool} from './VertexObjectPool';
@@ -165,10 +166,14 @@ describe('VertexObjectBuffer', () => {
 
   test('first vertex-object-buffer initializes the descriptor.voPrototype', () => {
     class VOBase {
-      moinMoin() {}
+      moinMoin() {
+        return 23;
+      }
     }
 
-    function fooBarPlah() {}
+    function fooBarPlah() {
+      return 42;
+    }
 
     const descriptor = new VertexObjectDescriptor({
       vertexCount: 4,
@@ -182,7 +187,7 @@ describe('VertexObjectBuffer', () => {
         },
       },
 
-      basePrototype: VOBase,
+      basePrototype: VOBase.prototype,
 
       methods: {
         fooBarPlah,
@@ -200,19 +205,24 @@ describe('VertexObjectBuffer', () => {
     // ------------------------------------------------------
 
     // vertex-object-pool uses the voPrototype prop from descriptor ---------------
-    const pool = new VertexObjectPool(descriptor, 1);
+    const pool = new VertexObjectPool<VO & {moinMoin(): number; fooBarPlah(): number}>(descriptor, 1);
     const vo = pool.createVO();
 
     expect(vo).toBeDefined();
     expect(Object.getPrototypeOf(vo)).toBe(descriptor.voPrototype);
     // ----------------------------------------------------------------------------
 
-    const voBaseProto = Object.getPrototypeOf(Object.getPrototypeOf(vo)).prototype;
+    const voBaseProto = Object.getPrototypeOf(Object.getPrototypeOf(vo));
     expect(voBaseProto).toHaveProperty('moinMoin');
     expect(voBaseProto).not.toHaveProperty('fooBarPlah');
 
     expect(Object.getPrototypeOf(vo)).toHaveProperty('fooBarPlah');
-    expect(Object.getPrototypeOf(vo)).not.toHaveProperty('moinMoin'); // ;)
+    expect(Object.getPrototypeOf(vo)).toHaveProperty('moinMoin'); // ;)
+
+    // ----------------------------------------------------------------------------
+
+    expect(vo.fooBarPlah()).toBe(42);
+    expect(vo.moinMoin()).toBe(23);
   });
 
   test('copyAttributes', () => {

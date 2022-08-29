@@ -68,10 +68,10 @@ examples can be found here:
          }
     }
 
-    basePrototpe: class MyBaseClass {};  // [optional]
+    basePrototpe: MyBaseClass.prototype;  // [optional]
 
-    methods: {                           // [optional] also works as mixins
-        [methodName]() {}
+    methods: {                            // [optional] also works as mixins
+        [methodName]() {}                 // attention: only functions are accepted as methods
     }
 }
 ```
