@@ -42,9 +42,11 @@ examples can be found here:
 - [textured-sprites](https://github.com/spearwolf/three-vertex-objects/tree/main/examples/textured-sprites.html)
 
 
-## CHEAT SHEET: Vertex Object Descriptors
+## CHEAT SHEET
 
-### Define
+### Vertex Object Descriptors
+
+#### Describe your vertex objects
 
 ```js
 {
@@ -66,15 +68,15 @@ examples can be found here:
          }
     }
 
-    prototpe: MyBaseClass.prototype;  // [optional]
+    basePrototpe: class MyBaseClass {};  // [optional]
 
-    methods: {  // TODO not yet implemented
+    methods: {                           // [optional] also works as mixins
         [methodName]() {}
     }
 }
 ```
 
-### API
+#### API Overview
 
 ```js
 const geometry = new VertexObjectGeometry(descriptor, CAPACITY = 1);
@@ -106,7 +108,7 @@ geometry.touch('position', {dynamic: true}, ...)  // yes, you can mix it here if
 geometry.update()  // automatically called by VertexObjects
 ```
 
-### Usage
+#### Simple Usage
 
 ```js
 const mesh = new VertexObjects(geometry, material)
