@@ -81,7 +81,7 @@ export interface VertexObjectDescription {
   meshCount?: number;
   attributes: VertexAttributesType;
   basePrototype?: Object | null | undefined;
-  // TODO methods
+  methods?: Object | null | undefined;
 }
 
 /**

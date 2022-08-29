@@ -10,10 +10,10 @@ export class VertexObjectDescriptor {
   readonly attributes: Map<string, VertexAttributeDescriptor>;
   readonly bufferNames: Set<string>;
   readonly basePrototype: Object | null | undefined;
+  readonly methods: Object | null | undefined;
 
-  voPrototype: Object; // initialization is delayed and is done by ..
-  // .. the first VertexObjectBuffer that uses this descriptor
-  // TODO add test for this case
+  voPrototype: Object; // lazy initialization!!
+  // is initialized by the first VertexObjectBuffer that uses this descriptor => createVertexObjectPrototype()
 
   constructor(description: VertexObjectDescription) {
     this.description = description;
@@ -25,6 +25,7 @@ export class VertexObjectDescriptor {
       this.bufferNames.add(descriptor.bufferName);
     });
     this.basePrototype = description.basePrototype;
+    this.methods = description.methods;
   }
 
   /** Returns `vertexCount` or `1` */

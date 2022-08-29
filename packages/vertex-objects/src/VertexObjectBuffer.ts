@@ -112,7 +112,7 @@ export class VertexObjectBuffer {
     }
 
     if (!this.descriptor.voPrototype) {
-      this.descriptor.voPrototype = createVertexObjectPrototype(this, this.descriptor.basePrototype);
+      this.descriptor.voPrototype = createVertexObjectPrototype(this, this.descriptor.basePrototype, this.descriptor.methods);
     }
   }
 

@@ -65,75 +65,73 @@ const makeAttributeValueSetter = (
   };
 };
 
-export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer, basePrototype: Object | null | undefined): Object {
+export function createVertexObjectPrototype(
+  voBuffer: VertexObjectBuffer,
+  basePrototype: Object | null | undefined,
+  methods: Object | null | undefined,
+): Object {
   const {descriptor} = voBuffer;
-  const props = Object.fromEntries(
-    descriptor.attributeNames.flatMap((attrName) => {
-      const attr = descriptor.getAttribute(attrName);
-      const bufAttr = voBuffer.bufferAttributes.get(attrName);
-      const buf = voBuffer.buffers.get(bufAttr.bufferName);
-      const AttrName = toPascalCase(attrName);
+  const entries = descriptor.attributeNames.flatMap((attrName) => {
+    const attr = descriptor.getAttribute(attrName);
+    const bufAttr = voBuffer.bufferAttributes.get(attrName);
+    const buf = voBuffer.buffers.get(bufAttr.bufferName);
+    const AttrName = toPascalCase(attrName);
 
-      const methods: any[] = [];
-      if (descriptor.vertexCount === 1 && attr.size === 1) {
-        methods.push([
-          attrName,
+    const methods: any[] = [];
+    if (descriptor.vertexCount === 1 && attr.size === 1) {
+      methods.push([
+        attrName,
+        {
+          enumerable: true,
+          get: makeAttributeGetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
+          set: makeAttributeSetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
+        },
+      ]);
+    } else {
+      methods.push(
+        [
+          `get${AttrName}`,
           {
             enumerable: true,
-            get: makeAttributeGetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
-            set: makeAttributeSetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
+            value: makeAttributeValuesGetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
           },
-        ]);
-      } else {
-        methods.push(
-          [
-            `get${AttrName}`,
-            {
-              enumerable: true,
-              value: makeAttributeValuesGetter(
-                bufAttr.bufferName,
-                buf.itemSize,
-                descriptor.vertexCount,
-                bufAttr.offset,
-                attr.size,
-              ),
-            },
-          ],
-          [
-            `set${AttrName}`,
-            {
-              enumerable: true,
-              value: makeAttributeValueSetter(
-                bufAttr.bufferName,
-                buf.itemSize,
-                descriptor.vertexCount,
-                bufAttr.offset,
-                attr.size,
-              ),
-            },
-          ],
-        );
-      }
-      if (attr.hasComponents) {
-        attr.components.forEach((component, componentIndex) => {
-          for (let vertexIndex = 0; vertexIndex < descriptor.vertexCount; vertexIndex++) {
-            const instanceOffset = descriptor.vertexCount * buf.itemSize;
-            const attrOffset = vertexIndex * buf.itemSize + bufAttr.offset + componentIndex;
-            if (descriptor.vertexCount > 1 || component !== attr.name) {
-              methods.push([
-                `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
-                {
-                  enumerable: true,
-                  get: makeAttributeGetter(bufAttr.bufferName, instanceOffset, attrOffset),
-                  set: makeAttributeSetter(bufAttr.bufferName, instanceOffset, attrOffset),
-                },
-              ]);
-            }
+        ],
+        [
+          `set${AttrName}`,
+          {
+            enumerable: true,
+            value: makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+          },
+        ],
+      );
+    }
+    if (attr.hasComponents) {
+      attr.components.forEach((component, componentIndex) => {
+        for (let vertexIndex = 0; vertexIndex < descriptor.vertexCount; vertexIndex++) {
+          const instanceOffset = descriptor.vertexCount * buf.itemSize;
+          const attrOffset = vertexIndex * buf.itemSize + bufAttr.offset + componentIndex;
+          if (descriptor.vertexCount > 1 || component !== attr.name) {
+            methods.push([
+              `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
+              {
+                enumerable: true,
+                get: makeAttributeGetter(bufAttr.bufferName, instanceOffset, attrOffset),
+                set: makeAttributeSetter(bufAttr.bufferName, instanceOffset, attrOffset),
+              },
+            ]);
           }
-        });
-      }
-      return methods;
-    }),
-  );
-  return Object.create(basePrototype !== undefined ? basePrototype : Object.prototype, props);
+        }
+      });
+    }
+    return methods;
+  });
+
+  if (methods) {
+    entries.push(...Object.entries(methods));
+  }
+
+  const proto = basePrototype ?? Object.prototype;
+  const props = Object.fromEntries(entries);
+
+  return Object.create(proto, props);
 }

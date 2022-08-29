@@ -1,5 +1,6 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {VertexObjectPool} from './VertexObjectPool';
 
 describe('VertexObjectBuffer', () => {
   test('construct with descriptor', () => {
@@ -160,6 +161,58 @@ describe('VertexObjectBuffer', () => {
         .map((bufAttr) => bufAttr.attributeName)
         .sort(),
     ).toEqual(['bar', 'plah', 'zack']);
+  });
+
+  test('first vertex-object-buffer initializes the descriptor.voPrototype', () => {
+    class VOBase {
+      moinMoin() {}
+    }
+
+    function fooBarPlah() {}
+
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+      indices: [0, 1, 2, 0, 2, 3],
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+          type: 'float32',
+          usage: 'dynamic',
+        },
+      },
+
+      basePrototype: VOBase,
+
+      methods: {
+        fooBarPlah,
+      },
+    });
+
+    // first buffer initializes the prototype ---------------
+    expect(descriptor.voPrototype).toBeUndefined();
+
+    const vob = new VertexObjectBuffer(descriptor, 1);
+
+    expect(vob).toBeDefined();
+    expect(vob.descriptor).toBe(descriptor);
+    expect(descriptor.voPrototype).toBeDefined();
+    // ------------------------------------------------------
+
+    // vertex-object-pool uses the voPrototype prop from descriptor ---------------
+    const pool = new VertexObjectPool(descriptor, 1);
+    const vo = pool.createVO();
+
+    expect(vo).toBeDefined();
+    expect(Object.getPrototypeOf(vo)).toBe(descriptor.voPrototype);
+    // ----------------------------------------------------------------------------
+
+    const voBaseProto = Object.getPrototypeOf(Object.getPrototypeOf(vo)).prototype;
+    expect(voBaseProto).toHaveProperty('moinMoin');
+    expect(voBaseProto).not.toHaveProperty('fooBarPlah');
+
+    expect(Object.getPrototypeOf(vo)).toHaveProperty('fooBarPlah');
+    expect(Object.getPrototypeOf(vo)).not.toHaveProperty('moinMoin'); // ;)
   });
 
   test('copyAttributes', () => {
