@@ -1,9 +1,55 @@
-# stage25
+# @spearwolf/stage25
 
-> stages and responsive design aware 2d projections
+:rocket: _responsive scenes for threejs_
 
-it's based on the [vertex-objects](https://github.com/spearwolf/three-vertex-objects/tree/master/vertex-objects) library which itself is build upon [three.js](https://threejs.org/)
+[![npm version](https://badge.fury.io/js/@spearwolf%2Fdisplay3.svg)](https://badge.fury.io/js/@spearwolf%2Fdisplay3)
+
+```js
+import { Stage2D, ParallaxProjection } from "@spearwolf/stage25"
+import { Display } from "@spearwolf/display3"
+
+const projection = new ParallaxProjection("xy|bottom-left", {
+    width: 640,
+    height: 400,
+    fit: 'contain',
+    minPixelZoom: 2,
+})
+
+const stage = new Stage2D(projection)
+
+stage.scene  // => THREE.Scene
+
+const canvasEl = document.querySelector('canvas')
+const display = new Display(canvasEl)
+
+display.on({
+  resize({ width: canvasWidth, height: canvasHeight }) {
+      stage.resize(canvasWidth, canvasHeight)
+      
+      // the effective dimension, may or may not be equal to the container,
+      // depending on the projection description and the container dimension
+      stage.width
+      stage.height
+
+      // the container dimension from resize()
+      stage.containerWith  // === canvasWidth
+      stage.containerHeight  // === canvasHeight
+      
+      stage.camera  // => THREE.PerspectiveCamera, because ParallaxProjection creates such
+  }
+  
+  frame({ renderer }) {
+      stage.renderFrame(renderer)
+  }
+})
+```
+(_the use of `Display` is optional, it is used only for better illustration_)
+
+## Stage2D
+
+A *stage* is a facade for a *scene* with a *camera*.
+The camera is managed by means of a *projection* description.
 
 ## Projection
 
-the projection simplifies the use of a [THREE.Camera](https://threejs.org/docs/#api/en/cameras/Camera) in a two dimensional responsive design aware pixelart context. you ever wanted a perspective camera that shows a resolution of 640x480 in the canvas, but respecting the ["object-fit: contain"](https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit) rules within the viewport, ideally with the origin in the upper left corner? then you should try the [[ParallaxProjection]] or the [[OrthographicProjection]].
+...
