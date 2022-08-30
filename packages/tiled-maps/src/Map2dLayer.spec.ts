@@ -33,7 +33,7 @@ describe('Map2dLayer', () => {
     });
     test('tilesRenderer', () => {
       const layer = new Map2dLayer(1, 1);
-      expect(layer.tilesRenderer).toBeUndefined();
+      expect(layer.renderers.size).toBe(0);
       const renderer: IMap2dLayerTilesRenderer = {
         beginUpdate(_layer: Map2dLayer, _xOffset: number, _yOffset: number, _fullViewArea: AABB2) {},
         addTile(_tile: Map2dAreaTile) {},
@@ -45,8 +45,8 @@ describe('Map2dLayer', () => {
         endUpdate() {},
         dispose() {},
       };
-      layer.tilesRenderer = renderer;
-      expect(layer.tilesRenderer).toBe(renderer);
+      layer.addTilesRenderer(renderer);
+      expect(layer.renderers.has(renderer)).toBeTruthy();
     });
     // TODO add renderViewArea() tests !!
   });

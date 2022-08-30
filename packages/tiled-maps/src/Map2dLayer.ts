@@ -103,14 +103,22 @@ export class Map2dLayer {
   }
 
   tiles: Map2dAreaTile[] = [];
-  tilesRenderer: IMap2dLayerTilesRenderer;
+  renderers: Set<IMap2dLayerTilesRenderer> = new Set();
 
-  constructor(tileWidth: number, tileHeight: number, xOffset = 0, yOffset = 0) {
+  constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
     this.#tileCoords = new Map2dTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
+  addTilesRenderer(renderer: IMap2dLayerTilesRenderer): void {
+    this.renderers.add(renderer);
+  }
+
+  removeTilessRenderer(renderer: IMap2dLayerTilesRenderer): void {
+    this.renderers.delete(renderer);
+  }
+
   update(): void {
-    if (!this.tilesRenderer) return;
+    if (this.renderers.size === 0) return;
 
     if (this.#needsUpdate) {
       const {width, height, centerX, centerY} = this;
@@ -162,11 +170,13 @@ export class Map2dLayer {
       const xOffset = this.xOffset - centerX;
       const yOffset = this.yOffset - centerY;
 
-      this.tilesRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
-      removeTiles.forEach((tile) => this.tilesRenderer.removeTile(tile));
-      createTiles.forEach((tile) => this.tilesRenderer.addTile(tile));
-      reuseTiles.forEach((tile) => this.tilesRenderer.reuseTile(tile));
-      this.tilesRenderer.endUpdate();
+      for (const tilesRenderer of this.renderers) {
+        tilesRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
+        removeTiles.forEach((tile) => tilesRenderer.removeTile(tile));
+        createTiles.forEach((tile) => tilesRenderer.addTile(tile));
+        reuseTiles.forEach((tile) => tilesRenderer.reuseTile(tile));
+        tilesRenderer.endUpdate();
+      }
     }
   }
 }

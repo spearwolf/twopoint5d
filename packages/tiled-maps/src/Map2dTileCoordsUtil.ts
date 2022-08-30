@@ -24,7 +24,7 @@ export class Map2dTileCoordsUtil {
   xOffset: number;
   yOffset: number;
 
-  constructor(tileWidth: number, tileHeight: number, xOffset = 0, yOffset = 0) {
+  constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
     this.xOffset = xOffset;

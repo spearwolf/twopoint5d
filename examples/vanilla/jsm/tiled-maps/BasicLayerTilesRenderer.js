@@ -26,6 +26,10 @@ export class BasicLayerTilesRenderer {
     this.renderSerial = 0;
   }
 
+  getObject3D() {
+    return this.mesh;
+  }
+
   get instancedPool() {
     return this.mesh?.geometry?.instancedPool;
   }

@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         color: #fff;
         background: linear-gradient(
@@ -61,7 +64,10 @@
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import { TextureFactory, TileSetLoader } from "@spearwolf/vertex-objects";
-      import { RepeatingTilesProvider, Map2dLayer } from "@spearwolf/tiled-maps";
+      import {
+        RepeatingTilesProvider,
+        Map2dLayer3D,
+      } from "@spearwolf/tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
       import { BasicLayerTilesRenderer } from "/examples/vanilla/jsm/tiled-maps/BasicLayerTilesRenderer.js";
       import { makePoints } from "/examples/vanilla/jsm/utils/makePoints.js";
@@ -83,7 +89,30 @@
         );
         scene.add(line);
 
-        // a. create a tiles data provider
+        // create a map2d layer and add to scene
+        // ------------------------------------------------------
+
+        const map2dLayer = new Map2dLayer3D();
+
+        map2dLayer.tileWidth = 256;
+        map2dLayer.tileHeight = 256;
+        map2dLayer.xOffset = -128;
+        map2dLayer.yOffset = -128;
+
+        map2dLayer.width = 640;
+        map2dLayer.height = 480;
+
+        map2dLayer.centerX = 0;
+        map2dLayer.centerY = 0;
+
+        scene.add(map2dLayer);
+
+        demo.on("frame", () => map2dLayer.update());
+
+        window.map2dLayer = map2dLayer;
+        console.log("map2dLayer", map2dLayer);
+
+        // create a tiles data provider
         // ------------------------------------------------------
 
         const tilesData = new RepeatingTilesProvider([
@@ -91,16 +120,17 @@
           [3, 4],
         ]);
 
-        // b. load a tileset
+        // load a tileset texture
         // ------------------------------------------------------
 
-        const tileSetLoader = new TileSetLoader(new TextureFactory());
-        const { tileSet, texture } = await tileSetLoader.loadAsync(
-          "/examples/assets/map2d-debug-tiles_4x256x256.png",
-          { tileWidth: 256, tileHeight: 256 }
-        );
+        const { tileSet, texture } = await new TileSetLoader(
+          new TextureFactory()
+        ).loadAsync("/examples/assets/map2d-debug-tiles_4x256x256.png", {
+          tileWidth: 256,
+          tileHeight: 256,
+        });
 
-        // c. create the layer tiles renderer
+        // create the tiles renderer and add to map2d layer
         // ------------------------------------------------------
 
         const renderer = new BasicLayerTilesRenderer(
@@ -109,27 +139,10 @@
           texture
         );
 
-        scene.add(renderer.mesh);
+        map2dLayer.addTilesRenderer(renderer);
 
-        console.log(renderer);
-
-        // d. create a map2d layer
-        // ------------------------------------------------------
-
-        const map2dLayer = new Map2dLayer(256, 256, -128, -128);
-
-        map2dLayer.tilesRenderer = renderer;
-
-        map2dLayer.width = 640;
-        map2dLayer.height = 480;
-
-        map2dLayer.centerX = 0;
-        map2dLayer.centerY = 0;
-
-        demo.on("frame", () => map2dLayer.update());
-
-        window.map2dLayer = map2dLayer;
-        console.log("map2dLayer", map2dLayer);
+        window.tilesRenderer = renderer;
+        console.log("tilesRenderer", renderer);
 
         // prettier-ignore
         scene.add(makePoints([
