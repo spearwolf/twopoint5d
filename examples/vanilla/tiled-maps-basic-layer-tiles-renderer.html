@@ -67,9 +67,11 @@
       import {
         RepeatingTilesProvider,
         Map2dLayer3D,
+        Map2dTileSpritesLayerRenderer,
+        TileSpritesGeometry,
+        TileSpritesMaterial,
       } from "@spearwolf/tiled-maps";
       import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
-      import { BasicLayerTilesRenderer } from "/examples/vanilla/jsm/tiled-maps/BasicLayerTilesRenderer.js";
       import { makePoints } from "/examples/vanilla/jsm/utils/makePoints.js";
 
       const demo = new PerspectiveOrbitDemo(
@@ -133,11 +135,18 @@
         // create the tiles renderer and add to map2d layer
         // ------------------------------------------------------
 
-        const renderer = new BasicLayerTilesRenderer(
-          tilesData,
-          tileSet,
-          texture
-        );
+        const renderer = new Map2dTileSpritesLayerRenderer();
+
+        renderer.tilesData = tilesData;
+        renderer.tileSet = tileSet;
+
+        renderer.geometry = new TileSpritesGeometry(1000);
+
+        renderer.material = new TileSpritesMaterial({
+          colorMap: texture,
+          depthTest: true,
+          depthWrite: true,
+        });
 
         map2dLayer.addTilesRenderer(renderer);
 

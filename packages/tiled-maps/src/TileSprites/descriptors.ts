@@ -1,6 +1,6 @@
-import {VertexObjectDescription} from '@spearwolf/vertex-objects';
+import {VertexObjectDescription, VO} from '@spearwolf/vertex-objects';
 
-export interface TileBaseSprite {
+export interface TileBaseSprite extends VO {
   setPosition(position: number[]): void;
   setUv(texCoords: number[]): void;
 }
@@ -45,3 +45,18 @@ export const TileSpriteDescriptor: VertexObjectDescription = {
     quadSize: {components: ['width', 'height'], usage: 'dynamic', autoTouch: false},
   },
 };
+
+export interface TileSprite extends VO {
+  setInstancePosition(position: [x: number, y: number, z: number]): void;
+
+  x: number;
+  y: number;
+  z: number;
+
+  setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
+
+  setQuadSize(size: [width: number, height: number]): void;
+
+  width: number;
+  height: number;
+}

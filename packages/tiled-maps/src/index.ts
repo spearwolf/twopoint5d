@@ -6,6 +6,7 @@ export * from './Map2dLayer';
 export * from './Map2dLayer3D';
 export * from './Map2dSpatialHashGrid';
 export * from './Map2dTileCoordsUtil';
+export * from './Map2dTileSpritesLayerRenderer';
 export * from './RepeatingTilesProvider';
 export * from './TileSprites/descriptors';
 export * from './TileSprites/TileSprites';
