@@ -25,7 +25,7 @@ const display = new Display(canvasEl)
 display.on({
   resize({ width: canvasWidth, height: canvasHeight }) {
       stage.resize(canvasWidth, canvasHeight)
-      
+
       // the effective dimension, may or may not be equal to the container,
       // depending on the projection description and the container dimension
       stage.width
@@ -34,10 +34,10 @@ display.on({
       // the container dimension from resize()
       stage.containerWith  // === canvasWidth
       stage.containerHeight  // === canvasHeight
-      
+
       stage.camera  // => THREE.PerspectiveCamera, because ParallaxProjection creates such
   }
-  
+
   frame({ renderer }) {
       stage.renderFrame(renderer)
   }

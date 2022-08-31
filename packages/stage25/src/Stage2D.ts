@@ -5,21 +5,28 @@ import {IProjection} from './IProjection';
 
 export interface Stage2D extends Eventize {}
 
+/**
+ * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
+ * The camera is managed by means of a *projection* description.
+ *
+ * A stage is always embedded in a logical 2d container that has a width and height.
+ * Such a container can be e.g. the canvas element or another stage.
+ * The stage doesn't need to know this in detail, but it gets the size of the container using the `resize(width, height)` method.
+ *
+ * Based on the container dimension and the *projection* description
+ * the effective width and size is calculated and finally a camera is created.
+ *
+ * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
+ */
 export class Stage2D {
   scene: Scene;
 
   autoClear = true;
 
-  /**
-   * Get the *scene* name
-   */
   get name(): string {
     return this.scene.name;
   }
 
-  /**
-   * Set the *scene* name
-   */
   set name(name: string) {
     this.scene.name = name;
   }
@@ -65,6 +72,16 @@ export class Stage2D {
   #cameraFromProjection?: Camera;
   #cameraUserOverride?: Camera;
 
+  /**
+   * A camera is automatically created based on the projection and is available after the first call of the `resize()` method.
+   *
+   * Alternatively, you can simply set your own camera.
+   *
+   * This will then take precedence over the automatically created camera.
+   *
+   * If the camera is manually set back to `null | undefined`, the next call of `resize()`
+   * will create (or resuse) the camera (created by the projection) as described above.
+   */
   get camera(): Camera | undefined {
     return this.#cameraUserOverride ?? this.#cameraFromProjection;
   }
@@ -81,20 +98,6 @@ export class Stage2D {
     }
   };
 
-  /**
-   * A _stage_ consists of a _scene_ and a _camera_, which is created from a _projection_.
-   * A _stage_ also has a _dimension_ (`width` and `height`), which is calculated from the _projection_
-   * and the dimension of the surrounding container (which is usually the _canvas_).
-   *
-   * The _projection_ can be set later by a setter (and yes, it works without if you set your own _camera_).
-   *
-   * A _camera_ is automatically created by the _projection_, but you can also explicitly set your own _camera_,
-   * which will be used instead. Note that a _projection_ will try to adjust the _camera_ settings after a `resize()` call,
-   * no matter if it is a custom _camera_ or a _camera_ created by the _projection_.
-   *
-   * A _stage_ can be rendered using the `renderFrame(renderer)` method.
-   *
-   */
   constructor(projection?: IProjection, scene?: Scene) {
     eventize(this);
 
