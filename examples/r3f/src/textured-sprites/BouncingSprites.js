@@ -1,4 +1,5 @@
-const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 export class BouncingSprites {
   gravity = -45;
   startSpeedX = 20;
@@ -27,9 +28,9 @@ export class BouncingSprites {
     this.textureAtlas = atlas;
     this.initalSpriteCount = capacity;
 
-    this.frames = atlas
-      .frameNames(/numbers32/)
-      .map((name) => atlas.frame(name));
+    // this.frames = atlas
+    //   .frameNames(/numbers32/)
+    //   .map((name) => atlas.frame(name));
 
     this.createSprites();
 
@@ -53,7 +54,8 @@ export class BouncingSprites {
       );
 
       sprite.setFrame(
-        this.frames ? sample(this.frames) : this.textureAtlas.randomFrame()
+        // this.frames ? sample(this.frames) : this.textureAtlas.randomFrame()
+        this.textureAtlas.randomFrame()
       );
 
       sprite.speedX = Math.random() * this.startSpeedX + this.startSpeedBaseX;

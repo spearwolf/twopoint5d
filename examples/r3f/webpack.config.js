@@ -12,6 +12,10 @@ module.exports = {
       import: "./src/textured-sprites/index.jsx",
       dependOn: "libs",
     },
+    "textured-sprites-from-tileset": {
+      import: "./src/textured-sprites-from-tileset/index.jsx",
+      dependOn: "libs",
+    },
     clouds: {
       import: "./src/clouds/index.jsx",
       dependOn: "libs",
