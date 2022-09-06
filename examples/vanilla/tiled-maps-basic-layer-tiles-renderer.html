@@ -125,12 +125,13 @@
         // load a tileset texture
         // ------------------------------------------------------
 
-        const { tileSet, texture } = await new TileSetLoader(
-          new TextureFactory()
-        ).loadAsync("/examples/assets/map2d-debug-tiles_4x256x256.png", {
-          tileWidth: 256,
-          tileHeight: 256,
-        });
+        const { tileSet, texture } = await new TileSetLoader().loadAsync(
+          "/examples/assets/map2d-debug-tiles_4x256x256.png",
+          {
+            tileWidth: 256,
+            tileHeight: 256,
+          }
+        );
 
         // create the tiles renderer and add to map2d layer
         // ------------------------------------------------------

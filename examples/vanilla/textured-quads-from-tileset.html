@@ -181,11 +181,12 @@
         { antialias: false }
       );
 
-      const tilesetLoader = new TileSetLoader(new TextureFactory());
+      const tilesetLoader = new TileSetLoader();
 
       tilesetLoader.load(
         "/examples/assets/nobinger-anim-sheet.png",
         { tileWidth: 64, tileHeight: 64, margin: 1 },
+        undefined,
         (data) => {
           console.log("loaded tileset", data);
 

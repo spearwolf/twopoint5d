@@ -1,5 +1,8 @@
 @spearwolf/vertex-objects
 
+## 0.2.0
+
+- add optional `textureClasses` argument to `TileSetLoader`
 
 ## 0.1.2
 

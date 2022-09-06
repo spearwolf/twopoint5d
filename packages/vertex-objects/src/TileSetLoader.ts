@@ -1,7 +1,7 @@
 import {Texture} from 'three';
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
 import {TextureCoords} from './TextureCoords';
-import {TextureFactory} from './TextureFactory';
+import {TextureFactory, TextureOptionClasses} from './TextureFactory';
 import {TileSet, TileSetOptions} from './TileSet';
 import {TextureSource} from './types';
 
@@ -33,14 +33,20 @@ export class TileSetLoader {
     this.imageLoader = imageLoader;
   }
 
-  load(url: string, tileSetOptions: TileSetOptions, onLoadCallback: OnLoadCallback, onErrorCallback?: OnErrorCallback): void {
+  load(
+    url: string,
+    tileSetOptions: TileSetOptions,
+    textureClasses: Array<TextureOptionClasses> | null | undefined,
+    onLoadCallback: OnLoadCallback,
+    onErrorCallback?: OnErrorCallback,
+  ): void {
     this.imageLoader.load(
       url,
       (imageData) => {
         const texture = new Texture(imageData.imgEl);
         texture.name = url;
 
-        this.textureFactory.update(texture);
+        this.textureFactory.update(texture, ...(textureClasses ?? []));
 
         const tileSet = new TileSet(imageData.texCoords, tileSetOptions);
 
@@ -55,9 +61,9 @@ export class TileSetLoader {
     );
   }
 
-  loadAsync(url: string, tileSetOptions: TileSetOptions): Promise<TileSetData> {
+  loadAsync(url: string, tileSetOptions: TileSetOptions, textureClasses?: Array<TextureOptionClasses>): Promise<TileSetData> {
     return new Promise((resolve, reject) => {
-      this.load(url, tileSetOptions, resolve, reject);
+      this.load(url, tileSetOptions, textureClasses, resolve, reject);
     });
   }
 }
