@@ -13,7 +13,7 @@ import {TileSprites} from './TileSprites/TileSprites';
 import {TileSpritesGeometry} from './TileSprites/TileSpritesGeometry';
 import {TileSpritesMaterial} from './TileSprites/TileSpritesMaterial';
 
-export class Map2dTileSpritesLayerRenderer implements IMap2dLayerTilesRenderer {
+export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
   tilesData?: IMap2dTileDataProvider;
   tileSet?: TileSet;
 
@@ -141,6 +141,6 @@ export class Map2dTileSpritesLayerRenderer implements IMap2dLayerTilesRenderer {
 
   dispose(): void {
     // eslint-disable-next-line no-console
-    console.warn('Map2dTileSpritesLayerRenderer.dispose() is not implemented');
+    console.warn('Map2dTileSpritesRenderer.dispose() is not implemented');
   }
 }

@@ -67,7 +67,7 @@
       import {
         RepeatingTilesProvider,
         Map2dLayer3D,
-        Map2dTileSpritesLayerRenderer,
+        Map2dTileSpritesRenderer,
         TileSpritesGeometry,
         TileSpritesMaterial,
       } from "@spearwolf/tiled-maps";
@@ -136,7 +136,7 @@
         // create the tiles renderer and add to map2d layer
         // ------------------------------------------------------
 
-        const renderer = new Map2dTileSpritesLayerRenderer();
+        const renderer = new Map2dTileSpritesRenderer();
 
         renderer.tilesData = tilesData;
         renderer.tileSet = tileSet;
