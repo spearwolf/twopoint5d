@@ -1,6 +1,6 @@
 import {Group, Object3D} from 'three';
 
-import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
+import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 
 import {Map2DLayer} from './Map2DLayer';
 
@@ -8,8 +8,8 @@ import {Map2DLayer} from './Map2DLayer';
  * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
  */
 export class Map2DLayer3D extends Group {
-  #renderers: Set<IMap2DLayerTilesRenderer> = new Set();
-  #rendererObjects: Map<IMap2DLayerTilesRenderer, Object3D> = new Map();
+  #renderers: Set<IMap2DTileRenderer> = new Set();
+  #rendererObjects: Map<IMap2DTileRenderer, Object3D> = new Map();
   #map2dLayer: Map2DLayer;
 
   get map2dLayer(): Map2DLayer {
@@ -20,7 +20,7 @@ export class Map2DLayer3D extends Group {
     if (this.#renderers.size > 0) {
       if (this.#map2dLayer) {
         for (const renderer of this.#renderers) {
-          this.#map2dLayer.removeTilessRenderer(renderer);
+          this.#map2dLayer.removeTileRenderer(renderer);
         }
       }
     }
@@ -29,7 +29,7 @@ export class Map2DLayer3D extends Group {
 
     if (this.#map2dLayer) {
       for (const renderer of this.#renderers) {
-        this.#map2dLayer.addTilesRenderer(renderer);
+        this.#map2dLayer.addTileRenderer(renderer);
       }
     }
   }
@@ -103,11 +103,11 @@ export class Map2DLayer3D extends Group {
     this.#map2dLayer = map2dLayer;
   }
 
-  addTilesRenderer(renderer: IMap2DLayerTilesRenderer): void {
+  addTileRenderer(renderer: IMap2DTileRenderer): void {
     if (!this.#renderers.has(renderer)) {
       this.#renderers.add(renderer);
 
-      this.#map2dLayer.addTilesRenderer(renderer);
+      this.#map2dLayer.addTileRenderer(renderer);
 
       const rendererObject = renderer.getObject3D();
       if (rendererObject) {
@@ -117,11 +117,11 @@ export class Map2DLayer3D extends Group {
     }
   }
 
-  removeTilesRenderer(renderer: IMap2DLayerTilesRenderer): void {
+  removeTileRenderer(renderer: IMap2DTileRenderer): void {
     if (this.#renderers.has(renderer)) {
       this.#renderers.delete(renderer);
 
-      this.#map2dLayer.removeTilessRenderer(renderer);
+      this.#map2dLayer.removeTileRenderer(renderer);
 
       const rendererObject = this.#rendererObjects.get(renderer);
       if (rendererObject) {
@@ -137,7 +137,7 @@ export class Map2DLayer3D extends Group {
 
   dispose(): void {
     for (const renderer of this.#renderers) {
-      this.removeTilesRenderer(renderer);
+      this.removeTileRenderer(renderer);
       renderer.dispose();
     }
   }

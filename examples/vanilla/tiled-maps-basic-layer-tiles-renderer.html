@@ -117,7 +117,7 @@
         // create a tiles data provider
         // ------------------------------------------------------
 
-        const tilesData = new RepeatingTilesProvider([
+        const tileData = new RepeatingTilesProvider([
           [1, 2],
           [3, 4],
         ]);
@@ -138,7 +138,7 @@
 
         const renderer = new Map2DTileSpritesRenderer();
 
-        renderer.tilesData = tilesData;
+        renderer.tileData = tileData;
         renderer.tileSet = tileSet;
 
         renderer.geometry = new TileSpritesGeometry(1000);
@@ -149,10 +149,10 @@
           depthWrite: true,
         });
 
-        map2dLayer.addTilesRenderer(renderer);
+        map2dLayer.addTileRenderer(renderer);
 
-        window.tilesRenderer = renderer;
-        console.log("tilesRenderer", renderer);
+        window.tileRenderer = renderer;
+        console.log("tileRenderer", renderer);
 
         // prettier-ignore
         scene.add(makePoints([

@@ -1,7 +1,7 @@
 import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
-import {Map2DAreaTile} from './Map2DAreaTile';
+import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {Map2DLayer} from './Map2DLayer';
+import {Map2DTile} from './Map2DTile';
 
 describe('Map2DLayer', () => {
   describe('new', () => {
@@ -34,18 +34,18 @@ describe('Map2DLayer', () => {
     test('tilesRenderer', () => {
       const layer = new Map2DLayer(1, 1);
       expect(layer.renderers.size).toBe(0);
-      const renderer: IMap2DLayerTilesRenderer = {
+      const renderer: IMap2DTileRenderer = {
         beginUpdate(_layer: Map2DLayer, _xOffset: number, _yOffset: number, _fullViewArea: AABB2) {},
-        addTile(_tile: Map2DAreaTile) {},
-        reuseTile(_tile: Map2DAreaTile) {},
-        removeTile(_tile: Map2DAreaTile) {},
+        addTile(_tile: Map2DTile) {},
+        reuseTile(_tile: Map2DTile) {},
+        removeTile(_tile: Map2DTile) {},
         getObject3D() {
           return null;
         },
         endUpdate() {},
         dispose() {},
       };
-      layer.addTilesRenderer(renderer);
+      layer.addTileRenderer(renderer);
       expect(layer.renderers.has(renderer)).toBeTruthy();
     });
     // TODO add renderViewArea() tests !!

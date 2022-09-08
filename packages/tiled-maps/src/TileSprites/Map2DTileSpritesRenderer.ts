@@ -3,18 +3,18 @@
 import {TileSet, VertexObjectPool} from '@spearwolf/vertex-objects';
 import {Object3D} from 'three';
 
-import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
-import {IMap2DTileDataProvider} from './IMap2DTileDataProvider';
-import {Map2DAreaTile} from './Map2DAreaTile';
-import {Map2DLayer} from './Map2DLayer';
-import {TileSprite} from './TileSprites/descriptors';
-import {TileSprites} from './TileSprites/TileSprites';
-import {TileSpritesGeometry} from './TileSprites/TileSpritesGeometry';
-import {TileSpritesMaterial} from './TileSprites/TileSpritesMaterial';
+import {AABB2} from '../AABB2';
+import {IMap2DTileDataProvider} from '../IMap2DTileDataProvider';
+import {IMap2DTileRenderer} from '../IMap2DTileRenderer';
+import {Map2DLayer} from '../Map2DLayer';
+import {Map2DTile} from '../Map2DTile';
+import {TileSprite} from './descriptors';
+import {TileSprites} from './TileSprites';
+import {TileSpritesGeometry} from './TileSpritesGeometry';
+import {TileSpritesMaterial} from './TileSpritesMaterial';
 
-export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
-  tilesData?: IMap2DTileDataProvider;
+export class Map2DTileSpritesRenderer implements IMap2DTileRenderer {
+  tileData?: IMap2DTileDataProvider;
   tileSet?: TileSet;
 
   readonly #obj3d: Object3D = new Object3D();
@@ -59,7 +59,7 @@ export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
   #isReady = false;
 
   beginUpdate(layer: Map2DLayer, offsetX: number, offsetY: number, viewArea: AABB2): void {
-    this.#isReady = this.tilesPool != null && this.tilesData != null && this.tileSet != null;
+    this.#isReady = this.tilesPool != null && this.tileData != null && this.tileSet != null;
     this.#curUpdateSerial = 0;
 
     // eslint-disable-next-line no-console
@@ -69,10 +69,10 @@ export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
   }
 
   private getTileId(x: number, y: number): number {
-    return this.tilesData.getTileIdAt(x, y);
+    return this.tileData.getTileIdAt(x, y);
   }
 
-  addTile(tile: Map2DAreaTile): void {
+  addTile(tile: Map2DTile): void {
     if (!this.#isReady) return;
 
     const tileId = this.getTileId(tile.x, tile.y);
@@ -99,7 +99,7 @@ export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
     console.log('addTile', tile, sprite);
   }
 
-  reuseTile(tile: Map2DAreaTile): void {
+  reuseTile(tile: Map2DTile): void {
     if (!this.#isReady) return;
 
     // eslint-disable-next-line no-console
@@ -110,7 +110,7 @@ export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
     }
   }
 
-  removeTile(tile: Map2DAreaTile): void {
+  removeTile(tile: Map2DTile): void {
     if (!this.#isReady) return;
 
     // eslint-disable-next-line no-console
@@ -141,6 +141,6 @@ export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
 
   dispose(): void {
     // eslint-disable-next-line no-console
-    console.warn('Map2dTileSpritesRenderer.dispose() is not implemented');
+    console.warn('Map2DTileSpritesRenderer.dispose() is not implemented');
   }
 }

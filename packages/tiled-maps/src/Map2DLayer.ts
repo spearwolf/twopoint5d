@@ -1,6 +1,6 @@
 import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
-import {Map2DAreaTile} from './Map2DAreaTile';
+import {IMap2DTileRenderer} from './IMap2DTileRenderer';
+import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 export class Map2DLayer {
@@ -102,18 +102,18 @@ export class Map2DLayer {
     }
   }
 
-  tiles: Map2DAreaTile[] = [];
-  renderers: Set<IMap2DLayerTilesRenderer> = new Set();
+  tiles: Map2DTile[] = [];
+  renderers: Set<IMap2DTileRenderer> = new Set();
 
   constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
     this.#tileCoords = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
-  addTilesRenderer(renderer: IMap2DLayerTilesRenderer): void {
+  addTileRenderer(renderer: IMap2DTileRenderer): void {
     this.renderers.add(renderer);
   }
 
-  removeTilessRenderer(renderer: IMap2DLayerTilesRenderer): void {
+  removeTileRenderer(renderer: IMap2DTileRenderer): void {
     this.renderers.delete(renderer);
   }
 
@@ -133,8 +133,8 @@ export class Map2DLayer {
       const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
       const fullViewArea = AABB2.from(tileCoords);
 
-      const removeTiles: Map2DAreaTile[] = [];
-      const reuseTiles: Map2DAreaTile[] = [];
+      const removeTiles: Map2DTile[] = [];
+      const reuseTiles: Map2DTile[] = [];
       const createTilesState = new Uint8Array(tileCoords.rows * tileCoords.columns);
 
       this.tiles.forEach((tile) => {
@@ -148,14 +148,14 @@ export class Map2DLayer {
         }
       });
 
-      const createTiles: Map2DAreaTile[] = [];
+      const createTiles: Map2DTile[] = [];
 
       for (let ty = 0; ty < tileCoords.rows; ty++) {
         for (let tx = 0; tx < tileCoords.columns; tx++) {
           if (createTilesState[ty * tileCoords.columns + tx] === 0) {
             const tileX = tx + tileCoords.tileLeft;
             const tileY = ty + tileCoords.tileTop;
-            const tile = new Map2DAreaTile(
+            const tile = new Map2DTile(
               tileX,
               tileY,
               new AABB2(tileX * tileCoords.tileWidth, tileY * tileCoords.tileHeight, tileCoords.tileWidth, tileCoords.tileHeight),
@@ -170,12 +170,12 @@ export class Map2DLayer {
       const xOffset = this.xOffset - centerX;
       const yOffset = this.yOffset - centerY;
 
-      for (const tilesRenderer of this.renderers) {
-        tilesRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
-        removeTiles.forEach((tile) => tilesRenderer.removeTile(tile));
-        createTiles.forEach((tile) => tilesRenderer.addTile(tile));
-        reuseTiles.forEach((tile) => tilesRenderer.reuseTile(tile));
-        tilesRenderer.endUpdate();
+      for (const tileRenderer of this.renderers) {
+        tileRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
+        removeTiles.forEach((tile) => tileRenderer.removeTile(tile));
+        createTiles.forEach((tile) => tileRenderer.addTile(tile));
+        reuseTiles.forEach((tile) => tileRenderer.reuseTile(tile));
+        tileRenderer.endUpdate();
       }
     }
   }
