@@ -1,22 +1,22 @@
 import {Group, Object3D} from 'three';
 
-import {IMap2dLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
+import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
 
-import {Map2dLayer} from './Map2dLayer';
+import {Map2DLayer} from './Map2dLayer';
 
 /**
- * A fascade that is an `THREE.Object3D` and represents a `Map2dLayer`
+ * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
  */
-export class Map2dLayer3D extends Group {
-  #renderers: Set<IMap2dLayerTilesRenderer> = new Set();
-  #rendererObjects: Map<IMap2dLayerTilesRenderer, Object3D> = new Map();
-  #map2dLayer: Map2dLayer;
+export class Map2DLayer3D extends Group {
+  #renderers: Set<IMap2DLayerTilesRenderer> = new Set();
+  #rendererObjects: Map<IMap2DLayerTilesRenderer, Object3D> = new Map();
+  #map2dLayer: Map2DLayer;
 
-  get map2dLayer(): Map2dLayer {
+  get map2dLayer(): Map2DLayer {
     return this.#map2dLayer;
   }
 
-  set map2dLayer(map2dLayer: Map2dLayer) {
+  set map2dLayer(map2dLayer: Map2DLayer) {
     if (this.#renderers.size > 0) {
       if (this.#map2dLayer) {
         for (const renderer of this.#renderers) {
@@ -98,12 +98,12 @@ export class Map2dLayer3D extends Group {
     this.#map2dLayer.yOffset = offset;
   }
 
-  constructor(map2dLayer: Map2dLayer = new Map2dLayer()) {
+  constructor(map2dLayer: Map2DLayer = new Map2DLayer()) {
     super();
     this.#map2dLayer = map2dLayer;
   }
 
-  addTilesRenderer(renderer: IMap2dLayerTilesRenderer): void {
+  addTilesRenderer(renderer: IMap2DLayerTilesRenderer): void {
     if (!this.#renderers.has(renderer)) {
       this.#renderers.add(renderer);
 
@@ -117,7 +117,7 @@ export class Map2dLayer3D extends Group {
     }
   }
 
-  removeTilesRenderer(renderer: IMap2dLayerTilesRenderer): void {
+  removeTilesRenderer(renderer: IMap2DLayerTilesRenderer): void {
     if (this.#renderers.has(renderer)) {
       this.#renderers.delete(renderer);
 

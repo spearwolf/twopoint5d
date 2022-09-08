@@ -6,7 +6,7 @@
  * Please bear in mind that all coordinates are given in _tile space_
  * - therefore only integer numbers should be used here
  */
-export interface IMap2dTileDataProvider {
+export interface IMap2DTileDataProvider {
   getTileIdAt(col: number, row: number): number;
 
   getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array;

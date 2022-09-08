@@ -4,17 +4,17 @@ import {TileSet, VertexObjectPool} from '@spearwolf/vertex-objects';
 import {Object3D} from 'three';
 
 import {AABB2} from './AABB2';
-import {IMap2dLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
-import {IMap2dTileDataProvider} from './IMap2dTileDataProvider';
-import {Map2dAreaTile} from './Map2dAreaTile';
-import {Map2dLayer} from './Map2dLayer';
+import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
+import {IMap2DTileDataProvider} from './IMap2dTileDataProvider';
+import {Map2DAreaTile} from './Map2dAreaTile';
+import {Map2DLayer} from './Map2dLayer';
 import {TileSprite} from './TileSprites/descriptors';
 import {TileSprites} from './TileSprites/TileSprites';
 import {TileSpritesGeometry} from './TileSprites/TileSpritesGeometry';
 import {TileSpritesMaterial} from './TileSprites/TileSpritesMaterial';
 
-export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
-  tilesData?: IMap2dTileDataProvider;
+export class Map2DTileSpritesRenderer implements IMap2DLayerTilesRenderer {
+  tilesData?: IMap2DTileDataProvider;
   tileSet?: TileSet;
 
   readonly #obj3d: Object3D = new Object3D();
@@ -58,7 +58,7 @@ export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
   #curUpdateSerial = 0;
   #isReady = false;
 
-  beginUpdate(layer: Map2dLayer, offsetX: number, offsetY: number, viewArea: AABB2): void {
+  beginUpdate(layer: Map2DLayer, offsetX: number, offsetY: number, viewArea: AABB2): void {
     this.#isReady = this.tilesPool != null && this.tilesData != null && this.tileSet != null;
     this.#curUpdateSerial = 0;
 
@@ -72,7 +72,7 @@ export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
     return this.tilesData.getTileIdAt(x, y);
   }
 
-  addTile(tile: Map2dAreaTile): void {
+  addTile(tile: Map2DAreaTile): void {
     if (!this.#isReady) return;
 
     const tileId = this.getTileId(tile.x, tile.y);
@@ -99,7 +99,7 @@ export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
     console.log('addTile', tile, sprite);
   }
 
-  reuseTile(tile: Map2dAreaTile): void {
+  reuseTile(tile: Map2DAreaTile): void {
     if (!this.#isReady) return;
 
     // eslint-disable-next-line no-console
@@ -110,7 +110,7 @@ export class Map2dTileSpritesRenderer implements IMap2dLayerTilesRenderer {
     }
   }
 
-  removeTile(tile: Map2dAreaTile): void {
+  removeTile(tile: Map2DAreaTile): void {
     if (!this.#isReady) return;
 
     // eslint-disable-next-line no-console

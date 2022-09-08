@@ -50,8 +50,8 @@
   <body>
     <section class="intro">
       <p>
-        tiled-maps :: layer tiles renderer<br />
-        <em>an <code>IMap2dLayerTilesRenderer</code> example</em>
+        tiled-maps :: map2d layer<br />
+        <em>a <code>Map2DLayer3D|Map2DTilesSpritesRenderer</code> example</em>
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
@@ -66,8 +66,8 @@
       import { TextureFactory, TileSetLoader } from "@spearwolf/vertex-objects";
       import {
         RepeatingTilesProvider,
-        Map2dLayer3D,
-        Map2dTileSpritesRenderer,
+        Map2DLayer3D,
+        Map2DTileSpritesRenderer,
         TileSpritesGeometry,
         TileSpritesMaterial,
       } from "@spearwolf/tiled-maps";
@@ -94,7 +94,7 @@
         // create a map2d layer and add to scene
         // ------------------------------------------------------
 
-        const map2dLayer = new Map2dLayer3D();
+        const map2dLayer = new Map2DLayer3D();
 
         map2dLayer.tileWidth = 256;
         map2dLayer.tileHeight = 256;
@@ -136,7 +136,7 @@
         // create the tiles renderer and add to map2d layer
         // ------------------------------------------------------
 
-        const renderer = new Map2dTileSpritesRenderer();
+        const renderer = new Map2DTileSpritesRenderer();
 
         renderer.tilesData = tilesData;
         renderer.tileSet = tileSet;

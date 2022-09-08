@@ -1,4 +1,4 @@
-import {IMap2dTileDataProvider} from './IMap2dTileDataProvider';
+import {IMap2DTileDataProvider} from './IMap2dTileDataProvider';
 
 export type RepeatingTilesPatternType = number | number[] | number[][];
 export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
@@ -9,7 +9,7 @@ export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
  *
  * The tile IDs pattern always starts at (0,0)
  */
-export class RepeatingTilesProvider implements IMap2dTileDataProvider {
+export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   limitToAxis: LimitToAxisType;
 
   #tileIds: number[][];

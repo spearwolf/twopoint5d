@@ -1,17 +1,17 @@
 import {AABB2} from './AABB2';
-import {IMap2dRenderable} from './IMap2dRenderable';
-import {Map2dSpatialHashGrid} from './Map2dSpatialHashGrid';
+import {IMap2DRenderable} from './IMap2dRenderable';
+import {Map2DSpatialHashGrid} from './Map2dSpatialHashGrid';
 
-describe('Map2dSpatialHashGrid', () => {
+describe('Map2DSpatialHashGrid', () => {
   test('construction', () => {
-    const grid = new Map2dSpatialHashGrid(10, 100, -5, -50);
+    const grid = new Map2DSpatialHashGrid(10, 100, -5, -50);
     expect(grid).toBeDefined();
   });
 
   test('add', () => {
-    const grid = new Map2dSpatialHashGrid(100, 100);
-    const a: IMap2dRenderable = {aabb: new AABB2(10, 20, 150, 150)};
-    const b: IMap2dRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const a: IMap2DRenderable = {aabb: new AABB2(10, 20, 150, 150)};
+    const b: IMap2DRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
 
     expect(grid.add(a)).toBe(grid);
     expect(grid.add(b)).toBe(grid);
@@ -30,9 +30,9 @@ describe('Map2dSpatialHashGrid', () => {
   });
 
   test('remove', () => {
-    const grid = new Map2dSpatialHashGrid(100, 100);
-    const a: IMap2dRenderable = {aabb: new AABB2(10, 20, 150, 150)};
-    const b: IMap2dRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const a: IMap2DRenderable = {aabb: new AABB2(10, 20, 150, 150)};
+    const b: IMap2DRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
     grid.add(a, b);
 
     let tileset = grid.getTiles(-1, -1, 2, 2);
@@ -53,10 +53,10 @@ describe('Map2dSpatialHashGrid', () => {
   });
 
   test('findWithin', () => {
-    const grid = new Map2dSpatialHashGrid(20, 20);
-    const a: IMap2dRenderable = {aabb: new AABB2(-60, -60, 100, 80)};
-    const b: IMap2dRenderable = {aabb: new AABB2(30, 10, 80, 70)};
-    const c: IMap2dRenderable = {aabb: new AABB2(-90, 50, 50, 50)};
+    const grid = new Map2DSpatialHashGrid(20, 20);
+    const a: IMap2DRenderable = {aabb: new AABB2(-60, -60, 100, 80)};
+    const b: IMap2DRenderable = {aabb: new AABB2(30, 10, 80, 70)};
+    const c: IMap2DRenderable = {aabb: new AABB2(-90, 50, 50, 50)};
     grid.add(a, b, c);
 
     let tileset = grid.findWithin(new AABB2(-50, -50, 100, 110));
