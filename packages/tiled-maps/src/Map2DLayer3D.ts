@@ -1,8 +1,8 @@
 import {Group, Object3D} from 'three';
 
-import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
+import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
 
-import {Map2DLayer} from './Map2dLayer';
+import {Map2DLayer} from './Map2DLayer';
 
 /**
  * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}

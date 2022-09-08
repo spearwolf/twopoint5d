@@ -1,4 +1,4 @@
-import {Map2DAreaTile} from './Map2dAreaTile';
+import {Map2DAreaTile} from './Map2DAreaTile';
 
 describe('Map2DAreaTile', () => {
   test('id', () => {

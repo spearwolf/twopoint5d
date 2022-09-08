@@ -4,10 +4,10 @@ import {TileSet, VertexObjectPool} from '@spearwolf/vertex-objects';
 import {Object3D} from 'three';
 
 import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
-import {IMap2DTileDataProvider} from './IMap2dTileDataProvider';
-import {Map2DAreaTile} from './Map2dAreaTile';
-import {Map2DLayer} from './Map2dLayer';
+import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
+import {IMap2DTileDataProvider} from './IMap2DTileDataProvider';
+import {Map2DAreaTile} from './Map2DAreaTile';
+import {Map2DLayer} from './Map2DLayer';
 import {TileSprite} from './TileSprites/descriptors';
 import {TileSprites} from './TileSprites/TileSprites';
 import {TileSpritesGeometry} from './TileSprites/TileSpritesGeometry';

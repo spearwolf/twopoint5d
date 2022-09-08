@@ -1,8 +1,8 @@
 import {Object3D} from 'three';
 
 import {AABB2} from './AABB2';
-import {Map2DAreaTile} from './Map2dAreaTile';
-import {Map2DLayer} from './Map2dLayer';
+import {Map2DAreaTile} from './Map2DAreaTile';
+import {Map2DLayer} from './Map2DLayer';
 
 export interface IMap2DLayerTilesRenderer {
   beginUpdate(layer: Map2DLayer, offsetX: number, offsetY: number, viewArea: AABB2): void;

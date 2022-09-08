@@ -1,6 +1,6 @@
 import {AABB2} from './AABB2';
-import {IMap2DRenderable} from './IMap2dRenderable';
-import {Map2DSpatialHashGrid} from './Map2dSpatialHashGrid';
+import {IMap2DRenderable} from './IMap2DRenderable';
+import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid';
 
 describe('Map2DSpatialHashGrid', () => {
   test('construction', () => {

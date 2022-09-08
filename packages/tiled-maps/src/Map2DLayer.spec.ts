@@ -1,7 +1,7 @@
 import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
-import {Map2DAreaTile} from './Map2dAreaTile';
-import {Map2DLayer} from './Map2dLayer';
+import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
+import {Map2DAreaTile} from './Map2DAreaTile';
+import {Map2DLayer} from './Map2DLayer';
 
 describe('Map2DLayer', () => {
   describe('new', () => {

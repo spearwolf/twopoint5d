@@ -1,7 +1,7 @@
 import {AABB2} from './AABB2';
-import {IMap2DLayerTilesRenderer} from './IMap2dLayerTilesRenderer';
-import {Map2DAreaTile} from './Map2dAreaTile';
-import {Map2DTileCoordsUtil} from './Map2dTileCoordsUtil';
+import {IMap2DLayerTilesRenderer} from './IMap2DLayerTilesRenderer';
+import {Map2DAreaTile} from './Map2DAreaTile';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 export class Map2DLayer {
   #width = 320;
