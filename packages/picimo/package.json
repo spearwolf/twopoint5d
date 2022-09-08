@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/picimo",
-  "version": "0.1.1",
+  "version": "0.1.2-dev",
   "description": "sprites library based on react-three-fiber",
   "main": "build/picimo.cjs.js",
   "module": "build/picimo.js",
@@ -103,7 +103,7 @@
     "eslint-config-problems": "^6.0.0",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-prettier": "^4.2.1",
-    "eslint-plugin-react": "^7.31.7",
+    "eslint-plugin-react": "7.30.*",
     "eslint-plugin-react-hooks": "^4.6.0",
     "jest": "^28.1.3",
     "jest-environment-jsdom": "^28.1.3",

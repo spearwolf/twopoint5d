@@ -48,11 +48,13 @@
     "fix:textured-sprites": "yarn textured-sprites fix",
     "fix:display3": "yarn display3 fix",
     "fix:picimo": "yarn picimo fix",
-    "publish:vertex-objects": "yarn vertex-objects npm publish --tolerate-republish",
-    "publish:display3": "yarn display3 npm publish --tolerate-republish",
-    "publish:stage25": "yarn stage25 npm publish --tolerate-republish",
-    "publish:textured-sprites": "yarn textured-sprites npm publish --tolerate-republish",
-    "publish:picimo": "yarn picimo npm publish --tolerate-republish",
+    "publish-package": "node scripts/publish-package.js",
+    "publish:vertex-objects": " yarn publish-package vertex-objects",
+    "publish:display3": " yarn publish-package display3",
+    "publish:stage25": " yarn publish-package stage25",
+    "publish:textured-sprites": " yarn publish-package textured-sprites",
+    "publish:tiled-maps": " yarn publish-package tiled-maps",
+    "publish:picimo": "yarn publish-package picimo",
     "build": "npm-run-all --serial build:vertex-objects --parallel build:tiled-maps build:stage25 build:textured-sprites build:display3 --serial build:picimo",
     "test": "run-s test:vertex-objects test:tiled-maps test:stage25 test:textured-sprites test:display3 test:picimo",
     "clean": "run-p clean:vertex-objects clean:tiled-maps clean:stage25 clean:textured-sprites clean:display3 clean:picimo",
@@ -68,7 +70,8 @@
   "devDependencies": {
     "concurrently": "^7.3.0",
     "npm-run-all": "^4.1.5",
-    "servor": "^4.0.2"
+    "servor": "^4.0.2",
+    "shelljs": "^0.8.5"
   },
   "version": "0.0.0",
   "packageManager": "yarn@3.2.2",

@@ -1,5 +1,6 @@
 export * from './components/GetStage2D';
 export * from './components/ParallaxProjection';
+export * from './components/RepeatingTilesProvider';
 export * from './components/ShaderChunks';
 export * from './components/Stage2D';
 export * from './components/TextureAtlas';
