@@ -16,23 +16,47 @@ const pkgJson = JSON.parse(
   fs.readFileSync(path.join(packageDir, "package.json"), "utf8")
 );
 
-console.log("------- PUBLISH", pkgJson.name, pkgJson.version);
+function shouldPublish() {
+  if (pkgJson.version.endsWith("-dev")) {
+    console.log('aborting - package version ends with "-dev" !');
+    return false;
+  }
 
-if (pkgJson.version.endsWith("-dev")) {
-  console.log('aborting - package version ends with "-dev" !');
-} else {
+  try {
+    const versionsJson = JSON.parse(
+      shell
+        .exec(`npm show ${pkgJson.name} versions --json`, { silent: true })
+        .toString()
+    );
+
+    if (Array.isArray(versionsJson) && versionsJson.includes(pkgJson.version)) {
+      console.log("aborting - the package version has already been released !");
+      return false;
+    }
+  } catch {}
+
+  return true;
+}
+
+const pkgDisplayName = `${pkgJson.name}@${pkgJson.version}`;
+
+console.log("=== PUBLISH", pkgDisplayName, "===");
+
+if (shouldPublish()) {
   shell.cd(packageDir);
 
-  console.log("------- Step 1) Build", pkgJson.name, pkgJson.version);
+  console.log("----- Step 1) Build", pkgDisplayName);
 
   if (shell.exec(`yarn build`).code !== 0) {
     shell.echo("Error: yarn build failed");
     shell.exit(2);
   }
 
-  console.log("------- Step 2) Publish package", pkgJson.name, pkgJson.version);
+  console.log("\n----- Step 2) Publish package", pkgDisplayName);
 
-  if (shell.exec(`yarn npm publish  --tolerate-republish`).code !== 0) {
+  if (
+    shell.exec(`yarn npm publish --dry-run --tolerate-republish`).code !== 0
+  ) {
     shell.echo("Error: yarn npm publish failed");
     shell.exit(3);
   }
