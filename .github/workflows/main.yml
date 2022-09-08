@@ -40,9 +40,6 @@ jobs:
       - run: yarn --immutable
         name: Install dependencies
 
-      - run: yarn build
-        name: Build packages
-
       - name: Publish @spearwolf/vertex-objects
         run: yarn publish:vertex-objects
 
@@ -54,6 +51,9 @@ jobs:
 
       - name: Publish @spearwolf/textured-sprites
         run: yarn publish:textured-sprites
+
+      - name: Publish @spearwolf/tiled-maps
+        run: yarn publish:tiled-maps
 
       - name: Publish @spearwolf/picimo
         run: yarn publish:picimo

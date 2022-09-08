@@ -23,8 +23,17 @@ if (pkgJson.version.endsWith("-dev")) {
 } else {
   shell.cd(packageDir);
 
+  console.log("------- Step 1) Build", pkgJson.name, pkgJson.version);
+
+  if (shell.exec(`yarn build`).code !== 0) {
+    shell.echo("Error: yarn build failed");
+    shell.exit(2);
+  }
+
+  console.log("------- Step 2) Publish package", pkgJson.name, pkgJson.version);
+
   if (shell.exec(`yarn npm publish  --tolerate-republish`).code !== 0) {
     shell.echo("Error: yarn npm publish failed");
-    shell.exit(2);
+    shell.exit(3);
   }
 }
