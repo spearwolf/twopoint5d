@@ -11,7 +11,7 @@ export class TileSpritesGeometry extends InstancedVertexObjectGeometry {
   constructor(capacity = 100) {
     super(TileSpriteDescriptor, capacity, TileBaseSpriteDescriptor);
 
-    this.name = 'TileSpritesGeometry';
+    this.name = '@spearwolf/tiled-maps:TileSpritesGeometry';
 
     this.basePool.createVO().make();
   }

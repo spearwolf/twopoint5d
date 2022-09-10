@@ -1,4 +1,3 @@
-import {AABB2} from './AABB2';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {Map2DLayer} from './Map2DLayer';
 import {Map2DTile} from './Map2DTile';
@@ -35,19 +34,18 @@ describe('Map2DLayer', () => {
       const layer = new Map2DLayer(1, 1);
       expect(layer.renderers.size).toBe(0);
       const renderer: IMap2DTileRenderer = {
-        beginUpdate(_layer: Map2DLayer, _xOffset: number, _yOffset: number, _fullViewArea: AABB2) {},
+        beginUpdate(_xOffset: number, _yOffset: number) {},
         addTile(_tile: Map2DTile) {},
         reuseTile(_tile: Map2DTile) {},
         removeTile(_tile: Map2DTile) {},
-        getObject3D() {
-          return null;
-        },
+        // getObject3D() {
+        //   return null;
+        // },
         endUpdate() {},
         dispose() {},
       };
       layer.addTileRenderer(renderer);
       expect(layer.renderers.has(renderer)).toBeTruthy();
     });
-    // TODO add renderViewArea() tests !!
   });
 });

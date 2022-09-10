@@ -1,4 +1,8 @@
-@spearwolf/vertex-objects
+__@spearwolf/vertex-objects__
+
+## 0.2.1
+
+- fix `VertexObjects.onBeforeRender` issue when geometry has no `update()` method
 
 ## 0.2.0
 

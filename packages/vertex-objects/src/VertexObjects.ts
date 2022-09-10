@@ -1,7 +1,6 @@
 import {Material, Mesh} from 'three';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry';
-
 import {VertexObjectGeometry} from './VertexObjectGeometry';
 
 /**
@@ -21,6 +20,8 @@ export class VertexObjects extends Mesh {
   }
 
   onBeforeRender = (): void => {
-    this.geometry?.update();
+    if (typeof this.geometry?.update === 'function') {
+      this.geometry.update();
+    }
   };
 }

@@ -17,7 +17,7 @@ export type TexturedSpritesProps = JSX.IntrinsicElements['texturedSprites'];
 
 function Component({children, ...props}: TexturedSpritesProps, ref: ForwardedRef<__TexturedSprites>) {
   return (
-    <texturedSprites {...props} ref={ref as any}>
+    <texturedSprites {...props} ref={ref}>
       {children}
     </texturedSprites>
   );

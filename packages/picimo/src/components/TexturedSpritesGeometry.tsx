@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
 import {TexturedSpritesGeometry as __TexturedSpritesGeometry} from '@spearwolf/textured-sprites';
-import {ForwardedRef, forwardRef} from 'react';
+import {ForwardedRef, forwardRef, useEffect, useState} from 'react';
 
 extend({TexturedSpritesGeometry: __TexturedSpritesGeometry});
 
@@ -17,9 +17,27 @@ export type TexturedSpritesGeometryProps = JSX.IntrinsicElements['texturedSprite
   capacity: number;
 };
 
-function Component({capacity, children, ...props}: TexturedSpritesGeometryProps, ref: ForwardedRef<__TexturedSpritesGeometry>) {
+function Component(
+  {capacity, name, children, ...props}: TexturedSpritesGeometryProps,
+  ref: ForwardedRef<__TexturedSpritesGeometry>,
+) {
+  const [initialCapacity, setInitialCapacity] = useState(capacity ?? 0);
+
+  useEffect(() => {
+    if (initialCapacity === 0) {
+      if (capacity > 0) {
+        setInitialCapacity(capacity);
+      }
+    } else if (capacity !== initialCapacity) {
+      // eslint-disable-next-line no-console
+      console.warn('TexturedSpritesGeometry: capacity cannot be changed after initialization');
+    }
+  }, [initialCapacity, capacity]);
+
+  if (initialCapacity === 0) return null;
+
   return (
-    <texturedSpritesGeometry args={[capacity]} ref={ref as any} {...props}>
+    <texturedSpritesGeometry args={[initialCapacity]} name={name ?? 'TexturedSpritesGeometry'} ref={ref} {...props}>
       {children}
     </texturedSpritesGeometry>
   );

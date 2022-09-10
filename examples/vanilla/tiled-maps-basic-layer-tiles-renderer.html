@@ -67,7 +67,7 @@
       import {
         RepeatingTilesProvider,
         Map2DLayer3D,
-        Map2DTileSpritesRenderer,
+        Map2DTileSprites,
         TileSpritesGeometry,
         TileSpritesMaterial,
       } from "@spearwolf/tiled-maps";
@@ -109,12 +109,12 @@
 
         scene.add(map2dLayer);
 
-        demo.on("frame", () => map2dLayer.update());
+        // demo.on("frame", () => map2dLayer.update());
 
         window.map2dLayer = map2dLayer;
         console.log("map2dLayer", map2dLayer);
 
-        // create a tiles data provider
+        // create a tile data provider
         // ------------------------------------------------------
 
         const tileData = new RepeatingTilesProvider([
@@ -133,10 +133,14 @@
           }
         );
 
-        // create the tiles renderer and add to map2d layer
+        // create the tile-renderer and add to map2d-layer
         // ------------------------------------------------------
 
-        const renderer = new Map2DTileSpritesRenderer();
+        const renderer = new Map2DTileSprites();
+
+        map2dLayer.add(renderer);
+
+        map2dLayer.addTileRenderer(renderer);
 
         renderer.tileData = tileData;
         renderer.tileSet = tileSet;
@@ -149,10 +153,10 @@
           depthWrite: true,
         });
 
-        map2dLayer.addTileRenderer(renderer);
-
         window.tileRenderer = renderer;
         console.log("tileRenderer", renderer);
+
+        map2dLayer.update();
 
         // prettier-ignore
         scene.add(makePoints([

@@ -49,6 +49,15 @@ export class TileSpritesMaterial extends ShaderMaterial {
       side: DoubleSide,
       ...options,
     });
-    this.name = 'TileSpritesMaterial';
+
+    this.name = '@spearwolf/tiled-maps:TileSpritesMaterial';
+  }
+
+  get colorMap(): Texture | undefined {
+    return this.uniforms.colorMap.value;
+  }
+
+  set colorMap(colorMap: Texture | undefined) {
+    this.uniforms.colorMap.value = colorMap;
   }
 }

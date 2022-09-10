@@ -1,4 +1,6 @@
 export * from './components/GetStage2D';
+export * from './components/Map2DLayer3D';
+export * from './components/Map2DTileSprites';
 export * from './components/ParallaxProjection';
 export * from './components/RepeatingTilesProvider';
 export * from './components/ShaderChunks';
@@ -10,6 +12,8 @@ export * from './components/TexturedSpritesMaterial';
 export * from './components/TextureRef';
 export * from './components/TextureStore';
 export * from './components/TileSet';
+export * from './components/TileSpritesGeometry';
+export * from './components/TileSpritesMaterial';
 export * from './hooks/useAsyncEffect';
 export * from './hooks/useFrameLoop';
 export * from './hooks/useStage2D';

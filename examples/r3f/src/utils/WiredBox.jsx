@@ -2,7 +2,14 @@ import "@react-three/fiber";
 import { useMemo } from "react";
 import { BoxGeometry } from "three";
 
-export const WiredBox = ({ width, height, depth, children, ...props }) => {
+export const WiredBox = ({
+  width,
+  height,
+  depth,
+  children,
+  color = 0xf0f0f0,
+  ...props
+}) => {
   const boxGeometry = useMemo(
     () => new BoxGeometry(width, height, depth),
     [width, height, depth]
@@ -11,7 +18,7 @@ export const WiredBox = ({ width, height, depth, children, ...props }) => {
   return (
     <lineSegments {...props}>
       <edgesGeometry args={[boxGeometry]} />
-      <lineBasicMaterial color={0xf0f0f0} />
+      <lineBasicMaterial color={color} />
       {children}
     </lineSegments>
   );

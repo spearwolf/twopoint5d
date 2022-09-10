@@ -16,6 +16,10 @@ module.exports = {
       import: "./src/textured-sprites-from-tileset/index.jsx",
       dependOn: "libs",
     },
+    "map2d-tile-sprites-layer": {
+      import: "./src/map2d-tile-sprites-layer/index.jsx",
+      dependOn: "libs",
+    },
     clouds: {
       import: "./src/clouds/index.jsx",
       dependOn: "libs",
@@ -53,6 +57,7 @@ module.exports = {
     liveReload: true,
     hot: false,
     allowedHosts: 'all',
+    port: 9090,
     static: [
       path.resolve(__dirname, "./public"),
       {

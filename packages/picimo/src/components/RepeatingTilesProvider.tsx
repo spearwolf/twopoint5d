@@ -34,7 +34,7 @@ function Component(
     limitToAxisOverride ?? (horizontal && vertical ? 'none' : horizontal ? 'horizontal' : vertical ? 'vertical' : 'none');
 
   return (
-    <repeatingTilesProvider args={[tileIds]} limitToAxis={limitToAxis} ref={ref} {...props}>
+    <repeatingTilesProvider args={[tileIds]} attach="tileData" limitToAxis={limitToAxis} ref={ref} {...props}>
       {children}
     </repeatingTilesProvider>
   );

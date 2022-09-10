@@ -1,9 +1,10 @@
 import {AABB2} from './AABB2';
+import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
-export class Map2DLayer {
+export class Map2DLayer implements IMap2DLayer {
   #width = 320;
   #height = 240;
 
@@ -171,7 +172,7 @@ export class Map2DLayer {
       const yOffset = this.yOffset - centerY;
 
       for (const tileRenderer of this.renderers) {
-        tileRenderer.beginUpdate(this, xOffset, yOffset, fullViewArea);
+        tileRenderer.beginUpdate(xOffset, yOffset);
         removeTiles.forEach((tile) => tileRenderer.removeTile(tile));
         createTiles.forEach((tile) => tileRenderer.addTile(tile));
         reuseTiles.forEach((tile) => tileRenderer.reuseTile(tile));

@@ -1,15 +1,15 @@
-import {Group, Object3D} from 'three';
+import {Group} from 'three';
 
+import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
-
 import {Map2DLayer} from './Map2DLayer';
 
 /**
  * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
  */
-export class Map2DLayer3D extends Group {
+export class Map2DLayer3D extends Group implements IMap2DLayer {
   #renderers: Set<IMap2DTileRenderer> = new Set();
-  #rendererObjects: Map<IMap2DTileRenderer, Object3D> = new Map();
+  // #rendererObjects: Map<IMap2DTileRenderer, Object3D> = new Map();
   #map2dLayer: Map2DLayer;
 
   get map2dLayer(): Map2DLayer {
@@ -109,11 +109,15 @@ export class Map2DLayer3D extends Group {
 
       this.#map2dLayer.addTileRenderer(renderer);
 
-      const rendererObject = renderer.getObject3D();
-      if (rendererObject) {
-        this.#rendererObjects.set(renderer, rendererObject);
-        this.add(rendererObject);
-      }
+      // const rendererObject = renderer.getObject3D();
+      // if (rendererObject) {
+      //   this.#rendererObjects.set(renderer, rendererObject);
+      //   this.add(rendererObject);
+      // }
+
+      // eslint-disable-next-line no-console
+      console.log('Map2DLayer3D.addTileRenderer', {map2dLayer: this.#map2dLayer, renderer, Map2DLayer3D: this});
+      // console.log('Map2DLayer3D.addTileRenderer', {map2dLayer: this.#map2dLayer, renderer, rendererObject, Map2DLayer3D: this});
     }
   }
 
@@ -123,11 +127,19 @@ export class Map2DLayer3D extends Group {
 
       this.#map2dLayer.removeTileRenderer(renderer);
 
-      const rendererObject = this.#rendererObjects.get(renderer);
-      if (rendererObject) {
-        this.remove(rendererObject);
-        this.#rendererObjects.delete(renderer);
-      }
+      // const rendererObject = this.#rendererObjects.get(renderer);
+      // if (rendererObject) {
+      //   this.remove(rendererObject);
+      //   this.#rendererObjects.delete(renderer);
+      // }
+
+      // eslint-disable-next-line no-console
+      console.log('Map2DLayer3D.removeTileRenderer', {
+        map2dLayer: this.#map2dLayer,
+        renderer,
+        // rendererObject,
+        Map2DLayer3D: this,
+      });
     }
   }
 
