@@ -97,7 +97,10 @@ export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    this.uniforms.colorMap.value = colorMap;
+    if (this.uniforms.colorMap.value !== colorMap) {
+      this.uniforms.colorMap.value = colorMap;
+      this.uniformsNeedUpdate = true;
+    }
   }
 
   get renderAsBillboards(): boolean {

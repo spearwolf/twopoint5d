@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {TexturedSpritesMaterial as __TileSpritesMaterial} from '@spearwolf/textured-sprites';
+import {TileSpritesMaterial as __TileSpritesMaterial} from '@spearwolf/tiled-maps';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({TileSpritesMaterial: __TileSpritesMaterial});

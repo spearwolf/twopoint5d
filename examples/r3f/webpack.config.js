@@ -16,6 +16,10 @@ module.exports = {
       import: "./src/textured-sprites-from-tileset/index.jsx",
       dependOn: "libs",
     },
+    "map2d-tile-sprites": {
+      import: "./src/map2d-tile-sprites/index.jsx",
+      dependOn: "libs",
+    },
     "map2d-tile-sprites-layer": {
       import: "./src/map2d-tile-sprites-layer/index.jsx",
       dependOn: "libs",

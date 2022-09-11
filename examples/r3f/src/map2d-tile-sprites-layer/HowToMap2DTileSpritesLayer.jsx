@@ -7,6 +7,7 @@ import {
   TileSet,
   TileSpritesGeometry,
   TileSpritesMaterial,
+  useTileSet,
 } from "@spearwolf/picimo";
 import { useEffect, useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
@@ -17,18 +18,18 @@ const TILES = [
 ];
 
 export const HowToMap2DTileSpritesLayer = () => {
-  const [tileSet, setTileSet] = useState(null);
+  const tileset = useTileSet("tiles");
   const [map2DLayer, setMap2DLayer] = useState(null);
   const [tileSpritesRenderer, setTileSpritesRenderer] = useState(null);
 
   useEffect(() => {
-    if (tileSpritesRenderer && tileSet) {
-      tileSpritesRenderer.tileSet = tileSet.tileSet;
+    if (tileSpritesRenderer && tileset) {
+      tileSpritesRenderer.tileSet = tileset;
       if (map2DLayer) {
         map2DLayer.update();
       }
     }
-  }, [map2DLayer, tileSpritesRenderer, tileSet]);
+  }, [map2DLayer, tileSpritesRenderer, tileset]);
 
   return (
     <>
@@ -39,7 +40,6 @@ export const HowToMap2DTileSpritesLayer = () => {
         url="/examples/assets/map2d-debug-tiles_4x256x256.png"
         tileWidth={256}
         tileHeight={256}
-        ref={setTileSet}
       />
 
       <Map2DLayer3D
@@ -58,7 +58,7 @@ export const HowToMap2DTileSpritesLayer = () => {
           width={10}
           height={10}
           depth={10}
-          color={0xff9900}
+          color={0xff0066}
           name="box-B"
         />
 
@@ -67,7 +67,7 @@ export const HowToMap2DTileSpritesLayer = () => {
 
           <TileSpritesGeometry capacity={1000} />
 
-          <TileSpritesMaterial depthTest={true} depthWrite={true}>
+          <TileSpritesMaterial>
             <TextureRef name="tiles" attach="colorMap" />
           </TileSpritesMaterial>
         </Map2DTileSprites>

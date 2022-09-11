@@ -32,11 +32,11 @@ const fragmentShader = `
 `;
 
 export interface TileSpritesMaterialParamters extends ShaderMaterialParameters {
-  colorMap: Texture;
+  colorMap?: Texture;
 }
 
 export class TileSpritesMaterial extends ShaderMaterial {
-  constructor({colorMap, ...options}: TileSpritesMaterialParamters) {
+  constructor({colorMap, ...options}: TileSpritesMaterialParamters = {}) {
     super({
       vertexShader,
       fragmentShader,
@@ -58,6 +58,9 @@ export class TileSpritesMaterial extends ShaderMaterial {
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    this.uniforms.colorMap.value = colorMap;
+    if (this.uniforms.colorMap.value !== colorMap) {
+      this.uniforms.colorMap.value = colorMap;
+      this.uniformsNeedUpdate = true;
+    }
   }
 }

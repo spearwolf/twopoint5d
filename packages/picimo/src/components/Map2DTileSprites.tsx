@@ -21,14 +21,19 @@ const attach: any = (parent: Object3D & IMap2DLayer, self: __Map2DTileSprites) =
   console.log('<Map2DTileSprites> attach: addTileRenderer', {parent, self});
 
   parent.add(self);
-  parent.addTileRenderer(self);
-  parent.update(); // TODO do we need this here?
+
+  if (typeof parent.addTileRenderer === 'function') {
+    parent.addTileRenderer(self);
+  }
 
   return () => {
     // eslint-disable-next-line no-console
     console.log('<Map2DTileSprites> attach: removeTileRenderer', {parent, self});
 
-    parent.removeTileRenderer(self);
+    if (typeof parent.removeTileRenderer === 'function') {
+      parent.removeTileRenderer(self);
+    }
+
     self.removeFromParent();
   };
 };
