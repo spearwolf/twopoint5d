@@ -11,7 +11,7 @@ import {
   TextureRef,
   TileSet,
   useFrameLoop,
-  useTileSet,
+  useTextureAtlas,
 } from "@spearwolf/picimo";
 import { useRef } from "react";
 import { FilmPass } from "three/examples/jsm/postprocessing/FilmPass";
@@ -24,7 +24,7 @@ extend({ RenderPass, FilmPass });
 export const TexturedSpritesFromTileSet = ({ capacity }) => {
   const geometry = useRef();
 
-  const atlas = useTileSet("tiles")?.atlas;
+  const atlas = useTextureAtlas("tiles");
 
   useFrameLoop(() => new BouncingSprites(150, 75, 5), {
     geometry: forwardRefValue(geometry),
