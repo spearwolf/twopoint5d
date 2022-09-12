@@ -77,15 +77,16 @@ _is checked when implemented and ready to use_
 
 ### textures
 
+- [x] `<AssetStore>`
 - [x] `<TextureAtlas>`
+- [x] `<TextureRef>`
+- [x] `<TileSet>`
+- [x] `<TileSetRef>`
+- [x] `useTexture()`
 - [x] `useTextureAtlas()`
 - [x] `useTextureLoader()`
-- [ ] `<TileSet>`
 - [x] `useTileSet()`
 - [x] `useTileSetLoader()`
-- [x] `<TextureRef>`
-- [x] `useTextureRef()`
-- [x] `<TextureStore>`
 
 ### sprites
 
@@ -96,12 +97,19 @@ _is checked when implemented and ready to use_
 - [ ] `<AnimatedSpritesGeometry>`
 - [ ] `<AnimatedSpritesMaterial>`
 
+### map2D
+
+- [x] `<RepeatingTilesProvider>`
+- [x] `<Map2DLayer3D>`
+- [x] `<Map2DTileSprites>`
+- [x] `<TileSpritesGeometry>`
+- [x] `<TileSpritesMaterial>`
+
 ### utils
 
 - [x] `useAsyncEffect()`
 - [x] `useFrameLoop()`
 - [x] `<ShaderChunks>`
-
 
 
 :rocket: have fun!

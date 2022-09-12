@@ -1,7 +1,7 @@
 import '@react-three/fiber';
 import {TileSetData, TileSetLoader, TileSetOptions} from '@spearwolf/vertex-objects';
 import {ForwardedRef, forwardRef, ReactNode, useContext, useState} from 'react';
-import {TextureStoreContext} from '../context/TextureStore';
+import {AssetStoreContext} from '../context/AssetStore';
 import {useAsyncEffect} from '../hooks/useAsyncEffect';
 import {TextureOptionsAsProps, toTextureClasses, useTextureBitsFromProps} from '../hooks/useTextureBitsFromProps';
 
@@ -13,7 +13,7 @@ export type TileSetProps = TextureOptionsAsProps &
   };
 
 function Component({name, url, children, ...props}: TileSetProps, ref: ForwardedRef<TileSetData>) {
-  const textureStore = useContext(TextureStoreContext);
+  const assetStore = useContext(AssetStoreContext);
   const [tileSet, setTileSet] = useState<TileSetData>();
   const textureBits = useTextureBitsFromProps(props);
 
@@ -21,14 +21,16 @@ function Component({name, url, children, ...props}: TileSetProps, ref: Forwarded
     async () => (url ? new TileSetLoader().loadAsync(url, props, toTextureClasses(textureBits)) : undefined),
     {
       next(data) {
-        textureStore.insertAsset(name, 'tileset', data);
+        assetStore.insertAsset(name, 'tileset', data);
         setTileSet(data);
       },
       cancel(data) {
+        // eslint-disable-next-line no-console
         console.log('<TileSet> cancel tile-set', data);
         data.texture?.dispose();
       },
       dispose(data) {
+        // eslint-disable-next-line no-console
         console.log('<TileSet> dispose tile-set', data);
         data.texture?.dispose();
       },

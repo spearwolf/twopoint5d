@@ -1,58 +1,58 @@
 import {useContext, useEffect, useRef, useState} from 'react';
 import {Texture} from 'three';
-import {AssetName, TextureStore, TextureStoreContext} from '../context/TextureStore';
+import {AssetName, AssetStore, AssetStoreContext} from '../context/AssetStore';
 
 interface TextureState {
   lastName: AssetName | undefined;
-  lastTextureStore: TextureStore | undefined;
+  lastAssetStore: AssetStore | undefined;
 }
 
 export function useTexture(name: AssetName): Texture | undefined {
-  const stateRef = useRef<TextureState>({lastName: undefined, lastTextureStore: undefined});
-  const textureStore = useContext(TextureStoreContext);
+  const stateRef = useRef<TextureState>({lastName: undefined, lastAssetStore: undefined});
+  const assetStore = useContext(AssetStoreContext);
   const [curTexture, setTexture] = useState<Texture>();
 
   useEffect(() => {
-    const texture = textureStore.getTextureRef(name);
+    const texture = assetStore.getTextureRef(name);
     const state_ = stateRef.current;
 
-    if (state_.lastName && (state_.lastName !== name || (state_.lastTextureStore && state_.lastTextureStore !== textureStore))) {
-      state_.lastTextureStore?.disposeTextureRef(state_.lastName);
+    if (state_.lastName && (state_.lastName !== name || (state_.lastAssetStore && state_.lastAssetStore !== assetStore))) {
+      state_.lastAssetStore?.disposeTextureRef(state_.lastName);
       state_.lastName = undefined;
     }
 
     if (texture) {
       if (name !== state_.lastName) {
         state_.lastName = name;
-        textureStore.incTextureRefCount(name);
+        assetStore.incTextureRefCount(name);
       }
-      state_.lastTextureStore = textureStore;
+      state_.lastAssetStore = assetStore;
       setTexture(texture);
     } else if (state_.lastName) {
-      textureStore.disposeTextureRef(state_.lastName);
+      assetStore.disposeTextureRef(state_.lastName);
       state_.lastName = undefined;
     }
 
-    // TODO textureStore -> on asset destroy?
-    return textureStore.on('asset:insert', (assetName: AssetName) => {
+    // TODO assetStore -> on asset destroy?
+    return assetStore.on('asset:insert', (assetName: AssetName) => {
       if (name === assetName) {
-        const nextTexture = textureStore.getTextureRef(name);
+        const nextTexture = assetStore.getTextureRef(name);
         if (nextTexture !== curTexture) {
           if (name !== state_.lastName) {
             state_.lastName = name;
-            textureStore.incTextureRefCount(name);
+            assetStore.incTextureRefCount(name);
           }
-          state_.lastTextureStore = textureStore;
+          state_.lastAssetStore = assetStore;
           setTexture(nextTexture);
         }
       }
     });
-  }, [textureStore, name]);
+  }, [assetStore, name]);
 
   useEffect(
     () => () => {
       if (stateRef.current.lastName) {
-        stateRef.current.lastTextureStore?.disposeTextureRef(stateRef.current.lastName);
+        stateRef.current.lastAssetStore?.disposeTextureRef(stateRef.current.lastName);
         stateRef.current.lastName = undefined;
       }
     },

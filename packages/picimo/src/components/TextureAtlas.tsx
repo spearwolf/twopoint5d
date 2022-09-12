@@ -1,7 +1,7 @@
 import '@react-three/fiber';
 import {TextureAtlasData, TextureAtlasLoader, TextureAtlasLoadOptions} from '@spearwolf/vertex-objects';
 import {ForwardedRef, forwardRef, ReactNode, useContext, useState} from 'react';
-import {TextureStoreContext} from '../context/TextureStore';
+import {AssetStoreContext} from '../context/AssetStore';
 import {useAsyncEffect} from '../hooks/useAsyncEffect';
 import {TextureOptionsAsProps, toTextureClasses, useTextureBitsFromProps} from '../hooks/useTextureBitsFromProps';
 
@@ -13,7 +13,7 @@ export type TextureAtlasProps = TextureOptionsAsProps &
   };
 
 function Component({name, url, overrideImageUrl, children, ...props}: TextureAtlasProps, ref: ForwardedRef<TextureAtlasData>) {
-  const textureStore = useContext(TextureStoreContext);
+  const assetStore = useContext(AssetStoreContext);
   const [textureAtlas, setTextureAtlas] = useState<TextureAtlasData>();
   const textureBits = useTextureBitsFromProps(props);
 
@@ -26,14 +26,16 @@ function Component({name, url, overrideImageUrl, children, ...props}: TextureAtl
         : undefined,
     {
       next(data) {
-        textureStore.insertAsset(name, 'atlas', data);
+        assetStore.insertAsset(name, 'atlas', data);
         setTextureAtlas(data);
       },
       cancel(data) {
+        // eslint-disable-next-line no-console
         console.log('<TextureAtlas> cancel texture-atlas', data);
         data.texture?.dispose();
       },
       dispose(data) {
+        // eslint-disable-next-line no-console
         console.log('<TextureAtlas> dispose texture-atlas', data);
         data.texture?.dispose();
       },

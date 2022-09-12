@@ -60,9 +60,9 @@ const asTileSet = (item: AssetItem): TileSet | undefined => {
   }
 };
 
-export interface TextureStore extends Eventize {}
+export interface AssetStore extends Eventize {}
 
-export class TextureStore {
+export class AssetStore {
   readonly #assets = new Map<AssetName, AssetItem>();
 
   constructor() {
@@ -86,7 +86,8 @@ export class TextureStore {
       this.#assets.set(name, item);
     }
 
-    console.log('[TextureStore] asset:insert', item);
+    // eslint-disable-next-line no-console
+    console.log('[AssetStore] asset:insert', item);
 
     this.emit('asset:insert', item.name);
   }
@@ -100,7 +101,8 @@ export class TextureStore {
     const item = this.#assets.get(name);
     if (item) {
       item.refCount++;
-      console.log('[TextureStore] increase refCount to', item.refCount, 'for asset', item.name);
+      // eslint-disable-next-line no-console
+      console.log('[AssetStore] increase refCount to', item.refCount, 'for asset', item.name);
       return item.refCount;
     }
     return -1;
@@ -119,7 +121,8 @@ export class TextureStore {
   disposeTextureRef(name: AssetName): void {
     const item = this.#assets.get(name);
     if (item && item.refCount > 0) {
-      console.log('[TextureStore] decrease refCount to', item.refCount, 'for asset', item.name);
+      // eslint-disable-next-line no-console
+      console.log('[AssetStore] decrease refCount to', item.refCount, 'for asset', item.name);
       if (--item.refCount === 0) {
         asTexture(item)?.dispose();
       }
@@ -133,10 +136,10 @@ export class TextureStore {
   }
 }
 
-const defaultTextureStore = new TextureStore();
+const defaultAssetStore = new AssetStore();
 
-export const TextureStoreContext = createContext(defaultTextureStore);
+export const AssetStoreContext = createContext(defaultAssetStore);
 
-TextureStoreContext.displayName = 'TextureStore';
+AssetStoreContext.displayName = 'AssetStore';
 
-export default TextureStoreContext;
+export default AssetStoreContext;

@@ -28,7 +28,7 @@ export const useTextureAtlasLoader = (
       },
       dispose(data) {
         console.log('dispose texture-atlas', data);
-        data.texture?.dispose(); // XXX maybe we should do this in the TextureStore only ?
+        data.texture?.dispose(); // XXX maybe we should do this in the AssetStore only ?
       },
     },
     [url, overrideImageUrl],

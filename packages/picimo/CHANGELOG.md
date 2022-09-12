@@ -4,6 +4,7 @@ __@spearwolf/picimo__
 
 - add `<TileSetRef>` component
 - rename `useTextureRef` to `useTexture`
+- rename `TextureStore` to `AssetStore`
 - integrate _@spearwolf/tiled-maps_ package
   - add new components:
     - `<RepeatingTilesProvider>`

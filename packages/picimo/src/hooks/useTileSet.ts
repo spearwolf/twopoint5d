@@ -1,25 +1,25 @@
 import {TileSet} from '@spearwolf/vertex-objects';
 import {useContext, useEffect, useState} from 'react';
-import {AssetName, TextureStoreContext} from '../context/TextureStore';
+import {AssetName, AssetStoreContext} from '../context/AssetStore';
 
 export function useTileSet(name: AssetName): TileSet | undefined {
-  const textureStore = useContext(TextureStoreContext);
+  const assetStore = useContext(AssetStoreContext);
   const [curTileSet, setTileSet] = useState<TileSet>();
 
   useEffect(() => {
-    const tileSet = textureStore.getTileSet(name);
+    const tileSet = assetStore.getTileSet(name);
     if (tileSet) {
       setTileSet(tileSet);
     }
-    return textureStore.on('asset:insert', (assetName: AssetName) => {
+    return assetStore.on('asset:insert', (assetName: AssetName) => {
       if (name === assetName) {
-        const nextTileSet = textureStore.getTileSet(name);
+        const nextTileSet = assetStore.getTileSet(name);
         if (nextTileSet !== curTileSet) {
           setTileSet(nextTileSet);
         }
       }
     });
-  }, [textureStore, name]);
+  }, [assetStore, name]);
 
   return curTileSet;
 }
