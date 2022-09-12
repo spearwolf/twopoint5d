@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/picimo",
-  "version": "0.1.2-dev",
+  "version": "0.2.0-dev",
   "description": "sprites library based on react-three-fiber",
   "main": "build/picimo.cjs.js",
   "module": "build/picimo.js",

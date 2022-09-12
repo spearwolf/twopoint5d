@@ -23,6 +23,6 @@ export * from './hooks/useStageSize';
 export * from './hooks/useTextureAtlas';
 export * from './hooks/useTextureAtlasLoader';
 export * from './hooks/useTextureBitsFromProps';
-export * from './hooks/useTextureRef';
+export * from './hooks/useTexture';
 export * from './hooks/useTileSet';
 export * from './hooks/useTileSetLoader';

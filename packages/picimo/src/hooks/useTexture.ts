@@ -2,13 +2,13 @@ import {useContext, useEffect, useRef, useState} from 'react';
 import {Texture} from 'three';
 import {AssetName, TextureStore, TextureStoreContext} from '../context/TextureStore';
 
-interface TextureRefState {
+interface TextureState {
   lastName: AssetName | undefined;
   lastTextureStore: TextureStore | undefined;
 }
 
-export function useTextureRef(name: AssetName): Texture | undefined {
-  const stateRef = useRef<TextureRefState>({lastName: undefined, lastTextureStore: undefined});
+export function useTexture(name: AssetName): Texture | undefined {
+  const stateRef = useRef<TextureState>({lastName: undefined, lastTextureStore: undefined});
   const textureStore = useContext(TextureStoreContext);
   const [curTexture, setTexture] = useState<Texture>();
 

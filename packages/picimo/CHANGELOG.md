@@ -1,8 +1,9 @@
 __@spearwolf/picimo__
 
-## 0.1.2
+## 0.2.0
 
 - add `<TileSetRef>` component
+- rename `useTextureRef` to `useTexture`
 - integrate _@spearwolf/tiled-maps_ package
   - add new components:
     - `<RepeatingTilesProvider>`
