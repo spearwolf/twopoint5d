@@ -11,7 +11,7 @@ root.render(
   <Canvas dpr={[1, 2]} camera={{ position: [0, 350, 500], far: 8000 }}>
     <StrictMode>
       <HowToMap2DTileSprites />
-      <OrbitControls />
+      <OrbitControls autoRotate />
     </StrictMode>
   </Canvas>
 );

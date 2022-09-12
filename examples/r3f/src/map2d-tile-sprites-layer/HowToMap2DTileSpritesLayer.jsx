@@ -5,11 +5,10 @@ import {
   RepeatingTilesProvider,
   TextureRef,
   TileSet,
+  TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-  useTileSet,
 } from "@spearwolf/picimo";
-import { useEffect, useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
 
 const TILES = [
@@ -18,22 +17,9 @@ const TILES = [
 ];
 
 export const HowToMap2DTileSpritesLayer = () => {
-  const tileset = useTileSet("tiles");
-  const [map2DLayer, setMap2DLayer] = useState(null);
-  const [tileSpritesRenderer, setTileSpritesRenderer] = useState(null);
-
-  useEffect(() => {
-    if (tileSpritesRenderer && tileset) {
-      tileSpritesRenderer.tileSet = tileset;
-      if (map2DLayer) {
-        map2DLayer.update();
-      }
-    }
-  }, [map2DLayer, tileSpritesRenderer, tileset]);
-
   return (
     <>
-      <WiredBox width={100} height={100} depth={100} />
+      <WiredBox width={640} height={30} depth={480} />
 
       <TileSet
         name="tiles"
@@ -52,21 +38,13 @@ export const HowToMap2DTileSpritesLayer = () => {
         height={480}
         centerX={0}
         centerY={0}
-        ref={setMap2DLayer}
       >
-        <WiredBox
-          width={10}
-          height={10}
-          depth={10}
-          color={0xff0066}
-          name="box-B"
-        />
+        <WiredBox width={256} height={40} depth={256} color={0xff0066} />
 
-        <Map2DTileSprites ref={setTileSpritesRenderer}>
+        <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />
-
+          <TileSetRef name="tiles" attach="tileSet" />
           <TileSpritesGeometry capacity={1000} />
-
           <TileSpritesMaterial>
             <TextureRef name="tiles" attach="colorMap" />
           </TileSpritesMaterial>

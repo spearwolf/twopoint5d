@@ -12,6 +12,7 @@ export * from './components/TexturedSpritesMaterial';
 export * from './components/TextureRef';
 export * from './components/TextureStore';
 export * from './components/TileSet';
+export * from './components/TileSetRef';
 export * from './components/TileSpritesGeometry';
 export * from './components/TileSpritesMaterial';
 export * from './hooks/useAsyncEffect';

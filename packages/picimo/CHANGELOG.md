@@ -2,11 +2,12 @@ __@spearwolf/picimo__
 
 ## 0.1.2
 
+- add `<TileSetRef>` component
 - integrate _@spearwolf/tiled-maps_ package
   - add new components:
     - `<RepeatingTilesProvider>`
     - `<Map2DLayer3D>`
-    - `<Map2DTileSpritesRenderer>`
+    - `<Map2DTileSprites>`
     - `<TileSpritesGeometry>`
     - `<TileSpritesMaterial>`
 

@@ -4,9 +4,9 @@ import {
   RepeatingTilesProvider,
   TextureRef,
   TileSet,
+  TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-  useTileSet,
 } from "@spearwolf/picimo";
 import { AABB2, Map2DTile } from "@spearwolf/tiled-maps";
 import { useEffect, useState } from "react";
@@ -19,14 +19,6 @@ const TILES = [
 
 export const HowToMap2DTileSprites = () => {
   const [sprites, setSprites] = useState(null);
-  const tileset = useTileSet("tiles");
-
-  useEffect(() => {
-    if (sprites && tileset) {
-      console.log("tileset", tileset);
-      sprites.tileSet = tileset;
-    }
-  }, [sprites, tileset]);
 
   useEffect(() => {
     if (sprites) {
@@ -52,6 +44,8 @@ export const HowToMap2DTileSprites = () => {
 
       <Map2DTileSprites ref={setSprites}>
         <RepeatingTilesProvider tiles={TILES} />
+
+        <TileSetRef name="tiles" attach="tileSet" />
 
         <TileSpritesGeometry capacity={1000} />
 
