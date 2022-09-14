@@ -1,6 +1,7 @@
 export * from './components/AssetStore';
 export * from './components/GetStage2D';
 export * from './components/Map2DLayer3D';
+export * from './components/Map2DPanControl';
 export * from './components/Map2DTileSprites';
 export * from './components/ParallaxProjection';
 export * from './components/RepeatingTilesProvider';

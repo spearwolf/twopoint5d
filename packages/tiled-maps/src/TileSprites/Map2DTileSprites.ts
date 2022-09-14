@@ -12,6 +12,8 @@ import {TileSprites} from './TileSprites';
 export interface Map2DTileSprites extends Eventize {}
 
 export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer {
+  debug = false;
+
   #tileData?: IMap2DTileDataProvider;
 
   get tileData(): IMap2DTileDataProvider | undefined {
@@ -80,22 +82,26 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     this.#checkReady();
     this.#curUpdateSerial = 0;
 
-    // eslint-disable-next-line no-console
-    console.log('beginUpdate', {
-      offsetX,
-      offsetY,
-      isReady: this.#isReady,
-      tilesPool: this.tilesPool,
-      tileData: this.tileData,
-      tileSet: this.tileSet,
-    });
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log('beginUpdate', {
+        offsetX,
+        offsetY,
+        isReady: this.#isReady,
+        tilesPool: this.tilesPool,
+        tileData: this.tileData,
+        tileSet: this.tileSet,
+      });
+    }
   }
 
   addTile(tile: Map2DTile): void {
     if (!this.#isReady) {
       this.#deferredTiles.add(tile);
-      // eslint-disable-next-line no-console
-      console.log('addTile as deferred', {tile, tileSpritesRenderer: this});
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log('addTile as deferred', {tile, tileSpritesRenderer: this});
+      }
       return;
     }
 
@@ -119,16 +125,20 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
     ++this.#curUpdateSerial;
 
-    // eslint-disable-next-line no-console
-    console.log('addTile', {tile, sprite, tileSpritesRenderer: this});
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log('addTile', {tile, sprite, tileSpritesRenderer: this});
+    }
   }
 
   #addDeferredTiles = (): void => {
     const {size: deferredCount} = this.#deferredTiles;
 
     if (deferredCount > 0) {
-      // eslint-disable-next-line no-console
-      console.log('addDeferredTiles count=', deferredCount);
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log('addDeferredTiles count=', deferredCount);
+      }
 
       this.#deferredTiles.forEach((tile) => this.addTile(tile));
       this.#deferredTiles.clear();
@@ -140,8 +150,10 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
   reuseTile(tile: Map2DTile): void {
     if (!this.#isReady) return;
 
-    // eslint-disable-next-line no-console
-    console.log('reuseTile', {tile});
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log('reuseTile', {tile});
+    }
 
     if (!this.#tiles.has(tile.id)) {
       this.addTile(tile);
@@ -151,13 +163,17 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
   removeTile(tile: Map2DTile): void {
     if (!this.#isReady) {
       this.#deferredTiles.delete(tile);
-      // eslint-disable-next-line no-console
-      console.log('removeTile from deferred', {tile, tileSpritesRenderer: this});
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log('removeTile from deferred', {tile, tileSpritesRenderer: this});
+      }
       return;
     }
 
-    // eslint-disable-next-line no-console
-    console.log('removeTile', {tile, tileSpritesRenderer: this});
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log('removeTile', {tile, tileSpritesRenderer: this});
+    }
 
     const sprite = this.#tiles.get(tile.id);
 
@@ -169,8 +185,10 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
   }
 
   endUpdate(): void {
-    // eslint-disable-next-line no-console
-    console.log('endUpdate, serial=', this.#curUpdateSerial);
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log('endUpdate, serial=', this.#curUpdateSerial);
+    }
 
     if (!this.#isReady) return;
 

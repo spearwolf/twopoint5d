@@ -1,6 +1,6 @@
-/* eslint-disable no-console */
 import {
   Map2DLayer3D,
+  Map2DPanControl,
   Map2DTileSprites,
   RepeatingTilesProvider,
   TextureRef,
@@ -9,6 +9,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "@spearwolf/picimo";
+import { useEffect, useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
 
 const TILES = [
@@ -17,8 +18,15 @@ const TILES = [
 ];
 
 export const HowToMap2DTileSpritesLayer = () => {
+  const [center, setCenter] = useState({ x: 0, y: 0 });
+  const [panControl, setPanControl] = useState(null);
+
+  useEffect(() => panControl?.on("update", setCenter), [panControl]);
+
   return (
     <>
+      <Map2DPanControl ref={setPanControl} />
+
       <WiredBox width={640} height={30} depth={480} />
 
       <TileSet
@@ -36,8 +44,8 @@ export const HowToMap2DTileSpritesLayer = () => {
         yOffset={-128}
         width={640}
         height={480}
-        centerX={0}
-        centerY={0}
+        centerX={center.x}
+        centerY={center.y}
       >
         <WiredBox width={256} height={40} depth={256} color={0xff0066} />
 

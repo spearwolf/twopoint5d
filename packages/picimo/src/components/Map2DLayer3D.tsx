@@ -1,6 +1,6 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
 import {Map2DLayer3D as __Map2DLayer3D} from '@spearwolf/tiled-maps';
-import {ForwardedRef, forwardRef, useEffect, useState} from 'react';
+import {ForwardedRef, forwardRef, useEffect, useState, memo} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Map2DLayer3D: __Map2DLayer3D});
@@ -55,4 +55,4 @@ function Component(
 
 Component.displayName = 'Map2DLayer3D';
 
-export const Map2DLayer3D = forwardRef<__Map2DLayer3D, Map2DLayer3DProps>(Component);
+export const Map2DLayer3D = memo(forwardRef<__Map2DLayer3D, Map2DLayer3DProps>(Component));
