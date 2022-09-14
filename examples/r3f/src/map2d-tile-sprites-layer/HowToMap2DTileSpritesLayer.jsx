@@ -9,7 +9,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "@spearwolf/picimo";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
 
 const TILES = [
@@ -19,13 +19,10 @@ const TILES = [
 
 export const HowToMap2DTileSpritesLayer = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
-  const [panControl, setPanControl] = useState(null);
-
-  useEffect(() => panControl?.on("update", setCenter), [panControl]);
 
   return (
     <>
-      <Map2DPanControl ref={setPanControl} />
+      <Map2DPanControl onUpdate={setCenter} />
 
       <WiredBox width={640} height={30} depth={480} />
 
