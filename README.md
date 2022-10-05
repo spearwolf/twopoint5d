@@ -20,7 +20,7 @@ A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a
 
 ## As a front-end developer how can i use this in my own projects ?
 
-For all developers who want to just use the featureset easily in their own projects, the _picimo_ package is intended:
+For all developers who want to just use the featureset easily in their own projects, the [@spearwolf/picimo](./packages/picimo/) package is intended:
 - picimo is a typescript library that provides react components and hooks
 - is open source, licensed under the MIT license
 - offers a ready-to-use npm package: `npm i @spearwolf/picimo`
@@ -74,7 +74,7 @@ For all developers who want to just use the featureset easily in their own proje
 
 ### @react-three/fiber
 
-#### [picimo](./packages/picimo/)
+#### [@spearwolf/picimo](./packages/picimo/)
 [![npm version](https://badge.fury.io/js/@spearwolf%2Fpicimo.svg)](https://badge.fury.io/js/@spearwolf%2Fpicimo)
 
 - provides most of the previous libraries as react components and hooks
