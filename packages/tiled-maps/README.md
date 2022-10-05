@@ -1,11 +1,12 @@
-# tiled-maps
+# tiled 2.5D-maps
 
 is a typescript library for rendering (game level) maps composed of 2D tiles with [three.js](https://threejs.org/) *\#gamedev* *\#pixelart* *\#creative-coding*
 
 it's based on the [vertex-objects](../vertex-objects) library
 
 examples can be found here:
-- [tiled-maps-basic-layer-tiles-renderer](../../examples/vanilla/tiled-maps-basic-layer-tiles-renderer.html)
+- [tiled-maps-basic-layer-tiles-renderer](../../examples/vanilla/tiled-maps-basic-layer-tiles-renderer.html) (vanilla)
+- [map2d-tile-sprites-layer](../../examples/r3f/src/map2d-tile-sprites-layer/HowToMap2DTileSpritesLayer.jsx) (react)
 
 ## A Grid of Tiles
 
