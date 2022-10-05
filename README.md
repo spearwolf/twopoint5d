@@ -25,7 +25,7 @@ For all developers who want to just use the featureset easily in their own proje
 - is open source, licensed under the MIT license
 - offers a ready-to-use npm package: `npm i @spearwolf/picimo`
 
-<img src="picimo-tech-stack.png" width="221" height="206" alt="picimo tech stack">
+<img src="picimo-tech-stack.png" srcset="picimo-tech-stack.png 1x, picimo-tech-stack@2x.png 2x" alt="picimo tech stack">
 
 > :warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are a number of examples that illustrate the respective features and usage of the api
 
