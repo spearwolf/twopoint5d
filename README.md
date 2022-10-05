@@ -1,8 +1,36 @@
 ![@spearwolf/three-vertex-objects cover](cover.png)
 
-A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a monorepo. Most of these are centered around building 2.5D websites, demos and games with three.js and @react-three/fiber. Some of them are already quite stable, others are still experimental.
+A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and website(effect)s, with three.js and @react-three/fiber. Some of them are already quite stable, others are still experimental.
 
-## Packages
+## What are the goals of this project ?
+
+- creation of 2.5D games, demos and website(effect)s as easy and satisfying as possible
+- super easy import and use of gamedev assets and 2D resources from the internet
+- first-class pixel-art support and responsive-design awareness
+
+## What are the (planned*) core features ?
+
+- creation, management and efficient display of 2.5D sprites/particles
+  - texture-atlas support
+  - sprite-sheet animations
+  - billboards!
+- creation, management and efficient display of 2.5D maps
+- import of common texture atlas formats (TexturePacker) and 2.5D-maps* (tiled, LDtk)
+- advanced api for extending and customizing sprite features and 2.5D-map renderers
+
+## As a front-end developer how can i use this in my own projects ?
+
+For all developers who want to just use the featureset easily in their own projects, the _picimo_ package is intended:
+- picimo is a typescript library that provides react components and hooks
+- is open source, licensed under the MIT license
+- offers a ready-to-use npm package: `npm i @spearwolf/picimo`
+
+<img src="picimo-tech-stack.png" width="221" height="206" alt="picimo tech stack">
+
+> :warning: however, there are currently no detailed tutorials or comprehensive documentation available - instead, there are a number of examples that illustrate the respective features and usage of the api
+
+
+## Packages inside this monorepo
 
 ### three.js
 
@@ -66,6 +94,8 @@ Almost all of these examples serve to show individual aspects and usage of the r
   - start with: `$ yarn examples:r3f`
 
 ## Getting involved
+
+Everyone is welcome to contribute to this project, no matter if it's just bug-fixes, new features, ideas or documentation or graphics!
 
 ### Development Setup
 
