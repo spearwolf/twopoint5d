@@ -4,19 +4,19 @@ A collection of typescript&#x2011;based micro&#x2011;libraries in the shape of a
 
 ## What are the goals of this project ?
 
-- creation of 2.5D games, demos and website(effect)s as easy and satisfying as possible
-- super easy import and use of gamedev assets and 2D resources from the internet
-- first-class pixel-art support and responsive-design awareness
+- Make the creation of 2.5D games, demos and website(effect)s as easy and satisfying as possible
+- Super easy import and use of gamedev assets and 2D resources from the internet
+- First-class pixel-art support and responsive-design awareness
 
 ## What are the (planned*) core features ?
 
-- creation, management and efficient display of 2.5D sprites/particles
+- Creation, management and efficient display of 2.5D sprites/particles
   - texture-atlas support
   - sprite-sheet animations
   - billboards!
-- creation, management and efficient display of 2.5D maps
-- import of common texture atlas formats (TexturePacker) and 2.5D-maps* (tiled, LDtk)
-- advanced api for extending and customizing sprite features and 2.5D-map renderers
+- Creation, management and efficient display of 2.5D maps
+- Import of common texture atlas formats (TexturePacker) and 2.5D-maps* (tiled, LDtk)
+- Advanced api for extending and customizing sprite features and 2.5D-map renderers
 
 ## As a front-end developer how can i use this in my own projects ?
 
@@ -27,7 +27,7 @@ For all developers who want to just use the featureset easily in their own proje
 
 <img src="picimo-tech-stack.png" width="221" height="206" alt="picimo tech stack">
 
-> :warning: however, there are currently no detailed tutorials or comprehensive documentation available - instead, there are a number of examples that illustrate the respective features and usage of the api
+> :warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are a number of examples that illustrate the respective features and usage of the api
 
 
 ## Packages inside this monorepo
