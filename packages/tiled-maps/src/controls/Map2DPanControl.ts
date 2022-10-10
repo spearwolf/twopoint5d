@@ -234,8 +234,10 @@ export class Map2DPanControl extends InputControlBase {
     }
   };
 
-  #hideCursor(event: PointerEvent) {
-    const el = event.target as HTMLElement;
+  #hideCursor(_event: PointerEvent) {
+    // const el = event.target as HTMLElement;
+    // TODO configure cursor styles target
+    const el = document.body;
     el.style.cursor = this.cursorPanStyle;
   }
 
@@ -255,8 +257,9 @@ export class Map2DPanControl extends InputControlBase {
     }
   };
 
-  #restoreCursorStyle(event: PointerEvent) {
-    const el = event.target as HTMLElement;
+  #restoreCursorStyle(_event: PointerEvent) {
+    // const el = event.target as HTMLElement;
+    const el = document.body;
     if (el.style.cursor !== this.cursorDefaultStyle) {
       el.style.cursor = this.cursorDefaultStyle;
     }

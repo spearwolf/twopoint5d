@@ -24,6 +24,10 @@ module.exports = {
       import: "./src/map2d-tile-sprites-layer/index.jsx",
       dependOn: "libs",
     },
+    "map2d-camera-based-visibility": {
+      import: "./src/map2d-camera-based-visibility/index.jsx",
+      dependOn: "libs",
+    },
     clouds: {
       import: "./src/clouds/index.jsx",
       dependOn: "libs",

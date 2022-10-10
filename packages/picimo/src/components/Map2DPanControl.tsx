@@ -18,7 +18,7 @@ export type Map2DPanControlProps = JSX.IntrinsicElements['map2DPanControl'] & {
   onUpdate?: (pan: {x: number; y: number}) => void;
 };
 
-function Component({onUpdate, children, ...props}: Map2DPanControlProps, ref: ForwardedRef<__Map2DPanControl>) {
+function Component({onUpdate, isActive, children, ...props}: Map2DPanControlProps, ref: ForwardedRef<__Map2DPanControl>) {
   const panControlRef = useRef<__Map2DPanControl>();
   const [panControl, setPanControl] = useState<__Map2DPanControl>(panControlRef.current);
 
@@ -31,6 +31,12 @@ function Component({onUpdate, children, ...props}: Map2DPanControlProps, ref: Fo
       return panControl.on('update', onUpdate);
     }
   }, [panControl, onUpdate]);
+
+  useEffect(() => {
+    if (panControl) {
+      panControl[isActive ? 'subscribe' : 'unsubscribe']();
+    }
+  }, [panControl, isActive]);
 
   return (
     <map2DPanControl {...props} ref={mergeRefs(panControlRef, setPanControl, ref)}>

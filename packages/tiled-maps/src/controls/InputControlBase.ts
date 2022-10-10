@@ -35,6 +35,7 @@ export class InputControlBase {
 
   set isActive(active: boolean) {
     this.#active = active;
+    // TODO subscribe() / unsubscribe()
   }
 
   subscribe() {
