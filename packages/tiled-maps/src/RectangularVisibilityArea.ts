@@ -3,15 +3,13 @@ import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
-/**
- * A simple visibilitor that returns all tiles in a rectangle.
- * The center of the rectangle is the center of the Map2DLayer.
- */
-export class Map2DVisibleRect2 implements IMap2DVisibilitor {
+export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;
   #height = 0;
 
   needsUpdate = true;
+
+  #tileCreated?: Uint8Array;
 
   get width(): number {
     return this.#width;
@@ -59,14 +57,23 @@ export class Map2DVisibleRect2 implements IMap2DVisibilitor {
 
     const removeTiles: Map2DTile[] = [];
     const reuseTiles: Map2DTile[] = [];
-    const createTilesState = new Uint8Array(tileCoords.rows * tileCoords.columns);
+
+    const tilesLength = tileCoords.rows * tileCoords.columns;
+
+    let tileCreated = this.#tileCreated;
+    if (tileCreated == null || tileCreated.length < tilesLength) {
+      this.#tileCreated = new Uint8Array(tilesLength);
+      tileCreated = this.#tileCreated;
+    } else {
+      tileCreated.fill(0);
+    }
 
     previousTiles.forEach((tile) => {
       if (fullViewArea.isIntersecting(tile.view)) {
         reuseTiles.push(tile);
         const tx = tile.x - tileCoords.tileLeft;
         const ty = tile.y - tileCoords.tileTop;
-        createTilesState[ty * tileCoords.columns + tx] = 1;
+        tileCreated[ty * tileCoords.columns + tx] = 1;
       } else {
         removeTiles.push(tile);
       }
@@ -76,7 +83,7 @@ export class Map2DVisibleRect2 implements IMap2DVisibilitor {
 
     for (let ty = 0; ty < tileCoords.rows; ty++) {
       for (let tx = 0; tx < tileCoords.columns; tx++) {
-        if (createTilesState[ty * tileCoords.columns + tx] === 0) {
+        if (tileCreated[ty * tileCoords.columns + tx] === 0) {
           const tileX = tx + tileCoords.tileLeft;
           const tileY = ty + tileCoords.tileTop;
           const tile = new Map2DTile(

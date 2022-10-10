@@ -9,7 +9,7 @@ export * from './Map2DLayer3D';
 export * from './Map2DSpatialHashGrid';
 export * from './Map2DTile';
 export * from './Map2DTileCoordsUtil';
-export * from './Map2DVisibleRect2';
+export * from './RectangularVisibilityArea';
 export * from './RepeatingTilesProvider';
 export * from './TileSprites/descriptors';
 export * from './TileSprites/Map2DTileSprites';

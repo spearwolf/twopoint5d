@@ -1,3 +1,4 @@
+import { extend } from "@react-three/fiber";
 import {
   Map2DLayer3D,
   Map2DPanControl,
@@ -9,9 +10,11 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "@spearwolf/picimo";
-import { Map2DVisibleRect2 } from "@spearwolf/tiled-maps";
+import { RectangularVisibilityArea } from "@spearwolf/tiled-maps";
 import { useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
+
+extend({ RectangularVisibilityArea });
 
 const TILES = [
   [1, 2],
@@ -20,7 +23,6 @@ const TILES = [
 
 export const HowToMap2DTileSpritesLayer = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
-  const [visibilitor] = useState(() => new Map2DVisibleRect2(640, 480));
 
   return (
     <>
@@ -41,11 +43,16 @@ export const HowToMap2DTileSpritesLayer = () => {
         tileHeight={256}
         xOffset={-128}
         yOffset={-128}
-        visibilitor={visibilitor}
         centerX={center.x}
         centerY={center.y}
       >
         <WiredBox width={256} height={40} depth={256} color={0xff0066} />
+
+        <rectangularVisibilityArea
+          width={640}
+          height={480}
+          attach="visibilitor"
+        />
 
         <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />

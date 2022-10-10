@@ -68,7 +68,7 @@
         RepeatingTilesProvider,
         Map2DLayer3D,
         Map2DTileSprites,
-        Map2DVisibleRect2,
+        RectangularVisibilityArea,
         TileSpritesGeometry,
         TileSpritesMaterial,
       } from "@spearwolf/tiled-maps";
@@ -102,7 +102,7 @@
         map2dLayer.xOffset = -128;
         map2dLayer.yOffset = -128;
 
-        map2dLayer.visibilitor = new Map2DVisibleRect2(640, 480);
+        map2dLayer.visibilitor = new RectangularVisibilityArea(640, 480);
 
         map2dLayer.centerX = 0;
         map2dLayer.centerY = 0;
