@@ -1,13 +1,16 @@
-import {AABB2} from './AABB2';
 import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
+import {IMap2DVisibilitor} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
+/**
+ * A Map2DLayer divides a 2D map into a grid consisting of individual tiles of equal size.
+ * The center-point specifies the center of the visible area.
+ * The visibilitor interface is used to determine which tiles are visible.
+ * The rendering of the visible tiles via update() method is delegated to the TileRenderer.
+ */
 export class Map2DLayer implements IMap2DLayer {
-  #width = 320;
-  #height = 240;
-
   #centerX = 0;
   #centerY = 0;
 
@@ -15,25 +18,16 @@ export class Map2DLayer implements IMap2DLayer {
 
   #needsUpdate = true;
 
-  get width(): number {
-    return this.#width;
+  visibilitor?: IMap2DVisibilitor;
+
+  get needsUpdate(): boolean {
+    return this.#needsUpdate || this.visibilitor?.needsUpdate;
   }
 
-  set width(width: number) {
-    if (this.#width !== width) {
-      this.#width = width;
-      this.#needsUpdate = true;
-    }
-  }
-
-  get height(): number {
-    return this.#height;
-  }
-
-  set height(height: number) {
-    if (this.#height !== height) {
-      this.#height = height;
-      this.#needsUpdate = true;
+  set needsUpdate(update: boolean) {
+    this.#needsUpdate = update;
+    if (this.visibilitor) {
+      this.visibilitor.needsUpdate = update;
     }
   }
 
@@ -119,64 +113,25 @@ export class Map2DLayer implements IMap2DLayer {
   }
 
   update(): void {
-    if (this.renderers.size === 0) return;
+    if (this.renderers.size === 0 || this.visibilitor == null) return;
 
-    if (this.#needsUpdate) {
-      const {width, height, centerX, centerY} = this;
+    if (this.needsUpdate) {
+      const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords);
 
-      if (width === 0 || height === 0) return;
+      if (visible) {
+        this.tiles = visible.tiles;
+        this.needsUpdate = false;
 
-      this.#needsUpdate = false;
+        const xOffset = this.xOffset - this.centerX;
+        const yOffset = this.yOffset - this.centerY;
 
-      const left = centerX - width / 2;
-      const top = centerY - height / 2;
-
-      const tileCoords = this.#tileCoords.computeTilesWithinCoords(left, top, width, height);
-      const fullViewArea = AABB2.from(tileCoords);
-
-      const removeTiles: Map2DTile[] = [];
-      const reuseTiles: Map2DTile[] = [];
-      const createTilesState = new Uint8Array(tileCoords.rows * tileCoords.columns);
-
-      this.tiles.forEach((tile) => {
-        if (fullViewArea.isIntersecting(tile.view)) {
-          reuseTiles.push(tile);
-          const tx = tile.x - tileCoords.tileLeft;
-          const ty = tile.y - tileCoords.tileTop;
-          createTilesState[ty * tileCoords.columns + tx] = 1;
-        } else {
-          removeTiles.push(tile);
+        for (const tileRenderer of this.renderers) {
+          tileRenderer.beginUpdate(xOffset, yOffset);
+          visible.removeTiles?.forEach((tile) => tileRenderer.removeTile(tile));
+          visible.createTiles?.forEach((tile) => tileRenderer.addTile(tile));
+          visible.reuseTiles?.forEach((tile) => tileRenderer.reuseTile(tile));
+          tileRenderer.endUpdate();
         }
-      });
-
-      const createTiles: Map2DTile[] = [];
-
-      for (let ty = 0; ty < tileCoords.rows; ty++) {
-        for (let tx = 0; tx < tileCoords.columns; tx++) {
-          if (createTilesState[ty * tileCoords.columns + tx] === 0) {
-            const tileX = tx + tileCoords.tileLeft;
-            const tileY = ty + tileCoords.tileTop;
-            const tile = new Map2DTile(
-              tileX,
-              tileY,
-              new AABB2(tileX * tileCoords.tileWidth, tileY * tileCoords.tileHeight, tileCoords.tileWidth, tileCoords.tileHeight),
-            );
-            createTiles.push(tile);
-          }
-        }
-      }
-
-      this.tiles = reuseTiles.concat(createTiles);
-
-      const xOffset = this.xOffset - centerX;
-      const yOffset = this.yOffset - centerY;
-
-      for (const tileRenderer of this.renderers) {
-        tileRenderer.beginUpdate(xOffset, yOffset);
-        removeTiles.forEach((tile) => tileRenderer.removeTile(tile));
-        createTiles.forEach((tile) => tileRenderer.addTile(tile));
-        reuseTiles.forEach((tile) => tileRenderer.reuseTile(tile));
-        tileRenderer.endUpdate();
       }
     }
   }

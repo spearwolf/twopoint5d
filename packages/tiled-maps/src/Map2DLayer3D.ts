@@ -2,6 +2,7 @@ import {Group} from 'three';
 
 import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
+import {IMap2DVisibilitor} from './IMap2DVisibilitor';
 import {Map2DLayer} from './Map2DLayer';
 
 /**
@@ -9,45 +10,46 @@ import {Map2DLayer} from './Map2DLayer';
  */
 export class Map2DLayer3D extends Group implements IMap2DLayer {
   #renderers: Set<IMap2DTileRenderer> = new Set();
-  // #rendererObjects: Map<IMap2DTileRenderer, Object3D> = new Map();
   #map2dLayer: Map2DLayer;
+  #visibilitor?: IMap2DVisibilitor;
 
   get map2dLayer(): Map2DLayer {
     return this.#map2dLayer;
   }
 
   set map2dLayer(map2dLayer: Map2DLayer) {
-    if (this.#renderers.size > 0) {
+    if (this.#map2dLayer !== map2dLayer) {
+      if (this.#renderers.size > 0) {
+        if (this.#map2dLayer) {
+          for (const renderer of this.#renderers) {
+            this.#map2dLayer.removeTileRenderer(renderer);
+          }
+        }
+      }
+
+      this.#map2dLayer = map2dLayer;
+
+      if (this.#visibilitor) {
+        this.#map2dLayer.visibilitor = this.#visibilitor;
+      }
+
       if (this.#map2dLayer) {
         for (const renderer of this.#renderers) {
-          this.#map2dLayer.removeTileRenderer(renderer);
+          this.#map2dLayer.addTileRenderer(renderer);
         }
       }
     }
+  }
 
-    this.#map2dLayer = map2dLayer;
+  get visibilitor(): IMap2DVisibilitor {
+    return this.#visibilitor;
+  }
 
-    if (this.#map2dLayer) {
-      for (const renderer of this.#renderers) {
-        this.#map2dLayer.addTileRenderer(renderer);
-      }
+  set visibilitor(v: IMap2DVisibilitor) {
+    this.#visibilitor = v;
+    if (this.#map2dLayer != null) {
+      this.#map2dLayer.visibilitor = v;
     }
-  }
-
-  get width(): number {
-    return this.#map2dLayer.width;
-  }
-
-  set width(width: number) {
-    this.#map2dLayer.width = width;
-  }
-
-  get height(): number {
-    return this.#map2dLayer.height;
-  }
-
-  set height(height: number) {
-    this.#map2dLayer.height = height;
   }
 
   get centerX(): number {

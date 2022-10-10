@@ -9,6 +9,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "@spearwolf/picimo";
+import { Map2DVisibleRect2 } from "@spearwolf/tiled-maps";
 import { useState } from "react";
 import { WiredBox } from "../utils/WiredBox";
 
@@ -19,6 +20,7 @@ const TILES = [
 
 export const HowToMap2DTileSpritesLayer = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
+  const [visibilitor] = useState(() => new Map2DVisibleRect2(640, 480));
 
   return (
     <>
@@ -39,8 +41,7 @@ export const HowToMap2DTileSpritesLayer = () => {
         tileHeight={256}
         xOffset={-128}
         yOffset={-128}
-        width={640}
-        height={480}
+        visibilitor={visibilitor}
         centerX={center.x}
         centerY={center.y}
       >
