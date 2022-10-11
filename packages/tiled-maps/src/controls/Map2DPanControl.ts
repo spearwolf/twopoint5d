@@ -134,13 +134,6 @@ export class Map2DPanControl extends InputControlBase {
   set panView(panView: PanViewState) {
     const prevPanView = this.#panView;
     this.#panView = panView ?? {x: 0, y: 0, pixelRatio: globalThis.devicePixelRatio ?? 1};
-
-    // TODO remove me
-    if (prevPanView !== this.#panView) {
-      // eslint-disable-next-line no-console
-      console.log('Map2DPanControl: panView changed', this.#panView);
-    }
-
     this.#isFirstPanViewUpate = prevPanView !== this.#panView;
   }
 
@@ -187,19 +180,23 @@ export class Map2DPanControl extends InputControlBase {
     this.panView.x += this.speedEast * t;
     this.panView.x -= this.speedWest * t;
 
-    const {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));
+    if (!this.#pointerDisabled) {
+      const {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));
 
-    const pixelRatio = this.panView.pixelRatio || 1;
+      const pixelRatio = this.panView.pixelRatio || 1;
 
-    this.panView.x -= panX / pixelRatio;
-    this.panView.y -= panY / pixelRatio;
-
-    if (this.#isFirstPanViewUpate || prevX !== this.panView.x || prevY !== this.panView.y) {
-      this.emit('update', {x: this.panView.x, y: this.panView.y});
+      this.panView.x -= panX / pixelRatio;
+      this.panView.y -= panY / pixelRatio;
     }
 
-    if (this.#isFirstPanViewUpate) {
-      this.#isFirstPanViewUpate = false;
+    if (!this.#keyboardDisabled || !this.#pointerDisabled) {
+      if (this.#isFirstPanViewUpate || prevX !== this.panView.x || prevY !== this.panView.y) {
+        this.emit('update', {x: this.panView.x, y: this.panView.y});
+      }
+
+      if (this.#isFirstPanViewUpate) {
+        this.#isFirstPanViewUpate = false;
+      }
     }
   }
 
@@ -239,6 +236,7 @@ export class Map2DPanControl extends InputControlBase {
     // TODO configure cursor styles target
     const el = document.body;
     el.style.cursor = this.cursorPanStyle;
+    this.emit('hideCursor', this);
   }
 
   #onPointerUp = (event: PointerEvent): void => {
@@ -263,6 +261,7 @@ export class Map2DPanControl extends InputControlBase {
     if (el.style.cursor !== this.cursorDefaultStyle) {
       el.style.cursor = this.cursorDefaultStyle;
     }
+    this.emit('restoreCursor', this);
   }
 
   #onPointerMove = (event: PointerEvent): void => {
@@ -335,6 +334,6 @@ export class Map2DPanControl extends InputControlBase {
 
   dispose(): void {
     this.destroyAllListeners();
-    this.off('update');
+    this.off();
   }
 }

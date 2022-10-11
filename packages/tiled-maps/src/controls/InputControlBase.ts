@@ -20,7 +20,7 @@ export class InputControlBase {
 
   protected removeEventListener(host: EventTarget, eventName: string, callback: any, passive = true) {
     const index = this.#findListenerIndex(host, eventName, callback, passive);
-    if (index === -1) {
+    if (index >= 0) {
       if (this.#active) {
         const [host, eventName, callback] = this.#listeners[index];
         host.removeEventListener(eventName, callback);
@@ -34,8 +34,11 @@ export class InputControlBase {
   }
 
   set isActive(active: boolean) {
-    this.#active = active;
-    // TODO subscribe() / unsubscribe()
+    if (!this.#active && active) {
+      this.subscribe();
+    } else if (this.#active && !active) {
+      this.unsubscribe();
+    }
   }
 
   subscribe() {

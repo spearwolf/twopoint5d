@@ -26,11 +26,15 @@ export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const activeCamera = useDemoStore((state) => state.activeCameraName);
 
-  const panActive = activeCamera === "cam0";
+  const pointerPanDisabled = activeCamera !== "cam0";
 
   return (
     <>
-      <Map2DPanControl onUpdate={setCenter} isActive={panActive} />
+      <Map2DPanControl
+        onUpdate={setCenter}
+        pointerDisabled={pointerPanDisabled}
+        pixelsPerSecond={300}
+      />
 
       <WiredBox width={640} height={30} depth={480} />
 
