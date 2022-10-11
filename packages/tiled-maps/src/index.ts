@@ -1,5 +1,5 @@
 export * from './AABB2';
-export * from './controls/Map2DPanControl';
+export * from './controls/PanControl2D';
 export * from './IMap2DLayer';
 export * from './IMap2DTileDataProvider';
 export * from './IMap2DTileRenderer';

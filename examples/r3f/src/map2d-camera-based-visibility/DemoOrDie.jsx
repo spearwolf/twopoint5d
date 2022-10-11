@@ -1,8 +1,8 @@
 import { extend } from "@react-three/fiber";
 import {
   Map2DLayer3D,
-  Map2DPanControl,
   Map2DTileSprites,
+  PanControl2D,
   RepeatingTilesProvider,
   TextureRef,
   TileSet,
@@ -30,7 +30,7 @@ export const DemoOrDie = () => {
 
   return (
     <>
-      <Map2DPanControl
+      <PanControl2D
         onUpdate={setCenter}
         pointerDisabled={pointerPanDisabled}
         pixelsPerSecond={300}

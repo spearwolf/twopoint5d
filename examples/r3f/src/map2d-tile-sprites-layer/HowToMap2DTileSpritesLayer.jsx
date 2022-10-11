@@ -1,8 +1,8 @@
 import { extend } from "@react-three/fiber";
 import {
   Map2DLayer3D,
-  Map2DPanControl,
   Map2DTileSprites,
+  PanControl2D,
   RepeatingTilesProvider,
   TextureRef,
   TileSet,
@@ -26,7 +26,7 @@ export const HowToMap2DTileSpritesLayer = () => {
 
   return (
     <>
-      <Map2DPanControl onUpdate={setCenter} />
+      <PanControl2D onUpdate={setCenter} pixelsPerSecond={300} />
 
       <WiredBox width={640} height={30} depth={480} />
 

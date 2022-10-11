@@ -46,7 +46,7 @@ const POINTERUP = 'pointerup';
 const POINTERDOWN = 'pointerdown';
 const POINTERMOVE = 'pointermove';
 
-export interface Map2DPanControlOptions {
+export interface PanControl2DOptions {
   state?: PanViewState;
 
   /** Default css cursor style. Default is '' */
@@ -85,9 +85,9 @@ export interface Map2DPanControlOptions {
   disableKeyboard?: boolean;
 }
 
-export interface Map2DPanControl extends Eventize {}
+export interface PanControl2D extends Eventize {}
 
-export class Map2DPanControl extends InputControlBase {
+export class PanControl2D extends InputControlBase {
   pixelsPerSecond = 0;
 
   speedNorth = 0;
@@ -106,7 +106,7 @@ export class Map2DPanControl extends InputControlBase {
   #pointerDisabled = false;
   #keyboardDisabled = false;
 
-  constructor(options?: Map2DPanControlOptions) {
+  constructor(options?: PanControl2DOptions) {
     super();
     eventize(this);
 
