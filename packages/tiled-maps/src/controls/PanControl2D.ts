@@ -106,7 +106,7 @@ export class PanControl2D extends InputControlBase {
   #cursorPanStyle: string;
   #cursorPanClass?: string;
   #cursorStylesTarget?: HTMLElement;
-  #cursorState = HideCursorState.NO;
+  #hideCursorState = HideCursorState.NO;
 
   mouseButton: number;
   keyCodes: [number, number, number, number];
@@ -248,19 +248,18 @@ export class PanControl2D extends InputControlBase {
         });
       }
       if (event.pointerType === MOUSE) {
-        // this.#hideCursor(event);
-        if (this.#cursorState === HideCursorState.NO) {
-          this.#cursorState = HideCursorState.MAYBE;
+        if (this.#hideCursorState === HideCursorState.NO) {
+          this.#hideCursorState = HideCursorState.MAYBE;
         }
       }
     }
   };
 
   #hideCursor() {
+    this.#hideCursorState = HideCursorState.YES;
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.add(this.#cursorPanClass);
     }
-    this.#cursorState = HideCursorState.YES;
     this.emit('hideCursor', this);
   }
 
@@ -281,10 +280,10 @@ export class PanControl2D extends InputControlBase {
   };
 
   #restoreCursorStyle() {
+    this.#hideCursorState = HideCursorState.NO;
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
-    this.#cursorState = HideCursorState.NO;
     this.emit('restoreCursor', this);
   }
 
@@ -294,7 +293,7 @@ export class PanControl2D extends InputControlBase {
       if (state) {
         this.#updatePanState(event, state);
 
-        if (this.#cursorState === HideCursorState.MAYBE) {
+        if (this.#hideCursorState === HideCursorState.MAYBE) {
           this.#hideCursor();
         }
       }
