@@ -66,6 +66,7 @@
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.4.0",
+    "@spearwolf/display3": "*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/textured-sprites": "*",
     "@spearwolf/tiled-maps": "*",
@@ -81,6 +82,7 @@
     "@rollup/plugin-node-resolve": "^13.3.0",
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.5.0",
+    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/textured-sprites": "workspace:*",
     "@spearwolf/tiled-maps": "workspace:*",

@@ -22,6 +22,7 @@ const CameraButtonStyled = styled.button`
   font-weight: bold;
 
   cursor: pointer;
+  user-select: none;
 
   ${({ isRadio }) =>
     isRadio &&
@@ -69,6 +70,7 @@ const CameraButton = ({ value, name, isActive, onAction, radioGroup }) => {
   const onClick = useCallback(
     (event) => {
       event.preventDefault();
+      event.stopPropagation();
       onAction(value);
     },
     [value]

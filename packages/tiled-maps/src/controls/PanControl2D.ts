@@ -1,3 +1,4 @@
+import {Stylesheets} from '@spearwolf/display3';
 import eventize, {Eventize} from '@spearwolf/eventize';
 
 import {InputControlBase} from './InputControlBase';
@@ -8,6 +9,12 @@ export interface PanViewState {
   y: number;
 
   pixelRatio?: number;
+}
+
+enum HideCursorState {
+  NO = 0,
+  MAYBE = 1,
+  YES = 2,
 }
 
 interface PanInternalState {
@@ -49,11 +56,10 @@ const POINTERMOVE = 'pointermove';
 export interface PanControl2DOptions {
   state?: PanViewState;
 
-  /** Default css cursor style. Default is '' */
-  cursorDefaultStyle?: string;
-
   /** Cursor css style while panning. Default is 'none' (hide cursor) */
   cursorPanStyle?: string;
+
+  cursorStylesTarget?: HTMLElement;
 
   /** Scroll speed while using the keys. Pixels per seconds. Default is 100. */
   speed?: number;
@@ -97,8 +103,10 @@ export class PanControl2D extends InputControlBase {
 
   #pointersDown: Map<number, PanInternalState> = new Map();
 
-  cursorDefaultStyle: string;
-  cursorPanStyle: string;
+  #cursorPanStyle: string;
+  #cursorPanClass?: string;
+  #cursorStylesTarget?: HTMLElement;
+  #cursorState = HideCursorState.NO;
 
   mouseButton: number;
   keyCodes: [number, number, number, number];
@@ -114,8 +122,8 @@ export class PanControl2D extends InputControlBase {
 
     this.pixelsPerSecond = readOption(options, 'speed', 100);
 
-    this.cursorDefaultStyle = readOption(options, 'cursorDefaultStyle', '');
     this.cursorPanStyle = readOption(options, 'cursorPanStyle', 'none');
+    this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
 
     this.mouseButton = readOption(options, 'mouseButton', 1);
     this.keyCodes = readOption(options, 'keyCodes', [87, 83, 65, 68]);
@@ -123,6 +131,20 @@ export class PanControl2D extends InputControlBase {
     this.pointerDisabled = readOption(options, 'disablePointer', false);
     this.keyboardDisabled = readOption(options, 'disableKeyboard', false);
   }
+
+  get cursorPanStyle(): string {
+    return this.#cursorPanStyle;
+  }
+
+  set cursorPanStyle(value: string) {
+    if (this.#cursorPanStyle !== value) {
+      this.#cursorPanStyle = value;
+      this.#cursorPanClass = this.#installCursorPanStyleRules();
+    }
+  }
+
+  #installCursorPanStyleRules = (): string =>
+    Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`);
 
   #panView: PanViewState;
   #isFirstPanViewUpate = true;
@@ -226,16 +248,19 @@ export class PanControl2D extends InputControlBase {
         });
       }
       if (event.pointerType === MOUSE) {
-        this.#hideCursor(event);
+        // this.#hideCursor(event);
+        if (this.#cursorState === HideCursorState.NO) {
+          this.#cursorState = HideCursorState.MAYBE;
+        }
       }
     }
   };
 
-  #hideCursor(_event: PointerEvent) {
-    // const el = event.target as HTMLElement;
-    // TODO configure cursor styles target
-    const el = document.body;
-    el.style.cursor = this.cursorPanStyle;
+  #hideCursor() {
+    if (this.#cursorPanClass && this.#cursorStylesTarget) {
+      this.#cursorStylesTarget.classList.add(this.#cursorPanClass);
+    }
+    this.#cursorState = HideCursorState.YES;
     this.emit('hideCursor', this);
   }
 
@@ -250,17 +275,16 @@ export class PanControl2D extends InputControlBase {
     }
     if (event.pointerType === MOUSE) {
       if (!Array.from(pointersDown.values()).find((state) => state.pointerType === MOUSE)) {
-        this.#restoreCursorStyle(event);
+        this.#restoreCursorStyle();
       }
     }
   };
 
-  #restoreCursorStyle(_event: PointerEvent) {
-    // const el = event.target as HTMLElement;
-    const el = document.body;
-    if (el.style.cursor !== this.cursorDefaultStyle) {
-      el.style.cursor = this.cursorDefaultStyle;
+  #restoreCursorStyle() {
+    if (this.#cursorPanClass && this.#cursorStylesTarget) {
+      this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
+    this.#cursorState = HideCursorState.NO;
     this.emit('restoreCursor', this);
   }
 
@@ -269,10 +293,14 @@ export class PanControl2D extends InputControlBase {
       const state = this.#pointersDown.get(event.pointerId);
       if (state) {
         this.#updatePanState(event, state);
+
+        if (this.#cursorState === HideCursorState.MAYBE) {
+          this.#hideCursor();
+        }
       }
     }
     if (event.pointerType === MOUSE && event.buttons === 0) {
-      this.#restoreCursorStyle(event);
+      this.#restoreCursorStyle();
     }
   };
 

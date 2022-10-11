@@ -3138,7 +3138,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@spearwolf/display3@workspace:packages/display3":
+"@spearwolf/display3@workspace:*, @spearwolf/display3@workspace:packages/display3":
   version: 0.0.0-use.local
   resolution: "@spearwolf/display3@workspace:packages/display3"
   dependencies:
@@ -3203,6 +3203,7 @@ __metadata:
     "@rollup/plugin-node-resolve": ^13.3.0
     "@rollup/plugin-replace": ^4.0.0
     "@rollup/plugin-typescript": ^8.5.0
+    "@spearwolf/display3": "workspace:*"
     "@spearwolf/eventize": ^2.0.3
     "@spearwolf/textured-sprites": "workspace:*"
     "@spearwolf/tiled-maps": "workspace:*"
@@ -3249,6 +3250,7 @@ __metadata:
     zustand: ^4.1.1
   peerDependencies:
     "@react-three/fiber": ^8.4.0
+    "@spearwolf/display3": "*"
     "@spearwolf/eventize": ^2.0.3
     "@spearwolf/textured-sprites": "*"
     "@spearwolf/tiled-maps": "*"
@@ -3374,6 +3376,7 @@ __metadata:
     "@rollup/plugin-node-resolve": ^13.3.0
     "@rollup/plugin-replace": ^4.0.0
     "@rollup/plugin-typescript": ^8.5.0
+    "@spearwolf/display3": "workspace:*"
     "@spearwolf/eventize": ^2.0.3
     "@spearwolf/vertex-objects": "workspace:*"
     "@types/assert": ^1.5.6
@@ -3408,6 +3411,7 @@ __metadata:
     typedoc: ^0.23.14
     typescript: ^4.8.2
   peerDependencies:
+    "@spearwolf/display3": "*"
     "@spearwolf/eventize": ^2.0.3
     "@spearwolf/vertex-objects": "*"
     three: ^0.144

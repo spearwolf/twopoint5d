@@ -3,6 +3,8 @@ export const globalStylesID = `display3--${postFixID}`;
 
 let sheet: CSSStyleSheet = null;
 
+const installedRules: Map<string, {index: number; css: string}> = new Map();
+
 /**
  * Helpers for installing simple css-class-based rules
  */
@@ -18,22 +20,22 @@ export class Stylesheets {
   }
 
   static installRule(name: string, css: string): string {
+    const sheet = Stylesheets.getGlobalSheet();
+
     const className = `${name}-${postFixID}`;
     const selector = `.${className}`;
 
-    let ruleExists = false;
+    let index = sheet.cssRules.length;
 
-    const sheet = Stylesheets.getGlobalSheet();
-    for (const rule of Array.from(sheet.cssRules) as CSSStyleRule[]) {
-      if (selector === rule.selectorText) {
-        ruleExists = true;
-        break;
+    if (installedRules.has(name)) {
+      const prevRule = installedRules.get(name);
+      if (prevRule.css === css) {
+        return className;
       }
+      index = prevRule.index;
     }
 
-    if (!ruleExists) {
-      sheet.insertRule(`${selector} {${css}}`);
-    }
+    sheet.insertRule(`${selector} {${css}}`, index);
 
     return className;
   }
