@@ -11,3 +11,4 @@ jest.config.cjs
 tsconfig.json
 *.spec.ts
 *.spec.d.ts
+setup-tests.js
