@@ -55,7 +55,7 @@
     "publish:textured-sprites": " yarn publish-package textured-sprites",
     "publish:tiled-maps": " yarn publish-package tiled-maps",
     "publish:picimo": "yarn publish-package picimo",
-    "build": "npm-run-all --serial build:vertex-objects --parallel build:tiled-maps build:stage25 build:textured-sprites build:display3 --serial build:picimo",
+    "build": "npm-run-all --serial build:vertex-objects build:display3 --parallel build:tiled-maps build:stage25 build:textured-sprites --serial build:picimo",
     "test": "run-s test:vertex-objects test:tiled-maps test:stage25 test:textured-sprites test:display3 test:picimo",
     "clean": "run-p clean:vertex-objects clean:tiled-maps clean:stage25 clean:textured-sprites clean:display3 clean:picimo",
     "watch": "concurrently --raw yarn:watch:vertex-objects yarn:watch:tiled-maps yarn:watch:stage25 yarn:watch:textured-sprites yarn:watch:display3 yarn:watch:picimo",
