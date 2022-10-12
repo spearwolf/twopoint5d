@@ -21,7 +21,7 @@ const TILES = [
   [3, 4],
 ];
 
-export const HowToMap2DTileSpritesLayer = () => {
+export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
 
   return (

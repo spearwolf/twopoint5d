@@ -17,7 +17,7 @@ const TILES = [
   [3, 4],
 ];
 
-export const HowToMap2DTileSprites = () => {
+export const DemoOrDie = () => {
   const [sprites, setSprites] = useState(null);
 
   useEffect(() => {

@@ -24,7 +24,7 @@ import { BouncingSprites } from "./BouncingSprites";
 
 extend({ RenderPass, FilmPass });
 
-export const TexturedSpritesDemo = ({ capacity }) => {
+export const DemoOrDie = ({ capacity }) => {
   const geometry = useRef();
 
   const atlas = useTextureAtlas("atlas0");

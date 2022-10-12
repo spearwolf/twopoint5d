@@ -21,7 +21,7 @@ import { BouncingSprites } from "../textured-sprites/BouncingSprites";
 
 extend({ RenderPass, FilmPass });
 
-export const TexturedSpritesFromTileSet = ({ capacity }) => {
+export const DemoOrDie = ({ capacity }) => {
   const geometry = useRef();
 
   const atlas = useTextureAtlas("tiles");
