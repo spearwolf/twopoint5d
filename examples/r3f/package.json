@@ -10,6 +10,7 @@
   "dependencies": {
     "@react-three/drei": "^9.28.1",
     "@react-three/fiber": "^8.7.2",
+    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/picimo": "workspace:*",
     "@spearwolf/stage25": "workspace:*",

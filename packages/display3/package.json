@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/display3",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "a display for your three.js app",
   "main": "build/display3.umd.js",
   "module": "build/display3.js",

@@ -15,7 +15,6 @@
     "outputName": "tiled-maps",
     "externals": [
       "@spearwolf/eventize",
-      "@spearwolf/display3",
       "@spearwolf/vertex-objects",
       "three"
     ],
@@ -27,7 +26,6 @@
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",
-        "@spearwolf/display3": "display3",
         "@spearwolf/vertex-objects": "vertexObjects",
         "three": "THREE"
       }
@@ -65,7 +63,6 @@
     "test": "cross-env NODE_ENV=test jest"
   },
   "peerDependencies": {
-    "@spearwolf/display3": "*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/vertex-objects": "*",
     "three": "^0.144"
@@ -75,7 +72,6 @@
     "@rollup/plugin-node-resolve": "^13.3.0",
     "@rollup/plugin-replace": "^4.0.0",
     "@rollup/plugin-typescript": "^8.5.0",
-    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/vertex-objects": "workspace:*",
     "@types/assert": "^1.5.6",

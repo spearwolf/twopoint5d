@@ -1,6 +1,6 @@
-import {Stylesheets} from '@spearwolf/display3';
 import eventize, {Eventize} from '@spearwolf/eventize';
 
+import {Stylesheets} from '../Stylesheets';
 import {InputControlBase} from './InputControlBase';
 import {readOption} from './readOption';
 

@@ -105,6 +105,10 @@ _is checked when implemented and ready to use_
 - [x] `<TileSpritesGeometry>`
 - [x] `<TileSpritesMaterial>`
 
+### controls
+
+- [x] `<PanControl2D>`
+
 ### utils
 
 - [x] `useAsyncEffect()`

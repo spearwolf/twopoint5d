@@ -2,6 +2,7 @@ __@spearwolf/picimo__
 
 ## 0.2.0
 
+- add `<PanControl2D>` component
 - add `<TileSetRef>` component
 - rename `useTextureRef` to `useTexture`
 - rename `TextureStore` to `AssetStore`
