@@ -1,5 +1,6 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
+
 import {Chronometer} from './Chronometer';
 import {DisplayStateMachine} from './DisplayStateMachine';
 import {Stylesheets} from './Stylesheets';

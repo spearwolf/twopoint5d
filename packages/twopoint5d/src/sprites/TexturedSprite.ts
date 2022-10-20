@@ -1,4 +1,4 @@
-import {TextureAtlasFrame, VertexObjectDescription, VO} from '@spearwolf/vertex-objects';
+import {TextureAtlasFrame, VertexObjectDescription, VO} from '../vertexObjects';
 
 export interface TexturedSprite extends VO {
   width: number;

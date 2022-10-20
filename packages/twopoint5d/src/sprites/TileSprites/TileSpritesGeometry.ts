@@ -1,5 +1,4 @@
-import {InstancedVertexObjectGeometry, VertexObjectPool} from '@spearwolf/vertex-objects';
-
+import {InstancedVertexObjectGeometry, VertexObjectPool} from '../../vertexObjects';
 import {TileBaseSprite, TileBaseSpriteDescriptor, TileSprite, TileSpriteDescriptor} from './descriptors';
 
 export interface TileSpritesGeometry {
@@ -11,7 +10,7 @@ export class TileSpritesGeometry extends InstancedVertexObjectGeometry {
   constructor(capacity = 100) {
     super(TileSpriteDescriptor, capacity, TileBaseSpriteDescriptor);
 
-    this.name = '@spearwolf/tiled-maps:TileSpritesGeometry';
+    this.name = 'twopoint5d.TileSpritesGeometry';
 
     this.basePool.createVO().make();
   }

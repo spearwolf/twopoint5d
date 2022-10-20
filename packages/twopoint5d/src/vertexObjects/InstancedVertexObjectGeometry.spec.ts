@@ -1,7 +1,6 @@
 import {createSandbox} from 'sinon';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry';
-
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 
 describe('InstancedVertexObjectGeometry', () => {

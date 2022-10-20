@@ -1,9 +1,7 @@
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {createTypedArray} from './createTypedArray';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype';
-import {TypedArray, VertexAttributeDataType, VertexAttributeUsageType} from './types';
-
-import {VertexObjectBuffersData} from '.';
+import {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 
 interface BufferAttribute {
   bufferName: string;

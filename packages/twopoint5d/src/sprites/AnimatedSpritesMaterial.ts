@@ -1,5 +1,6 @@
-import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '@spearwolf/vertex-objects';
 import {DoubleSide, Texture} from 'three';
+
+import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '../vertexObjects';
 import ShaderLib from './ShaderLib';
 
 const vertexShader = `
@@ -99,7 +100,7 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
       ...unpick(options, 'uniforms', 'colorMap', 'animsMap', 'time'),
     });
 
-    this.name = options?.name ?? '@spearwolf/textured-sprites:AnimatedSpritesMaterial';
+    this.name = options?.name ?? 'twopoint5d.AnimatedSpritesMaterial';
 
     this.replaceVertexShaderChunks = [
       'extra_pars_vertex',

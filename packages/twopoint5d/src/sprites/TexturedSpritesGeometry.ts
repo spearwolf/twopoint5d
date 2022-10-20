@@ -1,4 +1,4 @@
-import {InstancedVertexObjectGeometry} from '@spearwolf/vertex-objects';
+import {InstancedVertexObjectGeometry} from '../vertexObjects';
 import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite';
 import {TexturedSprite, TexturedSpriteDescriptor} from './TexturedSprite';
 
@@ -11,7 +11,7 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
   ) {
     super(TexturedSpriteDescriptor, capacity, BaseSpriteDescriptor);
 
-    this.name = '@spearwolf/textured-sprites:TexturedSpritesGeometry';
+    this.name = 'twopoint5d.TexturedSpritesGeometry';
 
     this.basePool.createVO().make(...makeBaseSpriteArgs);
   }

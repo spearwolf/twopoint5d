@@ -1,6 +1,6 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
 
-import {Stylesheets} from '../Stylesheets';
+import {Stylesheets} from '../display/Stylesheets';
 import {InputControlBase} from './InputControlBase';
 import {readOption} from './readOption';
 

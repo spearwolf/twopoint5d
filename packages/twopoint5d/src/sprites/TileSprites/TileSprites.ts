@@ -1,5 +1,4 @@
-import {VertexObjects} from '@spearwolf/vertex-objects';
-
+import {VertexObjects} from '../../vertexObjects';
 import {TileSpritesGeometry} from './TileSpritesGeometry';
 import {TileSpritesMaterial} from './TileSpritesMaterial';
 
@@ -10,7 +9,7 @@ export class TileSprites extends VertexObjects {
   constructor(geometry?: TileSpritesGeometry, material?: TileSpritesMaterial) {
     super(geometry, material);
 
-    this.name = '@spearwolf/tiled-maps:TileSprites';
+    this.name = 'twopoint5d.TileSprites';
 
     this.frustumCulled = false;
   }

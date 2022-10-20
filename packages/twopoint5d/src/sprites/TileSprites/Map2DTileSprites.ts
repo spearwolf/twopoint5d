@@ -1,11 +1,9 @@
-/* eslint-disable import/order */
-
 import eventize, {Eventize} from '@spearwolf/eventize';
-import {TileSet, VertexObjectPool} from '@spearwolf/vertex-objects';
 
 import {IMap2DTileDataProvider} from '../../tiledMaps/IMap2DTileDataProvider';
 import {IMap2DTileRenderer} from '../../tiledMaps/IMap2DTileRenderer';
 import {Map2DTile} from '../../tiledMaps/Map2DTile';
+import {TileSet, VertexObjectPool} from '../../vertexObjects';
 import {TileSprite} from './descriptors';
 import {TileSprites} from './TileSprites';
 
@@ -44,7 +42,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     super();
     eventize(this);
 
-    this.name = '@spearwolf/tiled-maps:Map2DTileSprites';
+    this.name = 'twopoint5d.Map2DTileSprites';
 
     this.on('ready', () => this.#addDeferredTiles());
   }
@@ -140,7 +138,9 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
         console.log('addDeferredTiles count=', deferredCount);
       }
 
-      this.#deferredTiles.forEach((tile) => this.addTile(tile));
+      this.#deferredTiles.forEach((tile) => {
+        this.addTile(tile);
+      });
       this.#deferredTiles.clear();
 
       this.#syncGeometryBuffers();

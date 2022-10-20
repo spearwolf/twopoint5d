@@ -1,4 +1,5 @@
 import {FileLoader} from 'three';
+
 import {TextureAtlas} from './TextureAtlas';
 import {TextureOptionClasses} from './TextureFactory';
 import {TextureImage, TextureImageLoader} from './TextureImageLoader';

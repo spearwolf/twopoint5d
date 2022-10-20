@@ -1,32 +1,30 @@
 {
-  "name": "@spearwolf/display3",
-  "version": "0.1.1",
-  "description": "a display for your three.js app",
-  "main": "build/display3.umd.js",
-  "module": "build/display3.js",
+  "name": "twopoint5d",
+  "version": "0.0.1",
+  "description": "TODO twopoint5d description",
+  "main": "build/twopoint5d.umd.js",
+  "module": "build/twopoint5d.js",
   "types": "build/types/index.d.ts",
   "exports": {
-    "import": "./build/display3.js",
-    "require": "./build/display3.umd.js"
+    "import": "./build/twopoint5d.js",
+    "require": "./build/twopoint5d.umd.js"
   },
   "sideEffects": false,
   "rollupBuild": {
     "outputDir": "build",
-    "outputName": "display3",
+    "outputName": "twopoint5d",
     "externals": [
       "@spearwolf/eventize",
-      "@spearwolf/vertex-objects",
       "three"
     ],
     "esm": {
       "buildName": "es2017"
     },
     "umd": {
-      "name": "display3",
+      "name": "twopoint5d",
       "buildName": "umd",
       "globals": {
         "@spearwolf/eventize": "eventize",
-        "@spearwolf/vertex-objects": "vertexObjects",
         "three": "THREE"
       }
     }
@@ -51,7 +49,9 @@
     "watch:umd": "cross-env NODE_ENV=production rollup -w -c ../../shared-rollup-build/rollup.config.umd.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
-    "watch": "concurrently --restart-tries -1 --restart-after 1 --names display3:js,display3:types yarn:watch:js yarn:watch:types",
+    "analyze:js": "source-map-explorer build/twopoint5d.js",
+    "analyze:umd": "source-map-explorer build/twopoint5d.umd.js",
+    "watch": "concurrently --restart-tries -1 --restart-after 1 --names twopoint5d:js,twopoint5d:types yarn:watch:js yarn:watch:types",
     "build": "run-s --silent build:js build:umd build:types",
     "clean": "rimraf -r build types",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
@@ -59,11 +59,10 @@
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "fix": "run-s --silent --print-label prettier:write eslint:fix",
-    "test": "cross-env NODE_ENV=test jest --passWithNoTests"
+    "test": "cross-env NODE_ENV=test jest"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/vertex-objects": "*",
     "three": "^0.145"
   },
   "devDependencies": {
@@ -72,7 +71,6 @@
     "@rollup/plugin-replace": "^5.0.0",
     "@rollup/plugin-typescript": "^9.0.1",
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/vertex-objects": "workspace:*",
     "@types/assert": "^1.5.6",
     "@types/jest": "^29.1.2",
     "@types/node": "^18.8.4",
@@ -96,6 +94,7 @@
     "rollup-plugin-size-snapshot": "^0.12.0",
     "rollup-plugin-terser": "^7.0.2",
     "sinon": "^14.0.1",
+    "source-map-explorer": "^2.5.3",
     "three": "^0.145.0",
     "ts-jest": "^29.0.3",
     "ts-node": "^10.9.1",

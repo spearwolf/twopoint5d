@@ -127,9 +127,19 @@ export class Map2DLayer implements IMap2DLayer {
 
         for (const tileRenderer of this.renderers) {
           tileRenderer.beginUpdate(xOffset, yOffset);
-          visible.removeTiles?.forEach((tile) => tileRenderer.removeTile(tile));
-          visible.createTiles?.forEach((tile) => tileRenderer.addTile(tile));
-          visible.reuseTiles?.forEach((tile) => tileRenderer.reuseTile(tile));
+
+          visible.removeTiles?.forEach((tile) => {
+            tileRenderer.removeTile(tile);
+          });
+
+          visible.createTiles?.forEach((tile) => {
+            tileRenderer.addTile(tile);
+          });
+
+          visible.reuseTiles?.forEach((tile) => {
+            tileRenderer.reuseTile(tile);
+          });
+
           tileRenderer.endUpdate();
         }
       }

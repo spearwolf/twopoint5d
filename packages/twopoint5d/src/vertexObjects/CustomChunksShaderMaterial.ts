@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 import {MathUtils, Shader, ShaderMaterial, ShaderMaterialParameters, WebGLRenderer} from 'three';
 
 export interface CustomChunksShaderMaterialParameters extends ShaderMaterialParameters {}
@@ -92,7 +94,9 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
     const chunks: Record<string, string> = {};
 
     [...this.staticChunks, this.chunks].forEach((staticChunks) => {
-      Object.entries(staticChunks).forEach(([key, value]) => (chunks[key] = value));
+      Object.entries(staticChunks).forEach(([key, value]) => {
+        chunks[key] = value;
+      });
     });
 
     return Object.entries(chunks);

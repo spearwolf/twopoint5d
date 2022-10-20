@@ -1,4 +1,5 @@
 import {Texture} from 'three';
+
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
 import {TextureCoords} from './TextureCoords';
 import {TextureFactory, TextureOptionClasses} from './TextureFactory';

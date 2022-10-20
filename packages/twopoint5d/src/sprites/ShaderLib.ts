@@ -1,6 +1,6 @@
 // common used shader fragments
 
-import {ShaderTool} from '@spearwolf/vertex-objects';
+import {ShaderTool} from '../vertexObjects';
 
 const ShaderLib: Record<string, string> = {
   rotateZ_vertex: ShaderTool.rotateZ(),

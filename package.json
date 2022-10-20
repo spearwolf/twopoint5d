@@ -9,6 +9,7 @@
     "packages/textured-sprites",
     "packages/tiled-maps",
     "packages/vertex-objects",
+    "packages/twopoint5d",
     "examples/r3f"
   ],
   "scripts": {

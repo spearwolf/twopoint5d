@@ -1,4 +1,4 @@
-import {VertexObjectDescription, VO} from '@spearwolf/vertex-objects';
+import {VertexObjectDescription, VO} from '../../vertexObjects';
 
 export interface TileBaseSprite extends VO {
   setPosition(position: number[]): void;

@@ -50,7 +50,7 @@ export class TileSpritesMaterial extends ShaderMaterial {
       ...options,
     });
 
-    this.name = '@spearwolf/tiled-maps:TileSpritesMaterial';
+    this.name = 'twopoint5d.TileSpritesMaterial';
   }
 
   get colorMap(): Texture | undefined {
