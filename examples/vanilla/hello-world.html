@@ -20,8 +20,7 @@
         "imports": {
           "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
           "three": "/examples/vanilla/libs/three/build/three.module.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js"
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
@@ -29,19 +28,18 @@
   <body>
     <section class="intro">
       <p>
-        vertex-objects.js<br />
+        twopoint5d.js<br />
         <em>please, open your console...</em>
       </p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
     <script type="module">
-      import {Color} from 'three';
-      import {VertexObjectPool} from '@spearwolf/vertex-objects';
-      import {Display} from '@spearwolf/display3';
+      import { Color } from "three";
+      import { VertexObjectPool, Display } from "twopoint5d";
 
       class Foo {
         hello() {
-          console.log('hello');
+          console.log("hello");
         }
       }
 
@@ -50,44 +48,44 @@
           vertexCount: 3,
           basePrototype: Foo.prototype,
           attributes: {
-            foo: {size: 3},
-            bar: {components: ['b']},
-            position: {components: ['x', 'y']},
+            foo: { size: 3 },
+            bar: { components: ["b"] },
+            position: { components: ["x", "y"] },
           },
         },
-        10,
+        10
       );
 
       window.myInstancedPool = new VertexObjectPool(
         {
           meshCount: 1,
           attributes: {
-            foo: {size: 3},
-            bar: {size: 1},
-            position: {components: ['x', 'y']},
+            foo: { size: 3 },
+            bar: { size: 1 },
+            position: { components: ["x", "y"] },
           },
         },
-        10,
+        10
       );
 
-      console.log('hej-san!');
-      console.log('myPool=', myPool);
-      console.log('myInstancedPool=', myInstancedPool);
+      console.log("hej-san!");
+      console.log("myPool=", myPool);
+      console.log("myInstancedPool=", myInstancedPool);
 
       window.a = myPool.createVO();
-      console.log('a=', a);
+      console.log("a=", a);
       window.b = myInstancedPool.createVO();
-      console.log('b=', b);
+      console.log("b=", b);
 
-      window.display = new Display(document.getElementById('canvas-container'));
+      window.display = new Display(document.getElementById("canvas-container"));
 
-      display.on('init', ({renderer}) => {
+      display.on("init", ({ renderer }) => {
         renderer.setClearColor(new Color(0x000000), 0.0);
       });
 
       display.start();
 
-      console.log('display=', display);
+      console.log("display=", display);
     </script>
   </body>
 </html>

@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: #391e39;
         background: radial-gradient(
@@ -27,8 +30,7 @@
           "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js"
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
@@ -56,7 +58,7 @@
   <body>
     <section class="intro">
       <p>
-        vertex-objects.js<br />
+        twopoint5d.js<br />
         <em>an <code>InstancedVertexObjectGeometry</code> example</em>
       </p>
     </section>
@@ -70,15 +72,15 @@
         Scene,
         ShaderMaterial,
         Vector3,
-      } from 'three';
-      import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+      } from "three";
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
         getDescriptorOf,
         InstancedVertexObjectGeometry,
         VertexObjectGeometry,
         VertexObjects,
-      } from '@spearwolf/vertex-objects';
-      import {PerspectiveOrbitDemo} from '/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js';
+      } from "twopoint5d";
+      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
 
       class BaseQuad {
         make(width = 0.5, height = 0.5) {
@@ -97,7 +99,7 @@
         indices: [0, 2, 1, 0, 3, 2],
 
         attributes: {
-          position: {components: ['x', 'y', 'z']},
+          position: { components: ["x", "y", "z"] },
         },
 
         basePrototype: BaseQuad.prototype,
@@ -107,8 +109,8 @@
         meshCount: 1,
 
         attributes: {
-          quadSize: {components: ['width', 'height']},
-          instancePosition: {components: ['x', 'y', 'z']},
+          quadSize: { components: ["width", "height"] },
+          instancePosition: { components: ["x", "y", "z"] },
         },
       };
 
@@ -117,7 +119,7 @@
         const geometry = new InstancedVertexObjectGeometry(
           InstancedQuadDescriptor,
           capacity,
-          BaseQuadDescriptor,
+          BaseQuadDescriptor
         );
 
         geometry.basePool.createVO().make();
@@ -135,29 +137,29 @@
         }
 
         const material = new ShaderMaterial({
-          vertexShader: document.getElementById('vertexShader').textContent,
-          fragmentShader: document.getElementById('fragmentShader').textContent,
+          vertexShader: document.getElementById("vertexShader").textContent,
+          fragmentShader: document.getElementById("fragmentShader").textContent,
           transparent: true,
           side: DoubleSide,
         });
 
         const mesh = new VertexObjects(geometry, material);
-        mesh.name = 'InstancedQuadsMesh';
+        mesh.name = "InstancedQuadsMesh";
 
         return mesh;
       }
 
       const demo = new PerspectiveOrbitDemo(
-        document.getElementById('canvas-container'),
+        document.getElementById("canvas-container")
       );
 
-      demo.on('init', ({scene}) => {
+      demo.on("init", ({ scene }) => {
         scene.add(makeMesh(10, 20, 3.2, 1.2));
       });
 
       demo.start();
 
-      console.log('InstancedQuadsMesh', demo.scene.children[0]);
+      console.log("InstancedQuadsMesh", demo.scene.children[0]);
     </script>
   </body>
 </html>

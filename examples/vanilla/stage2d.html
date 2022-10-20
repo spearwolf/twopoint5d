@@ -3,7 +3,10 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { height: 100vh; overflow-y: hidden; }
+      body {
+        height: 100vh;
+        overflow-y: hidden;
+      }
       body {
         background-color: #00ff00;
         color: #f0f0f0;
@@ -26,9 +29,7 @@
         "imports": {
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
-          "@spearwolf/stage25": "/packages/stage25/build/stage25.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js"
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
@@ -36,13 +37,16 @@
   <body>
     <canvas id="canvas-container" resize-to="window"></canvas>
     <section class="intro">
-      <p>vertex-objects.js :: hello Stage2D<br /></p>
+      <p>twopoint5d :: hello Stage2D<br /></p>
     </section>
     <script type="module">
       import { Color, Sprite, SpriteMaterial, TextureLoader } from "three";
-      import { TextureFactory } from "@spearwolf/vertex-objects";
-      import { Stage2D, ParallaxProjection } from "@spearwolf/stage25";
-      import { Display } from "@spearwolf/display3";
+      import {
+        TextureFactory,
+        Stage2D,
+        ParallaxProjection,
+        Display,
+      } from "twopoint5d";
 
       window.display = new Display(document.getElementById("canvas-container"));
 
@@ -65,7 +69,7 @@
       stage2d.scene.add(sprite);
 
       display.on("init", ({ renderer }) => {
-        renderer.setClearColor(new Color('#323c39'), 1.0);
+        renderer.setClearColor(new Color("#323c39"), 1.0);
       });
 
       display.on("resize", ({ width, height }) => {

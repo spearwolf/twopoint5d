@@ -1,4 +1,4 @@
-import { InstancedVertexObjectGeometry } from "@spearwolf/vertex-objects";
+import { InstancedVertexObjectGeometry } from "twopoint5d";
 import { BaseQuadDescriptor, InstancedQuadDescriptor } from "./descriptors.js";
 
 export class InstancedQuadsGeometry extends InstancedVertexObjectGeometry {

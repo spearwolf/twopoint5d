@@ -40,16 +40,14 @@
           "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/tiled-maps": "/packages/tiled-maps/build/tiled-maps.js"
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
   </head>
   <body>
     <section class="intro">
-      <p>tiled-maps :: Map2DTileSprites</p>
+      <p>twopoint5d :: Map2DTileSprites</p>
     </section>
     <canvas id="canvas-container" resize-to="window"></canvas>
     <script type="module">
@@ -60,16 +58,17 @@
         LineBasicMaterial,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import { TextureFactory, TileSetLoader } from "@spearwolf/vertex-objects";
       import {
         AABB2,
-        RepeatingTilesProvider,
         Map2DLayer3D,
         Map2DTile,
         Map2DTileSprites,
+        RepeatingTilesProvider,
+        TextureFactory,
+        TileSetLoader,
         TileSpritesGeometry,
         TileSpritesMaterial,
-      } from "@spearwolf/tiled-maps";
+      } from "twopoint5d";
       import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
       import { makePoints } from "/examples/vanilla/jsm/utils/makePoints.js";
 
