@@ -18,7 +18,7 @@
       "three"
     ],
     "esm": {
-      "buildName": "es2020"
+      "buildName": "es2017"
     },
     "umd": {
       "name": "twopoint5d",
@@ -59,7 +59,8 @@
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "fix": "run-s --silent --print-label prettier:write eslint:fix",
-    "test": "cross-env NODE_ENV=test jest"
+    "test": "cross-env NODE_ENV=test jest",
+    "cbt": "run-s clean build test"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^2.0.3",
