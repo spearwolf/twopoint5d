@@ -8,5 +8,6 @@ export * from './Map2DLayer3D';
 export * from './Map2DSpatialHashGrid';
 export * from './Map2DTile';
 export * from './Map2DTileCoordsUtil';
+export * from './Map2DTileSprites';
 export * from './RectangularVisibilityArea';
 export * from './RepeatingTilesProvider';

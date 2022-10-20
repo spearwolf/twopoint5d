@@ -1,11 +1,11 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
 
-import {IMap2DTileDataProvider} from '../../tiledMaps/IMap2DTileDataProvider';
-import {IMap2DTileRenderer} from '../../tiledMaps/IMap2DTileRenderer';
-import {Map2DTile} from '../../tiledMaps/Map2DTile';
-import {TileSet, VertexObjectPool} from '../../vertexObjects';
-import {TileSprite} from './descriptors';
-import {TileSprites} from './TileSprites';
+import {TileSprite} from '../sprites/TileSprites/descriptors';
+import {TileSprites} from '../sprites/TileSprites/TileSprites';
+import {TileSet, VertexObjectPool} from '../vertexObjects';
+import {IMap2DTileDataProvider} from './IMap2DTileDataProvider';
+import {IMap2DTileRenderer} from './IMap2DTileRenderer';
+import {Map2DTile} from './Map2DTile';
 
 export interface Map2DTileSprites extends Eventize {}
 
