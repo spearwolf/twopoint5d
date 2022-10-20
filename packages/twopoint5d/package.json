@@ -2,23 +2,23 @@
   "name": "twopoint5d",
   "version": "0.0.1",
   "description": "TODO twopoint5d description",
-  "main": "build/twopoint5d.umd.js",
-  "module": "build/twopoint5d.js",
-  "types": "build/types/index.d.ts",
+  "main": "twopoint5d.umd.js",
+  "module": "twopoint5d.js",
+  "types": "types/index.d.ts",
   "exports": {
-    "import": "./build/twopoint5d.js",
-    "require": "./build/twopoint5d.umd.js"
+    "import": "./twopoint5d.js",
+    "require": "./twopoint5d.umd.js"
   },
   "sideEffects": false,
   "rollupBuild": {
-    "outputDir": "build",
+    "outputDir": ".",
     "outputName": "twopoint5d",
     "externals": [
       "@spearwolf/eventize",
       "three"
     ],
     "esm": {
-      "buildName": "es2017"
+      "buildName": "es2020"
     },
     "umd": {
       "name": "twopoint5d",
@@ -52,8 +52,8 @@
     "analyze:js": "source-map-explorer build/twopoint5d.js",
     "analyze:umd": "source-map-explorer build/twopoint5d.umd.js",
     "watch": "concurrently --restart-tries -1 --restart-after 1 --names twopoint5d:js,twopoint5d:types yarn:watch:js yarn:watch:types",
-    "build": "run-s --silent build:js build:umd build:types",
-    "clean": "rimraf -r build types",
+    "build": "concurrently --names js,umd,types yarn:build:js yarn:build:umd yarn:build:types",
+    "clean": "rimraf -r build types dist .rollup.cache tsconfig.tsbuildinfo twopoint5d.js twopoint5d.js.map twopoint5d.umd.js twopoint5d.umd.js.map",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",

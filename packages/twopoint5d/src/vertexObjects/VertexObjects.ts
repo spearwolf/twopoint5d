@@ -19,7 +19,7 @@ export class VertexObjects extends Mesh {
     this.name = 'VertexObjects';
   }
 
-  onBeforeRender = (): void => {
+  override onBeforeRender = (): void => {
     if (typeof this.geometry?.update === 'function') {
       this.geometry.update();
     }

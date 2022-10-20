@@ -55,7 +55,7 @@ export class InstancedVertexObjectGeometry<
     initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers);
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.basePool?.clear();
     this.instancedPool.clear();
     super.dispose();

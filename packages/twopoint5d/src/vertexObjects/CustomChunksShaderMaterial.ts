@@ -13,7 +13,7 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
 
   #chunksSerial = 0;
 
-  customProgramCacheKey(): string {
+  override customProgramCacheKey(): string {
     return `${this.#uuid},${this.#chunksSerial}`;
   }
 
@@ -104,7 +104,7 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
 
   logShadersToConsole = false;
 
-  onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
+  override onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
     const customChunks = this.#customChunks();
 
     const replaceChunk = (shaderType: 'vertexShader' | 'fragmentShader') => (chunkName: string) => {

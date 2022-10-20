@@ -66,7 +66,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     }
   };
 
-  onBeforeRender = (): void => {
+  override onBeforeRender = (): void => {
     this.#checkReady();
 
     if (typeof this.geometry?.update === 'function') {

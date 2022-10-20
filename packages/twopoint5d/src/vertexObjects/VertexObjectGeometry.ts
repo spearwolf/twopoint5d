@@ -23,7 +23,7 @@ export class VertexObjectGeometry extends BufferGeometry {
     initializeAttributes(this, this.pool, this.buffers);
   }
 
-  dispose(): void {
+  override dispose(): void {
     this.pool.clear();
     super.dispose();
   }

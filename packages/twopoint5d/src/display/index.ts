@@ -1,4 +1,3 @@
-export * from '../controls/PanControl2D';
 export * from './Chronometer';
 export * from './Display';
 export * from './Stylesheets';

@@ -1,4 +1,5 @@
 /* eslint-env node */
+
 import path from "path";
 
 import commonjs from "@rollup/plugin-commonjs";
@@ -27,11 +28,25 @@ export default (build, buildConfig) => {
   const version = makeVersionWithBuild(
     packageJson.rollupBuild[build].buildName
   )(packageJson.version);
-  const overrideConfig = buildConfig({ outputDir, version, packageJson });
+  const { typescript: typescriptOptions, ...overrideConfig } = buildConfig({
+    outputDir,
+    version,
+    packageJson,
+  });
 
   const plugins = [
     rewriteExternalsPlugin(externals),
-    typescript(),
+    typescript({
+      noForceEmit: true,
+      outputToFilesystem: true,
+      ...typescriptOptions,
+      compilerOptions: {
+        declaration: false,
+        declarationDir: undefined,
+        declarationMap: false,
+        ...typescriptOptions?.compilerOptions,
+      },
+    }),
     createBannerPlugin({ ...packageJson, version }),
     commonjs(),
     resolve({

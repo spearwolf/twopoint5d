@@ -1,4 +1,5 @@
 /* eslint-env node */
+
 import path from "path";
 
 import rollupConfigShared from "./rollup.config.shared";

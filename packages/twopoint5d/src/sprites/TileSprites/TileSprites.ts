@@ -3,8 +3,8 @@ import {TileSpritesGeometry} from './TileSpritesGeometry';
 import {TileSpritesMaterial} from './TileSpritesMaterial';
 
 export class TileSprites extends VertexObjects {
-  geometry: TileSpritesGeometry | undefined;
-  material: TileSpritesMaterial | undefined;
+  declare geometry: TileSpritesGeometry | undefined;
+  declare material: TileSpritesMaterial | undefined;
 
   constructor(geometry?: TileSpritesGeometry, material?: TileSpritesMaterial) {
     super(geometry, material);
