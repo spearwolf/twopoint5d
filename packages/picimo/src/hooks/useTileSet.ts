@@ -1,4 +1,4 @@
-import {TileSet} from '@spearwolf/vertex-objects';
+import {TileSet} from 'twopoint5d';
 import {useContext, useEffect, useState} from 'react';
 import {AssetName, AssetStoreContext} from '../context/AssetStore';
 

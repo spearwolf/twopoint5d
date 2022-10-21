@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {TileSetData, TileSetLoader, TileSetOptions} from '@spearwolf/vertex-objects';
+import {TileSetData, TileSetLoader, TileSetOptions} from 'twopoint5d';
 import {ForwardedRef, forwardRef, ReactNode, useContext, useState} from 'react';
 import {AssetStoreContext} from '../context/AssetStore';
 import {useAsyncEffect} from '../hooks/useAsyncEffect';

@@ -1,4 +1,4 @@
-import {TileSetData, TileSetLoader} from '@spearwolf/vertex-objects';
+import {TileSetData, TileSetLoader} from 'twopoint5d';
 import {useState} from 'react';
 import {useAsyncEffect} from './useAsyncEffect';
 

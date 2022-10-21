@@ -1,5 +1,5 @@
 import {createPortal, extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
-import {Stage2D as __Stage2D} from '@spearwolf/stage25';
+import {Stage2D as __Stage2D} from 'twopoint5d';
 import {
   createContext,
   ForwardedRef,

@@ -1,5 +1,5 @@
 import ReactThreeTestRenderer from '@react-three/test-renderer';
-import {PanControl2D as __PanControl2D} from '@spearwolf/display3';
+import {PanControl2D as __PanControl2D} from 'twopoint5d';
 import {PanControl2D} from './PanControl2D';
 
 describe('PanControl2D', () => {

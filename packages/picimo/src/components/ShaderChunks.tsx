@@ -1,4 +1,4 @@
-import {CustomChunksShaderMaterial} from '@spearwolf/vertex-objects';
+import {CustomChunksShaderMaterial} from 'twopoint5d';
 import {useEffect, useRef, useState} from 'react';
 
 export interface ShaderChunksProps {

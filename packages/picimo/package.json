@@ -16,16 +16,13 @@
     "externals": [
       "@react-three/fiber",
       "@spearwolf/eventize",
-      "@spearwolf/display3",
-      "@spearwolf/stage25",
-      "@spearwolf/textured-sprites",
-      "@spearwolf/tiled-maps",
-      "@spearwolf/vertex-objects",
       "react-dom",
       "react",
       "react/jsx-runtime",
       "three",
-      "use-asset"
+      "twopoint5d",
+      "use-asset",
+      "zustand"
     ],
     "esm": {
       "buildName": "es2017"
@@ -66,14 +63,12 @@
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.4.0",
-    "@spearwolf/display3": "*",
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/textured-sprites": "*",
-    "@spearwolf/tiled-maps": "*",
-    "@spearwolf/vertex-objects": "*",
     "react": "^18.2.0",
     "three": "^0.145",
-    "use-asset": "^1.0.0"
+    "twopoint5d": "*",
+    "use-asset": "^1.0.0",
+    "zustand": "^4.1.2"
   },
   "devDependencies": {
     "@react-three/fiber": "^8.8.10",
@@ -82,11 +77,7 @@
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-replace": "^5.0.0",
     "@rollup/plugin-typescript": "^9.0.1",
-    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/textured-sprites": "workspace:*",
-    "@spearwolf/tiled-maps": "workspace:*",
-    "@spearwolf/vertex-objects": "workspace:*",
     "@testing-library/react": "^13.4.0",
     "@types/assert": "^1.5.6",
     "@types/jest": "^29.1.2",
@@ -123,6 +114,7 @@
     "ts-jest": "^29.0.3",
     "ts-node": "^10.9.1",
     "tslib": "^2.4.0",
+    "twopoint5d": "workspace:*",
     "typedoc": "^0.23.16",
     "typescript": "^4.8.4",
     "use-asset": "^1.0.4",

@@ -1,4 +1,4 @@
-import {TextureOptionClasses} from '@spearwolf/vertex-objects';
+import {TextureOptionClasses} from 'twopoint5d';
 import {useMemo} from 'react';
 
 export enum TextureBit {

@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {TileSet} from '@spearwolf/vertex-objects';
+import {TileSet} from 'twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 import {useTileSet} from '../hooks/useTileSet';
 

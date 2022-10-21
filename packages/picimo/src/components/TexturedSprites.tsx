@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {TexturedSprites as __TexturedSprites} from '@spearwolf/textured-sprites';
+import {TexturedSprites as __TexturedSprites} from 'twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({TexturedSprites: __TexturedSprites});

@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {TextureAtlasData, TextureAtlasLoader, TextureAtlasLoadOptions} from '@spearwolf/vertex-objects';
+import {TextureAtlasData, TextureAtlasLoader, TextureAtlasLoadOptions} from 'twopoint5d';
 import {ForwardedRef, forwardRef, ReactNode, useContext, useState} from 'react';
 import {AssetStoreContext} from '../context/AssetStore';
 import {useAsyncEffect} from '../hooks/useAsyncEffect';

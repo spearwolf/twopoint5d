@@ -1,4 +1,4 @@
-import {Stage2D} from '@spearwolf/stage25';
+import {Stage2D} from 'twopoint5d';
 import {ReactNode} from 'react';
 import {useStage2D} from '../hooks/useStage2D';
 

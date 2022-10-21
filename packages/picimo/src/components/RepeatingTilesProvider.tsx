@@ -3,7 +3,7 @@ import {
   LimitToAxisType,
   RepeatingTilesPatternType,
   RepeatingTilesProvider as __RepeatingTilesProvider,
-} from '@spearwolf/tiled-maps';
+} from 'twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({RepeatingTilesProvider: __RepeatingTilesProvider});

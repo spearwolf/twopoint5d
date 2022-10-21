@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {ParallaxProjection as __ParallaxProjection, ProjectionPlane, ProjectionPlaneDescription} from '@spearwolf/stage25';
+import {ParallaxProjection as __ParallaxProjection, ProjectionPlane, ProjectionPlaneDescription} from 'twopoint5d';
 import {ForwardedRef, forwardRef, useContext, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 import {Stage2DContext} from './Stage2D';

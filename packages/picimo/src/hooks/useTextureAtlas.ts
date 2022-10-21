@@ -1,4 +1,4 @@
-import {TextureAtlas} from '@spearwolf/vertex-objects';
+import {TextureAtlas} from 'twopoint5d';
 import {useContext, useEffect, useState} from 'react';
 import {AssetName, AssetStoreContext} from '../context/AssetStore';
 
