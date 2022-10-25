@@ -43,20 +43,8 @@ jobs:
       - run: yarn --immutable
         name: Install dependencies
 
-      - name: Publish @spearwolf/vertex-objects
-        run: yarn publish:vertex-objects
+      - name: Publish twopoint5f
+        run: yarn publish:twopoint5d
 
-      - name: Publish @spearwolf/display3
-        run: yarn publish:display3
-
-      - name: Publish @spearwolf/stage25
-        run: yarn publish:stage25
-
-      - name: Publish @spearwolf/textured-sprites
-        run: yarn publish:textured-sprites
-
-      - name: Publish @spearwolf/tiled-maps
-        run: yarn publish:tiled-maps
-
-      - name: Publish @spearwolf/picimo
-        run: yarn publish:picimo
+      - name: Publish twopoint5d-r3f
+        run: yarn publish:twopoint5d-r3f
