@@ -10,16 +10,12 @@
   "dependencies": {
     "@react-three/drei": "^9.34.3",
     "@react-three/fiber": "^8.8.10",
-    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
     "@spearwolf/picimo": "workspace:*",
-    "@spearwolf/stage25": "workspace:*",
-    "@spearwolf/textured-sprites": "workspace:*",
-    "@spearwolf/tiled-maps": "workspace:*",
-    "@spearwolf/vertex-objects": "workspace:*",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.145.0",
+    "twopoint5d": "workspace:*",
     "zustand": "^4.1.2"
   },
   "devDependencies": {

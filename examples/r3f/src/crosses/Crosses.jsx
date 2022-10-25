@@ -1,9 +1,6 @@
 import { extend } from "@react-three/fiber";
-import {
-  VertexObjectGeometry,
-  VertexObjects
-} from "@spearwolf/vertex-objects";
 import { DoubleSide } from "three";
+import { VertexObjectGeometry, VertexObjects } from "twopoint5d";
 import { CrossDescriptor } from "./CrossDescriptor";
 
 extend({ VertexObjects, VertexObjectGeometry });

@@ -10,8 +10,8 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "@spearwolf/picimo";
-import { RectangularVisibilityArea } from "@spearwolf/tiled-maps";
 import { useState } from "react";
+import { RectangularVisibilityArea } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";
 
 extend({ RectangularVisibilityArea });

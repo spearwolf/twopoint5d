@@ -6,10 +6,10 @@ import {
   TileSet,
   TileSetRef,
   TileSpritesGeometry,
-  TileSpritesMaterial,
+  TileSpritesMaterial
 } from "@spearwolf/picimo";
-import { AABB2, Map2DTile } from "@spearwolf/tiled-maps";
 import { useEffect, useState } from "react";
+import { AABB2, Map2DTile } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";
 
 const TILES = [
