@@ -1,0 +1,14 @@
+node_modules
+
+build
+dist
+types
+
+twopoint5d-r3f.js
+twopoint5d-r3f.js.map
+twopoint5d-r3f.cjs.js
+twopoint5d-r3f.cjs.js.map
+
+.size-snapshot.json
+.rollup.cache
+tsconfig.tsbuildinfo

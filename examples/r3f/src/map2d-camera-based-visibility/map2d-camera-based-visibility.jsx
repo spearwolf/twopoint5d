@@ -9,7 +9,7 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-} from "@spearwolf/picimo";
+} from "twopoint5d-r3f";
 import { useState } from "react";
 import { RectangularVisibilityArea } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";

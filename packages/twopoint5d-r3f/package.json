@@ -1,18 +1,18 @@
 {
-  "name": "@spearwolf/picimo",
-  "version": "0.2.0-dev",
-  "description": "sprites library based on react-three-fiber",
-  "main": "build/picimo.cjs.js",
-  "module": "build/picimo.js",
-  "types": "build/types/index.d.ts",
+  "name": "twopoint5d-r3f",
+  "version": "0.1.0-dev",
+  "description": "A refreshingly satisfying 2.5D graphics library built on @react-three/fiber",
+  "main": "twopoint5d-r3f.cjs.js",
+  "module": "twopoint5d-r3f.js",
+  "types": "types/index.d.ts",
   "exports": {
-    "import": "./build/picimo.js",
-    "require": "./build/picimo.cjs.js"
+    "import": "./twopoint5d-r3f.js",
+    "require": "./twopoint5d-r3f.cjs.js"
   },
   "sideEffects": false,
   "rollupBuild": {
-    "outputDir": "build",
-    "outputName": "picimo",
+    "outputDir": ".",
+    "outputName": "twopoint5d-r3f",
     "externals": [
       "@react-three/fiber",
       "@spearwolf/eventize",
@@ -52,14 +52,17 @@
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "watch": "concurrently --restart-tries -1 --restart-after 1 --names picimo:js,picimo:types yarn:watch:js yarn:watch:types",
-    "build": "run-s --silent build:js build:cjs build:types",
-    "clean": "rimraf -r build types",
+    "build0": "run-s --silent build:js build:cjs build:types",
+    "build": "concurrently --names js,cjs,types yarn:build:js yarn:build:cjs yarn:build:types",
+    "clean0": "rimraf -r build types",
+    "clean": "rimraf -r build types dist .rollup.cache tsconfig.tsbuildinfo twopoint5d-r3f.js twopoint5d-r3f.js.map twopoint5d-r3f.cjs.js twopoint5d-r3f.cjs.js.map",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
     "eslint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
     "prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prettier:write": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "fix": "run-s --silent --print-label prettier:write eslint:fix",
-    "test": "cross-env NODE_ENV=test jest --passWithNoTests"
+    "test": "cross-env NODE_ENV=test jest --passWithNoTests",
+    "cbt": "run-s --silent --print-label clean build test"
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.4.0",

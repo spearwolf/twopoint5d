@@ -7,7 +7,7 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial
-} from "@spearwolf/picimo";
+} from "twopoint5d-r3f";
 import { useEffect, useState } from "react";
 import { AABB2, Map2DTile } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";

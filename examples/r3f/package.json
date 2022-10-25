@@ -11,11 +11,11 @@
     "@react-three/drei": "^9.34.3",
     "@react-three/fiber": "^8.8.10",
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/picimo": "workspace:*",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.145.0",
     "twopoint5d": "workspace:*",
+    "twopoint5d-r3f": "workspace:*",
     "zustand": "^4.1.2"
   },
   "devDependencies": {

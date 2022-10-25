@@ -34,20 +34,21 @@ settings:
         - .jsx
 
 rules:
+  "@typescript-eslint/ban-ts-comment": off
+  "@typescript-eslint/ban-ts-ignore": off
+  "@typescript-eslint/ban-types": off
+  "@typescript-eslint/consistent-type-assertions": [2, {assertionStyle: "as", objectLiteralTypeAssertions: "allow-as-parameter"}]
+  "@typescript-eslint/explicit-function-return-type": off
+  "@typescript-eslint/interface-name-prefix": off
+  "@typescript-eslint/no-empty-function": off
+  "@typescript-eslint/no-empty-interface": off
+  "@typescript-eslint/no-explicit-any": off
+  "@typescript-eslint/no-unused-vars": [2, {vars: "all", args: "after-used", argsIgnorePattern: "^_"}]
+  "@typescript-eslint/no-use-before-define": [2, {"functions": false}]
+  "@typescript-eslint/no-var-requires": off
+  "prettier/prettier": error
+  eqeqeq: [2, "smart"]
   no-fallthrough: off
   no-undef-init: off
-  prefer-rest-params: off
-  eqeqeq: [2, "smart"]
   no-use-before-define: off
-  "@typescript-eslint/explicit-function-return-type": off
-  "@typescript-eslint/no-explicit-any": off
-  "@typescript-eslint/no-var-requires": off
-  "@typescript-eslint/ban-ts-ignore": off
-  "@typescript-eslint/ban-ts-comment": off
-  "@typescript-eslint/ban-types": off
-  "@typescript-eslint/interface-name-prefix": off
-  "@typescript-eslint/no-empty-interface": off
-  "@typescript-eslint/no-empty-function": off
-  "@typescript-eslint/no-use-before-define": [2, {"functions": false}]
-  "@typescript-eslint/no-unused-vars": [2, {vars: "all", args: "after-used", argsIgnorePattern: "^_"}]
-  "@typescript-eslint/consistent-type-assertions": [2, {assertionStyle: "as", objectLiteralTypeAssertions: "allow-as-parameter"}]
+  prefer-rest-params: off

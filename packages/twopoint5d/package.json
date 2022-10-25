@@ -1,6 +1,6 @@
 {
   "name": "twopoint5d",
-  "version": "0.0.1",
+  "version": "0.1.0-dev",
   "description": "A refreshingly satisfying 2.5D graphics library built on three.js",
   "main": "twopoint5d.umd.js",
   "module": "twopoint5d.js",

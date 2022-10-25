@@ -1,7 +1,8 @@
-__@spearwolf/picimo__
+__twopoint5d-r3f__
 
-## 0.2.0
+## 0.1.0
 
+- rename pkg from "@spearwolf/picimo" to "twopoint3d-r3f"
 - add `<PanControl2D>` component
 - add `<TileSetRef>` component
 - rename `useTextureRef` to `useTexture`
@@ -14,6 +15,8 @@ __@spearwolf/picimo__
     - `<TileSpritesGeometry>`
     - `<TileSpritesMaterial>`
 
+
+__@spearwolf/picimo__
 
 ## 0.1.1
 

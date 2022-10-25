@@ -35,11 +35,8 @@ module.exports = {
     libs: [
       "regenerator-runtime/runtime",
       "three",
-      "@spearwolf/vertex-objects",
-      "@spearwolf/textured-sprites",
-      "@spearwolf/stage25",
-      "@spearwolf/tiled-maps",
-      "@spearwolf/picimo",
+      "twopoint5d",
+      "twopoint5d-r3f",
       "@react-three/fiber",
       "react-dom",
       "react",

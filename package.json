@@ -3,12 +3,7 @@
   "description": "three-vertex-objects project monorep",
   "private": true,
   "workspaces": [
-    "packages/display3",
-    "packages/picimo",
-    "packages/stage25",
-    "packages/textured-sprites",
-    "packages/tiled-maps",
-    "packages/vertex-objects",
+    "packages/twopoint5d-r3f",
     "packages/twopoint5d",
     "examples/r3f"
   ],

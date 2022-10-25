@@ -1,4 +1,4 @@
-import { Stage2DContext, useStageResize } from "@spearwolf/picimo";
+import { Stage2DContext, useStageResize } from "twopoint5d-r3f";
 import { useContext } from "react";
 
 export const LogStageSizeToConsole = () => {
