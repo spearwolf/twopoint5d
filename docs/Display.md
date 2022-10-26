@@ -5,9 +5,16 @@
 - nice starting point for your three.js demos
 - :heavy_check_mark: api is stable and ready to use
 
+
 ## Quickstart
 
 ![Display Quickstart](./display/use-display.png)
+
+More examples can be found here:
+- [stage2d](../examples/vanilla/stage2d.html)
+- [multiple displays](../examples/vanilla/display.html)
+- [persepective orbit demo](../examples/vanilla/jsm/display/PerspectiveOrbitDemo.js)
+
 
 ## State and Events
 
