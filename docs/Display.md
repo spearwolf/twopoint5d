@@ -1,6 +1,12 @@
 *twopoint5d.js*
 # Display
 
+- cosy boilerplate for creating a three.js `<canvas>` and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop
+- nice starting point for your three.js demos
+- :heavy_check_mark: api is stable and ready to use
+
+## Quickstart
+
 ![Display Quickstart](./display/use-display.png)
 
 ## State and Events
