@@ -42,7 +42,7 @@
     "shelljs": "^0.8.5"
   },
   "version": "0.0.0",
-  "packageManager": "yarn@3.2.2",
+  "packageManager": "yarn@3.2.4",
   "dependencies": {
     "prop-types": "^15.8.1",
     "styled-components": "^5.3.6"
