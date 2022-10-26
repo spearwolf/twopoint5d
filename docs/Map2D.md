@@ -1,9 +1,15 @@
 *twopoint5d.js*
 # Map2D
 
+> Create and render visual tiled maps which are laid out in a 2D spatial grid map data structure
+
+
 Examples can be found here:
 - [tiled-maps-basic-layer-tiles-renderer](../examples/vanilla/tiled-maps-basic-layer-tiles-renderer.html) (vanilla)
+- [map2d-tile-sprites](../examples/r3f/src/map2d-tile-sprites/map2d-tile-sprites.jsx) (react)
 - [map2d-tile-sprites-layer](../examples/r3f/src/map2d-tile-sprites-layer/map2d-tile-sprites-layer.jsx) (react)
+- [map2d-camera-based-visibility](../examples/r3f/src/map2d-camera-based-visibility/map2d-camera-based-visibility.jsx) (react)
+
 
 ## A Grid of Tiles
 
