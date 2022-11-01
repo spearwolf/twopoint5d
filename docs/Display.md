@@ -87,7 +87,7 @@ This behavior is shown in the example [multiple displays](../examples/vanilla/di
 > todo: css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
 
 
-**options** : _object_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the canvas argument).
+**options** : _object_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the _canvas_ parameter, it will be simply ignored).
 In addition, there are also the following options:
 
 | option | type | description |
