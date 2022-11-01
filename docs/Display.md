@@ -16,6 +16,10 @@ However, it is also possible to simply specify a document query selector, in whi
 
 But it also works completely without _resize-to_ !
 
+> todo: time helpers, chronometer
+
+> todo: eventized class
+
 
 ## Quickstart
 
@@ -83,7 +87,7 @@ This behavior is shown in the example [multiple displays](../examples/vanilla/di
 > todo: css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
 
 
-**options** : _DisplayParameters_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the canvas argument).
+**options** : _object_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the canvas argument).
 In addition, there are also the following options:
 
 | option | type | description |
@@ -114,15 +118,15 @@ The following parameters for the _WebGLRenderer_ are set as default unless other
 
 .__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - if specified, this function is called on each frame and the result is used to update the dimension of the canvas
 
-.__renderer__ : __THREE.WebGLRenderer__ - the renderer instance
+.__renderer__ : _THREE.WebGLRenderer_ - the renderer instance
 
-.__now__ : _number_ - the current time in seconds
+.__now__ : _number_ - The current time in seconds. starts at 0. 0 is the time at which the display is instantiated. time does not elapse until the display has been started with `.start()`. at the beginning of an _animation frame_ the time is updated. within a frame the time remains unchanged.
 
-.__deltaTime__ : _number_ - the time in seconds that has passed since the last frame
+.__deltaTime__ : _number_ - The time that has elapsed since the previous frame and the current frame time. Note that the pause times are subtracted here - so it is the time elapsed during the active phases.
 
-.__pause__ : _boolean_ - the pause status. readable but also settable
+.__pause__ : _boolean_ - the pause status. readable but also settable. note a paused display freezes the time and will never emit a _frame_ event. this is also the reason why the `deltaTime` does not continue to tick. only again when the pause is ended.
 
-.__pixelRatio__ : _number_ - todo
+.__pixelRatio__ : _number_ - the current device pixel ratio. is also read by the .resize() method.
 
 ## Methods
 
