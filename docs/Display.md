@@ -118,9 +118,9 @@ The following parameters for the _WebGLRenderer_ are set as default unless other
 
 .__now__ : _number_ - the current time in seconds
 
-.__deltaTime__ : _number_ - todo
+.__deltaTime__ : _number_ - the time in seconds that has passed since the last frame
 
-.__pause__ : _boolean_ - todo
+.__pause__ : _boolean_ - the pause status. readable but also settable
 
 .__pixelRatio__ : _number_ - todo
 
