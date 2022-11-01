@@ -69,7 +69,7 @@ display.start()
 
 ### Display(domElementOrRenderer, options?)
 
-**domElementOrRenderer** : _HTMLElement | WebGLRenderer_ - The __constructor__ of `Display` normally expects the canvas element as first parameter.
+**domElementOrRenderer** : _HTMLElement | WebGLRenderer_ - The constructor normally expects the canvas element as first parameter.
 
 Alternatively, any other element can be used. In this case the canvas is automatically generated and placed below the specified element in the dom. In this case the size of the canvas depends on the size of the container. If for some reason the container does not have its own size, the canvas simply uses its default size.
 
@@ -87,7 +87,7 @@ In addition, there are also the following options:
 
 | option | type | description |
 |--------|------|-------------|
-| resizeTo | `(display: Display) => [width: number, height: number]` | optional callback - if specified, this function is called on each frame and the result is used to adjust the dimension of the canvas |
+| resizeTo | `(display: Display) => [width: number, height: number]` | optional callback - if specified, this function is called on each frame and the result is used to update the dimension of the canvas |
 
 The following parameters for the _WebGLRenderer_ are set as default unless otherwise specified:
 
@@ -111,7 +111,7 @@ The following parameters for the _WebGLRenderer_ are set as default unless other
 
 .__resizeToElement__ : _HTMLElement | undefined_ - the element which is taken as reference for the dimension of the canvas
 
-.__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - if specified, this function is called on each frame and the result is used to adjust the dimension of the canvas
+.__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - if specified, this function is called on each frame and the result is used to update the dimension of the canvas
 
 .__renderer__ : __THREE.WebGLRenderer__ - the renderer instance
 
