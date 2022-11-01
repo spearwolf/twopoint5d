@@ -3,27 +3,17 @@
 
 The `Display` class is a cosy boilerplate for creating a three.js `<canvas>` and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop.
 
-Es erleichert erheblich den Umgang mit browser resizes und der frage wie groß der canvas denn eigentlich ist.
+It makes it much easier to deal with browser resizes and the question of how the dimension of the canvas actually is and should be.
 
-Wenn der canvas das ganze fenster (aka 'fullscreen') ausfüllen soll, braucht man keine extra css styles dafür zu setzen, es reicht dem canvas element ein _resize_to_ property zu geben: `<canvas resize-to="window">`
+If you want the canvas to fill the whole window (aka 'fullscreen'), you don't need to
+set extra css styles for it, all what you need is to give the canvas element a
+_resize_to_ property: `<canvas resize-to="window">`
 
-Die _resize-to_ property versteht alternativ zu `window` auch `fullscreen`.
+The _resize-to_ property also understands `fullscreen` as an alternative to `window`.
 
-Es ist aber auch möglich, einfach einen document query selector anzuegeben, in diesem falle wird das canvas element immer so groß sein, wie das vom selector adressierte element.
+However, it is also possible to simply specify a document query selector, in which case the canvas element will always be as large as the element addressed by the selector.
 
-Es funktioniert aber auch komplett ohne _resize-to_!
-
-Der constructor von `Display` erwartet normalerweise das canvas element als ersten parameter.
-Alternativ geht aber ein ein beliebiges andere element. In diesem Falle wird das canvas automatisch generiert und unterhalb vom angebenenen element in das dom gehängt. Die größe das canvas richtet sich in diesem Fall an der größe des containers aus. Falls aus Gründen der container keine eigene Größe haben sollte, verwendet der canvas einfach seine standard größe.
-
-Man braucht sich eigentlich keine großen gedanken darüber machen, in dem meisten Fällen verhällt sich der canvas genauso wie man es braucht :sparkles:
-
-Diese verhalten wird in dem Beispiel 
-[multiple displays](../examples/vanilla/display.html) demonstriert.
-
-
-- nice starting point for your three.js demos
-- :heavy_check_mark: api is stable and ready to use
+But it also works completely without _resize-to_ !
 
 
 ## Quickstart
@@ -79,21 +69,27 @@ display.start()
 
 ### Display(domElementOrRenderer, options?)
 
-**domElementOrRenderer** : _HTMLElement | WebGLRenderer_ - Wird als dom element ein canvas angegeben ...
+**domElementOrRenderer** : _HTMLElement | WebGLRenderer_ - The __constructor__ of `Display` normally expects the canvas element as first parameter.
 
-init: canvas vs. dom-el, vs webglrenderer
+Alternatively, any other element can be used. In this case the canvas is automatically generated and placed below the specified element in the dom. In this case the size of the canvas depends on the size of the container. If for some reason the container does not have its own size, the canvas simply uses its default size.
 
-canvas html `resize-to` attributes: `window`, `fullscreen` or _document-query-selector_
+You don't really need to worry about this, in most cases the canvas will behave exactly as you expect :sparkles:
 
-css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
+This behavior is shown in the example [multiple displays](../examples/vanilla/display.html).
 
-**options** : _DisplayParameters_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](...) (except the canvas argument). Zusäzlich gibt es noch die folgenden Optionen:
+> todo: init: canvas vs. dom-el, vs webglrenderer
+
+> todo: css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
+
+
+**options** : _DisplayParameters_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the canvas argument).
+In addition, there are also the following options:
 
 | option | type | description |
 |--------|------|-------------|
-| resizeTo | `(display: Display) => [width: number, height: number]` | optional callback that will be called every frame to read out the canvas size |
+| resizeTo | `(display: Display) => [width: number, height: number]` | optional callback - if specified, this function is called on each frame and the result is used to adjust the dimension of the canvas |
 
-Folgende Parameter für den WebGLRenderer werden - falls nicht anders angegeben - als default gesetzt:
+The following parameters for the _WebGLRenderer_ are set as default unless otherwise specified:
 
 | parameter | default |
 |-----------|---------|
@@ -113,13 +109,13 @@ Folgende Parameter für den WebGLRenderer werden - falls nicht anders angegeben 
 
 .__frameNo__ : _number_ - the current frame number. starts at 0
 
-.__resizeToElement__ : _HTMLElement | undefined_ - todo
+.__resizeToElement__ : _HTMLElement | undefined_ - the element which is taken as reference for the dimension of the canvas
 
-.__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - the resize callback from the options
+.__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - if specified, this function is called on each frame and the result is used to adjust the dimension of the canvas
 
 .__renderer__ : __THREE.WebGLRenderer__ - the renderer instance
 
-.__now__ : _number_ - todo
+.__now__ : _number_ - the current time in seconds
 
 .__deltaTime__ : _number_ - todo
 
