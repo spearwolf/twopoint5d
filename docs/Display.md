@@ -1,4 +1,5 @@
-*twopoint5d.js*
+<img width="150" src="twopoint5d-700x168.png">
+
 # Display
 
 The `Display` class is a cosy boilerplate for creating a three.js `<canvas>` and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop.
