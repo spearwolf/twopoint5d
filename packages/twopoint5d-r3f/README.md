@@ -14,53 +14,7 @@ please see [../README](../../README.md) for a general description of this projec
 
 The idea is roughly the following:
 
-```jsx
-export default () => {
-  const geometry = useRef();
-  const textureAtlas = useTextureAtlas("foo-atlas");
-
-  useFrameLoop(
-    {
-      init({ geometry, textureAtlas, state, delta }) {
-        // your code goes here
-      },
-
-      update({ geometry: { currentValue, previousValue }, textureAtlas.. }) {
-        // your code goes here
-      },
-
-      frame({ geometry, textureAtlas, state, delta }) {
-        // your code goes here
-      },
-
-      dispose({ geometry, textureAtlas }) {
-        // your code goes here
-      },
-    },
-    { geometry: forwardRefValue(geometry), textureAtlas }
-  );
-
-  return (
-    <Stage2D renderToTexture="stage0">
-      <ParallaxProjection
-        attach="projection"
-        width="640"
-        height="480"
-        fit="contain"
-      />
-
-      <TextureAtlas name="foo-atlas" url="foo-atlas.json" />
-
-      <TexturedSprites>
-        <TexturedSpritesGeometry ref={geometry} />
-        <TexturedSpritesMaterial>
-          <TextureRef name="foo-atlas" attach="colorMap" />
-        </TexturedSpritesMaterial>
-      </TexturedSprites>
-    </Stage2D>
-  );
-};
-```
+![twopoint5d-r3f preview](preview.png)
 
 
 ## API Overview
