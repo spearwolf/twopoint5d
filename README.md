@@ -14,8 +14,8 @@ A collection of typescript classes, functions and utils in the shape of a monore
 :rocket: Some of the features are already quite stable, others are still experimental.
 
 The library comes in two flavors:
-- __twopoint5d__: based on _three.js_ and _vanilla js_ all the main features are inside here
-- __twopoint5d-r3f__: based on _@react-three/fiber_ and offers all the features as _react_ components and hooks for those who prefer it in a more declarative way
+- [twopoint5d](packages/twopoint5d) : based on _three.js_ and _vanilla js_ all the main features are inside here
+- [twopoint5d-r3f](packages/twopoint5d-r3f) : based on _@react-three/fiber_ and offers all the features as _react_ components and hooks for those who prefer it in a more declarative way
 
 ## What are the goals of this project ?
 
