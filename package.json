@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/twopoint5d-r3f",
     "packages/twopoint5d",
+    "packages/lookbook",
     "examples/r3f"
   ],
   "scripts": {
