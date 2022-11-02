@@ -1,8 +1,16 @@
-# **picimo**
+<p align="center">
+  <img width="350" src="../../docs/images/twopoint5d-700x168.png">
+	<br>
+  <b>The Art of Tiling 2D Sprites</b>
+	<br>
+  <em>A refreshingly satisfying 2.5D graphics library built on three.js, react and @react-three/fiber</em>
+</p>
 
-Welcome to *picimo* &mdash; the 2.5D *sprite* :space_invader::joystick: engine _on top of_ { [three.js](https://threejs.org/) + [react](https://reactjs.org/) &#8658; [react-three-fiber](https://github.com/pmndrs/react-three-fiber) }
+---
 
-> *pic&mdash;i&ndash;mo* is an acronym for _**pictures in motion**_
+please see [../README](../../README.md) for a general description of this project.
+
+---
 
 The idea is roughly the following:
 
@@ -116,4 +124,5 @@ _is checked when implemented and ready to use_
 - [x] `<ShaderChunks>`
 
 
-:rocket: have fun!
+have fun!
+:rocket:
