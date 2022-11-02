@@ -1,5 +1,5 @@
-import { getDescriptorOf } from "@spearwolf/vertex-objects";
 import { Matrix4, Vector3 } from "three";
+import { getDescriptorOf } from "twopoint5d";
 
 class Cross {
   make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2) {

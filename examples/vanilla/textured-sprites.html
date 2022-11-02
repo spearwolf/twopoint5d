@@ -30,9 +30,7 @@
           "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/textured-sprites": "/packages/textured-sprites/build/textured-sprites.js"
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
@@ -40,7 +38,7 @@
   <body>
     <section class="intro">
       <p>
-        vertex-objects.js :: textured-sprites<br />
+        twopoint5d :: textured-sprites<br />
         <em>a <code>TexturedSprites</code> example</em>
       </p>
     </section>
@@ -58,13 +56,13 @@
         Vector3,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-      import { TileSetLoader } from "@spearwolf/vertex-objects";
       import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
       import {
         TexturedSprites,
         TexturedSpritesGeometry,
         TexturedSpritesMaterial,
-      } from "@spearwolf/textured-sprites";
+        TileSetLoader,
+      } from "twopoint5d";
 
       class BouncingSprites {
         gravity = -45;

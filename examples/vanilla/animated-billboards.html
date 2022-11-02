@@ -37,12 +37,10 @@
     <script type="importmap">
       {
         "imports": {
-          "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
           "three": "/examples/vanilla/libs/three/build/three.module.js",
           "three/examples/jsm/controls/OrbitControls.js": "/examples/vanilla/libs/three/examples/jsm/controls/OrbitControls.js",
-          "@spearwolf/display3": "/packages/display3/build/display3.js",
-          "@spearwolf/vertex-objects": "/packages/vertex-objects/build/vertex-objects.js",
-          "@spearwolf/textured-sprites": "/packages/textured-sprites/build/textured-sprites.js"
+          "@spearwolf/eventize": "/examples/vanilla/libs/eventize.js",
+          "twopoint5d": "/packages/twopoint5d/twopoint5d.js"
         }
       }
     </script>
@@ -50,7 +48,7 @@
   <body>
     <section class="intro">
       <p>
-        vertex-objects :: animated-billboards<br />
+        twopoint5d :: animated-billboards<br />
         <em>an <code>AnimatedSprites</code> example</em>
       </p>
     </section>
@@ -72,6 +70,7 @@
         Vector3,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
       import {
         FrameBasedAnimations,
         getDescriptorOf,
@@ -80,13 +79,10 @@
         TileSetLoader,
         VertexObjectGeometry,
         VertexObjects,
-      } from "@spearwolf/vertex-objects";
-      import { PerspectiveOrbitDemo } from "/examples/vanilla/jsm/display/PerspectiveOrbitDemo.js";
-      import {
         AnimatedSprites,
         AnimatedSpritesGeometry,
         AnimatedSpritesMaterial,
-      } from "@spearwolf/textured-sprites";
+      } from "twopoint5d";
 
       class BouncingSprites {
         gravity = -130;

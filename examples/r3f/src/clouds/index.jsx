@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { ParallaxProjection, Stage2D } from "@spearwolf/picimo";
+import { ParallaxProjection, Stage2D } from "twopoint5d-r3f";
 import { createRoot } from "react-dom/client";
 import { Clouds } from "./Clouds";
 

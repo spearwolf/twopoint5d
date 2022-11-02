@@ -1,7 +1,7 @@
-import { Display } from "@spearwolf/display3";
 import { Priority } from "@spearwolf/eventize";
 import { Color, PerspectiveCamera, Scene } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Display } from "twopoint5d";
 
 /**
  * Create a [[Display]] with a scene, perspective camera and an orbit control that as a transparent background.

@@ -1,0 +1,16 @@
+.editorconfig
+.eslintignore
+.eslintrc.yaml
+.prettierignore
+.prettierrc.yaml
+.rollup.cache
+.size-snapshot.json
+.vscode
+*.spec.d.ts
+*.spec.ts
+jest.config.cjs
+jest.config.ts
+rollup
+tsconfig.json
+tsconfig.tsbuildinfo
+typedoc.js

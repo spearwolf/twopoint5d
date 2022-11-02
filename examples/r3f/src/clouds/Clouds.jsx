@@ -8,7 +8,7 @@ import {
   TextureRef,
   useFrameLoop,
   useTextureAtlas,
-} from "@spearwolf/picimo";
+} from "twopoint5d-r3f";
 import { useEffect, useRef } from "react";
 import { FrontSide } from "three";
 import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";

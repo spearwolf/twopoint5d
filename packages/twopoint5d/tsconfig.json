@@ -1,0 +1,58 @@
+{
+  // https://www.typescriptlang.org/tsconfig
+
+  "include": ["src"],
+
+  "compilerOptions": {
+    // Type Checking
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": false,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true,
+    "strictNullChecks": false,
+    "useUnknownInCatchVariables": true,
+
+    // Modules
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+
+    // Emit
+    "declaration": true,
+    "declarationDir": "types",
+    "declarationMap": true,
+    "downlevelIteration": false,
+    "noEmitOnError": true,
+    "removeComments": true,
+    "stripInternal": true,
+
+    // JavaScript Support
+    "allowJs": true,
+
+    // Interop Constraints
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+
+    // Language and Environment
+    "lib": ["ESNext", "DOM"],
+    "target": "ES2017",
+    "useDefineForClassFields": true,
+
+    // Projects
+    "incremental": false,
+
+    // Output Formatting
+    "noErrorTruncation": true,
+
+    // Completeness
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true
+  }
+}

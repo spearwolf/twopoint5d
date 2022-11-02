@@ -35,10 +35,14 @@ function shouldPublish() {
       (typeof versions === "string" && versions === pkgJson.version) ||
       (Array.isArray(versions) && versions.includes(pkgJson.version))
     ) {
-      console.log("*** aborting - the package version has already been released !");
+      console.log(
+        "*** aborting - the package version has already been released !"
+      );
       return false;
     }
-  } catch {}
+  } catch (err) {
+    console.error("*** error while checking package version:", err);
+  }
 
   return true;
 }
@@ -63,4 +67,6 @@ if (shouldPublish()) {
     shell.echo("Error: yarn npm publish failed");
     shell.exit(3);
   }
+
+  console.log("\nSuccess!! Thank you and have a nice day ;)\nReady.");
 }

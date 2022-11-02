@@ -1,5 +1,5 @@
 {
-  "name": "r3f",
+  "name": "examples-r3f",
   "scripts": {
     "start": "webpack serve --mode development",
     "build": "webpack build --mode production",
@@ -10,16 +10,14 @@
   "dependencies": {
     "@react-three/drei": "^9.34.3",
     "@react-three/fiber": "^8.8.10",
-    "@spearwolf/display3": "workspace:*",
     "@spearwolf/eventize": "^2.0.3",
-    "@spearwolf/picimo": "workspace:*",
-    "@spearwolf/stage25": "workspace:*",
-    "@spearwolf/textured-sprites": "workspace:*",
-    "@spearwolf/tiled-maps": "workspace:*",
-    "@spearwolf/vertex-objects": "workspace:*",
+    "prop-types": "^15.8.1",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
+    "styled-components": "^5.3.6",
     "three": "^0.145.0",
+    "twopoint5d": "workspace:*",
+    "twopoint5d-r3f": "workspace:*",
     "zustand": "^4.1.2"
   },
   "devDependencies": {
