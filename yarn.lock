@@ -17258,6 +17258,14 @@ fsevents@^1.2.7:
   languageName: node
   linkType: hard
 
+"twopoint5d-lookbook@workspace:packages/lookbook":
+  version: 0.0.0-use.local
+  resolution: "twopoint5d-lookbook@workspace:packages/lookbook"
+  dependencies:
+    astro: ^1.6.0
+  languageName: unknown
+  linkType: soft
+
 "twopoint5d-r3f@workspace:*, twopoint5d-r3f@workspace:packages/twopoint5d-r3f":
   version: 0.0.0-use.local
   resolution: "twopoint5d-r3f@workspace:packages/twopoint5d-r3f"
