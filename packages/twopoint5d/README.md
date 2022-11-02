@@ -19,7 +19,6 @@ The core features can be roughly classified into the following areas:
 - load texture atlases
 - animations
 - render as billboards (optional)
-- based on @spearwolf/vertex&#x2011;objects
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
 #### [vertex-objects and texture atlases](src/vertexObjects/)
@@ -30,7 +29,6 @@ The core features can be roughly classified into the following areas:
 
 #### [tiled-maps](src/tiledMaps/)
 - create and render visual tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
-- based on @spearwolf/vertex&#x2011;objects
 - api docs: [docs/Map2D](../../docs/Map2D.md)
 - :warning: work in progress
 
