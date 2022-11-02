@@ -1,4 +1,4 @@
-<img width="150" src="twopoint5d-700x168.png">
+<img width="150" src="images/twopoint5d-700x168.png">
 
 # Display
 

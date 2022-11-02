@@ -1,4 +1,5 @@
-*twopoint5d.js*
+<img width="150" src="images/twopoint5d-700x168.png">
+
 # Stage2D
 
 :rocket: _responsive scenes for three.js_

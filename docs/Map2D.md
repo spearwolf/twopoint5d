@@ -1,4 +1,5 @@
-*twopoint5d.js*
+<img width="150" src="images/twopoint5d-700x168.png">
+
 # Map2D
 
 > Create and render visual tiled maps which are laid out in a 2D spatial grid map data structure
