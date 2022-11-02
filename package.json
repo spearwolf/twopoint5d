@@ -1,6 +1,6 @@
 {
-  "name": "@spearwolf/three-vertex-objects",
-  "description": "three-vertex-objects project monorep",
+  "name": "@spearwolf/twopoint5d",
+  "description": "the art of tiling 2D sprites - a refreshingly satisfying 2.5D graphics library built on three.js",
   "private": true,
   "workspaces": [
     "packages/twopoint5d-r3f",
@@ -42,9 +42,5 @@
     "shelljs": "^0.8.5"
   },
   "version": "0.0.0",
-  "packageManager": "yarn@3.2.4",
-  "dependencies": {
-    "prop-types": "^15.8.1",
-    "styled-components": "^5.3.6"
-  }
+  "packageManager": "yarn@3.2.4"
 }
