@@ -11,11 +11,11 @@
 
 A collection of typescript classes, functions and utils in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and realtime gfx on the web platform.
 
-:warning: Some of the features are already quite stable, others are still experimental.
+:rocket: Some of the features are already quite stable, others are still experimental.
 
 The library comes in two flavors:
-- __twopoint5d__: based on _three.js_ and _vanilla js_ all features of _twopoint5d_ are included here
-- __twopoint5d-r3f__: based on _@react-three/fiber_ and implements all the features as _react_ components and hooks for those who prefer it in a more declarative way
+- __twopoint5d__: based on _three.js_ and _vanilla js_ all the main features are inside here
+- __twopoint5d-r3f__: based on _@react-three/fiber_ and offers all the features as _react_ components and hooks for those who prefer it in a more declarative way
 
 ## What are the goals of this project ?
 
@@ -33,8 +33,8 @@ The library comes in two flavors:
 - Import of common texture atlas formats (TexturePacker) and 2.5D-maps* (tiled, LDtk)
 - Advanced api for extending and customizing sprite features and 2.5D-map renderers
 
-:warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are ..
-- a number of [examples](examples/) that illustrate the respective features and usage of the api
+:warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are
+- a number of examples that illustrate the respective features and usage of the api
 - some unsorted documents about selected features in the [docs/](docs/) directory
 
 ## Examples
