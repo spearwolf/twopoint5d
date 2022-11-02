@@ -7,7 +7,7 @@
 </p>
 
 
-![@spearwolf/three-vertex-objects cover](cover.png)
+![twopoint5d cover](cover.png)
 
 A collection of typescript classes, functions and utils in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and realtime gfx on the web platform.
 
