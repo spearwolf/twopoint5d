@@ -2,6 +2,11 @@
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
 import logo from "../images/twopoint5d.png";
+import preview_tiledMapsBasicLayerTilesRenderer from "../images/preview/tiled-maps-basic-layer-tiles-renderer.png";
+import preview_texturedSprites from "../images/preview/textured-sprites.png";
+import preview_texturedQuads from "../images/preview/textured-quads.png";
+import preview_animatedSprites from "../images/preview/animated-sprites.png";
+import preview_animatedBillboards from "../images/preview/animated-billboards.png";
 ---
 
 <Layout title="Welcome to Astro.">
@@ -10,26 +15,36 @@ import logo from "../images/twopoint5d.png";
       <img src={logo} alt="twopoint5d logo" />
       <figcaption>lookbook</figcaption>
     </figure>
-    <ul role="list" class="link-card-grid">
+    <ul role="list" class="demo-card-grid">
       <Card
         href="https://docs.astro.build/"
         title="Documentation"
         body="Learn how Astro works and explore the official API docs."
+        image={preview_tiledMapsBasicLayerTilesRenderer}
       />
       <Card
         href="https://astro.build/integrations/"
         title="Integrations"
         body="Supercharge your project with new frameworks and libraries."
+        image={preview_texturedSprites}
       />
       <Card
         href="https://astro.build/themes/"
         title="Themes"
         body="Explore a galaxy of community-built starter themes."
+        image={preview_animatedSprites}
       />
       <Card
         href="https://astro.build/chat/"
         title="Community"
         body="Come say hi to our amazing Discord community. ❤️"
+        image={preview_animatedBillboards}
+      />
+      <Card
+        href="https://astro.build/chat/"
+        title="Community"
+        body="Come say hi to our amazing Discord community."
+        image={preview_texturedQuads}
       />
     </ul>
   </main>
@@ -39,23 +54,24 @@ import logo from "../images/twopoint5d.png";
   main {
     margin: auto;
     padding: 1.5rem;
-    max-width: 60ch;
+    max-width: 120ch;
   }
   .lookbook-header {
     margin: 0;
-	display: flex;
+    display: flex;
+    align-items: flex-end;
   }
   .lookbook-header img {
-	width: 220px;
+    width: 220px;
   }
   .lookbook-header figcaption {
-	padding-left: 1rem;
+    padding-left: 1rem;
     font-size: 1.5rem;
     font-weight: normal;
-	text-transform: uppercase;
-	color: #ccc;
+    text-transform: uppercase;
+    color: var(--color-primary);
   }
-  .link-card-grid {
+  .demo-card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
     gap: 1rem;
