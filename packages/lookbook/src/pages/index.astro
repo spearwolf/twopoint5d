@@ -1,7 +1,9 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
+
 import logo from "../images/twopoint5d.png";
+
 import preview_tiledMapsBasicLayerTilesRenderer from "../images/preview/tiled-maps-basic-layer-tiles-renderer.png";
 import preview_texturedSprites from "../images/preview/textured-sprites.png";
 import preview_texturedQuads from "../images/preview/textured-quads.png";
@@ -13,7 +15,7 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
   <main>
     <figure class="lookbook-header">
       <img src={logo} alt="twopoint5d logo" />
-      <figcaption>lookbook</figcaption>
+      <figcaption>look<br />book</figcaption>
     </figure>
     <ul role="list" class="demo-card-grid">
       <Card
@@ -59,7 +61,7 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
   .lookbook-header {
     margin: 0;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
   }
   .lookbook-header img {
     width: 220px;
@@ -67,6 +69,7 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
   .lookbook-header figcaption {
     padding-left: 1rem;
     font-size: 1.5rem;
+    line-height: 1;
     font-weight: normal;
     text-transform: uppercase;
     color: var(--color-primary);

@@ -22,7 +22,7 @@ const { href, title, body, image } = Astro.props;
   </a>
 </li>
 
-<style define:vars={{ cardImageUrl: `url(${image})` }}>
+<style define:vars={{ cardTeaserImage: `url(${image})` }}>
   .link-card {
     list-style: none;
     display: flex;
@@ -58,8 +58,10 @@ const { href, title, body, image } = Astro.props;
   .card-image {
     margin: 0 -1.3rem;
     aspect-ratio: 16/10;
-    background-image: var(--cardImageUrl);
+    background-image: var(--cardTeaserImage);
     background-size: cover;
     background-position: center;
+    border-top: 1px solid var(--color-primary-darker);
+    border-bottom: 1px solid var(--color-primary-darker);
   }
 </style>
