@@ -1,4 +1,6 @@
 import { extend } from "@react-three/fiber";
+import { useState } from "react";
+import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -10,12 +12,10 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "twopoint5d-r3f";
-import { useState } from "react";
-import { RectangularVisibilityArea } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";
 import { useDemoStore } from "./useDemoStore";
 
-extend({ RectangularVisibilityArea });
+extend({ CameraBasedVisibility });
 
 const TILES = [
   [1, 2],
@@ -56,11 +56,7 @@ export const DemoOrDie = () => {
       >
         <WiredBox width={256} height={40} depth={256} color={0xff0066} />
 
-        <rectangularVisibilityArea
-          width={640}
-          height={480}
-          attach="visibilitor"
-        />
+        <cameraBasedVisibility width={640} height={480} attach="visibilitor" />
 
         <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />
