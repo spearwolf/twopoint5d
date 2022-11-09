@@ -1,3 +1,4 @@
+import {PerspectiveCamera} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
@@ -5,12 +6,29 @@ import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 // TODO
 export class CameraBasedVisibility implements IMap2DVisibilitor {
+  #camera?: PerspectiveCamera;
+
+  // TODO remove
   #width = 0;
   #height = 0;
 
   needsUpdate = true;
 
   #tileCreated?: Uint8Array;
+
+  get camera(): PerspectiveCamera {
+    return this.#camera;
+  }
+
+  set camera(camera: PerspectiveCamera) {
+    if (this.#camera !== camera) {
+      this.#camera = camera;
+      this.needsUpdate = true;
+
+      // TODO remove
+      console.log('camera switched to', camera);
+    }
+  }
 
   get width(): number {
     return this.#width;
@@ -34,9 +52,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  constructor(width = 320, height = 240) {
-    this.width = width;
-    this.height = height;
+  constructor(camera?: PerspectiveCamera) {
+    this.camera = camera;
+
+    // TODO remove
+    this.width = 320;
+    this.height = 240;
   }
 
   computeVisibleTiles(
