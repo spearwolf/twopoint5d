@@ -52,3 +52,4 @@ rules:
   no-undef-init: off
   no-use-before-define: off
   prefer-rest-params: off
+  "react/no-unknown-property": off

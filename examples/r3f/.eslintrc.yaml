@@ -36,3 +36,4 @@ rules:
   eqeqeq: [2, "smart"]
   no-use-before-define: off
   "react/prop-types": [1, { skipUndeclared: true }]
+  "react/no-unknown-property": off
