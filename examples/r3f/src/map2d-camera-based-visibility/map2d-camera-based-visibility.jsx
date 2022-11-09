@@ -1,5 +1,6 @@
 import { extend } from "@react-three/fiber";
 import { useState } from "react";
+import { PerspectiveCamera, CameraHelper } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
@@ -15,12 +16,18 @@ import {
 import { WiredBox } from "../utils/WiredBox";
 import { useDemoStore } from "./useDemoStore";
 
-extend({ CameraBasedVisibility });
+extend({ CameraBasedVisibility, CameraHelper });
 
 const TILES = [
   [1, 2],
   [3, 4],
 ];
+
+const map2dCamera = new PerspectiveCamera(75, 4 / 3, 0.1, 500);
+map2dCamera.position.set(0, 200, 200);
+map2dCamera.updateMatrix();
+map2dCamera.lookAt(0, 0, 0);
+map2dCamera.updateProjectionMatrix();
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -36,7 +43,7 @@ export const DemoOrDie = () => {
         pixelsPerSecond={300}
       />
 
-      <WiredBox width={640} height={30} depth={480} />
+      <cameraHelper args={[map2dCamera]} />
 
       <TileSet
         name="tiles"
@@ -54,9 +61,9 @@ export const DemoOrDie = () => {
         centerX={center.x}
         centerY={center.y}
       >
-        <WiredBox width={256} height={40} depth={256} color={0xff0066} />
+        <WiredBox width={256} height={10} depth={256} color={0xff0066} />
 
-        <cameraBasedVisibility width={640} height={480} attach="visibilitor" />
+        <cameraBasedVisibility camera={map2dCamera} attach="visibilitor" />
 
         <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />

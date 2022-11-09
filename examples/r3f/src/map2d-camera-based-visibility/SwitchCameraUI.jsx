@@ -96,21 +96,21 @@ export const SwitchCameraUI = () => {
       <CameraButton
         radioGroup
         value="cam0"
-        name="Static Camera"
+        name="Move Map2D"
         isActive={activeCamera === "cam0"}
         onAction={(name) => setActiveCamera(name)}
       />
       <CameraButton
         radioGroup
         value="cam1"
-        name="Camera 2"
+        name="Control Static Camera"
         isActive={activeCamera === "cam1"}
         onAction={(name) => setActiveCamera(name)}
       />
       <CameraButton
         radioGroup
         value="cam2"
-        name="Map2D Camera"
+        name="Control Map2D Camera"
         isActive={activeCamera === "cam2"}
         onAction={(name) => setActiveCamera(name)}
       />

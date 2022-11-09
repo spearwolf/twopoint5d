@@ -1,12 +1,25 @@
-import {PerspectiveCamera} from 'three';
+import {Line3, PerspectiveCamera, Plane, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
-// TODO
+/**
+ * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xy plane.
+ * So, the camera should point to the xy plane, if there should be visible tiles.
+ *
+ * If a plane other than the xy plane is needed, you can simply define your own plane.
+ *
+ * The view frustum of the camera is used to calculate the visible tiles.
+ *
+ * The _far_ value of the camera may be used to limit the visibility of the tiles.
+ * The _near_ value is not used.
+ */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
+  static readonly DEFAULT_PLANE = new Plane(new Vector3(0, 0, 1), 0);
+
   #camera?: PerspectiveCamera;
+  #plane: Plane = CameraBasedVisibility.DEFAULT_PLANE;
 
   // TODO remove
   #width = 0;
@@ -26,7 +39,25 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.needsUpdate = true;
 
       // TODO remove
+      // eslint-disable-next-line no-console
       console.log('camera switched to', camera);
+    }
+  }
+
+  get plane(): Plane {
+    return this.#plane;
+  }
+
+  set plane(plane: Plane) {
+    const nextPlane = plane ?? CameraBasedVisibility.DEFAULT_PLANE;
+
+    if (this.#plane !== nextPlane) {
+      this.#plane = nextPlane;
+      this.needsUpdate = true;
+
+      // TODO remove
+      // eslint-disable-next-line no-console
+      console.log('plane changed to', nextPlane);
     }
   }
 
@@ -52,15 +83,95 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  constructor(camera?: PerspectiveCamera) {
+  constructor(camera?: PerspectiveCamera, plane?: Plane) {
     this.camera = camera;
+    this.plane = plane;
 
     // TODO remove
-    this.width = 320;
-    this.height = 240;
+    this.width = 640;
+    this.height = 480;
   }
 
   computeVisibleTiles(
+    previousTiles: Map2DTile[],
+    [centerX, centerY]: [number, number],
+    map2dTileCoords: Map2DTileCoordsUtil,
+  ): Map2DVisibleTiles | undefined {
+    if (this.camera != null) {
+      this.computeVisibleTilesNEXT(previousTiles, [centerX, centerY], map2dTileCoords);
+    }
+    return this.computeVisibleTilesLEGACY(previousTiles, [centerX, centerY], map2dTileCoords);
+  }
+
+  #lastPlaneIntersect: Vector3 | undefined;
+
+  private equalsLastPlaneIntersect(intersect: Vector3): boolean {
+    return this.#lastPlaneIntersect != null && this.#lastPlaneIntersect.equals(intersect);
+  }
+
+  private rememberPlaneIntersect(planeIntersect: Vector3) {
+    if (this.#lastPlaneIntersect == null) {
+      this.#lastPlaneIntersect = planeIntersect.clone();
+    } else {
+      this.#lastPlaneIntersect.copy(planeIntersect);
+    }
+  }
+
+  private computeVisibleTilesNEXT(
+    previousTiles: Map2DTile[],
+    [centerX, centerY]: [number, number],
+    map2dTileCoords: Map2DTileCoordsUtil,
+  ): Map2DVisibleTiles | undefined {
+    if (this.camera == null) {
+      return undefined;
+    }
+
+    const planeIntersect = this.findPointOnPlaneThatIsInViewFrustum();
+
+    if (planeIntersect == null) {
+      return undefined;
+    }
+
+    planeIntersect.x += centerX;
+    planeIntersect.y += centerY;
+
+    if (!this.equalsLastPlaneIntersect(planeIntersect)) {
+      this.rememberPlaneIntersect(planeIntersect);
+
+      const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeIntersect.x, planeIntersect.y, 1, 1);
+
+      // eslint-disable-next-line no-console
+      console.log('new plane intersect', {tileCoords, planeIntersect});
+
+      return undefined;
+    }
+
+    // nothing changed, so we just return the previous tiles
+    return Array.isArray(previousTiles) && previousTiles.length > 0
+      ? {tiles: previousTiles, reuseTiles: previousTiles}
+      : undefined;
+  }
+
+  private findPointOnPlaneThatIsInViewFrustum(): Vector3 | undefined {
+    const camWorldPos = this.camera.getWorldPosition(new Vector3());
+    const camWorldDir = this.camera.getWorldDirection(new Vector3()).setLength(this.camera.far);
+
+    const lineOfSightEnd = camWorldDir.clone().add(camWorldPos);
+    const lineOfSight = new Line3(camWorldPos, lineOfSightEnd);
+
+    // TODO check all frame corners of the view frustum instead of the view frustum center
+
+    // console.log('lineOfSight', {
+    //   lineOfSight,
+    //   plane: this.plane,
+    //   camWorldPos: camWorldPos.toArray(),
+    //   camWorldDir: camWorldDir.toArray(),
+    // });
+
+    return this.plane.intersectLine(lineOfSight, new Vector3());
+  }
+
+  private computeVisibleTilesLEGACY(
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,

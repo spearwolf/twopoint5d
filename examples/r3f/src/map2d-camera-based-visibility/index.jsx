@@ -10,7 +10,7 @@ const root = createRoot(document.getElementById("root"));
 root.render(
   <>
     <SwitchCameraUI />
-    <Canvas dpr={[1, 2]} camera={{ position: [0, 350, 500], far: 8000 }}>
+    <Canvas dpr={[1, 2]} camera={{ position: [100, 350, 600], far: 8000 }}>
       <StrictMode>
         <DemoOrDie />
       </StrictMode>
