@@ -66,7 +66,7 @@ const CameraButtonStyled = styled.button`
         `}
 `;
 
-const CameraButton = ({ value, name, isActive, onAction, radioGroup }) => {
+const CameraButton = ({ value, label, isActive, onAction, radioGroup }) => {
   const onClick = useCallback(
     (event) => {
       event.preventDefault();
@@ -82,10 +82,25 @@ const CameraButton = ({ value, name, isActive, onAction, radioGroup }) => {
       isActive={!!isActive}
       onPointerDown={onClick}
     >
-      {name}
+      {label}
     </CameraButtonStyled>
   );
 };
+
+const CAMERA_BUTTONS = [
+  {
+    key: "cam0",
+    label: "Move Map2D",
+  },
+  {
+    key: "cam1",
+    label: "Control Static Camera",
+  },
+  {
+    key: "cam2",
+    label: "Control Map2D Camera",
+  },
+];
 
 export const SwitchCameraUI = () => {
   const activeCamera = useDemoStore((state) => state.activeCameraName);
@@ -93,27 +108,16 @@ export const SwitchCameraUI = () => {
 
   return (
     <Layout>
-      <CameraButton
-        radioGroup
-        value="cam0"
-        name="Move Map2D"
-        isActive={activeCamera === "cam0"}
-        onAction={(name) => setActiveCamera(name)}
-      />
-      <CameraButton
-        radioGroup
-        value="cam1"
-        name="Control Static Camera"
-        isActive={activeCamera === "cam1"}
-        onAction={(name) => setActiveCamera(name)}
-      />
-      <CameraButton
-        radioGroup
-        value="cam2"
-        name="Control Map2D Camera"
-        isActive={activeCamera === "cam2"}
-        onAction={(name) => setActiveCamera(name)}
-      />
+      {CAMERA_BUTTONS.map(({ key, label }) => (
+        <CameraButton
+          key={key}
+          radioGroup
+          value={key}
+          label={label}
+          isActive={activeCamera === name}
+          onAction={(name) => setActiveCamera(name)}
+        />
+      ))}
     </Layout>
   );
 };
