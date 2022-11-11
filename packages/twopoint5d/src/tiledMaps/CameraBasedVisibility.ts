@@ -1,4 +1,4 @@
-import {Line3, PerspectiveCamera, Plane, Vector3} from 'three';
+import {Line3, PerspectiveCamera, Plane, Vector2, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
@@ -8,18 +8,16 @@ import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xy plane.
  * So, the camera should point to the xy plane, if there should be visible tiles.
  *
- * If a plane other than the xy plane is needed, you can simply define your own plane.
- *
  * The view frustum of the camera is used to calculate the visible tiles.
  *
  * The _far_ value of the camera may be used to limit the visibility of the tiles.
  * The _near_ value is not used.
  */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
-  static readonly DEFAULT_PLANE = new Plane(new Vector3(0, 0, 1), 0);
+  static readonly PlaneXY = new Plane(new Vector3(0, 0, 1), 0);
 
   #camera?: PerspectiveCamera;
-  #plane: Plane = CameraBasedVisibility.DEFAULT_PLANE;
+  #plane: Plane = CameraBasedVisibility.PlaneXY;
 
   // TODO remove
   #width = 0;
@@ -49,7 +47,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   set plane(plane: Plane) {
-    const nextPlane = plane ?? CameraBasedVisibility.DEFAULT_PLANE;
+    const nextPlane = plane ?? CameraBasedVisibility.PlaneXY;
 
     if (this.#plane !== nextPlane) {
       this.#plane = nextPlane;
@@ -103,17 +101,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.computeVisibleTilesLEGACY(previousTiles, [centerX, centerY], map2dTileCoords);
   }
 
-  #lastPlaneIntersect: Vector3 | undefined;
+  #lastPlaneCoords: Vector2 | undefined;
 
-  private equalsLastPlaneIntersect(intersect: Vector3): boolean {
-    return this.#lastPlaneIntersect != null && this.#lastPlaneIntersect.equals(intersect);
+  private equalsLastPlaneCoords(coords: Vector2): boolean {
+    return this.#lastPlaneCoords != null && this.#lastPlaneCoords.equals(coords);
   }
 
-  private rememberPlaneIntersect(planeIntersect: Vector3) {
-    if (this.#lastPlaneIntersect == null) {
-      this.#lastPlaneIntersect = planeIntersect.clone();
+  private rememberPlaneCoords(coords: Vector2) {
+    if (this.#lastPlaneCoords == null) {
+      this.#lastPlaneCoords = coords.clone();
     } else {
-      this.#lastPlaneIntersect.copy(planeIntersect);
+      this.#lastPlaneCoords.copy(coords);
     }
   }
 
@@ -132,16 +130,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return undefined;
     }
 
-    planeIntersect.x += centerX;
-    planeIntersect.y += centerY;
+    const planeCoords = this.toPlaneCoords(planeIntersect);
 
-    if (!this.equalsLastPlaneIntersect(planeIntersect)) {
-      this.rememberPlaneIntersect(planeIntersect);
+    planeCoords.x += centerX;
+    planeCoords.y += centerY;
 
-      const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeIntersect.x, planeIntersect.y, 1, 1);
+    if (!this.equalsLastPlaneCoords(planeCoords)) {
+      this.rememberPlaneCoords(planeCoords);
+
+      const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
 
       // eslint-disable-next-line no-console
-      console.log('new plane intersect', {tileCoords, planeIntersect});
+      console.log('new plane coords', {tileCoords, planeCoords, planeIntersect});
 
       return undefined;
     }
@@ -150,6 +150,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return Array.isArray(previousTiles) && previousTiles.length > 0
       ? {tiles: previousTiles, reuseTiles: previousTiles}
       : undefined;
+  }
+
+  private toPlaneCoords(planeIntersect: Vector3): Vector2 {
+    // TODO find a more generic way to convert from plane -> 2d coords (maybe use and enhance a ProjectionPlane?)
+    return new Vector2(planeIntersect.x, planeIntersect.y);
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | undefined {
