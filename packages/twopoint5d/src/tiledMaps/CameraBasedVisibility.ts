@@ -1,8 +1,24 @@
-import {Line3, PerspectiveCamera, Plane, Vector2, Vector3} from 'three';
+import {Box3, Frustum, Line3, PerspectiveCamera, Plane, Vector2, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil';
+
+interface PlaneTileBox {
+  id: string;
+  x: number;
+  y: number;
+  planeCoords?: TilesWithinCoords;
+  planeBox?: Box3;
+}
+
+const makePlaneTileBoxId = (x: number, y: number) => `${x},${y}`;
+
+const makePlaneTileBox = (x: number, y: number): PlaneTileBox => ({
+  id: makePlaneTileBoxId(x, y),
+  x,
+  y,
+});
 
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xy plane.
@@ -18,6 +34,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #camera?: PerspectiveCamera;
   #plane: Plane = CameraBasedVisibility.PlaneXY;
+
+  depth = 100;
+
+  get ground(): number {
+    return Math.abs(this.depth) / -2;
+  }
+
+  get ceiling(): number {
+    return Math.abs(this.depth) / 2;
+  }
 
   // TODO remove
   #width = 0;
@@ -115,9 +141,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
+  // #cameraPosition = new Vector2();
+
   private computeVisibleTilesNEXT(
     previousTiles: Map2DTile[],
-    [centerX, centerY]: [number, number],
+    [_centerX, _centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (this.camera == null) {
@@ -130,18 +158,74 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return undefined;
     }
 
-    const planeCoords = this.toPlaneCoords(planeIntersect);
+    const planeIntersectCoords = this.toPlaneCoords(planeIntersect);
+    const planeCoords = map2dTileCoords.computeTilesWithinCoords(planeIntersectCoords.x, planeIntersectCoords.y, 1, 1);
 
-    planeCoords.x += centerX;
-    planeCoords.y += centerY;
+    // const deltaPosition = new Vector2(centerX, centerY).sub(this.#cameraPosition);
+    // this.#cameraPosition.set(centerX, centerY);
 
-    if (!this.equalsLastPlaneCoords(planeCoords)) {
-      this.rememberPlaneCoords(planeCoords);
+    // this.camera.position.applyMatrix4(this.camera.projectionMatrix);
+    // this.camera.position.add(new Vector3(deltaPosition.x, deltaPosition.y, 0));
+    // this.camera.position.applyMatrix4(this.camera.projectionMatrixInverse);
+    // this.camera.position.add(new Vector3(deltaPosition.x, deltaPosition.y, 0).applyMatrix4(this.camera.projectionMatrixInverse));
+    // this.camera.position.add(new Vector3(deltaPosition.x, 0, deltaPosition.y));
+    // this.camera.matrixWorldNeedsUpdate = true;
 
-      const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
+    const frustum = this.makeCameraFrustum();
+
+    if (!this.equalsLastPlaneCoords(planeIntersectCoords)) {
+      this.rememberPlaneCoords(planeIntersectCoords);
+
+      const visible: PlaneTileBox[] = [];
+      const visited = new Set<string>();
+      const next: PlaneTileBox[] = [makePlaneTileBox(planeCoords.tileLeft, planeCoords.tileTop)];
+
+      while (next.length > 0) {
+        const current = next.pop();
+        if (current != null) {
+          if (!visited.has(current.id)) {
+            visited.add(current.id);
+
+            current.planeCoords = map2dTileCoords.computeTilesWithinCoords(
+              current.x * planeCoords.tileWidth,
+              current.y * planeCoords.tileHeight,
+              1,
+              1,
+            );
+
+            console.log('planeCoords', current.planeCoords);
+
+            current.planeBox = this.getBoxFromTileCoords(current.planeCoords);
+
+            if (frustum.intersectsBox(current.planeBox)) {
+              visible.push(current);
+
+              [
+                [-1, 1],
+                [-1, 0],
+                [-1, -1],
+
+                [0, 1],
+                [0, -1],
+
+                [1, 1],
+                [1, 0],
+                [1, -1],
+              ].forEach(([dx, dy]) => {
+                const ptb = makePlaneTileBox(current.planeCoords.tileLeft + dx, current.planeCoords.tileTop + dy);
+                if (!visited.has(ptb.id)) {
+                  next.push(ptb);
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // TODO
 
       // eslint-disable-next-line no-console
-      console.log('new plane coords', {tileCoords, planeCoords, planeIntersect});
+      console.log('new plane coords', {visible, next, visited, planeIntersect, frustum});
 
       return undefined;
     }
@@ -150,6 +234,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return Array.isArray(previousTiles) && previousTiles.length > 0
       ? {tiles: previousTiles, reuseTiles: previousTiles}
       : undefined;
+  }
+
+  private makeCameraFrustum(): Frustum {
+    this.camera.updateMatrixWorld();
+    return new Frustum().setFromProjectionMatrix(
+      this.camera.projectionMatrix.clone().multiply(this.camera.matrixWorld.clone().invert()),
+    );
+  }
+
+  private getBoxFromTileCoords({top, left, width, height}: TilesWithinCoords): Box3 {
+    return new Box3(new Vector3(left, top, this.ground), new Vector3(left + width, top + height, this.ceiling));
   }
 
   private toPlaneCoords(planeIntersect: Vector3): Vector2 {

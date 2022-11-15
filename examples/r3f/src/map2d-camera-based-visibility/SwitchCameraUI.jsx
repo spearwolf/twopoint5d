@@ -6,8 +6,11 @@ const Layout = styled.div`
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
   z-index: 1000;
-  margin: 10px;
+  margin: 1em auto;
+  display: flex;
+  justify-content: center;
 `;
 
 const CameraButtonStyled = styled.button`
@@ -99,16 +102,20 @@ const CameraButton = ({ value, label, isActive, onAction, radioGroup }) => {
 
 const CAMERA_BUTTONS = [
   {
-    key: "cam0",
-    label: "Move Map2D",
+    key: "cam1",
+    label: "Orbit Around",
   },
   {
-    key: "cam1",
-    label: "Control Static Camera",
+    key: "cam0",
+    label: "Map2D Pan-Control",
   },
   {
     key: "cam2",
     label: "Control Map2D Camera",
+  },
+  {
+    key: "cam3",
+    label: "View & Control Map2D Camera",
   },
 ];
 
