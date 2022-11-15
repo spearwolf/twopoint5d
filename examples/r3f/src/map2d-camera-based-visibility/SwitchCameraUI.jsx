@@ -11,18 +11,25 @@ const Layout = styled.div`
 `;
 
 const CameraButtonStyled = styled.button`
-  margin: 2px 4px;
+  font-family: sans-serif;
+  font-size: 1rem;
+  font-weight: bold;
+
+  line-height: 1;
+
+  margin: 0.1em 0.2em;
   padding: 0.5em 1em;
 
   border-radius: 1em;
   border: 0;
 
-  font-family: sans-serif;
-  font-size: 16px;
-  font-weight: bold;
-
   cursor: pointer;
   user-select: none;
+
+  transition: 0.2s;
+
+  position: relative;
+  z-index: 0;
 
   ${({ isRadio }) =>
     isRadio &&
@@ -49,19 +56,22 @@ const CameraButtonStyled = styled.button`
   ${({ isActive }) =>
     isActive
       ? css`
-          background: #eee;
-          color: #333;
+          color: #fff;
 
-          &:hover {
-            background: #fff;
-          }
+          box-shadow: inset 0 0 1.5em #cc9, inset 0.5em 0 1.5em #f06,
+            inset -0.5em 0 1.5em #06f, inset 0.5em 0 3em #f06,
+            inset -0.5em 0 5em #06f, 0 0 0.5em #fff, -0.5em 0 1.5em #f06,
+            0.5em 0 1.5em #06f;
+
+          z-index: 1;
         `
       : css`
-          background: #333;
+          background: #202028;
           color: #eee;
 
           &:hover {
-            background: #555;
+            background: #282830;
+            text-shadow: 0 0 0.5em #fff, -0.5em 0 2em #f09, 0.5em 0 2em #09f;
           }
         `}
 `;
@@ -114,7 +124,7 @@ export const SwitchCameraUI = () => {
           radioGroup
           value={key}
           label={label}
-          isActive={activeCamera === name}
+          isActive={activeCamera === key}
           onAction={(name) => setActiveCamera(name)}
         />
       ))}
