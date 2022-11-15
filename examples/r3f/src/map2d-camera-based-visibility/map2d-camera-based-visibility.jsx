@@ -1,7 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CameraHelper, PerspectiveCamera } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
