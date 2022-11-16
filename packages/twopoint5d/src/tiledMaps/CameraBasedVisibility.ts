@@ -14,7 +14,7 @@ interface PlaneTileBox {
 
 const makePlaneTileBoxId = (x: number, y: number) => `${x},${y}`;
 
-const makePlaneTileBox = (x: number, y: number): PlaneTileBox => ({
+const makeTileBox = (x: number, y: number): PlaneTileBox => ({
   id: makePlaneTileBoxId(x, y),
   x,
   y,
@@ -145,7 +145,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   private computeVisibleTilesNEXT(
     previousTiles: Map2DTile[],
-    [_centerX, _centerY]: [number, number],
+    [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (this.camera == null) {
@@ -171,61 +171,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // this.camera.position.add(new Vector3(deltaPosition.x, 0, deltaPosition.y));
     // this.camera.matrixWorldNeedsUpdate = true;
 
-    const frustum = this.makeCameraFrustum();
+    planeIntersectCoords.x += centerX;
+    planeIntersectCoords.y += centerY;
 
     if (!this.equalsLastPlaneCoords(planeIntersectCoords)) {
       this.rememberPlaneCoords(planeIntersectCoords);
 
-      const visible: PlaneTileBox[] = [];
-      const visited = new Set<string>();
-      const next: PlaneTileBox[] = [makePlaneTileBox(planeCoords.tileLeft, planeCoords.tileTop)];
-
-      while (next.length > 0) {
-        const current = next.pop();
-        if (current != null) {
-          if (!visited.has(current.id)) {
-            visited.add(current.id);
-
-            current.planeCoords = map2dTileCoords.computeTilesWithinCoords(
-              current.x * planeCoords.tileWidth,
-              current.y * planeCoords.tileHeight,
-              1,
-              1,
-            );
-
-            console.log('planeCoords', current.planeCoords);
-
-            current.planeBox = this.getBoxFromTileCoords(current.planeCoords);
-
-            if (frustum.intersectsBox(current.planeBox)) {
-              visible.push(current);
-
-              [
-                [-1, 1],
-                [-1, 0],
-                [-1, -1],
-
-                [0, 1],
-                [0, -1],
-
-                [1, 1],
-                [1, 0],
-                [1, -1],
-              ].forEach(([dx, dy]) => {
-                const ptb = makePlaneTileBox(current.planeCoords.tileLeft + dx, current.planeCoords.tileTop + dy);
-                if (!visited.has(ptb.id)) {
-                  next.push(ptb);
-                }
-              });
-            }
-          }
-        }
-      }
-
-      // TODO
-
-      // eslint-disable-next-line no-console
-      console.log('new plane coords', {visible, next, visited, planeIntersect, frustum});
+      this.findAllVisibleTiles(planeCoords, map2dTileCoords);
 
       return undefined;
     }
@@ -234,6 +186,65 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return Array.isArray(previousTiles) && previousTiles.length > 0
       ? {tiles: previousTiles, reuseTiles: previousTiles}
       : undefined;
+  }
+
+  private findAllVisibleTiles(
+    planeCoords: TilesWithinCoords,
+    map2dTileCoords: Map2DTileCoordsUtil,
+  ): void {
+    const cameraFrustum = this.makeCameraFrustum();
+
+    const visibleBoxes: PlaneTileBox[] = [];
+    const visitedBoxIds = new Set<string>();
+
+    const nextBox: PlaneTileBox[] = [makeTileBox(planeCoords.tileLeft, planeCoords.tileTop)];
+
+    while (nextBox.length > 0) {
+      const current = nextBox.pop();
+      if (current != null) {
+        if (!visitedBoxIds.has(current.id)) {
+          visitedBoxIds.add(current.id);
+
+          current.planeCoords = map2dTileCoords.computeTilesWithinCoords(
+            current.x * planeCoords.tileWidth,
+            current.y * planeCoords.tileHeight,
+            1,
+            1,
+          );
+
+          console.log('planeCoords', current.planeCoords);
+
+          current.planeBox = this.getBoxFromTileCoords(current.planeCoords);
+
+          if (cameraFrustum.intersectsBox(current.planeBox)) {
+            visibleBoxes.push(current);
+
+            [
+              [-1, 1],
+              [-1, 0],
+              [-1, -1],
+
+              [0, 1],
+              [0, -1],
+
+              [1, 1],
+              [1, 0],
+              [1, -1],
+            ].forEach(([dx, dy]) => {
+              const ptb = makeTileBox(current.planeCoords.tileLeft + dx, current.planeCoords.tileTop + dy);
+              if (!visitedBoxIds.has(ptb.id)) {
+                nextBox.push(ptb);
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // TODO
+
+    // eslint-disable-next-line no-console
+    console.log('new plane coords', {visibleBoxes, nextBox, visitedBoxIds, planeCoords, cameraFrustum});
   }
 
   private makeCameraFrustum(): Frustum {
