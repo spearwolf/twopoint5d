@@ -14,7 +14,6 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "twopoint5d-r3f";
-import { WiredBox } from "../utils/WiredBox";
 import { useDemoStore } from "./useDemoStore";
 
 extend({ CameraBasedVisibility, CameraHelper });
@@ -78,9 +77,11 @@ export const DemoOrDie = () => {
         centerX={center.x}
         centerY={center.y}
       >
-        <WiredBox width={256} height={10} depth={256} color={0xff0066} />
-
-        <cameraBasedVisibility camera={map2dCamera} attach="visibilitor" />
+        <cameraBasedVisibility
+          camera={map2dCamera}
+          depth={10}
+          attach="visibilitor"
+        />
 
         <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />

@@ -1,3 +1,4 @@
+import {Object3D} from 'three';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
@@ -20,4 +21,7 @@ export interface IMap2DVisibilitor {
     centerPoint: [number, number],
     tileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined;
+
+  addToScene(scene: Object3D): void;
+  removeFromScene(scene: Object3D): void;
 }

@@ -1,4 +1,17 @@
-import {Box3, Frustum, Line3, PerspectiveCamera, Plane, Vector2, Vector3} from 'three';
+import {
+  Box3,
+  Box3Helper,
+  Color,
+  Event,
+  Frustum,
+  Line3,
+  MathUtils,
+  Object3D,
+  PerspectiveCamera,
+  Plane,
+  Vector2,
+  Vector3,
+} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
@@ -21,8 +34,8 @@ const makeTileBox = (x: number, y: number): PlaneTileBox => ({
 });
 
 /**
- * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xy plane.
- * So, the camera should point to the xy plane, if there should be visible tiles.
+ * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xz plane.
+ * So, the camera should point to the xz plane, if there should be visible tiles.
  *
  * The view frustum of the camera is used to calculate the visible tiles.
  *
@@ -30,9 +43,13 @@ const makeTileBox = (x: number, y: number): PlaneTileBox => ({
  * The _near_ value is not used.
  */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
-  static readonly PlaneXY = new Plane(new Vector3(0, 0, 1), 0);
+  static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
+
+  readonly uuid = MathUtils.generateUUID();
 
   #camera?: PerspectiveCamera;
+
+  #scene?: Object3D;
 
   depth = 100;
 
@@ -108,25 +125,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.computeVisibleTilesLEGACY(previousTiles, [centerX, centerY], map2dTileCoords);
   }
 
-  #lastPlaneCoords: Vector2 | undefined;
-
-  private equalsLastPlaneCoords(coords: Vector2): boolean {
-    return this.#lastPlaneCoords != null && this.#lastPlaneCoords.equals(coords);
-  }
-
-  private rememberPlaneCoords(coords: Vector2) {
-    if (this.#lastPlaneCoords == null) {
-      this.#lastPlaneCoords = coords.clone();
-    } else {
-      this.#lastPlaneCoords.copy(coords);
-    }
-  }
-
-  // #cameraPosition = new Vector2();
-
   private computeVisibleTilesNEXT(
     previousTiles: Map2DTile[],
-    [centerX, centerY]: [number, number],
+    [_centerX, _centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (this.camera == null) {
@@ -142,26 +143,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const planeIntersectCoords = this.toPlaneCoords(planeIntersect);
     const planeCoords = map2dTileCoords.computeTilesWithinCoords(planeIntersectCoords.x, planeIntersectCoords.y, 1, 1);
 
-    // const deltaPosition = new Vector2(centerX, centerY).sub(this.#cameraPosition);
-    // this.#cameraPosition.set(centerX, centerY);
-
-    // this.camera.position.applyMatrix4(this.camera.projectionMatrix);
-    // this.camera.position.add(new Vector3(deltaPosition.x, deltaPosition.y, 0));
-    // this.camera.position.applyMatrix4(this.camera.projectionMatrixInverse);
-    // this.camera.position.add(new Vector3(deltaPosition.x, deltaPosition.y, 0).applyMatrix4(this.camera.projectionMatrixInverse));
-    // this.camera.position.add(new Vector3(deltaPosition.x, 0, deltaPosition.y));
-    // this.camera.matrixWorldNeedsUpdate = true;
-
-    planeIntersectCoords.x += centerX;
-    planeIntersectCoords.y += centerY;
-
-    if (!this.equalsLastPlaneCoords(planeIntersectCoords)) {
-      this.rememberPlaneCoords(planeIntersectCoords);
-
-      this.findAllVisibleTiles(planeCoords, map2dTileCoords);
-
-      return undefined;
-    }
+    this.findAllVisibleTiles(planeCoords, map2dTileCoords);
 
     // nothing changed, so we just return the previous tiles
     return Array.isArray(previousTiles) && previousTiles.length > 0
@@ -169,10 +151,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       : undefined;
   }
 
-  private findAllVisibleTiles(
-    planeCoords: TilesWithinCoords,
-    map2dTileCoords: Map2DTileCoordsUtil,
-  ): void {
+  private findAllVisibleTiles(planeCoords: TilesWithinCoords, map2dTileCoords: Map2DTileCoordsUtil): void {
     const cameraFrustum = this.makeCameraFrustum();
 
     const visibleBoxes: PlaneTileBox[] = [];
@@ -193,13 +172,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             1,
           );
 
-          console.log('planeCoords', current.planeCoords);
-
           current.planeBox = this.getBoxFromTileCoords(current.planeCoords);
 
           if (cameraFrustum.intersectsBox(current.planeBox)) {
             visibleBoxes.push(current);
-
             [
               [-1, 1],
               [-1, 0],
@@ -224,8 +200,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     // TODO
 
-    // eslint-disable-next-line no-console
-    console.log('new plane coords', {visibleBoxes, nextBox, visitedBoxIds, planeCoords, cameraFrustum});
+    // console.log('new plane coords', {visibleBoxes, nextBox, visitedBoxIds, planeCoords, cameraFrustum});
+
+    if (this.#scene) {
+      this.removeFromScene(this.#scene);
+      for (const [i, {planeBox}] of visibleBoxes.entries()) {
+        if (planeBox != null) {
+          const box = planeBox.clone();
+          const boxSize = box.getSize(new Vector3());
+          box.expandByVector(boxSize.multiplyScalar(-0.01));
+          const helper = new Box3Helper(box, new Color(i === 0 ? 0xff0066 : 0xf0f0f0));
+          helper.userData.createdBy = this.uuid;
+          this.#scene.add(helper);
+        }
+      }
+    }
   }
 
   private makeCameraFrustum(): Frustum {
@@ -236,12 +225,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private getBoxFromTileCoords({top, left, width, height}: TilesWithinCoords): Box3 {
-    return new Box3(new Vector3(left, top, this.ground), new Vector3(left + width, top + height, this.ceiling));
+    return new Box3(new Vector3(left, this.ground, top), new Vector3(left + width, this.ceiling, top + height));
   }
 
   private toPlaneCoords(planeIntersect: Vector3): Vector2 {
-    // TODO find a more generic way to convert from plane -> 2d coords (maybe use and enhance a ProjectionPlane?)
-    return new Vector2(planeIntersect.x, planeIntersect.y);
+    return new Vector2(planeIntersect.x, planeIntersect.z);
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | undefined {
@@ -260,7 +248,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     //   camWorldDir: camWorldDir.toArray(),
     // });
 
-    return CameraBasedVisibility.PlaneXY.intersectLine(lineOfSight, new Vector3());
+    return CameraBasedVisibility.Plane.intersectLine(lineOfSight, new Vector3());
   }
 
   private computeVisibleTilesLEGACY(
@@ -322,5 +310,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
+  }
+
+  addToScene(scene: Object3D<Event>): void {
+    this.#scene = scene;
+  }
+
+  removeFromScene(scene: Object3D<Event>): void {
+    const removeChilds: Object3D[] = [];
+    for (const childNode of scene.children) {
+      if (childNode.userData.createdBy === this.uuid) {
+        removeChilds.push(childNode);
+      }
+    }
+    for (const childNode of removeChilds) {
+      childNode.removeFromParent();
+      (childNode as any).dispose?.();
+    }
   }
 }

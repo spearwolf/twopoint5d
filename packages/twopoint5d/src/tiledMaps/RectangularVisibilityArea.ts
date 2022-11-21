@@ -1,3 +1,4 @@
+import {Object3D, Event} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
@@ -98,4 +99,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
   }
+
+  addToScene(_scene: Object3D<Event>): void {}
+  removeFromScene(_scene: Object3D<Event>): void {}
 }
