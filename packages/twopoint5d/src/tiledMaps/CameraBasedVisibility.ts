@@ -33,7 +33,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly PlaneXY = new Plane(new Vector3(0, 0, 1), 0);
 
   #camera?: PerspectiveCamera;
-  #plane: Plane = CameraBasedVisibility.PlaneXY;
 
   depth = 100;
 
@@ -68,23 +67,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  get plane(): Plane {
-    return this.#plane;
-  }
-
-  set plane(plane: Plane) {
-    const nextPlane = plane ?? CameraBasedVisibility.PlaneXY;
-
-    if (this.#plane !== nextPlane) {
-      this.#plane = nextPlane;
-      this.needsUpdate = true;
-
-      // TODO remove
-      // eslint-disable-next-line no-console
-      console.log('plane changed to', nextPlane);
-    }
-  }
-
   get width(): number {
     return this.#width;
   }
@@ -107,9 +89,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  constructor(camera?: PerspectiveCamera, plane?: Plane) {
+  constructor(camera?: PerspectiveCamera) {
     this.camera = camera;
-    this.plane = plane;
 
     // TODO remove
     this.width = 640;
@@ -279,7 +260,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     //   camWorldDir: camWorldDir.toArray(),
     // });
 
-    return this.plane.intersectLine(lineOfSight, new Vector3());
+    return CameraBasedVisibility.PlaneXY.intersectLine(lineOfSight, new Vector3());
   }
 
   private computeVisibleTilesLEGACY(
