@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
 
 import logo from "../images/twopoint5d.png";
+import lookbook from "../images/20221122-lookbook-white-fat.svg";
 
 import preview_tiledMapsBasicLayerTilesRenderer from "../images/preview/tiled-maps-basic-layer-tiles-renderer.png";
 import preview_texturedSprites from "../images/preview/textured-sprites.png";
@@ -13,10 +14,10 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
 
 <Layout title="Welcome to Astro.">
   <main>
-    <figure class="lookbook-header">
-      <img src={logo} alt="twopoint5d logo" />
-      <figcaption>look<br />book</figcaption>
-    </figure>
+    <header class="lookbook-header">
+      <img class="primary" src={logo} alt="twopoint5d logo" />
+      <img class="secondary" src={lookbook} alt="lookbook title" />
+    </header>
     <ul role="list" class="demo-card-grid">
       <Card
         href="https://docs.astro.build/"
@@ -48,6 +49,16 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
         body="Come say hi to our amazing Discord community."
         image={preview_texturedQuads}
       />
+      <Card
+        href="https://astro.build/chat/"
+        title="Default 1"
+        body="Come say hi to our amazing Discord community."
+      />
+      <Card
+        href="https://astro.build/chat/"
+        title="Default 2"
+        body="Come say hi to our amazing Discord community."
+      />
     </ul>
   </main>
 </Layout>
@@ -63,16 +74,12 @@ import preview_animatedBillboards from "../images/preview/animated-billboards.pn
     display: flex;
     align-items: center;
   }
-  .lookbook-header img {
-    width: 220px;
+  .lookbook-header img.primary {
+    max-height: 60px;
   }
-  .lookbook-header figcaption {
-    padding-left: 1rem;
-    font-size: 1.5rem;
-    line-height: 1;
-    font-weight: normal;
-    text-transform: uppercase;
-    color: var(--color-primary);
+  .lookbook-header img.secondary {
+    max-height: 66px;
+    margin-left: 1rem;
   }
   .demo-card-grid {
     display: grid;
