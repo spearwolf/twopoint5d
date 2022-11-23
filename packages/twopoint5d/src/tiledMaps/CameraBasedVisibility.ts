@@ -18,21 +18,29 @@ import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil';
 
-interface PlaneTileBox {
+interface TilePlaneBox {
   id: string;
   x: number;
   y: number;
-  planeCoords?: TilesWithinCoords;
-  planeBox?: Box3;
+  coords?: TilesWithinCoords;
+  box?: Box3;
 }
 
-const makePlaneTileBoxId = (x: number, y: number) => `${x},${y}`;
+const asTilePlaneBoxId = (x: number, y: number) => `${x},${y}`;
 
-const makeTileBox = (x: number, y: number): PlaneTileBox => ({
-  id: makePlaneTileBoxId(x, y),
+const makeTilePlaneBox = (id: string, x: number, y: number): TilePlaneBox => ({
+  id,
   x,
   y,
 });
+
+const toPlaneCoords = (pointOnPlane: Vector3): Vector2 => new Vector2(pointOnPlane.x, pointOnPlane.z);
+
+const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4 =>
+  new Matrix4().makeTranslation(map2dTileCoords.xOffset, 0, map2dTileCoords.yOffset);
+
+const makeCameraFrustum = (camera: PerspectiveCamera): Frustum =>
+  new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
 
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xz plane.
@@ -91,6 +99,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       // eslint-disable-next-line no-console
       console.log('camera switched to', camera);
     }
+  }
+
+  get hasCamera(): boolean {
+    return this.#camera != null;
   }
 
   get width(): number {
@@ -152,7 +164,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     [_centerX, _centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
-    if (this.camera == null) {
+    if (!this.hasCamera) {
       return undefined;
     }
 
@@ -160,16 +172,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    const intersectionPoint = this.findPointOnPlaneThatIsInViewFrustum(map2dTileCoords);
+    const pointOnPlane = this.findPointOnPlaneThatIsInViewFrustum(map2dTileCoords);
 
-    if (intersectionPoint == null) {
+    if (pointOnPlane == null) {
       return undefined;
     }
 
-    const planeIntersectCoords = this.toPlaneCoords(intersectionPoint);
-    const planeCoords = map2dTileCoords.computeTilesWithinCoords(planeIntersectCoords.x, planeIntersectCoords.y, 1, 1);
+    const planeCoords = toPlaneCoords(pointOnPlane);
+    const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
 
-    this.findAllVisibleTiles(planeCoords, map2dTileCoords);
+    this.findAllVisibleTiles(tileCoords, map2dTileCoords);
 
     // nothing changed, so we just return the previous tiles
     return Array.isArray(previousTiles) && previousTiles.length > 0
@@ -177,67 +189,67 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       : undefined;
   }
 
-  private makePlaneOffset(map2dTileCoords: Map2DTileCoordsUtil): Matrix4 {
-    return new Matrix4().makeTranslation(map2dTileCoords.xOffset, 0, map2dTileCoords.yOffset);
-  }
+  private findAllVisibleTiles(planeTileCoords: TilesWithinCoords, map2dTileCoords: Map2DTileCoordsUtil): void {
+    const cameraFrustum = makeCameraFrustum(this.camera);
+    const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
 
-  private findAllVisibleTiles(planeCoords: TilesWithinCoords, map2dTileCoords: Map2DTileCoordsUtil): void {
-    const cameraFrustum = this.makeCameraFrustum();
+    const visibles: TilePlaneBox[] = [];
+    const visitedIds = new Set<string>();
 
-    const visibleBoxes: PlaneTileBox[] = [];
-    const visitedBoxIds = new Set<string>();
+    const next: TilePlaneBox[] = [
+      makeTilePlaneBox(
+        asTilePlaneBoxId(planeTileCoords.tileLeft, planeTileCoords.tileTop),
+        planeTileCoords.tileLeft,
+        planeTileCoords.tileTop,
+      ),
+    ];
 
-    const nextBox: PlaneTileBox[] = [makeTileBox(planeCoords.tileLeft, planeCoords.tileTop)];
+    while (next.length > 0) {
+      const tile = next.pop();
+      if (!visitedIds.has(tile.id)) {
+        visitedIds.add(tile.id);
 
-    const planeBoxOffset = this.makePlaneOffset(map2dTileCoords);
+        tile.coords = map2dTileCoords.computeTilesWithinCoords(
+          tile.x * planeTileCoords.tileWidth,
+          tile.y * planeTileCoords.tileHeight,
+          1,
+          1,
+        );
 
-    while (nextBox.length > 0) {
-      const current = nextBox.pop();
-      if (current != null) {
-        if (!visitedBoxIds.has(current.id)) {
-          visitedBoxIds.add(current.id);
+        tile.box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
 
-          current.planeCoords = map2dTileCoords.computeTilesWithinCoords(
-            current.x * planeCoords.tileWidth,
-            current.y * planeCoords.tileHeight,
-            1,
-            1,
-          );
+        if (cameraFrustum.intersectsBox(tile.box)) {
+          visibles.push(tile);
+          [
+            [-1, 1],
+            [-1, 0],
+            [-1, -1],
 
-          current.planeBox = this.getBoxFromTileCoords(current.planeCoords).applyMatrix4(planeBoxOffset);
+            [0, 1],
+            [0, -1],
 
-          if (cameraFrustum.intersectsBox(current.planeBox)) {
-            visibleBoxes.push(current);
-            [
-              [-1, 1],
-              [-1, 0],
-              [-1, -1],
-
-              [0, 1],
-              [0, -1],
-
-              [1, 1],
-              [1, 0],
-              [1, -1],
-            ].forEach(([dx, dy]) => {
-              const ptb = makeTileBox(current.planeCoords.tileLeft + dx, current.planeCoords.tileTop + dy);
-              if (!visitedBoxIds.has(ptb.id)) {
-                nextBox.push(ptb);
-              }
-            });
-          }
+            [1, 1],
+            [1, 0],
+            [1, -1],
+          ].forEach(([dx, dy]) => {
+            const [tx, ty] = [tile.coords.tileLeft + dx, tile.coords.tileTop + dy];
+            const tileId = asTilePlaneBoxId(tx, ty);
+            if (!visitedIds.has(tileId)) {
+              next.push(makeTilePlaneBox(tileId, tx, ty));
+            }
+          });
         }
       }
     }
 
     if (this.showHelpers) {
-      this.createHelpers(visibleBoxes);
+      this.createHelpers(visibles);
     }
   }
 
-  private createHelpers(visibleBoxes: PlaneTileBox[]) {
+  private createHelpers(visibleBoxes: TilePlaneBox[]) {
     if (this.#scene) {
-      for (const [i, {planeBox}] of visibleBoxes.entries()) {
+      for (const [i, {box: planeBox}] of visibleBoxes.entries()) {
         if (planeBox != null) {
           const box = planeBox.clone();
           const boxSize = box.getSize(new Vector3());
@@ -250,19 +262,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  private makeCameraFrustum(): Frustum {
-    this.camera.updateMatrixWorld();
-    return new Frustum().setFromProjectionMatrix(
-      this.camera.projectionMatrix.clone().multiply(this.camera.matrixWorld.clone().invert()),
-    );
-  }
-
-  private getBoxFromTileCoords({top, left, width, height}: TilesWithinCoords): Box3 {
+  private makeTileBox({top, left, width, height}: TilesWithinCoords): Box3 {
     return new Box3(new Vector3(left, this.ground, top), new Vector3(left + width, this.ceiling, top + height));
-  }
-
-  private toPlaneCoords(planeIntersect: Vector3): Vector2 {
-    return new Vector2(planeIntersect.x, planeIntersect.z);
   }
 
   private findPointOnPlaneThatIsInViewFrustum(map2dTileCoords: Map2DTileCoordsUtil): Vector3 | undefined {
@@ -274,7 +275,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     // TODO check all frame corners of the view frustum instead of the view frustum center
 
-    const planeOffset = this.makePlaneOffset(map2dTileCoords);
+    const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
     const projectPlane = CameraBasedVisibility.Plane.clone().applyMatrix4(planeOffset);
 
     return projectPlane.intersectLine(lineOfSight, new Vector3());
