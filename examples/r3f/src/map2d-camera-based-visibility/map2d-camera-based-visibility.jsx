@@ -76,6 +76,7 @@ export const DemoOrDie = () => {
         yOffset={-128}
         centerX={center.x}
         centerY={center.y}
+        updateOnFrame
       >
         <cameraBasedVisibility
           camera={map2dCamera}

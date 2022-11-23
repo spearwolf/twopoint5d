@@ -65,7 +65,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #width = 0;
   #height = 0;
 
-  needsUpdate = true;
+  get needsUpdate(): boolean {
+    return true;
+  }
+
+  set needsUpdate(_update: boolean) {}
 
   #tileCreated?: Uint8Array;
 

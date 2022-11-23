@@ -1,6 +1,6 @@
-import {extend, ReactThreeFiber} from '@react-three/fiber';
+import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
 import {Map2DLayer3D as __Map2DLayer3D} from 'twopoint5d';
-import {ForwardedRef, forwardRef, memo, useEffect, useState} from 'react';
+import {ForwardedRef, forwardRef, memo, useCallback, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Map2DLayer3D: __Map2DLayer3D});
@@ -21,10 +21,11 @@ export type Map2DLayer3DProps = JSX.IntrinsicElements['map2DLayer3D'] & {
   tileHeight?: number;
   xOffset?: number;
   yOffset?: number;
+  updateOnFrame?: boolean;
 };
 
 function Component(
-  {centerX, centerY, tileWidth, tileHeight, xOffset, yOffset, children, ...props}: Map2DLayer3DProps,
+  {centerX, centerY, tileWidth, tileHeight, xOffset, yOffset, updateOnFrame, children, ...props}: Map2DLayer3DProps,
   ref: ForwardedRef<__Map2DLayer3D>,
 ) {
   const [layer, setLayer] = useState<__Map2DLayer3D>(null);
@@ -32,6 +33,14 @@ function Component(
   useEffect(() => {
     layer?.update();
   }, [layer, centerX, centerY, tileWidth, tileHeight, xOffset, yOffset]);
+
+  const onFrame = useCallback(() => {
+    if (layer != null && updateOnFrame) {
+      layer.update();
+    }
+  }, [layer, updateOnFrame]);
+
+  useFrame(onFrame);
 
   return (
     <map2DLayer3D
