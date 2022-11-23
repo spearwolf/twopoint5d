@@ -66,10 +66,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #height = 0;
 
   get needsUpdate(): boolean {
+    // TODO at this point we should correctly check if something has changed on the input camera (orientation, rotation, etc),
+    // but since this is rather an expensive thing to do, the intermediate result (planeCoords) might have to be cached as well
     return true;
   }
 
-  set needsUpdate(_update: boolean) {}
+  set needsUpdate(_update: boolean) {
+    // TODO fix the needsUpdate getter ;)
+  }
 
   #tileCreated?: Uint8Array;
 
