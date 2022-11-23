@@ -8,6 +8,7 @@ import {
   MathUtils,
   Matrix4,
   Object3D,
+  OrthographicCamera,
   PerspectiveCamera,
   Plane,
   Vector2,
@@ -39,7 +40,7 @@ const toPlaneCoords = (pointOnPlane: Vector3): Vector2 => new Vector2(pointOnPla
 const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4 =>
   new Matrix4().makeTranslation(map2dTileCoords.xOffset, 0, map2dTileCoords.yOffset);
 
-const makeCameraFrustum = (camera: PerspectiveCamera): Frustum =>
+const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
   new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
 
 /**
@@ -56,10 +57,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   readonly uuid = MathUtils.generateUUID();
 
-  #camera?: PerspectiveCamera;
-
-  #scene?: Object3D;
-
   depth = 100;
 
   get ground(): number {
@@ -69,10 +66,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   get ceiling(): number {
     return Math.abs(this.depth) / 2;
   }
-
-  // TODO remove
-  #width = 0;
-  #height = 0;
 
   get needsUpdate(): boolean {
     // TODO at this point we should correctly check if something has changed on the input camera (orientation, rotation, etc),
@@ -84,13 +77,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // TODO fix the needsUpdate getter ;)
   }
 
+  // TODO still needed?
   #tileCreated?: Uint8Array;
 
-  get camera(): PerspectiveCamera {
+  #camera?: PerspectiveCamera | OrthographicCamera;
+
+  get camera(): PerspectiveCamera | OrthographicCamera {
     return this.#camera;
   }
 
-  set camera(camera: PerspectiveCamera) {
+  set camera(camera: PerspectiveCamera | OrthographicCamera) {
     if (this.#camera !== camera) {
       this.#camera = camera;
       this.needsUpdate = true;
@@ -104,6 +100,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   get hasCamera(): boolean {
     return this.#camera != null;
   }
+
+  // TODO remove width + height props
+
+  #width = 0;
+  #height = 0;
 
   get width(): number {
     return this.#width;
@@ -140,7 +141,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#showHelpers = showHelpers;
   }
 
-  constructor(camera?: PerspectiveCamera) {
+  constructor(camera?: PerspectiveCamera | OrthographicCamera) {
     this.camera = camera;
 
     // TODO remove
@@ -183,6 +184,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.findAllVisibleTiles(tileCoords, map2dTileCoords);
 
+    // TODO compute visible, reuse and remove tiles
+
     // nothing changed, so we just return the previous tiles
     return Array.isArray(previousTiles) && previousTiles.length > 0
       ? {tiles: previousTiles, reuseTiles: previousTiles}
@@ -209,14 +212,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       if (!visitedIds.has(tile.id)) {
         visitedIds.add(tile.id);
 
-        tile.coords = map2dTileCoords.computeTilesWithinCoords(
+        tile.coords ??= map2dTileCoords.computeTilesWithinCoords(
           tile.x * planeTileCoords.tileWidth,
           tile.y * planeTileCoords.tileHeight,
           1,
           1,
         );
 
-        tile.box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
+        tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
 
         if (cameraFrustum.intersectsBox(tile.box)) {
           visibles.push(tile);
@@ -235,6 +238,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             const [tx, ty] = [tile.coords.tileLeft + dx, tile.coords.tileTop + dy];
             const tileId = asTilePlaneBoxId(tx, ty);
             if (!visitedIds.has(tileId)) {
+              // TODO instead of always creating a new box we should check if we already have this tile..
+              // TODO should we look at the distance of the tile from the camera here?
               next.push(makeTilePlaneBox(tileId, tx, ty));
             }
           });
@@ -342,6 +347,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
   }
+
+  #scene?: Object3D;
 
   addToScene(scene: Object3D<Event>): void {
     this.#scene = scene;
