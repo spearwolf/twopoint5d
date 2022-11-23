@@ -247,13 +247,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  private createHelpers(visibleBoxes: TilePlaneBox[]) {
+  private createHelpers(visibles: TilePlaneBox[]) {
     if (this.#scene) {
-      for (const [i, {box: planeBox}] of visibleBoxes.entries()) {
-        if (planeBox != null) {
-          const box = planeBox.clone();
+      for (const [i, {box: visibleBox}] of visibles.entries()) {
+        if (visibleBox != null) {
+          const box = visibleBox.clone();
           const boxSize = box.getSize(new Vector3());
           box.expandByVector(boxSize.multiplyScalar(-0.01));
+
           const helper = new Box3Helper(box, new Color(i === 0 ? 0xff0066 : 0xf0f0f0));
           helper.userData.createdBy = this.uuid;
           this.#scene.add(helper);
