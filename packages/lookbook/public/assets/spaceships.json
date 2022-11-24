@@ -1,0 +1,34 @@
+{
+  "frames": {
+    "ship-00": {
+      "frame": { "x": 844, "y": 1, "w": 468, "h": 466 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 468, "h": 466 },
+      "sourceSize": { "w": 468, "h": 466 }
+    },
+    "ship-01": {
+      "frame": { "x": 1, "y": 1, "w": 841, "h": 920 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 841, "h": 920 },
+      "sourceSize": { "w": 841, "h": 920 }
+    },
+    "ship-02": {
+      "frame": { "x": 844, "y": 469, "w": 443, "h": 418 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 443, "h": 418 },
+      "sourceSize": { "w": 443, "h": 418 }
+    }
+  },
+  "meta": {
+    "app": "https://www.codeandweb.com/texturepacker",
+    "version": "1.0",
+    "image": "spaceships.png",
+    "format": "RGBA8888",
+    "size": { "w": 1313, "h": 1313 },
+    "scale": "1",
+    "smartupdate": "$TexturePacker:SmartUpdate:261fbe1c75839df77d33ecf1e185da74:0d916bf28d20488915a6dd96169d5eee:3272f82166f65e17cc3a00865a7647ff$"
+  }
+}
