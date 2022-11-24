@@ -1,8 +1,8 @@
 <canvas id="two.5d" resize-to="window"></canvas>
 
 <script>
+  import { FrontSide } from "three";
   import {
-    // TileSetLoader,
     TexturedSpritesGeometry,
     TexturedSpritesMaterial,
     TexturedSprites,
@@ -16,11 +16,6 @@
   const demo = new PerspectiveOrbitDemoShell(canvasEl, {
     antialias: true,
   });
-
-  // const { tileSet, texture } = await new TileSetLoader().loadAsync(
-  //   "assets/nobinger-anim-sheet.png",
-  //   { tileWidth: 64, tileHeight: 64, margin: 1 }
-  // );
 
   const { atlas, texture } = await new TextureAtlasLoader().loadAsync(
     "assets/skulls-n-robots.json",
@@ -54,6 +49,7 @@
     material.colorMap = texture;
     material.depthTest = false;
     material.depthWrite = false;
+    material.side = FrontSide;
 
     const mesh = new TexturedSprites(geometry, material);
 
