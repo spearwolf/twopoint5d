@@ -2,10 +2,11 @@
 
 <script>
   import {
-    TileSetLoader,
+    // TileSetLoader,
     TexturedSpritesGeometry,
     TexturedSpritesMaterial,
     TexturedSprites,
+    TextureAtlasLoader,
   } from "twopoint5d";
   import { BouncingSprites } from "./TexturedSprites/BouncingSprites.js";
   import { PerspectiveOrbitDemoShell } from "./shared/PerspectiveOrbitDemoShell.js";
@@ -16,23 +17,29 @@
     antialias: true,
   });
 
-  const { tileSet, texture } = await new TileSetLoader().loadAsync(
-    "assets/nobinger-anim-sheet.png",
-    { tileWidth: 64, tileHeight: 64, margin: 1 }
+  // const { tileSet, texture } = await new TileSetLoader().loadAsync(
+  //   "assets/nobinger-anim-sheet.png",
+  //   { tileWidth: 64, tileHeight: 64, margin: 1 }
+  // );
+
+  const { atlas, texture } = await new TextureAtlasLoader().loadAsync(
+    "assets/skulls-n-robots.json",
+    ["anisotrophy"],
+    { overrideImageUrl: "assets/skulls-n-robots--natural.png" }
   );
 
   demo.on("init", ({ scene, camera }) => {
     camera.position.set(0, 0, 50);
 
-    const CAPACITY = 333;
+    const CAPACITY = 666;
     const geometry = new TexturedSpritesGeometry(CAPACITY);
 
     const bouncingSprites = new BouncingSprites(
       geometry.instancedPool,
-      tileSet.atlas,
-      100,
-      75,
-      7,
+      atlas,
+      150,
+      90,
+      4,
       CAPACITY
     );
 
@@ -56,6 +63,4 @@
   });
 
   demo.start();
-
-  console.log("hello darkness, my old friend", canvasEl);
 </script>
