@@ -14,6 +14,9 @@
     "astro": "^1.6.0"
   },
   "devDependencies": {
-    "sass": "^1.56.0"
+    "@spearwolf/eventize": "^2.0.3",
+    "sass": "^1.56.0",
+    "three": "^0.145",
+    "twopoint5d": "workspace:*"
   }
 }

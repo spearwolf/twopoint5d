@@ -1,0 +1,61 @@
+<canvas id="two.5d" resize-to="window"></canvas>
+
+<script>
+  import {
+    TileSetLoader,
+    TexturedSpritesGeometry,
+    TexturedSpritesMaterial,
+    TexturedSprites,
+  } from "twopoint5d";
+  import { BouncingSprites } from "./TexturedSprites/BouncingSprites.js";
+  import { PerspectiveOrbitDemoShell } from "./shared/PerspectiveOrbitDemoShell.js";
+
+  const canvasEl = document.getElementById("two.5d");
+
+  const demo = new PerspectiveOrbitDemoShell(canvasEl, {
+    antialias: true,
+  });
+
+  const { tileSet, texture } = await new TileSetLoader().loadAsync(
+    "assets/nobinger-anim-sheet.png",
+    { tileWidth: 64, tileHeight: 64, margin: 1 }
+  );
+
+  demo.on("init", ({ scene, camera }) => {
+    camera.position.set(0, 0, 50);
+
+    const CAPACITY = 333;
+    const geometry = new TexturedSpritesGeometry(CAPACITY);
+
+    const bouncingSprites = new BouncingSprites(
+      geometry.instancedPool,
+      tileSet.atlas,
+      100,
+      75,
+      7,
+      CAPACITY
+    );
+
+    bouncingSprites.createSprites();
+
+    demo.on("frame", ({ deltaTime }) => {
+      bouncingSprites.animate(deltaTime);
+    });
+
+    const material = new TexturedSpritesMaterial();
+
+    material.colorMap = texture;
+    material.depthTest = false;
+    material.depthWrite = false;
+
+    const mesh = new TexturedSprites(geometry, material);
+
+    scene.add(mesh);
+
+    console.log("bouncingSprites", bouncingSprites);
+  });
+
+  demo.start();
+
+  console.log("hello darkness, my old friend", canvasEl);
+</script>
