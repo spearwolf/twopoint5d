@@ -1,0 +1,76 @@
+{
+  "frames": {
+    "head-00": {
+      "frame": { "x": 286, "y": 1077, "w": 274, "h": 336 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 274, "h": 336 },
+      "sourceSize": { "w": 274, "h": 336 }
+    },
+    "head-01": {
+      "frame": { "x": 338, "y": 663, "w": 293, "h": 412 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 293, "h": 412 },
+      "sourceSize": { "w": 293, "h": 412 }
+    },
+    "robot-00": {
+      "frame": { "x": 445, "y": 305, "w": 351, "h": 356 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 351, "h": 356 },
+      "sourceSize": { "w": 351, "h": 356 }
+    },
+    "robot-01": {
+      "frame": { "x": 1, "y": 431, "w": 335, "h": 339 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 335, "h": 339 },
+      "sourceSize": { "w": 335, "h": 339 }
+    },
+    "robot-02": {
+      "frame": { "x": 1, "y": 772, "w": 283, "h": 423 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 283, "h": 423 },
+      "sourceSize": { "w": 283, "h": 423 }
+    },
+    "robot-03": {
+      "frame": { "x": 445, "y": 1, "w": 384, "h": 302 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 384, "h": 302 },
+      "sourceSize": { "w": 384, "h": 302 }
+    },
+    "robot-04": {
+      "frame": { "x": 831, "y": 1, "w": 126, "h": 150 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 126, "h": 150 },
+      "sourceSize": { "w": 126, "h": 150 }
+    },
+    "robot-05": {
+      "frame": { "x": 633, "y": 663, "w": 283, "h": 414 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 283, "h": 414 },
+      "sourceSize": { "w": 283, "h": 414 }
+    },
+    "skull-00": {
+      "frame": { "x": 1, "y": 1, "w": 442, "h": 428 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 442, "h": 428 },
+      "sourceSize": { "w": 442, "h": 428 }
+    }
+  },
+  "meta": {
+    "app": "https://www.codeandweb.com/texturepacker",
+    "version": "1.0",
+    "image": "skulls-n-robots--natural.png",
+    "format": "RGBA8888",
+    "size": { "w": 1024, "h": 2048 },
+    "scale": "1",
+    "smartupdate": "$TexturePacker:SmartUpdate:9d5eb569e15f9fb706b8e29bb02bd21e:67229d0c6336253efe0d6524e8cb93e2:a8f162fc7a0dcbafee8f3f64b02e2a94$"
+  }
+}
