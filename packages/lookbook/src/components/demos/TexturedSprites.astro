@@ -18,15 +18,15 @@
   });
 
   const { atlas, texture } = await new TextureAtlasLoader().loadAsync(
-    "assets/skulls-n-robots.json",
+    "assets/spaceships.json",
     ["anisotrophy"],
-    { overrideImageUrl: "assets/skulls-n-robots--natural.png" }
+    { overrideImageUrl: "assets/spaceships.png" }
   );
 
   demo.on("init", ({ scene, camera }) => {
     camera.position.set(0, 0, 50);
 
-    const CAPACITY = 666;
+    const CAPACITY = 199;
     const geometry = new TexturedSpritesGeometry(CAPACITY);
 
     const bouncingSprites = new BouncingSprites(
@@ -34,7 +34,7 @@
       atlas,
       150,
       90,
-      4,
+      8,
       CAPACITY
     );
 

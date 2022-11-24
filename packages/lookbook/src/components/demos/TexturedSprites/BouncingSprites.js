@@ -1,14 +1,14 @@
 export class BouncingSprites {
-  gravity = -45;
-  startSpeedX = 20;
-  startSpeedY = 40;
+  gravity = -25;
+  startSpeedX = 10;
+  startSpeedY = 20;
   startSpeedBaseX = 10;
   startSpeedBaseY = 10;
-  fallSpeed = 25;
-  fallBaseSpeed = 15;
-  upwindBaseSpeed = 0.5;
-  upwindSpeed = 0.6;
-  speedRotateFactor = 1;
+  fallSpeed = 20;
+  fallBaseSpeed = 10;
+  upwindBaseSpeed = 0.4;
+  upwindSpeed = 0.4;
+  speedRotateFactor = 1.2;
 
   sprites = [];
 
