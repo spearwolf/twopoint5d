@@ -16,21 +16,33 @@ The core features can be roughly classified into the following areas:
 
 #### [textured-sprites](src/sprites/)
 - create and render textured 2D sprites
-- load texture atlases
-- animations
+- load from texture atlases or sprite sheet images
+- support animations
 - render as billboards (optional)
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
-#### [vertex-objects and texture atlases](src/vertexObjects/)
-- provides an object based abstraction over instanced buffer geometries. build them with your own api
-- create, update and delete instances with ease
-- _legacy_ api docs: [docs/VertexObjects-legacy](../../docs/VertexObjects-legacy.md)
+#### [texture atlases and tilesets](src/vertexObjects/)
+- load and use texture atlases from json
+- create tilesets from images
 - :heavy_check_mark: api is stable and ready to use
 
 #### [tiled-maps](src/tiledMaps/)
 - create and render visual tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
 - api docs: [docs/Map2D](../../docs/Map2D.md)
 - :warning: work in progress
+
+#### [vertex-objects](src/vertexObjects/)
+
+The main motivation behind the _vertex objects_ is to make it easier to create custom geometries, especially _instanced_ geometries (multiple objects within one buffer geometry) without worrying too much about low-level three.js/WebGL details.
+
+This library provides you with a declarative interface to describe the shape of the geometry, incl. indices and attributes and manages the internal attribute buffers, deals with mapping of attributes to buffers AND the update of them.
+  
+It should significantly cut down on the amount of boilerplate code and state management you need to do in your applications. At the same time, the _vertex objects_ api gives you a convenient object-based interface to write extremely clean and readable programs for your custom geometries.
+
+- provides an object based abstraction over instanced buffer geometries. build them with your own api
+- create, update and delete instances with ease
+- _legacy_ api docs: [docs/VertexObjects-legacy](../../docs/VertexObjects-legacy.md)
+- :heavy_check_mark: api is stable and ready to use
 
 #### [stage2d and projections](src/stage/)
 - create responsive three.js scenes by describing a _projection_
