@@ -11,6 +11,7 @@ const Layout = styled.div`
   margin: 1em auto;
   display: flex;
   justify-content: center;
+  pointer-events: none;
 `;
 
 const CameraButtonStyled = styled.button`
@@ -28,6 +29,7 @@ const CameraButtonStyled = styled.button`
 
   cursor: pointer;
   user-select: none;
+  pointer-events: auto;
 
   transition: 0.2s;
 
@@ -105,10 +107,10 @@ const CAMERA_BUTTONS = [
     key: "cam1",
     label: "Orbit Around",
   },
-  {
-    key: "cam0",
-    label: "Map2D Pan-Control",
-  },
+  // {
+  //   key: "cam0",
+  //   label: "Map2D Pan-Control",
+  // },
   {
     key: "cam2",
     label: "Control Map2D Camera",

@@ -3,6 +3,7 @@ import { extend, useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
 import { CameraHelper, PerspectiveCamera } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
+import { useControls } from "leva";
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -35,6 +36,13 @@ export const DemoOrDie = () => {
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
+  const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
+    "show helpers",
+    {
+      tiles: false,
+      camera: true,
+    }
+  );
 
   const pointerPanDisabled = activeCamera !== "cam0";
   const orbitAround = activeCamera === "cam1";
@@ -59,7 +67,7 @@ export const DemoOrDie = () => {
       {orbitAround && <OrbitControls makeDefault />}
       {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault />}
 
-      <cameraHelper args={[map2dCamera]} />
+      {showCameraHelper && <cameraHelper args={[map2dCamera]} />}
 
       <TileSet
         name="tiles"
@@ -79,7 +87,7 @@ export const DemoOrDie = () => {
         updateOnFrame
       >
         <cameraBasedVisibility
-          showHelpers
+          showHelpers={showTileBoxes}
           camera={map2dCamera}
           depth={10}
           attach="visibilitor"
