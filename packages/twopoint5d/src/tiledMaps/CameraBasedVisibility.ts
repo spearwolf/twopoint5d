@@ -136,7 +136,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const pointOnPlane = this.findPointOnPlaneThatIsInViewFrustum(map2dTileCoords);
 
     if (pointOnPlane == null) {
-      return undefined;
+      return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
     const planeCoords = toPlaneCoords(pointOnPlane);

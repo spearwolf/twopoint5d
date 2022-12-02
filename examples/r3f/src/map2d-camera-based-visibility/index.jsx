@@ -12,7 +12,7 @@ root.render(
   <>
     <Leva titleBar />
     <SwitchCameraUI />
-    <Canvas dpr={[1, 2]} camera={{ position: [100, 350, 600], far: 8000 }}>
+    <Canvas dpr={[1, 2]} camera={{ position: [100, 350, 600], far: 25000 }}>
       <StrictMode>
         <DemoOrDie />
       </StrictMode>
