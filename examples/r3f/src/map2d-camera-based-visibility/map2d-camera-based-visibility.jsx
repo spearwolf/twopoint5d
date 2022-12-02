@@ -20,7 +20,7 @@ import { useDemoStore } from "./useDemoStore";
 extend({ CameraBasedVisibility, CameraHelper });
 
 const TILES = [
-  [1, 2],
+  [4, 3],
   [3, 4],
 ];
 
@@ -71,9 +71,9 @@ export const DemoOrDie = () => {
 
       <TileSet
         name="tiles"
-        url="/examples/assets/map2d-debug-tiles_4x256x256.png"
-        tileWidth={256}
-        tileHeight={256}
+        url="/examples/assets/ball-patterns.png"
+        tileWidth={128}
+        tileHeight={128}
       />
 
       <Map2DLayer3D
