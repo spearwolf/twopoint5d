@@ -119,7 +119,7 @@ const CAMERA_BUTTONS = [
   // },
   {
     key: "cam3",
-    label: "View & Control Map2D Camera",
+    label: "View Map2D",
   },
 ];
 

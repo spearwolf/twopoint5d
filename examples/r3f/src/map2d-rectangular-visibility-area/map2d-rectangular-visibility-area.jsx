@@ -7,7 +7,9 @@ import {
   Map2DLayer3D,
   Map2DTileSprites,
   PanControl2D,
+  ParallaxProjection,
   RepeatingTilesProvider,
+  Stage2D,
   TextureRef,
   TileSet,
   TileSetRef,
@@ -37,24 +39,32 @@ const TILES = [
   [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
 ];
 
+const VIEW_WIDTH = "view width";
+const VIEW_HEIGHT = "view height";
+const VIEW_RECT = "view rect";
+
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const activeCamera = useDemoStore((state) => state.activeCameraName);
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
-  const { viewRect: showHelpers } = useControls("show helpers", {
-    viewRect: true,
+
+  const { [VIEW_WIDTH]: viewWidth, [VIEW_HEIGHT]: viewHeight } = useControls({
+    [VIEW_WIDTH]: 1024,
+    [VIEW_HEIGHT]: 768,
   });
 
-  const pointerPanDisabled = activeCamera !== "cam0";
+  const { [VIEW_RECT]: showHelpers } = useControls("show helpers", {
+    [VIEW_RECT]: true,
+  });
+
+  const pointerPanDisabled = activeCamera === "cam1";
   const orbitAround = activeCamera === "cam1";
-  // const controlMap2DCamera = activeCamera === "cam2" || activeCamera === "cam3";
+  const showMap2DCamera = activeCamera === "cam3";
 
   useEffect(() => {
-    if (activeCamera === "cam3") {
-      // setThree({ camera: map2dCamera });
-    } else {
+    if (activeCamera !== "cam3") {
       setThree({ camera: defaultCamera });
     }
   }, [activeCamera]);
@@ -68,9 +78,16 @@ export const DemoOrDie = () => {
       />
 
       {orbitAround && <OrbitControls makeDefault />}
-      {/* {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault />} */}
 
-      {/* {showCameraHelper && <cameraHelper args={[map2dCamera]} />} */}
+      <Stage2D noAutoRender defaultCamera={showMap2DCamera}>
+        <ParallaxProjection
+          plane="xz"
+          origin="top left"
+          width={viewWidth}
+          height={viewHeight}
+          fit="contain"
+        />
+      </Stage2D>
 
       <TileSet
         name="tiles"
@@ -90,8 +107,8 @@ export const DemoOrDie = () => {
         updateOnFrame
       >
         <rectangularVisibilityArea
-          width={1024}
-          height={768}
+          width={viewWidth}
+          height={viewHeight}
           showHelpers={showHelpers}
           attach="visibilitor"
         />
