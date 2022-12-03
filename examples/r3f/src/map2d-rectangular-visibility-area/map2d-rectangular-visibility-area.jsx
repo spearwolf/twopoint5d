@@ -41,6 +41,7 @@ const TILES = [
 
 const VIEW_WIDTH = "view width";
 const VIEW_HEIGHT = "view height";
+const VIEW_FIT = "view fit";
 const VIEW_RECT = "view rect";
 
 export const DemoOrDie = () => {
@@ -50,9 +51,14 @@ export const DemoOrDie = () => {
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
 
-  const { [VIEW_WIDTH]: viewWidth, [VIEW_HEIGHT]: viewHeight } = useControls({
+  const {
+    [VIEW_WIDTH]: viewWidth,
+    [VIEW_HEIGHT]: viewHeight,
+    [VIEW_FIT]: viewFit,
+  } = useControls({
     [VIEW_WIDTH]: 1024,
     [VIEW_HEIGHT]: 768,
+    [VIEW_FIT]: { options: ["cover", "contain"] },
   });
 
   const { [VIEW_RECT]: showHelpers } = useControls("show helpers", {
@@ -85,7 +91,7 @@ export const DemoOrDie = () => {
           origin="top left"
           width={viewWidth}
           height={viewHeight}
-          fit="contain"
+          fit={viewFit}
         />
       </Stage2D>
 
