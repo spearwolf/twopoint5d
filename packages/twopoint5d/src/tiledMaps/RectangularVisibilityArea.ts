@@ -1,16 +1,32 @@
-import {Object3D, Event} from 'three';
+import {Box3, Box3Helper, Color, Event, MathUtils, Object3D, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
+  readonly uuid = MathUtils.generateUUID();
+
   #width = 0;
   #height = 0;
 
   needsUpdate = true;
 
+  viewRectHelperHeight = 20;
+  viewRectHelperColor = new Color(0xfff066);
+
+  #viewRect?: Box3 = undefined;
+
   #tileCreated?: Uint8Array;
+
+  #showHelpers = false;
+
+  #scene?: Object3D;
+
+  constructor(width = 320, height = 240) {
+    this.width = width;
+    this.height = height;
+  }
 
   get width(): number {
     return this.#width;
@@ -34,11 +50,6 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
   }
 
-  constructor(width = 320, height = 240) {
-    this.width = width;
-    this.height = height;
-  }
-
   computeVisibleTiles(
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
@@ -50,8 +61,18 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     const {width, height} = this;
 
-    const left = centerX - width / 2;
-    const top = centerY - height / 2;
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    const left = centerX - halfWidth;
+    const top = centerY - halfHeight;
+
+    const viewRectHelperHalfHeight = this.viewRectHelperHeight / 2;
+
+    this.#viewRect = new Box3(
+      new Vector3(-halfWidth, -viewRectHelperHalfHeight, -halfHeight),
+      new Vector3(halfWidth, viewRectHelperHalfHeight, halfHeight),
+    );
 
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(left, top, width, height);
     const fullViewArea = AABB2.from(tileCoords);
@@ -97,9 +118,55 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       }
     }
 
+    if (this.showHelpers) {
+      this.updateHelpers();
+    }
+
     return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
   }
 
-  addToScene(_scene: Object3D<Event>): void {}
-  removeFromScene(_scene: Object3D<Event>): void {}
+  get showHelpers() {
+    return this.#showHelpers;
+  }
+
+  set showHelpers(showHelpers: boolean) {
+    if (this.#showHelpers && !showHelpers) {
+      this.removeHelpers();
+    } else if (!this.#showHelpers && showHelpers) {
+      this.updateHelpers();
+    }
+    this.#showHelpers = showHelpers;
+  }
+
+  addToScene(scene: Object3D<Event>): void {
+    this.#scene = scene;
+  }
+
+  removeFromScene(scene: Object3D<Event>): void {
+    const removeChilds: Object3D[] = [];
+    for (const childNode of scene.children) {
+      if (childNode.userData.createdBy === this.uuid) {
+        removeChilds.push(childNode);
+      }
+    }
+    for (const childNode of removeChilds) {
+      childNode.removeFromParent();
+      (childNode as any).dispose?.();
+    }
+  }
+
+  removeHelpers() {
+    if (this.#scene) {
+      this.removeFromScene(this.#scene);
+    }
+  }
+
+  updateHelpers() {
+    this.removeHelpers();
+    if (this.#scene && this.#viewRect) {
+      const helper = new Box3Helper(this.#viewRect, this.viewRectHelperColor);
+      helper.userData.createdBy = this.uuid;
+      this.#scene.add(helper);
+    }
+  }
 }

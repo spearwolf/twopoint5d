@@ -109,14 +109,14 @@ const CAMERA_BUTTONS = [
     key: "cam1",
     label: "Orbit Around",
   },
-  // {
-  //   key: "cam0",
-  //   label: "Map2D Pan-Control",
-  // },
   {
-    key: "cam2",
-    label: "Control Map2D Camera",
+    key: "cam0",
+    label: "Map2D Pan-Control",
   },
+  // {
+  //   key: "cam2",
+  //   label: "Control Map2D Camera",
+  // },
   {
     key: "cam3",
     label: "View & Control Map2D Camera",

@@ -64,6 +64,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   depth = 100;
 
+  #camera?: PerspectiveCamera | OrthographicCamera;
+
+  #showHelpers = false;
+
+  #scene?: Object3D;
+
+  constructor(camera?: PerspectiveCamera | OrthographicCamera) {
+    this.camera = camera;
+  }
+
   get ground(): number {
     return Math.abs(this.depth) / -2;
   }
@@ -81,8 +91,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   set needsUpdate(_update: boolean) {
     // TODO fix the needsUpdate getter ;)
   }
-
-  #camera?: PerspectiveCamera | OrthographicCamera;
 
   get camera(): PerspectiveCamera | OrthographicCamera {
     return this.#camera;
@@ -103,8 +111,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.#camera != null;
   }
 
-  #showHelpers = false;
-
   get showHelpers() {
     return this.#showHelpers;
   }
@@ -114,10 +120,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
     this.#showHelpers = showHelpers;
-  }
-
-  constructor(camera?: PerspectiveCamera | OrthographicCamera) {
-    this.camera = camera;
   }
 
   computeVisibleTiles(
@@ -259,8 +261,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     return projectPlane.intersectLine(lineOfSight, new Vector3());
   }
-
-  #scene?: Object3D;
 
   addToScene(scene: Object3D<Event>): void {
     this.#scene = scene;

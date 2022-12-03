@@ -28,6 +28,10 @@ module.exports = {
       import: "./src/map2d-camera-based-visibility/index.jsx",
       dependOn: "libs",
     },
+    "map2d-rectangular-visibility-area": {
+      import: "./src/map2d-rectangular-visibility-area/index.jsx",
+      dependOn: "libs",
+    },
     clouds: {
       import: "./src/clouds/index.jsx",
       dependOn: "libs",
@@ -61,7 +65,7 @@ module.exports = {
   devServer: {
     liveReload: true,
     hot: false,
-    allowedHosts: 'all',
+    allowedHosts: "all",
     port: 9090,
     static: [
       path.resolve(__dirname, "./public"),
