@@ -48,6 +48,25 @@ const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new 
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
 
+function findPointOnPlaneThatIsInViewFrustum(
+  camera: PerspectiveCamera | OrthographicCamera,
+  plane: Plane,
+  map2dTileCoords: Map2DTileCoordsUtil,
+): Vector3 | undefined {
+  const camWorldDir = camera.getWorldDirection(new Vector3()).setLength(camera.far);
+  const camWorldPos = new Vector3().setFromMatrixPosition(camera.matrixWorld);
+
+  const lineOfSightEnd = camWorldDir.clone().add(camWorldPos);
+  const lineOfSight = new Line3(camWorldPos, lineOfSightEnd);
+
+  // TODO check all frame corners of the view frustum instead of the view frustum center?
+
+  const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
+  const projectPlane = plane.clone().applyMatrix4(planeOffset);
+
+  return projectPlane.intersectLine(lineOfSight, new Vector3());
+}
+
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xz plane.
  * So, the camera should point to the xz plane, if there should be visible tiles.
@@ -65,6 +84,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   depth = 100;
 
   #camera?: PerspectiveCamera | OrthographicCamera;
+  #workingCamera?: PerspectiveCamera | OrthographicCamera;
 
   #showHelpers = false;
 
@@ -124,7 +144,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   computeVisibleTiles(
     previousTiles: Map2DTile[],
-    [_centerX, _centerY]: [number, number],
+    [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (!this.hasCamera) {
@@ -135,7 +155,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    const pointOnPlane = this.findPointOnPlaneThatIsInViewFrustum(map2dTileCoords);
+    this.#workingCamera = this.#camera.clone();
+    this.#workingCamera.position.x += centerX;
+    this.#workingCamera.position.z += centerY;
+    this.#workingCamera.updateMatrix();
+    this.#workingCamera.updateMatrixWorld(true);
+
+    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(this.#workingCamera, CameraBasedVisibility.Plane, map2dTileCoords);
 
     if (pointOnPlane == null) {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
@@ -144,15 +170,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const planeCoords = toPlaneCoords(pointOnPlane);
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
 
-    return this.findAllVisibleTiles(tileCoords, map2dTileCoords, previousTiles.slice(0));
+    const centerPointTransform = new Matrix4().makeTranslation(-centerX, 0, -centerY);
+
+    return this.findAllVisibleTiles(tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
   }
 
   private findAllVisibleTiles(
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
+    centerPointTransform: Matrix4, // Vector2,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
-    const cameraFrustum = makeCameraFrustum(this.camera);
+    const cameraFrustum = makeCameraFrustum(this.#workingCamera);
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
 
     const visibles: TilePlaneBox[] = [];
@@ -181,10 +210,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
+        const box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
 
-        if (cameraFrustum.intersectsBox(tile.box)) {
+        if (cameraFrustum.intersectsBox(box)) {
           visibles.push(tile);
+
+          tile.box ??= box.applyMatrix4(centerPointTransform);
 
           const previousTilesIndex = findTileIndex(previousTiles, Map2DTile.createID(tile.x, tile.y));
 
@@ -211,7 +242,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             const [tx, ty] = [tile.coords.tileLeft + dx, tile.coords.tileTop + dy];
             const tileId = asTilePlaneBoxId(tx, ty);
             if (!visitedIds.has(tileId)) {
-              // TODO instead of always creating a new box we should check if we already have this tile..
               // TODO should we look at the distance of the tile from the camera here?
               next.push(makeTilePlaneBox(tileId, tx, ty));
             }
@@ -245,21 +275,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   private makeTileBox({top, left, width, height}: TilesWithinCoords): Box3 {
     return new Box3(new Vector3(left, this.ground, top), new Vector3(left + width, this.ceiling, top + height));
-  }
-
-  private findPointOnPlaneThatIsInViewFrustum(map2dTileCoords: Map2DTileCoordsUtil): Vector3 | undefined {
-    const camWorldDir = this.camera.getWorldDirection(new Vector3()).setLength(this.camera.far);
-    const camWorldPos = new Vector3().setFromMatrixPosition(this.camera.matrixWorld);
-
-    const lineOfSightEnd = camWorldDir.clone().add(camWorldPos);
-    const lineOfSight = new Line3(camWorldPos, lineOfSightEnd);
-
-    // TODO check all frame corners of the view frustum instead of the view frustum center
-
-    const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
-    const projectPlane = CameraBasedVisibility.Plane.clone().applyMatrix4(planeOffset);
-
-    return projectPlane.intersectLine(lineOfSight, new Vector3());
   }
 
   addToScene(scene: Object3D<Event>): void {
