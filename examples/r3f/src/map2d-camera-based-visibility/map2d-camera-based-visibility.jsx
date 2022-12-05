@@ -39,7 +39,7 @@ const TILES = [
 ];
 
 const map2dCamera = new PerspectiveCamera(75, 4 / 3, 0.1, 4000);
-map2dCamera.position.set(0, 200, 200);
+map2dCamera.position.set(-300, 200, 200);
 map2dCamera.lookAt(0, 0, 0);
 map2dCamera.updateMatrix();
 map2dCamera.updateMatrixWorld(true);

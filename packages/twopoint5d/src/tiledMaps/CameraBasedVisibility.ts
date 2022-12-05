@@ -154,34 +154,64 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    const camera = this.#camera.clone();
-    camera.position.x += centerX;
-    camera.position.z += centerY;
-    camera.updateMatrix();
-    camera.updateMatrixWorld(true);
+    // first of all, we want to know what coordinates the camera is looking at, which will then be the origin
 
-    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
+    const pointOnPlane0 = findPointOnPlaneThatIsInViewFrustum(this.#camera, CameraBasedVisibility.Plane, map2dTileCoords);
 
-    if (pointOnPlane == null) {
+    if (pointOnPlane0 == null) {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
+    // based on the origin and the desired centerPoint we can now calculate the displacement of the map2d
+
+    const pointOnPlaneOffset = toPlaneCoords(pointOnPlane0);
+    const centerPointDelta = new Vector2(centerX, centerY).sub(pointOnPlaneOffset);
+
+    // we virtually just move the camera by this offset
+
+    const camera = this.#camera.clone();
+    // camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
+    // camera.position.x += centerPointDelta.x;
+    // camera.position.z += centerPointDelta.y;
+    // camera.updateMatrix();
+    camera.applyMatrix4(new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y));
+    // camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
+    camera.updateMatrixWorld(true);
+
+    const plane = CameraBasedVisibility.Plane.clone();
+    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, plane, map2dTileCoords);
     const planeCoords = toPlaneCoords(pointOnPlane);
+
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
+    // const tileCoords = map2dTileCoords.computeTilesWithinCoords(centerX, centerY, 1, 1);
 
-    const centerPointTransform = new Matrix4().makeTranslation(-centerX, 0, -centerY);
+    // and later we take this offset back again for the target coordinates
 
-    return this.findAllVisibleTiles(camera, tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
+    const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
+
+    camera.updateMatrix();
+    camera.updateMatrixWorld(true);
+    camera.updateProjectionMatrix();
+
+    const cameraFrustum = makeCameraFrustum(camera);
+
+    // const frustumTransform = new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y);
+    // cameraFrustum.planes.forEach((plane) => {
+    //   plane.applyMatrix4(camera.matrixWorld.clone().invert()).applyMatrix4(frustumTransform);
+    // });
+
+    return this.findAllVisibleTiles(cameraFrustum, tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
   }
 
   private findAllVisibleTiles(
-    camera: PerspectiveCamera | OrthographicCamera,
+    cameraFrustum: Frustum,
+    // camera: PerspectiveCamera | OrthographicCamera,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
     centerPointTransform: Matrix4,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
-    const cameraFrustum = makeCameraFrustum(camera);
+    // const cameraFrustum = makeCameraFrustum(camera);
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
 
     const visibles: TilePlaneBox[] = [];
