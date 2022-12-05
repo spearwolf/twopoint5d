@@ -43,6 +43,7 @@ const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4
 
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
   new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
+  // new Frustum().setFromProjectionMatrix(camera.projectionMatrix);
 
 const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
 
@@ -170,48 +171,45 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // we virtually just move the camera by this offset
 
     const camera = this.#camera.clone();
-    // camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
-    // camera.position.x += centerPointDelta.x;
-    // camera.position.z += centerPointDelta.y;
-    // camera.updateMatrix();
-    camera.applyMatrix4(new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y));
-    // camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
-    camera.updateMatrixWorld(true);
+    // camera.applyMatrix4(new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y));
+    // camera.updateMatrixWorld(true);
 
-    const plane = CameraBasedVisibility.Plane.clone();
-    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, plane, map2dTileCoords);
-    const planeCoords = toPlaneCoords(pointOnPlane);
+    // const plane = CameraBasedVisibility.Plane.clone();
+    // const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, plane, map2dTileCoords);
+    // const planeCoords = toPlaneCoords(pointOnPlane);
 
-    const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
-    // const tileCoords = map2dTileCoords.computeTilesWithinCoords(centerX, centerY, 1, 1);
+    // const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
+    const tileCoords = map2dTileCoords.computeTilesWithinCoords(centerX, centerY, 1, 1);
 
     // and later we take this offset back again for the target coordinates
 
-    const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
-
-    camera.updateMatrix();
+    // camera.updateMatrix();
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
 
+    // TODO we need to find a better way to create the frustum!!
+    //      after a pan from orbitControl the frustom.setFromProjectionMatrix doesn't work as expcted!!
     const cameraFrustum = makeCameraFrustum(camera);
 
-    // const frustumTransform = new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y);
-    // cameraFrustum.planes.forEach((plane) => {
-    //   plane.applyMatrix4(camera.matrixWorld.clone().invert()).applyMatrix4(frustumTransform);
-    // });
+    const frustumTransform = new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y);
+
+    cameraFrustum.planes.forEach((plane) => {
+      // plane.applyMatrix4(camera.matrixWorld).applyMatrix4(frustumTransform);
+      plane.applyMatrix4(frustumTransform);
+    });
+
+    const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
 
     return this.findAllVisibleTiles(cameraFrustum, tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
   }
 
   private findAllVisibleTiles(
     cameraFrustum: Frustum,
-    // camera: PerspectiveCamera | OrthographicCamera,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
     centerPointTransform: Matrix4,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
-    // const cameraFrustum = makeCameraFrustum(camera);
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
 
     const visibles: TilePlaneBox[] = [];
