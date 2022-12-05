@@ -84,7 +84,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   depth = 100;
 
   #camera?: PerspectiveCamera | OrthographicCamera;
-  #workingCamera?: PerspectiveCamera | OrthographicCamera;
 
   #showHelpers = false;
 
@@ -155,13 +154,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    this.#workingCamera = this.#camera.clone();
-    this.#workingCamera.position.x += centerX;
-    this.#workingCamera.position.z += centerY;
-    this.#workingCamera.updateMatrix();
-    this.#workingCamera.updateMatrixWorld(true);
+    const camera = this.#camera.clone();
+    camera.position.x += centerX;
+    camera.position.z += centerY;
+    camera.updateMatrix();
+    camera.updateMatrixWorld(true);
 
-    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(this.#workingCamera, CameraBasedVisibility.Plane, map2dTileCoords);
+    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
 
     if (pointOnPlane == null) {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
@@ -172,16 +171,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const centerPointTransform = new Matrix4().makeTranslation(-centerX, 0, -centerY);
 
-    return this.findAllVisibleTiles(tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
+    return this.findAllVisibleTiles(camera, tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
   }
 
   private findAllVisibleTiles(
+    camera: PerspectiveCamera | OrthographicCamera,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
-    centerPointTransform: Matrix4, // Vector2,
+    centerPointTransform: Matrix4,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
-    const cameraFrustum = makeCameraFrustum(this.#workingCamera);
+    const cameraFrustum = makeCameraFrustum(camera);
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
 
     const visibles: TilePlaneBox[] = [];
