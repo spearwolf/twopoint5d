@@ -45,6 +45,8 @@ map2dCamera.updateMatrix();
 map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
 
+console.log('camera', map2dCamera);
+
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const activeCamera = useDemoStore((state) => state.activeCameraName);
@@ -80,7 +82,7 @@ export const DemoOrDie = () => {
       />
 
       {orbitAround && <OrbitControls makeDefault />}
-      {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault />}
+      {controlMap2DCamera && <OrbitControls camera={map2dCamera} enablePan={false} makeDefault />}
 
       {showCameraHelper && <cameraHelper args={[map2dCamera]} />}
 
