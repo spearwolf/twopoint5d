@@ -66,13 +66,6 @@ export class Map2DTileCoordsUtil {
   xOffset: number;
   yOffset: number;
 
-  constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
-    this.tileWidth = tileWidth;
-    this.tileHeight = tileHeight;
-    this.xOffset = xOffset;
-    this.yOffset = yOffset;
-  }
-
   #left = (tileLeft: number): number => tileLeft * this.tileWidth + this.xOffset;
   #top = (tileTop: number): number => tileTop * this.tileHeight + this.yOffset;
 
@@ -91,6 +84,17 @@ export class Map2DTileCoordsUtil {
   #tileRows = (tileTop: number, height: number): number => {
     return Math.ceil(tileTop + height / this.tileHeight) - tileTop;
   };
+
+  constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
+    this.tileWidth = tileWidth;
+    this.tileHeight = tileHeight;
+    this.xOffset = xOffset;
+    this.yOffset = yOffset;
+  }
+
+  clone(): Map2DTileCoordsUtil {
+    return new Map2DTileCoordsUtil(this.tileWidth, this.tileHeight, this.xOffset, this.yOffset);
+  }
 
   /**
    * @param left - the left coordinate of the selection rectangle in _world space_
