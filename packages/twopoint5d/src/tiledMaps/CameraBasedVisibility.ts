@@ -177,7 +177,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   computeVisibleTiles(
     previousTiles: Map2DTile[],
-    [_centerX, _centerY]: [number, number],
+    [centerX, centerY]: [number, number],
     map2dTileCoords0: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (!this.hasCamera) {
@@ -215,6 +215,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
     const planeCoords = toPlaneCoords(pointOnPlane);
 
+    planeCoords.x -= centerX;
+    planeCoords.y -= centerY;
+
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
     // const tileCoords = map2dTileCoords.computeTilesWithinCoords(centerX, centerY, 1, 1);
 
@@ -244,18 +247,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       new Matrix4(),
       tileCoords,
       map2dTileCoords,
-      // new Vector2(centerX, centerY),
-      new Vector2(),
+      new Vector2(centerX, centerY),
+      // new Vector2(),
       previousTiles.slice(0),
     );
   }
 
   private findAllVisibleTiles(
     cameraFrustum: Frustum,
-    cameraTransform: Matrix4,
+    _cameraTransform: Matrix4,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
-    _centerPoint: Vector2,
+    centerPoint: Vector2,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
@@ -286,7 +289,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        const box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset).applyMatrix4(cameraTransform);
+        // const box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset).applyMatrix4(cameraTransform);
+        const box = this.makeTileBox(tile.coords)
+          .applyMatrix4(map2dOffset)
+          .applyMatrix4(new Matrix4().makeTranslation(centerPoint.x, 0, centerPoint.y));
 
         if (cameraFrustum.intersectsBox(box)) {
           visibles.push(tile);
