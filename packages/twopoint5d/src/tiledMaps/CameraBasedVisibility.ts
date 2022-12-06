@@ -41,17 +41,17 @@ const toPlaneCoords = (pointOnPlane: Vector3): Vector2 => new Vector2(pointOnPla
 const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4 =>
   new Matrix4().makeTranslation(map2dTileCoords.xOffset, 0, map2dTileCoords.yOffset);
 
-// const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
-  // new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
+const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
+  new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
 
+/*
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum => {
   // const matrixWorldInverse = camera.matrixWorld.clone().invert();
-  // const matrixWorldInverse = new Matrix4();
   // const matrixWorldInverse = camera.matrixWorld;
   const [n1, n2, n3, n4, f1, f2, f3] = [
     // near
     new Vector3(-1, -1, -1),
-    new Vector3( 1, -1, -1),
+    new Vector3(1, -1, -1),
     new Vector3(-1, 1, -1),
     new Vector3(1, 1, -1),
     // far
@@ -61,6 +61,7 @@ const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frus
     // new Vector3(1, 1, 1),
   ].map((p) => p.unproject(camera));
   // ].map((p) => p.unproject(camera).applyMatrix4(matrixWorldInverse));
+  // ].map((p) => p.applyMatrix4(matrixWorldInverse).unproject(camera));
   const near = new Plane().setFromCoplanarPoints(n1, n3, n2);
   const far = new Plane().setFromCoplanarPoints(f1, f2, f3);
   const right = new Plane().setFromCoplanarPoints(n2, n4, f2);
@@ -70,6 +71,7 @@ const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frus
   const frustum = new Frustum(near, far, right, left, top, bottom);
   return frustum;
 };
+*/
 
 const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
 
@@ -213,30 +215,47 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
 
+    // -------- DEBUG ---------------------------------------------------
+    const worldPos = camera.getWorldPosition(new Vector3());
+    const e = camera.matrixWorld.elements;
+    worldPos.x += -e[8];
+    worldPos.y += -e[9];
+    worldPos.z += -e[10];
+    // console.log('worldPos', worldPos, camera);
+    // -------- DEBUG ---------------------------------------------------
+
     // TODO we need to find a better way to create the frustum!!
     //      after a pan from orbitControl the frustom.setFromProjectionMatrix doesn't work as expcted!!
     const cameraFrustum = makeCameraFrustum(camera);
 
-    const frustumTransform = new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y);
+    // const frustumTransform = new Matrix4().makeTranslation(centerPointDelta.x, 0, centerPointDelta.y);
 
     // const matrixWorldInverse = camera.matrix.clone().invert();
 
-    cameraFrustum.planes.forEach((plane) => {
-      // plane.applyMatrix4(camera.matrixWorld).applyMatrix4(frustumTransform);
-      // plane.applyMatrix4(matrixWorldInverse).applyMatrix4(frustumTransform);
-      plane.applyMatrix4(frustumTransform);
-    });
+    // cameraFrustum.planes.forEach((plane) => {
+    // plane.applyMatrix4(camera.matrixWorld).applyMatrix4(frustumTransform);
+    // plane.applyMatrix4(matrixWorldInverse).applyMatrix4(frustumTransform);
+    // plane.applyMatrix4(frustumTransform);
+    // });
 
     const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
     // const centerPointTransform = camera.matrixWorld.invert().clone().multiply(
-      // new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y)
+    // new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y)
     // );
 
-    return this.findAllVisibleTiles(cameraFrustum, tileCoords, map2dTileCoords, centerPointTransform, previousTiles.slice(0));
+    return this.findAllVisibleTiles(
+      cameraFrustum,
+      new Matrix4(),
+      tileCoords,
+      map2dTileCoords,
+      centerPointTransform,
+      previousTiles.slice(0),
+    );
   }
 
   private findAllVisibleTiles(
     cameraFrustum: Frustum,
+    cameraTransform: Matrix4,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
     centerPointTransform: Matrix4,
@@ -270,7 +289,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        const box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset);
+        const box = this.makeTileBox(tile.coords).applyMatrix4(map2dOffset).applyMatrix4(cameraTransform);
 
         if (cameraFrustum.intersectsBox(box)) {
           visibles.push(tile);
