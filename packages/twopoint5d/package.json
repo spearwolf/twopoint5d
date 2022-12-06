@@ -51,7 +51,7 @@
     "watch:types": "tsc --emitDeclarationOnly --watch",
     "analyze:js": "source-map-explorer build/twopoint5d.js",
     "analyze:umd": "source-map-explorer build/twopoint5d.umd.js",
-    "watch": "concurrently --restart-tries -1 --restart-after 1 --names twopoint5d:js,twopoint5d:types yarn:watch:js yarn:watch:types",
+    "watch": "concurrently --restart-tries -1 --restart-after 1000 --names twopoint5d:js,twopoint5d:types yarn:watch:js yarn:watch:types",
     "build": "concurrently --names js,umd,types yarn:build:js yarn:build:umd yarn:build:types",
     "clean": "rimraf -r build types dist .rollup.cache tsconfig.tsbuildinfo twopoint5d.js twopoint5d.js.map twopoint5d.umd.js twopoint5d.umd.js.map",
     "eslint": "eslint src/ --ext .js,.jsx,.ts,.tsx",

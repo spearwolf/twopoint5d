@@ -76,7 +76,9 @@ const transformFrustum = (frustum: Frustum, transform: Matrix4): Frustum => {
   return frustum;
 };
 
-const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
+// const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
+const makeAABB2 = ({top, left, width, height}: TilesWithinCoords, xOffset: number, yOffset: number): AABB2 =>
+  new AABB2(left + xOffset, top + yOffset, width, height);
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
 
@@ -175,8 +177,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   computeVisibleTiles(
     previousTiles: Map2DTile[],
-    [centerX, centerY]: [number, number],
-    map2dTileCoords: Map2DTileCoordsUtil,
+    [_centerX, _centerY]: [number, number],
+    map2dTileCoords0: Map2DTileCoordsUtil,
   ): Map2DVisibleTiles | undefined {
     if (!this.hasCamera) {
       return undefined;
@@ -185,6 +187,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     if (this.showHelpers) {
       this.removeHelpers();
     }
+
+    const map2dTileCoords = map2dTileCoords0.clone();
+    // map2dTileCoords.xOffset += _centerX;
+    // map2dTileCoords.yOffset += _centerY;
 
     // first of all, we want to know what coordinates the camera is looking at, which will then be the origin
 
@@ -196,8 +202,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     // based on the origin and the desired centerPoint we can now calculate the displacement of the map2d
 
-    const pointOnPlaneOffset = toPlaneCoords(pointOnPlane0);
-    const centerPointDelta = new Vector2(centerX, centerY).sub(pointOnPlaneOffset);
+    // const pointOnPlaneOffset = toPlaneCoords(pointOnPlane0);
+    // const centerPointDelta = new Vector2(centerX, centerY).sub(pointOnPlaneOffset);
 
     // we virtually just move the camera by this offset
 
@@ -206,7 +212,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
 
-    // const plane = CameraBasedVisibility.Plane.clone();
     const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
     const planeCoords = toPlaneCoords(pointOnPlane);
 
@@ -228,7 +233,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     transformFrustum(cameraFrustum, new Matrix4());
 
-    const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
+    // const centerPointTransform = new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y);
     // const centerPointTransform = camera.matrixWorld.invert().clone().multiply(
     // new Matrix4().makeTranslation(-centerPointDelta.x, 0, -centerPointDelta.y)
     // );
@@ -239,7 +244,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       new Matrix4(),
       tileCoords,
       map2dTileCoords,
-      centerPointTransform,
+      // new Vector2(centerX, centerY),
+      new Vector2(),
       previousTiles.slice(0),
     );
   }
@@ -249,7 +255,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     cameraTransform: Matrix4,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
-    _centerPointTransform: Matrix4,
+    _centerPoint: Vector2,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
     const map2dOffset = makePlaneOffsetTransform(map2dTileCoords);
@@ -295,7 +301,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             tile.map2dTile = previousTiles.splice(previousTilesIndex, 1)[0];
             reuseTiles.push(tile.map2dTile);
           } else {
-            tile.map2dTile = new Map2DTile(tile.x, tile.y, makeAABB2(tile.coords));
+            tile.map2dTile = new Map2DTile(
+              tile.x,
+              tile.y,
+              makeAABB2(tile.coords, map2dTileCoords.xOffset, map2dTileCoords.yOffset),
+            );
             createTiles.push(tile.map2dTile);
           }
 
