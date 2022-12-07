@@ -62,3 +62,8 @@ Every time the _view area_ is updated (by calling `map2dLayer.update()` in combi
 ![Map2dLayer update view area](tiledMaps/Map2dLayer-update-view-area.svg)
 
 The [IMap2DTileRenderer](../packages/twopoint5d/src/tiledMaps/IMap2DTileRenderer.ts) is responsible for the display of the tiles.
+
+##### CameraBasedVisibility
+
+how it works: ![CameraBasedVisibility](tiledMaps/camera-based-visibility.jpg)
+
