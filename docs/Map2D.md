@@ -46,6 +46,8 @@ the origin of the 2D coordinate system is assumed to be in the upper left corner
 
 #### Map2DLayer
 
+> TODO the docs are a bit outdated, the IMap2DVisibilitor interface is a recently added feature
+
 In a [Map2DLayer](../packages/twopoint5d/src/tiledMaps/Map2DLayer.ts), the world is divided into a static grid with [tiles](../packages/twopoint5d/src/tiledMaps/Map2DTile.ts) of equal size.
 Which tiles are displayed is determined by the _view area_ (which is an [AABB2](../packages/twopoint5d/src/tiledMaps/AABB2.ts)) of the layer.
 
@@ -60,3 +62,8 @@ Every time the _view area_ is updated (by calling `map2dLayer.update()` in combi
 ![Map2dLayer update view area](tiledMaps/Map2dLayer-update-view-area.svg)
 
 The [IMap2DTileRenderer](../packages/twopoint5d/src/tiledMaps/IMap2DTileRenderer.ts) is responsible for the display of the tiles.
+
+##### CameraBasedVisibility
+
+how it works: ![CameraBasedVisibility](tiledMaps/camera-based-visibility.jpg)
+
