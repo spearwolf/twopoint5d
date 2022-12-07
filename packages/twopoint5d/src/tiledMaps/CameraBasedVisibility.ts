@@ -5,7 +5,6 @@ import {
   Event,
   Frustum,
   Line3,
-  MathUtils,
   Matrix4,
   Object3D,
   OrthographicCamera,
@@ -15,6 +14,7 @@ import {
   Vector3,
 } from 'three';
 import {AABB2} from './AABB2';
+import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil';
@@ -79,8 +79,6 @@ function findPointOnPlaneThatIsInViewFrustum(
 export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
 
-  readonly uuid = MathUtils.generateUUID();
-
   #lookAtCenter = true;
 
   #depth = 100;
@@ -89,11 +87,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #showHelpers = false;
 
-  #scene?: Object3D;
-
   #needsUpdate = true;
 
   readonly #lastUpdateState = {cameraMatrixWorld: new Matrix4(), cameraProjectionMatrix: new Matrix4()};
+
+  readonly #helpers = new HelpersManager();
 
   constructor(camera?: PerspectiveCamera | OrthographicCamera) {
     this.camera = camera;
@@ -170,7 +168,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   set showHelpers(showHelpers: boolean) {
     if (this.#showHelpers && !showHelpers) {
-      this.removeHelpers();
+      this.#helpers.remove();
     }
     if (!this.#showHelpers && showHelpers) {
       this.needsUpdate = true;
@@ -193,7 +191,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     if (this.showHelpers) {
-      this.removeHelpers();
+      this.#helpers.remove();
     }
 
     const camera = this.#camera;
@@ -314,17 +312,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createHelpers(visibles: TilePlaneBox[]) {
-    if (this.#scene) {
-      for (const [i, {box: visibleBox}] of visibles.entries()) {
-        if (visibleBox != null) {
-          const box = visibleBox.clone();
-          const boxSize = box.getSize(new Vector3());
-          box.expandByVector(boxSize.multiplyScalar(-0.01));
+    for (const [i, {box: visibleBox}] of visibles.entries()) {
+      if (visibleBox != null) {
+        const box = visibleBox.clone();
+        const boxSize = box.getSize(new Vector3());
+        box.expandByVector(boxSize.multiplyScalar(-0.01));
 
-          const helper = new Box3Helper(box, new Color(i === 0 ? 0xff0066 : 0xf0f0f0));
-          helper.userData.createdBy = this.uuid;
-          this.#scene.add(helper);
-        }
+        const helper = new Box3Helper(box, new Color(i === 0 ? 0xff0066 : 0xf0f0f0));
+        this.#helpers.add(helper);
       }
     }
   }
@@ -334,25 +329,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   addToScene(scene: Object3D<Event>): void {
-    this.#scene = scene;
+    this.#helpers.scene = scene;
   }
 
   removeFromScene(scene: Object3D<Event>): void {
-    const removeChilds: Object3D[] = [];
-    for (const childNode of scene.children) {
-      if (childNode.userData.createdBy === this.uuid) {
-        removeChilds.push(childNode);
-      }
-    }
-    for (const childNode of removeChilds) {
-      childNode.removeFromParent();
-      (childNode as any).dispose?.();
-    }
-  }
-
-  removeHelpers() {
-    if (this.#scene) {
-      this.removeFromScene(this.#scene);
-    }
+    this.#helpers.removeFromScene(scene);
   }
 }

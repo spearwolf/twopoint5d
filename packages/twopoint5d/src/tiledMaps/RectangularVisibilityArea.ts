@@ -1,12 +1,11 @@
-import {Box3, Box3Helper, Color, Event, MathUtils, Object3D, Vector3} from 'three';
+import {Box3, Box3Helper, Color, Event, Object3D, Vector3} from 'three';
 import {AABB2} from './AABB2';
+import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
-  readonly uuid = MathUtils.generateUUID();
-
   #width = 0;
   #height = 0;
 
@@ -20,8 +19,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #tileCreated?: Uint8Array;
 
   #showHelpers = false;
-
-  #scene?: Object3D;
+  readonly #helpers = new HelpersManager();
 
   constructor(width = 320, height = 240) {
     this.width = width;
@@ -138,7 +136,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   set showHelpers(showHelpers: boolean) {
     if (this.#showHelpers && !showHelpers) {
-      this.removeHelpers();
+      this.#helpers.remove();
     } else if (!this.#showHelpers && showHelpers) {
       this.updateHelpers();
     }
@@ -146,34 +144,18 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   addToScene(scene: Object3D<Event>): void {
-    this.#scene = scene;
+    this.#helpers.scene = scene;
   }
 
   removeFromScene(scene: Object3D<Event>): void {
-    const removeChilds: Object3D[] = [];
-    for (const childNode of scene.children) {
-      if (childNode.userData.createdBy === this.uuid) {
-        removeChilds.push(childNode);
-      }
-    }
-    for (const childNode of removeChilds) {
-      childNode.removeFromParent();
-      (childNode as any).dispose?.();
-    }
-  }
-
-  removeHelpers() {
-    if (this.#scene) {
-      this.removeFromScene(this.#scene);
-    }
+    this.#helpers.removeFromScene(scene);
   }
 
   updateHelpers() {
-    this.removeHelpers();
-    if (this.#scene && this.#viewRect) {
+    this.#helpers.remove();
+    if (this.#viewRect) {
       const helper = new Box3Helper(this.#viewRect, this.viewRectHelperColor);
-      helper.userData.createdBy = this.uuid;
-      this.#scene.add(helper);
+      this.#helpers.add(helper);
     }
   }
 }
