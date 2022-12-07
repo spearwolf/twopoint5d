@@ -122,7 +122,14 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       this.updateHelpers();
     }
 
-    return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
+    return {
+      tiles: reuseTiles.concat(createTiles),
+      xOffset: map2dTileCoords.xOffset - centerX,
+      yOffset: map2dTileCoords.yOffset - centerY,
+      removeTiles,
+      createTiles,
+      reuseTiles,
+    };
   }
 
   get showHelpers() {

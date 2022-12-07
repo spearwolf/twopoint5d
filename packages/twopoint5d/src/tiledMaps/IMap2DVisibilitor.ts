@@ -5,6 +5,9 @@ import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 export type Map2DVisibleTiles = {
   tiles: Map2DTile[];
 
+  xOffset?: number;
+  yOffset?: number;
+
   removeTiles?: Map2DTile[];
   reuseTiles?: Map2DTile[];
   createTiles?: Map2DTile[];

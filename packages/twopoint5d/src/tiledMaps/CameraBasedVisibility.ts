@@ -250,7 +250,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.createHelpers(visibles);
     }
 
-    return {tiles: visibles.map((visible) => visible.map2dTile), createTiles, reuseTiles, removeTiles: previousTiles};
+    return {
+      tiles: visibles.map((visible) => visible.map2dTile),
+      xOffset: map2dTileCoords.xOffset - centerPoint.x,
+      yOffset: map2dTileCoords.yOffset - centerPoint.y,
+      createTiles,
+      reuseTiles,
+      removeTiles: previousTiles,
+    };
   }
 
   private createHelpers(visibles: TilePlaneBox[]) {
