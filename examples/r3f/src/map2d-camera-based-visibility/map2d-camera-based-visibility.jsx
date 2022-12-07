@@ -41,11 +41,8 @@ const TILES = [
 const map2dCamera = new PerspectiveCamera(75, 4 / 3, 0.1, 4000);
 map2dCamera.position.set(0, 200, 200);
 map2dCamera.lookAt(0, 0, 0);
-map2dCamera.updateMatrix();
 map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
-
-console.log('camera', map2dCamera);
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -53,6 +50,8 @@ export const DemoOrDie = () => {
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
+
+  const { lookAtCenter } = useControls({ lookAtCenter: true });
   const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
     "show helpers",
     {
@@ -106,6 +105,7 @@ export const DemoOrDie = () => {
         <cameraBasedVisibility
           showHelpers={showTileBoxes}
           camera={map2dCamera}
+          lookAtCenter={lookAtCenter}
           depth={10}
           attach="visibilitor"
         />

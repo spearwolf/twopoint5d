@@ -81,6 +81,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   readonly uuid = MathUtils.generateUUID();
 
+  /**
+   * If `lookAtCenter` is set to *true*, then the center of the camera frustum
+   * always points exactly to the center of the map2d.
+   * Otherwise the center of the frustum and the center of the map2d are cumulated.
+   */
+  lookAtCenter = true;
+
   depth = 100;
 
   #camera?: PerspectiveCamera | OrthographicCamera;
@@ -150,7 +157,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    const camera = this.#camera.clone();
+    const camera = this.#camera; // no need to .clone() here;
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
 
@@ -160,8 +167,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
-    const centerPoint = new Vector2(centerX, centerY);
     const planeCoords = toPlaneCoords(pointOnPlane);
+    const centerPoint = new Vector2(centerX, centerY);
+
+    if (this.lookAtCenter) {
+      centerPoint.sub(planeCoords);
+    }
 
     planeCoords.add(centerPoint);
 
