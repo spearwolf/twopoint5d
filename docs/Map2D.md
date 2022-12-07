@@ -46,6 +46,8 @@ the origin of the 2D coordinate system is assumed to be in the upper left corner
 
 #### Map2DLayer
 
+> TODO the docs are a bit outdated, the IMap2DVisibilitor interface is a recently added feature
+
 In a [Map2DLayer](../packages/twopoint5d/src/tiledMaps/Map2DLayer.ts), the world is divided into a static grid with [tiles](../packages/twopoint5d/src/tiledMaps/Map2DTile.ts) of equal size.
 Which tiles are displayed is determined by the _view area_ (which is an [AABB2](../packages/twopoint5d/src/tiledMaps/AABB2.ts)) of the layer.
 
