@@ -1,9 +1,9 @@
 import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
+import { useControls } from "leva";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CameraHelper, PerspectiveCamera } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
-import { useControls } from "leva";
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -20,22 +20,51 @@ import { useDemoStore } from "./useDemoStore";
 extend({ CameraBasedVisibility, CameraHelper });
 
 const TILES = [
-  [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
-  [1, 0, 1, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
-  [1, 1, 1, 3, 4, 3, 4, 3, 2, 2, 2, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 2, 0, 2, 4, 3, 4, 3, 4],
-  [4, 3, 4, 3, 4, 3, 4, 3, 2, 2, 2, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
-  [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
-  [2, 2, 2, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
-  [2, 0, 2, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
-  [2, 2, 2, 3, 4, 3, 4, 3, 1, 1, 1, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 1, 0, 1, 4, 3, 4, 3, 4],
-  [4, 3, 4, 3, 4, 3, 4, 3, 1, 1, 1, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
-  [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
-  [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+  {
+    tilesUrl: "/examples/assets/ball-patterns.png",
+
+    tileWidth: 128,
+    tileHeight: 128,
+
+    map2dTileWidth: 256,
+    map2dTileHeight: 256,
+
+    map2dTileOffsetX: -128,
+    map2dTileOffsetY: -128,
+
+    tilesData: [
+      [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
+      [1, 0, 1, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+      [1, 1, 1, 3, 4, 3, 4, 3, 2, 2, 2, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 2, 0, 2, 4, 3, 4, 3, 4],
+      [4, 3, 4, 3, 4, 3, 4, 3, 2, 2, 2, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+      [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+      [2, 2, 2, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
+      [2, 0, 2, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+      [2, 2, 2, 3, 4, 3, 4, 3, 1, 1, 1, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 1, 0, 1, 4, 3, 4, 3, 4],
+      [4, 3, 4, 3, 4, 3, 4, 3, 1, 1, 1, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+      [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
+      [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
+    ],
+  },
+  {
+    tilesUrl: "/examples/assets/fliesen-tile-1000x579.png",
+
+    tileWidth: 1000,
+    tileHeight: 579,
+
+    map2dTileWidth: 1000,
+    map2dTileHeight: 579,
+
+    map2dTileOffsetX: 0,
+    map2dTileOffsetY: 0,
+
+    tilesData: [[1]],
+  },
 ];
 
 const map2dCamera = new PerspectiveCamera(75, 4 / 3, 0.1, 4000);
@@ -50,14 +79,39 @@ export const DemoOrDie = () => {
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
+  const [tileSprites, setTileSprites] = useState();
+  const map2dLayerRef = useRef();
 
-  const { lookAtCenter } = useControls({ lookAtCenter: false });
+  const { lookAtCenter, tiles } = useControls({
+    lookAtCenter: false,
+    tiles: { options: ["pixelart", "heilstätten tiles"] },
+  });
+
   const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
     "show helpers",
     {
       tiles: false,
       camera: true,
     }
+  );
+
+  const {
+    tilesUrl,
+    tileWidth,
+    tileHeight,
+    map2dTileWidth,
+    map2dTileHeight,
+    map2dTileOffsetX,
+    map2dTileOffsetY,
+    tilesData,
+  } = useMemo(() => TILES[tiles === "pixelart" ? 0 : 1], [tiles]);
+
+  useEffect(
+    () =>
+      tileSprites?.on(["tileSetChanged", "tileDataChanged"], () => {
+        map2dLayerRef.current?.resetTiles();
+      }),
+    [tileSprites]
   );
 
   const pointerPanDisabled = activeCamera !== "cam0";
@@ -87,17 +141,18 @@ export const DemoOrDie = () => {
 
       <TileSet
         name="tiles"
-        url="/examples/assets/ball-patterns.png"
-        tileWidth={128}
-        tileHeight={128}
+        url={tilesUrl}
+        tileWidth={tileWidth}
+        tileHeight={tileHeight}
       />
 
       <Map2DLayer3D
         name="Map2DLayer3D"
-        tileWidth={256}
-        tileHeight={256}
-        xOffset={-128}
-        yOffset={-128}
+        ref={map2dLayerRef}
+        tileWidth={map2dTileWidth}
+        tileHeight={map2dTileHeight}
+        xOffset={map2dTileOffsetX}
+        yOffset={map2dTileOffsetY}
         centerX={center.x}
         centerY={center.y}
         updateOnFrame
@@ -110,8 +165,8 @@ export const DemoOrDie = () => {
           attach="visibilitor"
         />
 
-        <Map2DTileSprites>
-          <RepeatingTilesProvider tiles={TILES} />
+        <Map2DTileSprites ref={setTileSprites}>
+          <RepeatingTilesProvider tiles={tilesData} />
           <TileSetRef name="tiles" attach="tileSet" />
           <TileSpritesGeometry capacity={1000} />
           <TileSpritesMaterial>

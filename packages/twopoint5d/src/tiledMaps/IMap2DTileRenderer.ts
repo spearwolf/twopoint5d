@@ -9,5 +9,7 @@ export interface IMap2DTileRenderer {
 
   endUpdate(): void;
 
+  resetTiles(): void;
+
   dispose(): void;
 }

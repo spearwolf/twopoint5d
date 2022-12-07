@@ -20,6 +20,8 @@ export class Map2DLayer implements IMap2DLayer {
 
   visibilitor?: IMap2DVisibilitor;
 
+  #resetTilesOnNextUpdate = false;
+
   get needsUpdate(): boolean {
     return this.#needsUpdate || this.visibilitor?.needsUpdate;
   }
@@ -115,11 +117,20 @@ export class Map2DLayer implements IMap2DLayer {
   update(): void {
     if (this.renderers.size === 0 || this.visibilitor == null) return;
 
+    if (this.#resetTilesOnNextUpdate) {
+      for (const tileRenderer of this.renderers) {
+        tileRenderer.resetTiles();
+      }
+      this.tiles.length = 0;
+      this.needsUpdate = true;
+      this.#resetTilesOnNextUpdate = false;
+    }
+
     if (this.needsUpdate) {
       const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords);
 
       if (visible) {
-        this.tiles = visible.tiles;
+        this.tiles = visible?.tiles;
         this.needsUpdate = false;
 
         const xOffset = visible.xOffset ?? 0;
@@ -144,5 +155,10 @@ export class Map2DLayer implements IMap2DLayer {
         }
       }
     }
+  }
+
+  resetTiles(): void {
+    this.#resetTilesOnNextUpdate = true;
+    this.needsUpdate = true;
   }
 }

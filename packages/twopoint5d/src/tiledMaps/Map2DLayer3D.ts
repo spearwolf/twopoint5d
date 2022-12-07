@@ -153,6 +153,10 @@ export class Map2DLayer3D extends Group implements IMap2DLayer {
     this.#map2dLayer.update();
   }
 
+  resetTiles(): void {
+    this.#map2dLayer.resetTiles();
+  }
+
   dispose(): void {
     for (const renderer of this.#renderers) {
       this.removeTileRenderer(renderer);

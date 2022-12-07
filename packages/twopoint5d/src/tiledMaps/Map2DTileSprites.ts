@@ -14,29 +14,17 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
   #tileData?: IMap2DTileDataProvider;
 
-  get tileData(): IMap2DTileDataProvider | undefined {
-    return this.#tileData;
-  }
+  #tiles = new Map<string, TileSprite>();
 
-  set tileData(tileData: IMap2DTileDataProvider | undefined) {
-    this.#tileData = tileData;
-    this.#checkReady();
-  }
+  #deferredTiles = new Set<Map2DTile>();
+
+  #curUpdateSerial = 0;
+
+  #isReady = false;
 
   #tileSet?: TileSet;
 
-  get tileSet(): TileSet | undefined {
-    return this.#tileSet;
-  }
-
-  set tileSet(tileSet: TileSet | undefined) {
-    this.#tileSet = tileSet;
-    this.#checkReady();
-  }
-
-  get tilesPool(): VertexObjectPool<TileSprite> | undefined {
-    return this.geometry?.instancedPool;
-  }
+  #nextUpdateShouldResetTiles = false;
 
   constructor() {
     super();
@@ -47,24 +35,46 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     this.on('ready', () => this.#addDeferredTiles());
   }
 
-  #tiles = new Map<string, TileSprite>();
+  get tileData(): IMap2DTileDataProvider | undefined {
+    return this.#tileData;
+  }
 
-  #deferredTiles = new Set<Map2DTile>();
+  set tileData(tileData: IMap2DTileDataProvider | undefined) {
+    const previousTileData = this.#tileData;
+    this.#tileData = tileData;
+    this.#checkReady();
+    if (previousTileData !== tileData) {
+      this.emit('tileDataChanged', tileData, previousTileData);
+    }
+  }
 
-  #curUpdateSerial = 0;
+  get tileSet(): TileSet | undefined {
+    return this.#tileSet;
+  }
 
-  #isReady = false;
+  set tileSet(tileSet: TileSet | undefined) {
+    const previousTileSet = this.#tileSet;
+    this.#tileSet = tileSet;
+    this.#checkReady();
+    if (previousTileSet !== tileSet) {
+      this.emit('tileSetChanged', tileSet, previousTileSet);
+    }
+  }
 
-  #updateReadyState = (): boolean => {
+  get tilesPool(): VertexObjectPool<TileSprite> | undefined {
+    return this.geometry?.instancedPool;
+  }
+
+  #updateReadyState(): boolean {
     this.#isReady = this.tilesPool != null && this.tileData != null && this.tileSet != null;
     return this.#isReady;
-  };
+  }
 
-  #checkReady = (): void => {
+  #checkReady(): void {
     if (!this.#isReady && this.#updateReadyState()) {
       this.emit('ready');
     }
-  };
+  }
 
   override onBeforeRender = (): void => {
     this.#checkReady();
@@ -79,6 +89,10 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
     this.#checkReady();
     this.#curUpdateSerial = 0;
+
+    if (this.#nextUpdateShouldResetTiles) {
+      this.#resetTiles();
+    }
 
     if (this.debug) {
       // eslint-disable-next-line no-console
@@ -184,6 +198,23 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     }
   }
 
+  resetTiles(): void {
+    this.#nextUpdateShouldResetTiles = true;
+  }
+
+  #resetTiles(): void {
+    if (!this.#isReady) return;
+
+    for (const sprite of this.#tiles.values()) {
+      this.tilesPool.freeVO(sprite);
+    }
+
+    this.#tiles.clear();
+    ++this.#curUpdateSerial;
+
+    this.#nextUpdateShouldResetTiles = false;
+  }
+
   endUpdate(): void {
     if (this.debug) {
       // eslint-disable-next-line no-console
@@ -197,9 +228,9 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     }
   }
 
-  #syncGeometryBuffers = (): void => {
+  #syncGeometryBuffers(): void {
     this.geometry.touch('quadSize', 'texCoords', 'instancePosition');
-  };
+  }
 
   dispose(): void {
     // eslint-disable-next-line no-console

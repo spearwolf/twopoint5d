@@ -38,9 +38,7 @@ describe('Map2DLayer', () => {
         addTile(_tile: Map2DTile) {},
         reuseTile(_tile: Map2DTile) {},
         removeTile(_tile: Map2DTile) {},
-        // getObject3D() {
-        //   return null;
-        // },
+        resetTiles() {},
         endUpdate() {},
         dispose() {},
       };
