@@ -60,6 +60,8 @@ function findPointOnPlaneThatIsInViewFrustum(
   const lineOfSight = new Line3(camWorldPos, lineOfSightEnd);
 
   // TODO check all frame corners of the view frustum instead of the view frustum center?
+  //   however, we would then need another way to define the centerPoint of the frustum
+  //   -> the camera line-of-sight-target point that lies on the plane
 
   const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
   const projectPlane = plane.clone().applyMatrix4(planeOffset);
