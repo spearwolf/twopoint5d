@@ -26,7 +26,6 @@ describe('fitIntoRectangle', () => {
     expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 400, minPixelZoom: 2}, target)).toBe(target);
     expect(target.width).toBe(320);
     expect(target.height).toBe(200);
-
     expect(
       fitIntoRectangle(new Vector2(640, 400), {
         fit: 'contain',
@@ -40,7 +39,6 @@ describe('fitIntoRectangle', () => {
     expect(fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, maxPixelZoom: 7}, target)).toBe(target);
     expect(target.width).toBe(100);
     expect(target.height).toBe(62.5);
-
     expect(
       fitIntoRectangle(new Vector2(640, 400), {
         fit: 'contain',

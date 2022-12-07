@@ -3,7 +3,7 @@ import { Leva } from "leva";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { DemoOrDie } from "./map2d-camera-based-visibility";
+import { DemoOrDie } from "./map2d-rectangular-visibility-area";
 import { SwitchCameraUI } from "./SwitchCameraUI";
 
 const root = createRoot(document.getElementById("root"));

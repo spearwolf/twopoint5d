@@ -23,6 +23,12 @@ export class Stage2D {
 
   autoClear = true;
 
+  /**
+   * with this flag you can tell the .update() method that the projection calculation needs an update
+   * (e.g. the settings in the projection have changed)
+   */
+  needsUpdate = false;
+
   get name(): string {
     return this.scene.name;
   }
@@ -63,9 +69,7 @@ export class Stage2D {
     if (this.#projection !== projection) {
       this.#projection = projection;
       this.#cameraFromProjection = undefined;
-      if (projection) {
-        this.#updateProjection(this.#containerWidth, this.#containerHeight);
-      }
+      this.update(true);
     }
   }
 
@@ -118,7 +122,15 @@ export class Stage2D {
     }
   }
 
+  update(forceUpdate = false): void {
+    if ((forceUpdate || this.needsUpdate) && this.projection) {
+      this.#updateProjection(this.#containerWidth, this.#containerHeight);
+    }
+  }
+
   #updateProjection = (width: number, height: number): void => {
+    this.needsUpdate = false;
+
     this.projection.updateViewRect(width, height);
     const [w, h] = this.projection.getViewRect();
 

@@ -122,8 +122,8 @@ export class Map2DLayer implements IMap2DLayer {
         this.tiles = visible.tiles;
         this.needsUpdate = false;
 
-        const xOffset = this.xOffset - this.centerX;
-        const yOffset = this.yOffset - this.centerY;
+        const xOffset = visible.xOffset ?? 0;
+        const yOffset = visible.yOffset ?? 0;
 
         for (const tileRenderer of this.renderers) {
           tileRenderer.beginUpdate(xOffset, yOffset);

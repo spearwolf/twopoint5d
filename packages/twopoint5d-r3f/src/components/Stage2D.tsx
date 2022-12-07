@@ -193,9 +193,12 @@ function StageContent({
 
   const renderFrame = useCallback(
     (renderer: WebGLRenderer) => {
-      if (stage && !noAutoRender) {
+      if (stage) {
         stage.autoClear = !noAutoClear;
-        stage.renderFrame(renderer);
+        stage.update();
+        if (!noAutoRender) {
+          stage.renderFrame(renderer);
+        }
       }
     },
     [stage, noAutoClear, noAutoRender],

@@ -1,14 +1,15 @@
 import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
-import { CameraHelper, PerspectiveCamera } from "three";
-import { CameraBasedVisibility } from "twopoint5d";
 import { useControls } from "leva";
+import { useEffect, useState } from "react";
+import { RectangularVisibilityArea } from "twopoint5d";
 import {
   Map2DLayer3D,
   Map2DTileSprites,
   PanControl2D,
+  ParallaxProjection,
   RepeatingTilesProvider,
+  Stage2D,
   TextureRef,
   TileSet,
   TileSetRef,
@@ -17,7 +18,7 @@ import {
 } from "twopoint5d-r3f";
 import { useDemoStore } from "./useDemoStore";
 
-extend({ CameraBasedVisibility, CameraHelper });
+extend({ RectangularVisibilityArea });
 
 const TILES = [
   [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
@@ -38,11 +39,10 @@ const TILES = [
   [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
 ];
 
-const map2dCamera = new PerspectiveCamera(75, 4 / 3, 0.1, 4000);
-map2dCamera.position.set(0, 200, 200);
-map2dCamera.lookAt(0, 0, 0);
-map2dCamera.updateMatrixWorld(true);
-map2dCamera.updateProjectionMatrix();
+const VIEW_WIDTH = "view width";
+const VIEW_HEIGHT = "view height";
+const VIEW_FIT = "view fit";
+const VIEW_RECT = "view rect";
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -51,23 +51,26 @@ export const DemoOrDie = () => {
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
 
-  const { lookAtCenter } = useControls({ lookAtCenter: false });
-  const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
-    "show helpers",
-    {
-      tiles: false,
-      camera: true,
-    }
-  );
+  const {
+    [VIEW_WIDTH]: viewWidth,
+    [VIEW_HEIGHT]: viewHeight,
+    [VIEW_FIT]: viewFit,
+  } = useControls({
+    [VIEW_WIDTH]: 1024,
+    [VIEW_HEIGHT]: 768,
+    [VIEW_FIT]: { options: ["cover", "contain"] },
+  });
 
-  const pointerPanDisabled = activeCamera !== "cam0";
+  const { [VIEW_RECT]: showHelpers } = useControls("show helpers", {
+    [VIEW_RECT]: true,
+  });
+
+  const pointerPanDisabled = activeCamera === "cam1";
   const orbitAround = activeCamera === "cam1";
-  const controlMap2DCamera = activeCamera === "cam2" || activeCamera === "cam3";
+  const showMap2DCamera = activeCamera === "cam3";
 
   useEffect(() => {
-    if (activeCamera === "cam3") {
-      setThree({ camera: map2dCamera });
-    } else {
+    if (activeCamera !== "cam3") {
       setThree({ camera: defaultCamera });
     }
   }, [activeCamera]);
@@ -81,9 +84,16 @@ export const DemoOrDie = () => {
       />
 
       {orbitAround && <OrbitControls makeDefault />}
-      {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault />}
 
-      {showCameraHelper && <cameraHelper args={[map2dCamera]} />}
+      <Stage2D noAutoRender defaultCamera={showMap2DCamera}>
+        <ParallaxProjection
+          plane="xz"
+          origin="top left"
+          width={viewWidth}
+          height={viewHeight}
+          fit={viewFit}
+        />
+      </Stage2D>
 
       <TileSet
         name="tiles"
@@ -102,11 +112,10 @@ export const DemoOrDie = () => {
         centerY={center.y}
         updateOnFrame
       >
-        <cameraBasedVisibility
-          showHelpers={showTileBoxes}
-          camera={map2dCamera}
-          lookAtCenter={lookAtCenter}
-          depth={10}
+        <rectangularVisibilityArea
+          width={viewWidth}
+          height={viewHeight}
+          showHelpers={showHelpers}
           attach="visibilitor"
         />
 

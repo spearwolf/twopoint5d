@@ -1,4 +1,6 @@
+import {Box3, Box3Helper, Color, Event, Object3D, Vector3} from 'three';
 import {AABB2} from './AABB2';
+import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
@@ -9,7 +11,20 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   needsUpdate = true;
 
+  viewRectHelperHeight = 20;
+  viewRectHelperColor = new Color(0xfff066);
+
+  #viewRect?: Box3 = undefined;
+
   #tileCreated?: Uint8Array;
+
+  #showHelpers = false;
+  readonly #helpers = new HelpersManager();
+
+  constructor(width = 320, height = 240) {
+    this.width = width;
+    this.height = height;
+  }
 
   get width(): number {
     return this.#width;
@@ -33,11 +48,6 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
   }
 
-  constructor(width = 320, height = 240) {
-    this.width = width;
-    this.height = height;
-  }
-
   computeVisibleTiles(
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
@@ -49,8 +59,18 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     const {width, height} = this;
 
-    const left = centerX - width / 2;
-    const top = centerY - height / 2;
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    const left = centerX - halfWidth;
+    const top = centerY - halfHeight;
+
+    const viewRectHelperHalfHeight = this.viewRectHelperHeight / 2;
+
+    this.#viewRect = new Box3(
+      new Vector3(-halfWidth, -viewRectHelperHalfHeight, -halfHeight),
+      new Vector3(halfWidth, viewRectHelperHalfHeight, halfHeight),
+    );
 
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(left, top, width, height);
     const fullViewArea = AABB2.from(tileCoords);
@@ -96,6 +116,46 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       }
     }
 
-    return {tiles: reuseTiles.concat(createTiles), removeTiles, createTiles, reuseTiles};
+    if (this.showHelpers) {
+      this.updateHelpers();
+    }
+
+    return {
+      tiles: reuseTiles.concat(createTiles),
+      xOffset: map2dTileCoords.xOffset - centerX,
+      yOffset: map2dTileCoords.yOffset - centerY,
+      removeTiles,
+      createTiles,
+      reuseTiles,
+    };
+  }
+
+  get showHelpers() {
+    return this.#showHelpers;
+  }
+
+  set showHelpers(showHelpers: boolean) {
+    if (this.#showHelpers && !showHelpers) {
+      this.#helpers.remove();
+    } else if (!this.#showHelpers && showHelpers) {
+      this.updateHelpers();
+    }
+    this.#showHelpers = showHelpers;
+  }
+
+  addToScene(scene: Object3D<Event>): void {
+    this.#helpers.scene = scene;
+  }
+
+  removeFromScene(scene: Object3D<Event>): void {
+    this.#helpers.removeFromScene(scene);
+  }
+
+  updateHelpers() {
+    this.#helpers.remove();
+    if (this.#viewRect) {
+      const helper = new Box3Helper(this.#viewRect, this.viewRectHelperColor);
+      this.#helpers.add(helper);
+    }
   }
 }

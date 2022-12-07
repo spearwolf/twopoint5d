@@ -89,6 +89,12 @@ function Component(
     }
   }, [stage, projection]);
 
+  useEffect(() => {
+    if (stage) {
+      stage.needsUpdate = true;
+    }
+  }, [stage, width, height, fit, pixelZoom, minPixelZoom, maxPixelZoom, distanceToProjectionPlane, near, far]);
+
   return (
     <parallaxProjection
       args={[initialProjectionPlane]}

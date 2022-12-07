@@ -1,4 +1,4 @@
-import {Plane as THREE_Plane, Quaternion, Vector3, Matrix4, Object3D} from 'three';
+import {Matrix4, Object3D, Plane as THREE_Plane, Quaternion, Vector3} from 'three';
 
 /**
  * @category Projection
@@ -66,10 +66,11 @@ export class ProjectionPlane {
     return this.getOrigin(target).add(this.plane.normal.clone().multiplyScalar(distanceToPlane));
   }
 
+  // TODO use coplanarPoint()
   getOrigin(target?: Vector3): Vector3 {
     const {normal, constant} = this.plane;
     target = target ? target.copy(normal) : normal.clone();
-    return target.multiplyScalar(constant);
+    return target.multiplyScalar(-constant);
   }
 
   getForward(target?: Vector3): Vector3 {
@@ -86,4 +87,9 @@ export class ProjectionPlane {
     target.add(this.up.clone().setLength(y));
     return target;
   }
+
+  // getPlaneCoords(pointIn: Vector3, target?: Vector2): Vector2 {
+  //   const pointOnPlane = this.plane.projectPoint(pointIn, new Vector3());
+  //   return target;
+  // }
 }

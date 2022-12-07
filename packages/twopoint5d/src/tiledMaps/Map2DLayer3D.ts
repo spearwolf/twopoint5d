@@ -46,9 +46,13 @@ export class Map2DLayer3D extends Group implements IMap2DLayer {
   }
 
   set visibilitor(v: IMap2DVisibilitor) {
-    this.#visibilitor = v;
-    if (this.#map2dLayer != null) {
-      this.#map2dLayer.visibilitor = v;
+    if (this.#visibilitor !== v) {
+      this.#visibilitor?.removeFromScene(this);
+      this.#visibilitor = v;
+      this.#visibilitor?.addToScene(this);
+      if (this.#map2dLayer != null) {
+        this.#map2dLayer.visibilitor = v;
+      }
     }
   }
 
