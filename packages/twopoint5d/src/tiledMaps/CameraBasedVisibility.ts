@@ -81,14 +81,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   readonly uuid = MathUtils.generateUUID();
 
-  /**
-   * If `lookAtCenter` is set to *true*, then the center of the camera frustum
-   * always points exactly to the center of the map2d.
-   * Otherwise the center of the frustum and the center of the map2d are cumulated.
-   */
-  lookAtCenter = true;
+  #lookAtCenter = true;
 
-  depth = 100;
+  #depth = 100;
 
   #camera?: PerspectiveCamera | OrthographicCamera;
 
@@ -96,8 +91,37 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #scene?: Object3D;
 
+  #needsUpdate = true;
+
+  readonly #lastUpdateState = {cameraMatrixWorld: new Matrix4(), cameraProjectionMatrix: new Matrix4()};
+
   constructor(camera?: PerspectiveCamera | OrthographicCamera) {
     this.camera = camera;
+  }
+
+  /**
+   * If `lookAtCenter` is set to *true* (default), then the center of the camera frustum
+   * always points exactly to the center of the map2d.
+   * Otherwise the center of the frustum and the center of the map2d are cumulated.
+   */
+  get lookAtCenter(): boolean {
+    return this.#lookAtCenter;
+  }
+
+  set lookAtCenter(lookAtCenter: boolean) {
+    if (this.#lookAtCenter === lookAtCenter) return;
+    this.#lookAtCenter = lookAtCenter;
+    this.needsUpdate = true;
+  }
+
+  set depth(depth: number) {
+    if (this.#depth === depth) return;
+    this.#depth = depth;
+    this.needsUpdate = true;
+  }
+
+  get depth(): number {
+    return this.#depth;
   }
 
   get ground(): number {
@@ -109,13 +133,20 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   get needsUpdate(): boolean {
-    // TODO at this point we should correctly check if something has changed on the input camera (orientation, rotation, etc),
-    //   but since this is rather an expensive thing to do, the intermediate result (planeCoords) might have to be cached as well
-    return true;
+    if (this.#needsUpdate) return true;
+
+    const camera = this.#camera;
+    camera.updateMatrixWorld();
+    camera.updateProjectionMatrix();
+
+    return !(
+      this.#lastUpdateState.cameraMatrixWorld.equals(camera.matrixWorld) &&
+      this.#lastUpdateState.cameraProjectionMatrix.equals(camera.projectionMatrix)
+    );
   }
 
-  set needsUpdate(_update: boolean) {
-    // TODO fix the needsUpdate getter ;)
+  set needsUpdate(update: boolean) {
+    this.#needsUpdate = update;
   }
 
   get camera(): PerspectiveCamera | OrthographicCamera {
@@ -141,7 +172,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     if (this.#showHelpers && !showHelpers) {
       this.removeHelpers();
     }
+    if (!this.#showHelpers && showHelpers) {
+      this.needsUpdate = true;
+    }
     this.#showHelpers = showHelpers;
+  }
+
+  private saveUpdateState(camera: PerspectiveCamera | OrthographicCamera) {
+    this.#lastUpdateState.cameraMatrixWorld.copy(camera.matrixWorld);
+    this.#lastUpdateState.cameraProjectionMatrix.copy(camera.projectionMatrix);
   }
 
   computeVisibleTiles(
@@ -157,9 +196,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.removeHelpers();
     }
 
-    const camera = this.#camera; // no need to .clone() here;
-    camera.updateMatrixWorld(true);
+    const camera = this.#camera;
+    camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
+
+    this.saveUpdateState(camera);
+    this.needsUpdate = false;
 
     const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
 

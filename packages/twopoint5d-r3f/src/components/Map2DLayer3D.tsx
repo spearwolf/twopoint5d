@@ -31,8 +31,10 @@ function Component(
   const [layer, setLayer] = useState<__Map2DLayer3D>(null);
 
   useEffect(() => {
-    layer?.update();
-  }, [layer, centerX, centerY, tileWidth, tileHeight, xOffset, yOffset]);
+    if (!updateOnFrame) {
+      layer?.update();
+    }
+  }, [layer, updateOnFrame, centerX, centerY, tileWidth, tileHeight, xOffset, yOffset]);
 
   const onFrame = useCallback(() => {
     if (layer != null && updateOnFrame) {

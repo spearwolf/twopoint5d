@@ -51,7 +51,7 @@ export const DemoOrDie = () => {
   const camera = useThree((state) => state.camera);
   const [defaultCamera] = useState(camera);
 
-  const { lookAtCenter } = useControls({ lookAtCenter: true });
+  const { lookAtCenter } = useControls({ lookAtCenter: false });
   const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
     "show helpers",
     {
