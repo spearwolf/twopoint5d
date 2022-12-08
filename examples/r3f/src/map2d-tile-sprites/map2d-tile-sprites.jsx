@@ -1,4 +1,7 @@
 /* eslint-disable no-console */
+import { useEffect, useState } from "react";
+import { Color } from "three";
+import { AABB2, Map2DTile } from "twopoint5d";
 import {
   Map2DTileSprites,
   RepeatingTilesProvider,
@@ -8,8 +11,6 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "twopoint5d-r3f";
-import { useEffect, useState } from "react";
-import { AABB2, Map2DTile } from "twopoint5d";
 import { WiredBox } from "../utils/WiredBox";
 
 const TILES = [
@@ -49,7 +50,11 @@ export const DemoOrDie = () => {
 
         <TileSpritesGeometry capacity={4} />
 
-        <TileSpritesMaterial>
+        <TileSpritesMaterial
+          fogNear={350}
+          fogFar={1100}
+          fogColor={[1, 0, 0.5, 0.1]}
+        >
           <TextureRef name="tiles" attach="colorMap" />
         </TileSpritesMaterial>
       </Map2DTileSprites>
