@@ -1,4 +1,4 @@
-import {DoubleSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
+import {FrontSide, ShaderMaterial, ShaderMaterialParameters, Texture} from 'three';
 
 const vertexShader = `
   attribute vec2 quadSize;
@@ -46,7 +46,7 @@ export class TileSpritesMaterial extends ShaderMaterial {
         },
       },
       transparent: true,
-      side: DoubleSide,
+      side: FrontSide,
       ...options,
     });
 

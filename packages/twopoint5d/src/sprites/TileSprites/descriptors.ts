@@ -7,13 +7,31 @@ export interface TileBaseSprite extends VO {
 
 export class TileBaseSprite {
   make(width = 1, height = 1, xOffset = 0, zOffset = 0): void {
+    // A square lying on the XZ plane:
+    //
+    //             ^(y)
+    //             |
+    //             |
+    //             |
+    //             A----D---->(x)
+    //            /    /
+    //           B----C
+    //          /
+    //      (z)v
+
     // prettier-ignore
     this.setPosition([
       xOffset,         0, zOffset,
-      xOffset,         0, height + zOffset,
-      width + xOffset, 0, height + zOffset,
-      width + xOffset, 0, zOffset,
+      xOffset,         0, zOffset + height,
+      xOffset + width, 0, zOffset + height,
+      xOffset + width, 0, zOffset,
     ]);
+
+    //   (0,0)----(1,0)
+    //     |        |
+    //     |        |
+    //   (0,1)----(1,1)
+
     // prettier-ignore
     this.setUv([
       0, 0,
@@ -26,7 +44,22 @@ export class TileBaseSprite {
 
 export const TileBaseSpriteDescriptor: VertexObjectDescription = {
   vertexCount: 4,
-  indices: [0, 2, 1, 0, 3, 2],
+
+  //
+  //  (0)
+  //   |
+  //   |
+  //   v
+  //  (1)--->(2)
+  //
+  //  (0)    (3)
+  //     \    ^
+  //      \   |
+  //       v  |
+  //         (2)
+  //
+  //
+  indices: [0, 1, 2, 0, 2, 3],
 
   attributes: {
     position: {components: ['x', 'y', 'z']},

@@ -6,7 +6,7 @@ import {
   TileSet,
   TileSetRef,
   TileSpritesGeometry,
-  TileSpritesMaterial
+  TileSpritesMaterial,
 } from "twopoint5d-r3f";
 import { useEffect, useState } from "react";
 import { AABB2, Map2DTile } from "twopoint5d";
@@ -47,7 +47,7 @@ export const DemoOrDie = () => {
 
         <TileSetRef name="tiles" attach="tileSet" />
 
-        <TileSpritesGeometry capacity={1000} />
+        <TileSpritesGeometry capacity={4} />
 
         <TileSpritesMaterial>
           <TextureRef name="tiles" attach="colorMap" />

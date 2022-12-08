@@ -32,6 +32,18 @@ export interface BaseSprite extends VO {
 
 export class BaseSprite {
   make(width = 0.5, height = 0.5, xOffset = 0, yOffset = 0): void {
+    // A square lying on the XY plane:
+    //
+    //             ^(y)
+    //             |
+    //        B''''|''''C
+    //        .    |    .
+    //        .    #--------->(x)
+    //        .   /     .
+    //        A../......D
+    //          /
+    //      (z)v
+
     // prettier-ignore
     this.setPosition([
       -width + xOffset, -height + yOffset, 0,
@@ -39,6 +51,12 @@ export class BaseSprite {
       +width + xOffset, +height + yOffset, 0,
       +width + xOffset, -height + yOffset, 0,
     ]);
+
+    //   (0,0)----(1,0)
+    //     |        |
+    //     |        |
+    //   (0,1)----(1,1)
+
     // prettier-ignore
     this.setUv([
       // flipY = false
@@ -52,6 +70,20 @@ export class BaseSprite {
 
 export const BaseSpriteDescriptor: VertexObjectDescription = {
   vertexCount: 4,
+
+  //
+  //  (1)<---(2)
+  //        ^
+  //       /
+  //      /
+  //  (0)
+  //
+  //         (2)
+  //          ^
+  //          |
+  //          |
+  //  (0)--->(3)
+  //
   indices: [0, 2, 1, 0, 3, 2],
 
   attributes: {
