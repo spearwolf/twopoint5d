@@ -21,6 +21,8 @@ extend({ CameraBasedVisibility, CameraHelper });
 
 const TILES = [
   {
+    name: "pixelart",
+
     tilesUrl: "/examples/assets/ball-patterns.png",
 
     tileWidth: 128,
@@ -52,6 +54,8 @@ const TILES = [
     ],
   },
   {
+    name: "heilstätten tiles",
+
     tilesUrl: "/examples/assets/fliesen-tile-1000x579.png",
 
     tileWidth: 1000,
@@ -64,6 +68,22 @@ const TILES = [
     map2dTileOffsetY: 0,
 
     tilesData: [[1]],
+  },
+  {
+    name: "a random tile",
+
+    tilesUrl: "/examples/assets/tiles-made-with-sd.png",
+
+    tileWidth: 512,
+    tileHeight: 512,
+
+    map2dTileWidth: 512,
+    map2dTileHeight: 512,
+
+    map2dTileOffsetX: 0,
+    map2dTileOffsetY: 0,
+
+    tilesData: () => [[1 + ((Math.random() * 9) | 0)]],
   },
 ];
 
@@ -84,7 +104,7 @@ export const DemoOrDie = () => {
 
   const { lookAtCenter, tiles } = useControls({
     lookAtCenter: false,
-    tiles: { options: ["pixelart", "heilstätten tiles"] },
+    tiles: { options: TILES.map((t) => t.name) },
   });
 
   const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
@@ -104,7 +124,16 @@ export const DemoOrDie = () => {
     map2dTileOffsetX,
     map2dTileOffsetY,
     tilesData,
-  } = useMemo(() => TILES[tiles === "pixelart" ? 0 : 1], [tiles]);
+  } = useMemo(() => {
+    const tile = TILES.find((t) => t.name === tiles);
+    return {
+      ...tile,
+      tilesData:
+        typeof tile.tilesData === "function"
+          ? tile.tilesData()
+          : tile.tilesData,
+    };
+  }, [tiles]);
 
   useEffect(
     () =>
@@ -144,6 +173,7 @@ export const DemoOrDie = () => {
         url={tilesUrl}
         tileWidth={tileWidth}
         tileHeight={tileHeight}
+        anisotrophy
       />
 
       <Map2DLayer3D
