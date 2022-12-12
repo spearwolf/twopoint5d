@@ -65,6 +65,7 @@ function findPointOnPlaneThatIsInViewFrustum(
 
   const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
   const projectPlane = plane.clone().applyMatrix4(planeOffset);
+  // TODO apply matrixWorld transform (from map2d-scene-container)
 
   return projectPlane.intersectLine(lineOfSight, new Vector3());
 }
