@@ -1,4 +1,4 @@
-import {Box3, Box3Helper, Color, Event, Object3D, Vector3} from 'three';
+import {Box3, Box3Helper, Color, Event, Matrix4, Object3D, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
@@ -52,6 +52,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
+    _matrixWorld: Matrix4,
   ): Map2DVisibleTiles | undefined {
     if (this.width === 0 || this.height === 0) {
       return undefined;

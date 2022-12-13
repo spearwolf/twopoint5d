@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
 import { useState } from "react";
-import { CameraHelper } from "three";
+import { CameraHelper, Euler, MathUtils, Matrix4 } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
@@ -16,6 +16,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "twopoint5d-r3f";
+import { WiredBox } from "../utils/WiredBox";
 
 extend({ CameraBasedVisibility, CameraHelper });
 
@@ -31,6 +32,7 @@ export const Map2DImageLayer = ({
   camera,
   horizontal = false,
   vertical = false,
+  matrix = new Matrix4(),
 }) => {
   return (
     <>
@@ -43,6 +45,8 @@ export const Map2DImageLayer = ({
 
       <Map2DLayer3D
         name="Map2DLayer3D"
+        matrix={matrix}
+        matrixAutoUpdate={false}
         tileWidth={width}
         tileHeight={height}
         xOffset={offsetX}
@@ -74,12 +78,24 @@ export const Map2DImageLayer = ({
   );
 };
 
+const matrixFirst = new Matrix4().multiplyMatrices(
+  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(0), 0, 0)),
+  new Matrix4().makeTranslation(0, 100, 1000)
+);
+
+const matrixSecond = new Matrix4().multiplyMatrices(
+  new Matrix4().makeTranslation(0, -200, 0),
+  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0))
+);
+
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const camera = useThree((state) => state.camera);
 
   return (
     <>
+      <WiredBox width={512} height={512} depth={512} />
+
       <PanControl2D
         onUpdate={setCenter}
         pixelsPerSecond={300}
@@ -101,6 +117,7 @@ export const DemoOrDie = () => {
 
       <Map2DImageLayer
         name="first"
+        matrix={matrixFirst}
         camera={camera}
         imageUrl="/examples/assets/kastani/skull-blue-2000px.png"
         width={2000}
@@ -114,6 +131,7 @@ export const DemoOrDie = () => {
 
       <Map2DImageLayer
         name="second"
+        matrix={matrixSecond}
         camera={camera}
         imageUrl="/examples/assets/kastani/skull-big-turquoise-2000px.png"
         width={2000}

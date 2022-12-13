@@ -1,3 +1,4 @@
+import {Matrix4} from 'three';
 import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {IMap2DVisibilitor} from './IMap2DVisibilitor';
@@ -114,7 +115,7 @@ export class Map2DLayer implements IMap2DLayer {
     this.renderers.delete(renderer);
   }
 
-  update(): void {
+  update(matrixWorld: Matrix4): void {
     if (this.renderers.size === 0 || this.visibilitor == null) return;
 
     if (this.#resetTilesOnNextUpdate) {
@@ -127,7 +128,12 @@ export class Map2DLayer implements IMap2DLayer {
     }
 
     if (this.needsUpdate) {
-      const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords);
+      const visible = this.visibilitor.computeVisibleTiles(
+        this.tiles,
+        [this.centerX, this.centerY],
+        this.#tileCoords,
+        matrixWorld,
+      );
 
       if (visible) {
         this.tiles = visible?.tiles;

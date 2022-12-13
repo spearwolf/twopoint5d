@@ -1,6 +1,5 @@
 /* eslint-disable no-console */
 import { useEffect, useState } from "react";
-import { Color } from "three";
 import { AABB2, Map2DTile } from "twopoint5d";
 import {
   Map2DTileSprites,

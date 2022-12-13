@@ -2,7 +2,13 @@ import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
 import { useControls } from "leva";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CameraHelper, PerspectiveCamera } from "three";
+import {
+  CameraHelper,
+  Euler,
+  MathUtils,
+  Matrix4,
+  PerspectiveCamera,
+} from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
@@ -93,6 +99,10 @@ map2dCamera.lookAt(0, 0, 0);
 map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
 
+const map2dMatrix = new Matrix4().makeRotationFromEuler(
+  new Euler(MathUtils.degToRad(-45), 0, 0)
+);
+
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const activeCamera = useDemoStore((state) => state.activeCameraName);
@@ -179,6 +189,8 @@ export const DemoOrDie = () => {
       <Map2DLayer3D
         name="Map2DLayer3D"
         ref={map2dLayerRef}
+        matrix={map2dMatrix}
+        matrixAutoUpdate={false}
         tileWidth={map2dTileWidth}
         tileHeight={map2dTileHeight}
         xOffset={map2dTileOffsetX}

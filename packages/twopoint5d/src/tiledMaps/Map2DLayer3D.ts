@@ -150,7 +150,8 @@ export class Map2DLayer3D extends Group implements IMap2DLayer {
   }
 
   update(): void {
-    this.#map2dLayer.update();
+    this.updateMatrixWorld();
+    this.#map2dLayer.update(this.matrixWorld);
   }
 
   resetTiles(): void {

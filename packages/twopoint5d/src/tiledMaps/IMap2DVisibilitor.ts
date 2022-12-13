@@ -1,4 +1,4 @@
-import {Object3D} from 'three';
+import {Matrix4, Object3D} from 'three';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
@@ -23,6 +23,7 @@ export interface IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     centerPoint: [number, number],
     tileCoords: Map2DTileCoordsUtil,
+    matrixWorld: Matrix4,
   ): Map2DVisibleTiles | undefined;
 
   addToScene(scene: Object3D): void;

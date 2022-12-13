@@ -44,6 +44,13 @@ const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
   new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
 
+const frustumApplyMatrix4 = (frustum: Frustum, matrix: Matrix4): Frustum => {
+  frustum.planes.forEach((plane) => {
+    plane.applyMatrix4(matrix);
+  });
+  return frustum;
+};
+
 const makeAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
@@ -52,6 +59,8 @@ function findPointOnPlaneThatIsInViewFrustum(
   camera: PerspectiveCamera | OrthographicCamera,
   plane: Plane,
   map2dTileCoords: Map2DTileCoordsUtil,
+  matrixWorld: Matrix4,
+  matrixWorldInverse: Matrix4,
 ): Vector3 | undefined {
   const camWorldDir = camera.getWorldDirection(new Vector3()).setLength(camera.far);
   const camWorldPos = new Vector3().setFromMatrixPosition(camera.matrixWorld);
@@ -64,10 +73,12 @@ function findPointOnPlaneThatIsInViewFrustum(
   //   -> the camera line-of-sight-target point that lies on the plane
 
   const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
-  const projectPlane = plane.clone().applyMatrix4(planeOffset);
-  // TODO apply matrixWorld transform (from map2d-scene-container)
+  const projectPlane = plane.clone().applyMatrix4(planeOffset).applyMatrix4(matrixWorld);
 
-  return projectPlane.intersectLine(lineOfSight, new Vector3());
+  const poi = projectPlane.intersectLine(lineOfSight, new Vector3());
+  poi?.applyMatrix4(matrixWorldInverse);
+
+  return poi;
 }
 
 /**
@@ -188,6 +199,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
+    matrixWorld: Matrix4,
   ): Map2DVisibleTiles | undefined {
     if (!this.hasCamera) {
       return undefined;
@@ -201,10 +213,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
 
-    this.saveUpdateState(camera);
+    this.saveUpdateState(camera); // TODO save matrixWorld
     this.needsUpdate = false;
 
-    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(camera, CameraBasedVisibility.Plane, map2dTileCoords);
+    const matrixWorldInverse = matrixWorld.clone().invert();
+
+    const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(
+      camera,
+      CameraBasedVisibility.Plane,
+      map2dTileCoords,
+      matrixWorld,
+      matrixWorldInverse,
+    );
 
     if (pointOnPlane == null) {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
@@ -220,7 +240,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     planeCoords.add(centerPoint);
 
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
-    const frustum = makeCameraFrustum(camera);
+    const frustum = frustumApplyMatrix4(makeCameraFrustum(camera), matrixWorldInverse);
 
     return this.findAllVisibleTiles(frustum, tileCoords, map2dTileCoords, centerPoint, previousTiles.slice(0));
   }
