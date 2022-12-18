@@ -242,7 +242,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
     const frustum = frustumApplyMatrix4(makeCameraFrustum(camera), matrixWorldInverse);
 
-    return this.findAllVisibleTiles(frustum, tileCoords, map2dTileCoords, centerPoint, previousTiles.slice(0));
+    // TODO not matrixWorld - parent->matrixWorld - local->matrix(->translate)
+    const translate = new Vector3().setFromMatrixPosition(matrixWorld);
+
+    return this.findAllVisibleTiles(frustum, tileCoords, map2dTileCoords, centerPoint, translate, previousTiles.slice(0));
   }
 
   private findAllVisibleTiles(
@@ -250,10 +253,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
     centerPoint: Vector2,
+    translate: Vector3,
     previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
     const boxTransform = makePlaneOffsetTransform(map2dTileCoords).multiply(
-      new Matrix4().makeTranslation(-centerPoint.x, 0, -centerPoint.y),
+      new Matrix4().makeTranslation(-centerPoint.x + translate.x, translate.y, -centerPoint.y + translate.z),
     );
 
     const visibles: TilePlaneBox[] = [];
@@ -324,10 +328,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.createHelpers(visibles);
     }
 
+    const offset = new Vector2(map2dTileCoords.xOffset - centerPoint.x, map2dTileCoords.yOffset - centerPoint.y);
+
     return {
       tiles: visibles.map((visible) => visible.map2dTile),
-      xOffset: map2dTileCoords.xOffset - centerPoint.x,
-      yOffset: map2dTileCoords.yOffset - centerPoint.y,
+      offset,
+      translate,
       createTiles,
       reuseTiles,
       removeTiles: previousTiles,

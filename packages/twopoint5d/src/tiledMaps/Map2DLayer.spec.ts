@@ -1,3 +1,4 @@
+import {Vector2, Vector3} from 'three';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {Map2DLayer} from './Map2DLayer';
 import {Map2DTile} from './Map2DTile';
@@ -34,7 +35,7 @@ describe('Map2DLayer', () => {
       const layer = new Map2DLayer(1, 1);
       expect(layer.renderers.size).toBe(0);
       const renderer: IMap2DTileRenderer = {
-        beginUpdate(_xOffset: number, _yOffset: number) {},
+        beginUpdate(_offset: Vector2, _translate: Vector3) {},
         addTile(_tile: Map2DTile) {},
         reuseTile(_tile: Map2DTile) {},
         removeTile(_tile: Map2DTile) {},

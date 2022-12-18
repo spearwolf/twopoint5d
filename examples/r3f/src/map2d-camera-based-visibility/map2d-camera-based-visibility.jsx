@@ -100,8 +100,8 @@ map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
 
 const map2dMatrix = new Matrix4().makeRotationFromEuler(
-  new Euler(MathUtils.degToRad(-45), 0, 0)
-);
+  new Euler(MathUtils.degToRad(-5), 0, 0)
+).multiply(new Matrix4().makeTranslation(100, 0, 0));
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });

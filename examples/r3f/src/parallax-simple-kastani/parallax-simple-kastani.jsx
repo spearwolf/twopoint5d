@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
 import { useState } from "react";
-import { CameraHelper, Euler, MathUtils, Matrix4 } from "three";
+import { CameraHelper, Matrix4 } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
@@ -57,6 +57,7 @@ export const Map2DImageLayer = ({
       >
         <cameraBasedVisibility
           camera={camera}
+          lookAtCenter={false}
           depth={10}
           attach="visibilitor"
         />
@@ -78,15 +79,18 @@ export const Map2DImageLayer = ({
   );
 };
 
-const matrixFirst = new Matrix4().multiplyMatrices(
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(0), 0, 0)),
-  new Matrix4().makeTranslation(0, 100, 1000)
-);
+const matrixFirst =
+// TODO rotate(90) to match orbit-controls
+  // new Matrix4().multiplyMatrices(
+  // new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
+  new Matrix4().makeTranslation(0, -256, 0);
+// );
 
-const matrixSecond = new Matrix4().multiplyMatrices(
-  new Matrix4().makeTranslation(0, -200, 0),
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0))
-);
+const matrixSecond =
+  //  new Matrix4().multiplyMatrices(
+  // new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
+  new Matrix4().makeTranslation(0, -200, 42);
+// );
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });

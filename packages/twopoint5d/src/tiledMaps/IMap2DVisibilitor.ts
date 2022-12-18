@@ -1,12 +1,12 @@
-import {Matrix4, Object3D} from 'three';
+import {Matrix4, Object3D, Vector2, Vector3} from 'three';
 import {Map2DTile} from './Map2DTile';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
 
 export type Map2DVisibleTiles = {
   tiles: Map2DTile[];
 
-  xOffset?: number;
-  yOffset?: number;
+  offset?: Vector2;
+  translate?: Vector3;
 
   removeTiles?: Map2DTile[];
   reuseTiles?: Map2DTile[];

@@ -1,4 +1,4 @@
-import {Matrix4} from 'three';
+import {Matrix4, Vector2, Vector3} from 'three';
 import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {IMap2DVisibilitor} from './IMap2DVisibilitor';
@@ -139,11 +139,11 @@ export class Map2DLayer implements IMap2DLayer {
         this.tiles = visible?.tiles;
         this.needsUpdate = false;
 
-        const xOffset = visible.xOffset ?? 0;
-        const yOffset = visible.yOffset ?? 0;
+        const offset = visible.offset ?? new Vector2();
+        const translate = visible.translate ?? new Vector3();
 
         for (const tileRenderer of this.renderers) {
-          tileRenderer.beginUpdate(xOffset, yOffset);
+          tileRenderer.beginUpdate(offset, translate);
 
           visible.removeTiles?.forEach((tile) => {
             tileRenderer.removeTile(tile);
