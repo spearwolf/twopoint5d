@@ -99,6 +99,7 @@ map2dCamera.lookAt(0, 0, 0);
 map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
 
+// TODO remove me
 const map2dMatrix = new Matrix4().makeRotationFromEuler(
   new Euler(MathUtils.degToRad(-5), 0, 0)
 ).multiply(new Matrix4().makeTranslation(100, 0, 0));

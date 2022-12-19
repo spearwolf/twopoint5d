@@ -93,7 +93,7 @@ function findPointOnPlaneThatIsInViewFrustum(
 export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
 
-  #lookAtCenter = true;
+  #lookAtCenter = false;
 
   #depth = 100;
 
