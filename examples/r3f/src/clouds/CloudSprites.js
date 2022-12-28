@@ -1,21 +1,21 @@
 /* eslint-disable no-console */
 
 export class CloudSprites {
-  capacity = 100;
+  capacity = 2000;
 
-  gap = 5;
+  gap = 1;
 
   speed = 20;
 
-  width = 1920;
-  height = 1080;
+  width = 800;
+  height = 600;
 
   xOffset = 0;
   yOffset = 0;
   zOffset = 0;
 
   fadeInRange = 0.1;
-  fadeOutRange = 0.2;
+  fadeOutRange = 0.1;
 
   geometry = null;
   material = null;

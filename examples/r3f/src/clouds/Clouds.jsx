@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { AdditiveBlending, FrontSide } from "three";
 import {
   forwardRefValue,
   ShaderChunks,
@@ -9,8 +11,6 @@ import {
   useFrameLoop,
   useTextureAtlas,
 } from "twopoint5d-r3f";
-import { useEffect, useRef } from "react";
-import { FrontSide } from "three";
 import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";
 import { CloudSprites } from "./CloudSprites";
 
@@ -42,6 +42,7 @@ const ShaderLib = {
 
   discard_by_alpha_fragment: `
     gl_FragColor.a *= vFadeInOutAlpha;
+    gl_FragColor.a *= 0.3;
 
     if (gl_FragColor.a == 0.0) {
       discard;
@@ -90,8 +91,8 @@ export const Clouds = ({
     <>
       <TextureAtlas
         name="clouds"
-        url="/examples/assets/clouds.json"
-        overrideImageUrl="/examples/assets/clouds.png"
+        url="/examples/assets/clouds-2.json"
+        overrideImageUrl="/examples/assets/clouds-2.png"
         anisotrophy
       />
 
@@ -104,6 +105,7 @@ export const Clouds = ({
           ref={material}
           depthTest={false}
           depthWrite={false}
+          blending={AdditiveBlending}
           side={FrontSide}
           logShadersToConsole={true}
         >

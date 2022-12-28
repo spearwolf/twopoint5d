@@ -12,18 +12,18 @@ root.render(
       <ParallaxProjection
         plane="xy"
         origin="bottom left"
-        width={1920}
-        height={1080}
+        width={1024}
+        height={768}
         fit="contain"
       />
 
       <Clouds
-        capacity={200}
-        gap={10}
+        capacity={800}
+        gap={2}
         speed={90}
-        width={1920}
-        height={400}
-        yOffset={-400}
+        width={2500}
+        height={600}
+        yOffset={-600}
         zOffset={-660}
         fadeInRange={0.1}
         fadeOutRange={0.1}
