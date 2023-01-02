@@ -19,6 +19,10 @@ const ShaderLib = {
     uniform vec4 fadeInOutZRange;
   `,
 
+  postAlpha_uniform: `
+    uniform float postAlphaMultiplier;
+  `,
+
   fadeInOutAlpha_varying: `
     varying float vFadeInOutAlpha;
   `,
@@ -29,6 +33,7 @@ const ShaderLib = {
   `,
 
   extra_pars_fragment: `
+    #include <postAlpha_uniform>
     #include <fadeInOutAlpha_varying>
   `,
 
@@ -42,7 +47,7 @@ const ShaderLib = {
 
   discard_by_alpha_fragment: `
     gl_FragColor.a *= vFadeInOutAlpha;
-    gl_FragColor.a *= 0.3;
+    gl_FragColor.a *= postAlphaMultiplier;
 
     if (gl_FragColor.a == 0.0) {
       discard;
@@ -61,6 +66,7 @@ export const Clouds = ({
   speed,
   fadeInRange,
   fadeOutRange,
+  postAlphaMultiplier,
 }) => {
   const geometry = useRef();
   const material = useRef();
@@ -68,7 +74,9 @@ export const Clouds = ({
   const atlas = useTextureAtlas("clouds");
 
   useEffect(() => {
+    // initialize extra uniforms to ensure that they are available in the shader
     material.current.uniforms.fadeInOutZRange = { value: [0, 0, 0, 0] };
+    material.current.uniforms.postAlphaMultiplier = { value: 0 };
   }, [material]);
 
   useFrameLoop(createFrameLoopComponent(CloudSprites), {
@@ -85,6 +93,7 @@ export const Clouds = ({
     speed,
     fadeInRange,
     fadeOutRange,
+    postAlphaMultiplier,
   });
 
   return (
@@ -128,4 +137,5 @@ Clouds.defaultProps = {
   speed: 5,
   fadeInRange: 0.1,
   fadeOutRange: 0.2,
+  postAlphaMultiplier: 1.0,
 };

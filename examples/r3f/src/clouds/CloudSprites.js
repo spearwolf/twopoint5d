@@ -17,6 +17,8 @@ export class CloudSprites {
   fadeInRange = 0.1;
   fadeOutRange = 0.1;
 
+  postAlphaMultiplier = 1.0;
+
   geometry = null;
   material = null;
   atlas = null;
@@ -47,8 +49,17 @@ export class CloudSprites {
   }
 
   update(changes) {
-    if (["capacity", "gap", "zOffset"].some((key) => key in changes)) {
+    if ("capacity" in changes) {
+      this.#updateUniforms();
+      return;
+    }
+
+    if (["gap", "zOffset"].some((key) => key in changes)) {
       this.#updateUniformZRange();
+    }
+
+    if ("postAlphaMultiplier" in changes) {
+      this.#updatePostAlpha();
     }
   }
 
@@ -58,6 +69,11 @@ export class CloudSprites {
 
   #updateUniforms() {
     this.#updateUniformZRange();
+    this.#updatePostAlpha();
+  }
+
+  #updatePostAlpha() {
+    this.material.uniforms.postAlphaMultiplier.value = this.postAlphaMultiplier;
   }
 
   #updateUniformZRange() {
@@ -69,6 +85,8 @@ export class CloudSprites {
       zRangeMax - zRange * this.fadeOutRange,
       zRangeMax,
     ];
+
+    this.material.uniforms.fadeInOutZRange.needsUpdate = true;
   }
 
   #animateClouds(delta) {
