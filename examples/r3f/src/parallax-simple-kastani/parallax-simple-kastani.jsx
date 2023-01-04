@@ -90,25 +90,14 @@ export const Map2DImageLayer = ({
   );
 };
 
-const forefrontTransform = new Matrix4().multiplyMatrices(
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 225, -200)
+const xyTransform = new Matrix4().makeRotationFromEuler(
+  new Euler(MathUtils.degToRad(90), 0, 0)
 );
 
-const frontTransform = new Matrix4().multiplyMatrices(
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 270, -100)
-);
-
-const middleTransform = new Matrix4().multiplyMatrices(
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 90, 0)
-);
-
-const backTransform = new Matrix4().multiplyMatrices(
-  new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, -180, 150)
-);
+const forefrontTransform = new Matrix4().makeTranslation(0, 225, -200);
+const frontTransform = new Matrix4().makeTranslation(0, 270, -100);
+const middleTransform = new Matrix4().makeTranslation(0, 90, 0);
+const backTransform = new Matrix4().makeTranslation(0, -180, 150);
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -137,61 +126,63 @@ export const DemoOrDie = () => {
         />
       </Stage2D>
 
-      <Map2DImageLayer
-        name="forefront"
-        matrix={forefrontTransform}
-        camera={camera}
-        imageUrl="/examples/assets/kastani/seamless-plants-1200px.png"
-        width={1200}
-        height={233}
-        offsetX={-1200 / 2}
-        offsetY={-233 / 2}
-        centerX={center.x}
-        centerY={center.y}
-        horizontal
-      />
+      <group matrix={xyTransform} matrixAutoUpdate={false}>
+        <Map2DImageLayer
+          name="forefront"
+          matrix={forefrontTransform}
+          camera={camera}
+          imageUrl="/examples/assets/kastani/seamless-plants-1200px.png"
+          width={1200}
+          height={233}
+          offsetX={-1200 / 2}
+          offsetY={-233 / 2}
+          centerX={center.x}
+          centerY={center.y}
+          horizontal
+        />
 
-      <Map2DImageLayer
-        name="front"
-        matrix={frontTransform}
-        camera={camera}
-        imageUrl="/examples/assets/kastani/seamless-small-blue-red-yellow-1000px.png"
-        width={1000}
-        height={258}
-        offsetX={-1000 / 2}
-        offsetY={-258 / 2}
-        centerX={center.x}
-        centerY={center.y}
-        horizontal
-      />
+        <Map2DImageLayer
+          name="front"
+          matrix={frontTransform}
+          camera={camera}
+          imageUrl="/examples/assets/kastani/seamless-small-blue-red-yellow-1000px.png"
+          width={1000}
+          height={258}
+          offsetX={-1000 / 2}
+          offsetY={-258 / 2}
+          centerX={center.x}
+          centerY={center.y}
+          horizontal
+        />
 
-      <Map2DImageLayer
-        name="middle"
-        matrix={middleTransform}
-        camera={camera}
-        imageUrl="/examples/assets/kastani/skull-big-turquoise-2000px.png"
-        width={2000}
-        height={479}
-        offsetX={-2000 / 2}
-        offsetY={-479 / 2}
-        centerX={center.x}
-        centerY={center.y}
-        horizontal
-      />
+        <Map2DImageLayer
+          name="middle"
+          matrix={middleTransform}
+          camera={camera}
+          imageUrl="/examples/assets/kastani/skull-big-turquoise-2000px.png"
+          width={2000}
+          height={479}
+          offsetX={-2000 / 2}
+          offsetY={-479 / 2}
+          centerX={center.x}
+          centerY={center.y}
+          horizontal
+        />
 
-      <Map2DImageLayer
-        name="back"
-        matrix={backTransform}
-        camera={camera}
-        imageUrl="/examples/assets/kastani/skull-blue-2000px.png"
-        width={2000}
-        height={383}
-        offsetX={-2000 / 2}
-        offsetY={-383 / 2}
-        centerX={center.x}
-        centerY={center.y}
-        horizontal
-      />
+        <Map2DImageLayer
+          name="back"
+          matrix={backTransform}
+          camera={camera}
+          imageUrl="/examples/assets/kastani/skull-blue-2000px.png"
+          width={2000}
+          height={383}
+          offsetX={-2000 / 2}
+          offsetY={-383 / 2}
+          centerX={center.x}
+          centerY={center.y}
+          horizontal
+        />
+      </group>
 
       <Effects>
         <shaderPass args={[SepiaShader]} uniforms-amount-value={0.2} />
