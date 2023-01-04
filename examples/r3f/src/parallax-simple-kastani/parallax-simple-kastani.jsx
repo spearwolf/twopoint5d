@@ -1,4 +1,4 @@
-import { OrbitControls } from "@react-three/drei";
+import { Effects, OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
 import { useState } from "react";
 import { CameraHelper, Euler, MathUtils, Matrix4 } from "three";
@@ -16,9 +16,20 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from "twopoint5d-r3f";
+
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
+import { SepiaShader } from "three/examples/jsm/shaders/SepiaShader";
+import { VignetteShader } from "three/examples/jsm/shaders/VignetteShader";
+
 import { WiredBox } from "../utils/WiredBox";
 
-extend({ CameraBasedVisibility, CameraHelper });
+extend({
+  CameraBasedVisibility,
+  CameraHelper,
+  RenderPass,
+  ShaderPass,
+});
 
 export const Map2DImageLayer = ({
   name,
@@ -70,7 +81,7 @@ export const Map2DImageLayer = ({
           />
           <TileSetRef name={name} attach="tileSet" />
           <TileSpritesGeometry capacity={100} />
-          <TileSpritesMaterial>
+          <TileSpritesMaterial fogColor={[0.1, 0.1, 0.4, 1]} fogFar={1500}>
             <TextureRef name={name} attach="colorMap" />
           </TileSpritesMaterial>
         </Map2DTileSprites>
@@ -81,22 +92,22 @@ export const Map2DImageLayer = ({
 
 const forefrontTransform = new Matrix4().multiplyMatrices(
   new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 225, -200),
+  new Matrix4().makeTranslation(0, 225, -200)
 );
 
 const frontTransform = new Matrix4().multiplyMatrices(
   new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 270, -100),
+  new Matrix4().makeTranslation(0, 270, -100)
 );
 
 const middleTransform = new Matrix4().multiplyMatrices(
   new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, 90, 0),
+  new Matrix4().makeTranslation(0, 90, 0)
 );
 
 const backTransform = new Matrix4().multiplyMatrices(
   new Matrix4().makeRotationFromEuler(new Euler(MathUtils.degToRad(90), 0, 0)),
-  new Matrix4().makeTranslation(0, -180, 150),
+  new Matrix4().makeTranslation(0, -180, 150)
 );
 
 export const DemoOrDie = () => {
@@ -115,7 +126,7 @@ export const DemoOrDie = () => {
 
       <OrbitControls />
 
-      <Stage2D noAutoRender defaultCamera>
+      <Stage2D name="stage0" noAutoRender defaultCamera>
         <ParallaxProjection
           plane="xy"
           origin="bottom left"
@@ -181,6 +192,11 @@ export const DemoOrDie = () => {
         centerY={center.y}
         horizontal
       />
+
+      <Effects>
+        <shaderPass args={[SepiaShader]} uniforms-amount-value={0.2} />
+        <shaderPass args={[VignetteShader]} uniforms-darkness-value={2} />
+      </Effects>
     </>
   );
 };
