@@ -9,10 +9,9 @@ import { Clouds } from "./Clouds";
 const root = createRoot(document.getElementById("root"));
 
 const Demo = () => {
-  const { fadeInRange, fadeOutRange, postAlphaMultiplier } = useControls({
-    fadeInRange: { value: 0.1, min: 0.01, max: 0.99, step: 0.01 },
-    fadeOutRange: { value: 0.1, min: 0.01, max: 0.99, step: 0.01 },
-    postAlphaMultiplier: { value: 0.3, min: 0.01, max: 0.99, step: 0.01 },
+  const { speed, alpha } = useControls({
+    speed: { value: 90, min: 0, max: 250, step: 1 },
+    alpha: { value: 0.3, min: 0.01, max: 0.99, step: 0.01 },
   });
 
   return (
@@ -29,14 +28,14 @@ const Demo = () => {
         <Clouds
           capacity={800}
           gap={2}
-          speed={90}
+          speed={speed}
           width={2500}
           height={600}
           yOffset={-600}
           zOffset={-660}
-          fadeInRange={fadeInRange}
-          fadeOutRange={fadeOutRange}
-          postAlphaMultiplier={postAlphaMultiplier}
+          fadeInRange={0.1}
+          fadeOutRange={0.1}
+          postAlphaMultiplier={alpha}
         />
       </Stage2D>
 
