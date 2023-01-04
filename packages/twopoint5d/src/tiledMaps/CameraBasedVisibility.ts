@@ -103,7 +103,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #needsUpdate = true;
 
-  readonly #lastUpdateState = {cameraMatrixWorld: new Matrix4(), cameraProjectionMatrix: new Matrix4()};
+  readonly #lastUpdateState = {
+    cameraMatrixWorld: new Matrix4(),
+    cameraProjectionMatrix: new Matrix4(),
+  };
 
   readonly #helpers = new HelpersManager();
 
@@ -199,7 +202,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
-    matrixWorld: Matrix4,
+    parentNode: Object3D,
   ): Map2DVisibleTiles | undefined {
     if (!this.hasCamera) {
       return undefined;
@@ -213,9 +216,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
 
-    this.saveUpdateState(camera); // TODO save matrixWorld
+    this.saveUpdateState(camera); // TODO save parentNode->matrixWorld ?
     this.needsUpdate = false;
 
+    const {matrixWorld} = parentNode;
     const matrixWorldInverse = matrixWorld.clone().invert();
 
     const pointOnPlane = findPointOnPlaneThatIsInViewFrustum(
@@ -241,8 +245,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(planeCoords.x, planeCoords.y, 1, 1);
     const frustum = frustumApplyMatrix4(makeCameraFrustum(camera), matrixWorldInverse);
-
-    // TODO not matrixWorld - parent->matrixWorld - local->matrix(->translate)
     const translate = new Vector3().setFromMatrixPosition(matrixWorld);
 
     return this.findAllVisibleTiles(frustum, tileCoords, map2dTileCoords, centerPoint, translate, previousTiles.slice(0));
