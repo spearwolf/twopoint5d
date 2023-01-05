@@ -1,6 +1,6 @@
 import { Effects, OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CameraHelper, Euler, MathUtils, Matrix4 } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
@@ -45,6 +45,21 @@ export const Map2DImageLayer = ({
   vertical = false,
   matrix = new Matrix4(),
 }) => {
+  const map2dRef = useRef();
+
+  useEffect(() => {
+    const onKeyup = (event) => {
+      if (event.ctrlKey && event.code === "Period") {
+        if (map2dRef.current.visibilitor && name === "front") {
+          map2dRef.current.visibilitor.debugNextVisibleTiles = true;
+        }
+      }
+    };
+
+    window.addEventListener("keyup", onKeyup);
+    return () => window.removeEventListener("keyup", onKeyup);
+  }, [name]);
+
   return (
     <>
       <TileSet
@@ -55,7 +70,8 @@ export const Map2DImageLayer = ({
       />
 
       <Map2DLayer3D
-        name="Map2DLayer3D"
+        name={name}
+        ref={map2dRef}
         matrix={matrix}
         matrixAutoUpdate={false}
         tileWidth={width}
@@ -71,6 +87,7 @@ export const Map2DImageLayer = ({
           lookAtCenter={false}
           depth={10}
           attach="visibilitor"
+          showHelpers={name === "front"}
         />
 
         <Map2DTileSprites>
@@ -94,10 +111,10 @@ const xyTransform = new Matrix4().makeRotationFromEuler(
   new Euler(MathUtils.degToRad(90), 0, 0)
 );
 
-const forefrontTransform = new Matrix4().makeTranslation(0, 225, -200);
-const frontTransform = new Matrix4().makeTranslation(0, 270, -100);
-const middleTransform = new Matrix4().makeTranslation(0, 90, 0);
-const backTransform = new Matrix4().makeTranslation(0, -180, 150);
+const forefrontTransform = new Matrix4().makeTranslation(0, 300, 0); // 0, 225, -200);
+const frontTransform = new Matrix4().makeTranslation(0, 250, 0); // 0, 270, -100);
+const middleTransform = new Matrix4().makeTranslation(0, 0, 0); // 0, 90, 0);
+const backTransform = new Matrix4().makeTranslation(0, -250, 0); // 0, -180, 150);
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -105,7 +122,7 @@ export const DemoOrDie = () => {
 
   return (
     <>
-      <WiredBox width={437} height={437} depth={437} />
+      <WiredBox width={500} height={500} depth={500} />
 
       <PanControl2D
         onUpdate={setCenter}
@@ -119,7 +136,7 @@ export const DemoOrDie = () => {
         <ParallaxProjection
           plane="xy"
           origin="bottom left"
-          height={600}
+          height={800}
           distanceToProjectionPlane={800}
           far={5000}
           fit="contain"
@@ -135,7 +152,7 @@ export const DemoOrDie = () => {
           width={1200}
           height={233}
           offsetX={-1200 / 2}
-          offsetY={-233 / 2}
+          offsetY={0}
           centerX={center.x}
           centerY={center.y}
           horizontal
@@ -149,7 +166,7 @@ export const DemoOrDie = () => {
           width={1000}
           height={258}
           offsetX={-1000 / 2}
-          offsetY={-258 / 2}
+          offsetY={0}
           centerX={center.x}
           centerY={center.y}
           horizontal
@@ -163,7 +180,7 @@ export const DemoOrDie = () => {
           width={2000}
           height={479}
           offsetX={-2000 / 2}
-          offsetY={-479 / 2}
+          offsetY={0}
           centerX={center.x}
           centerY={center.y}
           horizontal
@@ -177,7 +194,7 @@ export const DemoOrDie = () => {
           width={2000}
           height={383}
           offsetX={-2000 / 2}
-          offsetY={-383 / 2}
+          offsetY={0}
           centerX={center.x}
           centerY={center.y}
           horizontal

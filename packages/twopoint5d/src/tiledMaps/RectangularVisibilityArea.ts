@@ -52,7 +52,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
-    parentNode: Object3D,
+    node: Object3D,
   ): Map2DVisibleTiles | undefined {
     if (this.width === 0 || this.height === 0) {
       return undefined;
@@ -122,7 +122,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
 
     const offset = new Vector2(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
-    const translate = new Vector3().setFromMatrixPosition(parentNode.matrixWorld);
+    const translate = new Vector3().setFromMatrixPosition(node.matrixWorld);
 
     return {
       tiles: reuseTiles.concat(createTiles),

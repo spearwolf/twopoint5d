@@ -97,9 +97,10 @@ const map2dTransform = new Matrix4();
 // .makeRotationFromEuler(new Euler(MathUtils.degToRad(-10), 0, 0))
 // .multiply(new Matrix4().makeTranslation(100, 0, 0));
 
-const containerTransform = new Matrix4();
-// .makeRotationFromEuler(new Euler(0, MathUtils.degToRad(20), 0))
-// .multiply(new Matrix4().makeTranslation(0, 0, 50));
+const containerTransform = new Matrix4()
+  // .makeRotationFromEuler(new Euler(0, MathUtils.degToRad(20), 0))
+  // .multiply(new Matrix4().makeTranslation(256, 0, 256));
+  .multiply(new Matrix4().makeTranslation(0, 0, 0));
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });

@@ -3,6 +3,7 @@ import { Leva } from "leva";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { CrossHair } from "../utils/CrossHair";
 import { DemoOrDie } from "./parallax-simple-kastani";
 
 const root = createRoot(document.getElementById("root"));
@@ -15,5 +16,6 @@ root.render(
         <DemoOrDie />
       </StrictMode>
     </Canvas>
+    <CrossHair />
   </>
 );

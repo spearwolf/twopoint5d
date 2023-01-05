@@ -23,7 +23,7 @@ export interface IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     centerPoint: [number, number],
     tileCoords: Map2DTileCoordsUtil,
-    parentNode: Object3D,
+    node: Object3D,
   ): Map2DVisibleTiles | undefined;
 
   addToScene(scene: Object3D): void;

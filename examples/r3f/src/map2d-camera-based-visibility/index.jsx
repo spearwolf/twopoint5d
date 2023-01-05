@@ -3,6 +3,7 @@ import { Leva } from "leva";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { CrossHair } from "../utils/CrossHair";
 import { DemoOrDie } from "./map2d-camera-based-visibility";
 import { SwitchCameraUI } from "./SwitchCameraUI";
 
@@ -17,5 +18,6 @@ root.render(
         <DemoOrDie />
       </StrictMode>
     </Canvas>
+    <CrossHair />
   </>
 );
