@@ -38,6 +38,7 @@ export default (build, buildConfig) => {
     rewriteExternalsPlugin(externals),
     typescript({
       noForceEmit: true,
+      noEmitOnError: false,
       outputToFilesystem: true,
       ...typescriptOptions,
       compilerOptions: {
