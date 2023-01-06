@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Leva } from "leva";
+import { Perf } from "r3f-perf";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -15,6 +16,7 @@ root.render(
       <StrictMode>
         <DemoOrDie />
       </StrictMode>
+      <Perf position="top-left" style={{ transform: "scale(0.8)" }} />
     </Canvas>
     <CrossHair />
   </>

@@ -2991,6 +2991,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@radix-ui/react-icons@npm:^1.0.3":
+  version: 1.1.1
+  resolution: "@radix-ui/react-icons@npm:1.1.1"
+  peerDependencies:
+    react: ^16.x || ^17.x || ^18.x
+  checksum: fc64cd763994e035fe7a4898c0710793aebc2689d56dcc8a2fd76c334a424c48a1aa2fbcccc2bd1c0990d731f27090fc0ddf6859af32c5aa217bd75a10cb3e34
+  languageName: node
+  linkType: hard
+
 "@radix-ui/react-id@npm:0.1.4":
   version: 0.1.4
   resolution: "@radix-ui/react-id@npm:0.1.4"
@@ -3551,7 +3560,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@stitches/react@npm:1.2.8":
+"@stitches/react@npm:1.2.8, @stitches/react@npm:^1.2.8":
   version: 1.2.8
   resolution: "@stitches/react@npm:1.2.8"
   peerDependencies:
@@ -7569,6 +7578,7 @@ __metadata:
     leva: ^0.9.34
     prettier: ^2.7.1
     prop-types: ^15.8.1
+    r3f-perf: ^6.6.3
     react: 18.2.0
     react-dom: ^18.2.0
     regenerator-runtime: ^0.13.9
@@ -11967,6 +11977,24 @@ fsevents@^1.2.7:
   languageName: node
   linkType: hard
 
+"r3f-perf@npm:^6.6.3":
+  version: 6.6.3
+  resolution: "r3f-perf@npm:6.6.3"
+  dependencies:
+    "@radix-ui/react-icons": ^1.0.3
+    "@stitches/react": ^1.2.8
+    zustand: ^4.1.5
+  peerDependencies:
+    "@react-three/drei": "*"
+    "@react-three/fiber": "*"
+    react: ">=18.0"
+    react-dom: ">=18.0"
+    three: "*"
+    three-stdlib: "*"
+  checksum: c27b605c1c180b4ad45b4178382cb40f9f7d3085e633d124f68f627e1d233dbf7cee99ad8b3d027736d802bfdd8b5561be373d48e919aaebf7389bab4b0071c8
+  languageName: node
+  linkType: hard
+
 "randombytes@npm:^2.0.0, randombytes@npm:^2.0.1, randombytes@npm:^2.0.5, randombytes@npm:^2.1.0":
   version: 2.1.0
   resolution: "randombytes@npm:2.1.0"
@@ -15274,5 +15302,22 @@ resolve@^2.0.0-next.3:
     react:
       optional: true
   checksum: e7fefc5deb232082edd2abef072b92554d5effc261594d633ee55d7d4fe0e54c5b16ee8c5e628fab2e1090946d9e493865b72ad76280a413e8ff5bea6d0ca642
+  languageName: node
+  linkType: hard
+
+"zustand@npm:^4.1.5":
+  version: 4.2.0
+  resolution: "zustand@npm:4.2.0"
+  dependencies:
+    use-sync-external-store: 1.2.0
+  peerDependencies:
+    immer: ">=9.0"
+    react: ">=16.8"
+  peerDependenciesMeta:
+    immer:
+      optional: true
+    react:
+      optional: true
+  checksum: 70f9c9272c7ee6534d16e23e1f273822fdf4cb17a9865db588946ed250a51e169f8b0dcaf0a8d15e866239182263c015bca644756a69314ea1da4fe61ba1b67f
   languageName: node
   linkType: hard
