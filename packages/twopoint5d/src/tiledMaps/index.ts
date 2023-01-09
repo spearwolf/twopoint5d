@@ -1,5 +1,6 @@
 export * from './AABB2';
 export * from './CameraBasedVisibility';
+export * from './chunkQuadTree';
 export * from './IMap2DLayer';
 export * from './IMap2DTileDataProvider';
 export * from './IMap2DTileRenderer';
