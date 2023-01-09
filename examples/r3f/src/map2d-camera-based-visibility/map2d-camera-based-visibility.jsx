@@ -2,7 +2,7 @@ import { OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
 import { useControls } from "leva";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CameraHelper, PerspectiveCamera } from "three";
+import { CameraHelper, Matrix4, PerspectiveCamera } from "three";
 import { CameraBasedVisibility } from "twopoint5d";
 import {
   Map2DLayer3D,
@@ -93,6 +93,15 @@ map2dCamera.lookAt(0, 0, 0);
 map2dCamera.updateMatrixWorld(true);
 map2dCamera.updateProjectionMatrix();
 
+const map2dTransform = new Matrix4();
+// .makeRotationFromEuler(new Euler(MathUtils.degToRad(-10), 0, 0))
+// .multiply(new Matrix4().makeTranslation(100, 0, 0));
+
+const containerTransform = new Matrix4()
+  // .makeRotationFromEuler(new Euler(0, MathUtils.degToRad(20), 0))
+  // .multiply(new Matrix4().makeTranslation(256, 0, 256));
+  .multiply(new Matrix4().makeTranslation(0, 0, 0));
+
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const activeCamera = useDemoStore((state) => state.activeCameraName);
@@ -176,34 +185,38 @@ export const DemoOrDie = () => {
         anisotrophy
       />
 
-      <Map2DLayer3D
-        name="Map2DLayer3D"
-        ref={map2dLayerRef}
-        tileWidth={map2dTileWidth}
-        tileHeight={map2dTileHeight}
-        xOffset={map2dTileOffsetX}
-        yOffset={map2dTileOffsetY}
-        centerX={center.x}
-        centerY={center.y}
-        updateOnFrame
-      >
-        <cameraBasedVisibility
-          showHelpers={showTileBoxes}
-          camera={map2dCamera}
-          lookAtCenter={lookAtCenter}
-          depth={10}
-          attach="visibilitor"
-        />
+      <group matrix={containerTransform} matrixAutoUpdate={false}>
+        <Map2DLayer3D
+          name="Map2DLayer3D"
+          ref={map2dLayerRef}
+          matrix={map2dTransform}
+          matrixAutoUpdate={false}
+          tileWidth={map2dTileWidth}
+          tileHeight={map2dTileHeight}
+          xOffset={map2dTileOffsetX}
+          yOffset={map2dTileOffsetY}
+          centerX={center.x}
+          centerY={center.y}
+          updateOnFrame
+        >
+          <cameraBasedVisibility
+            showHelpers={showTileBoxes}
+            camera={map2dCamera}
+            lookAtCenter={lookAtCenter}
+            depth={10}
+            attach="visibilitor"
+          />
 
-        <Map2DTileSprites ref={setTileSprites}>
-          <RepeatingTilesProvider tiles={tilesData} />
-          <TileSetRef name="tiles" attach="tileSet" />
-          <TileSpritesGeometry capacity={1000} />
-          <TileSpritesMaterial>
-            <TextureRef name="tiles" attach="colorMap" />
-          </TileSpritesMaterial>
-        </Map2DTileSprites>
-      </Map2DLayer3D>
+          <Map2DTileSprites ref={setTileSprites}>
+            <RepeatingTilesProvider tiles={tilesData} />
+            <TileSetRef name="tiles" attach="tileSet" />
+            <TileSpritesGeometry capacity={1000} />
+            <TileSpritesMaterial>
+              <TextureRef name="tiles" attach="colorMap" />
+            </TileSpritesMaterial>
+          </Map2DTileSprites>
+        </Map2DLayer3D>
+      </group>
     </>
   );
 };

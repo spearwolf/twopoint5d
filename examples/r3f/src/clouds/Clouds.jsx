@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { AdditiveBlending, FrontSide } from "three";
 import {
   forwardRefValue,
   ShaderChunks,
@@ -9,14 +11,16 @@ import {
   useFrameLoop,
   useTextureAtlas,
 } from "twopoint5d-r3f";
-import { useEffect, useRef } from "react";
-import { FrontSide } from "three";
 import { createFrameLoopComponent } from "../utils/createFrameLoopComponent";
 import { CloudSprites } from "./CloudSprites";
 
 const ShaderLib = {
   fadeInOutZRange_uniform: `
     uniform vec4 fadeInOutZRange;
+  `,
+
+  postAlpha_uniform: `
+    uniform float postAlphaMultiplier;
   `,
 
   fadeInOutAlpha_varying: `
@@ -29,6 +33,7 @@ const ShaderLib = {
   `,
 
   extra_pars_fragment: `
+    #include <postAlpha_uniform>
     #include <fadeInOutAlpha_varying>
   `,
 
@@ -42,6 +47,7 @@ const ShaderLib = {
 
   discard_by_alpha_fragment: `
     gl_FragColor.a *= vFadeInOutAlpha;
+    gl_FragColor.a *= postAlphaMultiplier;
 
     if (gl_FragColor.a == 0.0) {
       discard;
@@ -60,6 +66,7 @@ export const Clouds = ({
   speed,
   fadeInRange,
   fadeOutRange,
+  postAlphaMultiplier,
 }) => {
   const geometry = useRef();
   const material = useRef();
@@ -67,7 +74,9 @@ export const Clouds = ({
   const atlas = useTextureAtlas("clouds");
 
   useEffect(() => {
+    // initialize extra uniforms to ensure that they are available in the shader
     material.current.uniforms.fadeInOutZRange = { value: [0, 0, 0, 0] };
+    material.current.uniforms.postAlphaMultiplier = { value: 0 };
   }, [material]);
 
   useFrameLoop(createFrameLoopComponent(CloudSprites), {
@@ -84,14 +93,15 @@ export const Clouds = ({
     speed,
     fadeInRange,
     fadeOutRange,
+    postAlphaMultiplier,
   });
 
   return (
     <>
       <TextureAtlas
         name="clouds"
-        url="/examples/assets/clouds.json"
-        overrideImageUrl="/examples/assets/clouds.png"
+        url="/examples/assets/clouds-2.json"
+        overrideImageUrl="/examples/assets/clouds-2.png"
         anisotrophy
       />
 
@@ -104,6 +114,7 @@ export const Clouds = ({
           ref={material}
           depthTest={false}
           depthWrite={false}
+          blending={AdditiveBlending}
           side={FrontSide}
           logShadersToConsole={true}
         >
@@ -126,4 +137,5 @@ Clouds.defaultProps = {
   speed: 5,
   fadeInRange: 0.1,
   fadeOutRange: 0.2,
+  postAlphaMultiplier: 1.0,
 };

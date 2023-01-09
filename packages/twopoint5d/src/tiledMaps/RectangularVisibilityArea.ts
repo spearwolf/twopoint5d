@@ -1,4 +1,4 @@
-import {Box3, Box3Helper, Color, Event, Object3D, Vector3} from 'three';
+import {Box3, Box3Helper, Color, Event, Object3D, Vector2, Vector3} from 'three';
 import {AABB2} from './AABB2';
 import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
@@ -52,6 +52,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
+    node: Object3D,
   ): Map2DVisibleTiles | undefined {
     if (this.width === 0 || this.height === 0) {
       return undefined;
@@ -120,10 +121,13 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       this.updateHelpers();
     }
 
+    const offset = new Vector2(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
+    const translate = new Vector3().setFromMatrixPosition(node.matrixWorld);
+
     return {
       tiles: reuseTiles.concat(createTiles),
-      xOffset: map2dTileCoords.xOffset - centerX,
-      yOffset: map2dTileCoords.yOffset - centerY,
+      offset,
+      translate,
       removeTiles,
       createTiles,
       reuseTiles,

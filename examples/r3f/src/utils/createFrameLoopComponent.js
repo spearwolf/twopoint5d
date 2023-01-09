@@ -22,15 +22,13 @@ export function createFrameLoopComponent(componentClass) {
     },
 
     update(changes) {
-      Object.assign(
-        component,
-        Object.fromEntries(
-          Object.entries(changes).map((key, { currentValue }) => [
-            key,
-            currentValue,
-          ])
-        )
+      const propChanges = Object.fromEntries(
+        Object.entries(changes).map(([key, { currentValue }]) => [
+          key,
+          currentValue,
+        ])
       );
+      Object.assign(component, propChanges);
       if (component.update) component.update(changes);
     },
 

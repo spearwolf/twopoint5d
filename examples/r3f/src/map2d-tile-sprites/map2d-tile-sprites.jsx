@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { useEffect, useState } from "react";
-import { Color } from "three";
+import { Vector2, Vector3 } from "three/src/Three";
 import { AABB2, Map2DTile } from "twopoint5d";
 import {
   Map2DTileSprites,
@@ -23,12 +23,14 @@ export const DemoOrDie = () => {
 
   useEffect(() => {
     if (sprites) {
-      sprites.beginUpdate(0, 0);
+      sprites.beginUpdate(new Vector2(), new Vector3());
       sprites.addTile(new Map2DTile(0, 0, new AABB2(0, 0, 256, 256)));
       sprites.addTile(new Map2DTile(-1, 0, new AABB2(-256, 0, 256, 256)));
       sprites.addTile(new Map2DTile(-1, -1, new AABB2(-256, -256, 256, 256)));
       sprites.addTile(new Map2DTile(0, -1, new AABB2(0, -256, 256, 256)));
       sprites.endUpdate();
+
+      console.log("twopoint5d.Map2DTileSprites", sprites);
     }
   }, [sprites]);
 

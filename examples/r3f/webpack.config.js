@@ -32,6 +32,10 @@ module.exports = {
       import: "./src/map2d-rectangular-visibility-area/index.jsx",
       dependOn: "libs",
     },
+    "parallax-simple-kastani": {
+      import: "./src/parallax-simple-kastani/index.jsx",
+      dependOn: "libs",
+    },
     clouds: {
       import: "./src/clouds/index.jsx",
       dependOn: "libs",

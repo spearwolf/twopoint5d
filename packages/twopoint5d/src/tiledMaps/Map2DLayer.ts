@@ -1,3 +1,4 @@
+import {Object3D, Vector2, Vector3} from 'three';
 import {IMap2DLayer} from './IMap2DLayer';
 import {IMap2DTileRenderer} from './IMap2DTileRenderer';
 import {IMap2DVisibilitor} from './IMap2DVisibilitor';
@@ -114,7 +115,7 @@ export class Map2DLayer implements IMap2DLayer {
     this.renderers.delete(renderer);
   }
 
-  update(): void {
+  update(node: Object3D): void {
     if (this.renderers.size === 0 || this.visibilitor == null) return;
 
     if (this.#resetTilesOnNextUpdate) {
@@ -127,17 +128,19 @@ export class Map2DLayer implements IMap2DLayer {
     }
 
     if (this.needsUpdate) {
-      const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords);
+      node.updateWorldMatrix(true, false);
+
+      const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords, node);
 
       if (visible) {
         this.tiles = visible?.tiles;
         this.needsUpdate = false;
 
-        const xOffset = visible.xOffset ?? 0;
-        const yOffset = visible.yOffset ?? 0;
+        const offset = visible.offset ?? new Vector2();
+        const translate = visible.translate ?? new Vector3();
 
         for (const tileRenderer of this.renderers) {
-          tileRenderer.beginUpdate(xOffset, yOffset);
+          tileRenderer.beginUpdate(offset, translate);
 
           visible.removeTiles?.forEach((tile) => {
             tileRenderer.removeTile(tile);

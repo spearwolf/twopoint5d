@@ -5,15 +5,13 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { CrossHair } from "../utils/CrossHair";
-import { DemoOrDie } from "./map2d-camera-based-visibility";
-import { SwitchCameraUI } from "./SwitchCameraUI";
+import { DemoOrDie } from "./parallax-simple-kastani";
 
 const root = createRoot(document.getElementById("root"));
 
 root.render(
   <>
     <Leva titleBar />
-    <SwitchCameraUI />
     <Canvas dpr={[1, 2]} camera={{ position: [100, 350, 600], far: 25000 }}>
       <StrictMode>
         <DemoOrDie />

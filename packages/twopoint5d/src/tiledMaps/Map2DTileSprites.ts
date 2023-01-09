@@ -1,4 +1,5 @@
 import eventize, {Eventize} from '@spearwolf/eventize';
+import {Vector2, Vector3} from 'three';
 
 import {TileSprite} from '../sprites/TileSprites/descriptors';
 import {TileSprites} from '../sprites/TileSprites/TileSprites';
@@ -86,8 +87,8 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     }
   };
 
-  beginUpdate(offsetX: number, offsetY: number): void {
-    this.position.set(offsetX, 0, offsetY);
+  beginUpdate(offset: Vector2, translate: Vector3): void {
+    this.position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
 
     this.#checkReady();
     this.#curUpdateSerial = 0;
