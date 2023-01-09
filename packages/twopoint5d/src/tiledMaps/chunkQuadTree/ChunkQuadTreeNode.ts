@@ -76,6 +76,21 @@ const findAxis = (chunks: Data2DChunk[], beforeProp: ChunkAabbValues, afterProp:
 };
 
 export class ChunkQuadTreeNode {
+  //
+  //               -y
+  //
+  //                |
+  //     North West | North East
+  //                |
+  // -x ------------+------------> +x
+  //                |
+  //     South West | South East
+  //                |
+  //                v
+  //
+  //               +y
+  //
+
   originX: number = null;
   originY: number = null;
 
@@ -90,9 +105,6 @@ export class ChunkQuadTreeNode {
     southWest: null,
   };
 
-  /**
-   * Uses a right-handed coordinate system
-   */
   constructor(chunks?: Data2DChunk | Data2DChunk[]) {
     this.chunks = chunks ? [].concat(chunks) : [];
   }
@@ -104,6 +116,7 @@ export class ChunkQuadTreeNode {
   subdivide(maxChunkNodes = 2): void {
     if (this.canSubdivide() && this.chunks.length > maxChunkNodes) {
       const chunks = this.chunks.slice(0);
+
       const xAxis = findAxis(chunks, 'right', 'left');
       const yAxis = findAxis(chunks, 'bottom', 'top');
 
@@ -138,7 +151,9 @@ export class ChunkQuadTreeNode {
       this.chunks.push(chunk);
       return;
     }
+
     const {originY, originX} = this;
+
     if (chunk.left >= originX) {
       if (chunk.top >= originY) {
         this.appendToNode(Quadrant.SouthEast, chunk);
@@ -206,7 +221,9 @@ export class ChunkQuadTreeNode {
 
   findChunksAt(x: number, y: number): Data2DChunk[] {
     const chunks: Data2DChunk[] = this.chunks.filter((chunk: Data2DChunk) => chunk.containsTileIdAt(x, y));
+
     let moreChunks: Data2DChunk[] = null;
+
     if (x < this.originX) {
       if (y < this.originY) {
         moreChunks = this.nodes.northWest.findChunksAt(x, y);
@@ -218,32 +235,33 @@ export class ChunkQuadTreeNode {
     } else {
       moreChunks = this.nodes.southEast.findChunksAt(x, y);
     }
+
     return chunks.concat(moreChunks);
   }
 
-  toDebugJson(): object | string {
-    if (this.isLeaf) {
-      return this.chunks.map((chunk) => chunk.rawData).join(', ');
-    }
-    const out: any = {
-      _originX: this.originX,
-      _originY: this.originY,
-    };
-    if (this.chunks.length) {
-      out._chunks = this.chunks.map((chunk) => chunk.rawData).join(', ');
-    }
-    if (this.nodes.northEast) {
-      out.NorthEast = this.nodes.northEast.toDebugJson();
-    }
-    if (this.nodes.northWest) {
-      out.NorthWest = this.nodes.northWest.toDebugJson();
-    }
-    if (this.nodes.southEast) {
-      out.SouthEast = this.nodes.southEast.toDebugJson();
-    }
-    if (this.nodes.southWest) {
-      out.SouthWest = this.nodes.southWest.toDebugJson();
-    }
-    return out;
-  }
+  // toDebugJson(): object | string {
+  //   if (this.isLeaf) {
+  //     return this.chunks.map((chunk) => chunk.rawData).join(', ');
+  //   }
+  //   const out: any = {
+  //     _originX: this.originX,
+  //     _originY: this.originY,
+  //   };
+  //   if (this.chunks.length) {
+  //     out._chunks = this.chunks.map((chunk) => chunk.rawData).join(', ');
+  //   }
+  //   if (this.nodes.northEast) {
+  //     out.NorthEast = this.nodes.northEast.toDebugJson();
+  //   }
+  //   if (this.nodes.northWest) {
+  //     out.NorthWest = this.nodes.northWest.toDebugJson();
+  //   }
+  //   if (this.nodes.southEast) {
+  //     out.SouthEast = this.nodes.southEast.toDebugJson();
+  //   }
+  //   if (this.nodes.southWest) {
+  //     out.SouthWest = this.nodes.southWest.toDebugJson();
+  //   }
+  //   return out;
+  // }
 }

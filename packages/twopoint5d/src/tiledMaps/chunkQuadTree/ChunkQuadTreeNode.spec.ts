@@ -1,13 +1,10 @@
-/* eslint-env jest */
-
 import assert from 'assert';
 
 import {AABB2} from '../AABB2';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode';
 import {Data2DChunk} from './Data2DChunk';
-import {IRawData2DChunk} from './IRawData2DChunk';
 
-const chunkNodeNames = (nodes: Data2DChunk[]) => nodes.map((chunkNode) => chunkNode.rawData).sort();
+const chunkNodeNames = (nodes: Data2DChunk[]) => nodes.map((chunkNode) => chunkNode.toString()).sort();
 
 describe('ChunkQuadTreeNode', () => {
   describe('create without children', () => {
@@ -26,49 +23,49 @@ describe('ChunkQuadTreeNode', () => {
         width: 5,
         height: 5,
         data: 'A',
-      } as IRawData2DChunk),
+      }),
       B: new Data2DChunk({
         x: -5,
         y: -10,
         width: 5,
         height: 5,
         data: 'B',
-      } as IRawData2DChunk),
-      C: new Data2DChunk({x: 0, y: -10, width: 5, height: 5, data: 'C'} as IRawData2DChunk),
-      D: new Data2DChunk({x: 5, y: -10, width: 5, height: 5, data: 'D'} as IRawData2DChunk),
+      }),
+      C: new Data2DChunk({x: 0, y: -10, width: 5, height: 5, data: 'C'}),
+      D: new Data2DChunk({x: 5, y: -10, width: 5, height: 5, data: 'D'}),
       E: new Data2DChunk({
         x: -10,
         y: -5,
         width: 5,
         height: 5,
         data: 'E',
-      } as IRawData2DChunk),
-      F: new Data2DChunk({x: -5, y: -5, width: 5, height: 5, data: 'F'} as IRawData2DChunk),
-      G: new Data2DChunk({x: 0, y: -5, width: 5, height: 5, data: 'G'} as IRawData2DChunk),
-      H: new Data2DChunk({x: 5, y: -5, width: 5, height: 5, data: 'H'} as IRawData2DChunk),
-      I: new Data2DChunk({x: -10, y: 0, width: 5, height: 5, data: 'I'} as IRawData2DChunk),
-      J: new Data2DChunk({x: -5, y: 0, width: 5, height: 5, data: 'J'} as IRawData2DChunk),
-      K: new Data2DChunk({x: 0, y: 0, width: 5, height: 5, data: 'K'} as IRawData2DChunk),
-      L: new Data2DChunk({x: 5, y: 0, width: 5, height: 5, data: 'L'} as IRawData2DChunk),
-      M: new Data2DChunk({x: -10, y: 5, width: 5, height: 5, data: 'M'} as IRawData2DChunk),
-      N: new Data2DChunk({x: -5, y: 5, width: 5, height: 5, data: 'N'} as IRawData2DChunk),
-      O: new Data2DChunk({x: 0, y: 5, width: 5, height: 5, data: 'O'} as IRawData2DChunk),
-      P: new Data2DChunk({x: 5, y: 5, width: 5, height: 5, data: 'P'} as IRawData2DChunk),
+      }),
+      F: new Data2DChunk({x: -5, y: -5, width: 5, height: 5, data: 'F'}),
+      G: new Data2DChunk({x: 0, y: -5, width: 5, height: 5, data: 'G'}),
+      H: new Data2DChunk({x: 5, y: -5, width: 5, height: 5, data: 'H'}),
+      I: new Data2DChunk({x: -10, y: 0, width: 5, height: 5, data: 'I'}),
+      J: new Data2DChunk({x: -5, y: 0, width: 5, height: 5, data: 'J'}),
+      K: new Data2DChunk({x: 0, y: 0, width: 5, height: 5, data: 'K'}),
+      L: new Data2DChunk({x: 5, y: 0, width: 5, height: 5, data: 'L'}),
+      M: new Data2DChunk({x: -10, y: 5, width: 5, height: 5, data: 'M'}),
+      N: new Data2DChunk({x: -5, y: 5, width: 5, height: 5, data: 'N'}),
+      O: new Data2DChunk({x: 0, y: 5, width: 5, height: 5, data: 'O'}),
+      P: new Data2DChunk({x: 5, y: 5, width: 5, height: 5, data: 'P'}),
       Q: new Data2DChunk({
         x: -7,
         y: -7,
         width: 10,
         height: 4,
         data: 'Q',
-      } as IRawData2DChunk),
-      R: new Data2DChunk({x: 0, y: -9, width: 7, height: 3, data: 'R'} as IRawData2DChunk),
-      S: new Data2DChunk({x: 4, y: -6, width: 6, height: 4, data: 'S'} as IRawData2DChunk),
-      T: new Data2DChunk({x: -8, y: -2, width: 3, height: 5, data: 'T'} as IRawData2DChunk),
-      U: new Data2DChunk({x: -2, y: -2, width: 5, height: 5, data: 'U'} as IRawData2DChunk),
-      V: new Data2DChunk({x: 5, y: -1, width: 5, height: 3, data: 'V'} as IRawData2DChunk),
-      W: new Data2DChunk({x: -8, y: 4, width: 6, height: 4, data: 'W'} as IRawData2DChunk),
-      X: new Data2DChunk({x: -1, y: 5, width: 3, height: 5, data: 'X'} as IRawData2DChunk),
-      Y: new Data2DChunk({x: 2, y: 4, width: 6, height: 4, data: 'Y'} as IRawData2DChunk),
+      }),
+      R: new Data2DChunk({x: 0, y: -9, width: 7, height: 3, data: 'R'}),
+      S: new Data2DChunk({x: 4, y: -6, width: 6, height: 4, data: 'S'}),
+      T: new Data2DChunk({x: -8, y: -2, width: 3, height: 5, data: 'T'}),
+      U: new Data2DChunk({x: -2, y: -2, width: 5, height: 5, data: 'U'}),
+      V: new Data2DChunk({x: 5, y: -1, width: 5, height: 3, data: 'V'}),
+      W: new Data2DChunk({x: -8, y: 4, width: 6, height: 4, data: 'W'}),
+      X: new Data2DChunk({x: -1, y: 5, width: 3, height: 5, data: 'X'}),
+      Y: new Data2DChunk({x: 2, y: 4, width: 6, height: 4, data: 'Y'}),
     };
     const node = new ChunkQuadTreeNode(Object.values(chunks));
 
@@ -108,34 +105,34 @@ describe('ChunkQuadTreeNode', () => {
         width: 5,
         height: 5,
         data: 'A',
-      } as IRawData2DChunk),
+      }),
       B: new Data2DChunk({
         x: -5,
         y: -10,
         width: 5,
         height: 5,
         data: 'B',
-      } as IRawData2DChunk),
-      C: new Data2DChunk({x: 0, y: -10, width: 5, height: 5, data: 'C'} as IRawData2DChunk),
-      D: new Data2DChunk({x: 5, y: -10, width: 5, height: 5, data: 'D'} as IRawData2DChunk),
+      }),
+      C: new Data2DChunk({x: 0, y: -10, width: 5, height: 5, data: 'C'}),
+      D: new Data2DChunk({x: 5, y: -10, width: 5, height: 5, data: 'D'}),
       E: new Data2DChunk({
         x: -10,
         y: -5,
         width: 5,
         height: 5,
         data: 'E',
-      } as IRawData2DChunk),
-      F: new Data2DChunk({x: -5, y: -5, width: 5, height: 5, data: 'F'} as IRawData2DChunk),
-      G: new Data2DChunk({x: 0, y: -5, width: 5, height: 5, data: 'G'} as IRawData2DChunk),
-      H: new Data2DChunk({x: 5, y: -5, width: 5, height: 5, data: 'H'} as IRawData2DChunk),
-      I: new Data2DChunk({x: -10, y: 0, width: 5, height: 5, data: 'I'} as IRawData2DChunk),
-      J: new Data2DChunk({x: -5, y: 0, width: 5, height: 5, data: 'J'} as IRawData2DChunk),
-      K: new Data2DChunk({x: 0, y: 0, width: 5, height: 5, data: 'K'} as IRawData2DChunk),
-      L: new Data2DChunk({x: 5, y: 0, width: 5, height: 5, data: 'L'} as IRawData2DChunk),
-      M: new Data2DChunk({x: -10, y: 5, width: 5, height: 5, data: 'M'} as IRawData2DChunk),
-      N: new Data2DChunk({x: -5, y: 5, width: 5, height: 5, data: 'N'} as IRawData2DChunk),
-      O: new Data2DChunk({x: 0, y: 5, width: 5, height: 5, data: 'O'} as IRawData2DChunk),
-      P: new Data2DChunk({x: 5, y: 5, width: 5, height: 5, data: 'P'} as IRawData2DChunk),
+      }),
+      F: new Data2DChunk({x: -5, y: -5, width: 5, height: 5, data: 'F'}),
+      G: new Data2DChunk({x: 0, y: -5, width: 5, height: 5, data: 'G'}),
+      H: new Data2DChunk({x: 5, y: -5, width: 5, height: 5, data: 'H'}),
+      I: new Data2DChunk({x: -10, y: 0, width: 5, height: 5, data: 'I'}),
+      J: new Data2DChunk({x: -5, y: 0, width: 5, height: 5, data: 'J'}),
+      K: new Data2DChunk({x: 0, y: 0, width: 5, height: 5, data: 'K'}),
+      L: new Data2DChunk({x: 5, y: 0, width: 5, height: 5, data: 'L'}),
+      M: new Data2DChunk({x: -10, y: 5, width: 5, height: 5, data: 'M'}),
+      N: new Data2DChunk({x: -5, y: 5, width: 5, height: 5, data: 'N'}),
+      O: new Data2DChunk({x: 0, y: 5, width: 5, height: 5, data: 'O'}),
+      P: new Data2DChunk({x: 5, y: 5, width: 5, height: 5, data: 'P'}),
     };
     const node = new ChunkQuadTreeNode(Object.values(chunks));
 
