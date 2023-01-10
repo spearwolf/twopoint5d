@@ -38,6 +38,17 @@ describe('InstancedVertexObjectGeometry', () => {
     },
   });
 
+  const extraInstancedDescriptor = new VertexObjectDescriptor({
+    meshCount: 2,
+
+    attributes: {
+      extra: {
+        size: 1,
+        bufferName: 'extraBuffer',
+      },
+    },
+  });
+
   const sandbox = createSandbox();
 
   afterEach(() => {
@@ -63,6 +74,20 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(geometry.instancedBuffers.get('dynamic_uint32').array).toBe(
       geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray,
     );
+  });
+
+  test('construct with base, instanced and extra-instanced descriptors', () => {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+
+    const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+    expect(extraPool).toBeDefined();
+
+    expect(geometry.extraInstancedBuffers.get('extraPool').get('extraBuffer').array).toBe(
+      extraPool.buffer.buffers.get('extraBuffer').typedArray,
+    );
+
+    expect(geometry.getAttribute('extra')).toBeDefined();
   });
 
   test('index array buffer is created', () => {
