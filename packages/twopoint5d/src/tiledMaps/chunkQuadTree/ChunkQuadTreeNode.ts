@@ -84,6 +84,7 @@ const findAxis = (chunks: IDataIdsChunk2D[], beforeKey: AABBPropKey, afterKey: A
  *
  * With `appendChunk()` chunks are added to the node.
  * With `subdivide()` the node is recursively subdivided into children if this is possible.
+ * With `findChunks*()` all chunks in a certain area are found.
  */
 export class ChunkQuadTreeNode {
   //
