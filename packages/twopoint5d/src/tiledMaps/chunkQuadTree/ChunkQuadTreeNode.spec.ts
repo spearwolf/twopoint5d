@@ -80,10 +80,10 @@ describe('ChunkQuadTreeNode', () => {
     it('is a leaf', () => assert.equal(node.isLeaf, true));
     it('has chunk nodes', () => assert.equal(node.chunks.length, 25));
 
-    it('chunk->B->containsTileIdAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-5, -10), true));
-    it('chunk->B->containsTileIdAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(0, -10), false));
-    it('chunk->B->containsTileIdAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-2, -6), true));
-    it('chunk->B->containsTileIdAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(-6, -6), false));
+    it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-5, -10), true));
+    it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(0, -10), false));
+    it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-2, -6), true));
+    it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(-6, -6), false));
 
     it('subdivide()', () => {
       node.subdivide();
