@@ -19,7 +19,7 @@ const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexOb
  * @category Vertex Objects
  */
 export class VertexObjectPool<VOType = VO> {
-  static setVoIndex(vo: VO, idx: number): VO {
+  static setIndex(vo: VO, idx: number): VO {
     vo[voIndex] = idx;
     return vo;
   }

@@ -257,18 +257,18 @@ describe('VertexObjectPool', () => {
       expect(Array.from(pool.getVO(7).getZack())).toEqual([5, 55, 555, 5555]);
     });
 
-    test('use VertexObjectPool.setVoIndex() to use a single VO as proxy', () => {
+    test('use VertexObjectPool.setIndex() to use a single VO as proxy', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
       const vo = pool.createVO();
 
       vo.setBar([1, 2, 3, 4]);
 
       pool.usedCount = 2;
-      VertexObjectPool.setVoIndex(vo, 1);
+      VertexObjectPool.setIndex(vo, 1);
 
       vo.setBar([5, 6, 7, 8]);
 
-      VertexObjectPool.setVoIndex(vo, 0);
+      VertexObjectPool.setIndex(vo, 0);
 
       expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
       expect(Array.from(pool.getVO(1).getBar())).toEqual([5, 6, 7, 8]);
