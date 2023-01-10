@@ -60,17 +60,24 @@ export class VertexObjectGeometry extends BufferGeometry {
 
   update(): void {
     this.#autoTouchAttributes();
+    this.#updateBuffersUpdateRange();
     this.#updateDrawRange();
   }
 
-  #updateDrawRange = (): void => {
+  #updateBuffersUpdateRange() {
+    for (const [name, {itemSize}] of this.pool.buffer.buffers) {
+      this.buffers.get(name).updateRange.count = itemSize * this.pool.usedCount * this.pool.descriptor.vertexCount;
+    }
+  }
+
+  #updateDrawRange() {
     this.setDrawRange(
       0,
       this.pool.descriptor.hasIndices
         ? this.pool.usedCount * this.pool.descriptor.indices.length
         : this.pool.usedCount * this.pool.descriptor.vertexCount,
     );
-  };
+  }
 
   #firstAutoTouch = true;
 

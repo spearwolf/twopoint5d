@@ -191,11 +191,31 @@ export class InstancedVertexObjectGeometry<
 
   update(): void {
     this.instanceCount = this.instancedPool.usedCount;
+    this.#updateBuffersUpdateRange();
     this.#autoTouchAttributes();
     this.#updateDrawRange();
   }
 
-  #updateDrawRange = (): void => {
+  #updateBuffersUpdateRange() {
+    if (this.basePool) {
+      for (const [name, {itemSize}] of this.basePool.buffer.buffers) {
+        this.baseBuffers.get(name).updateRange.count = itemSize * this.basePool.usedCount * this.basePool.descriptor.vertexCount;
+      }
+    }
+    for (const [name, {itemSize}] of this.instancedPool.buffer.buffers) {
+      this.instancedBuffers.get(name).updateRange.count = itemSize * this.instanceCount;
+    }
+    for (const [name, pool] of this.extraInstancedPools) {
+      const poolBuffers = this.extraInstancedBuffers.get(name);
+      if (poolBuffers) {
+        for (const [, {itemSize}] of pool.buffer.buffers) {
+          poolBuffers.get(name).updateRange.count = itemSize * pool.usedCount;
+        }
+      }
+    }
+  }
+
+  #updateDrawRange() {
     if (this.basePool) {
       this.setDrawRange(
         0,
@@ -206,7 +226,7 @@ export class InstancedVertexObjectGeometry<
     } else {
       this.setDrawRange(0, Infinity);
     }
-  };
+  }
 
   #firstAutoTouch = true;
 
