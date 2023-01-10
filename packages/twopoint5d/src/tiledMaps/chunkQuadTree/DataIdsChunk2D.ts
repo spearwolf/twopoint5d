@@ -1,6 +1,6 @@
 import {AABB2} from '../AABB2';
 import {base64toUint32Arr} from './base64toUint32Arr';
-import {IDataIdsChunk2D} from './IData2DChunk';
+import {IDataChunk2D} from './IDataChunk2D';
 
 interface DataIdsChunkCoords2D {
   x: number;
@@ -30,7 +30,7 @@ export type DataIdsChunk2DParams = StringDataIdsChunk2DParams | Uint32DataIdsChu
  * Each chunk has a position (x,y) which is the upper left corner
  * in a right-hand coordinate system on the XY plane.
  */
-export class DataIdsChunk2D implements IDataIdsChunk2D {
+export class DataIdsChunk2D implements IDataChunk2D {
   readonly #aabb: AABB2;
   readonly #data: DataIdsChunk2DParams;
 
@@ -56,10 +56,6 @@ export class DataIdsChunk2D implements IDataIdsChunk2D {
       return null;
     }
     return data;
-  }
-
-  toString(): string {
-    return (this.#data as StringDataIdsChunk2DParams).data ?? this.#uint32Data.toString() ?? '';
   }
 
   get uint32Arr(): Uint32Array {

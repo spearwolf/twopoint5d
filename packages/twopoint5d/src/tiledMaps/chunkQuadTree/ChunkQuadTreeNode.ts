@@ -1,5 +1,5 @@
 import {AABB2} from '../AABB2';
-import {IDataIdsChunk2D} from './IData2DChunk';
+import {IDataChunk2D} from './IDataChunk2D';
 
 enum Quadrant {
   NorthEast = 'northEast',
@@ -8,8 +8,8 @@ enum Quadrant {
   NorthWest = 'northWest',
 }
 
-type IChunkQuadTreeChildNodes = {
-  [index in Quadrant]: ChunkQuadTreeNode;
+type IChunkQuadTreeChildNodes<ChunkType extends IDataChunk2D> = {
+  [index in Quadrant]: ChunkQuadTreeNode<ChunkType>;
 };
 
 interface IChunkAxis {
@@ -23,17 +23,12 @@ const BEFORE_AFTER_DELTA_FACTOR = Math.PI;
 
 type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
-const calcAxis = (
-  chunks: IDataIdsChunk2D[],
-  beforeKey: AABBPropKey,
-  afterKey: AABBPropKey,
-  chunk: IDataIdsChunk2D,
-): IChunkAxis => {
+const calcAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey, chunk: IDataChunk2D): IChunkAxis => {
   const chunksCount = chunks.length;
   const origin = chunk[beforeKey];
-  const beforeChunks: IDataIdsChunk2D[] = [];
-  const intersectChunks: IDataIdsChunk2D[] = [];
-  const afterChunks: IDataIdsChunk2D[] = [];
+  const beforeChunks: IDataChunk2D[] = [];
+  const intersectChunks: IDataChunk2D[] = [];
+  const afterChunks: IDataChunk2D[] = [];
 
   for (let i = 0; i < chunksCount; i++) {
     const beforeValue = chunks[i][beforeKey];
@@ -67,8 +62,8 @@ const calcAxis = (
   };
 };
 
-const findAxis = (chunks: IDataIdsChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis => {
-  chunks.sort((a: IDataIdsChunk2D, b: IDataIdsChunk2D) => a[beforeKey] - b[beforeKey]);
+const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis => {
+  chunks.sort((a: IDataChunk2D, b: IDataChunk2D) => a[beforeKey] - b[beforeKey]);
   return chunks
     .map(calcAxis.bind(null, chunks, beforeKey, afterKey))
     .filter((axis: IChunkAxis) => !axis.noSubdivide)
@@ -86,7 +81,7 @@ const findAxis = (chunks: IDataIdsChunk2D[], beforeKey: AABBPropKey, afterKey: A
  * With `subdivide()` the node is recursively subdivided into children if this is possible.
  * With `findChunks*()` all chunks in a certain area are found.
  */
-export class ChunkQuadTreeNode {
+export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //
   //               -y
   //
@@ -105,18 +100,18 @@ export class ChunkQuadTreeNode {
   originX: number = null;
   originY: number = null;
 
-  chunks: IDataIdsChunk2D[];
+  chunks: ChunkType[];
 
   isLeaf = true;
 
-  readonly nodes: IChunkQuadTreeChildNodes = {
+  readonly nodes: IChunkQuadTreeChildNodes<ChunkType> = {
     northEast: null,
     northWest: null,
     southEast: null,
     southWest: null,
   };
 
-  constructor(chunks?: IDataIdsChunk2D | IDataIdsChunk2D[]) {
+  constructor(chunks?: ChunkType | ChunkType[]) {
     this.chunks = chunks ? [].concat(chunks) : [];
   }
 
@@ -157,7 +152,7 @@ export class ChunkQuadTreeNode {
     }
   }
 
-  appendChunk(chunk: IDataIdsChunk2D) {
+  appendChunk(chunk: ChunkType) {
     if (this.isLeaf) {
       this.chunks.push(chunk);
       return;
@@ -186,7 +181,7 @@ export class ChunkQuadTreeNode {
     }
   }
 
-  private appendToNode(quadrant: Quadrant, chunk: IDataIdsChunk2D) {
+  private appendToNode(quadrant: Quadrant, chunk: ChunkType) {
     const node = this.nodes[quadrant];
     if (node) {
       node.appendChunk(chunk);
@@ -230,10 +225,10 @@ export class ChunkQuadTreeNode {
     return this.nodes.southWest && aabb.isSouthWest(this.originX, this.originY);
   }
 
-  findChunksAt(x: number, y: number): IDataIdsChunk2D[] {
-    const chunks: IDataIdsChunk2D[] = this.chunks.filter((chunk: IDataIdsChunk2D) => chunk.containsDataAt(x, y));
+  findChunksAt(x: number, y: number): ChunkType[] {
+    const chunks: ChunkType[] = this.chunks.filter((chunk: ChunkType) => chunk.containsDataAt(x, y));
 
-    let moreChunks: IDataIdsChunk2D[] = null;
+    let moreChunks: ChunkType[] = null;
 
     if (x < this.originX) {
       if (y < this.originY) {
