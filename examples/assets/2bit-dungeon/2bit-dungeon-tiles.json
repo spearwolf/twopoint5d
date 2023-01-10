@@ -1,0 +1,14 @@
+{ "columns":8,
+ "image":"2bit-dungeon-tiles.png",
+ "imageheight":144,
+ "imagewidth":144,
+ "margin":1,
+ "name":"2bit-dungeon-tiles",
+ "spacing":2,
+ "tilecount":64,
+ "tiledversion":"2021.01.13",
+ "tileheight":16,
+ "tilewidth":16,
+ "type":"tileset",
+ "version":1.4
+}
