@@ -1,18 +1,14 @@
-interface IData2DChunkDimension {
-  x: number;
-  y: number;
+import {AABB2} from '../AABB2';
 
-  height: number;
-  width: number;
+export interface IDataIdsChunk2D {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+
+  readDataIdAt(x: number, y: number): number;
+  containsDataAt(x: number, y: number): boolean;
+  isIntersecting(aabb: AABB2): boolean;
+
+  toString(): string;
 }
-
-export interface IStringData2DChunk extends IData2DChunkDimension {
-  data: string;
-  compression?: string;
-}
-
-export interface IUint32Data2DChunk extends IData2DChunkDimension {
-  uint32Arr: Uint32Array;
-}
-
-export type IData2DChunk = IStringData2DChunk | IUint32Data2DChunk;

@@ -1,5 +1,5 @@
 import {AABB2} from '../AABB2';
-import {Data2DChunk} from './Data2DChunk';
+import {IDataIdsChunk2D} from './IData2DChunk';
 
 enum Quadrant {
   NorthEast = 'northEast',
@@ -21,26 +21,26 @@ interface IChunkAxis {
 const INTERSECT_DISTANCE_FACTOR = Math.PI;
 const BEFORE_AFTER_DELTA_FACTOR = Math.PI;
 
-type ChunkAabbValues = 'top' | 'right' | 'bottom' | 'left';
+type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
 const calcAxis = (
-  chunks: Data2DChunk[],
-  beforeProp: ChunkAabbValues,
-  afterProp: ChunkAabbValues,
-  chunk: Data2DChunk,
+  chunks: IDataIdsChunk2D[],
+  beforeKey: AABBPropKey,
+  afterKey: AABBPropKey,
+  chunk: IDataIdsChunk2D,
 ): IChunkAxis => {
   const chunksCount = chunks.length;
-  const origin = chunk[beforeProp];
-  const beforeChunks: Data2DChunk[] = [];
-  const intersectChunks: Data2DChunk[] = [];
-  const afterChunks: Data2DChunk[] = [];
+  const origin = chunk[beforeKey];
+  const beforeChunks: IDataIdsChunk2D[] = [];
+  const intersectChunks: IDataIdsChunk2D[] = [];
+  const afterChunks: IDataIdsChunk2D[] = [];
 
   for (let i = 0; i < chunksCount; i++) {
-    const beforeValue = chunks[i][beforeProp];
+    const beforeValue = chunks[i][beforeKey];
     if (beforeValue <= origin) {
       beforeChunks.push(chunk);
     } else {
-      const afterValue = chunks[i][afterProp];
+      const afterValue = chunks[i][afterKey];
       if (afterValue >= origin) {
         afterChunks.push(chunk);
       } else {
@@ -67,14 +67,24 @@ const calcAxis = (
   };
 };
 
-const findAxis = (chunks: Data2DChunk[], beforeProp: ChunkAabbValues, afterProp: ChunkAabbValues): IChunkAxis => {
-  chunks.sort((a: Data2DChunk, b: Data2DChunk) => a[beforeProp] - b[beforeProp]);
+const findAxis = (chunks: IDataIdsChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis => {
+  chunks.sort((a: IDataIdsChunk2D, b: IDataIdsChunk2D) => a[beforeKey] - b[beforeKey]);
   return chunks
-    .map(calcAxis.bind(null, chunks, beforeProp, afterProp))
+    .map(calcAxis.bind(null, chunks, beforeKey, afterKey))
     .filter((axis: IChunkAxis) => !axis.noSubdivide)
     .sort((a: IChunkAxis, b: IChunkAxis) => a.distance - b.distance)[0] as IChunkAxis;
 };
 
+/**
+ * A node is either a leaf without children or has exactly four children
+ * corresponding to the celestial directions (quadrants).
+ *
+ * Each node can contain any amount of 2d data matrices (chunks).
+ * Each chunk is located in a right-hand coordinate system on the XY plane.
+ *
+ * With `appendChunk()` chunks are added to the node.
+ * With `subdivide()` the node is subdivided into children if this is possible.
+ */
 export class ChunkQuadTreeNode {
   //
   //               -y
@@ -94,7 +104,7 @@ export class ChunkQuadTreeNode {
   originX: number = null;
   originY: number = null;
 
-  chunks: Data2DChunk[];
+  chunks: IDataIdsChunk2D[];
 
   isLeaf = true;
 
@@ -105,7 +115,7 @@ export class ChunkQuadTreeNode {
     southWest: null,
   };
 
-  constructor(chunks?: Data2DChunk | Data2DChunk[]) {
+  constructor(chunks?: IDataIdsChunk2D | IDataIdsChunk2D[]) {
     this.chunks = chunks ? [].concat(chunks) : [];
   }
 
@@ -146,7 +156,7 @@ export class ChunkQuadTreeNode {
     }
   }
 
-  appendChunk(chunk: Data2DChunk) {
+  appendChunk(chunk: IDataIdsChunk2D) {
     if (this.isLeaf) {
       this.chunks.push(chunk);
       return;
@@ -175,7 +185,7 @@ export class ChunkQuadTreeNode {
     }
   }
 
-  private appendToNode(quadrant: Quadrant, chunk: Data2DChunk) {
+  private appendToNode(quadrant: Quadrant, chunk: IDataIdsChunk2D) {
     const node = this.nodes[quadrant];
     if (node) {
       node.appendChunk(chunk);
@@ -184,20 +194,20 @@ export class ChunkQuadTreeNode {
     }
   }
 
-  findVisibleChunks(aabb: AABB2) {
+  findChunks(aabb: AABB2) {
     let chunks = this.chunks.filter((chunk) => chunk.isIntersecting(aabb));
 
     if (this.isNorthWest(aabb)) {
-      chunks = chunks.concat(this.nodes.northWest.findVisibleChunks(aabb));
+      chunks = chunks.concat(this.nodes.northWest.findChunks(aabb));
     }
     if (this.isNorthEast(aabb)) {
-      chunks = chunks.concat(this.nodes.northEast.findVisibleChunks(aabb));
+      chunks = chunks.concat(this.nodes.northEast.findChunks(aabb));
     }
     if (this.isSouthEast(aabb)) {
-      chunks = chunks.concat(this.nodes.southEast.findVisibleChunks(aabb));
+      chunks = chunks.concat(this.nodes.southEast.findChunks(aabb));
     }
     if (this.isSouthWest(aabb)) {
-      chunks = chunks.concat(this.nodes.southWest.findVisibleChunks(aabb));
+      chunks = chunks.concat(this.nodes.southWest.findChunks(aabb));
     }
 
     return chunks;
@@ -219,10 +229,10 @@ export class ChunkQuadTreeNode {
     return this.nodes.southWest && aabb.isSouthWest(this.originX, this.originY);
   }
 
-  findChunksAt(x: number, y: number): Data2DChunk[] {
-    const chunks: Data2DChunk[] = this.chunks.filter((chunk: Data2DChunk) => chunk.containsTileIdAt(x, y));
+  findChunksAt(x: number, y: number): IDataIdsChunk2D[] {
+    const chunks: IDataIdsChunk2D[] = this.chunks.filter((chunk: IDataIdsChunk2D) => chunk.containsDataAt(x, y));
 
-    let moreChunks: Data2DChunk[] = null;
+    let moreChunks: IDataIdsChunk2D[] = null;
 
     if (x < this.originX) {
       if (y < this.originY) {
