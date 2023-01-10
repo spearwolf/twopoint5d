@@ -269,6 +269,43 @@ describe('VertexObjectBuffer', () => {
     ]);
   });
 
+  test('copyArray', () => {
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+        },
+        bar: {
+          size: 1,
+          usage: 'dynamic',
+          bufferName: 'bar',
+        },
+        plah: {
+          components: ['a', 'b', 'c'],
+        },
+      },
+    });
+    const vob = new VertexObjectBuffer(descriptor, 2);
+
+    vob.copyArray(new Float32Array([100, 101, 102, 103]), 'bar');
+
+    // prettier-ignore
+    expect(Array.from(vob.buffers.get('bar').typedArray)).toEqual([
+      100, 101, 102, 103,
+      0, 0, 0, 0,
+    ]);
+
+    vob.copyArray(new Float32Array([200, 201, 202, 203]), 'bar', 1);
+
+    // prettier-ignore
+    expect(Array.from(vob.buffers.get('bar').typedArray)).toEqual([
+      100, 101, 102, 103,
+      200, 201, 202, 203,
+    ]);
+  });
+
   test('copyWithin', () => {
     const descriptor = new VertexObjectDescriptor({
       vertexCount: 4,

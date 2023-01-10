@@ -46,6 +46,7 @@ export interface VADescription {
   normalized?: boolean;
   usage?: VertexAttributeUsageType;
   autoTouch?: boolean;
+  bufferName?: string;
 }
 
 /**

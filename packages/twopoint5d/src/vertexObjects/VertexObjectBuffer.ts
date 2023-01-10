@@ -127,6 +127,12 @@ export class VertexObjectBuffer {
     return clone;
   }
 
+  copyArray(source: TypedArray, bufferName: string, objectOffset = 0): void {
+    const {vertexCount} = this.descriptor;
+    const {typedArray, itemSize} = this.buffers.get(bufferName);
+    typedArray.set(source, objectOffset * vertexCount * itemSize);
+  }
+
   copyWithin(target: number, start: number, end = this.capacity): void {
     const {vertexCount} = this.descriptor;
     for (const {typedArray, itemSize} of this.buffers.values()) {
