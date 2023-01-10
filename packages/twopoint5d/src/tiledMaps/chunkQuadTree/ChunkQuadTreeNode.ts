@@ -80,10 +80,10 @@ const findAxis = (chunks: IDataIdsChunk2D[], beforeKey: AABBPropKey, afterKey: A
  * corresponding to the celestial directions (quadrants).
  *
  * Each node can contain any amount of 2d data matrices (chunks).
- * Each chunk is located in a right-hand coordinate system on the XY plane.
+ * Each chunk is positioned in a right-hand coordinate system on the XY plane.
  *
  * With `appendChunk()` chunks are added to the node.
- * With `subdivide()` the node is subdivided into children if this is possible.
+ * With `subdivide()` the node is recursively subdivided into children if this is possible.
  */
 export class ChunkQuadTreeNode {
   //
