@@ -205,10 +205,10 @@ export class InstancedVertexObjectGeometry<
     for (const [name, {itemSize}] of this.instancedPool.buffer.buffers) {
       this.instancedBuffers.get(name).updateRange.count = itemSize * this.instanceCount;
     }
-    for (const [name, pool] of this.extraInstancedPools) {
-      const poolBuffers = this.extraInstancedBuffers.get(name);
+    for (const [extraName, pool] of this.extraInstancedPools) {
+      const poolBuffers = this.extraInstancedBuffers.get(extraName);
       if (poolBuffers) {
-        for (const [, {itemSize}] of pool.buffer.buffers) {
+        for (const [name, {itemSize}] of pool.buffer.buffers) {
           poolBuffers.get(name).updateRange.count = itemSize * pool.usedCount;
         }
       }
