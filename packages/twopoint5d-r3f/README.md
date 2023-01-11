@@ -3,7 +3,7 @@
 	<br>
   <b>The Art of Tiling 2D Sprites</b>
 	<br>
-  <em>A refreshingly satisfying 2.5D graphics library built on three.js, react and @react-three/fiber</em>
+  <em>A 2.5D realtime gfx library built with three.js, react and @react-three/fiber</em>
 </p>
 
 ---

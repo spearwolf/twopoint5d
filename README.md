@@ -3,7 +3,7 @@
 	<br>
   <b>The Art of Tiling 2D Sprites</b>
 	<br>
-  <em>A refreshingly satisfying 2.5D graphics library built on three.js</em>
+  <em>A 2.5D realtime gfx library built with three.js</em>
 </p>
 
 
@@ -70,10 +70,10 @@ $ yarn
 $ yarn cbt  # => yarn clean && yarn build && yarn test
 ```
 
-#### 3. Run examples
+#### 3. Run dev
 
-Start the examples that can be found under [examples/](./examples/)
+Serve all examples and rebuild sources on change (aka _dev_ mode)
 
 ```sh
-$ yarn examples:vanilla  # or 'examples:r3f'
+$ yarn dev
 ```
