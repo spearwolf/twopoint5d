@@ -56,6 +56,8 @@
         EdgesGeometry,
         LineSegments,
         LineBasicMaterial,
+        Vector2,
+        Vector3,
       } from "three";
       import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
       import {
@@ -119,7 +121,7 @@
 
         // ------------------------------------------------------
 
-        tiles.beginUpdate(0, 0);
+        tiles.beginUpdate(new Vector2(), new Vector3());
 
         tiles.addTile(new Map2DTile(0, 0, new AABB2(0, 0, 256, 256)));
         tiles.addTile(new Map2DTile(-1, 0, new AABB2(-256, 0, 256, 256)));

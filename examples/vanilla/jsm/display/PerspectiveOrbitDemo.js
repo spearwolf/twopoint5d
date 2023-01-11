@@ -21,6 +21,7 @@ export class PerspectiveOrbitDemo extends Display {
     this.camera.position.z = 30;
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
 
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 
