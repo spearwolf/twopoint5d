@@ -1,11 +1,12 @@
 import {BufferGeometry} from 'three';
 
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
-import {VertexObjectPool} from './VertexObjectPool';
 import {initializeAttributes} from './initializeAttributes';
 import {selectAttributes} from './selectAttributes';
 import {selectBuffers} from './selectBuffers';
 import {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types';
+import {updateUpdateRange} from './updateUpdateRange';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {VertexObjectPool} from './VertexObjectPool';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
@@ -65,9 +66,10 @@ export class VertexObjectGeometry extends BufferGeometry {
   }
 
   #updateBuffersUpdateRange() {
-    for (const [name, {itemSize}] of this.pool.buffer.buffers) {
-      this.buffers.get(name).updateRange.count = itemSize * this.pool.usedCount * this.pool.descriptor.vertexCount;
-    }
+    // for (const [name, {itemSize}] of this.pool.buffer.buffers) {
+    //   this.buffers.get(name).updateRange.count = itemSize * this.pool.usedCount * this.pool.descriptor.vertexCount;
+    // }
+    updateUpdateRange(this.pool, this.buffers);
   }
 
   #updateDrawRange() {

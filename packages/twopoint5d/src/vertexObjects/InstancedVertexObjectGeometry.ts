@@ -5,6 +5,7 @@ import {initializeInstancedAttributes} from './initializeInstancedAttributes';
 import {selectAttributes} from './selectAttributes';
 import {selectBuffers} from './selectBuffers';
 import {BufferLike, VertexAttributeUsageType, VertexObjectDescription, VO} from './types';
+import {updateUpdateRange} from './updateUpdateRange';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor';
 import {VertexObjectPool} from './VertexObjectPool';
 
@@ -197,21 +198,12 @@ export class InstancedVertexObjectGeometry<
   }
 
   #updateBuffersUpdateRange() {
-    if (this.basePool) {
-      for (const [name, {itemSize}] of this.basePool.buffer.buffers) {
-        this.baseBuffers.get(name).updateRange.count = itemSize * this.basePool.usedCount * this.basePool.descriptor.vertexCount;
-      }
-    }
-    for (const [name, {itemSize}] of this.instancedPool.buffer.buffers) {
-      this.instancedBuffers.get(name).updateRange.count = itemSize * this.instanceCount;
-    }
-    for (const [extraName, pool] of this.extraInstancedPools) {
-      const poolBuffers = this.extraInstancedBuffers.get(extraName);
-      if (poolBuffers) {
-        for (const [name, {itemSize}] of pool.buffer.buffers) {
-          poolBuffers.get(name).updateRange.count = itemSize * pool.usedCount;
-        }
-      }
+    updateUpdateRange(this.basePool, this.baseBuffers);
+    updateUpdateRange(this.instancedPool, this.instancedBuffers);
+
+    for (const [name, pool] of this.extraInstancedPools) {
+      const buffers = this.extraInstancedBuffers.get(name);
+      updateUpdateRange(pool, buffers);
     }
   }
 
