@@ -33,12 +33,12 @@
     "examples:vanilla": "servor . ./examples/vanilla/animated-billboards.html ---reload --browse",
     "examples": "concurrently --names 'examples:vanilla,examples:react|r3f' yarn:examples:vanilla yarn:examples:r3f",
     "dev": "concurrently --raw yarn:examples yarn:watch",
-    "start": "yarn examples:vanilla"
+    "start": "yarn examples"
   },
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
   "devDependencies": {
-    "concurrently": "^7.4.0",
+    "concurrently": "^7.6.0",
     "npm-run-all": "^4.1.5",
     "servor": "^4.0.2",
     "shelljs": "^0.8.5"

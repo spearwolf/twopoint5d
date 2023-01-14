@@ -1,4 +1,4 @@
-export const readOption = <OptionsType, ValueType>(
+export const readOption = <OptionsType extends Object, ValueType>(
   options: OptionsType,
   propName: keyof OptionsType,
   defValue: ValueType,
