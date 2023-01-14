@@ -23,6 +23,7 @@ import { SepiaShader } from "three/examples/jsm/shaders/SepiaShader";
 import { VignetteShader } from "three/examples/jsm/shaders/VignetteShader";
 
 import { WiredBox } from "../utils/WiredBox";
+import { useControls } from "leva";
 
 extend({
   CameraBasedVisibility,
@@ -41,16 +42,19 @@ export const Map2DImageLayer = ({
   centerX,
   centerY,
   camera,
+  debugNextVisibleTiles = false,
+  showHelpers = false,
   horizontal = false,
   vertical = false,
   matrix = new Matrix4(),
+  visible = true,
 }) => {
   const map2dRef = useRef();
 
   useEffect(() => {
     const onKeyup = (event) => {
       if (event.ctrlKey && event.code === "Period") {
-        if (map2dRef.current.visibilitor && name === "front") {
+        if (debugNextVisibleTiles && map2dRef.current.visibilitor) {
           map2dRef.current.visibilitor.debugNextVisibleTiles = true;
         }
       }
@@ -58,7 +62,7 @@ export const Map2DImageLayer = ({
 
     window.addEventListener("keyup", onKeyup);
     return () => window.removeEventListener("keyup", onKeyup);
-  }, [name]);
+  }, [debugNextVisibleTiles]);
 
   return (
     <>
@@ -81,13 +85,14 @@ export const Map2DImageLayer = ({
         centerX={centerX}
         centerY={centerY}
         updateOnFrame
+        visible={visible}
       >
         <cameraBasedVisibility
           camera={camera}
           lookAtCenter={false}
           depth={10}
           attach="visibilitor"
-          showHelpers={name === "front"}
+          showHelpers={showHelpers}
         />
 
         <Map2DTileSprites>
@@ -120,9 +125,53 @@ export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const camera = useThree((state) => state.camera);
 
+  const { showBox } = useControls({
+    showBox: true,
+  });
+
+  const {
+    show: back_show,
+    debug: back_debugNextVisibleTiles,
+    showHelpers: back_showHelpers,
+  } = useControls("back", {
+    show: true,
+    debug: false,
+    showHelpers: false,
+  });
+
+  const {
+    show: middle_show,
+    debug: middle_debugNextVisibleTiles,
+    showHelpers: middle_showHelpers,
+  } = useControls("middle", {
+    show: true,
+    debug: false,
+    showHelpers: false,
+  });
+
+  const {
+    show: front_show,
+    debug: front_debugNextVisibleTiles,
+    showHelpers: front_showHelpers,
+  } = useControls("front", {
+    show: true,
+    debug: true,
+    showHelpers: false,
+  });
+
+  const {
+    show: forefront_show,
+    debug: forefront_debugNextVisibleTiles,
+    showHelpers: forefront_showHelpers,
+  } = useControls("forefront", {
+    show: true,
+    debug: false,
+    showHelpers: false,
+  });
+
   return (
     <>
-      <WiredBox width={500} height={500} depth={500} />
+      <WiredBox visible={showBox} width={500} height={500} depth={500} />
 
       <PanControl2D
         onUpdate={setCenter}
@@ -156,6 +205,9 @@ export const DemoOrDie = () => {
           centerX={center.x}
           centerY={center.y}
           horizontal
+          debugNextVisibleTiles={forefront_debugNextVisibleTiles}
+          showHelpers={forefront_showHelpers}
+          visible={forefront_show}
         />
 
         <Map2DImageLayer
@@ -170,6 +222,9 @@ export const DemoOrDie = () => {
           centerX={center.x}
           centerY={center.y}
           horizontal
+          debugNextVisibleTiles={front_debugNextVisibleTiles}
+          showHelpers={front_showHelpers}
+          visible={front_show}
         />
 
         <Map2DImageLayer
@@ -184,6 +239,9 @@ export const DemoOrDie = () => {
           centerX={center.x}
           centerY={center.y}
           horizontal
+          debugNextVisibleTiles={middle_debugNextVisibleTiles}
+          showHelpers={middle_showHelpers}
+          visible={middle_show}
         />
 
         <Map2DImageLayer
@@ -198,6 +256,9 @@ export const DemoOrDie = () => {
           centerX={center.x}
           centerY={center.y}
           horizontal
+          debugNextVisibleTiles={back_debugNextVisibleTiles}
+          showHelpers={back_showHelpers}
+          visible={back_show}
         />
       </group>
 
