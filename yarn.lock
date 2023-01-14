@@ -14570,13 +14570,13 @@ fsevents@^1.2.7:
     use-asset: ^1.0.4
     zustand: ^4.3.2
   peerDependencies:
-    "@react-three/fiber": ^8.4.0
+    "@react-three/fiber": ^8.10.0
     "@spearwolf/eventize": ^2.0.3
     react: ^18.2.0
     three: ^0.148
     twopoint5d: "*"
     use-asset: ^1.0.0
-    zustand: ^4.1.2
+    zustand: ^4.3.2
   languageName: unknown
   linkType: soft
 
