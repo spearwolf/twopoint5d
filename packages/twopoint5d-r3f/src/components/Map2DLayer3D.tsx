@@ -31,7 +31,7 @@ function Component(
   const [layer, setLayer] = useState<__Map2DLayer3D>(null);
 
   useEffect(() => {
-    if (!updateOnFrame) {
+    if (!updateOnFrame && layer.visible) {
       layer?.update();
     }
   }, [layer, updateOnFrame, centerX, centerY, tileWidth, tileHeight, xOffset, yOffset]);
