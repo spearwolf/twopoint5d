@@ -13,7 +13,7 @@ import {
   PerspectiveCamera,
   Plane,
   Vector2,
-  Vector3
+  Vector3,
 } from 'three';
 import {AABB2} from './AABB2';
 import {HelpersManager} from './HelpersManager';
