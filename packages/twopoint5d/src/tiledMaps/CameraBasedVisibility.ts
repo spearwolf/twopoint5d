@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 
+import {off} from 'process';
 import {
   Box3,
   Box3Helper,
@@ -27,7 +28,7 @@ interface TilePlaneBox {
   y: number;
   coords?: TilesWithinCoords;
   box?: Box3;
-  frustumBox?: Box3;
+  worldBox?: Box3;
   map2dTile?: Map2DTile;
 }
 
@@ -267,27 +268,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const translate = new Vector3().setFromMatrixPosition(matrixWorld);
 
-    // const _position = new Vector3();
-    // const _rotation = new Quaternion();
-    // const _scale = new Vector3();
-
-    // node.matrixWorld.decompose(_position, _rotation, _scale);
-
-    // _position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
-
-    // const boxWorldTransform = new Matrix4().compose(_position, _rotation, _scale);
-    //
-    // const boxWorldTransform = matrixWorld
-    //   .clone()
-    //   .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
-    // .invert();
-    // const boxWorldTransform = matrixWorld.clone().multiply(new Matrix4().makeTranslation(offset.x, 0, offset.y));
-    const boxWorldTransform = matrixWorld
-      .clone()
-      .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
-    // const boxWorldTransform = new Matrix4();
-
-    // const frustum = frustumApplyMatrix4(makeCameraFrustum(camera), boxWorldTransform.clone().invert());
     const frustum = makeCameraFrustum(camera);
 
     if (isDebug) {
@@ -298,14 +278,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       });
     }
 
+    const boxTransform = makePlaneOffsetTransform(map2dTileCoords).multiply(
+      new Matrix4().makeTranslation(-centerPoint.x + translate.x, translate.y, -centerPoint.y + translate.z),
+    );
+
+    const boxWorldTransform = matrixWorld
+      .clone()
+      .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
+
     const visibleTiles = this.findAllVisibleTiles(
       frustum,
       tileCoords,
       map2dTileCoords,
-      centerPoint,
-      translate,
-      previousTiles.slice(0),
+      boxTransform,
       boxWorldTransform,
+      previousTiles.slice(0),
     );
 
     visibleTiles.offset.copy(offset);
@@ -324,15 +311,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     cameraFrustum: Frustum,
     planeTileCoords: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
-    centerPoint: Vector2,
-    translate: Vector3,
-    previousTiles: Map2DTile[],
+    boxTransform: Matrix4,
     boxWorldTransform: Matrix4,
+    previousTiles: Map2DTile[],
   ): Map2DVisibleTiles | undefined {
-    const boxTransform = makePlaneOffsetTransform(map2dTileCoords).multiply(
-      new Matrix4().makeTranslation(-centerPoint.x + translate.x, translate.y, -centerPoint.y + translate.z),
-    );
-
     const visibles: TilePlaneBox[] = [];
     const visitedIds = new Set<string>();
 
@@ -361,10 +343,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
         tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(boxTransform);
 
-        // const frustumBox = tile.box;
-        tile.frustumBox = tile.box.clone().applyMatrix4(boxWorldTransform);
+        tile.worldBox = tile.box.clone().applyMatrix4(boxWorldTransform);
 
-        if (cameraFrustum.intersectsBox(tile.frustumBox)) {
+        if (cameraFrustum.intersectsBox(tile.worldBox)) {
           visibles.push(tile);
 
           const previousTilesIndex = findTileIndex(previousTiles, Map2DTile.createID(tile.x, tile.y));
@@ -416,15 +397,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createTileHelpers(visibles: TilePlaneBox[]) {
-    for (const [i, {box, frustumBox}] of visibles.entries()) {
+    for (const [i, {box, worldBox}] of visibles.entries()) {
       if (i > MAX_DEBUG_HELPERS) {
         break;
       }
+      const isFirst = i === 0;
       if (box != null) {
-        this.createHelper(box, -0.01, new Color(i === 0 ? 0xff0066 : 0x772222), false);
+        this.createHelper(box, -0.01, new Color(isFirst ? 0xff0066 : 0x772222), false);
       }
-      if (frustumBox != null) {
-        this.createHelper(frustumBox, -0.015, new Color(i === 0 ? 0xffff00 : 0x777722), true);
+      if (worldBox != null) {
+        this.createHelper(worldBox, -0.015, new Color(isFirst ? 0xffff00 : 0x777722), true);
       }
     }
   }
