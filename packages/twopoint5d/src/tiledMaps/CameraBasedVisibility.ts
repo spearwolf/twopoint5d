@@ -12,7 +12,6 @@ import {
   OrthographicCamera,
   PerspectiveCamera,
   Plane,
-  Quaternion,
   Vector2,
   Vector3,
 } from 'three';
@@ -28,8 +27,11 @@ interface TilePlaneBox {
   y: number;
   coords?: TilesWithinCoords;
   box?: Box3;
+  frustumBox?: Box3;
   map2dTile?: Map2DTile;
 }
+
+const MAX_DEBUG_HELPERS = 9;
 
 const asTilePlaneBoxId = (x: number, y: number) => `${x},${y}`;
 
@@ -265,15 +267,25 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const translate = new Vector3().setFromMatrixPosition(matrixWorld);
 
-    const _position = new Vector3();
-    const _rotation = new Quaternion();
-    const _scale = new Vector3();
+    // const _position = new Vector3();
+    // const _rotation = new Quaternion();
+    // const _scale = new Vector3();
 
-    node.matrixWorld.decompose(_position, _rotation, _scale);
+    // node.matrixWorld.decompose(_position, _rotation, _scale);
 
-    _position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
+    // _position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
 
-    const boxWorldTransform = new Matrix4().compose(_position, _rotation, _scale);
+    // const boxWorldTransform = new Matrix4().compose(_position, _rotation, _scale);
+    //
+    // const boxWorldTransform = matrixWorld
+    //   .clone()
+    //   .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
+    // .invert();
+    // const boxWorldTransform = matrixWorld.clone().multiply(new Matrix4().makeTranslation(offset.x, 0, offset.y));
+    const boxWorldTransform = matrixWorld
+      .clone()
+      .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
+    // const boxWorldTransform = new Matrix4();
 
     // const frustum = frustumApplyMatrix4(makeCameraFrustum(camera), boxWorldTransform.clone().invert());
     const frustum = makeCameraFrustum(camera);
@@ -294,7 +306,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       translate,
       previousTiles.slice(0),
       boxWorldTransform,
-      isDebug,
     );
 
     visibleTiles.offset.copy(offset);
@@ -316,8 +327,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     centerPoint: Vector2,
     translate: Vector3,
     previousTiles: Map2DTile[],
-    _boxWorldTransform: Matrix4,
-    isDebug = false,
+    boxWorldTransform: Matrix4,
   ): Map2DVisibleTiles | undefined {
     const boxTransform = makePlaneOffsetTransform(map2dTileCoords).multiply(
       new Matrix4().makeTranslation(-centerPoint.x + translate.x, translate.y, -centerPoint.y + translate.z),
@@ -351,15 +361,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
         tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(boxTransform);
 
-        if (isDebug) {
-          console.log('check tile:', {tile, cameraFrustum});
-        }
+        // const frustumBox = tile.box;
+        tile.frustumBox = tile.box.clone().applyMatrix4(boxWorldTransform);
 
-        const frustumBox = tile.box;
-        // const frustumBox = tile.box.clone().applyMatrix4(boxWorldTransform);
-        // const frustumBox = this.makeTileBox(tile.coords).applyMatrix4(boxWorldTransform).applyMatrix4(boxTransform);
-
-        if (cameraFrustum.intersectsBox(frustumBox)) {
+        if (cameraFrustum.intersectsBox(tile.frustumBox)) {
           visibles.push(tile);
 
           const previousTilesIndex = findTileIndex(previousTiles, Map2DTile.createID(tile.x, tile.y));
@@ -411,16 +416,26 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createTileHelpers(visibles: TilePlaneBox[]) {
-    for (const [i, {box: visibleBox}] of visibles.entries()) {
-      if (visibleBox != null) {
-        const box = visibleBox.clone();
-        const boxSize = box.getSize(new Vector3());
-        box.expandByVector(boxSize.multiplyScalar(-0.01));
-
-        const helper = new Box3Helper(box, new Color(i === 0 ? 0xff0066 : 0xf0f0f0));
-        this.#helpers.add(helper);
+    for (const [i, {box, frustumBox}] of visibles.entries()) {
+      if (i > MAX_DEBUG_HELPERS) {
+        break;
+      }
+      if (box != null) {
+        this.createHelper(box, -0.01, new Color(i === 0 ? 0xff0066 : 0x772222), false);
+      }
+      if (frustumBox != null) {
+        this.createHelper(frustumBox, -0.015, new Color(i === 0 ? 0xffff00 : 0x777722), true);
       }
     }
+  }
+
+  private createHelper(box: Box3, expand: number, color: Color, addToRoot: boolean) {
+    box = box.clone();
+    const boxSize = box.getSize(new Vector3());
+    box.expandByVector(boxSize.multiplyScalar(expand));
+
+    const helper = new Box3Helper(box, color);
+    this.#helpers.add(helper, addToRoot);
   }
 
   private makeTileBox({top, left, width, height}: TilesWithinCoords): Box3 {

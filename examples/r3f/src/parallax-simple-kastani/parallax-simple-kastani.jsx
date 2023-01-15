@@ -1,8 +1,9 @@
 import { Effects, OrbitControls } from "@react-three/drei";
 import { extend, useThree } from "@react-three/fiber";
+import { button, useControls } from "leva";
 import { useEffect, useRef, useState } from "react";
 import { CameraHelper, Euler, MathUtils, Matrix4 } from "three";
-import { CameraBasedVisibility } from "twopoint5d";
+import { CameraBasedVisibility, printSceneGraphToConsole } from "twopoint5d";
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -23,7 +24,6 @@ import { SepiaShader } from "three/examples/jsm/shaders/SepiaShader";
 import { VignetteShader } from "three/examples/jsm/shaders/VignetteShader";
 
 import { WiredBox } from "../utils/WiredBox";
-import { useControls } from "leva";
 
 extend({
   CameraBasedVisibility,
@@ -31,6 +31,22 @@ extend({
   RenderPass,
   ShaderPass,
 });
+
+let debugUsageInfoIsShown = false;
+
+function printDebugUsageInfo() {
+  if (debugUsageInfoIsShown) return;
+  const styles = "font-weight:bold;color:#dd0044";
+  console.info(
+    `%c!!! to use the debug feature, press <Ctrl+.> and change the view.`,
+    styles
+  );
+  console.info(
+    `%ceach layer that is set to debug will then print the debug info to the console !!!`,
+    styles
+  );
+  debugUsageInfoIsShown = true;
+}
 
 export const Map2DImageLayer = ({
   name,
@@ -124,9 +140,17 @@ const backTransform = new Matrix4().makeTranslation(0, -250, 0); // 0, -180, 150
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
   const camera = useThree((state) => state.camera);
+  const rootNode = useRef();
+
+  useEffect(printDebugUsageInfo);
 
   const { showBox } = useControls({
     showBox: true,
+    printGraph2console: button(() => {
+      if (rootNode.current) {
+        printSceneGraphToConsole(rootNode.current, true);
+      }
+    }),
   });
 
   const {
@@ -192,7 +216,7 @@ export const DemoOrDie = () => {
         />
       </Stage2D>
 
-      <group matrix={xyTransform} matrixAutoUpdate={false}>
+      <group matrix={xyTransform} matrixAutoUpdate={false} ref={rootNode}>
         <Map2DImageLayer
           name="forefront"
           matrix={forefrontTransform}
