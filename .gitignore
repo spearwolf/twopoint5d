@@ -12,3 +12,5 @@ dist
 !.yarn/versions
 .pnp.*
 examples/react-think-tank.jsx
+.vscode/pinned-files.json
+packages/twopoint5d/src/tiledMaps/CameraBasedVisibility-NOTES.md

@@ -281,9 +281,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       new Matrix4().makeTranslation(-centerPoint.x + translate.x, translate.y, -centerPoint.y + translate.z),
     );
 
-    const boxWorldTransform = matrixWorld
-      .clone()
-      .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
+    const boxWorldTransform = matrixWorld.clone().multiply(new Matrix4().makeTranslation(translate.x, translate.y, translate.z));
+    // .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
 
     const visibleTiles = this.findAllVisibleTiles(
       frustum,
