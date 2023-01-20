@@ -301,11 +301,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       if (pointOnPlane3D) {
         this.createPointHelper(pointOnPlane3D);
 
-        // const anotherPoint = this.makeCoplanarPoint(pointOnPlane3D, map2dPlane);
+        // const origin = this.makeCoplanarPoint(pointOnPlane3D, map2dPlane);
         // this.createPointHelper(anotherPoint, true, 10, 0xff0033);
 
-        this.createPointHelper(makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)), true, 5, 0xff0000);
-        this.createPointHelper(makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(0, 50)), true, 5, 0x00ff00);
+        const uOrigin = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2());
+        this.createPointHelper(uOrigin, true, 10, 0xcccccc);
+
+        const origin = map2dPlane.coplanarPoint(new Vector3());
+        this.createPointHelper(origin, true, 10, 0x55eeee);
+
+        origin.sub(uOrigin);
+
+        const ux = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)).add(origin);
+        const uy = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(0, 50)).add(origin);
+
+        this.createPointHelper(ux, true, 5, 0xff0000);
+        this.createPointHelper(uy, true, 5, 0x00ff00);
 
         const coords = this.toMap2DCoords(pointOnPlane3D, map2dPlane);
 
