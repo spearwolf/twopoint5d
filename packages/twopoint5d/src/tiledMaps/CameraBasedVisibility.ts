@@ -235,27 +235,27 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   //     .add(planeOrigin);
   // }
 
-  private toMap2DCoords(pointOnPlane: Vector3, plane: Plane): Vector2 {
-    const origin = plane.coplanarPoint(new Vector3());
+  // private toMap2DCoords(pointOnPlane: Vector3, plane: Plane): Vector2 {
+  //   const origin = plane.coplanarPoint(new Vector3());
 
-    const U = pointOnPlane.clone().sub(origin).normalize();
-    const uN = plane.normal.clone().normalize();
-    const V = U.clone().cross(uN);
+  //   const U = pointOnPlane.clone().sub(origin).normalize();
+  //   const uN = plane.normal.clone().normalize();
+  //   const V = U.clone().cross(uN);
 
-    const u = origin.clone().add(U);
-    const v = origin.clone().add(V);
-    const n = origin.clone().add(uN);
+  //   const u = origin.clone().add(U);
+  //   const v = origin.clone().add(V);
+  //   const n = origin.clone().add(uN);
 
-    // this.createPointHelper(origin.clone().add(U.clone().multiplyScalar(100)), true, 5, 0xff0000);
-    // this.createPointHelper(origin.clone().add(V.clone().multiplyScalar(100)), true, 5, 0x00ff00);
-    // this.createPointHelper(origin.clone().add(uN.clone().multiplyScalar(100)), true, 5, 0x0000ff);
+  //   // this.createPointHelper(origin.clone().add(U.clone().multiplyScalar(100)), true, 5, 0xff0000);
+  //   // this.createPointHelper(origin.clone().add(V.clone().multiplyScalar(100)), true, 5, 0x00ff00);
+  //   // this.createPointHelper(origin.clone().add(uN.clone().multiplyScalar(100)), true, 5, 0x0000ff);
 
-    const M = new Matrix4().set(origin.x, u.x, v.x, n.x, origin.y, u.y, v.y, n.y, origin.z, u.z, v.z, n.z, 1, 1, 1, 1).invert();
+  //   const M = new Matrix4().set(origin.x, u.x, v.x, n.x, origin.y, u.y, v.y, n.y, origin.z, u.z, v.z, n.z, 1, 1, 1, 1).invert();
 
-    const target = pointOnPlane.clone().applyMatrix4(M);
+  //   const target = pointOnPlane.clone().applyMatrix4(M);
 
-    return new Vector2(target.x, target.z);
-  }
+  //   return new Vector2(target.x, target.z);
+  // }
 
   computeVisibleTiles(
     previousTiles: Map2DTile[],
@@ -310,15 +310,20 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         const origin = map2dPlane.coplanarPoint(new Vector3());
         this.createPointHelper(origin, true, 10, 0x55eeee);
 
-        origin.sub(uOrigin);
-
-        const ux = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)).add(origin);
-        const uy = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(0, 50)).add(origin);
+        const u0 = origin.clone().sub(uOrigin);
+        const ux = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)).add(u0);
+        const uy = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(0, 50)).add(u0);
 
         this.createPointHelper(ux, true, 5, 0xff0000);
         this.createPointHelper(uy, true, 5, 0x00ff00);
 
-        const coords = this.toMap2DCoords(pointOnPlane3D, map2dPlane);
+        const vPop3D = pointOnPlane3D.clone().sub(origin);
+
+        vPop3D.applyMatrix4(matrixWorld.clone().invert());
+
+        const coords = new Vector2(vPop3D.x, vPop3D.z);
+
+        // const coords = this.toMap2DCoords(pointOnPlane3D, map2dPlane);
 
         // TODO remove me!
         const el = document.querySelector('.map2dCoords');

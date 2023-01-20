@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { CrossHair } from "../utils/CrossHair";
+import { Map2DCoords } from "../utils/Map2DCoords";
 import { DemoOrDie } from "./parallax-simple-kastani";
 
 const root = createRoot(document.getElementById("root"));
@@ -19,5 +20,6 @@ root.render(
       <Perf position="top-left" style={{ transform: "scale(0.8)" }} />
     </Canvas>
     <CrossHair />
+    <Map2DCoords />
   </>
 );
