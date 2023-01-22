@@ -33,6 +33,7 @@ interface TilePlaneBox {
   box?: Box3;
   worldBox?: Box3;
   map2dTile?: Map2DTile;
+  primary?: boolean;
 }
 
 const MAX_DEBUG_HELPERS = 9;
@@ -44,8 +45,6 @@ const makeTilePlaneBox = (id: string, x: number, y: number): TilePlaneBox => ({
   x,
   y,
 });
-
-const toPlaneCoords = (pointOnPlane: Vector3): Vector2 => new Vector2(pointOnPlane.x, pointOnPlane.z);
 
 const makePlaneOffsetTransform = (map2dTileCoords: Map2DTileCoordsUtil): Matrix4 =>
   new Matrix4().makeTranslation(map2dTileCoords.xOffset, 0, map2dTileCoords.yOffset);
@@ -286,7 +285,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.needsUpdate = false;
 
     const {matrixWorld} = node;
-    // const matrixWorldInverse = matrixWorld.clone().invert();
+    const matrixWorldInverse = matrixWorld.clone().invert();
 
     const [pointOnPlane3D, map2dPlane] = findPointOnPlaneThatIsInViewFrustum(
       camera,
@@ -299,16 +298,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#helpers.add(new PlaneHelper(map2dPlane, 100, 0x20f040), true);
 
       if (pointOnPlane3D) {
-        this.createPointHelper(pointOnPlane3D);
+        this.createPointHelper(pointOnPlane3D, true, 10, 0xc0c0c0);
 
         // const origin = this.makeCoplanarPoint(pointOnPlane3D, map2dPlane);
         // this.createPointHelper(anotherPoint, true, 10, 0xff0033);
 
         const uOrigin = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2());
-        this.createPointHelper(uOrigin, true, 10, 0xcccccc);
+        // this.createPointHelper(uOrigin, true, 10, 0xcccccc);
 
         const origin = map2dPlane.coplanarPoint(new Vector3());
-        this.createPointHelper(origin, true, 10, 0x55eeee);
+        this.createPointHelper(origin, true, 5, 0x406090);
 
         const u0 = origin.clone().sub(uOrigin);
         const ux = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)).add(u0);
@@ -316,20 +315,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
         this.createPointHelper(ux, true, 5, 0xff0000);
         this.createPointHelper(uy, true, 5, 0x00ff00);
-
-        const vPop3D = pointOnPlane3D.clone().sub(origin);
-
-        vPop3D.applyMatrix4(matrixWorld.clone().invert());
-
-        const coords = new Vector2(vPop3D.x, vPop3D.z);
-
-        // const coords = this.toMap2DCoords(pointOnPlane3D, map2dPlane);
-
-        // TODO remove me!
-        const el = document.querySelector('.map2dCoords');
-        if (el) {
-          el.textContent = coords.toArray().map(Math.round).join(', ');
-        }
       }
     }
 
@@ -341,7 +326,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
-    const planeCoords2D = toPlaneCoords(pointOnPlane3D);
+    const planeCoords2D = this.toPlaneCoords2D(map2dPlane, pointOnPlane3D, matrixWorldInverse);
+
+    // TODO remove me!
+    if (this.showHelpers) {
+      const el = document.querySelector('.map2dCoords');
+      if (el) {
+        el.textContent = planeCoords2D.toArray().map(Math.round).join(', ');
+      }
+    }
+
     const centerPoint2D = new Vector2(centerX, centerY);
 
     if (this.lookAtCenter) {
@@ -370,7 +364,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       new Matrix4().makeTranslation(-centerPoint2D.x + translate.x, translate.y, -centerPoint2D.y + translate.z),
     );
 
-    const boxWorldTransform = matrixWorld.clone();
+    const boxWorldTransform = matrixWorld; // .clone();
     // const boxWorldTransform = matrixWorld.clone().multiply(new Matrix4().makeTranslation(translate.x, translate.y, translate.z));
     // .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
 
@@ -395,6 +389,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return visibleTiles;
   }
 
+  private toPlaneCoords2D(map2dPlane: Plane, pointOnPlane3D: Vector3, matrixWorldInverse: Matrix4) {
+    const origin = map2dPlane.coplanarPoint(new Vector3());
+
+    const v = pointOnPlane3D.clone().sub(origin).applyMatrix4(matrixWorldInverse);
+
+    return new Vector2(v.x, v.z);
+  }
+
   private findAllVisibleTiles(
     cameraFrustum: Frustum,
     planeTileCoords: TilesWithinCoords,
@@ -413,6 +415,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         planeTileCoords.tileTop,
       ),
     ];
+
+    next[0].primary = true;
 
     const reuseTiles: Map2DTile[] = [];
     const createTiles: Map2DTile[] = [];
@@ -485,16 +489,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createTileHelpers(visibles: TilePlaneBox[]) {
-    for (const [i, {box, worldBox}] of visibles.entries()) {
+    for (const [i, {box, worldBox, primary}] of visibles.entries()) {
       if (i > MAX_DEBUG_HELPERS) {
         break;
       }
-      const isFirst = i === 0;
       if (box != null) {
-        this.createHelper(box, -0.01, new Color(isFirst ? 0xff0066 : 0x772222), false);
+        this.createHelper(box, -0.01, new Color(primary ? 0xff0066 : 0x772222), false);
       }
       if (worldBox != null) {
-        this.createHelper(worldBox, -0.015, new Color(isFirst ? 0xffff00 : 0x777722), true);
+        this.createHelper(worldBox, -0.015, new Color(primary ? 0xffffff : 0x777777), true);
       }
     }
   }
