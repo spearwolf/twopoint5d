@@ -7,9 +7,6 @@ const Map2DCoordsContainer = styled.section`
 `;
 
 const Map2DCoordsText = styled.div`
-  border: 1px solid #fff;
-  border-radius: 3px;
-  padding: 0.05em 0.2em 0.1em;
   color: #fff;
   font-size: 1.5rem;
   font-weight: bold;

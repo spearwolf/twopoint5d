@@ -141,7 +141,11 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
   reuseTile(tile: Map2DTile): void {
     if (!this.#isReady) return;
 
-    if (!this.#tiles.has(tile.id)) {
+    const sprite = this.#tiles.get(tile.id);
+    if (sprite) {
+      sprite.setInstancePosition([tile.view.left, 0, tile.view.top]);
+      ++this.#curUpdateSerial;
+    } else {
       this.addTile(tile);
     }
   }

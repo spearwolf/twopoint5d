@@ -12,7 +12,7 @@ const root = createRoot(document.getElementById("root"));
 
 root.render(
   <>
-    <Leva titleBar />
+    <Leva titleBar collapsed />
     <Canvas dpr={[1, 2]} camera={{ position: [100, 350, 600], far: 25000 }}>
       <StrictMode>
         <DemoOrDie />

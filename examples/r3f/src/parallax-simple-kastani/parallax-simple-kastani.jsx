@@ -118,8 +118,12 @@ export const Map2DImageLayer = ({
             vertical={vertical}
           />
           <TileSetRef name={name} attach="tileSet" />
-          <TileSpritesGeometry capacity={100} />
-          <TileSpritesMaterial fogColor={[0.1, 0.1, 0.4, 1]} fogFar={1500}>
+          <TileSpritesGeometry capacity={20000} />
+          <TileSpritesMaterial
+            fogColor={[0.1, 0.1, 0.3, 1]}
+            fogNear={500}
+            fogFar={2500}
+          >
             <TextureRef name={name} attach="colorMap" />
           </TileSpritesMaterial>
         </Map2DTileSprites>
@@ -132,10 +136,10 @@ const xyTransform = new Matrix4().makeRotationFromEuler(
   new Euler(MathUtils.degToRad(90), 0, 0)
 );
 
-const forefrontTransform = new Matrix4().makeTranslation(0, 300, 0); // 0, 225, -200);
-const frontTransform = new Matrix4().makeTranslation(0, 250, 0); // 0, 270, -100);
-const middleTransform = new Matrix4().makeTranslation(0, 0, 0); // 0, 90, 0);
-const backTransform = new Matrix4().makeTranslation(0, -250, 0); // 0, -180, 150);
+const forefrontTransform = new Matrix4().makeTranslation(0, 300, -290);
+const frontTransform = new Matrix4().makeTranslation(0, 200, -30);
+const middleTransform = new Matrix4().makeTranslation(0, 0, -40);
+const backTransform = new Matrix4().makeTranslation(0, -220, 200);
 
 export const DemoOrDie = () => {
   const [center, setCenter] = useState({ x: 0, y: 0 });
@@ -145,7 +149,7 @@ export const DemoOrDie = () => {
   useEffect(printDebugUsageInfo);
 
   const { showBox } = useControls({
-    showBox: true,
+    showBox: false,
     printGraph2console: button(() => {
       if (rootNode.current) {
         printSceneGraphToConsole(rootNode.current, true);
@@ -210,8 +214,9 @@ export const DemoOrDie = () => {
           plane="xy"
           origin="bottom left"
           height={800}
-          distanceToProjectionPlane={800}
-          far={5000}
+          distanceToProjectionPlane={1500}
+          near={0.01}
+          far={10000}
           fit="contain"
         />
       </Stage2D>

@@ -32,6 +32,7 @@ interface TileBox {
   coords?: TilesWithinCoords;
   box?: Box3;
   worldBox?: Box3;
+  worldCenter?: Vector3;
   map2dTile?: Map2DTile;
   primary?: boolean;
 }
@@ -40,7 +41,8 @@ const MAX_DEBUG_HELPERS = 10;
 
 const toBoxId = (x: number, y: number) => `${x},${y}`;
 
-const toAABB2 = ({top, left, width, height}: TilesWithinCoords): AABB2 => new AABB2(left, top, width, height);
+const toAABB2 = ({top, left, width, height}: TilesWithinCoords, xOffset: number, yOffset: number): AABB2 =>
+  new AABB2(left + xOffset, top + yOffset, width, height);
 
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
   new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
@@ -69,7 +71,7 @@ function findPointOnPlaneThatIsInViewFrustum(
   plane: Plane,
   tileCoords: Map2DTileCoordsUtil,
   matrixWorld: Matrix4,
-): [Vector3, Plane] {
+): [Vector3, Plane, Vector3] {
   const camWorldDir = camera.getWorldDirection(new Vector3()).setLength(camera.far);
   const camWorldPos = new Vector3().setFromMatrixPosition(camera.matrixWorld);
 
@@ -82,11 +84,11 @@ function findPointOnPlaneThatIsInViewFrustum(
 
   // const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
   // const projectPlane = plane.clone().applyMatrix4(planeOffset).applyMatrix4(matrixWorld);
-  const projectPlane = applyToPlane(plane, tileCoords, matrixWorld);
+  const planeWorld = applyToPlane(plane, tileCoords, matrixWorld);
 
-  const poi = projectPlane.intersectLine(lineOfSight, new Vector3());
+  const poi = planeWorld.intersectLine(lineOfSight, new Vector3());
 
-  return [poi, projectPlane];
+  return [poi, planeWorld, camWorldPos];
 }
 
 /**
@@ -106,6 +108,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #depth = 100;
 
   #camera?: PerspectiveCamera | OrthographicCamera;
+  #cameraWorldPosition = new Vector3();
+
+  #matrixWorld = new Matrix4();
+  #matrixWorldInverse = new Matrix4();
 
   #showHelpers = false;
 
@@ -203,11 +209,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#showHelpers = showHelpers;
   }
 
-  private saveUpdateState(camera: PerspectiveCamera | OrthographicCamera) {
-    this.#lastUpdateState.cameraMatrixWorld.copy(camera.matrixWorld);
-    this.#lastUpdateState.cameraProjectionMatrix.copy(camera.projectionMatrix);
-  }
-
   computeVisibleTiles(
     previousTiles: Map2DTile[],
     [centerX, centerY]: [number, number],
@@ -229,25 +230,25 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       console.group('[CameraBasedVisibility] computeVisibleTiles:', node?.name);
     }
 
-    const camera = this.#camera;
-    camera.updateMatrixWorld();
-    camera.updateProjectionMatrix();
+    this.updateCamera();
 
-    this.saveUpdateState(camera); // TODO save parentNode->matrixWorld ?
+    this.#matrixWorld.copy(node.matrixWorld);
+    this.#matrixWorldInverse.copy(node.matrixWorld).invert();
+
+    this.saveUpdateState(); // TODO save parentNode->matrixWorld ?
     this.needsUpdate = false;
 
-    const {matrixWorld} = node;
-    const matrixWorldInverse = matrixWorld.clone().invert();
-
-    const [pointOnPlane3D, map2dPlane] = findPointOnPlaneThatIsInViewFrustum(
-      camera,
+    const [pointOnPlane3D, planeWorld, cameraWorldPosition] = findPointOnPlaneThatIsInViewFrustum(
+      this.#camera,
       CameraBasedVisibility.Plane,
       map2dTileCoords,
-      matrixWorld,
+      this.#matrixWorld,
     );
 
+    this.#cameraWorldPosition.copy(cameraWorldPosition);
+
     if (this.showHelpers) {
-      this.#helpers.add(new PlaneHelper(map2dPlane, 100, 0x20f040), true);
+      this.#helpers.add(new PlaneHelper(planeWorld, 100, 0x20f040), true);
 
       if (pointOnPlane3D) {
         this.createPointHelper(pointOnPlane3D, true, 10, 0xc0c0c0);
@@ -255,15 +256,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         // const origin = this.makeCoplanarPoint(pointOnPlane3D, map2dPlane);
         // this.createPointHelper(anotherPoint, true, 10, 0xff0033);
 
-        const uOrigin = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2());
+        const uOrigin = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2());
         // this.createPointHelper(uOrigin, true, 10, 0xcccccc);
 
-        const origin = map2dPlane.coplanarPoint(new Vector3());
+        const origin = planeWorld.coplanarPoint(new Vector3());
         this.createPointHelper(origin, true, 5, 0x406090);
 
         const u0 = origin.clone().sub(uOrigin);
-        const ux = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(50, 0)).add(u0);
-        const uy = makePointOnPlane(map2dTileCoords, matrixWorld, new Vector2(0, 50)).add(u0);
+        const ux = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2(50, 0)).add(u0);
+        const uy = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2(0, 50)).add(u0);
 
         this.createPointHelper(ux, true, 5, 0xff0000);
         this.createPointHelper(uy, true, 5, 0x00ff00);
@@ -278,7 +279,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
-    const planeCoords2D = this.toPlaneCoords2D(map2dPlane, pointOnPlane3D, matrixWorldInverse);
+    const planeCoords2D = this.toPlaneCoords2D(planeWorld, pointOnPlane3D);
 
     // TODO remove me!
     if (this.showHelpers) {
@@ -300,9 +301,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const offset = new Vector2(map2dTileCoords.xOffset - centerPoint2D.x, map2dTileCoords.yOffset - centerPoint2D.y);
 
-    const translate = new Vector3().setFromMatrixPosition(matrixWorld);
+    const translate = new Vector3().setFromMatrixPosition(this.#matrixWorld);
 
-    const frustum = makeCameraFrustum(camera);
+    const frustum = makeCameraFrustum(this.#camera);
 
     if (isDebug) {
       console.log({
@@ -318,18 +319,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       map2dTileCoords.yOffset - centerPoint2D.y + translate.z,
     );
 
-    const boxWorldTransform = matrixWorld; // .clone();
-    // const boxWorldTransform = matrixWorld.clone().multiply(new Matrix4().makeTranslation(translate.x, translate.y, translate.z));
-    // .multiply(new Matrix4().makeTranslation(offset.x + translate.x, translate.y, offset.y + translate.z));
-
-    const visibleTiles = this.findAllVisibleTiles(
-      frustum,
-      tiles,
-      map2dTileCoords,
-      boxTransform,
-      boxWorldTransform,
-      previousTiles.slice(0),
-    );
+    const visibleTiles = this.findAllVisibleTiles(frustum, tiles, map2dTileCoords, boxTransform, previousTiles.slice(0), isDebug);
 
     visibleTiles.offset.copy(offset);
     visibleTiles.translate.copy(translate);
@@ -343,21 +333,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return visibleTiles;
   }
 
-  private toPlaneCoords2D(map2dPlane: Plane, pointOnPlane3D: Vector3, matrixWorldInverse: Matrix4) {
-    const origin = map2dPlane.coplanarPoint(new Vector3());
-
-    const v = pointOnPlane3D.clone().sub(origin).applyMatrix4(matrixWorldInverse);
-
-    return new Vector2(v.x, v.z);
-  }
-
   private findAllVisibleTiles(
     cameraFrustum: Frustum,
     primaryTiles: TilesWithinCoords,
     map2dTileCoords: Map2DTileCoordsUtil,
-    boxTransform: Matrix4,
-    boxWorldTransform: Matrix4,
+    transform: Matrix4,
     previousTiles: Map2DTile[],
+    isDebug: boolean,
   ): Map2DVisibleTiles | undefined {
     const visibles: TileBox[] = [];
     const visitedIds = new Set<string>();
@@ -387,14 +369,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(boxTransform);
+        tile.worldCenter = new Vector3(
+          tile.coords.left + tile.coords.width / 2,
+          0,
+          tile.coords.top + tile.coords.height / 2,
+        ).applyMatrix4(transform);
 
-        tile.worldBox = tile.box.clone().applyMatrix4(boxWorldTransform);
+        // TODO rename to frustumBox and make sclae factor configurable
+        tile.worldBox ??= this.makeTileBox(tile.coords, 1.1).applyMatrix4(transform).applyMatrix4(this.#matrixWorld);
 
         if (cameraFrustum.intersectsBox(tile.worldBox)) {
           visibles.push(tile);
 
-          tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords));
+          tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(transform);
+
+          tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
 
           const previousTilesIndex = findTileIndex(previousTiles, Map2DTile.createID(tile.x, tile.y));
 
@@ -403,6 +392,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             reuseTiles.push(tile.map2dTile);
           } else {
             createTiles.push(tile.map2dTile);
+          }
+
+          if (isDebug) {
+            console.log('tile', previousTilesIndex >= 0 ? '(reuse)' : '(new)', tile);
           }
 
           [
@@ -417,6 +410,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           ].forEach(([dx, dy]) => {
             const [tx, ty] = [tile.coords.tileLeft + dx, tile.coords.tileTop + dy];
             const tileId = toBoxId(tx, ty);
+
             if (!visitedIds.has(tileId)) {
               // TODO should we look at the distance of the tile from the camera here?
               next.push({
@@ -443,6 +437,25 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       offset: new Vector2(),
       translate: new Vector3(),
     };
+  }
+
+  private toPlaneCoords2D(map2dPlane: Plane, pointOnPlane3D: Vector3) {
+    const origin = map2dPlane.coplanarPoint(new Vector3());
+
+    const v = pointOnPlane3D.clone().sub(origin).applyMatrix4(this.#matrixWorldInverse);
+
+    return new Vector2(v.x, v.z);
+  }
+
+  private saveUpdateState() {
+    this.#lastUpdateState.cameraMatrixWorld.copy(this.#camera.matrixWorld);
+    this.#lastUpdateState.cameraProjectionMatrix.copy(this.#camera.projectionMatrix);
+  }
+
+  private updateCamera() {
+    const camera = this.#camera;
+    camera.updateMatrixWorld();
+    camera.updateProjectionMatrix();
   }
 
   private createTileHelpers(visibles: TileBox[]) {
@@ -474,8 +487,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#helpers.add(helper, addToRoot);
   }
 
-  private makeTileBox({top, left, width, height}: TilesWithinCoords): Box3 {
-    return new Box3(new Vector3(left, this.ground, top), new Vector3(left + width, this.ceiling, top + height));
+  private makeTileBox({top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
+    const w = width * scale - width;
+    const h = height * scale - height;
+    return new Box3(new Vector3(left - w, this.ground, top - h), new Vector3(left + width + w, this.ceiling, top + height + h));
   }
 
   addToScene(scene: Object3D<Event>): void {
