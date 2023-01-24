@@ -31,7 +31,7 @@ interface TileBox {
   y: number;
   coords?: TilesWithinCoords;
   box?: Box3;
-  worldBox?: Box3;
+  frustumBox?: Box3;
   worldCenter?: Vector3;
   map2dTile?: Map2DTile;
   primary?: boolean;
@@ -103,6 +103,8 @@ function findPointOnPlaneThatIsInViewFrustum(
 export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
 
+  frustumBoxScale = 1.1;
+
   #lookAtCenter = false;
 
   #depth = 100;
@@ -153,14 +155,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   get depth(): number {
     return this.#depth;
-  }
-
-  get ground(): number {
-    return Math.abs(this.depth) / -2;
-  }
-
-  get ceiling(): number {
-    return Math.abs(this.depth) / 2;
   }
 
   get needsUpdate(): boolean {
@@ -375,13 +369,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           tile.coords.top + tile.coords.height / 2,
         ).applyMatrix4(transform);
 
-        // TODO rename to frustumBox and make sclae factor configurable
-        tile.worldBox ??= this.makeTileBox(tile.coords, 1.1).applyMatrix4(transform).applyMatrix4(this.#matrixWorld);
+        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale)
+          .applyMatrix4(transform)
+          .applyMatrix4(this.#matrixWorld);
 
-        if (cameraFrustum.intersectsBox(tile.worldBox)) {
+        if (cameraFrustum.intersectsBox(tile.frustumBox)) {
           visibles.push(tile);
 
-          tile.box ??= this.makeTileBox(tile.coords).applyMatrix4(transform);
+          tile.box ??= this.makeBox(tile.coords).applyMatrix4(transform);
 
           tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
 
@@ -459,15 +454,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createTileHelpers(visibles: TileBox[]) {
-    for (const [i, {box, worldBox, primary}] of visibles.entries()) {
+    for (const [i, {box, frustumBox, primary}] of visibles.entries()) {
       if (i > MAX_DEBUG_HELPERS) {
         break;
       }
       if (box != null) {
         this.createHelper(box, -0.01, new Color(primary ? 0xff0066 : 0x772222), false);
       }
-      if (worldBox != null) {
-        this.createHelper(worldBox, -0.015, new Color(primary ? 0xffffff : 0x777777), true);
+      if (frustumBox != null) {
+        this.createHelper(frustumBox, -0.015, new Color(primary ? 0xffffff : 0x777777), true);
       }
     }
   }
@@ -487,10 +482,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#helpers.add(helper, addToRoot);
   }
 
-  private makeTileBox({top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
-    const w = width * scale - width;
-    const h = height * scale - height;
-    return new Box3(new Vector3(left - w, this.ground, top - h), new Vector3(left + width + w, this.ceiling, top + height + h));
+  private makeBox({top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
+    const sw = width * scale - width;
+    const sh = height * scale - height;
+    const ground = this.#depth * -0.5 * scale;
+    const ceiling = this.#depth * 0.5 * scale;
+    return new Box3(new Vector3(left - sw, ground, top - sh), new Vector3(left + width + sw, ceiling, top + height + sh));
   }
 
   addToScene(scene: Object3D<Event>): void {
