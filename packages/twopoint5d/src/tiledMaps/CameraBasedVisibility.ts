@@ -32,64 +32,28 @@ interface TileBox {
   coords?: TilesWithinCoords;
   box?: Box3;
   frustumBox?: Box3;
-  worldCenter?: Vector3;
+  centerWorld?: Vector3;
   map2dTile?: Map2DTile;
   primary?: boolean;
 }
 
 const MAX_DEBUG_HELPERS = 10;
 
+const _v = new Vector3();
+const _m = new Matrix4();
+
+const _boxTransform = new Matrix4();
+const _boxTransformWorld = new Matrix4();
+
 const toBoxId = (x: number, y: number) => `${x},${y}`;
 
 const toAABB2 = ({top, left, width, height}: TilesWithinCoords, xOffset: number, yOffset: number): AABB2 =>
   new AABB2(left + xOffset, top + yOffset, width, height);
 
-const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera): Frustum =>
-  new Frustum().setFromProjectionMatrix(camera.projectionMatrix.clone().multiply(camera.matrixWorld.clone().invert()));
+const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, target = new Frustum()): Frustum =>
+  target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
-
-function applyToPlane(plane: Plane, map2dTileCoords: Map2DTileCoordsUtil, matrixWorld: Matrix4, map2dPoint?: Vector2): Plane {
-  const planeOffset = new Matrix4().makeTranslation(
-    map2dTileCoords.xOffset + (map2dPoint?.x ?? 0),
-    0,
-    map2dTileCoords.yOffset + (map2dPoint?.y ?? 0),
-  );
-  return plane.clone().applyMatrix4(planeOffset).applyMatrix4(matrixWorld);
-}
-
-const makePointOnPlane = (map2dTileCoords: Map2DTileCoordsUtil, matrixWorld: Matrix4, map2dPoint: Vector2): Vector3 => {
-  return new Vector3(
-    map2dTileCoords.xOffset + (map2dPoint?.x ?? 0),
-    0,
-    map2dTileCoords.yOffset + (map2dPoint?.y ?? 0),
-  ).applyMatrix4(matrixWorld);
-};
-
-function findPointOnPlaneThatIsInViewFrustum(
-  camera: PerspectiveCamera | OrthographicCamera,
-  plane: Plane,
-  tileCoords: Map2DTileCoordsUtil,
-  matrixWorld: Matrix4,
-): [Vector3, Plane, Vector3] {
-  const camWorldDir = camera.getWorldDirection(new Vector3()).setLength(camera.far);
-  const camWorldPos = new Vector3().setFromMatrixPosition(camera.matrixWorld);
-
-  const lineOfSightEnd = camWorldDir.clone().add(camWorldPos);
-  const lineOfSight = new Line3(camWorldPos, lineOfSightEnd);
-
-  // TODO check all frame corners of the view frustum instead of the view frustum center?
-  //   however, we would then need another way to define the centerPoint of the frustum
-  //   -> the camera line-of-sight-target point that lies on the plane
-
-  // const planeOffset = makePlaneOffsetTransform(map2dTileCoords);
-  // const projectPlane = plane.clone().applyMatrix4(planeOffset).applyMatrix4(matrixWorld);
-  const planeWorld = applyToPlane(plane, tileCoords, matrixWorld);
-
-  const poi = planeWorld.intersectLine(lineOfSight, new Vector3());
-
-  return [poi, planeWorld, camWorldPos];
-}
 
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xz plane.
@@ -112,8 +76,20 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #camera?: PerspectiveCamera | OrthographicCamera;
   #cameraWorldPosition = new Vector3();
 
+  #planeWorld = CameraBasedVisibility.Plane.clone();
+  #planeOrigin = new Vector3();
+
+  #pointOnPlane?: Vector3;
+
+  #planeCoords2D = new Vector2();
+  #centerPoint2D = new Vector2();
+
   #matrixWorld = new Matrix4();
   #matrixWorldInverse = new Matrix4();
+
+  #cameraFrustum = new Frustum();
+
+  #map2dTileCoords = new Map2DTileCoordsUtil();
 
   #showHelpers = false;
 
@@ -209,6 +185,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     map2dTileCoords: Map2DTileCoordsUtil,
     node: Object3D,
   ): Map2DVisibleTiles | undefined {
+    this.#centerPoint2D.set(centerX, centerY);
+    this.#map2dTileCoords = map2dTileCoords;
+
     if (!this.hasCamera) {
       return undefined;
     }
@@ -224,7 +203,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       console.group('[CameraBasedVisibility] computeVisibleTiles:', node?.name);
     }
 
-    this.updateCamera();
+    this.#camera.updateMatrixWorld();
+    this.#camera.updateProjectionMatrix();
 
     this.#matrixWorld.copy(node.matrixWorld);
     this.#matrixWorldInverse.copy(node.matrixWorld).invert();
@@ -232,37 +212,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.saveUpdateState(); // TODO save parentNode->matrixWorld ?
     this.needsUpdate = false;
 
-    const [pointOnPlane3D, planeWorld, cameraWorldPosition] = findPointOnPlaneThatIsInViewFrustum(
-      this.#camera,
-      CameraBasedVisibility.Plane,
-      map2dTileCoords,
-      this.#matrixWorld,
-    );
+    const pointOnPlane3D = this.findPointOnPlaneThatIsInViewFrustum();
 
-    this.#cameraWorldPosition.copy(cameraWorldPosition);
+    if (pointOnPlane3D != null) {
+      if (this.#pointOnPlane == null) {
+        this.#pointOnPlane = pointOnPlane3D;
+      } else {
+        this.#pointOnPlane.copy(pointOnPlane3D);
+      }
+    } else {
+      this.#pointOnPlane = null;
+    }
+
+    this.#planeWorld.coplanarPoint(this.#planeOrigin);
 
     if (this.showHelpers) {
-      this.#helpers.add(new PlaneHelper(planeWorld, 100, 0x20f040), true);
-
-      if (pointOnPlane3D) {
-        this.createPointHelper(pointOnPlane3D, true, 10, 0xc0c0c0);
-
-        // const origin = this.makeCoplanarPoint(pointOnPlane3D, map2dPlane);
-        // this.createPointHelper(anotherPoint, true, 10, 0xff0033);
-
-        const uOrigin = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2());
-        // this.createPointHelper(uOrigin, true, 10, 0xcccccc);
-
-        const origin = planeWorld.coplanarPoint(new Vector3());
-        this.createPointHelper(origin, true, 5, 0x406090);
-
-        const u0 = origin.clone().sub(uOrigin);
-        const ux = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2(50, 0)).add(u0);
-        const uy = makePointOnPlane(map2dTileCoords, this.#matrixWorld, new Vector2(0, 50)).add(u0);
-
-        this.createPointHelper(ux, true, 5, 0xff0000);
-        this.createPointHelper(uy, true, 5, 0x00ff00);
-      }
+      this.createPlaneHelpers();
     }
 
     if (pointOnPlane3D == null) {
@@ -273,50 +238,23 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
-    const planeCoords2D = this.toPlaneCoords2D(planeWorld, pointOnPlane3D);
+    this.convertToPlaneCoords2D(pointOnPlane3D, this.#planeCoords2D);
+
+    if (this.lookAtCenter) {
+      this.#centerPoint2D.sub(this.#planeCoords2D);
+    }
+
+    this.#planeCoords2D.add(this.#centerPoint2D);
 
     // TODO remove me!
     if (this.showHelpers) {
       const el = document.querySelector('.map2dCoords');
       if (el) {
-        el.textContent = planeCoords2D.toArray().map(Math.round).join(', ');
+        el.textContent = this.#planeCoords2D.toArray().map(Math.round).join(', ');
       }
     }
 
-    const centerPoint2D = new Vector2(centerX, centerY);
-
-    if (this.lookAtCenter) {
-      centerPoint2D.sub(planeCoords2D);
-    }
-
-    planeCoords2D.add(centerPoint2D);
-
-    const tiles = map2dTileCoords.computeTilesWithinCoords(planeCoords2D.x, planeCoords2D.y, 1, 1);
-
-    const offset = new Vector2(map2dTileCoords.xOffset - centerPoint2D.x, map2dTileCoords.yOffset - centerPoint2D.y);
-
-    const translate = new Vector3().setFromMatrixPosition(this.#matrixWorld);
-
-    const frustum = makeCameraFrustum(this.#camera);
-
-    if (isDebug) {
-      console.log({
-        planeCoords: planeCoords2D,
-        centerPoint: centerPoint2D,
-        tiles,
-      });
-    }
-
-    const boxTransform = new Matrix4().makeTranslation(
-      map2dTileCoords.xOffset - centerPoint2D.x + translate.x,
-      translate.y,
-      map2dTileCoords.yOffset - centerPoint2D.y + translate.z,
-    );
-
-    const visibleTiles = this.findAllVisibleTiles(frustum, tiles, map2dTileCoords, boxTransform, previousTiles.slice(0), isDebug);
-
-    visibleTiles.offset.copy(offset);
-    visibleTiles.translate.copy(translate);
+    const visibleTiles = this.findVisibleTiles(previousTiles.slice(0));
 
     if (isDebug) {
       console.log('visibleTiles:', visibleTiles.tiles.length);
@@ -327,19 +265,55 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return visibleTiles;
   }
 
-  private findAllVisibleTiles(
-    cameraFrustum: Frustum,
-    primaryTiles: TilesWithinCoords,
-    map2dTileCoords: Map2DTileCoordsUtil,
-    transform: Matrix4,
-    previousTiles: Map2DTile[],
-    isDebug: boolean,
-  ): Map2DVisibleTiles | undefined {
+  private findPointOnPlaneThatIsInViewFrustum(): Vector3 | null | undefined {
+    const camWorldDir = this.#camera.getWorldDirection(_v).setLength(this.#camera.far);
+    this.#cameraWorldPosition.setFromMatrixPosition(this.#camera.matrixWorld);
+
+    const lineOfSightEnd = camWorldDir.clone().add(this.#cameraWorldPosition);
+    const lineOfSight = new Line3(this.#cameraWorldPosition, lineOfSightEnd);
+
+    // TODO check all frame corners of the view frustum instead of the view frustum center?
+    //   however, we would then need another way to define the centerPoint of the frustum
+    //   -> the camera line-of-sight-target point that lies on the plane
+
+    this.#planeWorld
+      .copy(CameraBasedVisibility.Plane)
+      .applyMatrix4(_m.makeTranslation(this.#map2dTileCoords.xOffset, 0, this.#map2dTileCoords.yOffset))
+      .applyMatrix4(this.#matrixWorld);
+
+    return this.#planeWorld.intersectLine(lineOfSight, new Vector3());
+  }
+
+  private findVisibleTiles(previousTiles: Map2DTile[]): Map2DVisibleTiles | undefined {
+    makeCameraFrustum(this.#camera, this.#cameraFrustum);
+
+    const primaryTiles = this.#map2dTileCoords.computeTilesWithinCoords(this.#planeCoords2D.x, this.#planeCoords2D.y, 1, 1);
+
+    const translate = new Vector3().setFromMatrixPosition(this.#matrixWorld);
+
+    const isDebug = this.debugNextVisibleTiles;
+
+    if (isDebug) {
+      console.log({
+        planeCoords: this.#planeCoords2D,
+        centerPoint: this.#centerPoint2D,
+        primaryTiles,
+      });
+    }
+
+    _boxTransform.makeTranslation(
+      this.#map2dTileCoords.xOffset - this.#centerPoint2D.x + translate.x,
+      translate.y,
+      this.#map2dTileCoords.yOffset - this.#centerPoint2D.y + translate.z,
+    );
+
+    _boxTransformWorld.copy(_boxTransform).multiply(this.#matrixWorld);
+
     const visibles: TileBox[] = [];
     const visitedIds = new Set<string>();
 
     const next: TileBox[] = [
-      // TODO create _all_ primary tiles
+      // TODO create _all_ primary tiles ?!
       {
         id: toBoxId(primaryTiles.tileLeft, primaryTiles.tileTop),
         x: primaryTiles.tileLeft,
@@ -356,27 +330,27 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       if (!visitedIds.has(tile.id)) {
         visitedIds.add(tile.id);
 
-        tile.coords ??= map2dTileCoords.computeTilesWithinCoords(
+        tile.coords ??= this.#map2dTileCoords.computeTilesWithinCoords(
           tile.x * primaryTiles.tileWidth,
           tile.y * primaryTiles.tileHeight,
           1,
           1,
         );
 
-        tile.worldCenter = new Vector3(
+        tile.centerWorld = new Vector3(
           tile.coords.left + tile.coords.width / 2,
           0,
           tile.coords.top + tile.coords.height / 2,
-        ).applyMatrix4(transform);
+        ).applyMatrix4(_boxTransformWorld);
 
-        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale)
-          .applyMatrix4(transform)
-          .applyMatrix4(this.#matrixWorld);
+        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale).applyMatrix4(_boxTransformWorld);
 
-        if (cameraFrustum.intersectsBox(tile.frustumBox)) {
+        if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
           visibles.push(tile);
 
-          tile.box ??= this.makeBox(tile.coords).applyMatrix4(transform);
+          if (isDebug) {
+            tile.box ??= this.makeBox(tile.coords).applyMatrix4(_boxTransform);
+          }
 
           tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
 
@@ -419,27 +393,40 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       }
     }
 
+    const offset = new Vector2(
+      this.#map2dTileCoords.xOffset - this.#centerPoint2D.x,
+      this.#map2dTileCoords.yOffset - this.#centerPoint2D.y,
+    );
+
     if (this.showHelpers) {
       this.createTileHelpers(visibles);
     }
 
     return {
       tiles: visibles.map((visible) => visible.map2dTile),
+
       createTiles,
       reuseTiles,
 
       removeTiles: previousTiles,
-      offset: new Vector2(),
-      translate: new Vector3(),
+      offset,
+      translate,
     };
   }
 
-  private toPlaneCoords2D(map2dPlane: Plane, pointOnPlane3D: Vector3) {
-    const origin = map2dPlane.coplanarPoint(new Vector3());
+  private makePointOnPlane(point?: Vector2): Vector3 {
+    return new Vector3(
+      this.#map2dTileCoords.xOffset + (point?.x ?? 0),
+      0,
+      this.#map2dTileCoords.yOffset + (point?.y ?? 0),
+    ).applyMatrix4(this.#matrixWorld);
+  }
 
-    const v = pointOnPlane3D.clone().sub(origin).applyMatrix4(this.#matrixWorldInverse);
+  private convertToPlaneCoords2D(pointOnPlane3D: Vector3, target: Vector2) {
+    _v.copy(pointOnPlane3D);
+    _v.sub(this.#planeOrigin).applyMatrix4(this.#matrixWorldInverse);
 
-    return new Vector2(v.x, v.z);
+    target.set(_v.x, _v.z);
   }
 
   private saveUpdateState() {
@@ -447,10 +434,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#lastUpdateState.cameraProjectionMatrix.copy(this.#camera.projectionMatrix);
   }
 
-  private updateCamera() {
-    const camera = this.#camera;
-    camera.updateMatrixWorld();
-    camera.updateProjectionMatrix();
+  private createPlaneHelpers() {
+    this.#helpers.add(new PlaneHelper(this.#planeWorld, 100, 0x20f040), true);
+
+    if (this.#pointOnPlane) {
+      this.createPointHelper(this.#pointOnPlane, true, 10, 0xc0c0c0);
+    }
+
+    this.createPointHelper(this.#planeOrigin, true, 5, 0x406090);
+
+    const uOrigin = this.makePointOnPlane(new Vector2());
+    const u0 = this.#planeOrigin.clone().sub(uOrigin);
+    const ux = this.makePointOnPlane(new Vector2(50, 0)).add(u0);
+    const uy = this.makePointOnPlane(new Vector2(0, 50)).add(u0);
+
+    this.createPointHelper(ux, true, 5, 0xff0000);
+    this.createPointHelper(uy, true, 5, 0x00ff00);
   }
 
   private createTileHelpers(visibles: TileBox[]) {
