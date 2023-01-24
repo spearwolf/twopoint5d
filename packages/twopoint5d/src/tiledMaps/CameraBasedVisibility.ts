@@ -196,13 +196,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#helpers.remove();
     }
 
-    const isDebug = this.debugNextVisibleTiles;
-
-    if (isDebug) {
-      this.debugNextVisibleTiles = false;
-      console.group('[CameraBasedVisibility] computeVisibleTiles:', node?.name);
-    }
-
     this.#camera.updateMatrixWorld();
     this.#camera.updateProjectionMatrix();
 
@@ -231,10 +224,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     if (pointOnPlane3D == null) {
-      if (isDebug) {
-        console.log('no point on plane found!');
-        console.groupEnd();
-      }
       return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
     }
 
@@ -254,15 +243,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       }
     }
 
-    const visibleTiles = this.findVisibleTiles(previousTiles.slice(0));
-
-    if (isDebug) {
-      console.log('visibleTiles:', visibleTiles.tiles.length);
-      console.dir(visibleTiles);
-      console.groupEnd();
-    }
-
-    return visibleTiles;
+    return this.findVisibleTiles(previousTiles.slice(0));
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | null | undefined {
@@ -290,16 +271,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const primaryTiles = this.#map2dTileCoords.computeTilesWithinCoords(this.#planeCoords2D.x, this.#planeCoords2D.y, 1, 1);
 
     const translate = new Vector3().setFromMatrixPosition(this.#matrixWorld);
-
-    const isDebug = this.debugNextVisibleTiles;
-
-    if (isDebug) {
-      console.log({
-        planeCoords: this.#planeCoords2D,
-        centerPoint: this.#centerPoint2D,
-        primaryTiles,
-      });
-    }
 
     _boxTransform.makeTranslation(
       this.#map2dTileCoords.xOffset - this.#centerPoint2D.x + translate.x,
@@ -348,7 +319,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
           visibles.push(tile);
 
-          if (isDebug) {
+          if (this.debugNextVisibleTiles) {
             tile.box ??= this.makeBox(tile.coords).applyMatrix4(_boxTransform);
           }
 
@@ -361,10 +332,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             reuseTiles.push(tile.map2dTile);
           } else {
             createTiles.push(tile.map2dTile);
-          }
-
-          if (isDebug) {
-            console.log('tile', previousTilesIndex >= 0 ? '(reuse)' : '(new)', tile);
           }
 
           [
