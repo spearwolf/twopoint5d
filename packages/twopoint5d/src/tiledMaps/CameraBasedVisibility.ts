@@ -33,17 +33,13 @@ interface TileBox {
   box?: Box3;
   frustumBox?: Box3;
   centerWorld?: Vector3;
+  distanceToCamera?: number;
   map2dTile?: Map2DTile;
   primary?: boolean;
 }
 
-const MAX_DEBUG_HELPERS = 10;
-
 const _v = new Vector3();
 const _m = new Matrix4();
-
-const _boxTransform = new Matrix4();
-const _boxTransformWorld = new Matrix4();
 
 const toBoxId = (x: number, y: number) => `${x},${y}`;
 
@@ -54,6 +50,15 @@ const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, targe
   target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
+
+const insertSortByDistance = (arr: TileBox[], tile: TileBox): void => {
+  const index = arr.findIndex((t) => tile.distanceToCamera < t.distanceToCamera);
+  if (index === -1) {
+    arr.push(tile);
+  } else {
+    arr.splice(index, 0, tile);
+  }
+};
 
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3d space on the xz plane.
@@ -89,6 +94,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #cameraFrustum = new Frustum();
 
+  #tileBoxMatrix = new Matrix4();
+  #tileBoxMatrixWorld = new Matrix4();
+
   #map2dTileCoords = new Map2DTileCoordsUtil();
 
   #showHelpers = false;
@@ -96,6 +104,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #needsUpdate = true;
 
   debugNextVisibleTiles = false;
+
+  maxDebugHelpers = 9;
+
+  tileBoxHelperExpand = -0.01;
+  frustumBoxHelperExpand = 0;
+
+  frustumBoxHelperColor = new Color(0x777777);
+  frustumBoxPrimaryHelperColor = new Color(0xffffff);
+
+  tileBoxHelperColor = new Color(0x772222);
+  tileBoxPrimaryHelperColor = new Color(0xff0066);
 
   readonly #lastUpdateState = {
     cameraMatrixWorld: new Matrix4(),
@@ -272,13 +291,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const translate = new Vector3().setFromMatrixPosition(this.#matrixWorld);
 
-    _boxTransform.makeTranslation(
+    this.#tileBoxMatrix.makeTranslation(
       this.#map2dTileCoords.xOffset - this.#centerPoint2D.x + translate.x,
       translate.y,
       this.#map2dTileCoords.yOffset - this.#centerPoint2D.y + translate.z,
     );
 
-    _boxTransformWorld.copy(_boxTransform).multiply(this.#matrixWorld);
+    this.#tileBoxMatrixWorld.multiplyMatrices(this.#tileBoxMatrix, this.#matrixWorld);
 
     const visibles: TileBox[] = [];
     const visitedIds = new Set<string>();
@@ -308,19 +327,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        tile.centerWorld = new Vector3(
-          tile.coords.left + tile.coords.width / 2,
-          0,
-          tile.coords.top + tile.coords.height / 2,
-        ).applyMatrix4(_boxTransformWorld);
-
-        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale).applyMatrix4(_boxTransformWorld);
+        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale).applyMatrix4(this.#tileBoxMatrixWorld);
 
         if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
-          visibles.push(tile);
+          tile.centerWorld = new Vector3(
+            tile.coords.left + tile.coords.width / 2,
+            0,
+            tile.coords.top + tile.coords.height / 2,
+          ).applyMatrix4(this.#tileBoxMatrixWorld);
+
+          tile.distanceToCamera = tile.centerWorld.distanceTo(this.#cameraWorldPosition);
+
+          insertSortByDistance(visibles, tile);
 
           if (this.debugNextVisibleTiles) {
-            tile.box ??= this.makeBox(tile.coords).applyMatrix4(_boxTransform);
+            tile.box ??= this.makeBox(tile.coords).applyMatrix4(this.#tileBoxMatrix);
           }
 
           tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
@@ -348,7 +369,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             const tileId = toBoxId(tx, ty);
 
             if (!visitedIds.has(tileId)) {
-              // TODO should we look at the distance of the tile from the camera here?
               next.push({
                 id: tileId,
                 x: tx,
@@ -374,8 +394,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
       createTiles,
       reuseTiles,
-
       removeTiles: previousTiles,
+
       offset,
       translate,
     };
@@ -420,16 +440,34 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private createTileHelpers(visibles: TileBox[]) {
-    for (const [i, {box, frustumBox, primary}] of visibles.entries()) {
-      if (i > MAX_DEBUG_HELPERS) {
-        break;
+    const primaries = visibles.filter((v) => v.primary);
+
+    primaries.forEach((tile) => {
+      this.createTileBoxHelper(tile);
+    });
+
+    let count = primaries.length;
+
+    for (let i = 0; i < visibles.length && count < this.maxDebugHelpers; ++i) {
+      const tile = visibles[i];
+      if (!tile.primary) {
+        this.createTileBoxHelper(tile);
+        ++count;
       }
-      if (box != null) {
-        this.createHelper(box, -0.01, new Color(primary ? 0xff0066 : 0x772222), false);
-      }
-      if (frustumBox != null) {
-        this.createHelper(frustumBox, -0.015, new Color(primary ? 0xffffff : 0x777777), true);
-      }
+    }
+  }
+
+  private createTileBoxHelper({box, frustumBox, primary}: TileBox) {
+    if (box != null) {
+      this.createHelper(box, this.tileBoxHelperExpand, primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor, false);
+    }
+    if (frustumBox != null) {
+      this.createHelper(
+        frustumBox,
+        this.frustumBoxHelperExpand,
+        primary ? this.frustumBoxPrimaryHelperColor : this.frustumBoxHelperColor,
+        true,
+      );
     }
   }
 
