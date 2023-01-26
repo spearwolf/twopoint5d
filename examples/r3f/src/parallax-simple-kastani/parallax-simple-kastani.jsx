@@ -203,7 +203,7 @@ export const DemoOrDie = () => {
 
       <PanControl2D
         onUpdate={setCenter}
-        pixelsPerSecond={300}
+        pixelsPerSecond={500}
         pointerDisabled
       />
 

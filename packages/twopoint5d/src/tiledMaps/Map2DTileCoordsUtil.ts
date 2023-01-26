@@ -106,10 +106,10 @@ export class Map2DTileCoordsUtil {
 
   equals(other: Map2DTileCoordsUtil): boolean {
     return (
-      this.tileWidth === other.tileWidth
-      && this.tileHeight === other.tileHeight
-      && this.xOffset === other.xOffset
-      && this.yOffset === other.yOffset
+      this.tileWidth === other.tileWidth &&
+      this.tileHeight === other.tileHeight &&
+      this.xOffset === other.xOffset &&
+      this.yOffset === other.yOffset
     );
   }
 
