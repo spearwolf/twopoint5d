@@ -19,6 +19,7 @@ import {
   Vector2,
   Vector3,
 } from 'three';
+import {Dependencies} from '../utils';
 import {AABB2} from './AABB2';
 import {HelpersManager} from './HelpersManager';
 import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
@@ -74,11 +75,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   frustumBoxScale = 1.1;
 
-  #lookAtCenter = false;
+  /**
+   * If `lookAtCenter` is set to *true* (default), then the center of the camera frustum
+   * always points exactly to the center of the map2d.
+   * Otherwise the center of the frustum and the center of the map2d are cumulated.
+   */
+  lookAtCenter = false;
 
-  #depth = 100;
+  depth = 100;
 
-  #camera?: PerspectiveCamera | OrthographicCamera;
+  camera?: PerspectiveCamera | OrthographicCamera;
+
   #cameraWorldPosition = new Vector3();
 
   #planeWorld = CameraBasedVisibility.Plane.clone();
@@ -101,7 +108,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #showHelpers = false;
 
-  #needsUpdate = true;
+  #updateSerial = 0;
 
   debugNextVisibleTiles = false;
 
@@ -116,10 +123,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   tileBoxHelperColor = new Color(0x772222);
   tileBoxPrimaryHelperColor = new Color(0xff0066);
 
-  readonly #lastUpdateState = {
-    cameraMatrixWorld: new Matrix4(),
-    cameraProjectionMatrix: new Matrix4(),
-  };
+  readonly #deps = new Dependencies([
+    'updateSerial',
+    'lookAtCenter',
+    'depth',
+    Dependencies.cloneable<Vector2>('centerPoint2D'),
+    Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
+    Dependencies.cloneable<Matrix4>('nodeMatrixWoderld'),
+    Dependencies.cloneable<Matrix4>('cameraMatrixWorld'),
+    Dependencies.cloneable<Matrix4>('cameraProjectionMatrix'),
+  ]);
+
+  #visibleTiles?: Map2DVisibleTiles;
 
   readonly #helpers = new HelpersManager();
 
@@ -127,61 +142,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.camera = camera;
   }
 
-  /**
-   * If `lookAtCenter` is set to *true* (default), then the center of the camera frustum
-   * always points exactly to the center of the map2d.
-   * Otherwise the center of the frustum and the center of the map2d are cumulated.
-   */
-  get lookAtCenter(): boolean {
-    return this.#lookAtCenter;
-  }
-
-  set lookAtCenter(lookAtCenter: boolean) {
-    if (this.#lookAtCenter === lookAtCenter) return;
-    this.#lookAtCenter = lookAtCenter;
-    this.needsUpdate = true;
-  }
-
-  set depth(depth: number) {
-    if (this.#depth === depth) return;
-    this.#depth = depth;
-    this.needsUpdate = true;
-  }
-
-  get depth(): number {
-    return this.#depth;
-  }
-
   get needsUpdate(): boolean {
-    if (this.#needsUpdate) return true;
-
-    const camera = this.#camera;
-    camera.updateMatrixWorld();
-    camera.updateProjectionMatrix();
-
-    return !(
-      this.#lastUpdateState.cameraMatrixWorld.equals(camera.matrixWorld) &&
-      this.#lastUpdateState.cameraProjectionMatrix.equals(camera.projectionMatrix)
-    );
+    // we have our own custom dependencies-changed-check inside of computeVisibleTiles()
+    return true;
   }
 
-  set needsUpdate(update: boolean) {
-    this.#needsUpdate = update;
-  }
-
-  get camera(): PerspectiveCamera | OrthographicCamera {
-    return this.#camera;
-  }
-
-  set camera(camera: PerspectiveCamera | OrthographicCamera) {
-    if (this.#camera !== camera) {
-      this.#camera = camera;
-      this.needsUpdate = true;
-    }
-  }
-
-  get hasCamera(): boolean {
-    return this.#camera != null;
+  set needsUpdate(_update: boolean) {
+    // ntd
   }
 
   get showHelpers() {
@@ -193,9 +160,23 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#helpers.remove();
     }
     if (!this.#showHelpers && showHelpers) {
-      this.needsUpdate = true;
+      // TODO show helpers when we have this.#visibleTiles.tiles?
+      ++this.#updateSerial;
     }
     this.#showHelpers = showHelpers;
+  }
+
+  private dependenciesChanged(node: Object3D): boolean {
+    return this.#deps.changed({
+      updateSerial: this.#updateSerial, // TODO remove
+      lookAtCenter: this.lookAtCenter,
+      depth: this.depth,
+      centerPoint2D: this.#centerPoint2D,
+      map2dTileCoords: this.#map2dTileCoords,
+      nodeMatrixWorld: node.matrixWorld,
+      cameraMatrixWorld: this.camera.matrixWorld,
+      cameraProjectionMatrix: this.camera.projectionMatrix,
+    })
   }
 
   computeVisibleTiles(
@@ -207,7 +188,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#centerPoint2D.set(centerX, centerY);
     this.#map2dTileCoords = map2dTileCoords;
 
-    if (!this.hasCamera) {
+    if (!this.camera) {
       return undefined;
     }
 
@@ -215,14 +196,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#helpers.remove();
     }
 
-    this.#camera.updateMatrixWorld();
-    this.#camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld();
+    this.camera.updateProjectionMatrix();
+
+    if (!this.dependenciesChanged(node)) {
+      if (this.#visibleTiles) {
+        this.#visibleTiles.createTiles = undefined;
+        this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;
+        this.#visibleTiles.removeTiles = undefined;
+        // TODO add .changed? prop?
+      }
+      // TODO helpers!
+      return this.#visibleTiles;
+    }
 
     this.#matrixWorld.copy(node.matrixWorld);
     this.#matrixWorldInverse.copy(node.matrixWorld).invert();
-
-    this.saveUpdateState(); // TODO save parentNode->matrixWorld ?
-    this.needsUpdate = false;
 
     const pointOnPlane3D = this.findPointOnPlaneThatIsInViewFrustum();
 
@@ -243,7 +232,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     if (pointOnPlane3D == null) {
-      return previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
+      this.#visibleTiles = previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
+      return this.#visibleTiles;
     }
 
     this.convertToPlaneCoords2D(pointOnPlane3D, this.#planeCoords2D);
@@ -262,12 +252,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       }
     }
 
-    return this.findVisibleTiles(previousTiles.slice(0));
+    this.#visibleTiles = this.findVisibleTiles(previousTiles.slice(0));
+    return this.#visibleTiles;
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | null | undefined {
-    const camWorldDir = this.#camera.getWorldDirection(_v).setLength(this.#camera.far);
-    this.#cameraWorldPosition.setFromMatrixPosition(this.#camera.matrixWorld);
+    const camWorldDir = this.camera.getWorldDirection(_v).setLength(this.camera.far);
+    this.#cameraWorldPosition.setFromMatrixPosition(this.camera.matrixWorld);
 
     const lineOfSightEnd = camWorldDir.clone().add(this.#cameraWorldPosition);
     const lineOfSight = new Line3(this.#cameraWorldPosition, lineOfSightEnd);
@@ -285,7 +276,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private findVisibleTiles(previousTiles: Map2DTile[]): Map2DVisibleTiles | undefined {
-    makeCameraFrustum(this.#camera, this.#cameraFrustum);
+    makeCameraFrustum(this.camera, this.#cameraFrustum);
 
     const primaryTiles = this.#map2dTileCoords.computeTilesWithinCoords(this.#planeCoords2D.x, this.#planeCoords2D.y, 1, 1);
 
@@ -416,11 +407,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     target.set(_v.x, _v.z);
   }
 
-  private saveUpdateState() {
-    this.#lastUpdateState.cameraMatrixWorld.copy(this.#camera.matrixWorld);
-    this.#lastUpdateState.cameraProjectionMatrix.copy(this.#camera.projectionMatrix);
-  }
-
   private createPlaneHelpers() {
     this.#helpers.add(new PlaneHelper(this.#planeWorld, 100, 0x20f040), true);
 
@@ -489,8 +475,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   private makeBox({top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
     const sw = width * scale - width;
     const sh = height * scale - height;
-    const ground = this.#depth * -0.5 * scale;
-    const ceiling = this.#depth * 0.5 * scale;
+    const ground = this.depth * -0.5 * scale;
+    const ceiling = this.depth * 0.5 * scale;
     return new Box3(new Vector3(left - sw, ground, top - sh), new Vector3(left + width + sw, ceiling, top + height + sh));
   }
 

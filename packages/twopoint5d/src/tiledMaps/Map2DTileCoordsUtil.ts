@@ -92,8 +92,25 @@ export class Map2DTileCoordsUtil {
     this.yOffset = yOffset;
   }
 
+  copy(source: Map2DTileCoordsUtil): Map2DTileCoordsUtil {
+    this.tileWidth = source.tileWidth;
+    this.tileHeight = source.tileHeight;
+    this.xOffset = source.xOffset;
+    this.yOffset = source.yOffset;
+    return this;
+  }
+
   clone(): Map2DTileCoordsUtil {
     return new Map2DTileCoordsUtil(this.tileWidth, this.tileHeight, this.xOffset, this.yOffset);
+  }
+
+  equals(other: Map2DTileCoordsUtil): boolean {
+    return (
+      this.tileWidth === other.tileWidth
+      && this.tileHeight === other.tileHeight
+      && this.xOffset === other.xOffset
+      && this.yOffset === other.yOffset
+    );
   }
 
   /**
