@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-
 import {
   Box3,
   Box3Helper,
@@ -52,7 +50,7 @@ const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, targe
 
 const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
 
-const insertSortByDistance = (arr: TileBox[], tile: TileBox): void => {
+const insertAndSortByDistance = (arr: TileBox[], tile: TileBox): void => {
   const index = arr.findIndex((t) => tile.distanceToCamera < t.distanceToCamera);
   if (index === -1) {
     arr.push(tile);
@@ -106,11 +104,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #map2dTileCoords = new Map2DTileCoordsUtil();
 
+  debugNextVisibleTiles = false; // TODO remove
+
   #showHelpers = false;
-
-  #updateSerial = 0;
-
-  debugNextVisibleTiles = false;
 
   maxDebugHelpers = 9;
 
@@ -124,9 +120,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   tileBoxPrimaryHelperColor = new Color(0xff0066);
 
   readonly #deps = new Dependencies([
-    'updateSerial',
-    'lookAtCenter',
     'depth',
+    'lookAtCenter',
     Dependencies.cloneable<Vector2>('centerPoint2D'),
     Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
     Dependencies.cloneable<Matrix4>('nodeMatrixWoderld'),
@@ -134,6 +129,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     Dependencies.cloneable<Matrix4>('cameraProjectionMatrix'),
   ]);
 
+  readonly #visibles: TileBox[] = [];
   #visibleTiles?: Map2DVisibleTiles;
 
   readonly #helpers = new HelpersManager();
@@ -160,23 +156,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#helpers.remove();
     }
     if (!this.#showHelpers && showHelpers) {
-      // TODO show helpers when we have this.#visibleTiles.tiles?
-      ++this.#updateSerial;
+      this.createHelpers();
     }
     this.#showHelpers = showHelpers;
   }
 
   private dependenciesChanged(node: Object3D): boolean {
     return this.#deps.changed({
-      updateSerial: this.#updateSerial, // TODO remove
-      lookAtCenter: this.lookAtCenter,
       depth: this.depth,
+      lookAtCenter: this.lookAtCenter,
       centerPoint2D: this.#centerPoint2D,
       map2dTileCoords: this.#map2dTileCoords,
       nodeMatrixWorld: node.matrixWorld,
       cameraMatrixWorld: this.camera.matrixWorld,
       cameraProjectionMatrix: this.camera.projectionMatrix,
-    })
+    });
   }
 
   computeVisibleTiles(
@@ -185,16 +179,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     map2dTileCoords: Map2DTileCoordsUtil,
     node: Object3D,
   ): Map2DVisibleTiles | undefined {
-    this.#centerPoint2D.set(centerX, centerY);
-    this.#map2dTileCoords = map2dTileCoords;
-
     if (!this.camera) {
       return undefined;
     }
 
-    if (this.showHelpers) {
-      this.#helpers.remove();
-    }
+    this.#map2dTileCoords = map2dTileCoords;
+    this.#centerPoint2D.set(centerX, centerY);
+
+    node.updateWorldMatrix(true, false);
 
     this.camera.updateMatrixWorld();
     this.camera.updateProjectionMatrix();
@@ -206,7 +198,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         this.#visibleTiles.removeTiles = undefined;
         // TODO add .changed? prop?
       }
-      // TODO helpers!
       return this.#visibleTiles;
     }
 
@@ -228,7 +219,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#planeWorld.coplanarPoint(this.#planeOrigin);
 
     if (this.showHelpers) {
-      this.createPlaneHelpers();
+      this.#helpers.remove();
     }
 
     if (pointOnPlane3D == null) {
@@ -244,15 +235,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.#planeCoords2D.add(this.#centerPoint2D);
 
-    // TODO remove me!
+    this.#visibleTiles = this.findVisibleTiles(previousTiles);
+
     if (this.showHelpers) {
-      const el = document.querySelector('.map2dCoords');
-      if (el) {
-        el.textContent = this.#planeCoords2D.toArray().map(Math.round).join(', ');
-      }
+      this.createHelpers();
     }
 
-    this.#visibleTiles = this.findVisibleTiles(previousTiles.slice(0));
     return this.#visibleTiles;
   }
 
@@ -276,6 +264,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private findVisibleTiles(previousTiles: Map2DTile[]): Map2DVisibleTiles | undefined {
+    previousTiles = previousTiles.slice(0); // TODO use a Set!
+
     makeCameraFrustum(this.camera, this.#cameraFrustum);
 
     const primaryTiles = this.#map2dTileCoords.computeTilesWithinCoords(this.#planeCoords2D.x, this.#planeCoords2D.y, 1, 1);
@@ -290,7 +280,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.#tileBoxMatrixWorld.multiplyMatrices(this.#tileBoxMatrix, this.#matrixWorld);
 
-    const visibles: TileBox[] = [];
+    this.#visibles.length = 0;
+
     const visitedIds = new Set<string>();
 
     const next: TileBox[] = [
@@ -329,7 +320,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
           tile.distanceToCamera = tile.centerWorld.distanceTo(this.#cameraWorldPosition);
 
-          insertSortByDistance(visibles, tile);
+          insertAndSortByDistance(this.#visibles, tile);
 
           if (this.debugNextVisibleTiles) {
             tile.box ??= this.makeBox(tile.coords).applyMatrix4(this.#tileBoxMatrix);
@@ -376,12 +367,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
 
-    if (this.showHelpers) {
-      this.createTileHelpers(visibles);
-    }
-
     return {
-      tiles: visibles.map((visible) => visible.map2dTile),
+      tiles: this.#visibles.map((visible) => visible.map2dTile),
 
       createTiles,
       reuseTiles,
@@ -407,29 +394,40 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     target.set(_v.x, _v.z);
   }
 
+  private createHelpers() {
+    this.createPlaneHelpers();
+    this.createTileHelpers(this.#visibles);
+
+    // TODO remove this!
+    const el = document.querySelector('.map2dCoords');
+    if (el) {
+      el.textContent = this.#planeCoords2D.toArray().map(Math.round).join(', ');
+    }
+  }
+
   private createPlaneHelpers() {
     this.#helpers.add(new PlaneHelper(this.#planeWorld, 100, 0x20f040), true);
 
     if (this.#pointOnPlane) {
-      this.createPointHelper(this.#pointOnPlane, true, 10, 0xc0c0c0);
+      this.addPointHelper(this.#pointOnPlane, true, 10, 0xc0c0c0);
     }
 
-    this.createPointHelper(this.#planeOrigin, true, 5, 0x406090);
+    this.addPointHelper(this.#planeOrigin, true, 5, 0x406090);
 
     const uOrigin = this.makePointOnPlane(new Vector2());
     const u0 = this.#planeOrigin.clone().sub(uOrigin);
     const ux = this.makePointOnPlane(new Vector2(50, 0)).add(u0);
     const uy = this.makePointOnPlane(new Vector2(0, 50)).add(u0);
 
-    this.createPointHelper(ux, true, 5, 0xff0000);
-    this.createPointHelper(uy, true, 5, 0x00ff00);
+    this.addPointHelper(ux, true, 5, 0xff0000);
+    this.addPointHelper(uy, true, 5, 0x00ff00);
   }
 
   private createTileHelpers(visibles: TileBox[]) {
     const primaries = visibles.filter((v) => v.primary);
 
     primaries.forEach((tile) => {
-      this.createTileBoxHelper(tile);
+      this.createTileBoxHelpers(tile);
     });
 
     let count = primaries.length;
@@ -437,18 +435,18 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     for (let i = 0; i < visibles.length && count < this.maxDebugHelpers; ++i) {
       const tile = visibles[i];
       if (!tile.primary) {
-        this.createTileBoxHelper(tile);
+        this.createTileBoxHelpers(tile);
         ++count;
       }
     }
   }
 
-  private createTileBoxHelper({box, frustumBox, primary}: TileBox) {
+  private createTileBoxHelpers({box, frustumBox, primary}: TileBox) {
     if (box != null) {
-      this.createHelper(box, this.tileBoxHelperExpand, primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor, false);
+      this.addBoxHelper(box, this.tileBoxHelperExpand, primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor, false);
     }
     if (frustumBox != null) {
-      this.createHelper(
+      this.addBoxHelper(
         frustumBox,
         this.frustumBoxHelperExpand,
         primary ? this.frustumBoxPrimaryHelperColor : this.frustumBoxHelperColor,
@@ -457,13 +455,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  private createPointHelper(point: Vector3, addToRoot = true, size = 10, color = 0x20f040) {
+  private addPointHelper(point: Vector3, addToRoot = true, size = 10, color = 0x20f040) {
     const poiBox = new Mesh(new BoxGeometry(size, size, size), new MeshBasicMaterial({color}));
     poiBox.position.copy(point);
     this.#helpers.add(poiBox, addToRoot);
   }
 
-  private createHelper(box: Box3, expand: number, color: Color, addToRoot: boolean) {
+  private addBoxHelper(box: Box3, expand: number, color: Color, addToRoot: boolean) {
     box = box.clone();
     const boxSize = box.getSize(new Vector3());
     box.expandByVector(boxSize.multiplyScalar(expand));
