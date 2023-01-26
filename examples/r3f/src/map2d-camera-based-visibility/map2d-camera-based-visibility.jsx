@@ -173,7 +173,9 @@ export const DemoOrDie = () => {
       />
 
       {orbitAround && <OrbitControls makeDefault />}
-      {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault />}
+      {controlMap2DCamera && (
+        <OrbitControls camera={map2dCamera} makeDefault enableDamping={false} />
+      )}
 
       {showCameraHelper && <cameraHelper args={[map2dCamera]} />}
 

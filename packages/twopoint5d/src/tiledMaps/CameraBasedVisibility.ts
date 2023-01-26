@@ -278,7 +278,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#map2dTileCoords.yOffset - this.#centerPoint2D.y + translate.z,
     );
 
-    this.#tileBoxMatrixWorld.multiplyMatrices(this.#tileBoxMatrix, this.#matrixWorld);
+    this.#tileBoxMatrixWorld.copy(this.#matrixWorld);
 
     this.#visibles.length = 0;
 
@@ -309,7 +309,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           1,
         );
 
-        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale).applyMatrix4(this.#tileBoxMatrixWorld);
+        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale)
+          .applyMatrix4(this.#tileBoxMatrix)
+          .applyMatrix4(this.#tileBoxMatrixWorld);
 
         if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
           tile.centerWorld = new Vector3(
@@ -322,9 +324,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
           insertAndSortByDistance(this.#visibles, tile);
 
-          if (this.debugNextVisibleTiles) {
-            tile.box ??= this.makeBox(tile.coords).applyMatrix4(this.#tileBoxMatrix);
-          }
+          tile.box ??= this.makeBox(tile.coords).applyMatrix4(this.#tileBoxMatrix);
 
           tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
 
@@ -427,30 +427,21 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const primaries = visibles.filter((v) => v.primary);
 
     primaries.forEach((tile) => {
-      this.createTileBoxHelpers(tile);
+      this.addBoxHelper(tile.frustumBox, this.frustumBoxHelperExpand, this.frustumBoxPrimaryHelperColor, true);
     });
 
-    let count = primaries.length;
-
-    for (let i = 0; i < visibles.length && count < this.maxDebugHelpers; ++i) {
+    for (let i = 0; i < visibles.length; ++i) {
       const tile = visibles[i];
-      if (!tile.primary) {
-        this.createTileBoxHelpers(tile);
-        ++count;
-      }
-    }
-  }
 
-  private createTileBoxHelpers({box, frustumBox, primary}: TileBox) {
-    if (box != null) {
-      this.addBoxHelper(box, this.tileBoxHelperExpand, primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor, false);
-    }
-    if (frustumBox != null) {
+      if (!tile.primary && i < this.maxDebugHelpers) {
+        this.addBoxHelper(tile.frustumBox, this.frustumBoxHelperExpand, this.frustumBoxHelperColor, true);
+      }
+
       this.addBoxHelper(
-        frustumBox,
-        this.frustumBoxHelperExpand,
-        primary ? this.frustumBoxPrimaryHelperColor : this.frustumBoxHelperColor,
-        true,
+        tile.box,
+        this.tileBoxHelperExpand,
+        tile.primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor,
+        false,
       );
     }
   }

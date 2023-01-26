@@ -207,7 +207,7 @@ export const DemoOrDie = () => {
         pointerDisabled
       />
 
-      <OrbitControls />
+      <OrbitControls enableDamping={false} />
 
       <Stage2D name="stage0" noAutoRender defaultCamera>
         <ParallaxProjection
