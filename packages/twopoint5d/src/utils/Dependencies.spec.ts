@@ -84,5 +84,9 @@ describe('Dependencies', () => {
     expect(v.equals(new Vector2(2, 3))).toBe(true);
     expect(deps.value('v').equals(new Vector2(2, 3))).toBe(true);
     expect(deps.value('v')).not.toBe(v);
+
+    expect(deps.changed({v: null})).toBe(true);
+    expect(deps.changed({v: undefined})).toBe(false);
+    expect(deps.changed({})).toBe(false);
   });
 });
