@@ -263,7 +263,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private findVisibleTiles(previousTiles: Map2DTile[]): Map2DVisibleTiles | undefined {
-    previousTiles = previousTiles.slice(0); // TODO use a Set!
+    previousTiles = previousTiles.slice(0);
 
     makeCameraFrustum(this.camera, this.#cameraFrustum);
 
