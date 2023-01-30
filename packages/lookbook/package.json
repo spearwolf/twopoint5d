@@ -11,12 +11,12 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^1.6.0"
+    "astro": "^2.0.2"
   },
   "devDependencies": {
-    "@spearwolf/eventize": "^2.0.3",
-    "sass": "^1.56.0",
-    "three": "^0.145",
+    "@spearwolf/eventize": "^2.0.4",
+    "sass": "^1.57.1",
+    "three": "^0.149.0",
     "twopoint5d": "workspace:*"
   }
 }
