@@ -45,10 +45,10 @@
     "url": "https://www.spearwolf.de"
   },
   "scripts": {
-    "build:js": "cross-env NODE_ENV=production rollup -c ../../shared-rollup-build/rollup.config.esm.js",
-    "watch:js": "cross-env NODE_ENV=production rollup -w -c ../../shared-rollup-build/rollup.config.esm.js",
-    "build:cjs": "cross-env NODE_ENV=production rollup -c ../../shared-rollup-build/rollup.config.cjs.js",
-    "watch:cjs": "cross-env NODE_ENV=production rollup -w -c ../../shared-rollup-build/rollup.config.cjs.js",
+    "build:js": "cross-env NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider rollup -c ../../shared-rollup-build/rollup.config.esm.js",
+    "watch:js": "cross-env NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider rollup -w -c ../../shared-rollup-build/rollup.config.esm.js",
+    "build:cjs": "cross-env NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider rollup -c ../../shared-rollup-build/rollup.config.cjs.js",
+    "watch:cjs": "cross-env NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider rollup -w -c ../../shared-rollup-build/rollup.config.cjs.js",
     "build:types": "tsc --emitDeclarationOnly",
     "watch:types": "tsc --emitDeclarationOnly --watch --preserveWatchOutput",
     "watch": "concurrently --names types,js yarn:watch:types yarn:watch:js",
