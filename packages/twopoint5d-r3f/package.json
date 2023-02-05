@@ -74,10 +74,10 @@
   "devDependencies": {
     "@react-three/fiber": "^8.10.4",
     "@react-three/test-renderer": "^8.1.2",
-    "@rollup/plugin-commonjs": "^23.0.7",
+    "@rollup/plugin-commonjs": "^24.0.1",
     "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-replace": "^5.0.2",
-    "@rollup/plugin-typescript": "^9.0.2",
+    "@rollup/plugin-typescript": "^11.0.0",
     "@spearwolf/eventize": "^2.0.4",
     "@testing-library/react": "^13.4.0",
     "@types/assert": "^1.5.6",

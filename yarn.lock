@@ -3372,9 +3372,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-commonjs@npm:^23.0.7":
-  version: 23.0.7
-  resolution: "@rollup/plugin-commonjs@npm:23.0.7"
+"@rollup/plugin-commonjs@npm:^24.0.1":
+  version: 24.0.1
+  resolution: "@rollup/plugin-commonjs@npm:24.0.1"
   dependencies:
     "@rollup/pluginutils": ^5.0.1
     commondir: ^1.0.1
@@ -3387,7 +3387,7 @@ __metadata:
   peerDependenciesMeta:
     rollup:
       optional: true
-  checksum: 01d90947bd4aa664c568cec172399825921f29afc035a6d8aec153868ab151ce7901ad56a101c76655e31b21567ddc70313c4bca476685b872218f041757a8c9
+  checksum: ff5b09f5c350640fe6836fcc97bf5c5612bf78b26eaaad01bf1aee955f0b136135d1a8950a02f680779aec1f16f2c6b6cf89d6080e84ed09be62737abb6b3a5f
   languageName: node
   linkType: hard
 
@@ -3437,9 +3437,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rollup/plugin-typescript@npm:^9.0.2":
-  version: 9.0.2
-  resolution: "@rollup/plugin-typescript@npm:9.0.2"
+"@rollup/plugin-typescript@npm:^11.0.0":
+  version: 11.0.0
+  resolution: "@rollup/plugin-typescript@npm:11.0.0"
   dependencies:
     "@rollup/pluginutils": ^5.0.1
     resolve: ^1.22.1
@@ -3452,7 +3452,7 @@ __metadata:
       optional: true
     tslib:
       optional: true
-  checksum: 0b3a15e7402a8cf46a491003a0bfe6bf50294939133cf898c1dee0b9f1f8f4742242e81abd15effd8de2e9f3fe5fd81d01a03020341e1d3d0b7f4c6be21d989f
+  checksum: b0d34ff0ad6bfc681c437ef42df7b02f04c361465be5a2044cd30cac5b003045c54e4377d58ab91925e296076b792bbb5ddded72cacdd21092bc8694a95b046f
   languageName: node
   linkType: hard
 
@@ -14483,10 +14483,10 @@ resolve@^1.14.2:
   dependencies:
     "@react-three/fiber": ^8.10.4
     "@react-three/test-renderer": ^8.1.2
-    "@rollup/plugin-commonjs": ^23.0.7
+    "@rollup/plugin-commonjs": ^24.0.1
     "@rollup/plugin-node-resolve": ^15.0.1
     "@rollup/plugin-replace": ^5.0.2
-    "@rollup/plugin-typescript": ^9.0.2
+    "@rollup/plugin-typescript": ^11.0.0
     "@spearwolf/eventize": ^2.0.4
     "@testing-library/react": ^13.4.0
     "@types/assert": ^1.5.6
@@ -14544,10 +14544,10 @@ resolve@^1.14.2:
   version: 0.0.0-use.local
   resolution: "twopoint5d@workspace:packages/twopoint5d"
   dependencies:
-    "@rollup/plugin-commonjs": ^23.0.7
+    "@rollup/plugin-commonjs": ^24.0.1
     "@rollup/plugin-node-resolve": ^15.0.1
     "@rollup/plugin-replace": ^5.0.2
-    "@rollup/plugin-typescript": ^9.0.2
+    "@rollup/plugin-typescript": ^11.0.0
     "@spearwolf/eventize": ^2.0.4
     "@types/assert": ^1.5.6
     "@types/jest": ^29.4.0
