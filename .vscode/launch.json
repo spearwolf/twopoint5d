@@ -7,7 +7,7 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "tiled-maps: jest run current",
+      "name": "twopoint5d-r3f: jest run current",
       "skipFiles": ["<node_internals>/**"],
       "resolveSourceMapLocations": [
         "${workspaceFolder}/**",
@@ -17,9 +17,9 @@
       "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
       "args": [
         "--rootDir",
-        "${workspaceFolder}/packages/tiled-maps/",
+        "${workspaceFolder}/packages/twopoint5d-r3f/",
         "--config",
-        "packages/tiled-maps/jest.config.ts",
+        "packages/twopoint5d-r3f/jest.config.cjs",
         "--runInBand",
         "--no-cache",
         "--verbose",
