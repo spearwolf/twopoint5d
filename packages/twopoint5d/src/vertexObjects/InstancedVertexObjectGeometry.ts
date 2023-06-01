@@ -51,7 +51,7 @@ export class InstancedVertexObjectGeometry<
       instancedSource instanceof VertexObjectPool ? instancedSource : new VertexObjectPool(instancedSource, instancedCapacity);
 
     if (args[2] instanceof BufferGeometry) {
-      this.copy(args[2]);
+      this.copy(args[2] as any);
     } else {
       const baseSource = args[2];
       const baseCapacity = args[3] ?? 1;
