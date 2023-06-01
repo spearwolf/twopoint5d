@@ -70,7 +70,8 @@ describe('useFrameLoop hook', () => {
 
     expect(callbacks.init).toBeCalledTimes(1);
     expect(callbacks.update).not.toBeCalled();
-    expect(callbacks.frame).not.toBeCalled();
+    // expect(callbacks.frame).not.toBeCalled();
+    expect(callbacks.frame).toBeCalledTimes(1);
     expect(callbacks.dispose).not.toBeCalled();
 
     let args = callbacks.init.mock.calls[0][0];
@@ -80,7 +81,15 @@ describe('useFrameLoop hook', () => {
     expect(args.foo).toBe('plah!');
     expect(args.extraValue).toBe('abc');
 
+    args = callbacks.frame.mock.calls.at(-1)[0];
+    expect(args.mesh).toBe(mesh);
+    expect(args.state).toBeDefined();
+    expect(args.delta).toBe(1);
+    expect(args.foo).toBe('plah!');
+    expect(args.extraValue).toBe('abc');
+
     callbacks.init.mockClear();
+    callbacks.frame.mockClear();
 
     await ReactThreeTestRenderer.act(async () => {
       renderer.advanceFrames(5, 2);
@@ -173,7 +182,7 @@ describe('useFrameLoop hook', () => {
 
     expect(callbacks.init).toBeCalledTimes(1);
     expect(callbacks.update).not.toBeCalled();
-    expect(callbacks.frame).not.toBeCalled();
+    expect(callbacks.frame).toBeCalledTimes(1);
     expect(callbacks.dispose).not.toBeCalled();
 
     let args = callbacks.init.mock.calls[0][0];
@@ -186,7 +195,7 @@ describe('useFrameLoop hook', () => {
 
     expect(callbacks.init).toBeCalledTimes(1);
     expect(callbacks.update).not.toBeCalled();
-    expect(callbacks.frame).toBeCalledTimes(5);
+    expect(callbacks.frame).toBeCalledTimes(6);
     expect(callbacks.dispose).not.toBeCalled();
 
     args = callbacks.frame.mock.calls.at(-1)[0];
@@ -201,7 +210,7 @@ describe('useFrameLoop hook', () => {
 
     expect(callbacks.init).toBeCalledTimes(1);
     expect(callbacks.update).not.toBeCalled();
-    expect(callbacks.frame).toBeCalledTimes(6);
+    expect(callbacks.frame).toBeCalledTimes(7);
     expect(callbacks.dispose).not.toBeCalled();
 
     await renderer.update(<TestSceneWithoutDependencies callbacks={callbacks} />);
@@ -212,7 +221,7 @@ describe('useFrameLoop hook', () => {
 
     expect(callbacks.init).toBeCalledTimes(1);
     expect(callbacks.update).not.toBeCalled();
-    expect(callbacks.frame).toBeCalledTimes(6);
+    expect(callbacks.frame).toBeCalledTimes(7);
     expect(callbacks.dispose).toBeCalledTimes(1);
 
     args = callbacks.dispose.mock.calls.at(-1)[0];
@@ -247,7 +256,7 @@ describe('useFrameLoop hook', () => {
 
     expect(lazyCallbacks).toBeCalledTimes(1);
     expect(callbacks.init).toBeCalledTimes(1);
-    expect(callbacks.frame).not.toBeCalled();
+    expect(callbacks.frame).toBeCalledTimes(1);
     expect(callbacks.dispose).not.toBeCalled();
 
     let args = lazyCallbacks.mock.calls[0][0];
@@ -263,6 +272,8 @@ describe('useFrameLoop hook', () => {
     await ReactThreeTestRenderer.act(async () => {
       renderer.advanceFrames(5, 2);
     });
+
+    expect(callbacks.frame).toBeCalledTimes(6);
 
     expect(lazyCallbacks).toBeCalledTimes(1);
   });

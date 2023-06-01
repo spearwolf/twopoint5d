@@ -164,6 +164,10 @@ export const useFrameLoop = <Params extends FrameStateMachineParams>(
         state_.state = 'initialized';
 
         setIsInitialized(true);
+
+        if (stateMachine_?.frame) {
+          stateMachine_.frame(methodArgs);
+        }
       }
     },
     [isInitialized, ...depValues],
