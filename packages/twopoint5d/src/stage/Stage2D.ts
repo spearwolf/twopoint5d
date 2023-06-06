@@ -1,4 +1,4 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
+import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
 import {IProjection} from './IProjection';

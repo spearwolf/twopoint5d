@@ -52,7 +52,7 @@ export class VertexObjectPool<VOType = VO> {
   }
 
   set usedCount(value: number) {
-    // TODO test
+    // TODO write test
     if (value < this.#usedCount) {
       this.#index.fill(undefined, value, this.#usedCount);
     }
@@ -74,6 +74,7 @@ export class VertexObjectPool<VOType = VO> {
       this.#index[idx] = vo;
       return vo;
     }
+    return undefined;
   }
 
   createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIdx: number] {

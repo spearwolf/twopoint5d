@@ -1,5 +1,5 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
-import {TextureAtlas, TextureAtlasData, TileSet, TileSetData} from 'twopoint5d';
+import {eventize, Eventize} from '@spearwolf/eventize';
+import {TextureAtlas, TextureAtlasData, TileSet, TileSetData} from '@spearwolf/twopoint5d';
 import {createContext} from 'react';
 import {Texture} from 'three';
 
@@ -70,7 +70,7 @@ export class AssetStore {
   }
 
   insertAsset(name: AssetName, type: AssetType, data: any) {
-    let item: AssetItem = this.#assets.get(name);
+    let item: AssetItem | undefined = this.#assets.get(name);
 
     if (item) {
       item.type = type;
@@ -83,13 +83,13 @@ export class AssetStore {
         refCount: 0,
       };
 
-      this.#assets.set(name, item);
+      this.#assets.set(name, item!);
     }
 
     // eslint-disable-next-line no-console
     console.log('[AssetStore] asset:insert', item);
 
-    this.emit('asset:insert', item.name);
+    this.emit('asset:insert', item!.name);
   }
 
   getTextureRef(name: AssetName): Texture | undefined {

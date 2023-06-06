@@ -1,4 +1,4 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
+import {eventize, Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 
 import {Chronometer} from './Chronometer';

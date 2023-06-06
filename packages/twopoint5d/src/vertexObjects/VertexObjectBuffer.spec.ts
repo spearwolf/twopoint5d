@@ -413,9 +413,9 @@ describe('VertexObjectBuffer', () => {
     });
 
     // prettier-ignore
-    expect(Array.from(vob.toAttributeArrays(['foo'], 1).foo)).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(Array.from(vob.toAttributeArrays(['foo'], 1)['foo'])).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
 
     // prettier-ignore
-    expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1).bar)).toEqual([100, 101, 102, 103]);
+    expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar'])).toEqual([100, 101, 102, 103]);
   });
 });

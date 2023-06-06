@@ -1,11 +1,10 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {TexturedSpritesGeometry as __TexturedSpritesGeometry} from 'twopoint5d';
+import {TexturedSpritesGeometry as __TexturedSpritesGeometry} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef, useEffect, useState} from 'react';
 
 extend({TexturedSpritesGeometry: __TexturedSpritesGeometry});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       texturedSpritesGeometry: ReactThreeFiber.BufferGeometryNode<__TexturedSpritesGeometry, typeof __TexturedSpritesGeometry>;

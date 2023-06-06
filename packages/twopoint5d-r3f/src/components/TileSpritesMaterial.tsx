@@ -1,11 +1,10 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {TileSpritesMaterial as __TileSpritesMaterial} from 'twopoint5d';
+import {TileSpritesMaterial as __TileSpritesMaterial} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({TileSpritesMaterial: __TileSpritesMaterial});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       tileSpritesMaterial: ReactThreeFiber.MaterialNode<__TileSpritesMaterial, typeof __TileSpritesMaterial>;

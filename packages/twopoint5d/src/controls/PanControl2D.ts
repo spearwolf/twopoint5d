@@ -1,4 +1,4 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
+import {eventize, Eventize} from '@spearwolf/eventize';
 
 import {Stylesheets} from '../display/Stylesheets';
 import {InputControlBase} from './InputControlBase';
@@ -153,7 +153,7 @@ export class PanControl2D extends InputControlBase {
     return this.#panView;
   }
 
-  set panView(panView: PanViewState) {
+  set panView(panView: PanViewState | undefined) {
     const prevPanView = this.#panView;
     this.#panView = panView ?? {x: 0, y: 0, pixelRatio: globalThis.devicePixelRatio ?? 1};
     this.#isFirstPanViewUpate = prevPanView !== this.#panView;

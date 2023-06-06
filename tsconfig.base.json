@@ -1,0 +1,58 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "baseUrl": ".",
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": false,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "strict": true,
+    "strictNullChecks": false,
+    "useUnknownInCatchVariables": true,
+    "noFallthroughCasesInSwitch": false,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "downlevelIteration": false,
+    "removeComments": true,
+    "stripInternal": true,
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "lib": ["es2022", "dom"],
+    "target": "es2022",
+    "useDefineForClassFields": true,
+    "incremental": false,
+    "noErrorTruncation": true,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "paths": {
+      "twopint5d": ["packages/twopoint5d/src"],
+      "twopint5d-r3f": ["packages/twopoint5d-r3f/src"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"],
+  "references": [
+    {
+      "path": "./packages/twopoint5d/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/twopoint5d-r3f/tsconfig.build.json"
+    }
+  ]
+}

@@ -1,2 +1,2 @@
-export const unpick = <T extends Object>(o: T, ...keys: (keyof T)[]): Partial<T> =>
-  o ? (Object.fromEntries(Object.entries(o).filter(([key]) => !keys.includes(key as keyof T))) as Partial<T>) : undefined;
+export const unpick = <T extends object>(o: T | null | undefined, ...keys: (keyof T)[]): Partial<T> | undefined =>
+  o == null ? undefined : (Object.fromEntries(Object.entries(o).filter(([key]) => !keys.includes(key as keyof T))) as Partial<T>);

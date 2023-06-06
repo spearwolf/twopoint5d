@@ -1,4 +1,4 @@
-import {TileSetData, TileSetLoader} from 'twopoint5d';
+import {TileSetData, TileSetLoader} from '@spearwolf/twopoint5d';
 import {useState} from 'react';
 import {useAsyncEffect} from './useAsyncEffect';
 
@@ -14,8 +14,8 @@ export interface UseTileSetParams {
 export const useTileSetLoader = (tileSetUrl: string, options?: UseTileSetParams): Partial<TileSetData> => {
   const [tileSetData, setTileSetData] = useState<Partial<TileSetData>>({});
 
-  const tileWidth = options?.tileWidth;
-  const tileHeight = options?.tileHeight;
+  const tileWidth = options?.tileWidth ?? 0;
+  const tileHeight = options?.tileHeight ?? 0;
   const margin = options?.margin;
   const spacing = options?.spacing;
   const padding = options?.padding;

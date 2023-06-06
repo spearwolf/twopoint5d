@@ -3,13 +3,12 @@ import {
   LimitToAxisType,
   RepeatingTilesPatternType,
   RepeatingTilesProvider as __RepeatingTilesProvider,
-} from 'twopoint5d';
+} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({RepeatingTilesProvider: __RepeatingTilesProvider});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       repeatingTilesProvider: ReactThreeFiber.Node<__RepeatingTilesProvider, typeof __RepeatingTilesProvider>;

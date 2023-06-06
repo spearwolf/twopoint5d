@@ -1,12 +1,11 @@
 import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
-import {Map2DLayer3D as __Map2DLayer3D} from 'twopoint5d';
+import {Map2DLayer3D as __Map2DLayer3D} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef, memo, useCallback, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({Map2DLayer3D: __Map2DLayer3D});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       map2DLayer3D: ReactThreeFiber.Node<__Map2DLayer3D, typeof __Map2DLayer3D>;
@@ -28,10 +27,10 @@ function Component(
   {centerX, centerY, tileWidth, tileHeight, xOffset, yOffset, updateOnFrame, children, ...props}: Map2DLayer3DProps,
   ref: ForwardedRef<__Map2DLayer3D>,
 ) {
-  const [layer, setLayer] = useState<__Map2DLayer3D>(null);
+  const [layer, setLayer] = useState<__Map2DLayer3D | null>(null);
 
   useEffect(() => {
-    if (!updateOnFrame && layer.visible) {
+    if (!updateOnFrame && layer?.visible) {
       layer?.update();
     }
   }, [layer, updateOnFrame, centerX, centerY, tileWidth, tileHeight, xOffset, yOffset]);

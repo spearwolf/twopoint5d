@@ -17,7 +17,7 @@ describe('unpick', () => {
 
   test('return undefined if object is not defined', () => {
     expect(unpick(undefined)).toBeUndefined();
-    expect(unpick(undefined, 'foo', 'bar')).toBeUndefined();
+    expect(unpick(undefined as any, 'foo', 'bar')).toBeUndefined();
     expect(unpick(null)).toBeUndefined();
   });
 });

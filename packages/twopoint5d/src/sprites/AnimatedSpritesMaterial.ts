@@ -97,7 +97,7 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
       },
       transparent: true,
       side: DoubleSide,
-      ...unpick(options, 'uniforms', 'colorMap', 'animsMap', 'time'),
+      ...unpick(options ?? {}, 'uniforms', 'colorMap', 'animsMap', 'time'),
     });
 
     this.name = options?.name ?? 'twopoint5d.AnimatedSpritesMaterial';
@@ -118,24 +118,24 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
   }
 
   get colorMap(): Texture | undefined {
-    return this.uniforms.colorMap.value;
+    return this.uniforms['colorMap'].value;
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    this.uniforms.colorMap.value = colorMap;
+    this.uniforms['colorMap'].value = colorMap;
   }
 
   get animsMap(): Texture | undefined {
-    return this.uniforms.animsMap.value;
+    return this.uniforms['animsMap'].value;
   }
 
   set animsMap(animsMap: Texture | undefined) {
-    this.uniforms.animsMap.value = animsMap;
-    this.uniforms.animsMapSize.value = animsMap ? [animsMap.image.width, animsMap.image.height] : [0, 0];
+    this.uniforms['animsMap'].value = animsMap;
+    this.uniforms['animsMapSize'].value = animsMap ? [animsMap.image.width, animsMap.image.height] : [0, 0];
   }
 
   get renderAsBillboards(): boolean {
-    return this.defines?.RENDER_AS_BILLBOARDS === 1;
+    return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
   }
 
   set renderAsBillboards(renderAsBillboards: boolean) {

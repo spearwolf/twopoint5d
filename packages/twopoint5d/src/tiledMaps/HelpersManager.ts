@@ -32,8 +32,8 @@ export class HelpersManager {
   add(node: Object3D, addToRoot = false): void {
     const target = addToRoot ? this.root : this.#scene;
     if (target) {
-      node.userData.isHelper = true;
-      node.userData.createdBy = this.uuid;
+      node.userData['isHelper'] = true;
+      node.userData['createdBy'] = this.uuid;
       target.add(node);
     }
   }
@@ -47,13 +47,13 @@ export class HelpersManager {
   removeFromScene(scene: Object3D): void {
     const removeChilds: Object3D[] = [];
     for (const childNode of scene.children) {
-      if (childNode.userData.isHelper && childNode.userData.createdBy === this.uuid) {
+      if (childNode.userData['isHelper'] && childNode.userData['createdBy'] === this.uuid) {
         removeChilds.push(childNode);
       }
     }
     for (const childNode of removeChilds) {
       childNode.removeFromParent();
-      (childNode as any).dispose?.();
+      (childNode as unknown as {dispose?: () => void}).dispose?.();
     }
     if (this.root && scene !== this.root) {
       this.removeFromScene(this.root);

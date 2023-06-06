@@ -1,12 +1,11 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {IMap2DLayer, Map2DTileSprites as __Map2DTileSprites} from 'twopoint5d';
+import {Map2DTileSprites as __Map2DTileSprites, IMap2DLayer} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 import {Object3D} from 'three';
 
 extend({Map2DTileSprites: __Map2DTileSprites});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       map2DTileSprites: ReactThreeFiber.Node<__Map2DTileSprites, typeof __Map2DTileSprites>;
