@@ -1,7 +1,8 @@
 {
   "name": "twopoint5d-r3f",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/twopoint5d-r3f",
+  "root": "packages/twopoint5d-r3f",
+  "sourceRoot": "packages/twopoint5d-r3f/src",
   "projectType": "library",
   "targets": {
     "lint": {

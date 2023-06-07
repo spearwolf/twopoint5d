@@ -4,14 +4,7 @@
   "root": "apps/lookbook",
   "sourceRoot": "apps/lookbook/src",
   "projectType": "application",
-  "targets": {
-    "lint": {
-      "executor": "@nx/linter:eslint",
-      "outputs": ["{options.outputFile}"],
-      "options": {
-        "lintFilePatterns": ["{projectRoot}/src/**/*.ts", "{projectRoot}/src/**/*.tsx"]
-      }
-    }
-  },
+  "implicitDependencies": ["twopoint5d", "twopoint5d-r3f"],
+  "targets": {},
   "tags": []
 }

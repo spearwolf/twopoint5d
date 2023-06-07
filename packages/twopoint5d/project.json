@@ -1,7 +1,8 @@
 {
   "name": "twopoint5d",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/twopoint5d",
+  "root": "packages/twopoint5d",
+  "sourceRoot": "packages/twopoint5d/src",
   "projectType": "library",
   "targets": {
     "lint": {

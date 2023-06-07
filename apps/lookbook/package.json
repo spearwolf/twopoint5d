@@ -12,5 +12,12 @@
   },
   "dependencies": {
     "astro": "^2.5.6"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "dependsOn": ["^build"]
+      }
+    }
   }
 }
