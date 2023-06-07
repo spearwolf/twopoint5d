@@ -4,6 +4,14 @@
   "root": "apps/lookbook",
   "sourceRoot": "apps/lookbook/src",
   "projectType": "application",
-  "targets": {},
+  "targets": {
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/lookbook/**/*.js", "apps/lookbook/**/*.jsx", "apps/lookbook/**/*.ts", "apps/lookbook/**/*.tsx"]
+      }
+    }
+  },
   "tags": []
 }
