@@ -49,7 +49,7 @@ export class VertexObjectDescriptor {
   }
 
   get hasIndices(): boolean {
-    return this.description.indices?.length > 0;
+    return this.description.indices != null && this.description.indices.length > 0;
   }
 
   get indices(): number[] {
