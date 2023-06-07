@@ -11,12 +11,16 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^2.5.6"
+    "astro": "^2.5.6",
+    "@spearwolf/twopoint5d": "*",
+    "@spearwolf/twopoint5d-r3f": "*"
   },
   "nx": {
     "targets": {
       "build": {
-        "dependsOn": ["^build"]
+        "dependsOn": [
+          "^build"
+        ]
       }
     }
   }

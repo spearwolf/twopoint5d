@@ -4,7 +4,6 @@
   "root": "apps/lookbook",
   "sourceRoot": "apps/lookbook/src",
   "projectType": "application",
-  "implicitDependencies": ["twopoint5d", "twopoint5d-r3f"],
   "targets": {},
   "tags": []
 }
