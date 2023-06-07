@@ -11,9 +11,11 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^2.5.6",
+    "@astrojs/tailwind": "^3.1.3",
     "@spearwolf/twopoint5d": "*",
-    "@spearwolf/twopoint5d-r3f": "*"
+    "@spearwolf/twopoint5d-r3f": "*",
+    "astro": "^2.6.1",
+    "tailwindcss": "^3.3.2"
   },
   "nx": {
     "targets": {
