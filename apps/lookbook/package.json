@@ -16,14 +16,5 @@
     "@spearwolf/twopoint5d-r3f": "*",
     "astro": "^2.6.1",
     "tailwindcss": "^3.3.2"
-  },
-  "nx": {
-    "targets": {
-      "build": {
-        "dependsOn": [
-          "^build"
-        ]
-      }
-    }
   }
 }
