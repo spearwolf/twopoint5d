@@ -52,7 +52,8 @@
     "zustand": "^4.3.8"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "dependencies": {
     "tslib": "^2.5.3"
