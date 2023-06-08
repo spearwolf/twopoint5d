@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.16",
+    "pnpm": ">=8.6"
+  },
   "scripts": {
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
@@ -13,7 +18,6 @@
     "update": "npx npm-check --update",
     "cbt": "run-s clean build test"
   },
-  "private": true,
   "devDependencies": {
     "@nx/eslint-plugin": "^16.3.2",
     "@nx/jest": "^16.3.2",
