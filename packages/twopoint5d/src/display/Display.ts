@@ -37,7 +37,7 @@ export class Display {
   #rafID = -1;
   #lastResizeHash = '';
 
-  #fullscreenCssRules: string = undefined;
+  #fullscreenCssRules?: string;
   #fullscreenCssRulesMustBeRemoved = false;
 
   width = 0;
@@ -45,10 +45,10 @@ export class Display {
 
   frameNo = 0;
 
-  resizeToElement: HTMLElement = undefined;
-  resizeToCallback: ResizeCallback = undefined;
+  resizeToElement?: HTMLElement;
+  resizeToCallback?: ResizeCallback;
 
-  renderer: WebGLRenderer;
+  renderer?: WebGLRenderer;
 
   constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
@@ -61,9 +61,9 @@ export class Display {
       this.renderer = domElementOrRenderer;
       this.resizeToElement = domElementOrRenderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
-      let canvas;
+      let canvas: HTMLCanvasElement;
       if (domElementOrRenderer.tagName === 'CANVAS') {
-        canvas = domElementOrRenderer;
+        canvas = domElementOrRenderer as HTMLCanvasElement;
       } else {
         const container = document.createElement('div');
         Stylesheets.addRule(
@@ -91,7 +91,7 @@ export class Display {
       });
     }
 
-    const {domElement: canvas} = this.renderer;
+    const {domElement: canvas} = this.renderer!;
     Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;');
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
@@ -165,14 +165,14 @@ export class Display {
     let wPx = 300;
     let hPx = 150;
 
-    const canvasElement = this.renderer.domElement;
+    const canvasElement = this.renderer!.domElement;
 
     let sizeRefElement = this.resizeToElement;
 
     let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
 
     if (canvasElement.hasAttribute('resize-to')) {
-      const resizeTo = canvasElement.getAttribute('resize-to').trim();
+      const resizeTo = canvasElement.getAttribute('resize-to')!.trim();
       if (resizeTo.match(/^:?(fullscreen|window)$/)) {
         wPx = window.innerWidth;
         hPx = window.innerHeight;
@@ -190,12 +190,14 @@ export class Display {
           this.#fullscreenCssRulesMustBeRemoved = true;
         }
       } else if (resizeTo) {
-        sizeRefElement = document.querySelector(resizeTo) ?? canvasElement;
+        sizeRefElement = (document.querySelector(resizeTo) as HTMLElement) ?? canvasElement;
       }
     }
 
     if (fullscreenCssRulesMustBeRemoved) {
-      canvasElement.classList.remove(this.#fullscreenCssRules);
+      if (this.#fullscreenCssRules) {
+        canvasElement.classList.remove(this.#fullscreenCssRules);
+      }
       this.#fullscreenCssRulesMustBeRemoved = false;
     }
 
@@ -266,8 +268,8 @@ export class Display {
       this.width = wPx;
       this.height = hPx;
 
-      this.renderer.setPixelRatio(pixelRatio);
-      this.renderer.setSize(wPx, hPx, false);
+      this.renderer!.setPixelRatio(pixelRatio);
+      this.renderer!.setSize(wPx, hPx, false);
 
       canvasElement.style.width = `${cssWidth}px`;
       canvasElement.style.height = `${cssHeight}px`;
@@ -312,7 +314,7 @@ export class Display {
     this.stop();
     this.emit('dispose');
     this.off();
-    this.renderer.dispose();
+    this.renderer?.dispose();
     delete this.renderer;
   }
 
@@ -320,7 +322,7 @@ export class Display {
   getEventArgs(): DisplayEventArgs {
     return {
       display: this,
-      renderer: this.renderer,
+      renderer: this.renderer!,
 
       width: this.width,
       height: this.height,
