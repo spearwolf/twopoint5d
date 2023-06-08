@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/VanillaDemo.astro';
+import {title} from './display-minimal.json';
 ---
 
-<Layout title="minimal display">
+<Layout title={title}>
   <canvas id="twopoint5d" resize-to="window"></canvas>
 </Layout>
 
@@ -13,13 +14,13 @@ import Layout from '../../layouts/VanillaDemo.astro';
   const canvas = document.getElementById('twopoint5d')!;
   const display = new Display(canvas);
 
-  const DISPLAY_WIDTH = 100;
-  const DISPLAY_HEIGHT = 100;
+  const width = 197;
+  const height = 205;
 
   const stage = new Stage2D(
     new ParallaxProjection('xy|bottom-left', {
-      width: DISPLAY_WIDTH,
-      height: DISPLAY_HEIGHT,
+      width: width,
+      height: height,
       fit: 'contain',
     }),
   );
@@ -34,7 +35,7 @@ import Layout from '../../layouts/VanillaDemo.astro';
   const material = new SpriteMaterial({map: textureImage});
   const sprite = new Sprite(material);
 
-  sprite.scale.set(DISPLAY_WIDTH, DISPLAY_HEIGHT, 1);
+  sprite.scale.set(width, height, 1);
   stage.scene.add(sprite);
 
   display.on('init', ({renderer}) => {
