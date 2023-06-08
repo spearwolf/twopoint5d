@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/VanillaDemo.astro';
+import Layout from '@layouts/VanillaDemo.astro';
 import {title} from './display-minimal.json';
 ---
 
@@ -10,6 +10,7 @@ import {title} from './display-minimal.json';
 <script>
   import {Color, Sprite, SpriteMaterial} from 'three';
   import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
+  import assetsUrl from '@utils/assetsUrl';
 
   const canvas = document.getElementById('twopoint5d')!;
   const display = new Display(canvas);
@@ -30,7 +31,7 @@ import {title} from './display-minimal.json';
 
   const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy']);
 
-  const textureImage = textureFactory.load(`${import.meta.env.BASE_URL}/assets/ball-pattern-rot--not-power-of-2.png`);
+  const textureImage = textureFactory.load(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
 
   const material = new SpriteMaterial({map: textureImage});
   const sprite = new Sprite(material);

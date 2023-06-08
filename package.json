@@ -16,7 +16,8 @@
     "test:affected": "nx affected -t test",
     "clean": "nx run-many -t clean && rimraf dist && nx reset",
     "update": "npx npm-check --update",
-    "cbt": "run-s clean build test"
+    "cbt": "run-s clean build test",
+    "start": "nx dev lookbook"
   },
   "devDependencies": {
     "@nx/eslint-plugin": "^16.3.2",
