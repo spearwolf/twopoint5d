@@ -29,6 +29,7 @@
     "@spearwolf/eventize": "^2.2.0",
     "@types/jest": "^29.4.0",
     "@types/node": "^20.2.5",
+    "@types/react": "^18.2.9",
     "@types/sinon": "^10.0.15",
     "@types/three": "^0.152.1",
     "@typescript-eslint/eslint-plugin": "^5.59.9",
@@ -55,10 +56,6 @@
     "use-asset": "^1.0.4",
     "zustand": "^4.3.8"
   },
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
   "dependencies": {
     "tslib": "^2.5.3"
   }
