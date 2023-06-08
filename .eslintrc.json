@@ -4,7 +4,7 @@
   "plugins": ["@nx", "prettier"],
   "overrides": [
     {
-      "files": ["*.ts", "*.tsx", "*.js", "*.jsx"],
+      "files": ["*.ts", "*.tsx", "*.js", "*.mjs", "*.jsx"],
       "extends": ["plugin:import/recommended", "plugin:prettier/recommended"],
       "rules": {
         "@nx/enforce-module-boundaries": [
@@ -51,7 +51,7 @@
       }
     },
     {
-      "files": ["*.js", "*.jsx"],
+      "files": ["*.js", "*.mjs", "*.jsx"],
       "extends": ["plugin:@nx/javascript"],
       "rules": {}
     },
