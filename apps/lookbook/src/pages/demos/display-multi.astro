@@ -1,5 +1,5 @@
 ---
-import Layout from '@layouts/VanillaDemo.astro';
+import Layout from '~layouts/VanillaDemo.astro';
 import {title} from './display-multi.json';
 ---
 
@@ -57,7 +57,7 @@ import {title} from './display-multi.json';
 <script>
   import {Color, Sprite, SpriteMaterial} from 'three';
   import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
-  import assetsUrl from '@utils/assetsUrl';
+  import assetsUrl from '~utils/assetsUrl';
 
   function createCanvasSizeInfoUpdater(el: HTMLElement) {
     let canvasSizeInfo = el.parentElement!;

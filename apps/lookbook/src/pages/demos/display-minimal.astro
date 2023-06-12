@@ -1,5 +1,5 @@
 ---
-import Layout from '@layouts/VanillaDemo.astro';
+import Layout from '~layouts/VanillaDemo.astro';
 import {title} from './display-minimal.json';
 ---
 
@@ -10,7 +10,7 @@ import {title} from './display-minimal.json';
 <script>
   import {Color, Sprite, SpriteMaterial} from 'three';
   import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
-  import assetsUrl from '@utils/assetsUrl';
+  import assetsUrl from '~utils/assetsUrl';
 
   const canvas = document.getElementById('twopoint5d')!;
   const display = new Display(canvas);
