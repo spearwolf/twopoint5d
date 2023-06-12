@@ -1,5 +1,6 @@
 {
   "title": "multiple displays",
   "description": "Multiple examples in one page of how to use the Display class helper",
-  "url": "/demos/display-multi"
+  "url": "/demos/display-multi",
+  "tags": ["TextureFactory", "Stage2D", "ParallaxProjection", "Display"]
 }
