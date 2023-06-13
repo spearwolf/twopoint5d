@@ -1,0 +1,151 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './textured-quads.json';
+---
+
+<Layout title={title}>
+  <script id="vertexShader" type="x-shader/x-vertex">
+    attribute vec2 quadSize;
+    attribute vec3 instancePosition;
+    attribute vec4 texCoords;
+
+    varying vec2 vTexCoords;
+
+    void main() {
+      vec4 pos = vec4(
+        position.x * quadSize.x + instancePosition.x,
+        position.y * quadSize.y + instancePosition.y,
+        position.z + instancePosition.z,
+        1.0
+      );
+
+      gl_Position = projectionMatrix * modelViewMatrix * pos;
+
+      vTexCoords = vec2(
+        texCoords.x + (uv.x * texCoords.z),
+        texCoords.y + (uv.y * texCoords.w)
+      );
+    }
+  </script>
+
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    uniform sampler2D colorMap;
+
+    varying vec2 vTexCoords;
+
+    void main()	{
+      gl_FragColor = texture2D(colorMap, vTexCoords);
+
+      gl_FragColor.a *= 0.75;
+    }
+  </script>
+
+  <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <div id="texture-preview" class="texture-preview"></div>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #391e39;
+    background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
+  }
+  .texture-preview {
+    background-color: rgba(86, 101, 115, 80%);
+    border: 5px solid #324168;
+    border-radius: 5px;
+    width: 150px;
+    height: 150px;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+    overflow: hidden;
+  }
+  .texture-preview :global(img),
+  .texture-preview :global(canvas) {
+    max-width: 100%;
+  }
+</style>
+
+<script>
+  import { TextureCoords, TextureImageLoader, VertexObjects } from "@spearwolf/twopoint5d";
+  import { DoubleSide, ShaderMaterial, Texture } from "three";
+  import { InstancedQuadsGeometry } from "~shared/instanced-quads/InstancedQuadsGeometry";
+  import { PerspectiveOrbitDemo } from "~utils/PerspectiveOrbitDemo";
+  import assetsUrl from '~utils/assetsUrl';
+
+  function makeMesh(rows: number, columns: number, size: number, offset: number, texCoords: TextureCoords, texture: Texture) {
+    const capacity = rows * columns;
+    const geometry = new InstancedQuadsGeometry(capacity);
+
+    geometry.basePool.createVO().make();
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < columns; x++) {
+        const quad = geometry.instancedPool.createVO();
+
+        quad.width = 1.0 + Math.random() * (size - 1.0);
+        quad.height = quad.width;
+
+        quad.setInstancePosition([
+          x * size * offset - ((columns - 1) * size * offset) / 2,
+          y * size * offset - ((rows - 1) * size * offset) / 2,
+          0,
+        ]);
+
+        quad.setTexCoords([
+          texCoords.s,
+          texCoords.t,
+          texCoords.u,
+          texCoords.v,
+        ]);
+      }
+    }
+
+    const material = new ShaderMaterial({
+      vertexShader: document.getElementById("vertexShader").textContent,
+      fragmentShader: document.getElementById("fragmentShader").textContent,
+      uniforms: {
+        colorMap: {
+          value: texture,
+        },
+      },
+      transparent: true,
+      side: DoubleSide,
+    });
+
+    const mesh = new VertexObjects(geometry, material);
+    mesh.name = "InstancedQuadsMesh";
+    mesh.frustumCulled = false;
+
+    return mesh;
+  }
+
+  const demo = new PerspectiveOrbitDemo(
+    document.getElementById("canvas-container"),
+    { antialias: false }
+  );
+
+  const { imgEl, texture, texCoords } =
+    await new TextureImageLoader().loadAsync(
+      assetsUrl("ball-pattern-rot--not-power-of-2.png"),
+      ["nearest"]
+    );
+
+  console.log("loaded texture-image", { imgEl, texCoords, texture });
+
+  document.getElementById("texture-preview").appendChild(imgEl);
+
+  demo.on("init", ({ scene }) => {
+    scene.add(makeMesh(16, 32, 3.5, 1, texCoords, texture));
+  });
+
+  demo.start();
+
+  console.log("TexturedQuadsMesh", demo.scene.children[0]);
+</script>

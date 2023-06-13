@@ -1,0 +1,6 @@
+{
+  "title": "textured quads",
+  "description": "How to use the VertexObjects mesh with a texture map",
+  "url": "/demos/textured-quads",
+  "tags": ["TextureCoords", "TextureImageLoader", "VertexObjects", "instanced"]
+}
