@@ -1,0 +1,84 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './textured-sprites.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #391e39;
+    background: radial-gradient(circle, rgb(82 95 132) 0%, rgb(149 188 199) 100%);
+    color: #eee;
+    font-family: sans-serif;
+    font-size: 16px;
+    line-height: 2;
+  }
+  em {
+    font-size: 84.615384%;
+    color: #ddd;
+  }
+</style>
+
+<script>
+  import {
+    AnimatedSprites,
+    AnimatedSpritesGeometry,
+    AnimatedSpritesMaterial,
+    FrameBasedAnimations,
+    TileSetLoader,
+  } from '@spearwolf/twopoint5d';
+  import {BouncingSprites} from '~shared/animated-sprites/BouncingSprites';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  demo.on('init', async ({scene}) => {
+    const CAPACITY = 333;
+
+    const geometry = new AnimatedSpritesGeometry(CAPACITY);
+
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
+      tileWidth: 64,
+      tileHeight: 64,
+      margin: 1,
+    });
+
+    const anims = new FrameBasedAnimations();
+    const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 500, 75, 7);
+
+    bouncingSprites.createSprites(CAPACITY, animId);
+
+    const material = new AnimatedSpritesMaterial();
+
+    material.colorMap = texture;
+    material.animsMap = anims.bakeDataTexture();
+
+    material.renderAsBillboards = false;
+    material.depthTest = false;
+    material.depthWrite = false;
+
+    const mesh = new AnimatedSprites(geometry, material);
+
+    scene.add(mesh);
+
+    demo.on('frame', ({deltaTime, now}) => {
+      bouncingSprites.animate(deltaTime);
+      material.uniforms['time'].value = now;
+    });
+
+    console.log('BouncingSprites', bouncingSprites);
+    console.log('AnimatedSprites', mesh);
+  });
+
+  demo.start();
+</script>
