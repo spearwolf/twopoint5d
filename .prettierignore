@@ -5,5 +5,10 @@
 /examples
 *.md
 
+apps/*/dist
+apps/*/build
+packages/*/dist
+packages/*/build
+
 pnpm-lock.yaml
 pnpm-workspace.yaml
