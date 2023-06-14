@@ -73,7 +73,7 @@ interface AnimatedSpritesMaterialParameters extends CustomChunksShaderMaterialPa
   colorMap?: Texture;
   animsMap?: Texture;
   time?: number;
-  // TODO add renderAsBillboards prop
+  renderAsBillboards?: boolean;
 }
 
 export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
@@ -93,15 +93,19 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
           value: [options?.animsMap?.image.width ?? 0, options?.animsMap?.image.height ?? 0],
         },
         time: {
-          value: 0,
+          value: options?.time ?? 0,
         },
       },
       transparent: true,
       side: DoubleSide,
-      ...unpick(options ?? {}, 'uniforms', 'colorMap', 'animsMap', 'time'),
+      ...unpick(options ?? {}, 'uniforms', 'colorMap', 'animsMap', 'time', 'renderAsBillboards'),
     });
 
     this.name = options?.name ?? 'twopoint5d.AnimatedSpritesMaterial';
+
+    if (typeof options?.renderAsBillboards === 'boolean') {
+      this.renderAsBillboards = options.renderAsBillboards!;
+    }
 
     this.replaceVertexShaderChunks = [
       'extra_pars_vertex',

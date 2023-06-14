@@ -38,6 +38,7 @@ import {title} from './textured-sprites.json';
     demo.camera.position.set(0, 70, -210);
 
     const CAPACITY = 400;
+
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
     const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
@@ -53,14 +54,13 @@ import {title} from './textured-sprites.json';
 
     bouncingSprites.createSprites(CAPACITY, animId);
 
-    const material = new AnimatedSpritesMaterial();
-
-    material.colorMap = texture;
-    material.animsMap = anims.bakeDataTexture();
-
-    material.renderAsBillboards = true;
-    material.depthTest = true;
-    material.depthWrite = true;
+    const material = new AnimatedSpritesMaterial({
+      colorMap: texture,
+      animsMap: anims.bakeDataTexture(),
+      depthTest: true,
+      depthWrite: true,
+      renderAsBillboards: true,
+    });
 
     const mesh = new AnimatedSprites(geometry, material);
 
@@ -71,7 +71,7 @@ import {title} from './textured-sprites.json';
       material.uniforms['time'].value = now;
     });
 
-    console.log(bouncingSprites);
+    console.log('BouncingSprites', bouncingSprites);
 
     const cylinderGeometry = new CylinderGeometry(170, 170, 3, 180);
     const cylinderMaterial = new MeshPhongMaterial({
@@ -89,6 +89,6 @@ import {title} from './textured-sprites.json';
 
     demo.scene.add(mainLight);
 
-    console.log(mesh);
+    console.log('AnimatedSprites', mesh);
   });
 </script>
