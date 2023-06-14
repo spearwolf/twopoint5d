@@ -73,6 +73,7 @@ interface AnimatedSpritesMaterialParameters extends CustomChunksShaderMaterialPa
   colorMap?: Texture;
   animsMap?: Texture;
   time?: number;
+  // TODO add renderAsBillboards prop
 }
 
 export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {

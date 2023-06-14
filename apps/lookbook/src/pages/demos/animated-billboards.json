@@ -1,0 +1,14 @@
+{
+  "title": "animated billboards",
+  "description": "A demo showing how to render animated billboards.",
+  "url": "/demos/animated-billboards",
+  "tags": [
+    "AnimatedSprites",
+    "AnimatedSpritesGeometry",
+    "AnimatedSpritesMaterial",
+    "FrameBasedAnimations",
+    "TileSetLoader",
+    "tilesets",
+    "billboards"
+  ]
+}
