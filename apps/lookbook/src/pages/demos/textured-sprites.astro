@@ -34,17 +34,16 @@ import {title} from './textured-sprites.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
-    tileWidth: 64,
-    tileHeight: 64,
-    margin: 1,
-  });
-
-  demo.on('init', ({scene, camera}) => {
-    camera.position.set(0, 0, 50);
-
+  demo.on('init', async ({scene}) => {
     const CAPACITY = 333;
+
     const geometry = new TexturedSpritesGeometry(CAPACITY);
+
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
+      tileWidth: 64,
+      tileHeight: 64,
+      margin: 1,
+    });
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 100, 75, 7, CAPACITY);
 
@@ -54,20 +53,15 @@ import {title} from './textured-sprites.json';
       bouncingSprites.animate(deltaTime);
     });
 
-    const material = new TexturedSpritesMaterial();
-
-    material.colorMap = texture;
-    material.depthTest = false;
-    material.depthWrite = false;
+    const material = new TexturedSpritesMaterial({colorMap: texture, depthTest: false, depthWrite: false});
 
     const mesh = new TexturedSprites(geometry, material);
 
     scene.add(mesh);
 
     console.log('bouncingSprites', bouncingSprites);
+    console.log('TexturedSpritesMesh', mesh);
   });
 
   demo.start();
-
-  console.log('TexturedSpritesMesh', demo.scene.children[0]);
 </script>
