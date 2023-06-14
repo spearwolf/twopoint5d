@@ -15,7 +15,8 @@
       "~components/*": ["src/components/*"],
       "~layouts/*": ["src/layouts/*"],
       "~utils/*": ["src/utils/*"],
-      "~shared/*": ["src/shared/*"]
+      "~shared/*": ["src/shared/*"],
+      "~shaders/*": ["src/shaders/*"]
     }
   }
 }

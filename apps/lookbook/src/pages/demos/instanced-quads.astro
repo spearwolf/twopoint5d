@@ -4,28 +4,6 @@ import {title} from './instanced-quads.json';
 ---
 
 <Layout title={title}>
-  <script id="vertexShader" type="x-shader/x-vertex">
-    attribute vec2 quadSize;
-    attribute vec3 instancePosition;
-
-    void main() {
-      vec4 pos = vec4(
-        position.x * quadSize.x + instancePosition.x,
-        position.y * quadSize.y + instancePosition.y,
-        position.z + instancePosition.z,
-        1.0
-      );
-
-      gl_Position = projectionMatrix * modelViewMatrix * pos;
-    }
-  </script>
-
-  <script id="fragmentShader" type="x-shader/x-fragment">
-    void main()	{
-      gl_FragColor = vec4(1.0, 0.3, 0.6, 0.9);
-    }
-  </script>
-
   <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 
@@ -42,8 +20,11 @@ import {title} from './instanced-quads.json';
 
 <script>
   import {InstancedVertexObjectGeometry, VO, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, ShaderMaterial} from "three";
-  import {PerspectiveOrbitDemo} from "~utils/PerspectiveOrbitDemo";
+  import {DoubleSide, ShaderMaterial} from 'three';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import loadShaderSource from '~utils/loadShaderSource';
+  import vertexShaderSource from '~shaders/instanced-quads.vert?url';
+  import fragmentShaderSource from '~shaders/instanced-quads.frag?url';
 
   interface BaseQuad extends VO {
     setPosition(position: [number, number, number, number, number, number, number, number, number, number, number, number]): void;
@@ -51,12 +32,7 @@ import {title} from './instanced-quads.json';
 
   class BaseQuad {
     make(width = 0.5, height = 0.5) {
-      this.setPosition([
-        - width, - height, 0,
-        - width, + height, 0,
-        + width, + height, 0,
-        + width, - height, 0,
-      ]);
+      this.setPosition([-width, -height, 0, -width, +height, 0, +width, +height, 0, +width, -height, 0]);
     }
   }
 
@@ -65,7 +41,7 @@ import {title} from './instanced-quads.json';
     indices: [0, 2, 1, 0, 3, 2],
 
     attributes: {
-      position: { components: ["x", "y", "z"] },
+      position: {components: ['x', 'y', 'z']},
     },
 
     basePrototype: BaseQuad.prototype,
@@ -75,25 +51,25 @@ import {title} from './instanced-quads.json';
     width: number;
     height: number;
 
-    setInstancePosition: (position: [number,number]) => void;
+    setInstancePosition: (position: [number, number]) => void;
   }
 
   const InstancedQuadDescriptor = {
     meshCount: 1,
 
     attributes: {
-      quadSize: { components: ["width", "height"] },
-      instancePosition: { components: ["x", "y", "z"] },
+      quadSize: {components: ['width', 'height']},
+      instancePosition: {components: ['x', 'y', 'z']},
     },
   };
 
-  function makeMesh(rows: number, columns: number, size: number, offset: number) {
+  async function makeMesh(rows: number, columns: number, size: number, offset: number) {
     const capacity = rows * columns;
 
     const geometry = new InstancedVertexObjectGeometry<InstancedQuad, BaseQuad>(
       InstancedQuadDescriptor,
       capacity,
-      BaseQuadDescriptor
+      BaseQuadDescriptor,
     );
 
     geometry.basePool.createVO().make();
@@ -111,27 +87,23 @@ import {title} from './instanced-quads.json';
     }
 
     const material = new ShaderMaterial({
-      vertexShader: document.getElementById("vertexShader").textContent,
-      fragmentShader: document.getElementById("fragmentShader").textContent,
+      vertexShader: await loadShaderSource(vertexShaderSource),
+      fragmentShader: await loadShaderSource(fragmentShaderSource),
       transparent: true,
       side: DoubleSide,
     });
 
     const mesh = new VertexObjects(geometry, material);
-    mesh.name = "InstancedQuadsMesh";
+    mesh.name = 'InstancedQuadsMesh';
 
     return mesh;
   }
 
-  const demo = new PerspectiveOrbitDemo(
-    document.getElementById("canvas-container")
-  );
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
-  demo.on("init", ({ scene }) => {
-    scene.add(makeMesh(10, 20, 3.2, 1.2));
+  await demo.start(async () => {
+    demo.scene.add(await makeMesh(10, 20, 3.2, 1.2));
   });
 
-  demo.start();
-
-  console.log("InstancedQuadsMesh", demo.scene.children[0]);
+  console.log('InstancedQuadsMesh', demo.scene.children[0]);
 </script>
