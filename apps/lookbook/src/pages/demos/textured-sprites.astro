@@ -1,0 +1,73 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './textured-sprites.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #391e39;
+    background: radial-gradient(circle, rgb(82 95 132) 0%, rgb(149 188 199) 100%);
+    color: #eee;
+    font-family: sans-serif;
+    font-size: 16px;
+    line-height: 2;
+  }
+  em {
+    font-size: 84.615384%;
+    color: #ddd;
+  }
+</style>
+
+<script>
+  import {TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial, TileSetLoader} from '@spearwolf/twopoint5d';
+  import {BouncingSprites} from '~shared/textured-sprites/BouncingSprites';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
+    tileWidth: 64,
+    tileHeight: 64,
+    margin: 1,
+  });
+
+  demo.on('init', ({scene, camera}) => {
+    camera.position.set(0, 0, 50);
+
+    const CAPACITY = 333;
+    const geometry = new TexturedSpritesGeometry(CAPACITY);
+
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 100, 75, 7, CAPACITY);
+
+    bouncingSprites.createSprites();
+
+    demo.on('frame', ({deltaTime}) => {
+      bouncingSprites.animate(deltaTime);
+    });
+
+    const material = new TexturedSpritesMaterial();
+
+    material.colorMap = texture;
+    material.depthTest = false;
+    material.depthWrite = false;
+
+    const mesh = new TexturedSprites(geometry, material);
+
+    scene.add(mesh);
+
+    console.log('bouncingSprites', bouncingSprites);
+  });
+
+  demo.start();
+
+  console.log('TexturedSpritesMesh', demo.scene.children[0]);
+</script>
