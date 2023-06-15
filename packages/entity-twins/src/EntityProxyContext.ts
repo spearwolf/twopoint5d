@@ -1,8 +1,11 @@
+import {EntityChanges} from './EntityChanges';
 import {EntityProxy} from './EntityProxy';
+import {EntityTrailType, IEntityChangeEntry} from './types';
 
 interface EntityEntry {
   entity: EntityProxy;
   children: Set<string>;
+  changes: EntityChanges;
 }
 
 declare global {
@@ -30,6 +33,8 @@ export class EntityProxyContext {
   #entities: Map<string, EntityEntry> = new Map();
   #rootEntities: Set<string> = new Set();
 
+  #removedEntityChanges: EntityChanges[] = [];
+
   addEntity(entity: EntityProxy) {
     if (this.hasEntity(entity)) {
       throw new Error(`Entity with uuid:${entity.uuid} already exists`);
@@ -37,6 +42,7 @@ export class EntityProxyContext {
     this.#entities.set(entity.uuid, {
       entity,
       children: new Set<string>(),
+      changes: new EntityChanges(entity.uuid),
     });
     if (entity.parent) {
       this.addToChildren(entity.parent, entity);
@@ -63,6 +69,8 @@ export class EntityProxyContext {
 
       this.#entities.delete(entity.uuid);
       this.#rootEntities.delete(entity.uuid);
+
+      this.#removedEntityChanges.push(entry.changes);
     }
   }
 
@@ -113,6 +121,45 @@ export class EntityProxyContext {
 
     if (this.#entities.size !== 0) {
       throw new Error('entity-proxy-context clear panic: entities is not empty!');
+    }
+  }
+
+  buildChangeTrails() {
+    const trail: IEntityChangeEntry[] = [];
+    const changePath: EntityChanges[] = [];
+
+    for (const changes of this.#removedEntityChanges) {
+      changes.buildChangeTrail(trail, EntityTrailType.Cleanup);
+      changes.clear();
+    }
+
+    this.#removedEntityChanges.length = 0;
+
+    for (const entityUuid of this.#rootEntities) {
+      this.#buildChangesPath(entityUuid, changePath);
+    }
+
+    for (const changes of changePath) {
+      changes.buildChangeTrail(trail, EntityTrailType.Structural);
+    }
+
+    for (const changes of changePath) {
+      changes.buildChangeTrail(trail, EntityTrailType.Content);
+      changes.clear();
+    }
+
+    return trail;
+  }
+
+  #buildChangesPath(entityUuid: string, path: EntityChanges[]) {
+    const entity = this.#entities.get(entityUuid);
+    if (entity) {
+      if (entity.changes.hasChanges()) {
+        path.push(entity.changes);
+      }
+      for (const childUuid of entity.children) {
+        this.#buildChangesPath(childUuid, path);
+      }
     }
   }
 }
