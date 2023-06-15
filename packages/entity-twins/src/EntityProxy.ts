@@ -1,16 +1,12 @@
-import {Eventize} from '@spearwolf/eventize';
-
-export interface EntityProxy extends Eventize {}
+import {EntityProxyContext} from './EntityProxyContext';
+import {generateUUID} from './generateUUID';
 
 export class EntityProxy {
-  static SetParent = Symbol('setParent');
-  static RemoveFromParent = Symbol('removeFromParent');
-  static AddChild = Symbol('addChild');
-  static RemoveChild = Symbol('removeChild');
-
   #uuid: string;
   #token: string;
 
+  #namespace?: string | symbol;
+  #context: EntityProxyContext;
   #parent?: EntityProxy;
 
   get uuid() {
@@ -27,16 +23,21 @@ export class EntityProxy {
 
   set parent(parent: EntityProxy | null | undefined) {
     if (parent) {
-      this.addChild(parent);
+      parent.addChild(this);
     } else {
       this.removeFromParent();
     }
   }
 
-  constructor(token: string, parent?: EntityProxy) {
-    this.#uuid = globalThis.crypto.randomUUID();
+  constructor(token: string, parent?: EntityProxy, namespace?: string | symbol) {
+    this.#uuid = generateUUID();
+
     this.#token = token;
     this.#parent = parent;
+    this.#namespace = namespace;
+
+    this.#context = EntityProxyContext.get(this.#namespace);
+    this.#context.addEntity(this);
   }
 
   isChildOf(entity: EntityProxy) {
@@ -45,18 +46,21 @@ export class EntityProxy {
 
   removeFromParent() {
     if (this.#parent) {
-      this.#parent.emit(EntityProxy.RemoveChild, this, this.#parent);
-      this.#parent.emit(EntityProxy.RemoveFromParent, this.#parent, this);
+      this.#context.removeChildFromParent(this.uuid, this.#parent);
       this.#parent = undefined;
     }
   }
 
-  addChild(entity: EntityProxy) {
-    if (!entity.isChildOf(this)) {
-      this.removeFromParent();
-      entity.#parent = this;
-      this.emit(EntityProxy.AddChild, entity, this);
-      entity.emit(EntityProxy.SetParent, this, entity);
+  addChild(child: EntityProxy) {
+    if (!child.isChildOf(this)) {
+      child.removeFromParent();
+      child.#parent = this;
+      this.#context.addToChildren(this, child);
     }
+  }
+
+  destroy() {
+    this.removeFromParent();
+    this.#context.removeEntity(this);
   }
 }
