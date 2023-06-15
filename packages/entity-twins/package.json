@@ -1,0 +1,33 @@
+{
+  "name": "@spearwolf/entity-twins",
+  "description": "a library for creating entity hierarchies",
+  "version": "0.0.1-dev",
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
+  },
+  "main": "dist/entity-twins.js",
+  "type": "module",
+  "module": "dist/entity-twins.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    "import": "./dist/entity-twins.js",
+    "require": "./dist/entity-twins.cjs.js"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "run-s compile bundle",
+    "compile": "tsc -b tsconfig.build.json",
+    "bundle": "rollup -c rollup.config.js",
+    "clean": "rimraf build types dist ../../dist/packages/entity-twins"
+  },
+  "peerDependencies": {
+    "@spearwolf/eventize": "^2.2.0"
+  },
+  "rollup": {
+    "external": [
+      "@spearwolf/eventize"
+    ]
+  }
+}

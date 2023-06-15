@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+
+    "rootDir": "./src",
+    "outDir": "./build/src",
+
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "declarationMap": true
+  },
+  "files": [],
+  "include": [],
+  "exclude": ["build", "dist"]
+}
