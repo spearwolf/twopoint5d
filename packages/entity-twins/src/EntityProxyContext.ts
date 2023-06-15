@@ -28,6 +28,7 @@ export class EntityProxyContext {
   }
 
   #entities: Map<string, EntityEntry> = new Map();
+  #rootEntities: Set<string> = new Set();
 
   addEntity(entity: EntityProxy) {
     if (this.hasEntity(entity)) {
@@ -39,6 +40,8 @@ export class EntityProxyContext {
     });
     if (entity.parent) {
       this.addToChildren(entity.parent, entity);
+    } else {
+      this.#rootEntities.add(entity.uuid);
     }
   }
 
@@ -46,15 +49,20 @@ export class EntityProxyContext {
     return this.#entities.has(entity.uuid);
   }
 
+  isRootEntity(entity: EntityProxy) {
+    return this.#rootEntities.has(entity.uuid);
+  }
+
   removeEntity(entity: EntityProxy) {
     if (this.hasEntity(entity)) {
       const entry = this.#entities.get(entity.uuid)!;
 
-      for (const child of entry.children) {
-        this.#entities.get(child)!.entity.removeFromParent();
+      for (const childUuid of entry.children) {
+        this.#entities.get(childUuid)?.entity.removeFromParent();
       }
 
       this.#entities.delete(entity.uuid);
+      this.#rootEntities.delete(entity.uuid);
     }
   }
 
@@ -63,6 +71,7 @@ export class EntityProxyContext {
       const entry = this.#entities.get(parent.uuid)!;
       entry.children.delete(childUuid);
     }
+    this.#rootEntities.add(childUuid);
   }
 
   isChildOf(child: EntityProxy, parent: EntityProxy) {
@@ -77,8 +86,33 @@ export class EntityProxyContext {
     const entry = this.#entities.get(parent.uuid);
     if (entry) {
       entry.children.add(child.uuid);
+      this.#rootEntities.delete(child.uuid);
     } else {
       throw new Error(`Could not add child entity to parent! Parent entity with uuid:${parent.uuid} does not exist`);
+    }
+  }
+
+  removeEntitySubTree(entityUuid: string) {
+    const entry = this.#entities.get(entityUuid);
+    if (entry) {
+      for (const childUuid of Array.from(entry.children)) {
+        this.removeEntitySubTree(childUuid);
+      }
+      this.removeEntity(entry.entity);
+    }
+  }
+
+  clear() {
+    for (const entity of Array.from(this.#rootEntities)) {
+      this.removeEntitySubTree(entity);
+    }
+
+    if (this.#rootEntities.size !== 0) {
+      throw new Error('entity-proxy-context clear panic: rootEntities is not empty!');
+    }
+
+    if (this.#entities.size !== 0) {
+      throw new Error('entity-proxy-context clear panic: entities is not empty!');
     }
   }
 }
