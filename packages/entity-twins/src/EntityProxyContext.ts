@@ -39,13 +39,15 @@ export class EntityProxyContext {
     if (this.hasEntity(entity)) {
       throw new Error(`Entity with uuid:${entity.uuid} already exists`);
     }
+    const changes = new EntityChanges(entity.uuid);
     this.#entities.set(entity.uuid, {
       entity,
       children: new Set<string>(),
-      changes: new EntityChanges(entity.uuid),
+      changes,
     });
     if (entity.parent) {
       this.addToChildren(entity.parent, entity);
+      changes.setParent(entity.parent.uuid);
     } else {
       this.#rootEntities.add(entity.uuid);
     }
@@ -71,6 +73,7 @@ export class EntityProxyContext {
       this.#rootEntities.delete(entity.uuid);
 
       this.#removedEntityChanges.push(entry.changes);
+      entry.changes.destroyEntity();
     }
   }
 

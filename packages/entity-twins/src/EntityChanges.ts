@@ -19,6 +19,11 @@ export class EntityChanges {
     this.#entityUuid = entityUuid;
   }
 
+  destroyEntity() {
+    this.#isDestroyEntity = true;
+    this.#curTrailSerial++;
+  }
+
   removeChild(childUuid: string) {
     this.#removeChildren.add(childUuid);
     this.#curTrailSerial++;
