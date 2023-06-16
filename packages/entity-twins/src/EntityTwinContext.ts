@@ -1,6 +1,5 @@
 import {EntityChanges} from './EntityChanges';
 import {EntityTwin} from './EntityTwin';
-import {appendTo} from './array-utils';
 import {EntityChangeTrailPhase, IEntityChangeEntry} from './types';
 
 interface EntityEntry {
@@ -99,7 +98,8 @@ export class EntityTwinContext {
   addToChildren(parent: EntityTwin, child: EntityTwin) {
     const entry = this.#entities.get(parent.uuid);
     if (entry) {
-      appendTo(entry.children, child.uuid);
+      // appendTo(entry.children, child.uuid);
+      this.#appendToOrdered(child, entry.children);
       this.#entities.get(child.uuid)?.changes.setParent(parent.uuid);
       this.#rootEntities.delete(child.uuid);
     } else {
@@ -183,5 +183,43 @@ export class EntityTwinContext {
     }
 
     return path;
+  }
+
+  #appendToOrdered(entity: EntityTwin, childUuids: string[]) {
+    if (childUuids.length === 0) {
+      childUuids.push(entity.uuid);
+      return;
+    }
+
+    const len = childUuids.length;
+    const childEntities = new Array<EntityTwin>(len);
+
+    childEntities[0] = this.#entities.get(childUuids[0])!.entity;
+
+    if (entity.order < childEntities[0].order) {
+      childUuids.unshift(entity.uuid);
+      return;
+    }
+
+    if (len === 1) {
+      childUuids.push(entity.uuid);
+      return;
+    }
+
+    const lastIdx = len - 1;
+    childEntities[lastIdx] = this.#entities.get(childUuids[lastIdx])!.entity;
+
+    if (entity.order >= childEntities[lastIdx].order) {
+      childUuids.push(entity.uuid);
+      return;
+    }
+
+    for (let i = lastIdx - 1; i >= 1; i--) {
+      childEntities[i] = this.#entities.get(childUuids[i])!.entity;
+      if (entity.order >= childEntities[i].order) {
+        childUuids.splice(i + 1, 0, entity.uuid);
+        return;
+      }
+    }
   }
 }

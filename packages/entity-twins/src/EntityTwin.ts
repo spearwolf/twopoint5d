@@ -42,11 +42,12 @@ export class EntityTwin {
     this.#order = order ?? 0;
   }
 
-  constructor(token: string, parent?: EntityTwin, namespace?: string | symbol) {
+  constructor(token: string, parent?: EntityTwin, order = 0, namespace?: string | symbol) {
     this.#uuid = generateUUID();
 
     this.#token = token;
     this.#parent = parent;
+    this.#order = order;
     this.#namespace = namespace;
 
     this.#context = EntityTwinContext.get(this.#namespace);
