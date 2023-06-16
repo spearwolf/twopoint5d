@@ -59,6 +59,14 @@ export class EntityTwin {
     }
   }
 
+  setProperty<T = unknown>(name: string, value: T, isEqual?: (a: T, b: T) => boolean) {
+    this.#context.setProperty(this, name, value, isEqual);
+  }
+
+  removeProperty(name: string) {
+    this.#context.removeProperty(this, name);
+  }
+
   destroy() {
     this.removeFromParent();
     this.#context.removeEntity(this);

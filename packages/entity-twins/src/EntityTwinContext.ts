@@ -120,6 +120,14 @@ export class EntityTwinContext {
     }
   }
 
+  setProperty<T = unknown>(entity: EntityTwin, propKey: string, value: T, isEqual?: (a: T, b: T) => boolean) {
+    this.#entities.get(entity.uuid)?.changes.changeProperty(propKey, value, isEqual);
+  }
+
+  removeProperty(entity: EntityTwin, propKey: string) {
+    this.#entities.get(entity.uuid)?.changes.removeProperty(propKey);
+  }
+
   clear() {
     for (const entity of Array.from(this.#rootEntities)) {
       this.removeEntitySubTree(entity);
@@ -149,7 +157,7 @@ export class EntityTwinContext {
 
     for (const changes of this.#removedEntityChanges) {
       changes.buildChangeTrail(trail, EntityChangeTrailPhase.Removal);
-      changes.clear();
+      changes.dispose();
     }
 
     this.#removedEntityChanges.length = 0;

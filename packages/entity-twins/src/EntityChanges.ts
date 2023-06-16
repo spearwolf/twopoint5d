@@ -1,3 +1,4 @@
+import {appendTo} from './array-utils';
 import {
   EntityChangeType,
   EntityChangeTrailPhase,
@@ -18,7 +19,9 @@ export class EntityChanges {
   #isDestroyEntity = false;
 
   #parentUuid: string | null | undefined = undefined;
+
   #properties: Map<string, unknown> = new Map();
+  #changedProperties: string[] = [];
 
   get entityUuid() {
     return this.#entityUuid;
@@ -39,12 +42,21 @@ export class EntityChanges {
     this.#curTrailSerial++;
   }
 
-  // TODO call me
-  changeProperties(props: Record<string, unknown>) {
-    for (const key in props) {
-      this.#properties.set(key, props[key]);
+  changeProperty<T = unknown>(key: string, value: T, isEqual?: (a: T, b: T) => boolean) {
+    const prevValue = this.#properties.get(key) as T;
+    if ((isEqual == null && value !== prevValue) || (isEqual != null && !isEqual(value, prevValue))) {
+      this.#properties.set(key, value);
+      appendTo(this.#changedProperties, key);
+      this.#curTrailSerial++;
     }
-    this.#curTrailSerial++;
+  }
+
+  removeProperty(key: string) {
+    if (this.#properties.has(key)) {
+      this.#properties.delete(key);
+      appendTo(this.#changedProperties, key);
+      this.#curTrailSerial++;
+    }
   }
 
   hasChanges() {
@@ -55,8 +67,13 @@ export class EntityChanges {
     this.#isCreateEntity = false;
     this.#isDestroyEntity = false;
     this.#parentUuid = undefined;
-    this.#properties.clear();
+    this.#changedProperties.length = 0;
     this.#curTrailSerial = 0;
+  }
+
+  dispose() {
+    this.clear();
+    this.#properties.clear();
   }
 
   buildChangeTrail(trail: IEntityChangeEntry[], trailPhase: EntityChangeTrailPhase) {
@@ -72,7 +89,7 @@ export class EntityChanges {
         }
         break;
       case EntityChangeTrailPhase.ContentUpdates:
-        if (this.#properties.size > 0) {
+        if (!this.#isCreateEntity && this.#changedProperties.length > 0) {
           trail.push(this.makeChangePropertyChange());
         }
         break;
@@ -96,7 +113,7 @@ export class EntityChanges {
     }
 
     if (this.#properties.size > 0) {
-      entry.properties = this.#makeProperties();
+      entry.properties = Array.from(this.#properties.entries());
     }
 
     return entry;
@@ -121,11 +138,10 @@ export class EntityChanges {
     return {
       type: EntityChangeType.ChangeProperties,
       uuid: this.#entityUuid,
-      properties: this.#makeProperties(),
+      properties: this.#changedProperties.reduce(
+        (entries, key) => [...entries, [key, this.#properties.get(key)]],
+        [] as [string, unknown][],
+      ),
     };
-  }
-
-  #makeProperties(): [string, unknown][] {
-    return Array.from(this.#properties.entries());
   }
 }
