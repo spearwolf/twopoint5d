@@ -5,6 +5,7 @@ export class EntityTwin {
   #uuid: string;
   #token: string;
   #namespace?: string | symbol;
+  #order = 0;
 
   #context: EntityTwinContext;
   #parent?: EntityTwin;
@@ -27,6 +28,18 @@ export class EntityTwin {
     } else {
       this.removeFromParent();
     }
+  }
+
+  /**
+   * The order property sets the order to lay out an entity in a children array of the parent entity.
+   * Items in a children array are sorted by ascending order value and then by their insertion order.
+   */
+  get order(): number {
+    return this.#order;
+  }
+
+  set order(order: number | null | undefined) {
+    this.#order = order ?? 0;
   }
 
   constructor(token: string, parent?: EntityTwin, namespace?: string | symbol) {

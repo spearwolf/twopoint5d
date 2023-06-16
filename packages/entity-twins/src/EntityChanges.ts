@@ -21,7 +21,7 @@ export class EntityChanges {
   #parentUuid: string | null | undefined = undefined;
 
   #properties: Map<string, unknown> = new Map();
-  #changedProperties: string[] = [];
+  #changedProperties: string[] = []; // we use an Array here and not a Set, because we want to keep the insertion order
 
   get entityUuid() {
     return this.#entityUuid;

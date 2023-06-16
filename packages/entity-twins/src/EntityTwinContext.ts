@@ -1,10 +1,11 @@
 import {EntityChanges} from './EntityChanges';
 import {EntityTwin} from './EntityTwin';
+import {appendTo} from './array-utils';
 import {EntityChangeTrailPhase, IEntityChangeEntry} from './types';
 
 interface EntityEntry {
   entity: EntityTwin;
-  children: Set<string>;
+  children: string[]; // we use an Array here and not a Set, because we want to keep the insertion order
   changes: EntityChanges;
 }
 
@@ -42,7 +43,7 @@ export class EntityTwinContext {
     const changes = new EntityChanges(entity.uuid, entity.token);
     this.#entities.set(entity.uuid, {
       entity,
-      children: new Set<string>(),
+      children: [],
       changes,
     });
     if (entity.parent) {
@@ -65,12 +66,7 @@ export class EntityTwinContext {
     if (this.hasEntity(entity)) {
       const entry = this.#entities.get(entity.uuid)!;
 
-      for (const childUuid of entry.children) {
-        const child = this.#entities.get(childUuid);
-        if (child) {
-          child.entity.removeFromParent();
-        }
-      }
+      entry.children.slice(0).forEach((childUuid) => this.#entities.get(childUuid)?.entity.removeFromParent());
 
       this.#entities.delete(entity.uuid);
       this.#rootEntities.delete(entity.uuid);
@@ -83,8 +79,9 @@ export class EntityTwinContext {
   removeChildFromParent(childUuid: string, parent: EntityTwin) {
     if (this.hasEntity(parent)) {
       const entry = this.#entities.get(parent.uuid)!;
-      if (entry.children.has(childUuid)) {
-        entry.children.delete(childUuid);
+      const childIdx = entry.children.indexOf(childUuid);
+      if (childIdx !== -1) {
+        entry.children.splice(childIdx, 1);
         this.#entities.get(childUuid)?.changes.setParent(undefined);
       }
     }
@@ -94,7 +91,7 @@ export class EntityTwinContext {
   isChildOf(child: EntityTwin, parent: EntityTwin) {
     if (this.hasEntity(parent)) {
       const entry = this.#entities.get(parent.uuid)!;
-      return entry.children.has(child.uuid);
+      return entry.children.includes(child.uuid);
     }
     return false;
   }
@@ -102,7 +99,7 @@ export class EntityTwinContext {
   addToChildren(parent: EntityTwin, child: EntityTwin) {
     const entry = this.#entities.get(parent.uuid);
     if (entry) {
-      entry.children.add(child.uuid);
+      appendTo(entry.children, child.uuid);
       this.#entities.get(child.uuid)?.changes.setParent(parent.uuid);
       this.#rootEntities.delete(child.uuid);
     } else {
@@ -113,9 +110,7 @@ export class EntityTwinContext {
   removeEntitySubTree(entityUuid: string) {
     const entry = this.#entities.get(entityUuid);
     if (entry) {
-      for (const childUuid of Array.from(entry.children)) {
-        this.removeEntitySubTree(childUuid);
-      }
+      entry.children.slice(0).forEach((childUuid) => this.removeEntitySubTree(childUuid));
       this.removeEntity(entry.entity);
     }
   }
@@ -126,6 +121,11 @@ export class EntityTwinContext {
 
   removeProperty(entity: EntityTwin, propKey: string) {
     this.#entities.get(entity.uuid)?.changes.removeProperty(propKey);
+  }
+
+  changeOrder(_entity: EntityTwin) {
+    // TODO resort children
+    // TODO send to changes
   }
 
   clear() {
@@ -174,9 +174,7 @@ export class EntityTwinContext {
         if (entity.changes.hasChanges()) {
           path.push(entity.changes);
         }
-        for (const childUuid of entity.children) {
-          buildPath(childUuid);
-        }
+        entity.children.forEach((childUuid) => buildPath(childUuid));
       }
     };
 

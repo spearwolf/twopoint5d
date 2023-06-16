@@ -8,6 +8,7 @@ export enum EntityChangeType {
   CreateEntity = 1,
   DestroyEntity,
   SetParent,
+  UpdateOrder,
   ChangeProperties,
 }
 
@@ -20,6 +21,7 @@ export interface IEntityChangeCreateEntity extends IEntityChangeEntry {
   type: EntityChangeType.CreateEntity;
   token: string;
   parentUuid?: string;
+  order?: number;
   properties?: [string, unknown][];
 }
 
@@ -30,6 +32,12 @@ export interface IEntityChangeDestroyEntity extends IEntityChangeEntry {
 export interface IEntityChangeSetParent extends IEntityChangeEntry {
   type: EntityChangeType.SetParent;
   parentUuid: string | undefined;
+  order?: number;
+}
+
+export interface IEntityChangeUpdateOrder extends IEntityChangeEntry {
+  type: EntityChangeType.UpdateOrder;
+  order: number;
 }
 
 export interface IEntityChangeProperty extends IEntityChangeEntry {
