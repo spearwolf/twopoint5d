@@ -7,11 +7,13 @@ import {
   IEntityChangeEntry,
   IEntityChangeProperty,
   IEntityChangeSetParent,
+  IEntityChangeUpdateOrder,
 } from './types';
 
 export class EntityChanges {
   #entityUuid: string;
   #token: string;
+  #order: number;
 
   #curTrailSerial = 1;
 
@@ -23,13 +25,16 @@ export class EntityChanges {
   #properties: Map<string, unknown> = new Map();
   #changedProperties: string[] = []; // we use an Array here and not a Set, because we want to keep the insertion order
 
+  #orderChanged = false;
+
   get entityUuid() {
     return this.#entityUuid;
   }
 
-  constructor(entityUuid: string, token: string) {
+  constructor(entityUuid: string, token: string, order: number) {
     this.#entityUuid = entityUuid;
     this.#token = token;
+    this.#order = order;
   }
 
   destroyEntity() {
@@ -51,6 +56,14 @@ export class EntityChanges {
     }
   }
 
+  changeOrder(order: number) {
+    if (this.#order !== order) {
+      this.#order = order;
+      this.#orderChanged = true;
+      this.#curTrailSerial++;
+    }
+  }
+
   removeProperty(key: string) {
     if (this.#properties.has(key)) {
       this.#properties.delete(key);
@@ -68,6 +81,7 @@ export class EntityChanges {
     this.#isDestroyEntity = false;
     this.#parentUuid = undefined;
     this.#changedProperties.length = 0;
+    this.#orderChanged = false;
     this.#curTrailSerial = 0;
   }
 
@@ -85,6 +99,8 @@ export class EntityChanges {
         if (!this.#isCreateEntity && !this.#isDestroyEntity) {
           if (this.#parentUuid !== undefined) {
             trail.push(this.makeSetParentChange());
+          } else if (this.#orderChanged) {
+            trail.push(this.makeUpdateOrderChange());
           }
         }
         break;
@@ -116,7 +132,9 @@ export class EntityChanges {
       entry.properties = Array.from(this.#properties.entries());
     }
 
-    // TODO order
+    if (this.#order !== 0) {
+      entry.order = this.#order;
+    }
 
     return entry;
   }
@@ -129,10 +147,22 @@ export class EntityChanges {
   }
 
   makeSetParentChange(): IEntityChangeSetParent {
-    return {
+    const entry: IEntityChangeSetParent = {
       type: EntityChangeType.SetParent,
       uuid: this.#entityUuid,
       parentUuid: this.#parentUuid ?? undefined,
+    };
+    if (this.#orderChanged) {
+      entry.order = this.#order;
+    }
+    return entry;
+  }
+
+  makeUpdateOrderChange(): IEntityChangeUpdateOrder {
+    return {
+      type: EntityChangeType.UpdateOrder,
+      uuid: this.#entityUuid,
+      order: this.#order,
     };
   }
 

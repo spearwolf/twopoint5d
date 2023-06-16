@@ -72,4 +72,34 @@ describe('EntityTwinContext', () => {
       },
     ]);
   });
+
+  it('should insert update-orders in change trail', () => {
+    const a = new EntityTwin('a', undefined, 100);
+    const b = new EntityTwin('b', a);
+    const c = new EntityTwin('c', a, 3);
+    const d = new EntityTwin('d', a, 2);
+
+    let changes = ctx.buildChangeTrails();
+
+    expect(changes).toHaveLength(4);
+    expect(changes).toEqual([
+      {type: EntityChangeType.CreateEntity, uuid: a.uuid, token: 'a', order: 100},
+      {type: EntityChangeType.CreateEntity, uuid: b.uuid, token: 'b', parentUuid: a.uuid},
+      {type: EntityChangeType.CreateEntity, uuid: d.uuid, token: 'd', parentUuid: a.uuid, order: 2},
+      {type: EntityChangeType.CreateEntity, uuid: c.uuid, token: 'c', parentUuid: a.uuid, order: 3},
+    ]);
+
+    c.removeFromParent();
+    c.order = 15;
+
+    b.order = 1;
+
+    changes = ctx.buildChangeTrails();
+
+    expect(changes).toHaveLength(2);
+    expect(changes).toEqual([
+      {type: EntityChangeType.SetParent, uuid: c.uuid, parentUuid: undefined, order: 15},
+      {type: EntityChangeType.UpdateOrder, uuid: b.uuid, order: 1},
+    ]);
+  });
 });

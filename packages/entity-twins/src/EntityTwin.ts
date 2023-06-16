@@ -39,7 +39,11 @@ export class EntityTwin {
   }
 
   set order(order: number | null | undefined) {
+    const prevOrder = this.#order;
     this.#order = order ?? 0;
+    if (prevOrder !== this.#order) {
+      this.#context.changeOrder(this);
+    }
   }
 
   constructor(token: string, parent?: EntityTwin, order = 0, namespace?: string | symbol) {

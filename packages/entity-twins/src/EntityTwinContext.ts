@@ -40,7 +40,7 @@ export class EntityTwinContext {
     if (this.hasEntity(entity)) {
       throw new Error(`Entity with uuid:${entity.uuid} already exists`);
     }
-    const changes = new EntityChanges(entity.uuid, entity.token);
+    const changes = new EntityChanges(entity.uuid, entity.token, entity.order);
     this.#entities.set(entity.uuid, {
       entity,
       children: [],
@@ -124,9 +124,16 @@ export class EntityTwinContext {
     this.#entities.get(entity.uuid)?.changes.removeProperty(propKey);
   }
 
-  changeOrder(_entity: EntityTwin) {
-    // TODO resort children
-    // TODO send to changes
+  changeOrder(entity: EntityTwin) {
+    if (entity.parent) {
+      const parentEntry = this.#entities.get(entity.parent.uuid)!;
+      removeFrom(parentEntry.children, entity.uuid);
+      this.#appendToOrdered(entity, parentEntry.children);
+    } else {
+      removeFrom(this.#rootEntities, entity.uuid);
+      this.#appendToOrdered(entity, this.#rootEntities);
+    }
+    this.#entities.get(entity.uuid)?.changes.changeOrder(entity.order);
   }
 
   clear() {
@@ -214,6 +221,11 @@ export class EntityTwinContext {
 
     if (entity.order >= childEntities[lastIdx].order) {
       childUuids.push(entity.uuid);
+      return;
+    }
+
+    if (len === 2) {
+      childUuids.splice(1, 0, entity.uuid);
       return;
     }
 
