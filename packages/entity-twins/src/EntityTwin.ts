@@ -31,7 +31,7 @@ export class EntityTwin {
   }
 
   /**
-   * The order property sets the order to lay out an entity in a children array of the parent entity.
+   * The order property sets the order to lay out an entity in a children array of the parent entity container.
    * Items in a children array are sorted by ascending order value and then by their insertion order.
    */
   get order(): number {

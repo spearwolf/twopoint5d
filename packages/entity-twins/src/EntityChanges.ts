@@ -116,6 +116,8 @@ export class EntityChanges {
       entry.properties = Array.from(this.#properties.entries());
     }
 
+    // TODO order
+
     return entry;
   }
 
