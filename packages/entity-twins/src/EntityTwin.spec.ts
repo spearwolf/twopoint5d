@@ -1,19 +1,19 @@
-import {EntityProxy} from './EntityProxy';
-import {EntityProxyContext} from './EntityProxyContext';
+import {EntityTwin} from './EntityTwin';
+import {EntityTwinContext} from './EntityTwinContext';
 
 describe('EntityProxy', () => {
-  const ctx = EntityProxyContext.get();
+  const ctx = EntityTwinContext.get();
 
   afterAll(() => {
     ctx.clear();
   });
 
   it('should be defined', () => {
-    expect(EntityProxy).toBeDefined();
+    expect(EntityTwin).toBeDefined();
   });
 
   it('should create new entity', () => {
-    const entity = new EntityProxy('test');
+    const entity = new EntityTwin('test');
     expect(entity.uuid).toBeDefined();
     expect(entity.token).toBe('test');
     expect(entity.parent).toBeUndefined();
@@ -22,16 +22,16 @@ describe('EntityProxy', () => {
   });
 
   it('should destroy entity', () => {
-    const entity = new EntityProxy('test');
+    const entity = new EntityTwin('test');
     expect(ctx.hasEntity(entity)).toBeTruthy();
     entity.destroy();
     expect(ctx.hasEntity(entity)).toBeFalsy();
   });
 
   it('should add entity as child (constructor)', () => {
-    const parent = new EntityProxy('test');
-    const child = new EntityProxy('test', parent);
-    const ctx = EntityProxyContext.get();
+    const parent = new EntityTwin('test');
+    const child = new EntityTwin('test', parent);
+    const ctx = EntityTwinContext.get();
 
     expect(ctx.hasEntity(parent)).toBeTruthy();
     expect(ctx.hasEntity(child)).toBeTruthy();
@@ -40,8 +40,8 @@ describe('EntityProxy', () => {
   });
 
   it('should add entity as child (addChild)', () => {
-    const parent = new EntityProxy('test');
-    const child = new EntityProxy('test');
+    const parent = new EntityTwin('test');
+    const child = new EntityTwin('test');
 
     expect(ctx.hasEntity(parent)).toBeTruthy();
     expect(ctx.hasEntity(child)).toBeTruthy();
@@ -55,8 +55,8 @@ describe('EntityProxy', () => {
   });
 
   it('should remove from parent', () => {
-    const parent = new EntityProxy('test');
-    const child = new EntityProxy('test', parent);
+    const parent = new EntityTwin('test');
+    const child = new EntityTwin('test', parent);
 
     expect(ctx.isChildOf(child, parent)).toBeTruthy();
     expect(ctx.isRootEntity(parent)).toBeTruthy();
@@ -69,9 +69,9 @@ describe('EntityProxy', () => {
   });
 
   it('should set parent', () => {
-    const a = new EntityProxy('test');
-    const b = new EntityProxy('test', a);
-    const c = new EntityProxy('test');
+    const a = new EntityTwin('test');
+    const b = new EntityTwin('test', a);
+    const c = new EntityTwin('test');
 
     expect(ctx.isChildOf(b, a)).toBeTruthy();
     expect(ctx.isChildOf(b, c)).toBeFalsy();

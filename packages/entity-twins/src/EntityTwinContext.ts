@@ -1,30 +1,30 @@
 import {EntityChanges} from './EntityChanges';
-import {EntityProxy} from './EntityProxy';
+import {EntityTwin} from './EntityTwin';
 import {EntityChangeTrailPhase, IEntityChangeEntry} from './types';
 
 interface EntityEntry {
-  entity: EntityProxy;
+  entity: EntityTwin;
   children: Set<string>;
   changes: EntityChanges;
 }
 
 declare global {
   // eslint-disable-next-line no-var
-  var __entityProxyContext: Map<string | symbol, EntityProxyContext> | undefined;
+  var __entityProxyContext: Map<string | symbol, EntityTwinContext> | undefined;
 }
 
-export class EntityProxyContext {
+export class EntityTwinContext {
   static GlobalNS = Symbol.for('globalEntityProxyContext');
 
-  static get(namespace?: string | symbol): EntityProxyContext {
+  static get(namespace?: string | symbol): EntityTwinContext {
     if (globalThis.__entityProxyContext === undefined) {
-      globalThis.__entityProxyContext = new Map<string | symbol, EntityProxyContext>();
+      globalThis.__entityProxyContext = new Map<string | symbol, EntityTwinContext>();
     }
-    const ns = namespace ?? EntityProxyContext.GlobalNS;
+    const ns = namespace ?? EntityTwinContext.GlobalNS;
     if (globalThis.__entityProxyContext.has(ns)) {
       return globalThis.__entityProxyContext.get(ns)!;
     } else {
-      const ctx = new EntityProxyContext();
+      const ctx = new EntityTwinContext();
       globalThis.__entityProxyContext.set(ns, ctx);
       return ctx;
     }
@@ -35,7 +35,7 @@ export class EntityProxyContext {
 
   #removedEntityChanges: EntityChanges[] = [];
 
-  addEntity(entity: EntityProxy) {
+  addEntity(entity: EntityTwin) {
     if (this.hasEntity(entity)) {
       throw new Error(`Entity with uuid:${entity.uuid} already exists`);
     }
@@ -53,15 +53,15 @@ export class EntityProxyContext {
     }
   }
 
-  hasEntity(entity: EntityProxy) {
+  hasEntity(entity: EntityTwin) {
     return this.#entities.has(entity.uuid);
   }
 
-  isRootEntity(entity: EntityProxy) {
+  isRootEntity(entity: EntityTwin) {
     return this.#rootEntities.has(entity.uuid);
   }
 
-  removeEntity(entity: EntityProxy) {
+  removeEntity(entity: EntityTwin) {
     if (this.hasEntity(entity)) {
       const entry = this.#entities.get(entity.uuid)!;
 
@@ -80,7 +80,7 @@ export class EntityProxyContext {
     }
   }
 
-  removeChildFromParent(childUuid: string, parent: EntityProxy) {
+  removeChildFromParent(childUuid: string, parent: EntityTwin) {
     if (this.hasEntity(parent)) {
       const entry = this.#entities.get(parent.uuid)!;
       if (entry.children.has(childUuid)) {
@@ -91,7 +91,7 @@ export class EntityProxyContext {
     this.#rootEntities.add(childUuid);
   }
 
-  isChildOf(child: EntityProxy, parent: EntityProxy) {
+  isChildOf(child: EntityTwin, parent: EntityTwin) {
     if (this.hasEntity(parent)) {
       const entry = this.#entities.get(parent.uuid)!;
       return entry.children.has(child.uuid);
@@ -99,7 +99,7 @@ export class EntityProxyContext {
     return false;
   }
 
-  addToChildren(parent: EntityProxy, child: EntityProxy) {
+  addToChildren(parent: EntityTwin, child: EntityTwin) {
     const entry = this.#entities.get(parent.uuid);
     if (entry) {
       entry.children.add(child.uuid);

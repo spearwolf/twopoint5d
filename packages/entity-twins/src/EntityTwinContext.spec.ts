@@ -1,21 +1,21 @@
-import {EntityProxy} from './EntityProxy';
-import {EntityProxyContext} from './EntityProxyContext';
+import {EntityTwin} from './EntityTwin';
+import {EntityTwinContext} from './EntityTwinContext';
 import {EntityChangeType} from './types';
 
-describe('EntityProxyContext', () => {
-  const ctx = EntityProxyContext.get();
+describe('EntityTwinContext', () => {
+  const ctx = EntityTwinContext.get();
 
   afterAll(() => {
     ctx.clear();
   });
 
   it('should be defined', () => {
-    expect(EntityProxyContext).toBeDefined();
+    expect(EntityTwinContext).toBeDefined();
   });
 
   it('should insert create-entity and destroy-entites in change trail', () => {
-    const a = new EntityProxy('a');
-    const b = new EntityProxy('b', a);
+    const a = new EntityTwin('a');
+    const b = new EntityTwin('b', a);
 
     let changes = ctx.buildChangeTrails();
 

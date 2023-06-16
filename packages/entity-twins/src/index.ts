@@ -1,4 +1,3 @@
-export * from './EntityProxy';
-export * from './EntityProxyContext';
-export * from './EntityChanges';
+export * from './EntityTwin';
+export * from './EntityTwinContext';
 export * from './types';

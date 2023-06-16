@@ -1,13 +1,13 @@
-import {EntityProxyContext} from './EntityProxyContext';
+import {EntityTwinContext} from './EntityTwinContext';
 import {generateUUID} from './generateUUID';
 
-export class EntityProxy {
+export class EntityTwin {
   #uuid: string;
   #token: string;
-
   #namespace?: string | symbol;
-  #context: EntityProxyContext;
-  #parent?: EntityProxy;
+
+  #context: EntityTwinContext;
+  #parent?: EntityTwin;
 
   get uuid() {
     return this.#uuid;
@@ -17,11 +17,11 @@ export class EntityProxy {
     return this.#token;
   }
 
-  get parent(): EntityProxy | undefined {
+  get parent(): EntityTwin | undefined {
     return this.#parent;
   }
 
-  set parent(parent: EntityProxy | null | undefined) {
+  set parent(parent: EntityTwin | null | undefined) {
     if (parent) {
       parent.addChild(this);
     } else {
@@ -29,18 +29,18 @@ export class EntityProxy {
     }
   }
 
-  constructor(token: string, parent?: EntityProxy, namespace?: string | symbol) {
+  constructor(token: string, parent?: EntityTwin, namespace?: string | symbol) {
     this.#uuid = generateUUID();
 
     this.#token = token;
     this.#parent = parent;
     this.#namespace = namespace;
 
-    this.#context = EntityProxyContext.get(this.#namespace);
+    this.#context = EntityTwinContext.get(this.#namespace);
     this.#context.addEntity(this);
   }
 
-  isChildOf(entity: EntityProxy) {
+  isChildOf(entity: EntityTwin) {
     return this.#parent === entity;
   }
 
@@ -51,7 +51,7 @@ export class EntityProxy {
     }
   }
 
-  addChild(child: EntityProxy) {
+  addChild(child: EntityTwin) {
     if (!child.isChildOf(this)) {
       child.removeFromParent();
       child.#parent = this;
