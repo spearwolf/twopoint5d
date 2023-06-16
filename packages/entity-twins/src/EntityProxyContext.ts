@@ -1,6 +1,6 @@
 import {EntityChanges} from './EntityChanges';
 import {EntityProxy} from './EntityProxy';
-import {EntityTrailType, IEntityChangeEntry} from './types';
+import {EntityChangeTrailPhase, IEntityChangeEntry} from './types';
 
 interface EntityEntry {
   entity: EntityProxy;
@@ -39,7 +39,7 @@ export class EntityProxyContext {
     if (this.hasEntity(entity)) {
       throw new Error(`Entity with uuid:${entity.uuid} already exists`);
     }
-    const changes = new EntityChanges(entity.uuid);
+    const changes = new EntityChanges(entity.uuid, entity.token);
     this.#entities.set(entity.uuid, {
       entity,
       children: new Set<string>(),
@@ -129,40 +129,46 @@ export class EntityProxyContext {
 
   buildChangeTrails() {
     const trail: IEntityChangeEntry[] = [];
-    const changePath: EntityChanges[] = [];
+    const pathOfChanges = this.#buildPathOfChanges();
+
+    for (const changes of pathOfChanges) {
+      changes.buildChangeTrail(trail, EntityChangeTrailPhase.StructuralChanges);
+    }
+
+    for (const changes of pathOfChanges) {
+      changes.buildChangeTrail(trail, EntityChangeTrailPhase.ContentUpdates);
+      changes.clear();
+    }
 
     for (const changes of this.#removedEntityChanges) {
-      changes.buildChangeTrail(trail, EntityTrailType.Cleanup);
+      changes.buildChangeTrail(trail, EntityChangeTrailPhase.Removal);
       changes.clear();
     }
 
     this.#removedEntityChanges.length = 0;
 
-    for (const entityUuid of this.#rootEntities) {
-      this.#buildChangesPath(entityUuid, changePath);
-    }
-
-    for (const changes of changePath) {
-      changes.buildChangeTrail(trail, EntityTrailType.Structural);
-    }
-
-    for (const changes of changePath) {
-      changes.buildChangeTrail(trail, EntityTrailType.Content);
-      changes.clear();
-    }
-
     return trail;
   }
 
-  #buildChangesPath(entityUuid: string, path: EntityChanges[]) {
-    const entity = this.#entities.get(entityUuid);
-    if (entity) {
-      if (entity.changes.hasChanges()) {
-        path.push(entity.changes);
+  #buildPathOfChanges(): EntityChanges[] {
+    const path: EntityChanges[] = [];
+
+    const buildPath = (entityUuid: string) => {
+      const entity = this.#entities.get(entityUuid);
+      if (entity) {
+        if (entity.changes.hasChanges()) {
+          path.push(entity.changes);
+        }
+        for (const childUuid of entity.children) {
+          buildPath(childUuid);
+        }
       }
-      for (const childUuid of entity.children) {
-        this.#buildChangesPath(childUuid, path);
-      }
+    };
+
+    for (const entityUuid of this.#rootEntities) {
+      buildPath(entityUuid);
     }
+
+    return path;
   }
 }

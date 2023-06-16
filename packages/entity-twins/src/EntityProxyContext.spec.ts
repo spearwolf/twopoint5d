@@ -19,26 +19,17 @@ describe('EntityProxyContext', () => {
 
     let changes = ctx.buildChangeTrails();
 
-    console.log('changes[create]', changes);
-
     expect(changes).toHaveLength(2);
-
-    expect(changes[0].type).toBe(EntityChangeType.CreateEntity);
-    expect(changes[0].uuid).toBe(a.uuid);
-
-    expect(changes[1].type).toBe(EntityChangeType.CreateEntity);
-    expect(changes[1].uuid).toBe(b.uuid);
-    expect((changes[1].data as any)?.parentUuid).toBe(a.uuid);
+    expect(changes).toEqual([
+      {type: EntityChangeType.CreateEntity, uuid: a.uuid, token: 'a'},
+      {type: EntityChangeType.CreateEntity, uuid: b.uuid, token: 'b', parentUuid: a.uuid},
+    ]);
 
     a.destroy();
 
     changes = ctx.buildChangeTrails();
 
-    console.log('changes[destroy]', changes);
-
     expect(changes).toHaveLength(1);
-
-    expect(changes[0].type).toBe(EntityChangeType.DestroyEntity);
-    expect(changes[0].uuid).toBe(a.uuid);
+    expect(changes).toEqual([{type: EntityChangeType.DestroyEntity, uuid: a.uuid}]);
   });
 });
