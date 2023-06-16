@@ -8,9 +8,7 @@ export enum EntityChangeType {
   CreateEntity = 1,
   DestroyEntity,
   SetParent,
-  AddChild,
-  RemoveChild,
-  ChangeProperty,
+  ChangeProperties,
 }
 
 export interface IEntityChangeEntry {
@@ -35,6 +33,6 @@ export interface IEntityChangeSetParent extends IEntityChangeEntry {
 }
 
 export interface IEntityChangeProperty extends IEntityChangeEntry {
-  type: EntityChangeType.ChangeProperty;
+  type: EntityChangeType.ChangeProperties;
   properties: [string, unknown][];
 }

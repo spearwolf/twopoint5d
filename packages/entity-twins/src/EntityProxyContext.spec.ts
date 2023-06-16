@@ -29,7 +29,10 @@ describe('EntityProxyContext', () => {
 
     changes = ctx.buildChangeTrails();
 
-    expect(changes).toHaveLength(1);
-    expect(changes).toEqual([{type: EntityChangeType.DestroyEntity, uuid: a.uuid}]);
+    expect(changes).toHaveLength(2);
+    expect(changes).toEqual([
+      {type: EntityChangeType.SetParent, uuid: b.uuid, parentUuid: undefined},
+      {type: EntityChangeType.DestroyEntity, uuid: a.uuid},
+    ]);
   });
 });

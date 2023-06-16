@@ -13,10 +13,10 @@ export class EntityChanges {
   #token: string;
 
   #curTrailSerial = 1;
-  #isCreateEntity = true;
 
+  #isCreateEntity = true;
   #isDestroyEntity = false;
-  #removeChildren: Set<string> = new Set();
+
   #parentUuid: string | null | undefined = undefined;
   #properties: Map<string, unknown> = new Map();
 
@@ -31,14 +31,6 @@ export class EntityChanges {
 
   destroyEntity() {
     this.#isDestroyEntity = true;
-    this.#curTrailSerial++;
-  }
-
-  // TODO add child
-
-  // TODO call me
-  removeChild(childUuid: string) {
-    this.#removeChildren.add(childUuid);
     this.#curTrailSerial++;
   }
 
@@ -62,7 +54,6 @@ export class EntityChanges {
   clear() {
     this.#isCreateEntity = false;
     this.#isDestroyEntity = false;
-    this.#removeChildren.clear();
     this.#parentUuid = undefined;
     this.#properties.clear();
     this.#curTrailSerial = 0;
@@ -79,7 +70,6 @@ export class EntityChanges {
             trail.push(this.makeSetParentChange());
           }
         }
-        // TODO children
         break;
       case EntityChangeTrailPhase.ContentUpdates:
         if (this.#properties.size > 0) {
@@ -129,7 +119,7 @@ export class EntityChanges {
 
   makeChangePropertyChange(): IEntityChangeProperty {
     return {
-      type: EntityChangeType.ChangeProperty,
+      type: EntityChangeType.ChangeProperties,
       uuid: this.#entityUuid,
       properties: this.#makeProperties(),
     };

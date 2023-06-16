@@ -66,7 +66,10 @@ export class EntityProxyContext {
       const entry = this.#entities.get(entity.uuid)!;
 
       for (const childUuid of entry.children) {
-        this.#entities.get(childUuid)?.entity.removeFromParent();
+        const child = this.#entities.get(childUuid);
+        if (child) {
+          child.entity.removeFromParent();
+        }
       }
 
       this.#entities.delete(entity.uuid);
@@ -80,7 +83,10 @@ export class EntityProxyContext {
   removeChildFromParent(childUuid: string, parent: EntityProxy) {
     if (this.hasEntity(parent)) {
       const entry = this.#entities.get(parent.uuid)!;
-      entry.children.delete(childUuid);
+      if (entry.children.has(childUuid)) {
+        entry.children.delete(childUuid);
+        this.#entities.get(childUuid)?.changes.setParent(undefined);
+      }
     }
     this.#rootEntities.add(childUuid);
   }
@@ -97,6 +103,7 @@ export class EntityProxyContext {
     const entry = this.#entities.get(parent.uuid);
     if (entry) {
       entry.children.add(child.uuid);
+      this.#entities.get(child.uuid)?.changes.setParent(parent.uuid);
       this.#rootEntities.delete(child.uuid);
     } else {
       throw new Error(`Could not add child entity to parent! Parent entity with uuid:${parent.uuid} does not exist`);
