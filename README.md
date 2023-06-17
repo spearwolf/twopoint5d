@@ -8,7 +8,7 @@
 
 ![GitHub License MIT](https://img.shields.io/github/license/wbkd/react-flow?color=%23ff0072)
 
-</p>
+</div>
 
 ![twopoint5d cover](cover.png)
 
