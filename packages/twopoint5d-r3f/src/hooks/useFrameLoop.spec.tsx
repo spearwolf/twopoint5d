@@ -1,7 +1,7 @@
 jest.mock('scheduler', () => require('scheduler/unstable_mock'));
 
 import '@react-three/fiber';
-import ReactThreeTestRenderer from '@react-three/test-renderer';
+import {act, create} from '@react-three/test-renderer';
 import {useRef} from 'react';
 import {Mesh} from 'three';
 import {forwardRefValue, useFrameLoop} from './useFrameLoop';
@@ -53,7 +53,7 @@ describe('useFrameLoop hook', () => {
       dispose: jest.fn(),
     };
 
-    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={callbacks} extraValue="abc" />);
+    const renderer = await create(<TestScene showMesh callbacks={callbacks} extraValue="abc" />);
     const mesh = renderer.scene.findByType('Mesh').instance;
 
     expect(mesh).toBeDefined();
@@ -64,7 +64,7 @@ describe('useFrameLoop hook', () => {
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -91,7 +91,7 @@ describe('useFrameLoop hook', () => {
     callbacks.init.mockClear();
     callbacks.frame.mockClear();
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(5, 2);
     });
 
@@ -116,7 +116,7 @@ describe('useFrameLoop hook', () => {
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -140,7 +140,7 @@ describe('useFrameLoop hook', () => {
 
     await renderer.update(<TestScene callbacks={callbacks} />);
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -165,7 +165,7 @@ describe('useFrameLoop hook', () => {
       dispose: jest.fn(),
     };
 
-    const renderer = await ReactThreeTestRenderer.create(<TestSceneWithoutDependencies showMesh callbacks={callbacks} />);
+    const renderer = await create(<TestSceneWithoutDependencies showMesh callbacks={callbacks} />);
     const mesh = renderer.scene.findByType('Mesh').instance;
 
     expect(mesh).toBeDefined();
@@ -176,7 +176,7 @@ describe('useFrameLoop hook', () => {
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -189,7 +189,7 @@ describe('useFrameLoop hook', () => {
     expect(args.state).toBeDefined();
     expect(args.delta).toBe(1);
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(5, 2);
     });
 
@@ -204,7 +204,7 @@ describe('useFrameLoop hook', () => {
 
     await renderer.update(<TestSceneWithoutDependencies showMesh callbacks={callbacks} />);
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -215,7 +215,7 @@ describe('useFrameLoop hook', () => {
 
     await renderer.update(<TestSceneWithoutDependencies callbacks={callbacks} />);
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -239,7 +239,7 @@ describe('useFrameLoop hook', () => {
     const lazyCallbacks = jest.fn();
     lazyCallbacks.mockReturnValueOnce(callbacks).mockReturnValue(undefined);
 
-    const renderer = await ReactThreeTestRenderer.create(<TestScene showMesh callbacks={lazyCallbacks} extraValue={42} />);
+    const renderer = await create(<TestScene showMesh callbacks={lazyCallbacks} extraValue={42} />);
     const mesh = renderer.scene.findByType('Mesh').instance;
 
     expect(mesh).toBeDefined();
@@ -250,7 +250,7 @@ describe('useFrameLoop hook', () => {
     expect(callbacks.frame).not.toBeCalled();
     expect(callbacks.dispose).not.toBeCalled();
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(1, 1);
     });
 
@@ -269,7 +269,7 @@ describe('useFrameLoop hook', () => {
     expect(args.state).toBeDefined();
     expect(args.delta).toBe(1);
 
-    await ReactThreeTestRenderer.act(async () => {
+    await act(async () => {
       renderer.advanceFrames(5, 2);
     });
 

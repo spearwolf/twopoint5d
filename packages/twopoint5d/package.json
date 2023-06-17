@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^2.2.0",
-    "three": "^0.152"
+    "three": "^0.153"
   },
   "rollup": {
     "external": [
