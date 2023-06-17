@@ -1,15 +1,15 @@
 <p align="center">
   <img width="350" src="docs/images/twopoint5d-700x168.png">
 	<br>
-  <b>The Art of Tiling 2D Sprites</b>
+  <b>the lost art of tiling 2d sprites</b>
 	<br>
-  <em>A 2.5D realtime gfx library built with three.js</em>
+  <em>a 2.5d realtime gfx library built with three.js</em>
 </p>
 
 
 ![twopoint5d cover](cover.png)
 
-A collection of typescript classes, functions and utils in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and realtime gfx on the web platform.
+A collection of typescript classes and helper functions in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and realtime gfx on the web platform.
 
 :rocket: Some of the features are already quite stable, others are still experimental.
 
@@ -37,16 +37,22 @@ The library comes in two flavors:
 - a number of examples that illustrate the respective features and usage of the api
 - some unsorted documents about selected features in the [docs/](docs/) directory
 
-## Examples
+## Usage Examples
 
 Almost all of these examples serve to show individual aspects and usage of the api. Therefore, don't expect any visual masterpieces at this point. This is given to the user of the libraries as an exercise :wink:
 
+> :info: At the moment the new [lookbook app](./apps/lookbook/) is being developed, which combines all examples. you can start it simply by:
+
+```sh
+$ npx nx dev lookbook  # or just use: npm start
+```
+
+but as long as not all examples have been migrated, the old examples can still be found in the [exmaples](./examples/) directory:
+
 - [examples/vanilla](./examples/vanilla/)
   - vanilla three.js examples (no build step required)
-  - start with: `$ yarn examples:vanilla`
 - [examples/r3f](./examples/r3f/)
   - examples for the usage of _twopoint5d_ components and hooks in a react context based on the fantastic _@react-three/fiber_
-  - start with: `$ yarn examples:r3f`
 
 ## Getting involved
 
@@ -54,26 +60,25 @@ Everyone is welcome to contribute to this project, no matter if it's just bug-fi
 
 ### Development Setup
 
-this repository is structured as a monorepo; based on [yarn workspaces](https://yarnpkg.com/features/workspaces)
+this repository is structured as a monorepo; based on [nx](https://nx.dev/) !
 
 #### 1. Install dependencies
 
-you need a current [node v16+](https://nodejs.org/) and [yarn](https://yarnpkg.com/) for it
+First, you need a current [node v16+](https://nodejs.org/) setup.
+Install the dependencies with:
 
 ```sh
-$ yarn
+$ npm
 ```
 
 #### 2. Build and test everything
 
 ```sh
-$ yarn cbt  # => yarn clean && yarn build && yarn test
+$ npm run cbt  # => npm run clean && npm run build && npm test
 ```
 
-#### 3. Run dev
-
-Serve all examples and rebuild sources on change (aka _dev_ mode)
+#### 3. Run the local lookbook
 
 ```sh
-$ yarn dev
+$ npm start
 ```
