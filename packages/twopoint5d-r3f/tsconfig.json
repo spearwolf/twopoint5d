@@ -12,6 +12,6 @@
     "declarationMap": true
   },
   "files": [],
-  "include": [],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["build", "dist"]
 }
