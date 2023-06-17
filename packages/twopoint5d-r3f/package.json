@@ -17,10 +17,11 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "run-s compile bundle",
+    "build": "run-s compile bundle makePackageJson",
     "compile": "tsc -b tsconfig.build.json",
     "bundle": "rollup -c rollup.config.js",
-    "clean": "rimraf build types dist ../../dist/packages/twopoint5d"
+    "clean": "rimraf build types dist ../../dist/packages/twopoint5d-r3f",
+    "makePackageJson": "node ../../scripts/makePackageJson.mjs"
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.13.0",
