@@ -34,7 +34,7 @@ The library comes in two flavors:
   - billboards!
 - Creation, management and display of 2.5D maps
 - Import of common texture atlas formats (TexturePacker) and 2.5D-maps (tiled, LDtk)
-  - :warning: _ok, to be honest: this point is still rather in the planning phase and not yet implemented, more like wok in progress_ :wink:
+  - _OK, to be honest: this point is still rather in the planning phase and not yet implemented, more like wok in progress_ :wink:
 - Advanced api for extending and customizing sprite features and 2.5D-map renderers
 
 :warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are
