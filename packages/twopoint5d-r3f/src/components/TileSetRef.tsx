@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {TileSet} from 'twopoint5d';
+import {TileSet, unpick} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 import {useTileSet} from '../hooks/useTileSet';
 
@@ -9,9 +9,10 @@ export type TileSetRefProps = JSX.IntrinsicElements['primitive'] & {
 
 function Component({name, children, ...props}: TileSetRefProps, ref: ForwardedRef<TileSet>) {
   const tileset = useTileSet(name);
+  const propsWithoutObject = unpick(props, 'object');
 
   return tileset ? (
-    <primitive object={tileset} ref={ref} {...props}>
+    <primitive object={tileset} ref={ref} {...propsWithoutObject}>
       {children}
     </primitive>
   ) : null;

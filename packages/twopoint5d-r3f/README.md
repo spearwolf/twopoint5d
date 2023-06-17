@@ -1,9 +1,7 @@
 <p align="center">
   <img width="350" src="../../docs/images/twopoint5d-700x168.png">
 	<br>
-  <b>The Art of Tiling 2D Sprites</b>
-	<br>
-  <em>A 2.5D realtime gfx library built with three.js, react and @react-three/fiber</em>
+  <em>a 2.5d realtime gfx library built with three.js, react and @react-three/fiber</em>
 </p>
 
 ---

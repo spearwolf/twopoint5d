@@ -1,4 +1,4 @@
-import {Stage2D} from 'twopoint5d';
+import {Stage2D} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D';
 

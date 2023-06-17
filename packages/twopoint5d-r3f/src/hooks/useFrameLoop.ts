@@ -19,7 +19,7 @@ interface NullableValue<T> {
   value: T | null;
 }
 
-export const nullableValue = <T>(value: T | null | undefined): NullableValue<T> => ({[isNullable$]: true, value});
+export const nullableValue = <T>(value: T | null | undefined): NullableValue<T> => ({[isNullable$]: true, value: value ?? null});
 
 type FrameStateMachineParams = Record<string, unknown>;
 type NonNullParams<Params extends FrameStateMachineParams> = {[Key in keyof Params]: NonNullable<Params[Key]>};
@@ -76,7 +76,7 @@ const isLazyCallbacks = <Params extends FrameStateMachineParams>(
 const getChanges = <Params extends FrameStateMachineParams>(
   args: Params,
   lastArgs: Params,
-): [hasChanges: boolean, changes: ParamChanges<Params>] => {
+): [hasChanges: boolean, changes?: ParamChanges<Params>] => {
   const changes = Object.entries(args).filter(([key, val]) => val !== lastArgs[key]);
   const hasChanges = changes.length > 0;
   return [
@@ -99,8 +99,8 @@ interface InternalState<Params extends FrameStateMachineParams> {
 export const useFrameLoop = <Params extends FrameStateMachineParams>(
   callbacks: FrameStateMachineCallbacksWithRenderPriority<Params> | FrameStateMachineLazyCallbacks<Params>,
   dependencies: Params = {} as Params,
-): MutableRefObject<FrameStateMachineCallbacks<Params>> => {
-  const stateMachineRef = useRef<FrameStateMachineCallbacks<Params>>(undefined);
+): MutableRefObject<FrameStateMachineCallbacks<Params> | undefined> => {
+  const stateMachineRef = useRef<FrameStateMachineCallbacks<Params> | undefined>(undefined);
   const stateRef = useRef<InternalState<Params>>({
     callbacks,
     dependencies,
@@ -142,7 +142,7 @@ export const useFrameLoop = <Params extends FrameStateMachineParams>(
         if (stateMachine_?.update) {
           const [hasChanges, changes] = getChanges(args as Params, state_.lastArgs as Params);
           if (hasChanges) {
-            stateMachine_.update(changes);
+            stateMachine_.update(changes!);
           }
         }
 

@@ -1,5 +1,5 @@
 import {createPortal, extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
-import {Stage2D as __Stage2D} from 'twopoint5d';
+import {Stage2D as __Stage2D} from '@spearwolf/twopoint5d';
 import {
   createContext,
   ForwardedRef,
@@ -18,7 +18,6 @@ import {mergeRefs} from '../utils/mergeRefs';
 extend({Stage2D: __Stage2D});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       stage2D: ReactThreeFiber.Node<__Stage2D, typeof __Stage2D>;
@@ -26,7 +25,7 @@ declare global {
   }
 }
 
-export const Stage2DContext = createContext<__Stage2D>(undefined);
+export const Stage2DContext = createContext<__Stage2D | undefined>(undefined);
 Stage2DContext.displayName = 'Stage2DContext';
 
 export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
@@ -41,7 +40,7 @@ export type Stage2DProps = JSX.IntrinsicElements['stage2D'] & {
 // - https://docs.pmnd.rs/react-three-fiber/tutorials/v8-migration-guide#createportal-creates-a-state-enclave
 
 // https://github.com/pmndrs/react-three-fiber/issues/92
-const toManualControlled = <C extends Camera>(camera: C, manual = true): C & {manual: boolean} =>
+const toManualControlled = <C extends Camera>(camera: C | undefined, manual = true): (C & {manual: boolean}) | undefined =>
   camera ? Object.assign(camera, {manual}) : undefined;
 
 function Component(
@@ -67,10 +66,10 @@ function Component(
   const [initialScene] = useState(sceneFromProps);
   const [initialProjection] = useState(projection);
 
-  const [stage, setStage] = useState<__Stage2D>(null);
+  const [stage, setStage] = useState<__Stage2D | null>(null);
   const scene = (sceneFromProps || stage?.scene) ?? null;
 
-  const [stageCamera, setStageCamera] = useState<Camera>(toManualControlled(stage?.camera));
+  const [stageCamera, setStageCamera] = useState<Camera | undefined>(toManualControlled(stage?.camera));
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
   // set stageCamera
@@ -128,7 +127,7 @@ function Component(
 
   return (
     <stage2D args={[initialProjection, initialScene]} ref={mergeRefs(setStage, ref)} name={name} {...props}>
-      <Stage2DContext.Provider value={stage}>
+      <Stage2DContext.Provider value={stage ?? undefined}>
         {stage &&
           scene &&
           createPortal(

@@ -11,20 +11,27 @@ export interface DependencyCallbacks<T = any> {
 }
 
 export type DependencyProp<T = any> =
-  DependencyKey
+  | DependencyKey
   | [name: DependencyKey, equals: EqualityCallback<T>]
   | [name: DependencyKey, callbacks: DependencyCallbacks];
 
 export class Dependencies {
-  static cloneable = <D extends {
-    equals: (x: D) => boolean,
-    clone: () => D,
-    copy: (x: D) => D,
-  }>(name: DependencyKey): DependencyProp<D> => [name, {
+  static cloneable = <
+    D extends {
+      equals: (x: D) => boolean;
+      clone: () => D;
+      copy: (x: D) => D;
+    },
+  >(
+    name: DependencyKey,
+  ): DependencyProp<D> => [
+    name,
+    {
       equals: (a: D, b: D) => a.equals(b),
-        clone: (source: D) => source.clone(),
-        copy: (source: D, target: D) => target.copy(source),
-  }];
+      clone: (source: D) => source.clone(),
+      copy: (source: D, target: D) => target.copy(source),
+    },
+  ];
 
   readonly #props: [DependencyKey, DependencyCallbacks | undefined][];
   readonly #callbacks: Map<DependencyKey, DependencyCallbacks> = new Map();
@@ -76,16 +83,14 @@ export class Dependencies {
 
       if (curValue == null || nextValue == null) {
         if (curValue == nextValue) {
-          continue; 
+          continue;
         }
         return false;
       }
 
-      if (curValue !== nextValue &&
-          callbacks?.equals?.(curValue, nextValue) === false
-         ) {
-           return false;
-         }
+      if (curValue !== nextValue && callbacks?.equals?.(curValue, nextValue) === false) {
+        return false;
+      }
     }
 
     return true;
@@ -100,7 +105,7 @@ export class Dependencies {
 
     return changed;
   }
-  
+
   clear(): void {
     this.#state.clear();
   }

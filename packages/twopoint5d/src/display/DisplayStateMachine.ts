@@ -1,4 +1,4 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
+import {eventize, Eventize} from '@spearwolf/eventize';
 
 export type DisplayStateName = 'new' | 'running' | 'paused';
 

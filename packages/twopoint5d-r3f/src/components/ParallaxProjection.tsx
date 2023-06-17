@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {ParallaxProjection as __ParallaxProjection, ProjectionPlane, ProjectionPlaneDescription} from 'twopoint5d';
+import {ParallaxProjection as __ParallaxProjection, ProjectionPlane, ProjectionPlaneDescription} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef, useContext, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 import {Stage2DContext} from './Stage2D';
@@ -7,7 +7,6 @@ import {Stage2DContext} from './Stage2D';
 extend({ParallaxProjection: __ParallaxProjection});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       parallaxProjection: ReactThreeFiber.Node<__ParallaxProjection, typeof __ParallaxProjection>;

@@ -1,12 +1,11 @@
 import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
-import {PanControl2D as __PanControl2D} from 'twopoint5d';
+import {PanControl2D as __PanControl2D} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef, memo, useEffect, useRef, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
 extend({PanControl2D: __PanControl2D});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       panControl2D: ReactThreeFiber.Node<__PanControl2D, typeof __PanControl2D>;
@@ -20,7 +19,7 @@ export type Map2DPanControlProps = JSX.IntrinsicElements['panControl2D'] & {
 
 function Component({onUpdate, children, ...props}: Map2DPanControlProps, ref: ForwardedRef<__PanControl2D>) {
   const panControlRef = useRef<__PanControl2D>();
-  const [panControl, setPanControl] = useState<__PanControl2D>(panControlRef.current);
+  const [panControl, setPanControl] = useState<__PanControl2D | undefined>(panControlRef.current);
 
   useFrame((_state, delta) => {
     panControlRef.current?.update(delta);

@@ -1,0 +1,6 @@
+{
+  "title": "crosses",
+  "description": "A minimal example of how to use the VertexObjcts mesh",
+  "url": "/demos/crosses",
+  "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf"]
+}

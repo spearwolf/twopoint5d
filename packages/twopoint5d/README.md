@@ -1,9 +1,7 @@
 <p align="center">
   <img width="400" height="84" src="twopoint5d-logo.png">
 	<br>
-  <b>The Art of Tiling 2D Sprites</b>
-	<br>
-  <em>A 2.5D realtime gfx library built with three.js</em>
+  <em>a 2.5d realtime gfx library built with three.js</em>
 </p>
 
 ---

@@ -1,5 +1,5 @@
 export const readOption = <OptionsType extends Object, ValueType>(
-  options: OptionsType,
+  options: OptionsType | null | undefined,
   propName: keyof OptionsType,
   defValue: ValueType,
 ): ValueType => {

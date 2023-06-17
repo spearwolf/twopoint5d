@@ -2,9 +2,9 @@ import {Vector2} from 'three';
 
 import {Dependencies} from './Dependencies';
 
-type Ref = { current: Object };
+type Ref = {current: Object};
 
-const refEquals = (a: Ref, b:Ref) => a?.current === b?.current;
+const refEquals = (a: Ref, b: Ref) => a?.current === b?.current;
 
 describe('Dependencies', () => {
   test('construction', () => {
@@ -65,9 +65,7 @@ describe('Dependencies', () => {
   });
 
   test('copy and clone', () => {
-    const deps = new Dependencies([
-      Dependencies.cloneable<Vector2>('v')
-    ]);
+    const deps = new Dependencies([Dependencies.cloneable<Vector2>('v')]);
 
     expect(deps.changed({v: new Vector2()})).toBe(true);
     expect(deps.changed({v: new Vector2()})).toBe(false);

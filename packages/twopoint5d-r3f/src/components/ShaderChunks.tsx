@@ -1,4 +1,4 @@
-import {CustomChunksShaderMaterial} from 'twopoint5d';
+import {CustomChunksShaderMaterial} from '@spearwolf/twopoint5d';
 import {useEffect, useRef, useState} from 'react';
 
 export interface ShaderChunksProps {
@@ -7,7 +7,7 @@ export interface ShaderChunksProps {
 
 export function ShaderChunks({chunks}: ShaderChunksProps) {
   const primitiveRef = useRef({});
-  const [material, setMaterial] = useState<CustomChunksShaderMaterial>(null);
+  const [material, setMaterial] = useState<CustomChunksShaderMaterial | null>(null);
 
   useEffect(() => {
     if (material && typeof chunks === 'object') {

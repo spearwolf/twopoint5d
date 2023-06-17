@@ -73,6 +73,7 @@ interface AnimatedSpritesMaterialParameters extends CustomChunksShaderMaterialPa
   colorMap?: Texture;
   animsMap?: Texture;
   time?: number;
+  renderAsBillboards?: boolean;
 }
 
 export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
@@ -92,15 +93,19 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
           value: [options?.animsMap?.image.width ?? 0, options?.animsMap?.image.height ?? 0],
         },
         time: {
-          value: 0,
+          value: options?.time ?? 0,
         },
       },
       transparent: true,
       side: DoubleSide,
-      ...unpick(options, 'uniforms', 'colorMap', 'animsMap', 'time'),
+      ...unpick(options ?? {}, 'uniforms', 'colorMap', 'animsMap', 'time', 'renderAsBillboards'),
     });
 
     this.name = options?.name ?? 'twopoint5d.AnimatedSpritesMaterial';
+
+    if (typeof options?.renderAsBillboards === 'boolean') {
+      this.renderAsBillboards = options.renderAsBillboards!;
+    }
 
     this.replaceVertexShaderChunks = [
       'extra_pars_vertex',
@@ -118,24 +123,24 @@ export class AnimatedSpritesMaterial extends CustomChunksShaderMaterial {
   }
 
   get colorMap(): Texture | undefined {
-    return this.uniforms.colorMap.value;
+    return this.uniforms['colorMap'].value;
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    this.uniforms.colorMap.value = colorMap;
+    this.uniforms['colorMap'].value = colorMap;
   }
 
   get animsMap(): Texture | undefined {
-    return this.uniforms.animsMap.value;
+    return this.uniforms['animsMap'].value;
   }
 
   set animsMap(animsMap: Texture | undefined) {
-    this.uniforms.animsMap.value = animsMap;
-    this.uniforms.animsMapSize.value = animsMap ? [animsMap.image.width, animsMap.image.height] : [0, 0];
+    this.uniforms['animsMap'].value = animsMap;
+    this.uniforms['animsMapSize'].value = animsMap ? [animsMap.image.width, animsMap.image.height] : [0, 0];
   }
 
   get renderAsBillboards(): boolean {
-    return this.defines?.RENDER_AS_BILLBOARDS === 1;
+    return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
   }
 
   set renderAsBillboards(renderAsBillboards: boolean) {

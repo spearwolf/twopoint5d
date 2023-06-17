@@ -46,7 +46,7 @@ export const useAsyncEffect = <ReturnType>(
         return;
       }
 
-      const myTask = activeTasksRef.current.at(taskIdx);
+      const myTask = activeTasksRef.current.at(taskIdx)!;
 
       switch (myTask.state) {
         case 'abort':

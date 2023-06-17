@@ -1,4 +1,4 @@
-import eventize, {Eventize} from '@spearwolf/eventize';
+import {eventize, Eventize} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three';
 
 import {TileSprite} from '../sprites/TileSprites/descriptors';

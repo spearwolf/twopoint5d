@@ -9,7 +9,7 @@ const makeAttributeGetter = (bufferName: string, instanceOffset: number, attrOff
   return function getAttribute(this: VO) {
     const idx = this[voIndex] * instanceOffset + attrOffset;
     const buf = this[voBuffer].buffers.get(bufferName);
-    return buf.typedArray[idx];
+    return buf!.typedArray[idx];
   };
 };
 
@@ -17,7 +17,7 @@ const makeAttributeSetter = (bufferName: string, instanceOffset: number, attrOff
   return function setAttribute(this: VO, value: number) {
     const idx = this[voIndex] * instanceOffset + attrOffset;
     const buf = this[voBuffer].buffers.get(bufferName);
-    buf.typedArray[idx] = value;
+    buf!.typedArray[idx] = value;
   };
 };
 
@@ -31,8 +31,8 @@ const makeAttributeValuesGetter = (
   return function getAttributeValues(this: VO) {
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
     const buf = this[voBuffer].buffers.get(bufferName);
-    const source = buf.typedArray;
-    const target = createTypedArray(buf.dataType, vertexCount * attrSize);
+    const source = buf!.typedArray;
+    const target = createTypedArray(buf!.dataType, vertexCount * attrSize);
     for (let i = 0; i < vertexCount; i++) {
       if (attrSize === 1) {
         target[i] = source[idx + i * bufferItemSize];
@@ -54,7 +54,7 @@ const makeAttributeValueSetter = (
   return function setAttributeValues(this: VO, ...values: number[] | [ArrayLike<number>]) {
     const source = values.length === 1 && Array.isArray(values[0]) ? values[0] : values;
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[voBuffer].buffers.get(bufferName).typedArray;
+    const target = this[voBuffer].buffers.get(bufferName)!.typedArray;
     for (let i = 0; i < vertexCount; i++) {
       if (attrSize === 1) {
         target[idx + i * bufferItemSize] = source[i];
@@ -65,19 +65,15 @@ const makeAttributeValueSetter = (
   };
 };
 
-export function createVertexObjectPrototype(
-  voBuffer: VertexObjectBuffer,
-  basePrototype: Object | null | undefined,
-  methods: Object | null | undefined,
-): Object {
+export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer, basePrototype?: object, methods?: object): object {
   const {descriptor} = voBuffer;
   const entries = descriptor.attributeNames.flatMap((attrName) => {
-    const attr = descriptor.getAttribute(attrName);
-    const bufAttr = voBuffer.bufferAttributes.get(attrName);
-    const buf = voBuffer.buffers.get(bufAttr.bufferName);
+    const attr = descriptor.getAttribute(attrName)!;
+    const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
+    const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
     const AttrName = toPascalCase(attrName);
 
-    const methods: any[] = [];
+    const methods: unknown[] = [];
     if (descriptor.vertexCount === 1 && attr.size === 1) {
       methods.push([
         attrName,
@@ -129,13 +125,13 @@ export function createVertexObjectPrototype(
   if (methods) {
     entries.push(
       ...Object.entries(methods)
-        .filter(([_key, val]) => typeof val === 'function')
+        .filter(([, val]) => typeof val === 'function')
         .map(([key, value]) => [key, {value}]),
     );
   }
 
   const proto = basePrototype ?? Object.prototype;
-  const props = Object.fromEntries(entries);
+  const props = Object.fromEntries(entries as []);
 
   return Object.create(proto, props);
 }

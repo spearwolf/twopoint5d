@@ -1,0 +1,18 @@
+# Add files here to ignore them from prettier formatting
+.vscode
+/dist
+/coverage
+/examples
+*.md
+
+apps/*/dist
+apps/*/build
+packages/*/dist
+packages/*/build
+
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+*.glsl
+*.vert
+*.frag

@@ -76,44 +76,44 @@ export class TileSpritesMaterial extends ShaderMaterial {
   }
 
   get colorMap(): Texture | undefined {
-    return this.uniforms.colorMap.value;
+    return this.uniforms['colorMap'].value;
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    if (this.uniforms.colorMap.value !== colorMap) {
-      this.uniforms.colorMap.value = colorMap;
+    if (this.uniforms['colorMap'].value !== colorMap) {
+      this.uniforms['colorMap'].value = colorMap;
       this.uniformsNeedUpdate = true;
     }
   }
 
   get fogNear(): number {
-    return this.uniforms.fogNearFar.value[0];
+    return this.uniforms['fogNearFar'].value[0];
   }
 
   set fogNear(value: number) {
-    if (this.uniforms.fogNearFar.value[0] !== value) {
-      this.uniforms.fogNearFar.value[0] = value;
+    if (this.uniforms['fogNearFar'].value[0] !== value) {
+      this.uniforms['fogNearFar'].value[0] = value;
       this.uniformsNeedUpdate = true;
     }
   }
 
   get fogFar(): number {
-    return this.uniforms.fogNearFar.value[1];
+    return this.uniforms['fogNearFar'].value[1];
   }
 
   set fogFar(value: number) {
-    if (this.uniforms.fogNearFar.value[1] !== value) {
-      this.uniforms.fogNearFar.value[1] = value;
+    if (this.uniforms['fogNearFar'].value[1] !== value) {
+      this.uniforms['fogNearFar'].value[1] = value;
       this.uniformsNeedUpdate = true;
     }
   }
 
   get fogColor(): Vector4 {
-    return this.uniforms.fogColor.value;
+    return this.uniforms['fogColor'].value;
   }
 
   set fogColor(color: Vector4) {
-    this.uniforms.fogColor.value.copy(color);
+    this.uniforms['fogColor'].value.copy(color);
     this.uniformsNeedUpdate = true;
   }
 }

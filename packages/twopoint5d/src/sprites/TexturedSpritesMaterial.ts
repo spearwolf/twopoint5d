@@ -94,18 +94,18 @@ export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
   }
 
   get colorMap(): Texture | undefined {
-    return this.uniforms.colorMap.value;
+    return this.uniforms['colorMap'].value;
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    if (this.uniforms.colorMap.value !== colorMap) {
-      this.uniforms.colorMap.value = colorMap;
+    if (this.uniforms['colorMap'].value !== colorMap) {
+      this.uniforms['colorMap'].value = colorMap;
       this.uniformsNeedUpdate = true;
     }
   }
 
   get renderAsBillboards(): boolean {
-    return this.defines?.RENDER_AS_BILLBOARDS === 1;
+    return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
   }
 
   set renderAsBillboards(renderAsBillboards: boolean) {

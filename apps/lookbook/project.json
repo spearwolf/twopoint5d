@@ -1,0 +1,17 @@
+{
+  "name": "lookbook",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "root": "apps/lookbook",
+  "sourceRoot": "apps/lookbook/src",
+  "projectType": "application",
+  "targets": {
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/lookbook/**/*.js", "apps/lookbook/**/*.jsx", "apps/lookbook/**/*.ts", "apps/lookbook/**/*.tsx"]
+      }
+    }
+  },
+  "tags": []
+}

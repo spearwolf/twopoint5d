@@ -13,6 +13,6 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
 
     this.name = 'twopoint5d.TexturedSpritesGeometry';
 
-    this.basePool.createVO().make(...makeBaseSpriteArgs);
+    this.basePool!.createVO().make(...makeBaseSpriteArgs);
   }
 }

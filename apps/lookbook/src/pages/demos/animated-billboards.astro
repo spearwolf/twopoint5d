@@ -1,0 +1,94 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './textured-sprites.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: rgb(46 64 82);
+    background: radial-gradient(circle, rgb(120 71 117) 0%, rgb(38 46 54) 42%);
+    color: #eee;
+  }
+</style>
+
+<script>
+  import {
+    AnimatedSprites,
+    AnimatedSpritesGeometry,
+    AnimatedSpritesMaterial,
+    FrameBasedAnimations,
+    TileSetLoader,
+  } from '@spearwolf/twopoint5d';
+  import {CylinderGeometry, Mesh, MeshPhongMaterial, PointLight} from 'three';
+  import {BouncingSprites} from '~shared/animated-billboards/BouncingSprites';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  demo.start(async () => {
+    demo.camera.position.set(0, 70, -210);
+
+    const CAPACITY = 400;
+
+    const geometry = new AnimatedSpritesGeometry(CAPACITY);
+
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
+      tileWidth: 64,
+      tileHeight: 64,
+      margin: 1,
+    });
+
+    const anims = new FrameBasedAnimations();
+    const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 150, 100, 40);
+
+    bouncingSprites.createSprites(CAPACITY, animId);
+
+    const material = new AnimatedSpritesMaterial({
+      colorMap: texture,
+      animsMap: anims.bakeDataTexture(),
+      depthTest: true,
+      depthWrite: true,
+      renderAsBillboards: true,
+    });
+
+    const mesh = new AnimatedSprites(geometry, material);
+
+    demo.scene.add(mesh);
+
+    demo.on('frame', ({deltaTime, now}) => {
+      bouncingSprites.animate(deltaTime);
+      material.uniforms['time'].value = now;
+    });
+
+    console.log('BouncingSprites', bouncingSprites);
+
+    const cylinderGeometry = new CylinderGeometry(170, 170, 3, 180);
+    const cylinderMaterial = new MeshPhongMaterial({
+      color: 0x8394a5,
+      emissive: 0x1f2133, // 0x223344, // 1f2133
+    });
+
+    const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
+    cylinder.position.set(0, -1.5, 0);
+
+    demo.scene.add(cylinder);
+
+    const mainLight = new PointLight(0xcccccc, 1.5, 250);
+    mainLight.position.y = 60;
+
+    demo.scene.add(mainLight);
+
+    console.log('AnimatedSprites', mesh);
+  });
+</script>

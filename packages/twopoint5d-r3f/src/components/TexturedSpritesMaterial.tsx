@@ -1,11 +1,10 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {TexturedSpritesMaterial as __TexturedSpritesMaterial} from 'twopoint5d';
+import {TexturedSpritesMaterial as __TexturedSpritesMaterial} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({TexturedSpritesMaterial: __TexturedSpritesMaterial});
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       texturedSpritesMaterial: ReactThreeFiber.MaterialNode<__TexturedSpritesMaterial, typeof __TexturedSpritesMaterial>;

@@ -1,0 +1,58 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './display-minimal.json';
+---
+
+<Layout title={title}>
+  <canvas id="twopoint5d" resize-to="window"></canvas>
+</Layout>
+
+<script>
+  import {Color, Sprite, SpriteMaterial} from 'three';
+  import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const canvas = document.getElementById('twopoint5d')!;
+  const display = new Display(canvas);
+
+  const width = 197;
+  const height = 205;
+
+  const stage = new Stage2D(
+    new ParallaxProjection('xy|bottom-left', {
+      width: width,
+      height: height,
+      fit: 'contain',
+    }),
+  );
+
+  (window as any).display = display;
+  (window as any).stage = stage;
+
+  const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy']);
+
+  const textureImage = textureFactory.load(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
+
+  const material = new SpriteMaterial({map: textureImage});
+  const sprite = new Sprite(material);
+
+  sprite.scale.set(width, height, 1);
+  stage.scene.add(sprite);
+
+  display.on('init', ({renderer}) => {
+    renderer.setClearColor(new Color('#0050A0'), 1.0);
+  });
+
+  display.on('resize', ({width, height}) => {
+    stage.resize(width, height);
+  });
+
+  display.on('frame', ({renderer}) => {
+    stage.renderFrame(renderer);
+  });
+
+  display.start();
+
+  console.log('display=', display);
+  console.log('stage=', stage);
+</script>
