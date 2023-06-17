@@ -45,13 +45,13 @@ The library comes in two flavors:
 
 Almost all of these examples serve to show individual aspects and usage of the api. Therefore, don't expect any visual masterpieces at this point. This is given to the user of the libraries as an exercise :wink:
 
-> :info: At the moment the new [lookbook app](./apps/lookbook/) is being developed, which combines all examples. you can start it simply by:
+> At the moment a new [lookbook](./apps/lookbook/) app is being developed, which combines all examples. you can start it simply by:
 
 ```sh
 $ npx nx dev lookbook  # or just use: npm start
 ```
 
-but as long as not all examples have been migrated, the old examples can still be found in the [exmaples](./examples/) directory:
+But as long as not all examples have been migrated, the _old_ examples can still be found here:
 
 - [examples/vanilla](./examples/vanilla/)
   - vanilla three.js examples (no build step required)
@@ -81,7 +81,7 @@ $ npm
 $ npm run cbt  # => npm run clean && npm run build && npm test
 ```
 
-#### 3. Run the local lookbook
+#### 3. Run the local lookbook app
 
 ```sh
 $ npm start
