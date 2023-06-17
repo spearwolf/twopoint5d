@@ -26,14 +26,15 @@ The library comes in two flavors:
 - Super easy import and use of gamedev assets and 2D resources from the internet
 - First-class pixel-art support and responsive-design awareness
 
-## What are the (planned*) core features ?
+## What are the core features ?
 
 - Creation, management and efficient display of 2.5D sprites/particles
   - texture-atlas support
   - sprite-sheet animations
   - billboards!
 - Creation, management and display of 2.5D maps
-- Import of common texture atlas formats (TexturePacker) and 2.5D-maps* (tiled, LDtk)
+- Import of common texture atlas formats (TexturePacker) and 2.5D-maps (tiled, LDtk)
+  - :warning: _ok, to be honest: this point is still rather in the planning phase and not yet implemented, more like wok in progress_ :wink:
 - Advanced api for extending and customizing sprite features and 2.5D-map renderers
 
 :warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are
