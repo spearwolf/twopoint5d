@@ -1,8 +1,6 @@
 <p align="center">
   <img width="350" src="docs/images/twopoint5d-700x168.png">
 	<br>
-  <b>the lost art of tiling 2d sprites</b>
-	<br>
   <em>a 2.5d realtime gfx library built with three.js</em>
 </p>
 
