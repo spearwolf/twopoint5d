@@ -1,9 +1,14 @@
 <p align="center">
   <img width="350" src="docs/images/twopoint5d-700x168.png">
-	<br>
+  <br>
   <em>a 2.5d realtime gfx library built with three.js</em>
 </p>
 
+<div align="center">
+
+![GitHub License MIT](https://img.shields.io/github/license/wbkd/react-flow?color=%23ff0072)
+
+</p>
 
 ![twopoint5d cover](cover.png)
 
