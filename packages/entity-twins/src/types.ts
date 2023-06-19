@@ -44,3 +44,7 @@ export interface IEntityChangeProperty extends IEntityChangeEntry {
   type: EntityChangeType.ChangeProperties;
   properties: [string, unknown][];
 }
+
+export interface EntitiesSyncEvent {
+  changeTrail: IEntityChangeEntry[];
+}

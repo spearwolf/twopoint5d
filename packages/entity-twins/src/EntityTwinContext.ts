@@ -15,7 +15,7 @@ declare global {
 }
 
 export class EntityTwinContext {
-  static GlobalNS = Symbol.for('globalEntityProxyContext');
+  static GlobalNS = Symbol.for('globalEntities');
 
   static get(namespace?: string | symbol): EntityTwinContext {
     if (globalThis.__entityProxyContext === undefined) {
