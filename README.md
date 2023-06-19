@@ -68,7 +68,7 @@ this repository is structured as a monorepo; based on [nx](https://nx.dev/) !
 
 #### 1. Install dependencies
 
-First, you need a current [node v16+](https://nodejs.org/) setup.
+First, you need a current [node v18+](https://nodejs.org/) setup.
 Install the dependencies with:
 
 ```sh
