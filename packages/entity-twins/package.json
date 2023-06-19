@@ -24,11 +24,13 @@
     "clean": "rimraf build types dist ../../dist/packages/entity-twins"
   },
   "peerDependencies": {
-    "@spearwolf/eventize": "^2.2.0"
+    "@spearwolf/eventize": "^2.2.0",
+    "@spearwolf/signalize": "^0.4.0"
   },
   "rollup": {
     "external": [
-      "@spearwolf/eventize"
+      "@spearwolf/eventize",
+      "@spearwolf/signalize"
     ]
   }
 }
