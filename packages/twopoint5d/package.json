@@ -7,6 +7,7 @@
     "email": "wolfger@spearwolf.de",
     "url": "https://www.spearwolf.de"
   },
+  "license": "Apache-2.0",
   "main": "dist/twopoint5d.js",
   "type": "module",
   "module": "dist/twopoint5d.js",
