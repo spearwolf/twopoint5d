@@ -40,7 +40,7 @@ export interface IEntityChangeUpdateOrder extends IEntityChangeEntry {
   order: number;
 }
 
-export interface IEntityChangeProperty extends IEntityChangeEntry {
+export interface IEntityChangeProperties extends IEntityChangeEntry {
   type: EntityChangeType.ChangeProperties;
   properties: [string, unknown][];
 }

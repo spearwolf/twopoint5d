@@ -1,12 +1,24 @@
-import {Eventize} from '@spearwolf/eventize';
-import {SignalReader, SignalWriter, batch, createSignal, value} from '@spearwolf/signalize';
+import {Eventize, Priority} from '@spearwolf/eventize';
+import {SignalReader, SignalWriter, batch, createSignal, destroySignal, value} from '@spearwolf/signalize';
 import {EntityKernel} from './EntityKernel';
 
+const OnDestroy = Symbol('OnDestroy');
+
 export class EntityUplink extends Eventize {
+  static OnDestroy = OnDestroy;
+
   #kernel: EntityKernel;
   #uuid: string;
 
   #signals = new Map<string, [get: SignalReader<any>, set: SignalWriter<any>]>();
+
+  #parentUuid?: string;
+  #parent?: EntityUplink;
+
+  #childrenUuids: Set<string> = new Set();
+  #children: EntityUplink[] = [];
+
+  #order = 0;
 
   get kernel(): EntityKernel {
     return this.#kernel;
@@ -16,10 +28,105 @@ export class EntityUplink extends Eventize {
     return this.#uuid;
   }
 
+  get order(): number {
+    return this.#order;
+  }
+
+  set order(value: number) {
+    if (this.#order !== value) {
+      this.#order = value;
+      if (this.#parentUuid) {
+        this.parent!.resortChildren();
+      }
+    }
+  }
+
+  get parentUuid(): string | undefined {
+    return this.#parentUuid || undefined;
+  }
+
+  set parentUuid(parentUuid: string | undefined) {
+    if (this.#parentUuid !== parentUuid) {
+      const prevParent = this.parent;
+      if (prevParent) {
+        prevParent.removeChild(this);
+      }
+
+      this.#parentUuid = parentUuid || undefined;
+      this.#parent = parentUuid ? this.#kernel.getEntity(parentUuid) : undefined;
+
+      if (this.#parent) {
+        this.#parent.addChild(this);
+      }
+    }
+  }
+
+  get parent(): EntityUplink | undefined {
+    if (!this.#parent && this.#parentUuid) {
+      this.#parent = this.#kernel.getEntity(this.#parentUuid);
+    }
+    return this.#parent;
+  }
+
+  set parent(parent: EntityUplink | undefined) {
+    this.parentUuid = parent?.uuid;
+  }
+
+  get hasParent(): boolean {
+    return !!this.#parentUuid;
+  }
+
+  get children(): readonly EntityUplink[] {
+    return this.#children;
+  }
+
   constructor(kernel: EntityKernel, uuid: string) {
     super();
     this.#kernel = kernel;
     this.#uuid = uuid;
+    this.once(OnDestroy, Priority.Min, this);
+  }
+
+  [OnDestroy]() {
+    console.log('uplink.on-destroy', this.uuid);
+
+    for (const [sig] of this.#signals.values()) {
+      destroySignal(sig);
+    }
+    this.#signals.clear();
+
+    this.#parentUuid = undefined;
+    this.#parent = undefined;
+
+    this.#childrenUuids.clear();
+    this.#children.length = 0;
+  }
+
+  addChild(child: EntityUplink) {
+    if (this.#children.length === 0) {
+      this.#childrenUuids.add(child.uuid);
+      this.#children.push(child);
+      return;
+    }
+
+    if (this.#childrenUuids.has(child.uuid)) {
+      throw new Error(`Child with uuid: ${child.uuid} already exists! parentUuid: ${this.uuid}`);
+    }
+    this.#childrenUuids.add(child.uuid);
+    this.#children.push(child);
+
+    this.resortChildren();
+  }
+
+  resortChildren() {
+    this.#children.sort((a, b) => a.order - b.order);
+  }
+
+  removeChild(child: EntityUplink) {
+    if (this.#childrenUuids.has(child.uuid)) {
+      this.#childrenUuids.delete(child.uuid);
+      this.#children.splice(this.#children.indexOf(child), 1);
+    }
   }
 
   getSignal<T = unknown>(key: string): [SignalReader<T>, SignalWriter<T>] {

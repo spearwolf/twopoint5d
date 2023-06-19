@@ -1,4 +1,4 @@
-import {Eventize} from '@spearwolf/eventize';
+import {Eventize, Priority} from '@spearwolf/eventize';
 import {EntityTwinContext} from './EntityTwinContext';
 import {EntitiesSyncEvent} from './types';
 
@@ -40,18 +40,21 @@ export class EntitiesLink extends Eventize {
     });
   }
 
-  sync() {
-    if (!this.isReady) {
-      this.#syncCallsBeforeReady++;
-      if (this.#syncCallsBeforeReady > 1) {
-        return;
+  sync(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.isReady) {
+        this.#syncCallsBeforeReady++;
+        if (this.#syncCallsBeforeReady > 1) {
+          return this.once(EntitiesLink.OnSync, Priority.Low, () => resolve());
+        }
       }
-    }
-    this.ready.then(() => {
-      const syncEvent: EntitiesSyncEvent = {
-        changeTrail: this.context.buildChangeTrails(),
-      };
-      this.emit(EntitiesLink.OnSync, syncEvent);
+      this.ready.then(() => {
+        const syncEvent: EntitiesSyncEvent = {
+          changeTrail: this.context.buildChangeTrails(),
+        };
+        this.emit(EntitiesLink.OnSync, syncEvent);
+        resolve();
+      });
     });
   }
 

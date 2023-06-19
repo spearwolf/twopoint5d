@@ -1,39 +1,110 @@
+import {Eventize} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {EntityUplink} from './EntityUplink';
-import {EntitiesSyncEvent, EntityChangeType, IEntityChangeCreateEntity, IEntityChangeEntry} from './types';
+import {
+  EntitiesSyncEvent,
+  EntityChangeType,
+  IEntityChangeCreateEntity,
+  IEntityChangeDestroyEntity,
+  IEntityChangeProperties,
+  IEntityChangeSetParent,
+  IEntityChangeUpdateOrder,
+} from './types';
 
-export class EntityKernel {
+export class EntityKernel extends Eventize {
   #entities: Map<string, EntityUplink> = new Map();
+
+  getEntity(uuid: string): EntityUplink {
+    const entity = this.#entities.get(uuid);
+    if (!entity) {
+      throw new Error(`Entity with uuid "${uuid}" not found.`);
+    }
+    return entity;
+  }
 
   run(event: EntitiesSyncEvent) {
     batch(() => {
       for (const entry of event.changeTrail) {
-        this.parse(entry);
+        this.parse(
+          entry as
+            | IEntityChangeCreateEntity
+            | IEntityChangeDestroyEntity
+            | IEntityChangeSetParent
+            | IEntityChangeUpdateOrder
+            | IEntityChangeProperties,
+        );
       }
     });
   }
 
-  parse(entry: IEntityChangeEntry) {
+  parse(
+    entry:
+      | IEntityChangeCreateEntity
+      | IEntityChangeDestroyEntity
+      | IEntityChangeSetParent
+      | IEntityChangeUpdateOrder
+      | IEntityChangeProperties,
+  ) {
     switch (entry.type) {
       case EntityChangeType.CreateEntity:
-        this.createEntity(entry as IEntityChangeCreateEntity);
+        this.createEntity(entry.uuid, entry.token, entry.parentUuid, entry.order, entry.properties);
         break;
-      // TODO implement other change-entry types
+
+      case EntityChangeType.DestroyEntity:
+        this.destroyEntity(entry.uuid);
+        break;
+
+      case EntityChangeType.SetParent:
+        this.setParent(entry.uuid, entry.parentUuid, entry.order);
+        break;
+
+      case EntityChangeType.UpdateOrder:
+        this.updateOrder(entry.uuid, entry.order);
+        break;
+
+      case EntityChangeType.ChangeProperties:
+        this.changeProperties(entry.uuid, entry.properties);
+        break;
     }
   }
 
-  createEntity(entry: IEntityChangeCreateEntity) {
-    const entity = new EntityUplink(this, entry.uuid);
+  createEntity(uuid: string, _token: string, parentUuid?: string, order = 0, properties?: [string, unknown][]) {
+    const entity = new EntityUplink(this, uuid);
 
-    // TODO use token for entity creation
-    // TODO respect entity parent -> children
+    entity.order = order;
 
-    if (entry.properties) {
-      entity.setProperties(entry.properties);
+    this.#entities.set(uuid, entity);
+
+    // TODO use token for entity component creation
+
+    if (parentUuid) {
+      entity.parentUuid = parentUuid;
     }
 
-    this.#entities.set(entry.uuid, entity);
+    if (properties) {
+      entity.setProperties(properties);
+    }
+  }
 
-    console.log('create', entity.uuid, entity.propertyEntries());
+  destroyEntity(uuid: string) {
+    this.getEntity(uuid).emit(EntityUplink.OnDestroy);
+    this.#entities.delete(uuid);
+  }
+
+  setParent(uuid: string, parentUuid?: string, order = 0) {
+    const entity = this.getEntity(uuid);
+    if (entity.hasParent) {
+      entity.parent!.removeChild(entity);
+    }
+    entity.order = order;
+    entity.parentUuid = parentUuid;
+  }
+
+  updateOrder(uuid: string, order: number) {
+    this.getEntity(uuid).order = order;
+  }
+
+  changeProperties(uuid: string, properties: [string, unknown][]) {
+    this.getEntity(uuid).setProperties(properties);
   }
 }

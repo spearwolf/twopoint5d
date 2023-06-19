@@ -1,11 +1,11 @@
 import {appendTo} from './array-utils';
 import {
-  EntityChangeType,
   EntityChangeTrailPhase,
+  EntityChangeType,
   IEntityChangeCreateEntity,
   IEntityChangeDestroyEntity,
   IEntityChangeEntry,
-  IEntityChangeProperty,
+  IEntityChangeProperties,
   IEntityChangeSetParent,
   IEntityChangeUpdateOrder,
 } from './types';
@@ -166,7 +166,7 @@ export class EntityChanges {
     };
   }
 
-  makeChangePropertyChange(): IEntityChangeProperty {
+  makeChangePropertyChange(): IEntityChangeProperties {
     return {
       type: EntityChangeType.ChangeProperties,
       uuid: this.#entityUuid,
