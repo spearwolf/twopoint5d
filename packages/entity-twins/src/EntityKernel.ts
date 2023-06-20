@@ -71,9 +71,7 @@ export class EntityKernel extends Eventize {
 
   setParent(uuid: string, parentUuid?: string, order = 0) {
     const entity = this.getEntity(uuid);
-    if (entity.hasParent) {
-      entity.parent!.removeChild(entity);
-    }
+    entity.removeFromParent();
     entity.order = order;
     entity.parentUuid = parentUuid;
   }
