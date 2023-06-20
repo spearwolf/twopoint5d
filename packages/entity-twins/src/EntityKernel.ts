@@ -1,15 +1,7 @@
 import {Eventize} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {EntityUplink} from './EntityUplink';
-import {
-  EntitiesSyncEvent,
-  EntityChangeType,
-  IEntityChangeCreateEntity,
-  IEntityChangeDestroyEntity,
-  IEntityChangeProperties,
-  IEntityChangeSetParent,
-  IEntityChangeUpdateOrder,
-} from './types';
+import {EntitiesSyncEvent, EntityChangeEntryType, EntityChangeType} from './types';
 
 export class EntityKernel extends Eventize {
   #entities: Map<string, EntityUplink> = new Map();
@@ -25,26 +17,12 @@ export class EntityKernel extends Eventize {
   run(event: EntitiesSyncEvent) {
     batch(() => {
       for (const entry of event.changeTrail) {
-        this.parse(
-          entry as
-            | IEntityChangeCreateEntity
-            | IEntityChangeDestroyEntity
-            | IEntityChangeSetParent
-            | IEntityChangeUpdateOrder
-            | IEntityChangeProperties,
-        );
+        this.parse(entry);
       }
     });
   }
 
-  parse(
-    entry:
-      | IEntityChangeCreateEntity
-      | IEntityChangeDestroyEntity
-      | IEntityChangeSetParent
-      | IEntityChangeUpdateOrder
-      | IEntityChangeProperties,
-  ) {
+  parse(entry: EntityChangeEntryType) {
     switch (entry.type) {
       case EntityChangeType.CreateEntity:
         this.createEntity(entry.uuid, entry.token, entry.parentUuid, entry.order, entry.properties);

@@ -1,10 +1,10 @@
 import {appendTo} from './array-utils';
 import {
+  EntityChangeEntryType,
   EntityChangeTrailPhase,
   EntityChangeType,
   IEntityChangeCreateEntity,
   IEntityChangeDestroyEntity,
-  IEntityChangeEntry,
   IEntityChangeProperties,
   IEntityChangeSetParent,
   IEntityChangeUpdateOrder,
@@ -90,7 +90,7 @@ export class EntityChanges {
     this.#properties.clear();
   }
 
-  buildChangeTrail(trail: IEntityChangeEntry[], trailPhase: EntityChangeTrailPhase) {
+  buildChangeTrail(trail: EntityChangeEntryType[], trailPhase: EntityChangeTrailPhase) {
     switch (trailPhase) {
       case EntityChangeTrailPhase.StructuralChanges:
         if (!this.#isDestroyEntity && this.#isCreateEntity) {

@@ -45,6 +45,13 @@ export interface IEntityChangeProperties extends IEntityChangeEntry {
   properties: [string, unknown][];
 }
 
+export type EntityChangeEntryType =
+  | IEntityChangeCreateEntity
+  | IEntityChangeDestroyEntity
+  | IEntityChangeSetParent
+  | IEntityChangeUpdateOrder
+  | IEntityChangeProperties;
+
 export interface EntitiesSyncEvent {
-  changeTrail: IEntityChangeEntry[];
+  changeTrail: EntityChangeEntryType[];
 }

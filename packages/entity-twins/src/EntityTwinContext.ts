@@ -1,7 +1,7 @@
 import {EntityChanges} from './EntityChanges';
 import {EntityTwin} from './EntityTwin';
 import {removeFrom} from './array-utils';
-import {EntityChangeTrailPhase, IEntityChangeEntry} from './types';
+import {EntityChangeEntryType, EntityChangeTrailPhase} from './types';
 
 interface EntityEntry {
   entity: EntityTwin;
@@ -149,7 +149,7 @@ export class EntityTwinContext {
   }
 
   buildChangeTrails() {
-    const trail: IEntityChangeEntry[] = [];
+    const trail: EntityChangeEntryType[] = [];
     const pathOfChanges = this.#buildPathOfChanges();
 
     for (const changes of pathOfChanges) {
