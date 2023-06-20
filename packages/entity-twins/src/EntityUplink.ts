@@ -89,6 +89,8 @@ export class EntityUplink extends Eventize {
     }
     this.#signals.clear();
 
+    this.off();
+
     this.#parentUuid = undefined;
     this.#parent = undefined;
 
@@ -132,10 +134,11 @@ export class EntityUplink extends Eventize {
 
   removeFromParent() {
     if (this.#parent) {
+      const prevParent = this.#parent;
       this.#parent.removeChild(this);
       this.#parent = undefined;
       this.#parentUuid = undefined;
-      this.emit(OnRemoveFromParent, this);
+      this.emit(OnRemoveFromParent, this, prevParent);
     }
   }
 
