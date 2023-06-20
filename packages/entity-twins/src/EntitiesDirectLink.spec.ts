@@ -1,12 +1,20 @@
+import {EventizeApi} from '@spearwolf/eventize';
 import {EntitiesDirectLink} from './EntitiesDirectLink';
 import {EntitiesLink} from './EntitiesLink';
 import {EntityTwin} from './EntityTwin';
 import {EntityTwinContext} from './EntityTwinContext';
+import {OnRemoveFromParent} from './events';
 import {EntitiesSyncEvent, EntityChangeType} from './types';
+import {EntityUplink} from './EntityUplink';
 
 const nextSyncEvent = (link: EntitiesLink): Promise<EntitiesSyncEvent> =>
   new Promise((resolve) => {
     link.once(EntitiesLink.OnSync, resolve);
+  });
+
+const waitForNext = (obj: EventizeApi, event: string | symbol): Promise<unknown[]> =>
+  new Promise((resolve) => {
+    obj.once(event, (...args: unknown[]) => resolve(args));
   });
 
 describe('EntitiesDirectLink', () => {
@@ -84,5 +92,18 @@ describe('EntitiesDirectLink', () => {
     expect(aa.children).toHaveLength(2);
     expect(aa.children[0]).toBe(cc);
     expect(aa.children[1]).toBe(bb);
+
+    const removeFromParent = waitForNext(cc, OnRemoveFromParent).then(([entity]) => (entity as EntityUplink).uuid);
+
+    c.removeFromParent();
+
+    // TODO check if removeFromParent is called before entity is destroyed
+
+    await directLink.sync();
+
+    expect(aa.children).toHaveLength(1);
+    expect(cc.parent).toBeUndefined();
+
+    await expect(removeFromParent).resolves.toBe(cc.uuid);
   });
 });

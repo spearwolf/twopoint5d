@@ -1,12 +1,9 @@
 import {Eventize, Priority} from '@spearwolf/eventize';
 import {SignalReader, SignalWriter, batch, createSignal, destroySignal, value} from '@spearwolf/signalize';
 import {EntityKernel} from './EntityKernel';
-
-const OnDestroy = Symbol('OnDestroy');
+import {OnAddChild, OnAddToParent, OnDestroy, OnRemoveChild, OnRemoveFromParent} from './events';
 
 export class EntityUplink extends Eventize {
-  static OnDestroy = OnDestroy;
-
   #kernel: EntityKernel;
   #uuid: string;
 
@@ -103,16 +100,22 @@ export class EntityUplink extends Eventize {
     if (this.#children.length === 0) {
       this.#childrenUuids.add(child.uuid);
       this.#children.push(child);
+      this.emit(OnAddChild, this, child);
+      child.emit(OnAddToParent, child, this);
       return;
     }
 
     if (this.#childrenUuids.has(child.uuid)) {
       throw new Error(`Child with uuid: ${child.uuid} already exists! parentUuid: ${this.uuid}`);
     }
+
     this.#childrenUuids.add(child.uuid);
     this.#children.push(child);
 
     this.resortChildren();
+
+    this.emit(OnAddChild, this, child);
+    child.emit(OnAddToParent, child, this);
   }
 
   resortChildren() {
@@ -123,6 +126,7 @@ export class EntityUplink extends Eventize {
     if (this.#childrenUuids.has(child.uuid)) {
       this.#childrenUuids.delete(child.uuid);
       this.#children.splice(this.#children.indexOf(child), 1);
+      this.emit(OnRemoveChild, this, child);
     }
   }
 
@@ -131,6 +135,7 @@ export class EntityUplink extends Eventize {
       this.#parent.removeChild(this);
       this.#parent = undefined;
       this.#parentUuid = undefined;
+      this.emit(OnRemoveFromParent, this);
     }
   }
 

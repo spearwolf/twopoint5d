@@ -1,6 +1,7 @@
 import {Eventize} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {EntityUplink} from './EntityUplink';
+import {OnDestroy, OnInit} from './events';
 import {EntitiesSyncEvent, EntityChangeEntryType, EntityChangeType} from './types';
 
 export class EntityKernel extends Eventize {
@@ -53,7 +54,7 @@ export class EntityKernel extends Eventize {
 
     this.#entities.set(uuid, entity);
 
-    // TODO use token for entity component creation
+    // TODO use token for entity component creation and emit(OnCreate)
 
     if (parentUuid) {
       entity.parentUuid = parentUuid;
@@ -62,10 +63,13 @@ export class EntityKernel extends Eventize {
     if (properties) {
       entity.setProperties(properties);
     }
+
+    entity.emit(OnInit, this);
   }
 
   destroyEntity(uuid: string) {
-    this.getEntity(uuid).emit(EntityUplink.OnDestroy);
+    const entity = this.getEntity(uuid);
+    entity.emit(OnDestroy, this);
     this.#entities.delete(uuid);
   }
 
