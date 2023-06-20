@@ -41,11 +41,9 @@ describe('EntitiesDirectLink', () => {
     a.setProperty('foo', 'bar');
     b.setProperty('xyz', 123);
 
-    const nextSync = nextSyncEvent(directLink);
-
     directLink.sync();
 
-    const event = await nextSync;
+    const event = await nextSyncEvent(directLink);
 
     expect(event.changeTrail).toEqual([
       {type: EntityChangeType.CreateEntity, token: 'a', uuid: a.uuid, properties: [['foo', 'bar']]},
