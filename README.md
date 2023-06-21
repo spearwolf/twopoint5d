@@ -6,6 +6,7 @@
 
 <div align="center">
 
+![github actions main workflow status](https://github.com/spearwolf/twopoint5d/actions/workflows/main.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
 </div>
@@ -86,3 +87,9 @@ $ npm run cbt  # => npm run clean && npm run build && npm test
 ```sh
 $ npm start
 ```
+
+## Copyright and License
+
+Copyright &copy; 2023 by Wolfger Schramm &lt;wolfger@spearwolf.de&gt;
+
+The source code is licensed under the [Apache-2.0 License](./LICENSE).
