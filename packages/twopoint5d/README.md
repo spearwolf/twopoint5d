@@ -15,7 +15,7 @@ The core features can be roughly classified into the following areas:
 #### [textured-sprites](src/sprites/)
 - create and render textured 2D sprites
 - load from texture atlases or sprite sheet images
-- support animations
+- support frame based animations
 - render as billboards (optional)
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
