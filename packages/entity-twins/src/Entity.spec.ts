@@ -1,11 +1,11 @@
 import {isEventized} from '@spearwolf/eventize';
 import {Entity} from './Entity';
 import {EntityKernel} from './EntityKernel';
-import {EntityRegistry} from './EntityRegistry';
+import {EntityRegistry, getDefaultRegistry} from './EntityRegistry';
 
 describe('@Entity decorator', () => {
   afterEach(() => {
-    EntityRegistry.clear();
+    getDefaultRegistry().clear();
   });
 
   it('should register a class constructor by token', () => {
@@ -13,12 +13,15 @@ describe('@Entity decorator', () => {
     class Foo {}
 
     expect(Foo).toBeDefined();
-    expect(EntityRegistry.hasToken('test')).toBeTruthy();
-    expect(EntityRegistry.findConstructors('test')).toContain(Foo);
+    expect(getDefaultRegistry().hasToken('test')).toBeTruthy();
+    expect(getDefaultRegistry().findConstructors('test')).toContain(Foo);
   });
 
   it('should create an entity component instance', () => {
-    @Entity({token: 'test'})
+    const registry = new EntityRegistry();
+    const kernel = new EntityKernel(registry);
+
+    @Entity({registry, token: 'test'})
     class Foo {
       foo: number;
       bar = 666;
@@ -28,7 +31,6 @@ describe('@Entity decorator', () => {
       }
     }
 
-    const kernel = new EntityKernel();
     const entity = kernel.createEntityComponents('test')?.at(-1) as Foo;
 
     expect(entity).toBeDefined();

@@ -6,26 +6,30 @@ interface RegistryEntry {
   constructors: EntityConstructor[];
 }
 
-const registry = new Map<string, RegistryEntry>();
+export class EntityRegistry {
+  readonly #registry = new Map<string, RegistryEntry>();
 
-export const EntityRegistry = {
   registerEntityComponent(token: string, constructor: EntityConstructor) {
-    if (registry.has(token)) {
-      appendTo(registry.get(token)!.constructors, constructor);
+    if (this.#registry.has(token)) {
+      appendTo(this.#registry.get(token)!.constructors, constructor);
     } else {
-      registry.set(token, {token, constructors: [constructor]});
+      this.#registry.set(token, {token, constructors: [constructor]});
     }
-  },
+  }
 
   findConstructors(token: string): EntityConstructor[] | undefined {
-    return registry.get(token)?.constructors;
-  },
+    return this.#registry.get(token)?.constructors;
+  }
 
   hasToken(token: string): boolean {
-    return registry.has(token);
-  },
+    return this.#registry.has(token);
+  }
 
   clear() {
-    registry.clear();
-  },
-};
+    this.#registry.clear();
+  }
+}
+
+const defaultRegistry = new EntityRegistry();
+
+export const getDefaultRegistry = () => defaultRegistry;

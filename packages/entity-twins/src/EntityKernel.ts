@@ -3,10 +3,17 @@ import {batch} from '@spearwolf/signalize';
 import {EntityUplink} from './EntityUplink';
 import {OnDestroy, OnInit} from './events';
 import {EntitiesSyncEvent, EntityChangeEntryType, EntityChangeType} from './types';
-import {EntityRegistry} from './EntityRegistry';
+import {EntityRegistry, getDefaultRegistry} from './EntityRegistry';
 
 export class EntityKernel extends Eventize {
+  registry: EntityRegistry;
+
   #entities: Map<string, EntityUplink> = new Map();
+
+  constructor(registry?: EntityRegistry) {
+    super();
+    this.registry = registry ?? getDefaultRegistry();
+  }
 
   getEntity(uuid: string): EntityUplink {
     const entity = this.#entities.get(uuid);
@@ -90,7 +97,7 @@ export class EntityKernel extends Eventize {
   }
 
   createEntityComponents(token: string, uplink?: EntityUplink) {
-    return EntityRegistry.findConstructors(token)?.map((constructor) => {
+    return this.registry.findConstructors(token)?.map((constructor) => {
       const instance = new constructor();
       if (uplink) {
         uplink.on(instance);
