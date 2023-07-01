@@ -1,13 +1,13 @@
 import {EventizeApi} from '@spearwolf/eventize';
 import {EntitiesDirectLink} from './EntitiesDirectLink';
 import {EntitiesLink} from './EntitiesLink';
+import {Entity} from './Entity';
+import {EntityRegistry} from './EntityRegistry';
 import {EntityTwin} from './EntityTwin';
 import {EntityTwinContext} from './EntityTwinContext';
+import {EntityUplink} from './EntityUplink';
 import {OnInit, OnRemoveFromParent} from './events';
 import {EntitiesSyncEvent, EntityChangeType} from './types';
-import {EntityUplink} from './EntityUplink';
-import {EntityRegistry} from './EntityRegistry';
-import {Entity} from './Entity';
 
 const nextSyncEvent = (link: EntitiesLink): Promise<EntitiesSyncEvent> =>
   new Promise((resolve) => {
@@ -118,7 +118,7 @@ describe('EntitiesDirectLink', () => {
     const onInitMock = jest.fn();
 
     @Entity({registry, token: 'a'})
-    class A {
+    class A implements OnInit {
       [OnInit](uplink: EntityUplink) {
         onInitMock(uplink, this);
       }

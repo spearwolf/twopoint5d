@@ -56,15 +56,6 @@ export interface EntitiesSyncEvent {
   changeTrail: EntityChangeEntryType[];
 }
 
-// export interface EntityCallbacks {
-//   [OnInit]?(entity: EntityUplink): void;
-//   [OnDestroy]?(entity: EntityUplink): void;
-//   [OnAddToParent]?(child: EntityUplink, parent: EntityUplink): void;
-//   [OnRemoveFromParent]?(child: EntityUplink, parent: EntityUplink): void;
-//   [OnAddChild]?(parent: EntityUplink, child: EntityUplink): void;
-//   [OnRemoveChild]?(parent: EntityUplink, child: EntityUplink): void;
-// }
-
 export interface EntityConstructor {
   new (...args: any[]): {};
 }
