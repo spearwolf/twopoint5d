@@ -55,14 +55,14 @@ export class EntityKernel extends Eventize {
     }
   }
 
-  createEntity(uuid: string, _token: string, parentUuid?: string, order = 0, properties?: [string, unknown][]) {
+  createEntity(uuid: string, token: string, parentUuid?: string, order = 0, properties?: [string, unknown][]) {
     const entity = new EntityUplink(this, uuid);
 
     entity.order = order;
 
     this.#entities.set(uuid, entity);
 
-    // TODO use token for entity component creation and emit(OnCreate)
+    this.createEntityComponents(token, entity);
 
     if (parentUuid) {
       entity.parentUuid = parentUuid;
@@ -72,7 +72,7 @@ export class EntityKernel extends Eventize {
       entity.setProperties(properties);
     }
 
-    entity.emit(OnInit, this);
+    entity.emit(OnInit, entity, this);
   }
 
   destroyEntity(uuid: string) {

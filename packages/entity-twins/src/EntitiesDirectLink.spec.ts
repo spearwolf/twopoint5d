@@ -3,9 +3,11 @@ import {EntitiesDirectLink} from './EntitiesDirectLink';
 import {EntitiesLink} from './EntitiesLink';
 import {EntityTwin} from './EntityTwin';
 import {EntityTwinContext} from './EntityTwinContext';
-import {OnRemoveFromParent} from './events';
+import {OnInit, OnRemoveFromParent} from './events';
 import {EntitiesSyncEvent, EntityChangeType} from './types';
 import {EntityUplink} from './EntityUplink';
+import {EntityRegistry} from './EntityRegistry';
+import {Entity} from './Entity';
 
 const nextSyncEvent = (link: EntitiesLink): Promise<EntitiesSyncEvent> =>
   new Promise((resolve) => {
@@ -105,5 +107,36 @@ describe('EntitiesDirectLink', () => {
     expect(cc.parent).toBeUndefined();
 
     await expect(removeFromParent).resolves.toBe(cc.uuid);
+  });
+
+  it('should create entity components', async () => {
+    const directLink = new EntitiesDirectLink().start();
+    const registry = new EntityRegistry();
+
+    directLink.kernel.registry = registry;
+
+    const onInitMock = jest.fn();
+
+    @Entity({registry, token: 'a'})
+    class A {
+      [OnInit](uplink: EntityUplink) {
+        onInitMock(uplink, this);
+      }
+    }
+
+    const a = new EntityTwin('a');
+    a.setProperty('foo', 'bar');
+
+    await directLink.sync();
+
+    const aa = directLink.kernel.getEntity(a.uuid);
+
+    expect(aa).toBeDefined();
+    expect(aa.getProperty('foo')).toBe('bar');
+
+    expect(A).toBeDefined();
+    expect(onInitMock).toBeCalled();
+    expect(onInitMock.mock.calls[0][0]).toBe(aa);
+    expect(onInitMock.mock.calls[0][1]).toBeInstanceOf(A);
   });
 });
