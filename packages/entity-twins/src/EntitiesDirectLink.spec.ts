@@ -6,7 +6,7 @@ import {EntityRegistry} from './EntityRegistry';
 import {EntityTwin} from './EntityTwin';
 import {EntityTwinContext} from './EntityTwinContext';
 import {EntityUplink} from './EntityUplink';
-import {OnInit, OnRemoveFromParent} from './events';
+import {OnCreate, OnInit, OnRemoveFromParent} from './events';
 import {EntitiesSyncEvent, EntityChangeType} from './types';
 
 const nextSyncEvent = (link: EntitiesLink): Promise<EntitiesSyncEvent> =>
@@ -85,6 +85,15 @@ describe('EntitiesDirectLink', () => {
     expect(bb.getProperty('xyz')).toBe(123);
     expect(bb.children).toHaveLength(0);
 
+    const onRemoveFromParent = jest.fn();
+
+    @Entity({registry: directLink.kernel.registry, token: 'c'})
+    class EntityCcc implements OnRemoveFromParent {
+      [OnRemoveFromParent](_uplink: EntityUplink) {
+        onRemoveFromParent(this);
+      }
+    }
+
     const c = new EntityTwin('c', a, -1);
 
     await directLink.sync();
@@ -95,16 +104,19 @@ describe('EntitiesDirectLink', () => {
     expect(aa.children[0]).toBe(cc);
     expect(aa.children[1]).toBe(bb);
 
+    expect(onRemoveFromParent).not.toHaveBeenCalled();
+
     const removeFromParent = waitForNext(cc, OnRemoveFromParent).then(([entity]) => (entity as EntityUplink).uuid);
 
     c.removeFromParent();
-
-    // TODO check if removeFromParent is called before entity is destroyed
 
     await directLink.sync();
 
     expect(aa.children).toHaveLength(1);
     expect(cc.parent).toBeUndefined();
+
+    expect(onRemoveFromParent).toHaveBeenCalled();
+    expect(onRemoveFromParent.mock.calls[0][0]).toBeInstanceOf(EntityCcc);
 
     await expect(removeFromParent).resolves.toBe(cc.uuid);
   });
@@ -115,10 +127,14 @@ describe('EntitiesDirectLink', () => {
 
     directLink.kernel.registry = registry;
 
+    const onCreateMock = jest.fn();
     const onInitMock = jest.fn();
 
     @Entity({registry, token: 'a'})
-    class A implements OnInit {
+    class Aaa implements OnCreate, OnInit {
+      [OnCreate](uplink: EntityUplink) {
+        onCreateMock(uplink, this);
+      }
       [OnInit](uplink: EntityUplink) {
         onInitMock(uplink, this);
       }
@@ -134,9 +150,14 @@ describe('EntitiesDirectLink', () => {
     expect(aa).toBeDefined();
     expect(aa.getProperty('foo')).toBe('bar');
 
-    expect(A).toBeDefined();
+    expect(Aaa).toBeDefined();
+
+    expect(onCreateMock).toBeCalled();
+    expect(onCreateMock.mock.calls[0][0]).toBe(aa);
+    expect(onCreateMock.mock.calls[0][1]).toBeInstanceOf(Aaa);
+
     expect(onInitMock).toBeCalled();
     expect(onInitMock.mock.calls[0][0]).toBe(aa);
-    expect(onInitMock.mock.calls[0][1]).toBeInstanceOf(A);
+    expect(onInitMock.mock.calls[0][1]).toBeInstanceOf(Aaa);
   });
 });

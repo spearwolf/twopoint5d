@@ -1,7 +1,7 @@
 import {Eventize} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {EntityUplink} from './EntityUplink';
-import {OnDestroy, OnInit} from './events';
+import {OnCreate, OnDestroy, OnInit} from './events';
 import {EntitiesSyncEvent, EntityChangeEntryType, EntityChangeType} from './types';
 import {EntityRegistry, getDefaultRegistry} from './EntityRegistry';
 
@@ -101,6 +101,9 @@ export class EntityKernel extends Eventize {
       const instance = new constructor();
       if (uplink) {
         uplink.on(instance);
+        if (typeof (instance as OnCreate)[OnCreate] === 'function') {
+          (instance as OnCreate)[OnCreate](uplink);
+        }
       }
       return instance;
     });
