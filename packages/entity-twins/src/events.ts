@@ -25,16 +25,31 @@ export interface OnCreate {
  * Is called when the _entity uplink_ object has been created and all the _entity components_ have been attached to it.
  *
  * The `OnInit` is triggered on the _entity uplink_, therefore all _entity components_ created with the uplink receive this event.
+ *
  * When the `OnInit` event is triggered, **all** entity components have been initialized and have already received their individual `OnCreate` event.
  */
 export interface OnInit {
   [OnInit](entity: EntityUplink): void;
 }
 
+/**
+ * Is called when the entity is about to be destroyed.
+ *
+ * The `OnDestroy` is triggered on the _entity uplink_, therefore all _entity components_ created with the uplink receive this event.
+ *
+ * This is the last event in the lifecycle of an entity component.
+ */
 export interface OnDestroy {
   [OnDestroy](entity: EntityUplink): void;
 }
 
+/**
+ * Is called when the entity is added to a parent entity as child.
+ *
+ * The `OnAddToParent` is triggered on the _entity uplink_, therefore all _entity components_ created with the uplink receive this event.
+ *
+ * The `OnAddToParent` event comes _after_ the `OnAddChild` event.
+ */
 export interface OnAddToParent {
   [OnAddToParent](child: EntityUplink, parent: EntityUplink): void;
 }
