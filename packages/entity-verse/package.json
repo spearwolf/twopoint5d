@@ -1,5 +1,5 @@
 {
-  "name": "@spearwolf/entity-twins",
+  "name": "@spearwolf/entity-verse",
   "description": "a metaverse for your entities",
   "version": "0.0.1-dev",
   "author": {
@@ -8,20 +8,20 @@
     "url": "https://www.spearwolf.de"
   },
   "license": "Apache-2.0",
-  "main": "dist/entity-twins.js",
+  "main": "dist/entity-verse.js",
   "type": "module",
-  "module": "dist/entity-twins.js",
+  "module": "dist/entity-verse.js",
   "types": "dist/types/index.d.ts",
   "exports": {
-    "import": "./dist/entity-twins.js",
-    "require": "./dist/entity-twins.cjs.js"
+    "import": "./dist/entity-verse.js",
+    "require": "./dist/entity-verse.cjs.js"
   },
   "sideEffects": false,
   "scripts": {
     "build": "run-s compile bundle makePackageJson",
     "compile": "tsc -b tsconfig.build.json",
     "bundle": "rollup -c rollup.config.js",
-    "clean": "rimraf build types dist ../../dist/packages/entity-twins",
+    "clean": "rimraf build types dist ../../dist/packages/entity-verse",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs"
   },
   "peerDependencies": {

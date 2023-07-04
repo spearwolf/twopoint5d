@@ -44,7 +44,7 @@
     "paths": {
       "twopint5d": ["packages/twopoint5d/src"],
       "twopint5d-r3f": ["packages/twopoint5d-r3f/src"],
-      "entity-twins": ["packages/entity-twins/src"],
+      "entity-verse": ["packages/entity-verse/src"],
     }
   },
   "exclude": ["node_modules", "tmp"],
