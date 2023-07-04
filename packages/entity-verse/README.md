@@ -13,6 +13,7 @@ an _entity component_ has the following properties:
 - entity components have a _context_: components have a parent-child relationship to each other and thus live in a classical tree-like hierarchy
   - a compoennt can be assigned to a parent component (but does not have to)
   - a component can have one, none or multiple child components
+- all _in-props_ and _context_ accessors are __signals__ (using [spearwolf/signalize](https://github.com/spearwolf/signalize))
 - there is a clearly defined lifecycle model with callbacks (which the user can use if needed)
   - the creation of the components is not done directly by the user, but indirectly via an entity _kernel_ (more about this later)
 
