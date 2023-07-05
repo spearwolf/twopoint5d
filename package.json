@@ -17,7 +17,7 @@
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "test:affected": "nx affected -t test",
-    "clean": "nx run-many -t clean && rimraf dist && nx reset",
+    "clean": "nx run-many -t clean && rimraf dist",
     "update": "npx npm-check --update",
     "cbt": "run-s clean build test",
     "start": "nx dev lookbook",
