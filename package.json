@@ -20,6 +20,7 @@
     "clean": "nx run-many -t clean && rimraf dist",
     "update": "npx npm-check --update",
     "cbt": "run-s clean build test",
+    "lookbook": "nx dev lookbook",
     "start": "nx dev lookbook",
     "ci": "run-s build lint test"
   },

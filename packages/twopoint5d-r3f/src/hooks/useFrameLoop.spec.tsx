@@ -45,7 +45,7 @@ describe('useFrameLoop hook', () => {
     expect(typeof useFrameLoop).toBe('function');
   });
 
-  test.skip('callbacks are called in the correct sequence', async () => {
+  test('callbacks are called in the correct sequence', async () => {
     const callbacks = {
       init: jest.fn(),
       update: jest.fn(),
@@ -157,7 +157,7 @@ describe('useFrameLoop hook', () => {
     expect(args.extraValue).toBe('xyz');
   });
 
-  test.skip('callbacks (without dependencies) are called in the correct sequence', async () => {
+  test('callbacks (without dependencies) are called in the correct sequence', async () => {
     const callbacks = {
       init: jest.fn(),
       update: jest.fn(),
@@ -229,7 +229,7 @@ describe('useFrameLoop hook', () => {
     expect(args.delta).toBeUndefined();
   });
 
-  test.skip('lazy callbacks', async () => {
+  test('lazy callbacks', async () => {
     const callbacks = {
       init: jest.fn(),
       frame: jest.fn(),
