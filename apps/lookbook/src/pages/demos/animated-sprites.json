@@ -9,5 +9,6 @@
     "FrameBasedAnimations",
     "TileSetLoader",
     "tilesets"
-  ]
+  ],
+  "previewImage": "animated-sprites.png"
 }

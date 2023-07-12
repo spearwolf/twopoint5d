@@ -1,4 +1,5 @@
 ---
+import demoPreviewImageUrl from '~utils/demoPreviewImageUrl';
 import defaultTeaserImage from '../images/20221122-dark-circles-back-1024x.png';
 
 export interface Props {
@@ -9,6 +10,8 @@ export interface Props {
 }
 
 const {href, title, body, image} = Astro.props;
+
+const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
 
 <li class="link-card">
@@ -23,7 +26,7 @@ const {href, title, body, image} = Astro.props;
   </a>
 </li>
 
-<style define:vars={{cardTeaserImage: `url(${image || defaultTeaserImage})`}}>
+<style define:vars={{cardTeaserImage: `url(${previewImage})`}}>
   .link-card {
     list-style: none;
     display: flex;

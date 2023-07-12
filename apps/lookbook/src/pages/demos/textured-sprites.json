@@ -2,5 +2,6 @@
   "title": "textured sprites",
   "description": "A simple demo showing how to use the TexturedSprites mesh.",
   "url": "/demos/textured-sprites",
-  "tags": ["TexturedSprites", "TexturedSpritesGeometry", "TexturedSpritesMaterial", "TileSetLoader", "tilesets"]
+  "tags": ["TexturedSprites", "TexturedSpritesGeometry", "TexturedSpritesMaterial", "TileSetLoader", "tilesets"],
+  "previewImage": "textured-sprites.png"
 }

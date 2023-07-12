@@ -10,5 +10,6 @@
     "TileSetLoader",
     "tilesets",
     "billboards"
-  ]
+  ],
+  "previewImage": "animated-billboards.png"
 }
