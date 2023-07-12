@@ -1,0 +1,14 @@
+{
+  "title": "map2d tile sprites",
+  "description": "How to use the Map2DTileSprites mesh.",
+  "url": "/demos/map2d-tile-sprites",
+  "tags": [
+    "Map2DTileSprites",
+    "Map2DTile",
+    "RepeatingTilesProvider",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "TileSetLoader",
+    "tilesets"
+  ]
+}

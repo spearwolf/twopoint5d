@@ -1,0 +1,89 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './map2d-tile-sprites.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #458497;
+    background-image: linear-gradient(to right bottom, #458497 0, #2e4564 52%, #9b1a61);
+    color: #eee;
+  }
+</style>
+
+<script>
+  import {
+    AABB2,
+    Map2DTile,
+    Map2DTileSprites,
+    RepeatingTilesProvider,
+    TileSetLoader,
+    TileSpritesGeometry,
+    TileSpritesMaterial,
+  } from '@spearwolf/twopoint5d';
+  import {BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments, Vector2, Vector3} from 'three';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  demo.start(async () => {
+    const {scene, camera} = demo;
+
+    camera.position.set(0, 350, 500);
+    camera.far = 8000;
+
+    const geometry = new BoxGeometry(512, 20, 512);
+    const edges = new EdgesGeometry(geometry);
+    const line = new LineSegments(edges, new LineBasicMaterial({color: 0xf0f0f0}));
+
+    scene.add(line);
+
+    // ------------------------------------------------------
+
+    const tiles = new Map2DTileSprites();
+
+    scene.add(tiles);
+
+    tiles.tileData = new RepeatingTilesProvider([
+      [1, 2],
+      [3, 4],
+    ]);
+
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('map2d-debug-tiles_4x256x256.png'), {
+      tileWidth: 256,
+      tileHeight: 256,
+    });
+
+    tiles.tileSet = tileSet;
+
+    tiles.geometry = new TileSpritesGeometry(4);
+
+    tiles.material = new TileSpritesMaterial({
+      colorMap: texture,
+    });
+
+    // ------------------------------------------------------
+
+    tiles.beginUpdate(new Vector2(), new Vector3());
+
+    tiles.addTile(new Map2DTile(0, 0, new AABB2(0, 0, 256, 256)));
+    tiles.addTile(new Map2DTile(-1, 0, new AABB2(-256, 0, 256, 256)));
+    tiles.addTile(new Map2DTile(-1, -1, new AABB2(-256, -256, 256, 256)));
+    tiles.addTile(new Map2DTile(0, -1, new AABB2(0, -256, 256, 256)));
+
+    tiles.endUpdate();
+
+    // ------------------------------------------------------
+
+    console.log('tileSprites', tiles);
+  });
+</script>
