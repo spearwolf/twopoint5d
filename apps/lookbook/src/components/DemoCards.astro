@@ -1,0 +1,63 @@
+---
+import Card from './Card.astro';
+
+import logo from '../images/twopoint5d.png';
+import lookbook from '../images/20221122-lookbook-white-fat.svg';
+
+const demos = Object.entries(
+  import.meta.glob('../pages/demos/*.json', {
+    eager: true,
+  }),
+).map(([, json]) => json) as {title: string; description?: string; url: string}[];
+
+const baseUrl = import.meta.env.BASE_URL;
+
+const getHref = (url: string) => {
+  if (url.startsWith('http')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return `${baseUrl}${url.substring(1)}`;
+  }
+  return `${baseUrl}${url}`;
+};
+---
+
+<main>
+  <header class="lookbook-header">
+    <img class="primary" src={logo} alt="twopoint5d logo" />
+    <img class="secondary" src={lookbook} alt="lookbook title" />
+  </header>
+  <ul role="list" class="demo-card-grid">
+    {demos.map(({title, description, url}) => <Card href={getHref(url)} title={title} body={description} image="" />)}
+  </ul>
+</main>
+
+<style>
+  main {
+    margin: auto;
+    padding: 1.5rem;
+    max-width: 120ch;
+  }
+  .lookbook-header {
+    margin: 0;
+    display: flex;
+    align-items: center;
+  }
+  .lookbook-header img.primary {
+    filter: drop-shadow(0 0 3px #ff6) drop-shadow(0 0 15px #a06);
+    max-height: 60px;
+  }
+  .lookbook-header img.secondary {
+    filter: drop-shadow(0 0 3px #eee) drop-shadow(0 0 15px #aaa);
+    max-height: 66px;
+    margin-left: 1rem;
+  }
+  .demo-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
+    gap: 1.5rem;
+    margin-top: 33px;
+    padding: 0;
+  }
+</style>

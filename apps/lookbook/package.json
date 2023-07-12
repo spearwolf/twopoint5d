@@ -16,6 +16,7 @@
     "@spearwolf/twopoint5d": "*",
     "@spearwolf/twopoint5d-r3f": "*",
     "astro": "^2.6.1",
+    "sass": "^1.63.6",
     "tailwindcss": "^3.3.2"
   },
   "nx": {

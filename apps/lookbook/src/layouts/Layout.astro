@@ -19,14 +19,23 @@ const {title} = Astro.props;
     <slot />
   </body>
 </html>
-<style is:global>
+
+<style lang="scss" is:global>
+  $color-background: #252525;
+  $color-primary: #afada5;
+  $hue-shift: 10deg;
+
   :root {
-    --accent: 124, 58, 237;
-    --accent-gradient: linear-gradient(45deg, rgb(var(--accent)), #da62c4 30%, white 60%);
+    --color-background: #{$color-background};
+    --color-background-dark: #{darken($color-background, 10%)};
+    --color-primary: #{$color-primary};
+    --color-primary-darker: #{adjust-hue(darken($color-primary, 20%), -$hue-shift)};
+    --color-primary-highlight: #{adjust-hue(lighten($color-primary, 25%), $hue-shift)};
   }
+
   html {
     font-family: system-ui, sans-serif;
-    background-color: #f6f6f6;
+    background-color: var(--color-background);
   }
   code {
     font-family: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New,
