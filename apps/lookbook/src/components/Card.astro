@@ -13,11 +13,10 @@ const {href, title, body, image} = Astro.props;
 
 <li class="link-card">
   <a href={href}>
+    <div class="card-image"></div>
     <h2>
       {title}
-      <span>&rarr;</span>
     </h2>
-    <div class="card-image"></div>
     <p>
       {body}
     </p>
@@ -31,8 +30,9 @@ const {href, title, body, image} = Astro.props;
     padding: 0;
     background-color: var(--color-background-dark);
     border-radius: 0.5rem;
-    box-shadow: 0 0 10px 10px rgba(0 0 0 / 35%);
+    box-shadow: 0 0 10px 5px rgba(0 0 0 / 30%);
     padding: 0;
+    overflow: hidden;
   }
 
   .link-card > a {
@@ -44,12 +44,13 @@ const {href, title, body, image} = Astro.props;
     color: var(--color-primary);
   }
   h2 {
-    margin: 0.2rem 0;
+    margin: 0.5rem 0;
     font-size: 1rem;
+    font-weight: bold;
   }
   p {
     margin-top: 0.5rem;
-    margin-bottom: 0;
+    margin-bottom: 0.5rem;
     color: var(--color-primary-darker);
   }
   .link-card:is(:hover, :focus-within) {
@@ -64,7 +65,5 @@ const {href, title, body, image} = Astro.props;
     background-image: var(--cardTeaserImage);
     background-size: cover;
     background-position: center;
-    border-top: 1px solid var(--color-primary-darker);
-    border-bottom: 1px solid var(--color-primary-darker);
   }
 </style>
