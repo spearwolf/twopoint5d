@@ -1,0 +1,15 @@
+{
+  "title": "map2d layer",
+  "description": "Render a Map2D layer",
+  "url": "/demos/map2d-layer3d",
+  "tags": [
+    "Map2DTileSprites",
+    "Map2DTile",
+    "RepeatingTilesProvider",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "TileSetLoader",
+    "tilesets"
+  ],
+  "previewImage": "map2d-layer3d.png"
+}

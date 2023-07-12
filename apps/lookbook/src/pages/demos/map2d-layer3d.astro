@@ -1,0 +1,134 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './map2d-layer3d.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #458497;
+    background-image: linear-gradient(to right bottom, #458497 0, #2e4564 52%, #9b1a61);
+    color: #eee;
+  }
+</style>
+
+<script>
+  import {
+    Map2DLayer3D,
+    Map2DTileSprites,
+    RectangularVisibilityArea,
+    RepeatingTilesProvider,
+    TileSetLoader,
+    TileSpritesGeometry,
+    TileSpritesMaterial,
+  } from '@spearwolf/twopoint5d';
+  import {BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments} from 'three';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import {makePoints} from '~utils/makePoints';
+  import assetsUrl from '~utils/assetsUrl';
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  demo.start(async () => {
+    const {scene, camera} = demo;
+
+    camera.position.set(0, 350, 500);
+    camera.far = 8000;
+
+    const geometry = new BoxGeometry(640, 20, 480);
+    const edges = new EdgesGeometry(geometry);
+    const line = new LineSegments(edges, new LineBasicMaterial({color: 0xf0f0f0}));
+    scene.add(line);
+
+    // create a map2d layer and add to scene
+    // ------------------------------------------------------
+
+    const map2dLayer = new Map2DLayer3D();
+
+    map2dLayer.tileWidth = 256;
+    map2dLayer.tileHeight = 256;
+    map2dLayer.xOffset = -128;
+    map2dLayer.yOffset = -128;
+
+    map2dLayer.visibilitor = new RectangularVisibilityArea(640, 480);
+
+    map2dLayer.centerX = 0;
+    map2dLayer.centerY = 0;
+
+    scene.add(map2dLayer);
+
+    (window as any).map2dLayer = map2dLayer;
+    console.log('map2dLayer', map2dLayer);
+
+    // create a tile data provider
+    // ------------------------------------------------------
+
+    const tileData = new RepeatingTilesProvider([
+      [1, 2],
+      [3, 4],
+    ]);
+
+    // load a tileset texture
+    // ------------------------------------------------------
+
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('map2d-debug-tiles_4x256x256.png'), {
+      tileWidth: 256,
+      tileHeight: 256,
+    });
+
+    // create the tile-renderer and add to map2d-layer
+    // ------------------------------------------------------
+
+    const renderer = new Map2DTileSprites();
+
+    map2dLayer.add(renderer);
+
+    map2dLayer.addTileRenderer(renderer);
+
+    renderer.tileData = tileData;
+    renderer.tileSet = tileSet;
+
+    renderer.geometry = new TileSpritesGeometry(1000);
+
+    renderer.material = new TileSpritesMaterial({
+      colorMap: texture,
+      depthTest: true,
+      depthWrite: true,
+    });
+
+    (window as any).tileRenderer = renderer;
+    console.log('tileRenderer', renderer);
+
+    map2dLayer.update();
+
+    // prettier-ignore
+    scene.add(makePoints([
+      -384, 11, -384,
+      -128, 11, -384,
+      128, 11, -384,
+      384, 11, -384,
+
+      -384, 11, -128,
+      -128, 11, -128,
+      128, 11, -128,
+      384, 11, -128,
+
+      -384, 11, 128,
+      -128, 11, 128,
+      128, 11, 128,
+      384, 11, 128,
+
+      -384, 11, 384,
+      -128, 11, 384,
+      128, 11, 384,
+      384, 11, 384,
+    ]));
+  });
+</script>
