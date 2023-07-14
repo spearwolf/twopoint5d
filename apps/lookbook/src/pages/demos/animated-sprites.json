@@ -1,6 +1,6 @@
 {
   "title": "animated sprites",
-  "description": "A simple demo showing how to render animated sprites with frame based animations.",
+  "description": "A demo showing 2d sprites in 3d with frame based animations",
   "url": "/demos/animated-sprites",
   "tags": [
     "AnimatedSprites",

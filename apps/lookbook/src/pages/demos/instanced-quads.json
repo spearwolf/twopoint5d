@@ -1,6 +1,6 @@
 {
   "title": "instanced quads",
-  "description": "A minimal example of how to use the VertexObjects mesh",
+  "description": "A minimal example of how to render instanced vertex-objects",
   "url": "/demos/instanced-quads",
   "tags": ["InstancedVertexObjectGeometry", "VO", "VertexObjects", "instanced"],
   "previewImage": "instanced-quads.png"

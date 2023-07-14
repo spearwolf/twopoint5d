@@ -1,14 +1,15 @@
 {
   "title": "map2d layer",
-  "description": "Render a Map2D layer",
+  "description": "Render a 2d-map layer in 3d using a rectangular visibility-area and a repeating-tiles provider",
   "url": "/demos/map2d-layer3d",
   "tags": [
+    "Map2DLayer3D",
     "Map2DTileSprites",
-    "Map2DTile",
+    "RectangularVisibilityArea",
     "RepeatingTilesProvider",
+    "TileSetLoader",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
-    "TileSetLoader",
     "tilesets"
   ],
   "previewImage": "map2d-layer3d.png"

@@ -1,6 +1,6 @@
 {
   "title": "minimal display",
-  "description": "A minimal example of how to use the Display class helper",
+  "description": "A minimal example of how to use the Display helper class",
   "url": "/demos/display-minimal",
   "tags": ["TextureFactory", "Stage2D", "ParallaxProjection", "Display"],
   "previewImage": "minimal-display.png"

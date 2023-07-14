@@ -1,6 +1,6 @@
 {
   "title": "animated billboards",
-  "description": "A demo showing how to render animated billboards.",
+  "description": "A demo showing animated billboards in 3d",
   "url": "/demos/animated-billboards",
   "tags": [
     "AnimatedSprites",
