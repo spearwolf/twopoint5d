@@ -25,7 +25,6 @@ const getHref = (url: string) => {
 
 <main>
   <header class="lookbook-header">
-    <img class="primary" src={logo} alt="twopoint5d logo" />
     <img class="secondary" src={lookbook} alt="lookbook title" />
   </header>
   <ul role="list" class="demo-card-grid">
@@ -48,11 +47,8 @@ const getHref = (url: string) => {
     display: flex;
     align-items: center;
   }
-  .lookbook-header img.primary {
-    max-height: 60px;
-  }
   .lookbook-header img.secondary {
-    filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #aaa);
+    filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #999);
     max-height: 66px;
     margin-left: 1rem;
   }
