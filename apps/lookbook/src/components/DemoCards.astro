@@ -1,14 +1,13 @@
 ---
 import Card from './Card.astro';
 
-import logo from '../images/twopoint5d.png';
 import lookbook from '../images/20221122-lookbook-white-fat.svg';
 
 const demos = Object.entries(
   import.meta.glob('../pages/demos/*.json', {
     eager: true,
   }),
-).map(([, json]) => json) as {title: string; description?: string; url: string; previewImage?: string}[];
+).map(([, json]) => json) as {title: string; description?: string; url: string; previewImage?: string; tags?: string[]}[];
 
 const baseUrl = import.meta.env.BASE_URL;
 
@@ -29,8 +28,8 @@ const getHref = (url: string) => {
   </header>
   <ul role="list" class="demo-card-grid">
     {
-      demos.map(({title, description, url, previewImage}) => (
-        <Card href={getHref(url)} title={title} body={description} image={previewImage} />
+      demos.map(({title, description, url, previewImage, tags}) => (
+        <Card href={getHref(url)} title={title} body={description} image={previewImage} tags={tags} />
       ))
     }
   </ul>
@@ -38,7 +37,7 @@ const getHref = (url: string) => {
 
 <style>
   main {
-    margin: auto;
+    margin: auto auto 3rem;
     padding: 1.5rem;
     max-width: 120ch;
   }
@@ -54,7 +53,7 @@ const getHref = (url: string) => {
   }
   .demo-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(32ch, 1fr));
     gap: 1.5rem;
     margin-top: 33px;
     padding: 0;

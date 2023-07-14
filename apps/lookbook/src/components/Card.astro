@@ -7,9 +7,10 @@ export interface Props {
   body: string;
   href: string;
   image?: string;
+  tags?: string[];
 }
 
-const {href, title, body, image} = Astro.props;
+const {href, title, body, image, tags} = Astro.props;
 
 const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
@@ -23,6 +24,15 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     <p>
       {body}
     </p>
+    {
+      tags && tags.length > 0 && (
+        <ul class="tags">
+          {tags.sort().map((tag) => (
+            <li class="tag">{tag}</li>
+          ))}
+        </ul>
+      )
+    }
   </a>
 </li>
 
@@ -68,5 +78,16 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     background-image: var(--cardTeaserImage);
     background-size: cover;
     background-position: center;
+  }
+  .tags {
+    margin: -0.1rem -0.3rem 0.5rem;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    background-color: var(--color-background);
+    margin: 0.2rem;
+    padding: 0.05rem 0.3em 0.1rem;
+    border-radius: 0.2rem;
   }
 </style>
