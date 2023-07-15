@@ -29,7 +29,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     {
       tags && tags.length > 0 && (
         <ul class="tags">
-          {tags.sort().map((tag) => (
+          {tags.map((tag) => (
             <li class="tag">{tag}</li>
           ))}
         </ul>

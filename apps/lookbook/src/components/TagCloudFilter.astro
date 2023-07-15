@@ -1,0 +1,25 @@
+---
+import {loadMetadataForDemos} from '~utils/loadMetadataForDemos';
+
+const {uniqTagKeys} = loadMetadataForDemos();
+---
+
+<ul class="tags">
+  {uniqTagKeys.sort().map((tag) => <li class="tag">{tag}</li>)}
+</ul>
+
+<style>
+  .tags {
+    margin: 2rem 0;
+    color: var(--color-primary);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    background-color: var(--color-background-light);
+    margin: 0.2rem;
+    padding: 0.05rem 0.3em 0.1rem;
+    border-radius: 0.2rem;
+    cursor: pointer;
+  }
+</style>

@@ -1,35 +1,24 @@
 ---
 import Card from './Card.astro';
+import TagCloudFilter from './TagCloudFilter.astro';
+import {loadMetadataForDemos} from '~utils/loadMetadataForDemos';
 
 import lookbook from '../images/20221122-lookbook-white-fat.svg';
 
-const demos = Object.entries(
-  import.meta.glob('../pages/demos/*.json', {
-    eager: true,
-  }),
-).map(([, json]) => json) as {title: string; description?: string; url: string; previewImage?: string; tags?: string[]}[];
-
-const baseUrl = import.meta.env.BASE_URL;
-
-const getHref = (url: string) => {
-  if (url.startsWith('http')) {
-    return url;
-  }
-  if (url.startsWith('/')) {
-    return `${baseUrl}${url.substring(1)}`;
-  }
-  return `${baseUrl}${url}`;
-};
+const {demos} = loadMetadataForDemos();
 ---
 
 <main>
   <header class="lookbook-header">
     <img class="secondary" src={lookbook} alt="lookbook title" />
   </header>
+
+  <TagCloudFilter />
+
   <ul role="list" class="demo-card-grid">
     {
-      demos.map(({title, description, url, previewImage, tags}) => (
-        <Card href={getHref(url)} title={title} body={description} image={previewImage} tags={tags} />
+      demos.map(({title, description, href, previewImage, tags}) => (
+        <Card href={href} title={title} body={description} image={previewImage} tags={tags} />
       ))
     }
   </ul>
