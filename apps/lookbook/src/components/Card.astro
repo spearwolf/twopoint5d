@@ -43,8 +43,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   document.querySelectorAll('.link-card').forEach(($el) => {
     const demoId = $el.getAttribute('data-demo-id');
     document.addEventListener('lookbook.showDemos', (event: any) => {
-      console.log(demoId, event.detail);
-      if (event.detail.showAll || event.detail.filterById?.includes(demoId)) {
+      if (event.detail.showAll || event.detail.filterById?.includes?.(demoId)) {
         $el.classList.remove('hidden');
       } else {
         $el.classList.add('hidden');

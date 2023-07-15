@@ -18,6 +18,7 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   .tags {
     margin: 2rem 0;
     color: var(--color-primary);
+    user-select: none;
   }
   .tag {
     display: inline-block;
@@ -28,29 +29,63 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
     border-radius: 0.2rem;
     cursor: pointer;
   }
+  .tag.active {
+    color: var(--color-background-dark);
+    background-color: var(--color-primary);
+  }
 </style>
 
 <script>
   document.querySelectorAll('.tag-cloud-filter').forEach(($el) => {
-    $el.addEventListener('pointerdown', (event: any) => {
-      if (event.isPrimary && event.target.hasAttribute('data-tag')) {
-        const $tag = event.target;
-        const $container = $tag.parentNode;
+    $el.addEventListener(
+      'pointerdown',
+      (event: any) => {
+        if (event.isPrimary && event.target.hasAttribute('data-tag')) {
+          const $tag = event.target;
+          const $container = $tag.parentNode;
 
-        const tag = $tag.getAttribute('data-tag');
-        const relatedDemos = $tag.getAttribute('data-related-demos').split(',');
+          const tag = $tag.getAttribute('data-tag');
+          const relatedDemos = $tag.getAttribute('data-related-demos').split(',');
 
-        console.log('click on', tag, 'related-demos:', relatedDemos, 'container:', $container);
+          console.log('click on', tag, 'related-demos:', relatedDemos, 'container:', $container);
 
-        document.dispatchEvent(
-          new CustomEvent('lookbook.showDemos', {
-            detail: {
-              filterById: relatedDemos,
-              showAll: false,
-            },
-          }),
-        );
-      }
-    });
+          $tag.classList.toggle('active');
+
+          const activated = $container.querySelectorAll('.active');
+
+          console.log('activated tag elements', activated);
+
+          if (activated.length === 0) {
+            document.dispatchEvent(
+              new CustomEvent('lookbook.showDemos', {
+                detail: {
+                  showAll: true,
+                },
+              }),
+            );
+          } else {
+            const filterById = new Set<string>();
+
+            for (const el of activated) {
+              el.getAttribute('data-related-demos')
+                .split(',')
+                .forEach((demo: string) => {
+                  filterById.add(demo);
+                });
+            }
+
+            document.dispatchEvent(
+              new CustomEvent('lookbook.showDemos', {
+                detail: {
+                  filterById: Array.from(filterById),
+                  showAll: false,
+                },
+              }),
+            );
+          }
+        }
+      },
+      {passive: true},
+    );
   });
 </script>
