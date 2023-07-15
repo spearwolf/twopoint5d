@@ -10,25 +10,27 @@ const getHref = (url: string) => {
   return `${baseUrl}${url}`;
 };
 
-const tags: Map<string, {demoUrls: Set<string>; relatedTags: Set<string>}> = new Map();
+const tags: Map<string, {demoIds: Set<string>; relatedTags: Set<string>}> = new Map();
 
 const demos = Object.entries(
   import.meta.glob('../pages/demos/*.json', {
     eager: true,
   }),
-).map(([, json]: [unknown, any]) => {
+).map(([filepath, json]: [string, any]) => {
+  const id = filepath.replace(/.*\/([^/.]+)\.json$/, '$1');
   if (json.tags) {
     json.tags.forEach((tag: string) => {
       if (!tags.has(tag)) {
-        tags.set(tag, {demoUrls: new Set(), relatedTags: new Set()});
+        tags.set(tag, {demoIds: new Set(), relatedTags: new Set()});
       }
       const meta = tags.get(tag)!;
-      meta.demoUrls.add(json.url);
+      meta.demoIds.add(id);
       json.tags.filter((t: string) => t !== tag).forEach((t: string) => meta.relatedTags.add(t));
     });
   }
-  return {...json, href: getHref(json.url), tags: json.tags?.sort()};
+  return {...json, id, href: getHref(json.url), tags: json.tags?.sort()};
 }) as {
+  id: string;
   title: string;
   description?: string;
   url: string;

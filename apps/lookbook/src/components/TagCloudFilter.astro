@@ -1,11 +1,17 @@
 ---
 import {loadMetadataForDemos} from '~utils/loadMetadataForDemos';
 
-const {uniqTagKeys} = loadMetadataForDemos();
+const {uniqTagKeys, tags} = loadMetadataForDemos();
 ---
 
-<ul class="tags">
-  {uniqTagKeys.sort().map((tag) => <li class="tag">{tag}</li>)}
+<ul class="tags tag-cloud-filter">
+  {
+    uniqTagKeys.sort().map((tag) => (
+      <li class="tag" data-related-demos={Array.from(tags.get(tag).demoIds).join(',')} data-tag={tag}>
+        {tag}
+      </li>
+    ))
+  }
 </ul>
 
 <style>
@@ -23,3 +29,28 @@ const {uniqTagKeys} = loadMetadataForDemos();
     cursor: pointer;
   }
 </style>
+
+<script>
+  document.querySelectorAll('.tag-cloud-filter').forEach(($el) => {
+    $el.addEventListener('pointerdown', (event: any) => {
+      if (event.isPrimary && event.target.hasAttribute('data-tag')) {
+        const $tag = event.target;
+        const $container = $tag.parentNode;
+
+        const tag = $tag.getAttribute('data-tag');
+        const relatedDemos = $tag.getAttribute('data-related-demos').split(',');
+
+        console.log('click on', tag, 'related-demos:', relatedDemos, 'container:', $container);
+
+        document.dispatchEvent(
+          new CustomEvent('lookbook.showDemos', {
+            detail: {
+              filterById: relatedDemos,
+              showAll: false,
+            },
+          }),
+        );
+      }
+    });
+  });
+</script>

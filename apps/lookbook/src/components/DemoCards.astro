@@ -17,8 +17,8 @@ const {demos} = loadMetadataForDemos();
 
   <ul role="list" class="demo-card-grid">
     {
-      demos.map(({title, description, href, previewImage, tags}) => (
-        <Card href={href} title={title} body={description} image={previewImage} tags={tags} />
+      demos.map(({id, title, description, href, previewImage, tags}) => (
+        <Card id={id} href={href} title={title} body={description} image={previewImage} tags={tags} />
       ))
     }
   </ul>
@@ -42,7 +42,7 @@ const {demos} = loadMetadataForDemos();
   }
   .demo-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(32ch, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(32ch, 0.5fr));
     gap: 1.5rem;
     margin-top: 33px;
     padding: 0;

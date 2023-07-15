@@ -3,6 +3,7 @@ import demoPreviewImageUrl from '~utils/demoPreviewImageUrl';
 import defaultTeaserImage from '../images/20221122-dark-circles-back-1024x.jpg';
 
 export interface Props {
+  id: string;
   title: string;
   body: string;
   href: string;
@@ -10,12 +11,12 @@ export interface Props {
   tags?: string[];
 }
 
-const {href, title, body, image, tags} = Astro.props;
+const {id, href, title, body, image, tags} = Astro.props;
 
 const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
 
-<li class="link-card">
+<li class="link-card" data-demo-id={id}>
   <a href={href}>
     <div class="card-image-container">
       <img src={previewImage} class="card-image" />
@@ -38,6 +39,20 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   </a>
 </li>
 
+<script>
+  document.querySelectorAll('.link-card').forEach(($el) => {
+    const demoId = $el.getAttribute('data-demo-id');
+    document.addEventListener('lookbook.showDemos', (event: any) => {
+      console.log(demoId, event.detail);
+      if (event.detail.showAll || event.detail.filterById?.includes(demoId)) {
+        $el.classList.remove('hidden');
+      } else {
+        $el.classList.add('hidden');
+      }
+    });
+  });
+</script>
+
 <style>
   .link-card {
     list-style: none;
@@ -47,6 +62,10 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     border-radius: 0.5rem;
     padding: 0;
     overflow: hidden;
+  }
+
+  .link-card.hidden {
+    display: none;
   }
 
   .link-card > a {
