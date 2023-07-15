@@ -17,7 +17,9 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
 <li class="link-card">
   <a href={href}>
-    <div class="card-image"></div>
+    <div class="card-image-container">
+      <img src={previewImage} class="card-image" />
+    </div>
     <h2>
       {title}
     </h2>
@@ -36,7 +38,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   </a>
 </li>
 
-<style define:vars={{cardTeaserImage: `url(${previewImage})`}}>
+<style>
   .link-card {
     list-style: none;
     display: flex;
@@ -72,10 +74,13 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   .link-card:is(:hover, :focus-within) h2 {
     color: var(--color-primary-highlight);
   }
-  .card-image {
+  .card-image-container {
     margin: 0 -1.3rem;
     aspect-ratio: 16/10;
-    background-image: var(--cardTeaserImage);
+  }
+  .card-image {
+    width: 100%;
+    height: 100%;
     background-size: cover;
     background-position: center;
   }
