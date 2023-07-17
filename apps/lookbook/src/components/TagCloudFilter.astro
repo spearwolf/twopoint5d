@@ -7,7 +7,12 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
 <ul class="tags tag-cloud-filter">
   {
     uniqTagKeys.sort().map((tag) => (
-      <li class="tag" data-related-demos={Array.from(tags.get(tag).demoIds).join(',')} data-tag={tag}>
+      <li
+        class="tag"
+        data-tag={tag}
+        data-related-demos={Array.from(tags.get(tag).demoIds).join(',')}
+        data-related-tags={Array.from(tags.get(tag).relatedTags).join(',')}
+      >
         {tag}
       </li>
     ))
@@ -33,56 +38,107 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
     color: var(--color-background-dark);
     background-color: var(--color-primary);
   }
+  .tag.inactive {
+    color: var(--color-primary-inactive);
+    background-color: transparent;
+  }
 </style>
 
 <script>
+  const ATTR_TAG = 'data-tag';
+  const ATTR_RELATED_DEMOS = 'data-related-demos';
+  const ATTR_RELATED_TAGS = 'data-related-tags';
+
+  const CSS_ACTIVE = 'active';
+  const CSS_INACTIVE = 'inactive';
+
+  function readUniqValuesFromAttribute($el: HTMLElement, attrName: string, target: Set<string> = new Set()): Set<string> {
+    $el
+      .getAttribute(attrName)
+      .split(',')
+      .forEach((value: string) => {
+        target.add(value);
+      });
+
+    return target;
+  }
+
+  function dispatchShowDemosEvent(payload: {showAll: boolean; filterById?: string[]}): void {
+    document.dispatchEvent(
+      new CustomEvent('lookbook.showDemos', {
+        detail: {
+          ...payload,
+        },
+      }),
+    );
+  }
+
   document.querySelectorAll('.tag-cloud-filter').forEach(($el) => {
     $el.addEventListener(
       'pointerdown',
       (event: any) => {
-        if (event.isPrimary && event.target.hasAttribute('data-tag')) {
+        if (event.isPrimary && event.button === 0 && event.target.hasAttribute(ATTR_TAG)) {
           const $tag = event.target;
           const $container = $tag.parentNode;
+          const $allTags = $container.querySelectorAll(`[${ATTR_TAG}]`);
 
-          const tag = $tag.getAttribute('data-tag');
-          const relatedDemos = $tag.getAttribute('data-related-demos').split(',');
-
-          console.log('click on', tag, 'related-demos:', relatedDemos, 'container:', $container);
-
-          $tag.classList.toggle('active');
-
-          const activated = $container.querySelectorAll('.active');
-
-          console.log('activated tag elements', activated);
-
-          if (activated.length === 0) {
-            document.dispatchEvent(
-              new CustomEvent('lookbook.showDemos', {
-                detail: {
-                  showAll: true,
-                },
-              }),
-            );
-          } else {
-            const filterById = new Set<string>();
-
-            for (const el of activated) {
-              el.getAttribute('data-related-demos')
-                .split(',')
-                .forEach((demo: string) => {
-                  filterById.add(demo);
-                });
+          if ($tag.classList.contains(CSS_INACTIVE)) {
+            for (const el of $allTags) {
+              el.classList.remove(CSS_INACTIVE);
+              el.classList.remove(CSS_ACTIVE);
             }
-
-            document.dispatchEvent(
-              new CustomEvent('lookbook.showDemos', {
-                detail: {
-                  filterById: Array.from(filterById),
-                  showAll: false,
-                },
-              }),
-            );
           }
+
+          $tag.classList.toggle(CSS_ACTIVE);
+
+          const $activated = $container.querySelectorAll(`.${CSS_ACTIVE}`);
+
+          if ($activated.length === 0) {
+            for (const el of $container.querySelectorAll(`.${CSS_INACTIVE}`)) {
+              el.classList.remove(CSS_INACTIVE);
+            }
+            dispatchShowDemosEvent({showAll: true});
+            return;
+          }
+
+          const relatedTags = readUniqValuesFromAttribute($activated[0], ATTR_RELATED_TAGS);
+          const relatedDemos = readUniqValuesFromAttribute($activated[0], ATTR_RELATED_DEMOS);
+
+          for (let i = 1; i < $activated.length; i++) {
+            const _relatedTags = readUniqValuesFromAttribute($activated[i], ATTR_RELATED_TAGS);
+            for (const tag of relatedTags) {
+              if (!_relatedTags.has(tag)) {
+                relatedTags.delete(tag);
+              }
+            }
+            const _relatedDemos = readUniqValuesFromAttribute($activated[i], ATTR_RELATED_DEMOS);
+            for (const demo of relatedDemos) {
+              if (!_relatedDemos.has(demo)) {
+                relatedDemos.delete(demo);
+              }
+            }
+          }
+
+          const activeTags = (Array.from($activated) as HTMLElement[]).map((el) => el.getAttribute(ATTR_TAG));
+          activeTags.forEach((tag) => relatedTags.add(tag));
+
+          for (const el of $allTags) {
+            const tagName = el.getAttribute(ATTR_TAG);
+            if (activeTags.includes(tagName)) {
+              el.classList.remove(CSS_INACTIVE);
+              el.classList.add(CSS_ACTIVE);
+            }
+            if (relatedTags.has(tagName)) {
+              el.classList.remove(CSS_INACTIVE);
+            } else {
+              el.classList.add(CSS_INACTIVE);
+            }
+          }
+
+          dispatchShowDemosEvent({
+            filterById: Array.from(relatedDemos),
+            showAll: false,
+          });
         }
       },
       {passive: true},
