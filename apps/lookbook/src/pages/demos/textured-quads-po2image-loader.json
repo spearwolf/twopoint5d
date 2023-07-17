@@ -1,0 +1,7 @@
+{
+  "title": "textured quads from power-of-2 image",
+  "description": "Render instanced quads with a power-of-2 image texture",
+  "url": "/demos/textured-quads-po2image-loader",
+  "tags": ["PowerOf2ImageLoader", "TextureCoords", "VertexObjects", "instanced"],
+  "previewImage": "textured-quads-po2image-loader.png"
+}
