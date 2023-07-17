@@ -126,7 +126,6 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
             const tagName = el.getAttribute(ATTR_TAG);
             if (activeTags.includes(tagName)) {
               el.classList.remove(CSS_INACTIVE);
-              el.classList.add(CSS_ACTIVE);
             }
             if (relatedTags.has(tagName)) {
               el.classList.remove(CSS_INACTIVE);
