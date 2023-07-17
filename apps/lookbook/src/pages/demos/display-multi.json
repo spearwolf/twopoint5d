@@ -2,6 +2,6 @@
   "title": "multiple displays",
   "description": "A test-page demonstrating the sizing behavior of the canvas element created by the Display helper class in different css contexts",
   "url": "/demos/display-multi",
-  "tags": ["TextureFactory", "Stage2D", "ParallaxProjection", "Display"],
+  "tags": ["TextureFactory", "Stage2D", "ParallaxProjection", "Display", "vanilla"],
   "previewImage": "multiple-displays.png"
 }

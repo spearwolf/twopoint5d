@@ -10,7 +10,10 @@
     "TileSetLoader",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
-    "tilesets"
+    "tilesets",
+    "textures",
+    "map2d",
+    "vanilla"
   ],
   "previewImage": "map2d-tile-sprites.png"
 }

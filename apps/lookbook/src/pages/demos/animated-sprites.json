@@ -8,7 +8,9 @@
     "AnimatedSpritesMaterial",
     "FrameBasedAnimations",
     "TileSetLoader",
-    "tilesets"
+    "tilesets",
+    "textures",
+    "vanilla"
   ],
   "previewImage": "animated-sprites.png"
 }

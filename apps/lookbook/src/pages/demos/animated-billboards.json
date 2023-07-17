@@ -9,7 +9,9 @@
     "FrameBasedAnimations",
     "TileSetLoader",
     "tilesets",
-    "billboards"
+    "textures",
+    "billboards",
+    "vanilla"
   ],
   "previewImage": "animated-billboards.png"
 }

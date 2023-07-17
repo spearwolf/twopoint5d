@@ -2,6 +2,6 @@
   "title": "textured quads from texture atlas",
   "description": "Render instanced quads with textures from a textures-atlas",
   "url": "/demos/textured-quads-from-texture-atlas",
-  "tags": ["TextureAtlas", "TextureAtlasLoader", "VertexObjects", "instanced"],
+  "tags": ["TextureAtlas", "TextureAtlasLoader", "VertexObjects", "instanced", "textures", "vanilla"],
   "previewImage": "textured-quads-from-texture-atlas.png"
 }
