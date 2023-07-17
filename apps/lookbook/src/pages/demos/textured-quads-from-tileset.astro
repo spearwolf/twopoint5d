@@ -1,0 +1,132 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './textured-quads-from-texture-atlas.json';
+---
+
+<Layout title={title}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <div id="texture-preview" class="texture-preview">
+    <header class="tileset-image-title">tileset image</header>
+  </div>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #391e39;
+    background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
+  }
+  .texture-preview {
+    background-color: rgba(86, 101, 115, 80%);
+    border: 5px solid #324168;
+    border-radius: 5px;
+    width: 150px;
+    height: 150px;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+  }
+  .tileset-image-title {
+    font-size: 13px;
+    color: #eee;
+    text-shadow: 1px 1px #000;
+    display: none;
+  }
+  #texture-preview:hover > .tileset-image-title {
+    display: block;
+  }
+  .texture-preview :global(img),
+  .texture-preview :global(canvas) {
+    max-width: 100%;
+  }
+  .texture-preview:hover :global(canvas),
+  .texture-preview:hover :global(img) {
+    box-shadow: 0 0 0 1px #fff, 0 0 10px rgba(255 255 255 / 80%);
+  }
+  .texture-preview :global(header) {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    left: 0;
+  }
+</style>
+
+<script>
+  import {TileSet, TileSetLoader, VertexObjects} from '@spearwolf/twopoint5d';
+  import {DoubleSide, RawShaderMaterial, Texture} from 'three';
+  import fragmentShaderSource from '~shaders/textured-quads.frag?url';
+  import vertexShaderSource from '~shaders/textured-quads.vert?url';
+  import {InstancedQuadsGeometry} from '~shared/instanced-quads/InstancedQuadsGeometry';
+  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~utils/assetsUrl';
+  import loadShaderSource from '~utils/loadShaderSource';
+
+  async function makeMesh(rows: number, columns: number, size: number, offset: number, tileset: TileSet, texture: Texture) {
+    const capacity = rows * columns;
+    const geometry = new InstancedQuadsGeometry(capacity);
+
+    geometry.basePool.createVO().make();
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < columns; x++) {
+        const quad = geometry.instancedPool.createVO();
+
+        quad.width = 1.0 + Math.random() * (size - 1.0);
+        quad.height = quad.width;
+
+        quad.setInstancePosition([
+          x * size * offset - ((columns - 1) * size * offset) / 2,
+          y * size * offset - ((rows - 1) * size * offset) / 2,
+          0,
+        ]);
+
+        const texCoords = tileset.atlas.randomFrame().coords;
+        quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+      }
+    }
+
+    const material = new RawShaderMaterial({
+      vertexShader: await loadShaderSource(vertexShaderSource),
+      fragmentShader: await loadShaderSource(fragmentShaderSource),
+      uniforms: {
+        colorMap: {
+          value: texture,
+        },
+      },
+      transparent: true,
+      side: DoubleSide,
+    });
+
+    const mesh = new VertexObjects(geometry, material);
+    mesh.name = 'InstancedQuadsMesh';
+    mesh.frustumCulled = false;
+
+    return mesh;
+  }
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  const {imgEl, texture, tileSet} = await new TileSetLoader().loadAsync(
+    assetsUrl('nobinger-anim-sheet.png'),
+    {
+      tileWidth: 64,
+      tileHeight: 64,
+      margin: 1,
+    },
+    ['nearest'],
+  );
+
+  console.log('loaded tileset', {imgEl, tileSet, texture});
+
+  document.getElementById('texture-preview').appendChild(imgEl);
+
+  await demo.start(async () => {
+    demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
+  });
+
+  console.log('TexturedQuadsMesh', demo.scene.children[0]);
+</script>

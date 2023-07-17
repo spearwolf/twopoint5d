@@ -1,0 +1,7 @@
+{
+  "title": "textured quads from tileset",
+  "description": "Render instanced quads with texture frames from a tileset",
+  "url": "/demos/textured-quads-from-tileset",
+  "tags": ["TileSet", "TileSetLoader", "VertexObjects", "instanced", "tilesets"],
+  "previewImage": "textured-quads-from-tileset.png"
+}
