@@ -14,6 +14,7 @@
   "dependencies": {
     "@astrojs/react": "^2.2.1",
     "@astrojs/tailwind": "^3.1.3",
+    "@react-three/drei": "^9.78.2",
     "@spearwolf/twopoint5d": "*",
     "@spearwolf/twopoint5d-r3f": "*",
     "@types/react": "^18.2.15",

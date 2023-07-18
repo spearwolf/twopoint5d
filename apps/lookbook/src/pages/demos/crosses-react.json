@@ -1,0 +1,7 @@
+{
+  "title": "crosses (react)",
+  "description": "A minimal example of how to use the VertexObjcts mesh with react-three/fiber",
+  "url": "/demos/crosses-react",
+  "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "react"],
+  "previewImage": "crosses-react.png"
+}

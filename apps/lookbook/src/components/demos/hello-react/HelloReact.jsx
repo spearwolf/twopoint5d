@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 
-export const HelloReact = () => {
+export default function HelloReact() {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -11,4 +11,4 @@ export const HelloReact = () => {
   }, [count]);
 
   return <div>hello react! {count}</div>;
-};
+}
