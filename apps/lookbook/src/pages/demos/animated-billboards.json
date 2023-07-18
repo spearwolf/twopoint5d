@@ -11,7 +11,8 @@
     "tilesets",
     "textures",
     "billboards",
-    "vanilla"
+    "vanilla",
+    "demo"
   ],
   "previewImage": "animated-billboards.png"
 }

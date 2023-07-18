@@ -1,0 +1,23 @@
+{
+  "title": "clouds",
+  "description": "A simple 2.5d clouds demo",
+  "url": "/demos/clouds",
+  "tags": [
+    "Stage2D",
+    "ParallaxProjection",
+    "ShaderChunks",
+    "TextureAtlas",
+    "TextureRef",
+    "TexturedSprites",
+    "TexturedSpritesGeometry",
+    "TexturedSpritesMaterial",
+    "forwardRefValue",
+    "useFrameLoop",
+    "useTextureAtlas",
+    "instanced",
+    "textures",
+    "react",
+    "demo"
+  ],
+  "previewImage": "clouds.png"
+}
