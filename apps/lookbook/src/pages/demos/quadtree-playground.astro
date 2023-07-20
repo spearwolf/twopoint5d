@@ -58,7 +58,7 @@ import {title} from './quadtree-playground.json';
 
   // -----------------------------
 
-  function updateVisualization() {
+  function updateViewSize() {
     visualQuadTree.update(settings.width, settings.height);
 
     (projection.viewSpecs as any).width = settings.width;
@@ -70,6 +70,6 @@ import {title} from './quadtree-playground.json';
 
   const gui = new GUI();
 
-  gui.add(settings, 'width').onChange(updateVisualization);
-  gui.add(settings, 'height').onChange(updateVisualization);
+  gui.add(settings, 'width').onChange(updateViewSize);
+  gui.add(settings, 'height').onChange(updateViewSize);
 </script>

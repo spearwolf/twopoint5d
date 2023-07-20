@@ -52,14 +52,17 @@ export class QuadTreeVisualization {
     return this.#texture;
   }
 
+  updateMaterial() {
+    if (this.#sprite) {
+      this.#sprite.material.map = this.makeTexture();
+      this.#sprite.material.needsUpdate = true;
+    }
+  }
+
   update(width: number, height: number) {
     this.resize(width, height, () => {
       this.render();
-
-      if (this.#sprite) {
-        this.#sprite.material.map = this.makeTexture();
-        this.#sprite.material.needsUpdate = true;
-      }
+      this.updateMaterial();
     });
   }
 
