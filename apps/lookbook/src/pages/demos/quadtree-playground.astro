@@ -50,11 +50,14 @@ import {title} from './quadtree-playground.json';
 
   const actions = {
     chunkCount: 100,
+    maxChunkNodes: 50,
+
     makeRandomQuadTree: () => {
-      visual.makeRandomQuadTree(actions.chunkCount);
+      visual.makeRandomQuadTree(actions.chunkCount, actions.maxChunkNodes);
     },
   };
 
   gui.add(actions, 'chunkCount', 1, 1000, 1).name('chunk count');
+  gui.add(actions, 'maxChunkNodes', 2, 30, 1).name('max chunk nodes');
   gui.add(actions, 'makeRandomQuadTree').name('make random chunks');
 </script>

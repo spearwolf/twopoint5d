@@ -85,7 +85,7 @@ export class QuadTreeVisualization {
     }
   }
 
-  makeRandomQuadTree(count = 100) {
+  makeRandomQuadTree(count = 100, maxChunkNodes = 2) {
     const WIDTH = 1000;
     const HEIGHT = 600;
 
@@ -113,7 +113,7 @@ export class QuadTreeVisualization {
 
     const root = new ChunkQuadTreeNode<DataIdsChunk2D>(chunks);
 
-    root.subdivide();
+    root.subdivide(maxChunkNodes);
 
     this.visualizeChunkQuadTree(root, WIDTH, HEIGHT);
   }
