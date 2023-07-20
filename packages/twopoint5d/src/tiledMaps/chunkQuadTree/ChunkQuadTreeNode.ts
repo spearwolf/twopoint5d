@@ -64,10 +64,14 @@ const calcAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
 
 const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis => {
   chunks.sort((a: IDataChunk2D, b: IDataChunk2D) => a[beforeKey] - b[beforeKey]);
-  return chunks
-    .map(calcAxis.bind(null, chunks, beforeKey, afterKey))
-    .filter((axis: IChunkAxis) => !axis.noSubdivide)
-    .sort((a: IChunkAxis, b: IChunkAxis) => a.distance - b.distance)[0] as IChunkAxis;
+  return (
+    chunks
+      .map(calcAxis.bind(null, chunks, beforeKey, afterKey))
+      // @ts-ignore
+      .filter((axis: IChunkAxis) => !axis.noSubdivide)
+      // @ts-ignore
+      .sort((a: IChunkAxis, b: IChunkAxis) => a.distance - b.distance)[0] as IChunkAxis
+  );
 };
 
 /**
@@ -97,7 +101,9 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //               +y
   //
 
+  // @ts-ignore
   originX: number = null;
+  // @ts-ignore
   originY: number = null;
 
   chunks: ChunkType[];
@@ -105,13 +111,18 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   isLeaf = true;
 
   readonly nodes: IChunkQuadTreeChildNodes<ChunkType> = {
+    // @ts-ignore
     northEast: null,
+    // @ts-ignore
     northWest: null,
+    // @ts-ignore
     southEast: null,
+    // @ts-ignore
     southWest: null,
   };
 
   constructor(chunks?: ChunkType | ChunkType[]) {
+    // @ts-ignore
     this.chunks = chunks ? [].concat(chunks) : [];
   }
 
@@ -228,7 +239,7 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   findChunksAt(x: number, y: number): ChunkType[] {
     const chunks: ChunkType[] = this.chunks.filter((chunk: ChunkType) => chunk.containsDataAt(x, y));
 
-    let moreChunks: ChunkType[] = null;
+    let moreChunks: ChunkType[] | null = null;
 
     if (x < this.originX) {
       if (y < this.originY) {
