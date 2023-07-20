@@ -20,20 +20,17 @@ import {title} from './quadtree-playground.json';
 
   // -----------------------------
 
-  const settings = {
-    width: 256,
-    height: 256,
-  };
-
   // -----------------------------
 
   const display = new Display(document.getElementById('twopoint5d')!);
 
-  const visual = new QuadTreeVisualization(display.renderer, settings.width, settings.height);
+  const visual = new QuadTreeVisualization(display.renderer, 256, 256);
 
-  visual.canvasStage.on('resize', () => {
-    visual.render();
-  });
+  // visual.canvasStage.on('resize', () => {
+  //   visual.render();
+  // });
+
+  visual.makeRandomQuadTree();
 
   display.on({
     resize: ({width, height}: DisplayEventArgs) => {
@@ -49,14 +46,15 @@ import {title} from './quadtree-playground.json';
 
   // -----------------------------
 
-  function updateViewSize() {
-    visual.canvasStage.setCanvasSize(settings.width, settings.height);
-  }
-
-  // -----------------------------
-
   const gui = new GUI({title: 'quadtree playground'});
 
-  gui.add(settings, 'width').onChange(updateViewSize);
-  gui.add(settings, 'height').onChange(updateViewSize);
+  const actions = {
+    chunkCount: 100,
+    makeRandomQuadTree: () => {
+      visual.makeRandomQuadTree(actions.chunkCount);
+    },
+  };
+
+  gui.add(actions, 'chunkCount', 1, 1000, 1).name('chunk count');
+  gui.add(actions, 'makeRandomQuadTree').name('make random chunks');
 </script>
