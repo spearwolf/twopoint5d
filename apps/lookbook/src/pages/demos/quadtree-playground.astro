@@ -8,7 +8,7 @@ import {title} from './quadtree-playground.json';
 </Layout>
 
 <script>
-  import {Display, DisplayEventArgs, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+  import {Display, DisplayEventArgs} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~shared/quadtree-playground/QuadTreeVisualization';
 
@@ -23,21 +23,19 @@ import {title} from './quadtree-playground.json';
 
   const display = new Display(document.getElementById('twopoint5d')!);
 
-  const projection = new OrthographicProjection('xy|bottom-left', {
-    width: settings.width,
-    height: settings.height,
-    fit: 'contain',
-  });
+  const visual = new QuadTreeVisualization(display.renderer, settings.width, settings.height);
 
-  const stage = new Stage2D(projection);
+  visual.canvasStage.on('resize', () => {
+    visual.render();
+  });
 
   display.on({
     resize: ({width, height}: DisplayEventArgs) => {
-      stage.resize(width, height);
+      visual.canvasStage.setContainerSize(width, height);
     },
 
-    frame: ({renderer}: DisplayEventArgs) => {
-      stage.renderFrame(renderer);
+    frame: () => {
+      visual.canvasStage.render();
     },
   });
 
@@ -45,20 +43,8 @@ import {title} from './quadtree-playground.json';
 
   // -----------------------------
 
-  const visualQuadTree = new QuadTreeVisualization(settings.width, settings.height);
-
-  stage.scene.add(visualQuadTree.buildScene(display.renderer));
-
-  visualQuadTree.render();
-
-  // -----------------------------
-
   function updateViewSize() {
-    visualQuadTree.update(settings.width, settings.height);
-
-    (projection.viewSpecs as any).width = settings.width;
-    (projection.viewSpecs as any).height = settings.height;
-    stage.update(true);
+    visual.canvasStage.setCanvasSize(settings.width, settings.height);
   }
 
   // -----------------------------

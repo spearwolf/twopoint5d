@@ -1,90 +1,27 @@
-import {TextureFactory} from '@spearwolf/twopoint5d';
-import {Scene, Sprite, SpriteMaterial, type Texture, type WebGLRenderer} from 'three';
+import type {WebGLRenderer} from 'three';
+import {Canvas2DStage} from '../../utils/Canvas2DStage';
 
 export class QuadTreeVisualization {
-  width: number;
-  height: number;
+  readonly canvasStage: Canvas2DStage;
 
-  readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
 
-  readonly scene = new Scene();
-
-  #texture?: Texture;
-  #sprite?: Sprite;
-  #renderer?: WebGLRenderer;
-
-  constructor(width: number, height: number, canvas?: HTMLCanvasElement) {
-    this.width = width;
-    this.height = height;
-
-    this.canvas = canvas || document.createElement('canvas');
-
-    this.canvas.width = width;
-    this.canvas.height = height;
-
-    this.ctx = this.canvas.getContext('2d');
+  get width(): number {
+    return this.canvasStage.width;
   }
 
-  buildScene(renderer: WebGLRenderer): Scene {
-    this.#renderer = renderer;
-
-    if (this.#sprite) return this.scene;
-
-    const material = new SpriteMaterial({map: this.makeTexture()});
-    this.#sprite = new Sprite(material);
-
-    this.#sprite.scale.set(this.width, this.height, 1);
-
-    this.scene.add(this.#sprite);
-
-    return this.scene;
+  get height(): number {
+    return this.canvasStage.height;
   }
 
-  makeTexture(renderer: WebGLRenderer = this.#renderer): Texture {
-    if (this.#texture) {
-      this.#texture.dispose();
-    }
+  constructor(renderer: WebGLRenderer, width: number, height: number) {
+    this.canvasStage = new Canvas2DStage(renderer, width, height);
 
-    const factory = new TextureFactory(renderer, ['nearest', 'flipy']);
-    this.#texture = factory.create(this.canvas);
-
-    return this.#texture;
-  }
-
-  updateMaterial() {
-    if (this.#sprite) {
-      this.#sprite.material.map = this.makeTexture();
-      this.#sprite.material.needsUpdate = true;
-    }
-  }
-
-  update(width: number, height: number) {
-    this.resize(width, height, () => {
-      this.render();
-      this.updateMaterial();
-    });
-  }
-
-  resize(width: number, height: number, action?: () => void) {
-    if (this.width === width && this.height === height) return;
-
-    this.width = width;
-    this.height = height;
-
-    this.canvas.width = width;
-    this.canvas.height = height;
-
-    if (this.#sprite) {
-      this.#sprite.scale.set(width, height, 1);
-    }
-
-    if (action) action();
+    this.ctx = this.canvasStage.canvas.getContext('2d')!;
   }
 
   render() {
-    this.ctx.fillStyle = 'rgb(0, 0, 0)';
-    this.ctx.fillRect(0, 0, this.width, this.height);
+    this.ctx.clearRect(0, 0, this.width, this.height);
 
     this.ctx.lineWidth = 1;
     this.ctx.strokeStyle = 'rgb(255, 255, 255)';
@@ -100,5 +37,7 @@ export class QuadTreeVisualization {
     this.ctx.font = '15px monospace';
     this.ctx.fillStyle = 'rgb(64, 64, 64)';
     this.ctx.fillText(`${this.width} x ${this.height}`, 10, 20);
+
+    this.canvasStage.needsUpdate = true;
   }
 }
