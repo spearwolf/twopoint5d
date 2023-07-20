@@ -2,14 +2,25 @@ import {EventizeApi, eventize} from '@spearwolf/eventize';
 import {OrthographicProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
 import {SpriteMaterial, type Scene, Sprite, type WebGLRenderer, Texture} from 'three';
 
-export type Canvas2DStageFitType = 'contain' | 'cover' | 'fill';
+export type Canvas2DStageFitType = 'contain' | 'cover';
 
 export interface Canvas2DStage extends EventizeApi {}
 
 export class Canvas2DStage {
   readonly renderer: WebGLRenderer;
 
-  fit: Canvas2DStageFitType = 'contain';
+  #fit: Canvas2DStageFitType = 'contain';
+
+  get fit(): Canvas2DStageFitType {
+    return this.#fit;
+  }
+
+  set fit(value: Canvas2DStageFitType) {
+    if (this.#fit === value) return;
+    this.#fit = value;
+    this.projection.viewSpecs.fit = value;
+    this.stage.update(true);
+  }
 
   readonly canvas: HTMLCanvasElement;
 
@@ -55,7 +66,7 @@ export class Canvas2DStage {
     if (typeof args[0] === 'number') {
       const [width, height, fit] = args as [width: number, height: number, fit: Canvas2DStageFitType];
 
-      this.fit = fit ?? this.fit;
+      this.#fit = fit ?? this.#fit;
 
       this.canvas = document.createElement('canvas');
       this.canvas.width = width;
@@ -63,7 +74,7 @@ export class Canvas2DStage {
     } else {
       const [canvas, fit] = args as [canvas: HTMLCanvasElement, fit: Canvas2DStageFitType];
 
-      this.fit = fit ?? this.fit;
+      this.#fit = fit ?? this.#fit;
 
       this.canvas = canvas;
     }
@@ -71,7 +82,7 @@ export class Canvas2DStage {
     this.projection = new OrthographicProjection('xy|bottom-left', {
       width: this.width,
       height: this.height,
-      fit: this.fit as any,
+      fit: this.#fit as any,
     });
 
     this.stage = new Stage2D(this.projection);

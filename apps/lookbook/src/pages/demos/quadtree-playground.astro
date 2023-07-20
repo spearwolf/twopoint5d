@@ -17,6 +17,7 @@ import {title} from './quadtree-playground.json';
   const settings = {
     width: 256,
     height: 256,
+    fit: 'contain',
   };
 
   // -----------------------------
@@ -53,4 +54,7 @@ import {title} from './quadtree-playground.json';
 
   gui.add(settings, 'width').onChange(updateViewSize);
   gui.add(settings, 'height').onChange(updateViewSize);
+  gui.add(settings, 'fit', ['contain', 'cover']).onChange(() => {
+    visual.canvasStage.fit = settings.fit as any;
+  });
 </script>
