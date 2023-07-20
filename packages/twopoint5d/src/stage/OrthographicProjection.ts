@@ -4,18 +4,12 @@ import {IProjection} from './IProjection';
 import {ProjectionPlane, ProjectionPlaneDescription} from './ProjectionPlane';
 import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
 
-/**
- * @category Projection
- */
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
   distanceToProjectionPlane?: number;
   near?: number;
   far?: number;
 };
 
-/**
- * @category Projection
- */
 export class OrthographicProjection implements IProjection {
   viewSpecs: OrthographicProjectionSpecs;
   projectionPlane: ProjectionPlane;
@@ -32,7 +26,9 @@ export class OrthographicProjection implements IProjection {
   #distanceToProjectionPlane: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: OrthographicProjectionSpecs) {
+    // @ts-ignore
     this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
+    // @ts-ignore
     this.viewSpecs = specs;
   }
 

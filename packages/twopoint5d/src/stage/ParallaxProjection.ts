@@ -4,18 +4,12 @@ import {IProjection} from './IProjection';
 import {ProjectionPlane, ProjectionPlaneDescription} from './ProjectionPlane';
 import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
 
-/**
- * @category Projection
- */
 export type ParallaxProjectionSpecs = FitIntoRectangleSpecs & {
   distanceToProjectionPlane?: number;
   near?: number;
   far?: number;
 };
 
-/**
- * @category Projection
- */
 export class ParallaxProjection implements IProjection {
   viewSpecs: Partial<ParallaxProjectionSpecs>;
   projectionPlane: ProjectionPlane;
@@ -34,6 +28,7 @@ export class ParallaxProjection implements IProjection {
   #fovy: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
+    // @ts-ignore
     this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
     this.viewSpecs = specs ?? {};
   }

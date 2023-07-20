@@ -5,17 +5,11 @@ import {TextureOptionClasses} from './TextureFactory';
 import {TextureImage, TextureImageLoader} from './TextureImageLoader';
 import {TexturePackerJson, TexturePackerJsonData, TexturePackerMetaData} from './TexturePackerJson';
 
-/**
- * @category Texture Mapping
- */
 export interface TextureAtlasData extends TextureImage {
   atlas: TextureAtlas;
   meta: TexturePackerMetaData;
 }
 
-/**
- * @category Texture Mapping
- */
 export interface TextureAtlasLoadOptions {
   overrideImageUrl?: string;
 }
@@ -29,9 +23,6 @@ const makeFileLoader = () => {
   return loader;
 };
 
-/**
- * @category Texture Mapping
- */
 export class TextureAtlasLoader {
   fileLoader: FileLoader;
   textureImageLoader: TextureImageLoader;
@@ -55,7 +46,7 @@ export class TextureAtlasLoader {
 
         this.textureImageLoader.load(
           imageUrl,
-          textureClasses,
+          textureClasses ?? [],
           ({texture, imgEl, texCoords}) => {
             const [atlas, meta] = TexturePackerJson.parse(jsonData, texCoords);
 

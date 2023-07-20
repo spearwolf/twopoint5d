@@ -7,9 +7,6 @@ import {findNextPowerOf2} from './findNextPowerOf2';
 
 type AnimName = string | symbol;
 
-/**
- * @category Texture Mapping
- */
 export interface FrameBasedAnimDef {
   frames: TextureCoords[];
   duration: number;
@@ -17,9 +14,6 @@ export interface FrameBasedAnimDef {
   id: number;
 }
 
-/**
- * @category Texture Mapping
- */
 export interface BakeTextureOptions {
   includeTextureSize: boolean;
 }
@@ -49,7 +43,7 @@ const renderFloatsBuffer = (
 
   floatsBuffer.set(
     names.flatMap((name) => {
-      const {frames, duration} = animations.get(name);
+      const {frames, duration} = animations.get(name)!;
       const offset = curOffset;
       curOffset += frames.length * (includeTextureSize ? 2 : 1);
       return [frames.length, duration, offset, 0];
@@ -59,18 +53,15 @@ const renderFloatsBuffer = (
   floatsBuffer.set(
     includeTextureSize
       ? names.flatMap((name) =>
-          animations.get(name).frames.flatMap(({s, t, u, v, width, height}) => [s, t, u, v, width, height, 0, 0]),
+          animations.get(name)!.frames.flatMap(({s, t, u, v, width, height}) => [s, t, u, v, width, height, 0, 0]),
         )
-      : names.flatMap((name) => animations.get(name).frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
+      : names.flatMap((name) => animations.get(name)!.frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
     names.length * 4,
   );
 
   return floatsBuffer;
 };
 
-/**
- * @category Texture Mapping
- */
 export class FrameBasedAnimations {
   static MaxTextureSize = 16384;
 
@@ -109,7 +100,7 @@ export class FrameBasedAnimations {
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
       const frameNames = atlas.frameNames(args[3] as any).sort();
-      frames = frameNames.map((frameName) => atlas.frame(frameName).coords);
+      frames = frameNames.map((frameName) => atlas.frame(frameName)!.coords);
     } else if (args[2] instanceof TileSet) {
       const tileSet = args[2];
       if (Array.isArray(args[3])) {
@@ -132,6 +123,7 @@ export class FrameBasedAnimations {
     this.#animations.set(name, {
       id,
       name,
+      // @ts-ignore
       frames,
       duration,
     });
@@ -140,7 +132,7 @@ export class FrameBasedAnimations {
   }
 
   animId(name: AnimName): number {
-    return this.#animations.get(name).id;
+    return this.#animations.get(name)!.id;
   }
 
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {

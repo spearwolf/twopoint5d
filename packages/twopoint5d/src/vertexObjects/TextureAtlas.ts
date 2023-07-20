@@ -1,13 +1,7 @@
 import {TextureCoords} from './TextureCoords';
 
-/**
- * @category Texture Mapping
- */
 export type TextureAtlasFrameData = Record<string, any>;
 
-/**
- * @category Texture Mapping
- */
 export interface TextureAtlasFrame {
   coords: TextureCoords;
   data?: TextureAtlasFrameData;
@@ -24,9 +18,6 @@ const isNamedTextureAtlasArgs = (args: TextureAtlasArgs | NamedTextureAtlasArgs)
 
 const rand = (max: number) => (Math.random() * max) | 0;
 
-/**
- * @category Texture Mapping
- */
 export class TextureAtlas {
   #frames: TextureAtlasFrame[] = [];
   #frameNames: Map<TextureAtlasFrameName, number> = new Map();
@@ -59,7 +50,7 @@ export class TextureAtlas {
   }
 
   frame(name: TextureAtlasFrameName): TextureAtlasFrame | undefined {
-    return this.#frames[this.#frameNames.get(name)];
+    return this.#frames[this.#frameNames.get(name)!];
   }
 
   /**
@@ -92,7 +83,8 @@ export class TextureAtlas {
       }
       ++idx;
     }
-    return undefined;
+    // @ts-ignore
+    return;
   }
 
   randomFrameIds(count: number): number[] {

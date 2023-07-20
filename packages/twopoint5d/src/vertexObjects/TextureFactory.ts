@@ -2,9 +2,6 @@ import {NearestFilter, TextureFilter, Texture, TextureLoader, LinearFilter, WebG
 
 import {TextureSource} from './types';
 
-/**
- * @category Texture Mapping
- */
 export interface TextureOptions {
   magFilter: TextureFilter;
   minFilter: TextureFilter;
@@ -55,9 +52,6 @@ const TextureClasses = {
   },
 };
 
-/**
- * @category Texture Mapping
- */
 export type TextureOptionClasses = keyof typeof TextureClasses;
 
 const TextureClassPriority: Record<TextureOptionClasses, number> = {
@@ -78,9 +72,6 @@ const TextureClassPriority: Record<TextureOptionClasses, number> = {
   'no-flipy': 0,
 };
 
-/**
- * @category Texture Mapping
- */
 export class TextureFactory {
   #maxAnisotrophy = 0;
   #defaultOptions: Partial<TextureOptions>;

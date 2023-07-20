@@ -2,9 +2,6 @@ import {Camera} from 'three';
 
 import {ProjectionPlane} from './ProjectionPlane';
 
-/**
- * @category Projection
- */
 export interface IProjection {
   updateViewRect(width: number, height: number): void;
   getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number];

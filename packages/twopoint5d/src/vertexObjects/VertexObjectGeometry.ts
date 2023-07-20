@@ -10,9 +10,6 @@ import {VertexObjectPool} from './VertexObjectPool';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
-/**
- * @category Vertex Objects
- */
 export class VertexObjectGeometry extends BufferGeometry {
   readonly pool: VertexObjectPool;
   readonly buffers: Map<string, BufferLike> = new Map();
@@ -43,7 +40,7 @@ export class VertexObjectGeometry extends BufferGeometry {
 
   touch(...args: Array<string | TouchBuffersType>): void {
     const attrNames: string[] = [];
-    let buffers: TouchBuffersType;
+    let buffers: TouchBuffersType | undefined = undefined;
     args.forEach((arg) => {
       if (typeof arg === 'string') {
         attrNames.push(arg);

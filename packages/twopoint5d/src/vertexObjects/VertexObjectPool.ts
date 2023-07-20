@@ -15,9 +15,6 @@ const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexOb
     },
   });
 
-/**
- * @category Vertex Objects
- */
 export class VertexObjectPool<VOType = VO> {
   static setIndex(vo: VO, idx: number): VO {
     vo[voIndex] = idx;
@@ -54,6 +51,7 @@ export class VertexObjectPool<VOType = VO> {
   set usedCount(value: number) {
     // TODO write test
     if (value < this.#usedCount) {
+      // @ts-ignore
       this.#index.fill(undefined, value, this.#usedCount);
     }
     this.#usedCount = value < this.capacity ? value : this.capacity;
@@ -74,6 +72,7 @@ export class VertexObjectPool<VOType = VO> {
       this.#index[idx] = vo;
       return vo;
     }
+    // @ts-ignore
     return undefined;
   }
 
@@ -93,6 +92,7 @@ export class VertexObjectPool<VOType = VO> {
       const idx = vo[voIndex];
       const lastUsedIdx = this.#usedCount - 1;
       if (idx === lastUsedIdx) {
+        // @ts-ignore
         this.#index[idx] = undefined;
       } else {
         this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
@@ -101,6 +101,7 @@ export class VertexObjectPool<VOType = VO> {
         this.#index[idx] = lastUsedVO;
       }
       this.usedCount--;
+      // @ts-ignore
       vo[voBuffer] = undefined;
     }
   }

@@ -16,9 +16,6 @@ type TouchInstancedBuffersType = {
   instanced?: TouchBuffersType;
 };
 
-/**
- * @category Vertex Objects
- */
 export class InstancedVertexObjectGeometry<
   VOInstancedType extends VO = VO,
   VOBaseType extends VO = VO,

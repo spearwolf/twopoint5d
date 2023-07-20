@@ -21,9 +21,6 @@ interface Buffer {
   // THREE->bufferAttribute?
 }
 
-/**
- * @category Vertex Objects
- */
 export class VertexObjectBuffer {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
@@ -69,11 +66,11 @@ export class VertexObjectBuffer {
       this.attributeNames = Object.freeze(Array.from(this.descriptor.attributeNames).sort());
 
       for (const attributeName of this.attributeNames) {
-        const attribute = this.descriptor.getAttribute(attributeName);
+        const attribute = this.descriptor.getAttribute(attributeName)!;
         const {bufferName} = attribute;
         let offset = 0;
         if (this.buffers.has(bufferName)) {
-          const buffer = this.buffers.get(bufferName);
+          const buffer = this.buffers.get(bufferName)!;
           offset = buffer.itemSize;
           buffer.itemSize += attribute.size;
         } else {
@@ -82,6 +79,7 @@ export class VertexObjectBuffer {
             itemSize: attribute.size,
             dataType: attribute.dataType,
             usageType: attribute.usageType,
+            // @ts-ignore
             typedArray: undefined,
           });
         }
@@ -102,7 +100,7 @@ export class VertexObjectBuffer {
       for (const bufAttr of this.bufferAttributes.values()) {
         const {bufferName} = bufAttr;
         if (this.bufferNameAttributes.has(bufferName)) {
-          this.bufferNameAttributes.get(bufferName).push(bufAttr);
+          this.bufferNameAttributes.get(bufferName)!.push(bufAttr);
         } else {
           this.bufferNameAttributes.set(bufferName, [bufAttr]);
         }
@@ -110,14 +108,18 @@ export class VertexObjectBuffer {
     }
 
     if (!this.descriptor.voPrototype) {
-      this.descriptor.voPrototype = createVertexObjectPrototype(this, this.descriptor.basePrototype, this.descriptor.methods);
+      this.descriptor.voPrototype = createVertexObjectPrototype(
+        this,
+        this.descriptor.basePrototype as object | undefined,
+        this.descriptor.methods as object | undefined,
+      );
     }
   }
 
   copy(otherVob: VertexObjectBuffer, objectOffset = 0): void {
     const {vertexCount} = this.descriptor;
     for (const {bufferName, typedArray, itemSize} of this.buffers.values()) {
-      typedArray.set(otherVob.buffers.get(bufferName).typedArray, objectOffset * vertexCount * itemSize);
+      typedArray.set(otherVob.buffers.get(bufferName)!.typedArray, objectOffset * vertexCount * itemSize);
     }
   }
 
@@ -129,7 +131,7 @@ export class VertexObjectBuffer {
 
   copyArray(source: TypedArray, bufferName: string, objectOffset = 0): void {
     const {vertexCount} = this.descriptor;
-    const {typedArray, itemSize} = this.buffers.get(bufferName);
+    const {typedArray, itemSize} = this.buffers.get(bufferName)!;
     typedArray.set(source, objectOffset * vertexCount * itemSize);
   }
 
@@ -146,9 +148,9 @@ export class VertexObjectBuffer {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
         let attrObjCount = 0;
-        const buffer = this.buffers.get(attr.bufferName);
+        const buffer = this.buffers.get(attr.bufferName)!;
         const {vertexCount} = this.descriptor;
-        const attrSize = this.descriptor.getAttribute(attrName).size;
+        const attrSize = this.descriptor.getAttribute(attrName)!.size;
         let idx = 0;
         let bufIdx = objectOffset * vertexCount * buffer.itemSize;
         while (idx < data.length && attrObjCount + objectOffset < this.capacity) {
@@ -172,9 +174,9 @@ export class VertexObjectBuffer {
       attributeNames.map((attrName) => {
         const attr = this.bufferAttributes.get(attrName);
         if (attr) {
-          const buffer = this.buffers.get(attr.bufferName);
+          const buffer = this.buffers.get(attr.bufferName)!;
           const {vertexCount} = this.descriptor;
-          const attrSize = this.descriptor.getAttribute(attrName).size;
+          const attrSize = this.descriptor.getAttribute(attrName)!.size;
 
           const targetArray = createTypedArray(buffer.dataType, (end - start) * vertexCount * attrSize);
 

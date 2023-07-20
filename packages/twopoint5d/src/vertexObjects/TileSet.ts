@@ -29,9 +29,6 @@ import {TextureCoords} from './TextureCoords';
 
 const rand = (max: number) => (Math.random() * max) | 0;
 
-/**
- * @category Texture Mapping
- */
 export interface TileSetOptions {
   tileWidth?: number;
   tileHeight?: number;
@@ -49,8 +46,6 @@ export interface TileSetOptions {
  * The [[TileSet]] maps _tileIds_ to _frameIds_.
  * Unlike the `frameId` of [[TextureAtlas]], the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
  * The `frameId` range of a [[TileSet]] starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
- *
- * @category Texture Mapping
  */
 export class TileSet {
   readonly atlas: TextureAtlas;
@@ -137,11 +132,11 @@ export class TileSet {
   }
 
   frame(tileId: number): TextureAtlasFrame {
-    return this.atlas.get(this.frameId(tileId));
+    return this.atlas.get(this.frameId(tileId))!;
   }
 
   randomFrame(): TextureAtlasFrame {
-    return this.atlas.get(this.randomFrameId());
+    return this.atlas.get(this.randomFrameId())!;
   }
 
   #createTextureCoords = (): void => {

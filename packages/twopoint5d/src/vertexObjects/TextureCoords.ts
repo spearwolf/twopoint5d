@@ -22,9 +22,6 @@ const maxCoord = (current: TextureCoords, scalarKey: 'x' | 'y', sizeKey: 'width'
   return coord / texCoords[sizeKey];
 };
 
-/**
- * @category Texture Mapping
- */
 export class TextureCoords {
   static readonly FLIP_HORIZONTAL = 1;
   static readonly FLIP_VERTICAL = 2;
@@ -42,7 +39,7 @@ export class TextureCoords {
 
   constructor(
     ...args:
-      | undefined
+      | []
       | [parent: TextureCoords, x?: number, y?: number, width?: number, height?: number]
       | [x?: number, y?: number, width?: number, height?: number]
   ) {
