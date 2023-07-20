@@ -9,9 +9,8 @@ import {title} from './quadtree-playground.json';
 
 <script>
   import {Display, DisplayEventArgs, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
-  import {Color} from 'three';
-  import {QuadTreeVisualization} from '~shared/quadtree-playground/QuadTreeVisualization';
   import GUI from 'lil-gui';
+  import {QuadTreeVisualization} from '~shared/quadtree-playground/QuadTreeVisualization';
 
   // -----------------------------
 
@@ -33,10 +32,6 @@ import {title} from './quadtree-playground.json';
   const stage = new Stage2D(projection);
 
   display.on({
-    init: ({renderer}: DisplayEventArgs) => {
-      renderer.setClearColor(new Color('#333333'), 1.0);
-    },
-
     resize: ({width, height}: DisplayEventArgs) => {
       stage.resize(width, height);
     },
@@ -68,7 +63,7 @@ import {title} from './quadtree-playground.json';
 
   // -----------------------------
 
-  const gui = new GUI();
+  const gui = new GUI({title: 'quadtree playground'});
 
   gui.add(settings, 'width').onChange(updateViewSize);
   gui.add(settings, 'height').onChange(updateViewSize);
