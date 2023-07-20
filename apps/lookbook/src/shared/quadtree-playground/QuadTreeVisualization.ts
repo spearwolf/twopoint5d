@@ -1,5 +1,5 @@
+import {Canvas2DStage} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
-import {Canvas2DStage} from '../../utils/Canvas2DStage';
 
 export class QuadTreeVisualization {
   readonly canvasStage: Canvas2DStage;

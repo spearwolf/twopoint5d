@@ -1,6 +1,8 @@
 import {EventizeApi, eventize} from '@spearwolf/eventize';
-import {OrthographicProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
-import {SpriteMaterial, type Scene, Sprite, type WebGLRenderer, Texture} from 'three';
+import {Sprite, SpriteMaterial, Texture, type Scene, type WebGLRenderer} from 'three';
+import {TextureFactory} from '../vertexObjects/TextureFactory';
+import {OrthographicProjection} from './OrthographicProjection';
+import {Stage2D} from './Stage2D';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
 
