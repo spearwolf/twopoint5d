@@ -1,0 +1,53 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './quadtree-playground.json';
+---
+
+<Layout title={title}>
+  <canvas id="twopoint5d" resize-to="window"></canvas>
+</Layout>
+
+<script>
+  import {Display, DisplayEventArgs, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+  import {Color} from 'three';
+  import {QuadTreeVisualization} from '~shared/quadtree-playground/QuadTreeVisualization';
+
+  const width = 197;
+  const height = 205;
+
+  // -----------------------------
+
+  const display = new Display(document.getElementById('twopoint5d')!);
+
+  const stage = new Stage2D(
+    new OrthographicProjection('xy|bottom-left', {
+      width: width,
+      height: height,
+      fit: 'contain',
+    }),
+  );
+
+  display.on({
+    init: ({renderer}: DisplayEventArgs) => {
+      renderer.setClearColor(new Color('#333333'), 1.0);
+    },
+
+    resize: ({width, height}: DisplayEventArgs) => {
+      stage.resize(width, height);
+    },
+
+    frame: ({renderer}: DisplayEventArgs) => {
+      stage.renderFrame(renderer);
+    },
+  });
+
+  display.start();
+
+  // -----------------------------
+
+  const visualQuadTree = new QuadTreeVisualization(width, height);
+
+  stage.scene.add(visualQuadTree.buildScene(display.renderer));
+
+  visualQuadTree.render();
+</script>

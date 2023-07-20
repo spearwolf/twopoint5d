@@ -1,0 +1,7 @@
+{
+  "title": "quadtree playground",
+  "description": "A visual playground for the quadtree data structure",
+  "url": "/demos/quadtree-playground",
+  "tags": ["Stage2D", "OrthographicProjection", "Display", "ChunkQuadTreeNode", "vanilla", "playground"],
+  "previewImage": ""
+}
