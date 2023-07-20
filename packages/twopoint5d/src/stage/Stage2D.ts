@@ -131,8 +131,8 @@ export class Stage2D {
   #updateProjection = (width: number, height: number): void => {
     this.needsUpdate = false;
 
-    this.projection.updateViewRect(width, height);
-    const [w, h] = this.projection.getViewRect();
+    this.projection!.updateViewRect(width, height);
+    const [w, h] = this.projection!.getViewRect();
 
     const prevWidth = this.#width;
     const prevHeight = this.#height;
@@ -140,9 +140,9 @@ export class Stage2D {
     this.#height = h;
 
     if (this.camera != null) {
-      this.projection.updateCamera(this.camera);
+      this.projection!.updateCamera(this.camera);
     } else {
-      this.#updateCamera(() => void (this.#cameraFromProjection = this.projection.createCamera()));
+      this.#updateCamera(() => void (this.#cameraFromProjection = this.projection!.createCamera()));
     }
 
     if (prevWidth !== w || prevHeight !== h) {

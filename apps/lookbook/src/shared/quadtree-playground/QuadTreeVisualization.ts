@@ -12,6 +12,7 @@ export class QuadTreeVisualization {
 
   #texture?: Texture;
   #sprite?: Sprite;
+  #renderer?: WebGLRenderer;
 
   constructor(width: number, height: number, canvas?: HTMLCanvasElement) {
     this.width = width;
@@ -26,32 +27,43 @@ export class QuadTreeVisualization {
   }
 
   buildScene(renderer: WebGLRenderer): Scene {
+    this.#renderer = renderer;
+
     if (this.#sprite) return this.scene;
 
-    const material = new SpriteMaterial({map: this.makeTexture(renderer)});
-    const sprite = new Sprite(material);
+    const material = new SpriteMaterial({map: this.makeTexture()});
+    this.#sprite = new Sprite(material);
 
-    sprite.scale.set(this.width, this.height, 1);
+    this.#sprite.scale.set(this.width, this.height, 1);
 
-    this.scene.add(sprite);
+    this.scene.add(this.#sprite);
 
     return this.scene;
   }
 
-  makeTexture(renderer: WebGLRenderer): Texture {
-    if (this.#texture == null) {
-      const factory = new TextureFactory(renderer, ['nearest', 'flipy']);
-      this.#texture = factory.create(this.canvas);
+  makeTexture(renderer: WebGLRenderer = this.#renderer): Texture {
+    if (this.#texture) {
+      this.#texture.dispose();
     }
+
+    const factory = new TextureFactory(renderer, ['nearest', 'flipy']);
+    this.#texture = factory.create(this.canvas);
+
     return this.#texture;
   }
 
   update(width: number, height: number) {
-    this.resize(width, height);
-    this.render();
+    this.resize(width, height, () => {
+      this.render();
+
+      if (this.#sprite) {
+        this.#sprite.material.map = this.makeTexture();
+        this.#sprite.material.needsUpdate = true;
+      }
+    });
   }
 
-  resize(width: number, height: number) {
+  resize(width: number, height: number, action?: () => void) {
     if (this.width === width && this.height === height) return;
 
     this.width = width;
@@ -60,13 +72,11 @@ export class QuadTreeVisualization {
     this.canvas.width = width;
     this.canvas.height = height;
 
-    if (this.#texture) {
-      this.#texture.needsUpdate = true;
-    }
-
     if (this.#sprite) {
       this.#sprite.scale.set(width, height, 1);
     }
+
+    if (action) action();
   }
 
   render() {
@@ -83,5 +93,9 @@ export class QuadTreeVisualization {
     this.ctx.lineTo(0, this.height);
     this.ctx.lineTo(0, 0);
     this.ctx.stroke();
+
+    this.ctx.font = '15px monospace';
+    this.ctx.fillStyle = 'rgb(64, 64, 64)';
+    this.ctx.fillText(`${this.width} x ${this.height}`, 10, 20);
   }
 }
