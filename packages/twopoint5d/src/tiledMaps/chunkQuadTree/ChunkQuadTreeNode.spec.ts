@@ -2,14 +2,8 @@ import assert from 'assert';
 
 import {AABB2} from '../AABB2';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode';
-import {DataIdsChunk2D} from './DataIdsChunk2D';
 import {IDataChunk2D} from './IDataChunk2D';
-
-class StringDataChunk2D extends DataIdsChunk2D {
-  override toString(): string {
-    return this.readData();
-  }
-}
+import {StringDataChunk2D} from './StringDataChunk2D';
 
 const chunksAsStrings = (chunks: IDataChunk2D[]) => chunks.map((chunk) => chunk.toString()).sort();
 

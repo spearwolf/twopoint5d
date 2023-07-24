@@ -1,4 +1,4 @@
-import {Canvas2DStage, ChunkQuadTreeNode, DataIdsChunk2D} from '@spearwolf/twopoint5d';
+import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
 
 export class QuadTreeVisualization {
@@ -41,7 +41,7 @@ export class QuadTreeVisualization {
     this.canvasStage.needsUpdate = true;
   }
 
-  visualizeChunkQuadTree(root: ChunkQuadTreeNode<DataIdsChunk2D>, width: number, height: number) {
+  visualizeChunkQuadTree(root: ChunkQuadTreeNode<NumberDataChunk2D>, width: number, height: number) {
     console.log('visualizeChunkQuadTree', root, width, height);
 
     this.canvasStage.setCanvasSize(width, height);
@@ -58,7 +58,13 @@ export class QuadTreeVisualization {
     this.canvasStage.needsUpdate = true;
   }
 
-  private renderChunkFrame(chunk: ChunkQuadTreeNode<DataIdsChunk2D>, left: number, top: number, right: number, bottom: number) {
+  private renderChunkFrame(
+    chunk: ChunkQuadTreeNode<NumberDataChunk2D>,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ) {
     if (chunk.isLeaf) {
       this.ctx.fillStyle = 'rgba(255, 0, 66, 0.5)';
     } else {
@@ -93,7 +99,7 @@ export class QuadTreeVisualization {
     const MIN_SIZE = 20;
     const MAX_SIZE = 50;
 
-    const chunks: DataIdsChunk2D[] = [];
+    const chunks: NumberDataChunk2D[] = [];
 
     for (let i = 0; i < count; i++) {
       const w = Math.ceil(Math.max(MIN_SIZE, Math.random() * MAX_SIZE));
@@ -101,17 +107,16 @@ export class QuadTreeVisualization {
       const x = Math.round(Math.random() * (WIDTH - MARGIN * 2) + MARGIN) - w / 2;
       const y = Math.round(Math.random() * (HEIGHT - MARGIN * 2) + MARGIN) - h / 2;
       chunks.push(
-        new DataIdsChunk2D({
+        new NumberDataChunk2D({
           x,
           y,
           width: w,
           height: h,
-          data: '',
         }),
       );
     }
 
-    const root = new ChunkQuadTreeNode<DataIdsChunk2D>(chunks);
+    const root = new ChunkQuadTreeNode<NumberDataChunk2D>(chunks);
 
     root.subdivide(maxChunkNodes);
 
