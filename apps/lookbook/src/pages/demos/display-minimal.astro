@@ -8,8 +8,8 @@ import {title} from './display-minimal.json';
 </Layout>
 
 <script>
+  import {Display, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
-  import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
   import assetsUrl from '~utils/assetsUrl';
 
   const canvas = document.getElementById('twopoint5d')!;
@@ -29,7 +29,7 @@ import {title} from './display-minimal.json';
   (window as any).display = display;
   (window as any).stage = stage;
 
-  const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy']);
+  const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy', 'srgb']);
 
   const textureImage = textureFactory.load(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
 

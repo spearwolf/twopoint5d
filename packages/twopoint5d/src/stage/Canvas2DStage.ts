@@ -102,7 +102,7 @@ export class Canvas2DStage {
       this.texture.dispose();
     }
 
-    const factory = new TextureFactory(this.renderer, ['nearest', 'flipy']);
+    const factory = new TextureFactory(this.renderer, ['nearest', 'flipy', 'srgb']);
     this.texture = factory.create(this.canvas);
 
     return this.texture;

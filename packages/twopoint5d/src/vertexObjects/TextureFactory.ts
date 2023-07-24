@@ -1,4 +1,14 @@
-import {NearestFilter, TextureFilter, Texture, TextureLoader, LinearFilter, WebGLRenderer} from 'three';
+import {
+  NearestFilter,
+  TextureFilter,
+  Texture,
+  TextureLoader,
+  LinearFilter,
+  WebGLRenderer,
+  ColorSpace,
+  SRGBColorSpace,
+  LinearSRGBColorSpace,
+} from 'three';
 
 import {TextureSource} from './types';
 
@@ -7,6 +17,7 @@ export interface TextureOptions {
   minFilter: TextureFilter;
   anisotrophy: number;
   flipY: boolean;
+  colorSpace: ColorSpace;
   // TODO encoding @see https://threejs.org/docs/#api/en/constants/Textures
 }
 
@@ -50,6 +61,12 @@ const TextureClasses = {
   'no-flipy': {
     flipY: false,
   },
+  srgb: {
+    colorSpace: SRGBColorSpace,
+  },
+  'linear-srgb': {
+    colorSpace: LinearSRGBColorSpace,
+  },
 };
 
 export type TextureOptionClasses = keyof typeof TextureClasses;
@@ -70,6 +87,9 @@ const TextureClassPriority: Record<TextureOptionClasses, number> = {
 
   flipy: 10,
   'no-flipy': 0,
+
+  srgb: 0,
+  'linear-srgb': 10,
 };
 
 export class TextureFactory {
