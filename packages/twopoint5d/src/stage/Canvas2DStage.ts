@@ -44,6 +44,7 @@ export class Canvas2DStage {
   readonly sprite: Sprite;
 
   texture?: Texture;
+  #textureFactory?: TextureFactory;
 
   /**
    * You should set `needsUpdate` to `true` if the canvas content has changed
@@ -102,8 +103,9 @@ export class Canvas2DStage {
       this.texture.dispose();
     }
 
-    const factory = new TextureFactory(this.renderer, ['nearest', 'flipy', 'srgb']);
-    this.texture = factory.create(this.canvas);
+    this.#textureFactory ||= new TextureFactory(this.renderer, ['nearest', 'flipy', 'srgb']);
+
+    this.texture = this.#textureFactory.create(this.canvas);
 
     return this.texture;
   }
