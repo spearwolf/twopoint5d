@@ -1,0 +1,21 @@
+{
+  "title": "map2d tile sprites (react)",
+  "description": "How to render tile-sprites with the Map2DTileSprites component",
+  "url": "/demos/map2d-tile-sprites-react",
+  "tags": [
+    "AABB2",
+    "Map2DTile",
+    "Map2DTileSprites",
+    "RepeatingTilesProvider",
+    "TextureRef",
+    "TileSet",
+    "TileSetRef",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "map2d",
+    "react"
+  ],
+  "previewImage": "map2d-tile-sprites-react.png"
+}
