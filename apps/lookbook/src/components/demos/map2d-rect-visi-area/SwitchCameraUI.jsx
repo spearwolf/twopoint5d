@@ -1,6 +1,6 @@
-import { useCallback } from "react";
-import styled, { css } from "styled-components";
-import { useDemoStore } from "./useDemoStore";
+import {useCallback} from 'react';
+import {css, styled} from 'styled-components';
+import {useDemoStore} from './useDemoStore';
 
 const Layout = styled.div`
   position: fixed;
@@ -36,7 +36,7 @@ const CameraButtonStyled = styled.button`
   position: relative;
   z-index: 0;
 
-  ${({ isRadio }) =>
+  ${({isRadio}) =>
     isRadio &&
     css`
       &:first-child {
@@ -58,15 +58,13 @@ const CameraButtonStyled = styled.button`
       }
     `}
 
-  ${({ isActive }) =>
+  ${({isActive}) =>
     isActive
       ? css`
           color: #fff;
 
-          box-shadow: inset 0 0 1.5em #cc9, inset 0.5em 0 1.5em #f06,
-            inset -0.5em 0 1.5em #06f, inset 0.5em 0 3em #f06,
-            inset -0.5em 0 5em #06f, 0 0 0.5em #fff, -0.5em 0 1.5em #f06,
-            0.5em 0 1.5em #06f;
+          box-shadow: inset 0 0 1.5em #cc9, inset 0.5em 0 1.5em #f06, inset -0.5em 0 1.5em #06f, inset 0.5em 0 3em #f06,
+            inset -0.5em 0 5em #06f, 0 0 0.5em #fff, -0.5em 0 1.5em #f06, 0.5em 0 1.5em #06f;
 
           z-index: 1;
         `
@@ -83,22 +81,19 @@ const CameraButtonStyled = styled.button`
         `}
 `;
 
-const CameraButton = ({ value, label, isActive, onAction, radioGroup }) => {
+// eslint-disable-next-line react/prop-types
+const CameraButton = ({value, label, isActive, onAction, radioGroup}) => {
   const onClick = useCallback(
     (event) => {
       event.preventDefault();
       event.stopPropagation();
       onAction(value);
     },
-    [value]
+    [value],
   );
 
   return (
-    <CameraButtonStyled
-      isRadio={!!radioGroup}
-      isActive={!!isActive}
-      onPointerDown={onClick}
-    >
+    <CameraButtonStyled isRadio={!!radioGroup} isActive={!!isActive} onPointerDown={onClick}>
       {label}
     </CameraButtonStyled>
   );
@@ -106,20 +101,20 @@ const CameraButton = ({ value, label, isActive, onAction, radioGroup }) => {
 
 const CAMERA_BUTTONS = [
   {
-    key: "cam1",
-    label: "Orbit Around",
+    key: 'cam1',
+    label: 'Orbit Around',
   },
   {
-    key: "cam0",
-    label: "Map2D Pan-Control",
+    key: 'cam0',
+    label: 'Map2D Pan-Control',
   },
   // {
   //   key: "cam2",
   //   label: "Control Map2D Camera",
   // },
   {
-    key: "cam3",
-    label: "View Map2D",
+    key: 'cam3',
+    label: 'View Map2D',
   },
 ];
 
@@ -129,7 +124,7 @@ export const SwitchCameraUI = () => {
 
   return (
     <Layout>
-      {CAMERA_BUTTONS.map(({ key, label }) => (
+      {CAMERA_BUTTONS.map(({key, label}) => (
         <CameraButton
           key={key}
           radioGroup

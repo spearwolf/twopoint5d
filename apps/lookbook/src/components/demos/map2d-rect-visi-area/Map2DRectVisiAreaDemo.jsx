@@ -1,8 +1,8 @@
-import { OrbitControls } from "@react-three/drei";
-import { extend, useThree } from "@react-three/fiber";
-import { useControls } from "leva";
-import { useEffect, useState } from "react";
-import { RectangularVisibilityArea } from "twopoint5d";
+import {OrbitControls} from '@react-three/drei';
+import {extend, useThree} from '@react-three/fiber';
+import {useControls} from 'leva';
+import {useEffect, useState} from 'react';
+import {RectangularVisibilityArea} from '@spearwolf/twopoint5d';
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -15,10 +15,11 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-} from "twopoint5d-r3f";
-import { useDemoStore } from "./useDemoStore";
+} from '@spearwolf/twopoint5d-r3f';
+import assetsUrl from '../../../demos/utils/assetsUrl.ts';
+import {useDemoStore} from './useDemoStore';
 
-extend({ RectangularVisibilityArea });
+extend({RectangularVisibilityArea});
 
 const TILES = [
   [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],
@@ -39,13 +40,13 @@ const TILES = [
   [3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
 ];
 
-const VIEW_WIDTH = "view width";
-const VIEW_HEIGHT = "view height";
-const VIEW_FIT = "view fit";
-const VIEW_RECT = "view rect";
+const VIEW_WIDTH = 'view width';
+const VIEW_HEIGHT = 'view height';
+const VIEW_FIT = 'view fit';
+const VIEW_RECT = 'view rect';
 
-export const DemoOrDie = () => {
-  const [center, setCenter] = useState({ x: 0, y: 0 });
+export const Map2DRectVisiAreaDemo = () => {
+  const [center, setCenter] = useState({x: 0, y: 0});
   const activeCamera = useDemoStore((state) => state.activeCameraName);
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
@@ -58,49 +59,34 @@ export const DemoOrDie = () => {
   } = useControls({
     [VIEW_WIDTH]: 1024,
     [VIEW_HEIGHT]: 768,
-    [VIEW_FIT]: { options: ["cover", "contain"] },
+    [VIEW_FIT]: {options: ['cover', 'contain']},
   });
 
-  const { [VIEW_RECT]: showHelpers } = useControls("show helpers", {
+  const {[VIEW_RECT]: showHelpers} = useControls('show helpers', {
     [VIEW_RECT]: true,
   });
 
-  const pointerPanDisabled = activeCamera === "cam1";
-  const orbitAround = activeCamera === "cam1";
-  const showMap2DCamera = activeCamera === "cam3";
+  const pointerPanDisabled = activeCamera === 'cam1';
+  const orbitAround = activeCamera === 'cam1';
+  const showMap2DCamera = activeCamera === 'cam3';
 
   useEffect(() => {
-    if (activeCamera !== "cam3") {
-      setThree({ camera: defaultCamera });
+    if (activeCamera !== 'cam3') {
+      setThree({camera: defaultCamera});
     }
   }, [activeCamera]);
 
   return (
     <>
-      <PanControl2D
-        onUpdate={setCenter}
-        pointerDisabled={pointerPanDisabled}
-        pixelsPerSecond={300}
-      />
+      <PanControl2D onUpdate={setCenter} pointerDisabled={pointerPanDisabled} pixelsPerSecond={300} />
 
       {orbitAround && <OrbitControls makeDefault />}
 
       <Stage2D noAutoRender defaultCamera={showMap2DCamera}>
-        <ParallaxProjection
-          plane="xz"
-          origin="top left"
-          width={viewWidth}
-          height={viewHeight}
-          fit={viewFit}
-        />
+        <ParallaxProjection plane="xz" origin="top left" width={viewWidth} height={viewHeight} fit={viewFit} />
       </Stage2D>
 
-      <TileSet
-        name="tiles"
-        url="/examples/assets/ball-patterns.png"
-        tileWidth={128}
-        tileHeight={128}
-      />
+      <TileSet name="tiles" url={assetsUrl('ball-patterns.png')} tileWidth={128} tileHeight={128} />
 
       <Map2DLayer3D
         name="Map2DLayer3D"
@@ -112,12 +98,7 @@ export const DemoOrDie = () => {
         centerY={center.y}
         updateOnFrame
       >
-        <rectangularVisibilityArea
-          width={viewWidth}
-          height={viewHeight}
-          showHelpers={showHelpers}
-          attach="visibilitor"
-        />
+        <rectangularVisibilityArea width={viewWidth} height={viewHeight} showHelpers={showHelpers} attach="visibilitor" />
 
         <Map2DTileSprites>
           <RepeatingTilesProvider tiles={TILES} />

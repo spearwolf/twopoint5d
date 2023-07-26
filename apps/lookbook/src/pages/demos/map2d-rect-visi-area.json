@@ -1,0 +1,24 @@
+{
+  "title": "map2d rect visi area",
+  "description": "How to render a map2d layer with a rectangular visibility area",
+  "url": "/demos/map2d-rect-visi-area",
+  "tags": [
+    "Map2DLayer3D",
+    "Map2DTileSprites",
+    "PanControl2D",
+    "ParallaxProjection",
+    "RectangularVisibilityArea",
+    "RepeatingTilesProvider",
+    "Stage2D",
+    "TextureRef",
+    "TileSet",
+    "TileSetRef",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "map2d",
+    "react"
+  ],
+  "previewImage": "map2d-rect-visi-area.png"
+}
