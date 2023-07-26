@@ -21,10 +21,10 @@ import {title} from './instanced-quads.json';
 <script>
   import {InstancedVertexObjectGeometry, VO, VertexObjects} from '@spearwolf/twopoint5d';
   import {DoubleSide, RawShaderMaterial} from 'three';
-  import fragmentShaderSource from '~shaders/instanced-quads.frag?url';
-  import vertexShaderSource from '~shaders/instanced-quads.vert?url';
-  import {PerspectiveOrbitDemo} from '~utils/PerspectiveOrbitDemo';
-  import loadShaderSource from '~utils/loadShaderSource';
+  import fragmentShaderSource from '~demos/shaders/instanced-quads.frag?url';
+  import vertexShaderSource from '~demos/shaders/instanced-quads.vert?url';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import loadShaderSource from '~demos/utils/loadShaderSource';
 
   interface BaseQuad extends VO {
     setPosition(position: [number, number, number, number, number, number, number, number, number, number, number, number]): void;

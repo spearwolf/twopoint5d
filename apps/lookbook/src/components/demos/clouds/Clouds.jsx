@@ -13,8 +13,8 @@ import {
 } from '@spearwolf/twopoint5d-r3f';
 import {useEffect, useRef} from 'react';
 import {AdditiveBlending, FrontSide} from 'three';
-import assetsUrl from '../../../utils/assetsUrl.ts';
-import {createFrameLoopComponent} from '../../../utils/createFrameLoopComponent';
+import assetsUrl from '../../../demos/utils/assetsUrl.ts';
+import {createFrameLoopComponent} from '../../../demos/utils/createFrameLoopComponent.js';
 import {CloudSprites} from './CloudSprites';
 
 const ShaderLib = {

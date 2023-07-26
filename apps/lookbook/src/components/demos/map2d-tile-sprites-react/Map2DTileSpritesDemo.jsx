@@ -10,7 +10,7 @@ import {
 } from '@spearwolf/twopoint5d-r3f';
 import {useEffect, useState} from 'react';
 import {Vector2, Vector3} from 'three';
-import assetsUrl from '../../../utils/assetsUrl.ts';
+import assetsUrl from '../../../demos/utils/assetsUrl.ts';
 import {WiredBox} from '../WiredBox.tsx';
 
 const TILES = [

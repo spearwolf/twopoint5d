@@ -13,7 +13,7 @@ const getHref = (url: string) => {
 const tags: Map<string, {demoIds: Set<string>; relatedTags: Set<string>}> = new Map();
 
 const demos = Object.entries(
-  import.meta.glob('../pages/demos/*.json', {
+  import.meta.glob('../../pages/demos/*.json', {
     eager: true,
   }),
 ).map(([filepath, json]: [string, any]) => {

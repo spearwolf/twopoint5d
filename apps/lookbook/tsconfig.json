@@ -14,9 +14,7 @@
     "paths": {
       "~components/*": ["src/components/*"],
       "~layouts/*": ["src/layouts/*"],
-      "~utils/*": ["src/utils/*"],
-      "~shared/*": ["src/shared/*"],
-      "~shaders/*": ["src/shaders/*"]
+      "~demos/*": ["src/demos/*"]
     }
   }
 }
