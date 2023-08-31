@@ -12,24 +12,30 @@ please see [../README](../../README.md) for a general description of this projec
 
 The core features can be roughly classified into the following areas:
 
-#### [textured-sprites](src/sprites/)
-- create and render textured 2D sprites
-- load from texture atlases or sprite sheet images
+#### 📚 [textured-sprites](src/sprites/)
+- create and render textured 2D sprites in 3D space
+- load and create sprites from texture atlases or sprite sheet images
 - support frame based animations
-- render as billboards (optional)
+- render as billboards
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
-#### [texture atlases and tilesets](src/vertexObjects/)
-- load and use texture atlases from json
+#### 📚 [texture atlases and tilesets](src/vertexObjects/)
+- load texture atlases from json
 - create tilesets from images
 - :heavy_check_mark: api is stable and ready to use
 
-#### [tiled-maps](src/tiledMaps/)
-- create and render visual tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
+#### 📚 [tiled-maps](src/tiledMaps/)
+- create and render tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
 - api docs: [docs/Map2D](../../docs/Map2D.md)
 - :warning: work in progress
 
-#### [vertex-objects](src/vertexObjects/)
+#### 📚 [vertex-objects](src/vertexObjects/)
+
+three.js offers standardized geometry properties like position, normal, colors, etc.. For rendering, triangles are almost always used as primtives.
+
+The _vertex-objects_ api simplifies the creation of geometries with custom properties. A _vertex-object description_ is used to describe the geometry and its primitives, and an object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom sprites_ of the geometry.
+
+For such a geometry, however, own vertex and fragment shaders are almost always needed, since the standard shaders from the three.js library are of course not written for non-standard geometry properties.
 
 The main motivation behind the _vertex objects_ is to make it easier to create custom geometries, especially _instanced_ geometries (multiple objects within one buffer geometry) without worrying too much about low-level three.js/WebGL details.
 
