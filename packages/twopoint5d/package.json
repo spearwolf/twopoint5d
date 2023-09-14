@@ -25,7 +25,7 @@
     "makePackageJson": "node ../../scripts/makePackageJson.mjs"
   },
   "peerDependencies": {
-    "@spearwolf/eventize": "^2.2.0",
+    "@spearwolf/eventize": "^3.0.0",
     "three": "^0.153"
   },
   "rollup": {
