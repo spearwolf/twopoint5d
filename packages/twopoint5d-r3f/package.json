@@ -8,19 +8,18 @@
     "url": "https://www.spearwolf.de"
   },
   "license": "Apache-2.0",
-  "main": "dist/twopoint5d-r3f.js",
-  "type": "module",
-  "module": "dist/twopoint5d-r3f.js",
+  "main": "dist/twopoint5d-r3f.cjs.js",
+  "module": "dist/twopoint5d-r3f.mjs",
   "types": "dist/types/index.d.ts",
   "exports": {
-    "import": "./dist/twopoint5d-r3f.js",
+    "import": "./dist/twopoint5d-r3f.mjs",
     "require": "./dist/twopoint5d-r3f.cjs.js"
   },
   "sideEffects": false,
   "scripts": {
     "build": "run-s compile bundle makePackageJson",
     "compile": "tsc -b tsconfig.build.json",
-    "bundle": "rollup -c rollup.config.js",
+    "bundle": "rollup -c rollup.config.mjs",
     "clean": "rimraf build types dist ../../dist/packages/twopoint5d-r3f",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs"
   },

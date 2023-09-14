@@ -28,7 +28,7 @@ export default {
     {
       banner: makeBanner('esm'),
       dir: distDir,
-      entryFileNames: '[name].js',
+      entryFileNames: '[name].mjs',
       format: 'es',
     },
     {
