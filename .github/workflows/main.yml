@@ -16,7 +16,7 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --force
         name: Install dependencies
 
       - run: npm run ci
