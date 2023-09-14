@@ -73,7 +73,7 @@ First, you need a current [node v18+](https://nodejs.org/) setup.
 Install the dependencies with:
 
 ```sh
-$ npm
+$ npm ci --force
 ```
 
 #### 2. Build and test everything
