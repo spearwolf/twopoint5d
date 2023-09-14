@@ -34,7 +34,8 @@
         "@typescript-eslint/no-empty-interface": 0,
         "@typescript-eslint/no-explicit-any": 0,
         "@typescript-eslint/no-non-null-assertion": 0,
-        "@typescript-eslint/no-unused-vars": ["error", {"vars": "all", "args": "after-used", "argsIgnorePattern": "^_"}]
+        "@typescript-eslint/no-unused-vars": ["error", {"vars": "all", "args": "after-used", "argsIgnorePattern": "^_"}],
+        "@typescript-eslint/no-unsafe-declaration-merging": 0
       }
     },
     {
@@ -53,7 +54,9 @@
     {
       "files": ["*.js", "*.mjs", "*.jsx"],
       "extends": ["plugin:@nx/javascript"],
-      "rules": {}
+      "rules": {
+        "react/prop-types": 0
+      }
     },
     {
       "files": ["*.spec.ts", "*.spec.tsx", "*.spec.js", "*.spec.jsx"],

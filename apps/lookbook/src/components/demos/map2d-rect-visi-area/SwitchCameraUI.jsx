@@ -63,8 +63,15 @@ const CameraButtonStyled = styled.button`
       ? css`
           color: #fff;
 
-          box-shadow: inset 0 0 1.5em #cc9, inset 0.5em 0 1.5em #f06, inset -0.5em 0 1.5em #06f, inset 0.5em 0 3em #f06,
-            inset -0.5em 0 5em #06f, 0 0 0.5em #fff, -0.5em 0 1.5em #f06, 0.5em 0 1.5em #06f;
+          box-shadow:
+            inset 0 0 1.5em #cc9,
+            inset 0.5em 0 1.5em #f06,
+            inset -0.5em 0 1.5em #06f,
+            inset 0.5em 0 3em #f06,
+            inset -0.5em 0 5em #06f,
+            0 0 0.5em #fff,
+            -0.5em 0 1.5em #f06,
+            0.5em 0 1.5em #06f;
 
           z-index: 1;
         `
@@ -72,16 +79,20 @@ const CameraButtonStyled = styled.button`
           background: #202028;
           color: #eee;
 
-          box-shadow: inset 0 0 0.2em #010, 0 0 0.75em rgba(245, 240, 255, 0.25);
+          box-shadow:
+            inset 0 0 0.2em #010,
+            0 0 0.75em rgba(245, 240, 255, 0.25);
 
           &:hover {
             background: #282830;
-            text-shadow: 0 0 0.5em #fff, -0.5em 0 2em #f09, 0.5em 0 2em #09f;
+            text-shadow:
+              0 0 0.5em #fff,
+              -0.5em 0 2em #f09,
+              0.5em 0 2em #09f;
           }
         `}
 `;
 
-// eslint-disable-next-line react/prop-types
 const CameraButton = ({value, label, isActive, onAction, radioGroup}) => {
   const onClick = useCallback(
     (event) => {

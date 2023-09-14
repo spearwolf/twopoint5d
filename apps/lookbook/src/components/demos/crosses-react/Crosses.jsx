@@ -1,5 +1,3 @@
-/* eslint-disable react/prop-types */
-
 import {extend} from '@react-three/fiber';
 import {DoubleSide} from 'three';
 import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
