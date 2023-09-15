@@ -1,4 +1,4 @@
-import {TileSetData, TileSetLoader} from '@spearwolf/twopoint5d';
+import {TileSetData, TileSetLoader} from '@twopoint5d/core';
 import {useState} from 'react';
 import {useAsyncEffect} from './useAsyncEffect';
 

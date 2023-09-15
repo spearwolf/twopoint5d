@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {TileSet, unpick} from '@spearwolf/twopoint5d';
+import {TileSet, unpick} from '@twopoint5d/core';
 import {ForwardedRef, forwardRef} from 'react';
 import {useTileSet} from '../hooks/useTileSet';
 

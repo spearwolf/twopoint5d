@@ -1,4 +1,4 @@
-import type {TextureAtlas, TexturedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
+import type {TextureAtlas, TexturedSprite, VertexObjectPool} from '@twopoint5d/core';
 
 interface Sprite extends TexturedSprite {
   speedX: number;

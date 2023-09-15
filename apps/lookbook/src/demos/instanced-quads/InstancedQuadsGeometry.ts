@@ -1,4 +1,4 @@
-import {InstancedVertexObjectGeometry, type VO} from '@spearwolf/twopoint5d';
+import {InstancedVertexObjectGeometry, type VO} from '@twopoint5d/core';
 
 export interface BaseQuad extends VO {
   setPosition(positions: [number, number, number, number, number, number, number, number, number, number, number, number]): void;

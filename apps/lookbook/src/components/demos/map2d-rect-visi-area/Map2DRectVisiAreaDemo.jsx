@@ -2,7 +2,7 @@ import {OrbitControls} from '@react-three/drei';
 import {extend, useThree} from '@react-three/fiber';
 import {useControls} from 'leva';
 import {useEffect, useState} from 'react';
-import {RectangularVisibilityArea} from '@spearwolf/twopoint5d';
+import {RectangularVisibilityArea} from '@twopoint5d/core';
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -15,7 +15,7 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-} from '@spearwolf/twopoint5d-r3f';
+} from '@twopoint5d/r3f';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';
 import {useDemoStore} from './useDemoStore';
 

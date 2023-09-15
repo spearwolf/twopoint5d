@@ -1,7 +1,7 @@
 import {OrbitControls} from '@react-three/drei';
 import {Canvas} from '@react-three/fiber';
 import {useControls} from 'leva';
-import {ParallaxProjection, Stage2D} from '@spearwolf/twopoint5d-r3f';
+import {ParallaxProjection, Stage2D} from '@twopoint5d/r3f';
 
 import {Clouds} from './Clouds.jsx';
 

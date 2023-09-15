@@ -1,5 +1,5 @@
 import {Priority} from '@spearwolf/eventize';
-import {Display} from '@spearwolf/twopoint5d';
+import {Display} from '@twopoint5d/core';
 import {Color, PerspectiveCamera, Scene} from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 

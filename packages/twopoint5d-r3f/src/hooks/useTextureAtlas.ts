@@ -1,4 +1,4 @@
-import {TextureAtlas} from '@spearwolf/twopoint5d';
+import {TextureAtlas} from '@twopoint5d/core';
 import {useContext, useEffect, useState} from 'react';
 import {AssetName, AssetStoreContext} from '../context/AssetStore';
 

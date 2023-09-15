@@ -8,7 +8,7 @@ import {
   forwardRefValue,
   useFrameLoop,
   useTextureAtlas,
-} from '@spearwolf/twopoint5d-r3f';
+} from '@twopoint5d/r3f';
 import {useEffect, useRef} from 'react';
 import {AdditiveBlending, FrontSide} from 'three';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';

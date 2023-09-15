@@ -1,5 +1,5 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
-import {TextureAtlas, TextureAtlasData, TileSet, TileSetData} from '@spearwolf/twopoint5d';
+import {TextureAtlas, TextureAtlasData, TileSet, TileSetData} from '@twopoint5d/core';
 import {createContext} from 'react';
 import {Texture} from 'three';
 

@@ -3,7 +3,7 @@ import {
   LimitToAxisType,
   RepeatingTilesPatternType,
   RepeatingTilesProvider as __RepeatingTilesProvider,
-} from '@spearwolf/twopoint5d';
+} from '@twopoint5d/core';
 import {ForwardedRef, forwardRef} from 'react';
 
 extend({RepeatingTilesProvider: __RepeatingTilesProvider});

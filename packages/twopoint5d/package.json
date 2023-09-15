@@ -1,5 +1,5 @@
 {
-  "name": "@spearwolf/twopoint5d",
+  "name": "@twopoint5d/core",
   "description": "a 2.5D graphics library built on three.js",
   "version": "0.1.0-dev",
   "author": {

@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
-import {Map2DLayer3D as __Map2DLayer3D} from '@spearwolf/twopoint5d';
+import {Map2DLayer3D as __Map2DLayer3D} from '@twopoint5d/core';
 import {ForwardedRef, forwardRef, memo, useCallback, useEffect, useState} from 'react';
 import {mergeRefs} from '../utils/mergeRefs';
 
