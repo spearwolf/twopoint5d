@@ -1,4 +1,4 @@
-import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@twopoint5d/core';
+import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
 
 export class QuadTreeVisualization {

@@ -1,4 +1,4 @@
-import {TileSet} from '@twopoint5d/core';
+import {TileSet} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
 import {AssetName, AssetStoreContext} from '../context/AssetStore';
 

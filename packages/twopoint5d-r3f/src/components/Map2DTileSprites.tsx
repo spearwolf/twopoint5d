@@ -1,5 +1,5 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
-import {Map2DTileSprites as __Map2DTileSprites, IMap2DLayer} from '@twopoint5d/core';
+import {Map2DTileSprites as __Map2DTileSprites, IMap2DLayer} from '@spearwolf/twopoint5d';
 import {ForwardedRef, forwardRef} from 'react';
 import {Object3D} from 'three';
 

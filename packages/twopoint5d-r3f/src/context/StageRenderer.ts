@@ -1,5 +1,5 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
-import {Stage2D} from '@twopoint5d/core';
+import {Stage2D} from '@spearwolf/twopoint5d';
 import {createContext} from 'react';
 
 const STAGE_RENDERER = 'StageRenderer';

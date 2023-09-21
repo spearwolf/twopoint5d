@@ -1,4 +1,4 @@
-import {CustomChunksShaderMaterial} from '@twopoint5d/core';
+import {CustomChunksShaderMaterial} from '@spearwolf/twopoint5d';
 import {useEffect, useRef, useState} from 'react';
 
 export interface ShaderChunksProps {

@@ -1,4 +1,4 @@
-import {VO, getDescriptorOf} from '@twopoint5d/core';
+import {VO, getDescriptorOf} from '@spearwolf/twopoint5d';
 import {Matrix4, Vector3} from 'three';
 
 export interface Cross extends VO {

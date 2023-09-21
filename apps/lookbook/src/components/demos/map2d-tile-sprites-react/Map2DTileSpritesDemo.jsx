@@ -1,4 +1,4 @@
-import {AABB2, Map2DTile} from '@twopoint5d/core';
+import {AABB2, Map2DTile} from '@spearwolf/twopoint5d';
 import {
   Map2DTileSprites,
   RepeatingTilesProvider,
@@ -7,7 +7,7 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-} from '@twopoint5d/r3f';
+} from '@spearwolf/twopoint5d-r3f';
 import {useEffect, useState} from 'react';
 import {Vector2, Vector3} from 'three';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';

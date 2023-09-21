@@ -1,4 +1,4 @@
-import {Stage2D} from '@twopoint5d/core';
+import {Stage2D} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
 import {REGISTER, StageRendererContext, UNREGISTER} from '../context/StageRenderer';
 

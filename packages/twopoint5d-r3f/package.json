@@ -1,5 +1,5 @@
 {
-  "name": "@twopoint5d/r3f",
+  "name": "@spearwolf/twopoint5d-r3f",
   "description": "a 2.5D graphics library built on @react-three/fiber and three.js",
   "version": "0.1.0-dev",
   "author": {
@@ -26,7 +26,7 @@
   "peerDependencies": {
     "@react-three/fiber": "^8.13.0",
     "@spearwolf/eventize": "^3.0.0",
-    "@twopoint5d/core": "*",
+    "@spearwolf/twopoint5d": "*",
     "react": "^18.2.0",
     "three": "^0.153",
     "use-asset": "^1.0.4",
@@ -36,7 +36,7 @@
     "external": [
       "@react-three/fiber",
       "@spearwolf/eventize",
-      "@twopoint5d/core",
+      "@spearwolf/twopoint5d",
       "react-dom",
       "react",
       "react/jsx-runtime",
