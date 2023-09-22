@@ -11,12 +11,10 @@ export function useTileSet(name: AssetName): TileSet | undefined {
     if (tileSet) {
       setTileSet(tileSet);
     }
-    return assetStore.on('asset:insert', (assetName: AssetName) => {
-      if (name === assetName) {
-        const nextTileSet = assetStore.getTileSet(name);
-        if (nextTileSet !== curTileSet) {
-          setTileSet(nextTileSet);
-        }
+    return assetStore.onAssetInsert(name, () => {
+      const nextTileSet = assetStore.getTileSet(name);
+      if (nextTileSet !== curTileSet) {
+        setTileSet(nextTileSet);
       }
     });
   }, [assetStore, name]);

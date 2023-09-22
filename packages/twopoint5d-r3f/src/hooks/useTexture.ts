@@ -34,17 +34,16 @@ export function useTexture(name: AssetName): Texture | undefined {
     }
 
     // TODO assetStore -> on asset destroy?
-    return assetStore.on('asset:insert', (assetName: AssetName) => {
-      if (name === assetName) {
-        const nextTexture = assetStore.getTextureRef(name);
-        if (nextTexture !== curTexture) {
-          if (name !== state_.lastName) {
-            state_.lastName = name;
-            assetStore.incTextureRefCount(name);
-          }
-          state_.lastAssetStore = assetStore;
-          setTexture(nextTexture);
+    // TODO decTextureRefCount ?
+    return assetStore.onAssetInsert(name, () => {
+      const nextTexture = assetStore.getTextureRef(name);
+      if (nextTexture !== curTexture) {
+        if (name !== state_.lastName) {
+          state_.lastName = name;
+          assetStore.incTextureRefCount(name);
         }
+        state_.lastAssetStore = assetStore;
+        setTexture(nextTexture);
       }
     });
   }, [assetStore, name]);

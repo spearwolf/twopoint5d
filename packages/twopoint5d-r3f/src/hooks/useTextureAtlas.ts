@@ -11,12 +11,10 @@ export function useTextureAtlas(name: AssetName): TextureAtlas | undefined {
     if (atlas) {
       setTextureAtlas(atlas);
     }
-    return assetStore.on('asset:insert', (assetName: AssetName) => {
-      if (name === assetName) {
-        const nextAtlas = assetStore.getTextureAtlas(name);
-        if (nextAtlas !== curTextureAtlas) {
-          setTextureAtlas(nextAtlas);
-        }
+    return assetStore.onAssetInsert(name, () => {
+      const nextAtlas = assetStore.getTextureAtlas(name);
+      if (nextAtlas !== curTextureAtlas) {
+        setTextureAtlas(nextAtlas);
       }
     });
   }, [assetStore, name]);
