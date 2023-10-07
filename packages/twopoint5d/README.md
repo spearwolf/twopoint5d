@@ -6,6 +6,8 @@
 
 ---
 
+![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/twopoint5d)
+
 please see [../README](../../README.md) for a general description of this project.
 
 ---
