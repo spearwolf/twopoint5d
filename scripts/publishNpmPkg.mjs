@@ -47,6 +47,7 @@ exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
 });
 
 function publishPackage(cwd, dryRun = DRY_RUN) {
+  copyFile(path.resolve(workspaceRoot, '.npmrc'), path.resolve(cwd, '.npmrc'));
   copyFile(path.resolve(workspaceRoot, 'LICENSE'), path.resolve(cwd, 'LICENSE'));
   copyFile(path.resolve(projectRoot, 'CHANGELOG.md'), path.resolve(cwd, 'CHANGELOG.md'));
 
