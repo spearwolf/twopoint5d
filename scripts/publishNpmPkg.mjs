@@ -15,8 +15,8 @@ console.log('projectRoot:', projectRoot);
 console.log('packageRoot:', packageRoot);
 console.log('dryRun:', DRY_RUN ? 'yes' : 'no');
 console.log('env: ---');
-console.log(' - NPM_TOKEN:', process.env.NPM_TOKEN ? `${process.env.NPM_TOKEN.substring(0, 6)}...` : 'not set');
-console.log(' - NPM_AUTH_TOKEN:', process.env.NPM_AUTH_TOKEN ? `${process.env.NPM_AUTH_TOKEN.substring(0, 6)}...` : 'not set');
+console.log(' - NPM_TOKEN:', process.env.NPM_TOKEN ? `${process.env.NPM_TOKEN.substring(0, 6)}...` : 'unset');
+console.log(' - NODE_AUTH_TOKEN:', process.env.NODE_AUTH_TOKEN ? `${process.env.NODE_AUTH_TOKEN.substring(0, 6)}...` : 'unset');
 console.log('packageJson: ---');
 console.dir(pkgJson);
 
