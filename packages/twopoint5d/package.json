@@ -21,7 +21,8 @@
     "compile": "tsc -b tsconfig.build.json",
     "bundle": "rollup -c rollup.config.mjs",
     "clean": "rimraf build types dist ../../dist/packages/twopoint5d",
-    "makePackageJson": "node ../../scripts/makePackageJson.mjs"
+    "makePackageJson": "node ../../scripts/makePackageJson.mjs",
+    "publishNpmPkg": "node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^3.0.0",

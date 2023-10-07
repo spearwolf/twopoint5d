@@ -1,7 +1,7 @@
 <p align="center">
   <img width="400" height="84" src="twopoint5d-logo.png">
 	<br>
-  <em>a 2.5d realtime gfx library built with three.js</em>
+  <em>a library to create 2.5d realtime graphics and pixelart with three.js</em>
 </p>
 
 ---

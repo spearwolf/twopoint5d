@@ -2,21 +2,21 @@
   "name": "twopoint5d",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "root": "packages/twopoint5d",
-  "sourceRoot": "packages/twopoint5d/src",
+  "sourceRoot": "{projectRoot}/src",
   "projectType": "library",
   "targets": {
     "lint": {
       "executor": "@nx/linter:eslint",
       "outputs": ["{options.outputFile}"],
       "options": {
-        "lintFilePatterns": ["packages/twopoint5d/**/*.ts"]
+        "lintFilePatterns": ["{projectRoot}/**/*.ts"]
       }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "packages/twopoint5d/jest.config.ts",
+        "jestConfig": "{projectRoot}/jest.config.ts",
         "passWithNoTests": true
       },
       "configurations": {
@@ -24,6 +24,13 @@
           "ci": true,
           "codeCoverage": true
         }
+      }
+    },
+    "publishNpmPkg": {
+      "executor": "nx:run-script",
+      "dependsOn": ["^build", "build"],
+      "options": {
+        "script": "publishNpmPkg"
       }
     }
   },
