@@ -5,6 +5,7 @@ export default {
   transform: {
     '^.+\\.[tj]sx?$': ['ts-jest', {tsconfig: '<rootDir>/tsconfig.spec.json'}],
   },
+  transformIgnorePatterns: ['node_modules', 'twopoint5d/dist'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'html'],
   setupFiles: ['./setup-tests.js'],
 };
