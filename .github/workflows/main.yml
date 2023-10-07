@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build, test and deploy
 
 on:
   push:
@@ -21,3 +21,21 @@ jobs:
 
       - run: npm run ci
         name: Run all checks
+
+  deploy:
+    name: Deploy packages
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - run: npm ci --force
+        name: Install dependencies
+
+      - run: npm run publishNpmPkg
+        name: Publish npm packages
