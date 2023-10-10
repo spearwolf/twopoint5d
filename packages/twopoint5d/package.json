@@ -25,7 +25,7 @@
     "publishNpmPkg": "node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
-    "@spearwolf/eventize": "^3.0.0",
+    "@spearwolf/eventize": "^3.0.2",
     "three": "^0.153"
   },
   "rollup": {
