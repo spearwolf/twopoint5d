@@ -1,37 +1,34 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
     "url": "https://www.spearwolf.de"
   },
   "license": "Apache-2.0",
-  "main": "dist/twopoint5d.cjs.js",
-  "module": "dist/twopoint5d.mjs",
-  "types": "dist/types/index.d.ts",
+  "type": "module",
+  "main": "dist/lib/index.js",
+  "module": "dist/lib/index.js",
+  "types": "dist/lib/index.d.ts",
   "exports": {
-    "import": "./dist/twopoint5d.mjs",
-    "require": "./dist/twopoint5d.cjs.js"
+    ".": {
+      "import": "./dist/lib/index.js",
+      "require": "./dist/lib/index.cjs"
+    }
   },
   "sideEffects": false,
   "scripts": {
-    "build": "run-s compile bundle makePackageJson",
-    "compile": "tsc -b tsconfig.build.json",
-    "bundle": "rollup -c rollup.config.mjs",
+    "compile": "tsup",
+    "build": "run-s -sn compile makePackageJson",
     "clean": "rimraf build types dist ../../dist/packages/twopoint5d",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "publishNpmPkg": "node ../../scripts/publishNpmPkg.mjs dist"
+    "checkPkgTypes": "cd dist && npx attw --pack",
+    "publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^3.0.2",
     "three": "^0.153"
-  },
-  "rollup": {
-    "external": [
-      "@spearwolf/eventize",
-      "three"
-    ]
   }
 }

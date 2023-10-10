@@ -16,7 +16,7 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      - run: npm ci --force
+      - run: npm ci
         name: Install dependencies
 
       - run: npm run ci
@@ -34,7 +34,7 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      - run: npm i --force
+      - run: npm i
         name: Install dependencies
 
       - run: npm run publishNpmPkg

@@ -1,4 +1,4 @@
-export function makeVersionWithBuild(build) {
+export function makeVersionWithBuild(build = 'build') {
   const today = new Date();
   let month = today.getUTCMonth() + 1;
   if (month < 10) {

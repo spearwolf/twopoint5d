@@ -20,12 +20,13 @@
     "clean": "nx run-many -t clean && rimraf dist",
     "publishNpmPkg": "nx run-many -t publishNpmPkg",
     "update": "npx npm-check --update",
-    "cbt": "run-s clean build test",
+    "cbt": "run-s -sn clean build test",
     "lookbook": "nx dev lookbook",
     "start": "nx dev lookbook",
-    "ci": "run-s build lint test"
+    "ci": "run-s -sn build lint test"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.12.1",
     "@nx/eslint-plugin": "^16.8.1",
     "@nx/jest": "^16.10.0",
     "@nx/js": "^16.10.0",
@@ -63,6 +64,7 @@
     "ts-jest": "^29.1.1",
     "ts-node": "10.9.1",
     "tslib": "^2.6.2",
+    "tsup": "^7.2.0",
     "typescript": "^5.2.2",
     "use-asset": "^1.0.4",
     "zustand": "^4.4.3"

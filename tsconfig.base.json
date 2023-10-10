@@ -2,12 +2,22 @@
   "compileOnSave": false,
   "compilerOptions": {
     "rootDir": ".",
-    "sourceMap": true,
-    "declaration": false,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "importHelpers": true,
     "baseUrl": ".",
+
+    "noEmit": true,
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false,
+
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": false,
+    "importHelpers": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "alwaysStrict": true,
@@ -22,10 +32,7 @@
     "strictNullChecks": false,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": false,
-    "module": "ESNext",
-    "moduleResolution": "Node",
     "jsx": "react-jsx",
-    "resolveJsonModule": true,
     "downlevelIteration": false,
     "removeComments": true,
     "stripInternal": true,
@@ -34,25 +41,9 @@
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "isolatedModules": true,
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
     "useDefineForClassFields": true,
-    "incremental": false,
     "noErrorTruncation": true,
     "skipDefaultLibCheck": true,
-    "skipLibCheck": true,
-    "paths": {
-      "twopint5d": ["packages/twopoint5d/src"],
-      "twopint5d-r3f": ["packages/twopoint5d-r3f/src"]
-    }
-  },
-  "exclude": ["node_modules", "tmp"],
-  "references": [
-    {
-      "path": "./packages/twopoint5d/tsconfig.build.json"
-    },
-    {
-      "path": "./packages/twopoint5d-r3f/tsconfig.build.json"
-    }
-  ]
+    "skipLibCheck": true
+  }
 }
