@@ -1,5 +1,5 @@
-import {Vector2, Vector3} from 'three';
-import {Map2DTile} from './Map2DTile';
+import type {Vector2, Vector3} from 'three';
+import type {Map2DTile} from './Map2DTile.js';
 
 export interface IMap2DTileRenderer {
   beginUpdate(offset: Vector2, translate: Vector3): void;

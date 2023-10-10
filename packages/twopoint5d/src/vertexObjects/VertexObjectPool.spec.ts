@@ -1,6 +1,6 @@
-import {VertexObjectPool} from './VertexObjectPool';
-import {voBuffer, voIndex} from './constants';
-import {VOAttrSetter, VOAttrGetter, VertexObjectDescription} from './types';
+import {VertexObjectPool} from './VertexObjectPool.js';
+import {voBuffer, voIndex} from './constants.js';
+import type {VOAttrSetter, VOAttrGetter, VertexObjectDescription} from './types.js';
 
 interface MyVertexObject {
   setFoo: VOAttrSetter;

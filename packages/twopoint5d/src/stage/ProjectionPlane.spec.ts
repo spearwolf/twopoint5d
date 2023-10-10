@@ -1,6 +1,6 @@
 import {Vector3} from 'three';
 
-import {ProjectionPlane} from './ProjectionPlane';
+import {ProjectionPlane} from './ProjectionPlane.js';
 
 describe('ProjectionPlane', () => {
   it('has predefined "xy" plane', () => {

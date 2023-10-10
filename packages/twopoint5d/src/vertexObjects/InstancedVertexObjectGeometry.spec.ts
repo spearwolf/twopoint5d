@@ -1,7 +1,7 @@
 import {createSandbox} from 'sinon';
 
-import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 describe('InstancedVertexObjectGeometry', () => {
   const baseDescriptor = new VertexObjectDescriptor({

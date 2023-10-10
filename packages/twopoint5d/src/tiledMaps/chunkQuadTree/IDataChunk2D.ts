@@ -1,4 +1,4 @@
-import {AABB2} from '../AABB2';
+import type {AABB2} from '../AABB2.js';
 
 /**
  * A generic data chunk.

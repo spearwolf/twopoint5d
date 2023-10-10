@@ -1,6 +1,6 @@
 // common used shader fragments
 
-import {ShaderTool} from '../vertexObjects';
+import {ShaderTool} from '../vertexObjects/ShaderTool.js';
 
 const ShaderLib: Record<string, string> = {
   rotateZ_vertex: ShaderTool.rotateZ(),

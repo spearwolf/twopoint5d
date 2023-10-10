@@ -1,5 +1,5 @@
-export * from './Chronometer';
-export * from './Display';
-export * from './Stylesheets';
-export {getContentAreaSize} from './styleUtils';
-export * from './types';
+export * from './Chronometer.js';
+export * from './Display.js';
+export * from './Stylesheets.js';
+export {getContentAreaSize} from './styleUtils.js';
+export type * from './types.js';

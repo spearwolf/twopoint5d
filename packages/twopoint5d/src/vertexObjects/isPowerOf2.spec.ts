@@ -1,4 +1,4 @@
-import {isPowerOf2} from './isPowerOf2';
+import {isPowerOf2} from './isPowerOf2.js';
 
 describe('isPowerOf2', () => {
   it('power of 2 value', () => {

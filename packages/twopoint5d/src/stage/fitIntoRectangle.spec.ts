@@ -1,6 +1,6 @@
 import {Vector2} from 'three';
 
-import {fitIntoRectangle} from './fitIntoRectangle';
+import {fitIntoRectangle} from './fitIntoRectangle.js';
 
 describe('fitIntoRectangle', () => {
   it('pixelZoom', () => {

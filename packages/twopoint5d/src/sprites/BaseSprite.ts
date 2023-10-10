@@ -1,4 +1,4 @@
-import {VertexObjectDescription, VO} from '../vertexObjects';
+import {VertexObjectDescription, VO} from '../vertexObjects/index.js';
 
 export interface BaseSprite extends VO {
   x0: number;

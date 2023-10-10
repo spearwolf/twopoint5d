@@ -1,12 +1,12 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three';
 
-import {TileSprite} from '../sprites/TileSprites/descriptors';
-import {TileSprites} from '../sprites/TileSprites/TileSprites';
-import {TileSet, VertexObjectPool} from '../vertexObjects';
-import {IMap2DTileDataProvider} from './IMap2DTileDataProvider';
-import {IMap2DTileRenderer} from './IMap2DTileRenderer';
-import {Map2DTile} from './Map2DTile';
+import {TileSprite} from '../sprites/TileSprites/descriptors.js';
+import {TileSprites} from '../sprites/TileSprites/TileSprites.js';
+import {TileSet, VertexObjectPool} from '../vertexObjects/index.js';
+import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
+import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
+import {Map2DTile} from './Map2DTile.js';
 
 export interface Map2DTileSprites extends Eventize {}
 

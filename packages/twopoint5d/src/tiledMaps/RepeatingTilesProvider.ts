@@ -1,4 +1,4 @@
-import {IMap2DTileDataProvider} from './IMap2DTileDataProvider';
+import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
 
 export type RepeatingTilesPatternType = number | number[] | number[][];
 export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';

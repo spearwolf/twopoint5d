@@ -1,7 +1,7 @@
-export * from './Canvas2DStage';
-export * from './IProjection';
-export * from './OrthographicProjection';
-export * from './ParallaxProjection';
-export * from './ProjectionPlane';
-export * from './Stage2D';
-export * from './fitIntoRectangle';
+export * from './Canvas2DStage.js';
+export type * from './IProjection.js';
+export * from './OrthographicProjection.js';
+export * from './ParallaxProjection.js';
+export * from './ProjectionPlane.js';
+export * from './Stage2D.js';
+export * from './fitIntoRectangle.js';

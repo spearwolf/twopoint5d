@@ -1,5 +1,5 @@
-import {TextureAtlas} from './TextureAtlas';
-import {TextureCoords} from './TextureCoords';
+import {TextureAtlas} from './TextureAtlas.js';
+import {TextureCoords} from './TextureCoords.js';
 
 export interface TexturePackerFrameData {
   frame: {

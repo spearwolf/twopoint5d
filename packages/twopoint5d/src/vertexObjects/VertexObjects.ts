@@ -1,7 +1,7 @@
 import {Material, Mesh} from 'three';
 
-import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry';
-import {VertexObjectGeometry} from './VertexObjectGeometry';
+import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 
 export interface VertexObjects {
   geometry: VertexObjectGeometry | InstancedVertexObjectGeometry;

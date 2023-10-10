@@ -1,7 +1,7 @@
 import {PerspectiveCamera} from 'three';
 
-import {ParallaxProjection} from './ParallaxProjection';
-import {ProjectionPlane} from './ProjectionPlane';
+import {ParallaxProjection} from './ParallaxProjection.js';
+import {ProjectionPlane} from './ProjectionPlane.js';
 
 describe('ParallaxProjection', () => {
   describe('construction', () => {

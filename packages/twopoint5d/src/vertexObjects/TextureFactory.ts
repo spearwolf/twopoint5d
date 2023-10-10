@@ -10,7 +10,7 @@ import {
   LinearSRGBColorSpace,
 } from 'three';
 
-import {TextureSource} from './types';
+import type {TextureSource} from './types.js';
 
 export interface TextureOptions {
   magFilter: TextureFilter;

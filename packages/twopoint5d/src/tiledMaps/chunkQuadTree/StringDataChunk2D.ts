@@ -1,4 +1,4 @@
-import {DataChunk2D, DataChunkCoords2D} from './DataChunk2D';
+import {DataChunk2D, DataChunkCoords2D} from './DataChunk2D.js';
 
 export interface StringDataChunk2DParams extends DataChunkCoords2D {
   data: string;

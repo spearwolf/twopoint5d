@@ -1,5 +1,5 @@
-import {toDrawUsage} from './toDrawUsage';
-import {BufferLike, VertexAttributeUsageType} from './types';
+import {toDrawUsage} from './toDrawUsage.js';
+import type {BufferLike, VertexAttributeUsageType} from './types.js';
 
 export function selectBuffers(
   buffers: Map<string, BufferLike>,

@@ -1,4 +1,4 @@
-import {RepeatingTilesProvider} from './RepeatingTilesProvider';
+import {RepeatingTilesProvider} from './RepeatingTilesProvider.js';
 
 describe('RepeatingTilesProvider', () => {
   describe('new', () => {

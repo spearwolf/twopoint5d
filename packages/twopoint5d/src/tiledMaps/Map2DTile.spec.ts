@@ -1,4 +1,4 @@
-import {Map2DTile} from './Map2DTile';
+import {Map2DTile} from './Map2DTile.js';
 
 describe('Map2DTile', () => {
   test('id', () => {

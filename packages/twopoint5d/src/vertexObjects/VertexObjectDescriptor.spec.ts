@@ -1,5 +1,5 @@
-import {VertexAttributeDescriptor} from './VertexAttributeDescriptor';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 describe('VertexObjectDescriptor', () => {
   test('construct with vertexCount and indices', () => {

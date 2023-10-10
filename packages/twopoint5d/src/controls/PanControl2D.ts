@@ -1,8 +1,8 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 
-import {Stylesheets} from '../display/Stylesheets';
-import {InputControlBase} from './InputControlBase';
-import {readOption} from './readOption';
+import {Stylesheets} from '../display/Stylesheets.js';
+import {InputControlBase} from './InputControlBase.js';
+import {readOption} from './readOption.js';
 
 export interface PanViewState {
   x: number;

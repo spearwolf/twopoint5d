@@ -1,6 +1,6 @@
-import {InstancedVertexObjectGeometry} from '../vertexObjects';
-import {AnimatedSprite, AnimatedSpriteDescriptor} from './AnimatedSprite';
-import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite';
+import {InstancedVertexObjectGeometry} from '../vertexObjects/index.js';
+import {AnimatedSprite, AnimatedSpriteDescriptor} from './AnimatedSprite.js';
+import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite.js';
 
 export class AnimatedSpritesGeometry extends InstancedVertexObjectGeometry<AnimatedSprite, BaseSprite> {
   constructor(

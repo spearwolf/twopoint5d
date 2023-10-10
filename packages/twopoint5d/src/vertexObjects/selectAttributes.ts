@@ -1,5 +1,5 @@
-import {VertexObjectPool} from './VertexObjectPool';
-import {BufferLike} from './types';
+import {VertexObjectPool} from './VertexObjectPool.js';
+import type {BufferLike} from './types.js';
 
 export function selectAttributes(pool: VertexObjectPool, buffers: Map<string, BufferLike>, attrNames: string[]): BufferLike[] {
   const attrs = new Set<string>();

@@ -1,9 +1,9 @@
 import {BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute} from 'three';
 
-import {VertexObjectPool} from './VertexObjectPool';
-import {createIndicesArray} from './createIndicesArray';
-import {toDrawUsage} from './toDrawUsage';
-import {BufferLike} from './types';
+import {VertexObjectPool} from './VertexObjectPool.js';
+import {createIndicesArray} from './createIndicesArray.js';
+import {toDrawUsage} from './toDrawUsage.js';
+import type {BufferLike} from './types.js';
 
 export function initializeAttributes(geometry: BufferGeometry, pool: VertexObjectPool, buffers: Map<string, BufferLike>): void {
   const {descriptor, capacity} = pool;

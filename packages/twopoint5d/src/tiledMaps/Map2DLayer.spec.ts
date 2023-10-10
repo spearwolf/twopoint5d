@@ -1,7 +1,7 @@
 import {Vector2, Vector3} from 'three';
-import {IMap2DTileRenderer} from './IMap2DTileRenderer';
-import {Map2DLayer} from './Map2DLayer';
-import {Map2DTile} from './Map2DTile';
+import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
+import {Map2DLayer} from './Map2DLayer.js';
+import {Map2DTile} from './Map2DTile.js';
 
 describe('Map2DLayer', () => {
   describe('new', () => {

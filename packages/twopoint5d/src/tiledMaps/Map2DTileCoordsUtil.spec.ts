@@ -1,4 +1,4 @@
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 describe('Map2DTileCoordsUtil', () => {
   describe('new', () => {

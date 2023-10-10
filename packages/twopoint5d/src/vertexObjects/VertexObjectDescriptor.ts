@@ -1,5 +1,5 @@
-import {VertexAttributeDescriptor} from './VertexAttributeDescriptor';
-import {VertexObjectDescription} from './types';
+import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
+import type {VertexObjectDescription} from './types.js';
 
 export class VertexObjectDescriptor {
   private readonly description: VertexObjectDescription;

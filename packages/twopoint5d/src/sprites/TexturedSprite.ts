@@ -1,4 +1,4 @@
-import {TextureAtlasFrame, VertexObjectDescription, VO} from '../vertexObjects';
+import {TextureAtlasFrame, type VertexObjectDescription, type VO} from '../vertexObjects/index.js';
 
 export interface TexturedSprite extends VO {
   width: number;

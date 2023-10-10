@@ -1,4 +1,4 @@
-import {Chronometer} from './Chronometer';
+import {Chronometer} from './Chronometer.js';
 
 describe('Chronometer', () => {
   it('create', () => {

@@ -1,7 +1,7 @@
 import {Material} from 'three';
 
-import {VertexObjects} from '../vertexObjects';
-import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry';
+import {VertexObjects} from '../vertexObjects/index.js';
+import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
 
 export class AnimatedSprites extends VertexObjects {
   constructor(geometry?: AnimatedSpritesGeometry, material?: Material) {

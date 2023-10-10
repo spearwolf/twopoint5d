@@ -1,9 +1,9 @@
 import {Box3, Box3Helper, Color, Event, Object3D, Vector2, Vector3} from 'three';
-import {AABB2} from './AABB2';
-import {HelpersManager} from './HelpersManager';
-import {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor';
-import {Map2DTile} from './Map2DTile';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import {AABB2} from './AABB2.js';
+import {HelpersManager} from './HelpersManager.js';
+import type {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor.js';
+import {Map2DTile} from './Map2DTile.js';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;

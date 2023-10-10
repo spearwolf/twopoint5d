@@ -1,6 +1,6 @@
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
-import {VertexObjectGeometry} from './VertexObjectGeometry';
-import {selectBuffers} from './selectBuffers';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
+import {selectBuffers} from './selectBuffers.js';
 
 describe('selectBuffers', () => {
   const descriptor = new VertexObjectDescriptor({

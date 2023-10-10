@@ -1,4 +1,4 @@
-import {VertexAttributeDataType, VertexAttributeDescription, VertexAttributeUsageType} from './types';
+import type {VertexAttributeDataType, VertexAttributeDescription, VertexAttributeUsageType} from './types.js';
 
 export class VertexAttributeDescriptor {
   private readonly description: VertexAttributeDescription;

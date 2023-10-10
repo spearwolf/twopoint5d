@@ -1,4 +1,4 @@
-import {VertexAttributeDescriptor} from './VertexAttributeDescriptor';
+import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 
 describe('VertexAttributeDescriptor', () => {
   test('construct with components', () => {

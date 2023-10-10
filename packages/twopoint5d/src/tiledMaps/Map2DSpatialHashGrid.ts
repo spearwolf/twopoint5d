@@ -1,6 +1,6 @@
-import {AABB2} from './AABB2';
-import {IMap2DRenderable} from './IMap2DRenderable';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import {AABB2} from './AABB2.js';
+import type {IMap2DRenderable} from './IMap2DRenderable.js';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 export type Map2DSpatialHashGridKeyType = string;
 

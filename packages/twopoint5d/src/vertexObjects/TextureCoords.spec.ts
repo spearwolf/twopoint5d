@@ -1,4 +1,4 @@
-import {TextureCoords} from './TextureCoords';
+import {TextureCoords} from './TextureCoords.js';
 
 describe('TextureCoords', () => {
   describe('construction', () => {

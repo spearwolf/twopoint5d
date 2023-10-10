@@ -17,9 +17,11 @@
       "dependsOn": ["^build"]
     },
     "lint": {
+      "dependsOn": ["^build"],
       "inputs": ["default", "{workspaceRoot}/.eslintrc.json", "{workspaceRoot}/.eslintignore"]
     },
     "test": {
+      "dependsOn": ["^build"],
       "inputs": ["default", "^default", "{workspaceRoot}/jest.preset.js"]
     }
   }

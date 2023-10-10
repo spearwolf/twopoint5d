@@ -1,11 +1,24 @@
 {
   "root": true,
   "ignorePatterns": ["**/*"],
-  "plugins": ["@nx", "prettier"],
+  "plugins": ["@nx", "import", "prettier"],
+  "extends": ["plugin:import/recommended", "plugin:prettier/recommended"],
+  "env": {
+    "browser": true
+  },
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".js"]
+    },
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true
+      }
+    }
+  },
   "overrides": [
     {
       "files": ["*.ts", "*.tsx", "*.js", "*.mjs", "*.jsx"],
-      "extends": ["plugin:import/recommended", "plugin:prettier/recommended"],
       "rules": {
         "@nx/enforce-module-boundaries": [
           "error",
@@ -62,8 +75,7 @@
       "files": ["*.spec.ts", "*.spec.tsx", "*.spec.js", "*.spec.jsx"],
       "env": {
         "jest": true
-      },
-      "rules": {}
+      }
     }
   ]
 }

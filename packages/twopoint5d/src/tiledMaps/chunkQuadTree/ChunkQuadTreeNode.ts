@@ -1,5 +1,5 @@
-import {AABB2} from '../AABB2';
-import {IDataChunk2D} from './IDataChunk2D';
+import {AABB2} from '../AABB2.js';
+import {IDataChunk2D} from './IDataChunk2D.js';
 
 enum Quadrant {
   NorthEast = 'northEast',

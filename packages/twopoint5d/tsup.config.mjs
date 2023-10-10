@@ -7,7 +7,7 @@ const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs', 'esm'],
+  format: ['cjs'],
   outDir: 'dist/lib',
   banner: {js: makeBanner(projectDir)},
   target: 'es2022',

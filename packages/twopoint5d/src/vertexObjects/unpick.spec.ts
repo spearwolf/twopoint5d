@@ -1,4 +1,4 @@
-import {unpick} from './unpick';
+import {unpick} from './unpick.js';
 
 describe('unpick', () => {
   test('works as expected', () => {

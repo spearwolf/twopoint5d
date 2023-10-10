@@ -1,7 +1,7 @@
 import {DoubleSide, Texture} from 'three';
 
-import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '../vertexObjects';
-import ShaderLib from './ShaderLib';
+import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '../vertexObjects/index.js';
+import ShaderLib from './ShaderLib.js';
 
 const vertexShader = `
   attribute vec2 quadSize;

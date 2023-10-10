@@ -1,11 +1,11 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 
-import {Chronometer} from './Chronometer';
-import {DisplayStateMachine} from './DisplayStateMachine';
-import {Stylesheets} from './Stylesheets';
-import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils';
-import {DisplayEventArgs, DisplayParameters, ResizeCallback} from './types';
+import {Chronometer} from './Chronometer.js';
+import {DisplayStateMachine} from './DisplayStateMachine.js';
+import {Stylesheets} from './Stylesheets.js';
+import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
+import type {DisplayEventArgs, DisplayParameters, ResizeCallback} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 

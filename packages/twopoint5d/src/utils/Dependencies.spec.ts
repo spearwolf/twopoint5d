@@ -1,6 +1,6 @@
 import {Vector2} from 'three';
 
-import {Dependencies} from './Dependencies';
+import {Dependencies} from './Dependencies.js';
 
 type Ref = {current: Object};
 

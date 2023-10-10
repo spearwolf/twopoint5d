@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 
 import {Object3D} from 'three';
-import {findRootNode} from './findRootNode';
+import {findRootNode} from './findRootNode.js';
 
 export function printSceneGraphToConsole(node: Object3D, startAtRoot = false): void {
   if (startAtRoot) {

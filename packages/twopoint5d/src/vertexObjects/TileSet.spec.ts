@@ -1,6 +1,6 @@
-import {TextureAtlas} from './TextureAtlas';
-import {TextureCoords} from './TextureCoords';
-import {TileSet} from './TileSet';
+import {TextureAtlas} from './TextureAtlas.js';
+import {TextureCoords} from './TextureCoords.js';
+import {TileSet} from './TileSet.js';
 
 describe('TileSet', () => {
   test('single tile', () => {

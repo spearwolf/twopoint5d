@@ -1,5 +1,5 @@
 import {MathUtils, Object3D} from 'three';
-import {findRootNode} from '../utils';
+import {findRootNode} from '../utils/findRootNode.js';
 
 /**
  * A simple helper class that inserts nodes (-> Object3D) into a scene and marks them as helper to remove them later.

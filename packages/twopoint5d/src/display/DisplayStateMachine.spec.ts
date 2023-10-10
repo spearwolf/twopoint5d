@@ -1,4 +1,4 @@
-import {DisplayStateMachine} from './DisplayStateMachine';
+import {DisplayStateMachine} from './DisplayStateMachine.js';
 
 const createEventMocks = () => ({
   [DisplayStateMachine.Init]: jest.fn(),

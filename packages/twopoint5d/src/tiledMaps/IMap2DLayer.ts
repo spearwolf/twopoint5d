@@ -1,5 +1,5 @@
 import {Object3D} from 'three';
-import {IMap2DTileRenderer} from './IMap2DTileRenderer';
+import {type IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 
 export interface IMap2DLayer {
   addTileRenderer(renderer: IMap2DTileRenderer): void;

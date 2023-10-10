@@ -1,7 +1,7 @@
-import {VertexObjectBuffer} from './VertexObjectBuffer';
-import {voBuffer, voIndex} from './constants';
-import {createTypedArray} from './createTypedArray';
-import {VO} from './types';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {voBuffer, voIndex} from './constants.js';
+import {createTypedArray} from './createTypedArray.js';
+import type {VO} from './types.js';
 
 const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) => m1.toUpperCase());
 

@@ -1,6 +1,6 @@
-import {Object3D, Vector2, Vector3} from 'three';
-import {Map2DTile} from './Map2DTile';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import type {Object3D, Vector2, Vector3} from 'three';
+import type {Map2DTile} from './Map2DTile.js';
+import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 export type Map2DVisibleTiles = {
   tiles: Map2DTile[];

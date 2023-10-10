@@ -1,7 +1,7 @@
-import {voBuffer, voIndex} from './constants';
-import {VertexObjectBuffersData, VertexObjectDescription, VO} from './types';
-import {VertexObjectBuffer} from './VertexObjectBuffer';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
+import {voBuffer, voIndex} from './constants.js';
+import type {VertexObjectBuffersData, VertexObjectDescription, VO} from './types.js';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexObjectBuffer, objectIndex: number) =>
   Object.create(descriptor.voPrototype, {

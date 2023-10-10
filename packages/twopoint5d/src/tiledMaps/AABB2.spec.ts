@@ -1,6 +1,6 @@
 import assert from 'assert';
 
-import {AABB2} from './AABB2';
+import {AABB2} from './AABB2.js';
 
 describe('AABB2', () => {
   describe('create', () => {

@@ -1,6 +1,6 @@
 import {Camera} from 'three';
 
-import {ProjectionPlane} from './ProjectionPlane';
+import {ProjectionPlane} from './ProjectionPlane.js';
 
 export interface IProjection {
   updateViewRect(width: number, height: number): void;

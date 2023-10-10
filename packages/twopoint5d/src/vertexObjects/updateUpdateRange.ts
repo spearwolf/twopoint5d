@@ -1,5 +1,5 @@
-import {BufferLike} from './types';
-import {VertexObjectPool} from './VertexObjectPool';
+import type {BufferLike} from './types.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
 
 export function updateUpdateRange(pool: VertexObjectPool<unknown>, buffers: Map<string, BufferLike>) {
   if (pool && buffers) {

@@ -1,4 +1,4 @@
-import {TypedArray, VertexAttributeDataType} from './types';
+import type {TypedArray, VertexAttributeDataType} from './types.js';
 
 export function createTypedArray(dataType: VertexAttributeDataType, size: number): TypedArray {
   switch (dataType) {

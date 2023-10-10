@@ -1,9 +1,9 @@
 import assert from 'assert';
 
-import {AABB2} from '../AABB2';
-import {ChunkQuadTreeNode} from './ChunkQuadTreeNode';
-import {IDataChunk2D} from './IDataChunk2D';
-import {StringDataChunk2D} from './StringDataChunk2D';
+import {AABB2} from '../AABB2.js';
+import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
+import {IDataChunk2D} from './IDataChunk2D.js';
+import {StringDataChunk2D} from './StringDataChunk2D.js';
 
 const chunksAsStrings = (chunks: IDataChunk2D[]) => chunks.map((chunk) => chunk.toString()).sort();
 

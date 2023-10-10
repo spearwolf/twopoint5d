@@ -1,9 +1,9 @@
 import {Object3D, Vector2, Vector3} from 'three';
-import {IMap2DLayer} from './IMap2DLayer';
-import {IMap2DTileRenderer} from './IMap2DTileRenderer';
-import {IMap2DVisibilitor} from './IMap2DVisibilitor';
-import {Map2DTile} from './Map2DTile';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil';
+import type {IMap2DLayer} from './IMap2DLayer.js';
+import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
+import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';
+import {Map2DTile} from './Map2DTile.js';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 /**
  * A Map2DLayer divides a 2D map into a grid consisting of individual tiles of equal size.

@@ -1,5 +1,5 @@
-import {ParallaxProjection} from './ParallaxProjection';
-import {Stage2D} from './Stage2D';
+import {ParallaxProjection} from './ParallaxProjection.js';
+import {Stage2D} from './Stage2D.js';
 
 describe('Stage2D', () => {
   it('has a scene by default', () => {

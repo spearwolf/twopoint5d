@@ -1,7 +1,7 @@
-import {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsage, StreamDrawUsage} from 'three';
+import type {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsage, StreamDrawUsage} from 'three';
 
-import {VertexObjectBuffer} from './VertexObjectBuffer';
-import {voBuffer, voIndex} from './constants';
+import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import type {voBuffer, voIndex} from './constants.js';
 
 export type TypedArray =
   | Float64Array

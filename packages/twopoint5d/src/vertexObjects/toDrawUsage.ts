@@ -1,6 +1,6 @@
 import {DynamicDrawUsage, StaticDrawUsage, StreamDrawUsage} from 'three';
 
-import {DrawUsageType, VertexAttributeUsageType} from './types';
+import type {DrawUsageType, VertexAttributeUsageType} from './types.js';
 
 export function toDrawUsage(usage: VertexAttributeUsageType): DrawUsageType {
   switch (usage) {

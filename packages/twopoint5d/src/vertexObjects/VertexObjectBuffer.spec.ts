@@ -1,7 +1,7 @@
-import {VO} from './types';
-import {VertexObjectBuffer} from './VertexObjectBuffer';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
-import {VertexObjectPool} from './VertexObjectPool';
+import type {VO} from './types.js';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
 
 describe('VertexObjectBuffer', () => {
   test('construct with descriptor', () => {

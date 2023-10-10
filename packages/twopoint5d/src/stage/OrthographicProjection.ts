@@ -1,8 +1,8 @@
 import {OrthographicCamera, Vector2} from 'three';
 
-import {IProjection} from './IProjection';
-import {ProjectionPlane, ProjectionPlaneDescription} from './ProjectionPlane';
-import {fitIntoRectangle, FitIntoRectangleSpecs} from './fitIntoRectangle';
+import type {IProjection} from './IProjection.js';
+import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
+import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
   distanceToProjectionPlane?: number;

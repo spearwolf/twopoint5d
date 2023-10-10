@@ -1,9 +1,9 @@
 import {Texture} from 'three';
 
-import {PowerOf2ImageLoader} from './PowerOf2ImageLoader';
-import {TextureCoords} from './TextureCoords';
-import {TextureFactory, TextureOptionClasses} from './TextureFactory';
-import {TextureSource} from './types';
+import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
+import {TextureCoords} from './TextureCoords.js';
+import {TextureFactory, TextureOptionClasses} from './TextureFactory.js';
+import type {TextureSource} from './types.js';
 
 export interface TextureImage {
   texture: Texture;

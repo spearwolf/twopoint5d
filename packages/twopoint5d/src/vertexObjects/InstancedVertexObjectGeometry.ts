@@ -1,13 +1,13 @@
 import {BufferGeometry, InstancedBufferGeometry} from 'three';
 
-import {initializeAttributes} from './initializeAttributes';
-import {initializeInstancedAttributes} from './initializeInstancedAttributes';
-import {selectAttributes} from './selectAttributes';
-import {selectBuffers} from './selectBuffers';
-import {BufferLike, VertexAttributeUsageType, VertexObjectDescription, VO} from './types';
-import {updateUpdateRange} from './updateUpdateRange';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor';
-import {VertexObjectPool} from './VertexObjectPool';
+import {initializeAttributes} from './initializeAttributes.js';
+import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
+import {selectAttributes} from './selectAttributes.js';
+import {selectBuffers} from './selectBuffers.js';
+import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription, VO} from './types.js';
+import {updateUpdateRange} from './updateUpdateRange.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 

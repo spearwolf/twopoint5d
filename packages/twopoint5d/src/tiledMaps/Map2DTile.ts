@@ -1,4 +1,4 @@
-import {AABB2} from './AABB2';
+import {AABB2} from './AABB2.js';
 
 /**
  * The `Map2DTile` addresses a single tile in a tile grid.

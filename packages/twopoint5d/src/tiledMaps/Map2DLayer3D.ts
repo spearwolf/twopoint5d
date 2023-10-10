@@ -1,9 +1,9 @@
 import {Group} from 'three';
 
-import {IMap2DLayer} from './IMap2DLayer';
-import {IMap2DTileRenderer} from './IMap2DTileRenderer';
-import {IMap2DVisibilitor} from './IMap2DVisibilitor';
-import {Map2DLayer} from './Map2DLayer';
+import type {IMap2DLayer} from './IMap2DLayer.js';
+import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
+import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';
+import {Map2DLayer} from './Map2DLayer.js';
 
 /**
  * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}

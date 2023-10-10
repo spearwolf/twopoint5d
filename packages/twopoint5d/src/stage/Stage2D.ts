@@ -1,7 +1,7 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
-import {IProjection} from './IProjection';
+import type {IProjection} from './IProjection.js';
 
 export interface Stage2D extends Eventize {}
 

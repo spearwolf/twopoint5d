@@ -1,5 +1,5 @@
-import {TextureAtlas, TextureAtlasFrame} from './TextureAtlas';
-import {TextureCoords} from './TextureCoords';
+import {TextureAtlas, TextureAtlasFrame} from './TextureAtlas.js';
+import {TextureCoords} from './TextureCoords.js';
 
 //
 // +---------------------------------------------+

@@ -1,4 +1,4 @@
-import {findNextPowerOf2} from './findNextPowerOf2';
+import {findNextPowerOf2} from './findNextPowerOf2.js';
 
 describe('findNextPowerOf2', () => {
   it('should work as expected', () => {

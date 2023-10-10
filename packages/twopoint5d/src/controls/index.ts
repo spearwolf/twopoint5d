@@ -1,1 +1,1 @@
-export * from './PanControl2D';
+export * from './PanControl2D.js';

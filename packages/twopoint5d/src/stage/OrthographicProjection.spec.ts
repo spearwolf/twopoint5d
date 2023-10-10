@@ -1,7 +1,7 @@
 import {OrthographicCamera} from 'three';
 
-import {OrthographicProjection} from './OrthographicProjection';
-import {ProjectionPlane} from './ProjectionPlane';
+import {OrthographicProjection} from './OrthographicProjection.js';
+import {ProjectionPlane} from './ProjectionPlane.js';
 
 describe('OrthographicProjection', () => {
   describe('construction', () => {

@@ -1,5 +1,5 @@
-import {InstancedVertexObjectGeometry, VertexObjectPool} from '../../vertexObjects';
-import {TileBaseSprite, TileBaseSpriteDescriptor, TileSprite, TileSpriteDescriptor} from './descriptors';
+import {InstancedVertexObjectGeometry, VertexObjectPool} from '../../vertexObjects/index.js';
+import {TileBaseSprite, TileBaseSpriteDescriptor, TileSprite, TileSpriteDescriptor} from './descriptors.js';
 
 export interface TileSpritesGeometry {
   basePool: VertexObjectPool<TileBaseSprite>;

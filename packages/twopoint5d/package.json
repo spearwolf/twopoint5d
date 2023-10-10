@@ -20,7 +20,8 @@
   },
   "sideEffects": false,
   "scripts": {
-    "compile": "tsup",
+    "_compile": "tsup",
+    "compile": "tsc",
     "build": "run-s -sn compile makePackageJson",
     "clean": "rimraf build types dist",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",

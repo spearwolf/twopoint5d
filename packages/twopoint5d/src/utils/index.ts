@@ -1,3 +1,3 @@
-export * from './findRootNode';
-export * from './printSceneGraphToConsole';
-export * from './Dependencies';
+export * from './findRootNode.js';
+export * from './printSceneGraphToConsole.js';
+export * from './Dependencies.js';

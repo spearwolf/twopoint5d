@@ -1,6 +1,6 @@
 import {WebGLRenderer, WebGLRendererParameters} from 'three';
 
-import {Display} from './Display';
+import type {Display} from './Display.js';
 
 export interface DisplayEventArgs {
   display: Display;
