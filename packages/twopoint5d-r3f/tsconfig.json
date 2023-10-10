@@ -1,14 +1,7 @@
 {
+  "include": ["src"],
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["build", "dist"],
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist/lib",
-
-    "sourceMap": true,
-    "declaration": true,
-    "declarationDir": "./dist/lib",
-    "declarationMap": true
+    "rootDir": "./src"
   }
 }

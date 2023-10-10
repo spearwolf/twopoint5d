@@ -8,20 +8,24 @@
     "url": "https://www.spearwolf.de"
   },
   "license": "Apache-2.0",
-  "main": "dist/twopoint5d-r3f.cjs.js",
-  "module": "dist/twopoint5d-r3f.mjs",
-  "types": "dist/types/index.d.ts",
+  "type": "module",
+  "main": "dist/lib/index.js",
+  "module": "dist/lib/index.js",
+  "types": "dist/lib/index.d.ts",
   "exports": {
-    "import": "./dist/twopoint5d-r3f.mjs",
-    "require": "./dist/twopoint5d-r3f.cjs.js"
+    ".": {
+      "import": "./dist/lib/index.js",
+      "require": "./dist/lib/index.cjs"
+    }
   },
   "sideEffects": false,
   "scripts": {
-    "build": "run-s compile bundle makePackageJson",
-    "compile": "tsc -b tsconfig.build.json",
-    "bundle": "rollup -c rollup.config.mjs",
-    "clean": "rimraf build types dist ../../dist/packages/twopoint5d-r3f",
-    "makePackageJson": "node ../../scripts/makePackageJson.mjs"
+    "compile": "tsup",
+    "build": "run-s -sn compile makePackageJson",
+    "clean": "rimraf build types dist",
+    "makePackageJson": "node ../../scripts/makePackageJson.mjs",
+    "checkPkgTypes": "cd dist && npx attw --pack",
+    "_publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.13.0",
@@ -31,18 +35,5 @@
     "three": "^0.153",
     "use-asset": "^1.0.4",
     "zustand": "^4.3.8"
-  },
-  "rollup": {
-    "external": [
-      "@react-three/fiber",
-      "@spearwolf/eventize",
-      "@spearwolf/twopoint5d",
-      "react-dom",
-      "react",
-      "react/jsx-runtime",
-      "three",
-      "use-asset",
-      "zustand"
-    ]
   }
 }

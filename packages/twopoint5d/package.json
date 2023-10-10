@@ -22,7 +22,7 @@
   "scripts": {
     "compile": "tsup",
     "build": "run-s -sn compile makePackageJson",
-    "clean": "rimraf build types dist ../../dist/packages/twopoint5d",
+    "clean": "rimraf build types dist",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && npx attw --pack",
     "publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
