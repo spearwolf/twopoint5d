@@ -14,7 +14,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
 
       - run: npm ci
         name: Install dependencies
@@ -32,7 +31,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
 
       - run: npm i
         name: Install dependencies
