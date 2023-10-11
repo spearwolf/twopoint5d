@@ -25,7 +25,7 @@
     "clean": "rimraf build types dist",
     "test": "vitest --run",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "checkPkgTypes": "cd dist && npx attw --pack",
+    "checkPkgTypes": "cd dist && npx attw --pack --ignore-rules cjs-resolves-to-esm",
     "_publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
