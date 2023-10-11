@@ -1,3 +1,4 @@
+import {describe, expect, it} from 'vitest';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
 

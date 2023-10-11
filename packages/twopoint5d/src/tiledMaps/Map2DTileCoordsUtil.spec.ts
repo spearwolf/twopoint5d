@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 describe('Map2DTileCoordsUtil', () => {

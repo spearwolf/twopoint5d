@@ -1,4 +1,5 @@
 import {PerspectiveCamera} from 'three';
+import {describe, expect, it} from 'vitest';
 
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {ProjectionPlane} from './ProjectionPlane.js';

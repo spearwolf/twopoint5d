@@ -23,6 +23,7 @@
     "compile": "tsc",
     "build": "run-s -sn compile makePackageJson",
     "clean": "rimraf build types dist",
+    "test": "vitest --run",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && npx attw --pack",
     "publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"

@@ -1,10 +1,11 @@
+import {describe, expect, it, vi} from 'vitest';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 
 const createEventMocks = () => ({
-  [DisplayStateMachine.Init]: jest.fn(),
-  [DisplayStateMachine.Start]: jest.fn(),
-  [DisplayStateMachine.Pause]: jest.fn(),
-  [DisplayStateMachine.Restart]: jest.fn(),
+  [DisplayStateMachine.Init]: vi.fn(),
+  [DisplayStateMachine.Start]: vi.fn(),
+  [DisplayStateMachine.Pause]: vi.fn(),
+  [DisplayStateMachine.Restart]: vi.fn(),
 });
 
 describe('DisplayStateMachine', () => {

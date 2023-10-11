@@ -1,7 +1,8 @@
-import type {VO} from './types.js';
+import {describe, expect, test} from 'vitest';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import type {VO} from './types.js';
 
 describe('VertexObjectBuffer', () => {
   test('construct with descriptor', () => {

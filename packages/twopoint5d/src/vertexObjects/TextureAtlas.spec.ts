@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 

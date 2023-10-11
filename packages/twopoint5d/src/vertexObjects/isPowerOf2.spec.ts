@@ -1,3 +1,4 @@
+import {describe, expect, it} from 'vitest';
 import {isPowerOf2} from './isPowerOf2.js';
 
 describe('isPowerOf2', () => {

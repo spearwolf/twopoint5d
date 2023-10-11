@@ -1,4 +1,5 @@
 import assert from 'assert';
+import {describe, it} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';

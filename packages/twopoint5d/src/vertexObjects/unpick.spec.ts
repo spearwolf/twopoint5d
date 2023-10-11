@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {unpick} from './unpick.js';
 
 describe('unpick', () => {

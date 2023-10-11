@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {AABB2} from './AABB2.js';
 import type {IMap2DRenderable} from './IMap2DRenderable.js';
 import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';

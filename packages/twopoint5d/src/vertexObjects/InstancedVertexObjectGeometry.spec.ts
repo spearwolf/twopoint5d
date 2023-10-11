@@ -1,4 +1,5 @@
 import {createSandbox} from 'sinon';
+import {afterEach, describe, expect, test} from 'vitest';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';

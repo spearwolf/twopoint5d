@@ -68,6 +68,7 @@
     "tsup": "^7.2.0",
     "typescript": "^5.2.2",
     "use-asset": "^1.0.4",
+    "vitest": "^0.34.6",
     "zustand": "^4.4.3"
   }
 }

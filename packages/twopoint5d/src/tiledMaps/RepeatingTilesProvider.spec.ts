@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {RepeatingTilesProvider} from './RepeatingTilesProvider.js';
 
 describe('RepeatingTilesProvider', () => {

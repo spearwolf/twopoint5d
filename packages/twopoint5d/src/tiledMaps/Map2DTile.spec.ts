@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {Map2DTile} from './Map2DTile.js';
 
 describe('Map2DTile', () => {

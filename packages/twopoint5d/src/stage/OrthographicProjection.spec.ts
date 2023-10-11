@@ -1,4 +1,5 @@
 import {OrthographicCamera} from 'three';
+import {describe, expect, it} from 'vitest';
 
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ProjectionPlane} from './ProjectionPlane.js';

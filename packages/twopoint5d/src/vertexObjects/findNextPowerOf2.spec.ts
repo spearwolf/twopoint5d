@@ -1,3 +1,4 @@
+import {describe, expect, it} from 'vitest';
 import {findNextPowerOf2} from './findNextPowerOf2.js';
 
 describe('findNextPowerOf2', () => {

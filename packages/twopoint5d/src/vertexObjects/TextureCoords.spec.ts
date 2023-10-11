@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {TextureCoords} from './TextureCoords.js';
 
 describe('TextureCoords', () => {

@@ -1,3 +1,4 @@
+import {describe, expect, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 
 describe('VertexAttributeDescriptor', () => {
