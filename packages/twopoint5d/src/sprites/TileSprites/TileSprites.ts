@@ -1,4 +1,4 @@
-import {VertexObjects} from '../../vertexObjects/index.js';
+import {VertexObjects} from '../../vertexObjects/VertexObjects.js';
 import {TileSpritesGeometry} from './TileSpritesGeometry.js';
 import {TileSpritesMaterial} from './TileSpritesMaterial.js';
 

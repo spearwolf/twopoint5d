@@ -1,6 +1,10 @@
 import {DoubleSide, Texture} from 'three';
 
-import {CustomChunksShaderMaterial, CustomChunksShaderMaterialParameters, unpick} from '../vertexObjects/index.js';
+import {
+  CustomChunksShaderMaterial,
+  type CustomChunksShaderMaterialParameters,
+} from '../vertexObjects/CustomChunksShaderMaterial.js';
+import {unpick} from '../vertexObjects/unpick.js';
 import ShaderLib from './ShaderLib.js';
 
 const vertexShader = `

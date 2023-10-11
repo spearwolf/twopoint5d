@@ -1,4 +1,4 @@
-import {InstancedVertexObjectGeometry} from '../vertexObjects/index.js';
+import {InstancedVertexObjectGeometry} from '../vertexObjects/InstancedVertexObjectGeometry.js';
 import {AnimatedSprite, AnimatedSpriteDescriptor} from './AnimatedSprite.js';
 import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite.js';
 

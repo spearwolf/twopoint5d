@@ -1,4 +1,4 @@
-import {FrontSide, ShaderMaterial, ShaderMaterialParameters, Texture, Vector4} from 'three';
+import {FrontSide, ShaderMaterial, Texture, Vector4, type ShaderMaterialParameters} from 'three';
 
 const vertexShader = `
   attribute vec2 quadSize;

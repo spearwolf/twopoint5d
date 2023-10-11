@@ -1,13 +1,13 @@
 import {
+  LinearFilter,
+  LinearSRGBColorSpace,
   NearestFilter,
-  TextureFilter,
+  SRGBColorSpace,
   Texture,
   TextureLoader,
-  LinearFilter,
   WebGLRenderer,
-  ColorSpace,
-  SRGBColorSpace,
-  LinearSRGBColorSpace,
+  type ColorSpace,
+  type TextureFilter,
 } from 'three';
 
 import type {TextureSource} from './types.js';

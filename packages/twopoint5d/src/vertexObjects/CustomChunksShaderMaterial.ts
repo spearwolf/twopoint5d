@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 
-import {MathUtils, Shader, ShaderMaterial, ShaderMaterialParameters, WebGLRenderer} from 'three';
+import {MathUtils, ShaderMaterial, WebGLRenderer, type Shader, type ShaderMaterialParameters} from 'three';
 
 export interface CustomChunksShaderMaterialParameters extends ShaderMaterialParameters {}
 

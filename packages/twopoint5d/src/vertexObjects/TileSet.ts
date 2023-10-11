@@ -1,4 +1,4 @@
-import {TextureAtlas, TextureAtlasFrame} from './TextureAtlas.js';
+import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
 //

@@ -3,7 +3,6 @@ import {
   Box3Helper,
   BoxGeometry,
   Color,
-  Event,
   Frustum,
   Line3,
   Matrix4,
@@ -16,13 +15,14 @@ import {
   PlaneHelper,
   Vector2,
   Vector3,
+  type Event,
 } from 'three';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {HelpersManager} from './HelpersManager.js';
-import {Map2DVisibleTiles, type IMap2DVisibilitor} from './IMap2DVisibilitor.js';
+import type {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor.js';
 import {Map2DTile} from './Map2DTile.js';
-import {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil.js';
+import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 
 interface TileBox {
   id: string;

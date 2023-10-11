@@ -1,6 +1,6 @@
 import {Material} from 'three';
 
-import {VertexObjects} from '../vertexObjects/index.js';
+import {VertexObjects} from '../vertexObjects/VertexObjects.js';
 import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
 
 export class AnimatedSprites extends VertexObjects {

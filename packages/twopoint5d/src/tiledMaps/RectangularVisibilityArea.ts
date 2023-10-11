@@ -1,4 +1,4 @@
-import {Box3, Box3Helper, Color, Event, Object3D, Vector2, Vector3} from 'three';
+import {Box3, Box3Helper, Color, Object3D, Vector2, Vector3, type Event} from 'three';
 import {AABB2} from './AABB2.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {IMap2DVisibilitor, Map2DVisibleTiles} from './IMap2DVisibilitor.js';

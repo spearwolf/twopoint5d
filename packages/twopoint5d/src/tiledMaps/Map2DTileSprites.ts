@@ -1,9 +1,10 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three';
 
-import {TileSprite} from '../sprites/TileSprites/descriptors.js';
+import type {TileSprite} from '../sprites/TileSprites/descriptors.js';
 import {TileSprites} from '../sprites/TileSprites/TileSprites.js';
-import {TileSet, VertexObjectPool} from '../vertexObjects/index.js';
+import {TileSet} from '../vertexObjects/TileSet.js';
+import {VertexObjectPool} from '../vertexObjects/VertexObjectPool.js';
 import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import {Map2DTile} from './Map2DTile.js';

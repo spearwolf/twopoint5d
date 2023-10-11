@@ -1,4 +1,4 @@
-import {WebGLRenderer, WebGLRendererParameters} from 'three';
+import {WebGLRenderer, type WebGLRendererParameters} from 'three';
 
 import type {Display} from './Display.js';
 

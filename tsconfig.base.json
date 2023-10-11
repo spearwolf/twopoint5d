@@ -41,6 +41,7 @@
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "useDefineForClassFields": true,
     "noErrorTruncation": true,
     "skipDefaultLibCheck": true,

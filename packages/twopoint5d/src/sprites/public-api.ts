@@ -7,4 +7,4 @@ export * from './TexturedSprite.js';
 export * from './TexturedSprites.js';
 export * from './TexturedSpritesGeometry.js';
 export * from './TexturedSpritesMaterial.js';
-export * from './TileSprites/index.js';
+export * from './TileSprites/public-api.js';
