@@ -17,12 +17,28 @@
       "dependsOn": ["^build"]
     },
     "lint": {
-      "dependsOn": ["^build"],
-      "inputs": ["default", "{workspaceRoot}/.eslintrc.json", "{workspaceRoot}/.eslintignore"]
+      "inputs": [
+        "default",
+        "{workspaceRoot}/.eslintignore",
+        "{workspaceRoot}/.eslintrc.json",
+        "{workspaceRoot}/.prettierrc",
+        "{workspaceRoot}/.prettierignore"
+      ]
     },
     "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
       "dependsOn": ["^build"],
-      "inputs": ["default", "^default", "{workspaceRoot}/jest.preset.js"]
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"]
+    },
+    "publishNpmPkg": {
+      "executor": "nx:run-script",
+      "dependsOn": ["build"],
+      "options": {
+        "script": "publishNpmPkg"
+      }
     }
   }
 }

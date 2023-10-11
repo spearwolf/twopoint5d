@@ -1,4 +1,4 @@
-jest.mock('scheduler', () => require('scheduler/unstable_mock'));
+import {describe, expect, test, vi} from 'vitest';
 
 import '@react-three/fiber';
 import {act, create} from '@react-three/test-renderer';
@@ -47,10 +47,10 @@ describe('useFrameLoop hook', () => {
 
   test('callbacks are called in the correct sequence', async () => {
     const callbacks = {
-      init: jest.fn(),
-      update: jest.fn(),
-      frame: jest.fn(),
-      dispose: jest.fn(),
+      init: vi.fn(),
+      update: vi.fn(),
+      frame: vi.fn(),
+      dispose: vi.fn(),
     };
 
     const renderer = await create(<TestScene showMesh callbacks={callbacks} extraValue="abc" />);
@@ -159,10 +159,10 @@ describe('useFrameLoop hook', () => {
 
   test('callbacks (without dependencies) are called in the correct sequence', async () => {
     const callbacks = {
-      init: jest.fn(),
-      update: jest.fn(),
-      frame: jest.fn(),
-      dispose: jest.fn(),
+      init: vi.fn(),
+      update: vi.fn(),
+      frame: vi.fn(),
+      dispose: vi.fn(),
     };
 
     const renderer = await create(<TestSceneWithoutDependencies showMesh callbacks={callbacks} />);
@@ -231,12 +231,12 @@ describe('useFrameLoop hook', () => {
 
   test('lazy callbacks', async () => {
     const callbacks = {
-      init: jest.fn(),
-      frame: jest.fn(),
-      dispose: jest.fn(),
+      init: vi.fn(),
+      frame: vi.fn(),
+      dispose: vi.fn(),
     };
 
-    const lazyCallbacks = jest.fn();
+    const lazyCallbacks = vi.fn();
     lazyCallbacks.mockReturnValueOnce(callbacks).mockReturnValue(undefined);
 
     const renderer = await create(<TestScene showMesh callbacks={lazyCallbacks} extraValue={42} />);

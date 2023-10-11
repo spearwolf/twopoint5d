@@ -11,20 +11,6 @@
       "options": {
         "lintFilePatterns": ["{projectRoot}/**/*.ts"]
       }
-    },
-    "test": {
-      "executor": "nx:run-script",
-      "dependsOn": ["^build"],
-      "options": {
-        "script": "test"
-      }
-    },
-    "publishNpmPkg": {
-      "executor": "nx:run-script",
-      "dependsOn": ["^build", "build"],
-      "options": {
-        "script": "publishNpmPkg"
-      }
     }
   },
   "tags": []

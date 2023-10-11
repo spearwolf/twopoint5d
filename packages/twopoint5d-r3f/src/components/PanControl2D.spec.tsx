@@ -1,5 +1,6 @@
 import {create} from '@react-three/test-renderer';
 import {PanControl2D as __PanControl2D} from '@spearwolf/twopoint5d';
+import {describe, expect, it} from 'vitest';
 import {PanControl2D} from './PanControl2D.js';
 
 describe('PanControl2D', () => {
