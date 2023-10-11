@@ -1,6 +1,6 @@
 import {Stage2D} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
-import {REGISTER, StageRendererContext, UNREGISTER} from '../context/StageRenderer';
+import {REGISTER, StageRendererContext, UNREGISTER} from '../context/StageRenderer.js';
 
 export function useStage2D(name: string): Stage2D | undefined {
   const stageRenderer = useContext(StageRendererContext);

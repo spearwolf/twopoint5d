@@ -1,6 +1,6 @@
 import {useContext, useEffect, useRef, useState} from 'react';
 import {Texture} from 'three';
-import {AssetName, AssetStore, AssetStoreContext} from '../context/AssetStore';
+import {AssetStore, AssetStoreContext, type AssetName} from '../context/AssetStore.js';
 
 interface TextureState {
   lastName: AssetName | undefined;

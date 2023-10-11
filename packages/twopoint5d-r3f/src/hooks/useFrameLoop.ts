@@ -1,5 +1,5 @@
-import {RootState, useFrame} from '@react-three/fiber';
-import {useCallback, useLayoutEffect, useMemo, useRef, useState, MutableRefObject} from 'react';
+import {useFrame, type RootState} from '@react-three/fiber';
+import {useCallback, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject} from 'react';
 
 const sortedKeys = (obj: any) => Object.keys(obj).sort();
 

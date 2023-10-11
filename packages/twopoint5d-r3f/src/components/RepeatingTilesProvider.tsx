@@ -1,10 +1,10 @@
 import {extend, ReactThreeFiber} from '@react-three/fiber';
 import {
-  LimitToAxisType,
-  RepeatingTilesPatternType,
   RepeatingTilesProvider as __RepeatingTilesProvider,
+  type LimitToAxisType,
+  type RepeatingTilesPatternType,
 } from '@spearwolf/twopoint5d';
-import {ForwardedRef, forwardRef} from 'react';
+import {forwardRef, type ForwardedRef} from 'react';
 
 extend({RepeatingTilesProvider: __RepeatingTilesProvider});
 

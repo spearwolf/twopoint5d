@@ -1,9 +1,9 @@
 import '@react-three/fiber';
-import {TileSetData, TileSetLoader, TileSetOptions} from '@spearwolf/twopoint5d';
-import {ForwardedRef, forwardRef, ReactNode, useContext, useState} from 'react';
-import {AssetStoreContext} from '../context/AssetStore';
-import {useAsyncEffect} from '../hooks/useAsyncEffect';
-import {TextureOptionsAsProps, toTextureClasses, useTextureBitsFromProps} from '../hooks/useTextureBitsFromProps';
+import {TileSetLoader, type TileSetData, type TileSetOptions} from '@spearwolf/twopoint5d';
+import {forwardRef, useContext, useState, type ForwardedRef, type ReactNode} from 'react';
+import {AssetStoreContext} from '../context/AssetStore.js';
+import {useAsyncEffect} from '../hooks/useAsyncEffect.js';
+import {toTextureClasses, useTextureBitsFromProps, type TextureOptionsAsProps} from '../hooks/useTextureBitsFromProps.js';
 
 export type TileSetProps = TextureOptionsAsProps &
   TileSetOptions & {

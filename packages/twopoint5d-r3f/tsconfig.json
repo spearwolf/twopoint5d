@@ -2,6 +2,16 @@
   "include": ["src"],
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src"
+    "rootDir": "./src",
+
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    "noEmit": false,
+    "outDir": "dist/lib",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationDir": "dist/lib",
+    "declarationMap": true
   }
 }

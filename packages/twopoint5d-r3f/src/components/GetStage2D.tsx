@@ -1,6 +1,6 @@
 import {Stage2D} from '@spearwolf/twopoint5d';
-import {ReactNode} from 'react';
-import {useStage2D} from '../hooks/useStage2D';
+import {type ReactNode} from 'react';
+import {useStage2D} from '../hooks/useStage2D.js';
 
 export interface GetStage2DProps {
   /**

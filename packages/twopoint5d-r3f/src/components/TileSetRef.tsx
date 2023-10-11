@@ -1,7 +1,7 @@
 import '@react-three/fiber';
 import {TileSet, unpick} from '@spearwolf/twopoint5d';
-import {ForwardedRef, forwardRef} from 'react';
-import {useTileSet} from '../hooks/useTileSet';
+import {forwardRef, type ForwardedRef} from 'react';
+import {useTileSet} from '../hooks/useTileSet.js';
 
 export type TileSetRefProps = JSX.IntrinsicElements['primitive'] & {
   name: string | symbol;

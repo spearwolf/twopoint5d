@@ -1,7 +1,7 @@
 import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
 import {PanControl2D as __PanControl2D} from '@spearwolf/twopoint5d';
-import {ForwardedRef, forwardRef, memo, useEffect, useRef, useState} from 'react';
-import {mergeRefs} from '../utils/mergeRefs';
+import {forwardRef, memo, useEffect, useRef, useState, type ForwardedRef} from 'react';
+import {mergeRefs} from '../utils/mergeRefs.js';
 
 extend({PanControl2D: __PanControl2D});
 

@@ -1,6 +1,6 @@
 // https://github.com/gregberge/react-merge-refs/blob/main/src/index.tsx
 
-import {LegacyRef, MutableRefObject, RefCallback} from 'react';
+import type {LegacyRef, MutableRefObject, RefCallback} from 'react';
 
 export function mergeRefs<T = any>(...refs: Array<MutableRefObject<T> | LegacyRef<T>>): RefCallback<T> {
   return (value) => {

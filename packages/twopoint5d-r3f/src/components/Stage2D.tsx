@@ -2,18 +2,18 @@ import {createPortal, extend, ReactThreeFiber, useFrame, useThree} from '@react-
 import {Stage2D as __Stage2D} from '@spearwolf/twopoint5d';
 import {
   createContext,
-  ForwardedRef,
   forwardRef,
-  ReactNode,
   useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
   useState,
+  type ForwardedRef,
+  type ReactNode,
 } from 'react';
 import {Camera, WebGLRenderer} from 'three';
-import {StageRendererContext} from '../context/StageRenderer';
-import {mergeRefs} from '../utils/mergeRefs';
+import {StageRendererContext} from '../context/StageRenderer.js';
+import {mergeRefs} from '../utils/mergeRefs.js';
 
 extend({Stage2D: __Stage2D});
 

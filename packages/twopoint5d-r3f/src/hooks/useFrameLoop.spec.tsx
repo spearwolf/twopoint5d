@@ -4,7 +4,7 @@ import '@react-three/fiber';
 import {act, create} from '@react-three/test-renderer';
 import {useRef} from 'react';
 import {Mesh} from 'three';
-import {forwardRefValue, useFrameLoop} from './useFrameLoop';
+import {forwardRefValue, useFrameLoop} from './useFrameLoop.js';
 
 const TestMesh = ({extraValue, callbacks}: any) => {
   const meshRef = useRef<Mesh>();

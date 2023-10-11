@@ -9,18 +9,18 @@
   },
   "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/lib/index.d.ts",
+      "import": "./dist/lib/index.js"
+    }
+  },
   "main": "dist/lib/index.js",
   "module": "dist/lib/index.js",
   "types": "dist/lib/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/lib/index.js",
-      "require": "./dist/lib/index.cjs"
-    }
-  },
-  "sideEffects": false,
   "scripts": {
-    "compile": "tsup",
+    "compile": "tsc",
     "build": "run-s -sn compile makePackageJson",
     "clean": "rimraf build types dist",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",

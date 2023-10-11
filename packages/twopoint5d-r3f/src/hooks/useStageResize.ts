@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useRef} from 'react';
-import {useStageSize} from './useStageSize';
+import {useStageSize} from './useStageSize.js';
 
 export type ResizeEffectCallback = (width: number, height: number) => any;
 

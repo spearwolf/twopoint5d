@@ -1,6 +1,11 @@
-import {TextureAtlasData, TextureAtlasLoader, TextureAtlasLoadOptions, TextureOptionClasses} from '@spearwolf/twopoint5d';
+import {
+  TextureAtlasLoader,
+  type TextureAtlasData,
+  type TextureAtlasLoadOptions,
+  type TextureOptionClasses,
+} from '@spearwolf/twopoint5d';
 import {useState} from 'react';
-import {useAsyncEffect} from './useAsyncEffect';
+import {useAsyncEffect} from './useAsyncEffect.js';
 
 export const useTextureAtlasLoader = (
   url: string,

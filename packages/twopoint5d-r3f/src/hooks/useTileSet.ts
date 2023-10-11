@@ -1,6 +1,6 @@
 import {TileSet} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
-import {AssetName, AssetStoreContext} from '../context/AssetStore';
+import {AssetStoreContext, type AssetName} from '../context/AssetStore.js';
 
 export function useTileSet(name: AssetName): TileSet | undefined {
   const assetStore = useContext(AssetStoreContext);

@@ -1,6 +1,6 @@
-import {TileSetData, TileSetLoader} from '@spearwolf/twopoint5d';
+import {TileSetLoader, type TileSetData} from '@spearwolf/twopoint5d';
 import {useState} from 'react';
-import {useAsyncEffect} from './useAsyncEffect';
+import {useAsyncEffect} from './useAsyncEffect.js';
 
 export interface UseTileSetParams {
   tileWidth?: number;

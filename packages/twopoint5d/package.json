@@ -20,7 +20,6 @@
   "module": "dist/lib/index.js",
   "types": "dist/lib/index.d.ts",
   "scripts": {
-    "_compile": "tsup",
     "compile": "tsc",
     "build": "run-s -sn compile makePackageJson",
     "clean": "rimraf build types dist",

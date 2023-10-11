@@ -1,6 +1,6 @@
 import {Stage2D} from '@spearwolf/twopoint5d';
 import {useContext, useEffect, useState} from 'react';
-import {Stage2DContext} from '../components/Stage2D';
+import {Stage2DContext} from '../components/Stage2D.js';
 
 /**
  * Use this hook if you simply want to know the stage size.

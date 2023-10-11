@@ -1,4 +1,4 @@
-import {DependencyList, useEffect, useRef} from 'react';
+import {useEffect, useRef, type DependencyList} from 'react';
 
 export type AsyncEffectNextFunc<T> = (data: T) => void;
 

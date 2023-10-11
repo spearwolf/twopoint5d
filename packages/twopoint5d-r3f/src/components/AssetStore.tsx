@@ -1,5 +1,5 @@
-import {ReactNode, useEffect, useState} from 'react';
-import {AssetStore as __AssetStore, AssetStoreContext} from '../context/AssetStore';
+import {type ReactNode, useEffect, useState} from 'react';
+import {AssetStore as __AssetStore, AssetStoreContext} from '../context/AssetStore.js';
 
 export interface AssetStoreProps {
   children: ReactNode;

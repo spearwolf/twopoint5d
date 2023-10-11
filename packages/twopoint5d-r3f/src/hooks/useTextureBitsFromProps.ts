@@ -1,4 +1,4 @@
-import {TextureOptionClasses} from '@spearwolf/twopoint5d';
+import type {TextureOptionClasses} from '@spearwolf/twopoint5d';
 import {useMemo} from 'react';
 
 export enum TextureBit {
