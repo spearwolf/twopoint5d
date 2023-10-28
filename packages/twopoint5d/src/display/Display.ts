@@ -100,6 +100,7 @@ export class Display {
     Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;', this.styleSheetRoot);
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
+    this.resizeToElement = options?.resizeToElement ?? this.resizeToElement;
     this.resizeToAttributeEl = options?.resizeToAttributeEl ?? canvas;
 
     this.resize();
@@ -200,8 +201,10 @@ export class Display {
           canvasElement.classList.add(fullscreenCssRules);
           this.#fullscreenCssRulesMustBeRemoved = true;
         }
+      } else if (resizeTo === 'self') {
+        sizeRefElement = this.resizeToElement ?? canvasElement;
       } else if (resizeTo) {
-        sizeRefElement = (document.querySelector(resizeTo) as HTMLElement) ?? canvasElement;
+        sizeRefElement = (document.querySelector(resizeTo) as HTMLElement) ?? this.resizeToElement ?? canvasElement;
       }
     }
 

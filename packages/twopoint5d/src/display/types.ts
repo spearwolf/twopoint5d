@@ -16,6 +16,8 @@ export type ResizeCallback = (display: Display) => [width: number, height: numbe
 
 export type DisplayParameters = Partial<Omit<WebGLRendererParameters, 'canvas'>> & {
   resizeTo?: ResizeCallback;
-  styleSheetRoot?: HTMLElement | ShadowRoot;
+  resizeToElement?: HTMLElement;
   resizeToAttributeEl?: HTMLElement;
+
+  styleSheetRoot?: HTMLElement | ShadowRoot;
 };
