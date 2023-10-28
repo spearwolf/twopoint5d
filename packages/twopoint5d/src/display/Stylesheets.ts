@@ -9,18 +9,18 @@ const installedRules: Map<string, {index: number; css: string}> = new Map();
  * Helpers for installing simple css-class-based rules
  */
 export class Stylesheets {
-  static getGlobalSheet(): CSSStyleSheet {
+  static getGlobalSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
     if (sheet === null) {
       const styleEl = document.createElement('style');
       styleEl.setAttribute('id', globalStylesID);
-      document.head.appendChild(styleEl);
+      root.appendChild(styleEl);
       sheet = styleEl.sheet;
     }
     return sheet;
   }
 
-  static installRule(name: string, css: string): string {
-    const sheet = Stylesheets.getGlobalSheet();
+  static installRule(name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {
+    const sheet = Stylesheets.getGlobalSheet(root);
 
     const className = `${name}-${postFixID}`;
     const selector = `.${className}`;
@@ -45,10 +45,11 @@ export class Stylesheets {
    * The class name gets a uniq-number as postfix added.
    * @param name The base class name
    * @param css The styles
+   * @param root default is document.head
    * @returns The postfixed class name
    */
-  static addRule(element: HTMLElement, name: string, css: string): string {
-    const className = Stylesheets.installRule(name, css);
+  static addRule(element: HTMLElement, name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {
+    const className = Stylesheets.installRule(name, css, root);
     element.classList.add(className);
     return className;
   }

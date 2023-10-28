@@ -47,6 +47,9 @@ export class Display {
 
   resizeToElement?: HTMLElement;
   resizeToCallback?: ResizeCallback;
+  resizeToAttributeEl: HTMLElement;
+
+  styleSheetRoot: HTMLElement | ShadowRoot;
 
   renderer?: WebGLRenderer;
 
@@ -56,6 +59,7 @@ export class Display {
     this.#chronometer.stop();
 
     this.resizeToCallback = options?.resizeTo;
+    this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
     if (domElementOrRenderer instanceof WebGLRenderer) {
       this.renderer = domElementOrRenderer;
@@ -72,6 +76,7 @@ export class Display {
           // we create another container div here to avoid the if container-has-no-discrete-size
           // then line-height-and-font-height-styles-give-weird-client-rect-behaviour issue
           'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;',
+          this.styleSheetRoot,
         );
         domElementOrRenderer.appendChild(container);
 
@@ -92,8 +97,10 @@ export class Display {
     }
 
     const {domElement: canvas} = this.renderer!;
-    Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;');
+    Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;', this.styleSheetRoot);
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
+
+    this.resizeToAttributeEl = options?.resizeToAttributeEl ?? canvas;
 
     this.resize();
 
@@ -158,7 +165,7 @@ export class Display {
   }
 
   get pixelRatio(): number {
-    return window.devicePixelRatio ?? 0;
+    return window.devicePixelRatio ?? 1;
   }
 
   resize(): void {
@@ -171,8 +178,8 @@ export class Display {
 
     let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
 
-    if (canvasElement.hasAttribute('resize-to')) {
-      const resizeTo = canvasElement.getAttribute('resize-to')!.trim();
+    if (this.resizeToAttributeEl.hasAttribute('resize-to')) {
+      const resizeTo = this.resizeToAttributeEl.getAttribute('resize-to')!.trim();
       if (resizeTo.match(/^:?(fullscreen|window)$/)) {
         wPx = window.innerWidth;
         hPx = window.innerHeight;
@@ -180,7 +187,11 @@ export class Display {
 
         let fullscreenCssRules = this.#fullscreenCssRules;
         if (!fullscreenCssRules) {
-          fullscreenCssRules = Stylesheets.installRule(Display.CssRulesPrefixFullscreen, `position:fixed;top:0;left:0;`);
+          fullscreenCssRules = Stylesheets.installRule(
+            Display.CssRulesPrefixFullscreen,
+            `position:fixed;top:0;left:0;`,
+            this.styleSheetRoot,
+          );
           this.#fullscreenCssRules = fullscreenCssRules;
         }
         if (fullscreenCssRulesMustBeRemoved) {
