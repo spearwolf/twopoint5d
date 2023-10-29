@@ -56,6 +56,9 @@ export class Display {
   constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
 
+    this.retain('init');
+    this.retain('start');
+
     this.#chronometer.stop();
 
     this.resizeToCallback = options?.resizeTo;
@@ -130,6 +133,8 @@ export class Display {
         window.cancelAnimationFrame(this.#rafID);
 
         this.#chronometer.stop();
+
+        this.retainClear('start');
 
         this.#emitEvent('pause');
       },

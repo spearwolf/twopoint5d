@@ -93,6 +93,9 @@ In addition, there are also the following options:
 | option | type | description |
 |--------|------|-------------|
 | resizeTo | `(display: Display) => [width: number, height: number]` | optional callback - if specified, this function is called on each frame and the result is used to update the dimension of the canvas |
+| resizeToElement | `HTMLElement` | normally the canvas or the container element is used for (re)sizing. with this you can explicitly set the reference element. can be very helpful if you create the canvas e.g. in a shadow-dom, but want to use the web-component element from the parent dom as reference for the size |
+| resizeToAttributeEl | `HTMLElement` | the element where a `resize-to` attribute is listened for. this is by default the canvas itself |
+| styleSheetRoot | `HTMLElement` or `ShadowRoot` | where to install the stylesheets. this is by default the `document.head`, but can of course also be a shadow-dom root |
 
 The following parameters for the _WebGLRenderer_ are set as default unless otherwise specified:
 
