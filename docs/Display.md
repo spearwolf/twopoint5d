@@ -8,17 +8,17 @@ It makes it much easier to deal with browser resizes and the question of how the
 
 If you want the canvas to fill the whole window (aka 'fullscreen'), you don't need to
 set extra css styles for it, all what you need is to give the canvas element a
-_resize_to_ property: `<canvas resize-to="window">`
+_resize_to_ attribute: `<canvas resize-to="window">`
 
-The _resize-to_ property also understands `fullscreen` as an alternative to `window`.
+The _resize-to_ attribute also understands `fullscreen` as an alternative to `window`.
 
 However, it is also possible to simply specify a document query selector, in which case the canvas element will always be as large as the element addressed by the selector.
 
 But it also works completely without _resize-to_ !
 
-> todo: time helpers, chronometer
+> TODO time helpers, chronometer
 
-> todo: eventized class
+> TODO eventized class
 
 
 ## Quickstart
@@ -82,9 +82,9 @@ You don't really need to worry about this, in most cases the canvas will behave 
 
 This behavior is shown in the example [multiple displays](../examples/vanilla/display.html).
 
-> todo: init: canvas vs. dom-el, vs webglrenderer
+> TODO init: canvas vs. dom-el, vs webglrenderer
 
-> todo: css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
+> TODO css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
 
 
 **options** : _object_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the _canvas_ parameter, it will be simply ignored).
