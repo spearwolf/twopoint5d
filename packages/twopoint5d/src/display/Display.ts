@@ -56,8 +56,7 @@ export class Display {
   constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
 
-    this.retain('init');
-    this.retain('start');
+    this.retain(['init', 'start', 'resize']);
 
     this.#chronometer.stop();
 
