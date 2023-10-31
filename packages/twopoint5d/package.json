@@ -1,7 +1,7 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -29,7 +29,7 @@
     "publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
-    "@spearwolf/eventize": "^3.4.0",
+    "@spearwolf/eventize": "^3.4.1",
     "three": "^0.153"
   }
 }
