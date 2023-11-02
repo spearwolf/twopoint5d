@@ -5,6 +5,17 @@ import type {IProjection} from './IProjection.js';
 
 export interface Stage2D extends Eventize {}
 
+export interface Stage2DRenderFrameProps {
+  stage: Stage2D;
+  renderer: WebGLRenderer;
+
+  /**
+   * you do not need to call this callback yourself. it is normally done after the event.
+   * however, you can use this callback to control when the THREE.WebGLRenderer is called.
+   */
+  renderFrame: () => void;
+}
+
 /**
  * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
  * The camera is managed by means of a *projection* description.
@@ -19,6 +30,10 @@ export interface Stage2D extends Eventize {}
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
  */
 export class Stage2D {
+  static readonly Resize = 'resize';
+  static readonly AfterCameraChanged = 'afterCameraChanged';
+  static readonly RenderFrame = 'renderFrame';
+
   scene: Scene;
 
   autoClear = true;
@@ -98,7 +113,7 @@ export class Stage2D {
     const prevCamera = this.camera;
     updateCallback();
     if (prevCamera !== this.camera) {
-      this.emit('afterCameraChanged', this, prevCamera);
+      this.emit(Stage2D.AfterCameraChanged, this, prevCamera);
     }
   };
 
@@ -136,17 +151,20 @@ export class Stage2D {
 
     const prevWidth = this.#width;
     const prevHeight = this.#height;
+
     this.#width = w;
     this.#height = h;
 
     if (this.camera != null) {
       this.projection!.updateCamera(this.camera);
     } else {
-      this.#updateCamera(() => void (this.#cameraFromProjection = this.projection!.createCamera()));
+      this.#updateCamera(() => {
+        this.#cameraFromProjection = this.projection!.createCamera();
+      });
     }
 
     if (prevWidth !== w || prevHeight !== h) {
-      this.emit('resize', this);
+      this.emit(Stage2D.Resize, this);
     }
   };
 
@@ -157,7 +175,18 @@ export class Stage2D {
     if (scene && camera) {
       const wasPreviouslyAutoClear = renderer.autoClear;
       renderer.autoClear = this.autoClear;
-      renderer.render(scene, camera);
+
+      let isRendered = false;
+      const renderFrame = () => {
+        if (!isRendered) {
+          isRendered = true;
+          renderer.render(scene, camera);
+        }
+      };
+
+      this.emit(Stage2D.RenderFrame, {stage: this, renderer, renderFrame} as Stage2DRenderFrameProps);
+      renderFrame();
+
       renderer.autoClear = wasPreviouslyAutoClear;
     } else if (!camera && ++this.#noCameraErrorCount === 100) {
       this.#noCameraErrorCount = -1000;
