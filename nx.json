@@ -31,7 +31,7 @@
         "script": "test"
       },
       "dependsOn": ["^build"],
-      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.base.json"]
+      "inputs": ["default", "^default", "{workspaceRoot}/tsconfig.json"]
     },
     "publishNpmPkg": {
       "executor": "nx:run-script",
