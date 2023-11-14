@@ -49,7 +49,7 @@ Almost all of these examples serve to show individual aspects and usage of the a
 > At the moment a new [lookbook](./apps/lookbook/) app is being developed, which combines all examples. you can start it simply by:
 
 ```sh
-$ npx nx dev lookbook  # or just use: npm start
+$ pnpm lookbook
 ```
 
 But as long as not all examples have been migrated, the _old_ examples can still be found here:
@@ -69,23 +69,23 @@ this repository is structured as a monorepo; based on [nx](https://nx.dev/) !
 
 #### 1. Install dependencies
 
-First, you need a current [node v18+](https://nodejs.org/) setup.
+First, you need a current [node v18+](https://nodejs.org/) with [PNpm as package manager](https://pnpm.io/) setup.
 Install the dependencies with:
 
 ```sh
-$ npm ci --force
+$ pnpm install
 ```
 
 #### 2. Build and test everything
 
 ```sh
-$ npm run cbt  # => npm run clean && npm run build && npm test
+$ pnpm cbt  # => pnpm run clean > build > test
 ```
 
 #### 3. Run the local lookbook app
 
 ```sh
-$ npm start
+$ pnpm lookbook
 ```
 
 ## Copyright and License

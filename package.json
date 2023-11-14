@@ -13,17 +13,16 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "nx run-many -t build",
-    "test": "nx run-many -t test",
-    "lint": "nx run-many -t lint",
-    "test:affected": "nx affected -t test",
-    "clean": "nx run-many -t clean && rimraf dist",
-    "publishNpmPkg": "nx run-many -t publishNpmPkg",
-    "update": "npx npm-check --update",
-    "cbt": "run-s -sn clean build test",
-    "lookbook": "nx dev lookbook",
-    "start": "nx dev lookbook",
-    "ci": "run-s -sn build lint test"
+    "build": "pnpm nx run-many -t build",
+    "test": "pnpm nx run-many -t test",
+    "lint": "pnpm nx run-many -t lint",
+    "test:affected": "pnpm nx affected -t test",
+    "clean": "pnpm nx run-many -t clean && rimraf dist",
+    "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
+    "update": "pnpm exec npm-check --update",
+    "cbt": "pnpm run-s -sn clean build test",
+    "lookbook": "pnpm nx dev lookbook",
+    "ci": "pnpm run-s -sn build lint test"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.12.1",
