@@ -9,16 +9,17 @@ jobs:
     name: Build, Lint and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - run: npm ci
-        name: Install dependencies
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
-      - run: npm run ci
+      - run: pnpm run ci
         name: Run all checks
 
   deploy:
@@ -26,16 +27,17 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - run: npm i
-        name: Install dependencies
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
 
-      - run: npm run publishNpmPkg
+      - run: pnpm run publishNpmPkg
         name: Publish npm packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
