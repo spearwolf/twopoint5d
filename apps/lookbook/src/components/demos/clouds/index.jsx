@@ -1,7 +1,6 @@
-import {OrbitControls} from '@react-three/drei';
 import {Canvas} from '@react-three/fiber';
-import {useControls} from 'leva';
 import {ParallaxProjection, Stage2D} from '@spearwolf/twopoint5d-r3f';
+import {useControls} from 'leva';
 
 import {Clouds} from './Clouds.jsx';
 
@@ -30,7 +29,7 @@ export default function DemoOrDie() {
         />
       </Stage2D>
 
-      <OrbitControls />
+      {/* <OrbitControls /> */}
     </Canvas>
   );
 }
