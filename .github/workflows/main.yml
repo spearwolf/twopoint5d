@@ -19,9 +19,13 @@ jobs:
         with:
           version: 8
           run_install: true
+        env:
+          NPM_TOKEN: xxx
 
       - run: pnpm run ci
         name: Run all checks
+        env:
+          NPM_TOKEN: xxx
 
   deploy:
     name: Deploy packages
@@ -38,6 +42,8 @@ jobs:
         with:
           version: 8
           run_install: true
+        env:
+          NPM_TOKEN: xxx
 
       - run: pnpm run publishNpmPkg
         name: Publish npm packages
