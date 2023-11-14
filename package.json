@@ -6,7 +6,8 @@
   "license": "Apache-2.0",
   "private": true,
   "engines": {
-    "node": ">=18.16"
+    "node": ">=18.16",
+    "pnpm": ">=8.8"
   },
   "workspaces": [
     "packages/*",
@@ -44,6 +45,7 @@
     "@typescript-eslint/parser": "^6.11.0",
     "@vitejs/plugin-react": "^4.1.1",
     "canvas": "^2.11.2",
+    "esbuild": "^0.19.5",
     "eslint": "^8.53.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-import-resolver-typescript": "^3.6.1",

@@ -1,0 +1,77 @@
+{
+  "name": "@spearwolf/twopoint5d-elements",
+  "description": "classes and helpers for creating custom elements for visual effects",
+  "version": "0.0.1-dev",
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "module": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "default": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    },
+    "./bundle.js": {
+      "default": "./dist/bundle.js",
+      "types": "./dist/src/bundle.d.ts"
+    },
+    "./events.js": {
+      "default": "./dist/src/events.js",
+      "types": "./dist/src/events.d.ts"
+    },
+    "./simple-greeting.js": {
+      "default": "./dist/src/simple-greeting.js",
+      "types": "./dist/src/simple-greeting.d.ts"
+    },
+    "./two5-display.js": {
+      "default": "./dist/src/two5-display.js",
+      "types": "./dist/src/two5-display.d.ts"
+    },
+    "./two5-stage2d.js": {
+      "default": "./dist/src/two5-stage2d.js",
+      "types": "./dist/src/two5-stage2d.d.ts"
+    }
+  },
+  "sideEffects": [
+    "build/src/simple-greeting.js",
+    "build/src/two5-display.js",
+    "build/src/two5-stage2d.js",
+    "build/src/components/attachContextRoot.js",
+    "dist/src/simple-greeting.js",
+    "dist/src/two5-display.js",
+    "dist/src/two5-stage2d.js",
+    "dist/src/components/attachContextRoot.js",
+    "dist/src/bundle.js",
+    "dist/bundle.js"
+  ],
+  "scripts": {
+    "tsc": "pnpm exec tsc",
+    "run-s": "pnpm exec run-s -s",
+    "build": "pnpm run-s compile:lib compile:bundle bundle makePackageJson",
+    "compile:lib": "pnpm tsc -b tsconfig.lib.json",
+    "compile:bundle": "pnpm tsc -b tsconfig.bundle.json",
+    "compile:tests": "pnpm tsc -b tsconfig.tests.json",
+    "bundle": "pnpm exec node bundle.mjs",
+    "vitest:run": "pnpm exec vitest tests/src --run",
+    "test": "pnpm compile:tests && pnpm vitest:run",
+    "clean": "pnpm exec rimraf build types dist lib tests",
+    "makePackageJson": "node ../../scripts/makePackageJson.mjs"
+  },
+  "dependencies": {
+    "@lit/context": "^1.0.1",
+    "@spearwolf/eventize": "^3.4.1",
+    "@spearwolf/signalize": "^0.9.0",
+    "@spearwolf/twopoint5d": "^0.3.3",
+    "lit": "3.0.1",
+    "three": "~0.153.0"
+  },
+  "devDependencies": {
+    "@types/three": "~0.153.0"
+  }
+}

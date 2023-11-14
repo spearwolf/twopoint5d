@@ -1,0 +1,24 @@
+{
+  "name": "twopoint5d-elements",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "root": "packages/twopoint5d-elements",
+  "sourceRoot": "{projectRoot}/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["{projectRoot}/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "dependsOn": ["^build"]
+    }
+  },
+  "tags": []
+}
