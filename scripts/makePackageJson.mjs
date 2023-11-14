@@ -11,20 +11,27 @@ console.log('projectRoot:', projectRoot);
 const packageJsonPath = path.resolve(projectRoot, 'package.json');
 const inPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
+const packageJsonOverridePath = path.resolve(projectRoot, 'package.override.json');
+const packageJsonOverride = fs.existsSync(packageJsonOverridePath)
+  ? JSON.parse(fs.readFileSync(packageJsonOverridePath, 'utf8'))
+  : {};
+
 const outPackageJson = {
   ...inPackageJson,
 };
-
-['scripts', 'devDependencies', 'rollup', 'nx', 'prettier', 'jest'].forEach((key) => {
-  if (key in outPackageJson) {
-    delete outPackageJson[key];
-  }
-});
 
 [[outPackageJson, ['main', 'module', 'types']], [outPackageJson.exports]].forEach(remmoveDistPathPrefix);
 
 resolveDependencies(outPackageJson.dependencies);
 resolveDependencies(outPackageJson.peerDependencies);
+
+for (const [key, value] of Object.entries(packageJsonOverride)) {
+  if (value == null) {
+    delete outPackageJson[key];
+  } else {
+    outPackageJson[key] = value;
+  }
+}
 
 const releasePackageJsonPath = path.resolve(projectRoot, 'dist/package.json');
 console.log('Write to', releasePackageJsonPath);
