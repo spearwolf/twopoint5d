@@ -1,6 +1,6 @@
 {
   "include": ["src"],
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "rootDir": "./src",
 
@@ -9,9 +9,6 @@
 
     "noEmit": false,
     "outDir": "dist/lib",
-    "sourceMap": true,
-    "declaration": true,
-    "declarationDir": "dist/lib",
-    "declarationMap": true
+    "declarationDir": "dist/lib"
   }
 }

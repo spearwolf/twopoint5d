@@ -4,12 +4,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "astro dev --host",
-    "start": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro:check": "astro check",
-    "astro": "astro"
+    "dev": "pnpm exec astro dev --host",
+    "start": "pnpm exec astro dev",
+    "build": "pnpm exec astro build",
+    "preview": "pnpm exec astro preview",
+    "astro:check": "pnpm exec astro check",
+    "astro": "pnpm exec astro"
   },
   "dependencies": {
     "@astrojs/react": "^2.2.1",

@@ -20,13 +20,13 @@
   "module": "dist/lib/index.js",
   "types": "dist/lib/index.d.ts",
   "scripts": {
-    "compile": "tsc",
-    "build": "run-s -sn compile makePackageJson",
-    "clean": "rimraf build types dist",
-    "test": "vitest --run",
+    "compile": "pnpm tsc",
+    "build": "pnpm run-s -sn compile makePackageJson",
+    "clean": "pnpm rimraf build types dist",
+    "test": "pnpm vitest --run",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "checkPkgTypes": "cd dist && npx attw --pack --ignore-rules cjs-resolves-to-esm",
-    "_publishNpmPkg": "npm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
+    "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm",
+    "_publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.13.0",

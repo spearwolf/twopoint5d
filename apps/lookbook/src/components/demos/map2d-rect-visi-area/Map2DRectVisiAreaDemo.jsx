@@ -1,7 +1,4 @@
-import {OrbitControls} from '@react-three/drei';
 import {extend, useThree} from '@react-three/fiber';
-import {useControls} from 'leva';
-import {useEffect, useState} from 'react';
 import {RectangularVisibilityArea} from '@spearwolf/twopoint5d';
 import {
   Map2DLayer3D,
@@ -16,6 +13,8 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d-r3f';
+import {useControls} from 'leva';
+import {useEffect, useState} from 'react';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';
 import {useDemoStore} from './useDemoStore';
 
@@ -67,7 +66,7 @@ export const Map2DRectVisiAreaDemo = () => {
   });
 
   const pointerPanDisabled = activeCamera === 'cam1';
-  const orbitAround = activeCamera === 'cam1';
+  // const orbitAround = activeCamera === 'cam1';
   const showMap2DCamera = activeCamera === 'cam3';
 
   useEffect(() => {
@@ -80,7 +79,7 @@ export const Map2DRectVisiAreaDemo = () => {
     <>
       <PanControl2D onUpdate={setCenter} pointerDisabled={pointerPanDisabled} pixelsPerSecond={300} />
 
-      {orbitAround && <OrbitControls makeDefault />}
+      {/* {orbitAround && <OrbitControls makeDefault />} */}
 
       <Stage2D noAutoRender defaultCamera={showMap2DCamera}>
         <ParallaxProjection plane="xz" origin="top left" width={viewWidth} height={viewHeight} fit={viewFit} />
