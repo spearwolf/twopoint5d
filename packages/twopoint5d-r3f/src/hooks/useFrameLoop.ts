@@ -61,8 +61,8 @@ const constructArgs = <Params extends FrameStateMachineParams>(args: Params): No
       isForwardRefValue(value)
         ? value.current
         : (value as NullableValue<any>)?.[isNullable$]
-        ? (value as NullableValue<any>).value
-        : value,
+          ? (value as NullableValue<any>).value
+          : value,
     ]),
   ) as NonNullParams<Params>;
 
