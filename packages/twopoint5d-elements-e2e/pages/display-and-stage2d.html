@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>display-and-stage2d (twopoint5d-elements-e2e)</title>
+  </head>
+  <body>
+    <script type="module" src="/src/display-and-stage2d.ts"></script>
+    <main class="two5-display-container">
+      <two5-display class="two5-display">
+        <x-texture-store src="/assets/textures.json">
+          <x-frame-buffer name="out1" width="640" height="480">
+            <two5-stage2d id="stage2d" projection-type="parallax" width="197" height="205"></two5-stage2d>
+          </x-frame-buffer>
+        </x-texture-store>
+      </two5-display>
+    </main>
+  </body>
+</html>

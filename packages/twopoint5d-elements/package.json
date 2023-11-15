@@ -67,7 +67,7 @@
     "@lit/context": "^1.0.1",
     "@spearwolf/eventize": "^3.4.1",
     "@spearwolf/signalize": "^0.9.0",
-    "@spearwolf/twopoint5d": "^0.3.3",
+    "@spearwolf/twopoint5d": "workspace:*",
     "lit": "3.0.1",
     "three": "~0.153.0"
   },

@@ -1,0 +1,30 @@
+{
+  "name": "twopoint5d-elements-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "root": "packages/twopoint5d-elements-e2e",
+  "sourceRoot": "{projectRoot}/src",
+  "projectType": "e2e",
+  "targets": {
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": [
+          "{projectRoot}/src/**/*.ts",
+          "{projectRoot}/src/**/*.js",
+          "{projectRoot}/tests/**/*.ts",
+          "{projectRoot}/tests/**/*.js"
+        ]
+      }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "outputs": ["{projectRoot}/playwright-report", "{projectRoot}/test-results"],
+      "dependsOn": ["^build", "build"]
+    }
+  },
+  "tags": []
+}

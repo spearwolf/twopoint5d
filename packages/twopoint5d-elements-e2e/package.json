@@ -1,0 +1,34 @@
+{
+  "name": "twopoint5d-elements-e2e",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "tsc": "pnpm exec tsc",
+    "run-s": "pnpm exec run-s -s",
+    "playwright": "pnpm exec playwright",
+    "vite": "pnpm exec vite",
+    "dev": "pnpm vite",
+    "build": "pnpm tsc && pnpm vite build",
+    "vite:preview": "pnpm vite preview --host",
+    "preview": "pnpm run-s build vite:preview",
+    "clean": "pnpm exec rimraf build dist playwright-report test-results",
+    "test:ui": "pnpm playwright test --ui",
+    "show-report": "pnpm playwright show-report",
+    "test": "pnpm playwright test"
+  },
+  "dependencies": {
+    "@spearwolf/twopoint5d": "workspace:*",
+    "@spearwolf/twopoint5d-elements": "workspace:*",
+    "three": "0.153"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.38.1",
+    "@types/three": "0.153",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.5"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "items": {
+    "ballPatternRot": {
+      "imageUrl": "/assets/ball-pattern-rot--not-power-of-2.png",
+      "texture": ["nearest", "flipy", "srgb"]
+    }
+  }
+}
