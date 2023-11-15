@@ -22,6 +22,10 @@ jobs:
         env:
           NPM_TOKEN: xxx
 
+      - uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
       - run: pnpm run ci
         name: Run all checks
         env:
