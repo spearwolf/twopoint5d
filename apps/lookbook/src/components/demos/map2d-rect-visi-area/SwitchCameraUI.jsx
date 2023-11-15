@@ -1,6 +1,6 @@
 import {useCallback} from 'react';
 import {css, styled} from 'styled-components';
-import {useDemoStore} from './useDemoStore';
+import {useDemoStore} from './useDemoStore.js';
 
 const Layout = styled.div`
   position: fixed;

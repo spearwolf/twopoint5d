@@ -13,7 +13,7 @@ import {useEffect, useRef} from 'react';
 import {AdditiveBlending, FrontSide} from 'three';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';
 import {createFrameLoopComponent} from '../../../demos/utils/createFrameLoopComponent.js';
-import {CloudSprites} from './CloudSprites';
+import {CloudSprites} from './CloudSprites.js';
 
 const ShaderLib = {
   fadeInOutZRange_uniform: `

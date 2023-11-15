@@ -1,24 +1,34 @@
 {
   "root": true,
   "ignorePatterns": ["**/*"],
-  "plugins": ["@nx", "import", "prettier"],
-  "extends": ["plugin:import/recommended", "plugin:prettier/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "@nx", "import", "require-extensions", "react", "prettier"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:import/typescript",
+    "plugin:require-extensions/recommended",
+    "plugin:astro/recommended",
+    "plugin:prettier/recommended"
+  ],
   "env": {
     "browser": true
   },
   "settings": {
     "import/parsers": {
-      "@typescript-eslint/parser": [".ts", ".js"]
+      "@typescript-eslint/parser": [".js", ".mjs", ".jsx", ".ts", ".tsx"]
     },
     "import/resolver": {
-      "typescript": {
-        "alwaysTryTypes": true
-      }
+      "typescript": true,
+      "node": true
+    },
+    "react": {
+      "version": "detect"
     }
   },
   "overrides": [
     {
-      "files": ["*.ts", "*.tsx", "*.js", "*.mjs", "*.jsx"],
+      "files": ["**/*.{js,jsx,mjs,ts,tsx}"],
       "rules": {
         "@nx/enforce-module-boundaries": [
           "error",
@@ -33,13 +43,7 @@
             ]
           }
         ],
-        "prettier/prettier": "error"
-      }
-    },
-    {
-      "files": ["*.ts", "*.tsx"],
-      "extends": ["plugin:@nx/typescript", "plugin:import/typescript"],
-      "rules": {
+        "prettier/prettier": "error",
         "@typescript-eslint/ban-ts-comment": 0,
         "@typescript-eslint/ban-ts-ignore": 0,
         "@typescript-eslint/ban-types": 0,
@@ -48,7 +52,19 @@
         "@typescript-eslint/no-explicit-any": 0,
         "@typescript-eslint/no-non-null-assertion": 0,
         "@typescript-eslint/no-unused-vars": ["error", {"vars": "all", "args": "after-used", "argsIgnorePattern": "^_"}],
-        "@typescript-eslint/no-unsafe-declaration-merging": 0
+        "@typescript-eslint/no-unsafe-declaration-merging": 0,
+        "@typescript-eslint/no-this-alias": 0
+      }
+    },
+    {
+      "files": ["*.astro"],
+      "parser": "astro-eslint-parser",
+      "rules": {
+        "prettier/prettier": "error"
+      },
+      "parserOptions": {
+        "parser": "@typescript-eslint/parser",
+        "extraFileExtensions": [".astro"]
       }
     },
     {

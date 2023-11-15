@@ -16,7 +16,7 @@ import {
 import {useControls} from 'leva';
 import {useEffect, useState} from 'react';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';
-import {useDemoStore} from './useDemoStore';
+import {useDemoStore} from './useDemoStore.js';
 
 extend({RectangularVisibilityArea});
 
