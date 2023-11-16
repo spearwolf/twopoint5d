@@ -1,4 +1,3 @@
-export * from './CustomChunksShaderMaterial.js';
 export * from './FrameBasedAnimations.js';
 export * from './InstancedVertexObjectGeometry.js';
 export * from './PowerOf2ImageLoader.js';

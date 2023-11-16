@@ -71,8 +71,6 @@ export type BufferLike = InterleavedBuffer | BufferAttribute;
 
 export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
-export type TextureSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
-
 export interface VertexObjectBuffersData {
   capacity: number;
   usedCount: number;
