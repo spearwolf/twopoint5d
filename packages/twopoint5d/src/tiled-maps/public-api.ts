@@ -12,4 +12,4 @@ export * from './Map2DTileCoordsUtil.js';
 export * from './Map2DTileSprites.js';
 export * from './RectangularVisibilityArea.js';
 export * from './RepeatingTilesProvider.js';
-export * from './chunkQuadTree/public-api.js';
+export * from './chunk-quad-tree/public-api.js';
