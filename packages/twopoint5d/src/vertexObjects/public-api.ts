@@ -19,4 +19,3 @@ export * from './constants.js';
 export * from './findNextPowerOf2.js';
 export * from './getDescriptorOf.js';
 export type * from './types.js';
-export * from './unpick.js';
