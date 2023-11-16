@@ -1,8 +1,7 @@
 import {ImageLoader} from 'three';
-
+import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
+import {isPowerOf2} from '../utils/isPowerOf2.js';
 import {TextureCoords} from './TextureCoords.js';
-import {findNextPowerOf2} from './findNextPowerOf2.js';
-import {isPowerOf2} from './isPowerOf2.js';
 
 export interface ImageWithTexCoords {
   imgEl: HTMLImageElement | HTMLCanvasElement;

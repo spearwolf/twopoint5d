@@ -16,6 +16,5 @@ export * from './VertexObjectGeometry.js';
 export * from './VertexObjectPool.js';
 export * from './VertexObjects.js';
 export * from './constants.js';
-export * from './findNextPowerOf2.js';
 export * from './getDescriptorOf.js';
 export type * from './types.js';
