@@ -31,6 +31,15 @@ jobs:
         env:
           NPM_TOKEN: xxx
 
+      - name: Upload twopoint5d-elements-e2e test-results artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          retention-days: 3
+          name: twopoint5d-elements-e2e-test-results
+          path: |
+            packages/twopoint5d-elements-e2e/test-results
+
   deploy:
     name: Deploy packages
     needs: ci
