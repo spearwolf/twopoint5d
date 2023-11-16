@@ -1,5 +1,5 @@
-import {InstancedVertexObjectGeometry} from '../vertexObjects/InstancedVertexObjectGeometry.js';
-import {BaseSprite, BaseSpriteDescriptor} from './BaseSprite.js';
+import {InstancedVertexObjectGeometry} from '../../vertexObjects/InstancedVertexObjectGeometry.js';
+import {BaseSprite, BaseSpriteDescriptor} from '../BaseSprite.js';
 import {TexturedSprite, TexturedSpriteDescriptor} from './TexturedSprite.js';
 
 export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<TexturedSprite, BaseSprite> {

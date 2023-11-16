@@ -1,4 +1,4 @@
-import type {VertexObjectDescription, VO} from '../vertexObjects/types.js';
+import type {VertexObjectDescription, VO} from '../../vertexObjects/types.js';
 
 export interface AnimatedSprite extends VO {
   width: number;
