@@ -1,4 +1,4 @@
-import type {VertexObjectDescription, VO} from '../../vertexObjects/types.js';
+import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
 
 export interface TileBaseSprite extends VO {
   setPosition(position: number[]): void;

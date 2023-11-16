@@ -3,7 +3,7 @@ import {Vector2, Vector3} from 'three';
 import type {TileSprite} from '../sprites/TileSprites/descriptors.js';
 import {TileSprites} from '../sprites/TileSprites/TileSprites.js';
 import {TileSet} from '../texture/TileSet.js';
-import {VertexObjectPool} from '../vertexObjects/VertexObjectPool.js';
+import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import {Map2DTile} from './Map2DTile.js';
