@@ -209,6 +209,9 @@ importers:
       '@spearwolf/eventize':
         specifier: ^3.4.1
         version: 3.4.1
+      '@spearwolf/signalize':
+        specifier: ^0.9.0
+        version: 0.9.0(@spearwolf/eventize@3.4.1)
       three:
         specifier: ^0.153
         version: 0.153.0

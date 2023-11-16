@@ -1,5 +1,6 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, value, type SignalFuncs, type SignalReader} from '@spearwolf/signalize';
+import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -81,16 +82,11 @@ export class TextureResource {
 
   // TODO static fromAtlas()
 
-  #renderer = createSignal<WebGLRenderer | undefined>();
-  #imageUrl: SignalFuncs<string | undefined> = createSignal();
-  #imageCoords: SignalFuncs<TextureCoords | undefined> = createSignal(undefined, {compareFn: cmpTexCoords});
   #atlasUrl?: SignalFuncs<string | undefined>;
   #atlas?: SignalFuncs<TextureAtlas | undefined>;
   #tileSetOptions?: SignalFuncs<TileSetOptions | undefined>;
   #tileSet?: SignalFuncs<TileSet | undefined>;
   #textureClasses: SignalFuncs<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
-  #textureFactory: SignalFuncs<TextureFactory | undefined> = createSignal();
-  #texture: SignalFuncs<Texture | undefined> = createSignal();
 
   #createTileSetOptionsSignal(tileSetOptions: TileSetOptions | undefined) {
     if (this.#tileSetOptions == null) {
@@ -103,29 +99,11 @@ export class TextureResource {
 
   refCount: number = 0;
 
-  get imageUrl(): string | undefined {
-    return value(this.#imageUrl[0]);
-  }
+  @signal({readAsValue: true}) accessor imageUrl: string | undefined;
+  @signalReader() accessor imageUrl$: SignalReader<string | undefined>;
 
-  get imageUrl$(): SignalReader<string | undefined> {
-    return this.#imageUrl[0];
-  }
-
-  set imageUrl(value: string | undefined) {
-    this.#imageUrl[1](value);
-  }
-
-  get imageCoords(): TextureCoords | undefined {
-    return value(this.#imageCoords[0]);
-  }
-
-  get imageCoords$(): SignalReader<TextureCoords | undefined> {
-    return this.#imageCoords[0];
-  }
-
-  set imageCoords(value: TextureCoords | undefined) {
-    this.#imageCoords[1](value);
-  }
+  @signal({readAsValue: true, compareFn: cmpTexCoords}) accessor imageCoords: TextureCoords | undefined;
+  @signalReader() accessor imageCoords$: SignalReader<TextureCoords | undefined>;
 
   get atlasUrl(): string | undefined {
     return this.#atlasUrl && value(this.#atlasUrl[0]);
@@ -198,41 +176,14 @@ export class TextureResource {
     this.#textureClasses[1](value);
   }
 
-  get textureFactory(): TextureFactory | undefined {
-    return value(this.#textureFactory[0]);
-  }
+  @signal({readAsValue: true}) accessor textureFactory: TextureFactory | undefined;
+  @signalReader() accessor textureFactory$: SignalReader<TextureFactory | undefined>;
 
-  get textureFactory$(): SignalReader<TextureFactory | undefined> {
-    return this.#textureFactory[0];
-  }
+  @signal({readAsValue: true}) accessor texture: Texture | undefined;
+  @signalReader() accessor texture$: SignalReader<Texture | undefined>;
 
-  set textureFactory(value: TextureFactory | undefined) {
-    this.#textureFactory[1](value);
-  }
-
-  get texture(): Texture | undefined {
-    return value(this.#texture[0]);
-  }
-
-  get texture$(): SignalReader<Texture | undefined> {
-    return this.#texture[0];
-  }
-
-  set texture(value: Texture | undefined) {
-    this.#texture[1](value);
-  }
-
-  get renderer(): WebGLRenderer | undefined {
-    return value(this.#renderer[0]);
-  }
-
-  get renderer$(): SignalReader<WebGLRenderer | undefined> {
-    return this.#renderer[0];
-  }
-
-  set renderer(value: WebGLRenderer | undefined) {
-    this.#renderer[1](value);
-  }
+  @signal({readAsValue: true}) accessor renderer: WebGLRenderer | undefined;
+  @signalReader() accessor renderer$: SignalReader<WebGLRenderer | undefined>;
 
   #load = false;
 
@@ -294,9 +245,9 @@ export class TextureResource {
         }
       }, [this.textureFactory$, this.imageUrl$]);
 
-      if (this.#tileSetOptions) {
+      if (this.tileSetOptions) {
         createEffect(async () => {
-          if (this.#imageCoords && this.#tileSetOptions) {
+          if (this.imageCoords && this.tileSetOptions) {
             this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
           }
         }, [this.imageCoords$, this.tileSetOptions$]);
