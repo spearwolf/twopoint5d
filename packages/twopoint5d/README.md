@@ -21,17 +21,17 @@ The core features can be roughly classified into the following areas:
 - render as billboards
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
-#### 📚 [texture atlases and tilesets](src/vertexObjects/)
+#### 📚 [texture atlases and tilesets](src/vertex-objects/)
 - load texture atlases from json
 - create tilesets from images
 - :heavy_check_mark: api is stable and ready to use
 
-#### 📚 [tiled-maps](src/tiledMaps/)
+#### 📚 [tiled-maps](src/tiled-maps/)
 - create and render tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
 - api docs: [docs/Map2D](../../docs/Map2D.md)
 - :warning: work in progress
 
-#### 📚 [vertex-objects](src/vertexObjects/)
+#### 📚 [vertex-objects](src/vertex-objects/)
 
 three.js offers standardized geometry properties like position, normal, colors, etc.. For rendering, triangles are almost always used as primtives.
 

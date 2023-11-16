@@ -23,13 +23,13 @@ For simplicity, it is assumed that the tiles are located in a 2D coordinate syst
 
 #### The Source of the Tile IDs
 
-The tile IDs are read out via the [IMap2DTileDataProvider](../packages/twopoint5d/src/tiledMaps/IMap2DTileDataProvider.ts) interface.
+The tile IDs are read out via the [IMap2DTileDataProvider](../packages/twopoint5d/src/tiled-maps/IMap2DTileDataProvider.ts) interface.
 
 Tile IDs start at `1` and are unsigned integers, where `0` means there is no tile there.
 
 ##### RepeatingTilesProvider
 
-The [RepeatingTilesProvider](../packages/twopoint5d/src/tiledMaps/RepeatingTilesProvider.ts) is an easy to use tile data provider which repeats a 2D pattern of tile IDs endlessly.
+The [RepeatingTilesProvider](../packages/twopoint5d/src/tiled-maps/RepeatingTilesProvider.ts) is an easy to use tile data provider which repeats a 2D pattern of tile IDs endlessly.
 Very handy when you just want a constantly repeating background.
 
 If you want you can limit the repeat to only horizontal or only vertical.
@@ -38,7 +38,7 @@ If you want you can limit the repeat to only horizontal or only vertical.
 
 #### From Tile to 2D Coordinates
 
-The [Map2DTileCoordsUtil](../packages/twopoint5d/src/tiledMaps/Map2DTileCoordsUtil.ts) does the mapping from 2D _world_ coordinates to _tile_ coordinates.
+The [Map2DTileCoordsUtil](../packages/twopoint5d/src/tiled-maps/Map2DTileCoordsUtil.ts) does the mapping from 2D _world_ coordinates to _tile_ coordinates.
 
 the origin of the 2D coordinate system is assumed to be in the upper left corner (with the y-axis pointing down).
 
@@ -48,8 +48,8 @@ the origin of the 2D coordinate system is assumed to be in the upper left corner
 
 > TODO the docs are a bit outdated, the IMap2DVisibilitor interface is a recently added feature
 
-In a [Map2DLayer](../packages/twopoint5d/src/tiledMaps/Map2DLayer.ts), the world is divided into a static grid with [tiles](../packages/twopoint5d/src/tiledMaps/Map2DTile.ts) of equal size.
-Which tiles are displayed is determined by the _view area_ (which is an [AABB2](../packages/twopoint5d/src/tiledMaps/AABB2.ts)) of the layer.
+In a [Map2DLayer](../packages/twopoint5d/src/tiled-maps/Map2DLayer.ts), the world is divided into a static grid with [tiles](../packages/twopoint5d/src/tiled-maps/Map2DTile.ts) of equal size.
+Which tiles are displayed is determined by the _view area_ (which is an [AABB2](../packages/twopoint5d/src/tiled-maps/AABB2.ts)) of the layer.
 
 ![Map2dLayer class diagram](tiledMaps/Map2dLayer.svg)
 
@@ -57,11 +57,11 @@ The layer does not render the tiles itself, it only manages which tiles are visi
 
 ![Map2dLayer update](tiledMaps/Map2dLayer-renderViewArea.svg)
 
-Every time the _view area_ is updated (by calling `map2dLayer.update()` in combination with changes to the map2d layer properties), the [IMap2DTileRenderer](../packages/twopoint5d/src/tiledMaps/IMap2DTileRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
+Every time the _view area_ is updated (by calling `map2dLayer.update()` in combination with changes to the map2d layer properties), the [IMap2DTileRenderer](../packages/twopoint5d/src/tiled-maps/IMap2DTileRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
 
 ![Map2dLayer update view area](tiledMaps/Map2dLayer-update-view-area.svg)
 
-The [IMap2DTileRenderer](../packages/twopoint5d/src/tiledMaps/IMap2DTileRenderer.ts) is responsible for the display of the tiles.
+The [IMap2DTileRenderer](../packages/twopoint5d/src/tiled-maps/IMap2DTileRenderer.ts) is responsible for the display of the tiles.
 
 ##### CameraBasedVisibility
 
