@@ -1,26 +1,5 @@
 import type {Stage2D} from '@spearwolf/twopoint5d';
-import type {WebGLRenderer} from 'three';
-import type {IStageRenderer, StageType} from './twopoint5d/IStageRenderer.js';
-
-/**
- * published by the SimpleStageRenderer
- */
-export const StageAdded = 'stageadded';
-
-export interface StageAddedProps {
-  stage: StageType;
-  renderer: IStageRenderer;
-}
-
-/**
- * published by the SimpleStageRenderer
- */
-export const StageRemoved = 'stageremoved';
-
-export interface StageRemovedProps {
-  stage: StageType;
-  renderer: IStageRenderer;
-}
+import type {StageRenderFrame, StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
 
 /**
  * published by the <two5-stage2d> element as object event and customevent
@@ -38,20 +17,6 @@ export interface StageResizeProps {
 
 export interface StageResizeEvent extends Event {
   detail?: StageResizeProps;
-}
-
-/**
- * published by the <two5-stage2d> element as object event and customevent
- */
-export const StageRenderFrame = 'stagerenderframe';
-
-export interface StageRenderFrameProps {
-  width: number;
-  height: number;
-  renderer: WebGLRenderer;
-  now: number;
-  deltaTime: number;
-  frameNo: number;
 }
 
 export interface StageRenderFrameEvent extends Event {

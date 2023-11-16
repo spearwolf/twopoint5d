@@ -1,14 +1,10 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, value, type SignalFuncs, type SignalReader} from '@spearwolf/signalize';
-import {
-  TextureCoords,
-  TextureFactory,
-  TileSet,
-  type TextureAtlas,
-  type TextureOptionClasses,
-  type TileSetOptions,
-} from '@spearwolf/twopoint5d';
 import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
+import type {TextureAtlas} from './TextureAtlas.js';
+import {TextureCoords} from './TextureCoords.js';
+import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
+import {TileSet, type TileSetOptions} from './TileSet.js';
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
 export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture';

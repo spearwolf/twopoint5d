@@ -6,23 +6,17 @@ import {
   ParallaxProjection,
   Stage2D,
   type IProjection,
+  type IStageRenderer,
   type OrthographicProjectionSpecs,
   type ParallaxProjectionSpecs,
   type ProjectionPlaneDescription,
 } from '@spearwolf/twopoint5d';
+import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
 import {stageRendererContext} from '../context/stage-renderer-context.js';
-import {
-  StageFirstFrame,
-  StageRenderFrame,
-  StageResize,
-  type StageFirstFrameProps,
-  type StageRenderFrameProps,
-  type StageResizeProps,
-} from '../events.js';
-import type {IStageRenderer} from '../twopoint5d/IStageRenderer.js';
+import {StageFirstFrame, StageResize, type StageFirstFrameProps, type StageResizeProps} from '../events.js';
 import {SignalMap} from '../utils/SignalMap.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';

@@ -1,4 +1,5 @@
-import {Stage2DElement, TextureStore} from '@spearwolf/twopoint5d-elements';
+import {TextureStore} from '@spearwolf/twopoint5d';
+import {Stage2DElement} from '@spearwolf/twopoint5d-elements';
 import type {StageFirstFrameProps} from '@spearwolf/twopoint5d-elements/events.js';
 import '@spearwolf/twopoint5d-elements/two5-display.js';
 import '@spearwolf/twopoint5d-elements/two5-stage2d.js';

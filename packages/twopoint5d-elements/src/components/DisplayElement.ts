@@ -1,10 +1,8 @@
 import {provide} from '@lit/context';
-import {Display, type DisplayParameters} from '@spearwolf/twopoint5d';
+import {Display, StageRenderer, type DisplayParameters, type IStageRenderer} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {displayContext} from '../context/display-context.js';
 import {stageRendererContext} from '../context/stage-renderer-context.js';
-import type {IStageRenderer} from '../twopoint5d/IStageRenderer.js';
-import {SimpleStageRenderer} from '../twopoint5d/SimpleStageRenderer.js';
 import {readBooleanAttribute} from '../utils/readBooleanAttribute.js';
 import {readStringAttribute} from '../utils/readStringAttribute.js';
 import {whenDefined} from '../utils/whenDefined.js';
@@ -146,7 +144,7 @@ export class DisplayElement extends TwoPoint5DElement {
 
     this.display.on(this);
 
-    this.stageRenderer = new SimpleStageRenderer();
+    this.stageRenderer = new StageRenderer();
     this.stageRenderer.attach(this.display);
 
     this.display.start();

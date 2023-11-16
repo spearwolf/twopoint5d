@@ -1,17 +1,19 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
-import {Display, Stage2D} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
+import {Display} from '../display/Display.js';
 import {
   StageAdded,
   StageRemoved,
   StageRenderFrame,
+  UnsubscribeFromParent,
   type StageAddedProps,
   type StageRemovedProps,
   type StageRenderFrameProps,
 } from '../events.js';
 import type {IStageRenderer, StageParentType, StageType} from './IStageRenderer.js';
+import {Stage2D} from './Stage2D.js';
 
-export interface SimpleStageRenderer extends Eventize {}
+export interface StageRenderer extends Eventize {}
 
 interface StageItem {
   stage: StageType;
@@ -19,10 +21,7 @@ interface StageItem {
   height: number;
 }
 
-const UnsubscribeFromParent = 'unsubscribeFromParent';
-
-// TODO rename to StageRenderer
-export class SimpleStageRenderer implements IStageRenderer {
+export class StageRenderer implements IStageRenderer {
   #parent?: StageParentType;
 
   width: number = 0;

@@ -1,8 +1,9 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
 import {batch, createSignal, value, type SignalReader} from '@spearwolf/signalize';
-import {type TextureOptionClasses, type TileSetOptions} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
+import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
+import type {TileSetOptions} from './TileSet.js';
 
 export interface TextureStoreItem {
   imageUrl?: string;

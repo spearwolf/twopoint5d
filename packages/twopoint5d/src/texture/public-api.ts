@@ -6,6 +6,8 @@ export * from './TextureCoords.js';
 export * from './TextureFactory.js';
 export * from './TextureImageLoader.js';
 export * from './TexturePackerJson.js';
+export * from './TextureResource.js';
+export * from './TextureStore.js';
 export * from './TileSet.js';
 export * from './TileSetLoader.js';
 export type * from './types.js';

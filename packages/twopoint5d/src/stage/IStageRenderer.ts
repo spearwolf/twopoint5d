@@ -1,5 +1,6 @@
-import type {Display, Stage2D} from '@spearwolf/twopoint5d';
 import type {WebGLRenderer} from 'three';
+import type {Display} from '../display/Display.js';
+import type {Stage2D} from './Stage2D.js';
 
 export type StageParentType = Display | IStageRenderer;
 export type StageType = Stage2D | IStageRenderer;
