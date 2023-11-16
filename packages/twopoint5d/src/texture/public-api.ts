@@ -1,7 +1,12 @@
 export * from './CustomChunksShaderMaterial.js';
+export * from './FrameBasedAnimations.js';
+export * from './PowerOf2ImageLoader.js';
 export * from './TextureAtlas.js';
+export * from './TextureAtlasLoader.js';
 export * from './TextureCoords.js';
 export * from './TextureFactory.js';
+export * from './TextureImageLoader.js';
 export * from './TexturePackerJson.js';
 export * from './TileSet.js';
+export * from './TileSetLoader.js';
 export type * from './types.js';

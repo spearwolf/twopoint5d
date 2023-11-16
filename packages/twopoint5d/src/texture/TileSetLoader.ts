@@ -1,9 +1,9 @@
 import {Texture} from 'three';
-import {TextureCoords} from '../texture/TextureCoords.js';
-import {TextureFactory, type TextureOptionClasses} from '../texture/TextureFactory.js';
-import {TileSet, type TileSetOptions} from '../texture/TileSet.js';
-import type {TextureSource} from '../texture/types.js';
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
+import {TextureCoords} from './TextureCoords.js';
+import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
+import {TileSet, type TileSetOptions} from './TileSet.js';
+import type {TextureSource} from './types.js';
 
 export interface TileSetData {
   tileSet: TileSet;

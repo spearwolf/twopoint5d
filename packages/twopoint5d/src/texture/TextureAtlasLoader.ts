@@ -1,8 +1,8 @@
 import {FileLoader} from 'three';
-import {TextureAtlas} from '../texture/TextureAtlas.js';
-import type {TextureOptionClasses} from '../texture/TextureFactory.js';
-import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaData} from '../texture/TexturePackerJson.js';
+import {TextureAtlas} from './TextureAtlas.js';
+import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';
+import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaData} from './TexturePackerJson.js';
 
 export interface TextureAtlasData extends TextureImage {
   atlas: TextureAtlas;
