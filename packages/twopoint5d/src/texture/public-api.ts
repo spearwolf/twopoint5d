@@ -1,4 +1,3 @@
-export * from './CustomChunksShaderMaterial.js';
 export * from './FrameBasedAnimations.js';
 export * from './PowerOf2ImageLoader.js';
 export * from './TextureAtlas.js';

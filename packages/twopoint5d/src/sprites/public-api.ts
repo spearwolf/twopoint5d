@@ -3,6 +3,7 @@ export * from './AnimatedSprites/AnimatedSprites.js';
 export * from './AnimatedSprites/AnimatedSpritesGeometry.js';
 export * from './AnimatedSprites/AnimatedSpritesMaterial.js';
 export * from './BaseSprite.js';
+export * from './CustomChunksShaderMaterial.js';
 export * from './ShaderTool.js';
 export * from './TexturedSprites/TexturedSprite.js';
 export * from './TexturedSprites/TexturedSprites.js';
