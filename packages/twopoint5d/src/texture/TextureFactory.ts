@@ -10,7 +10,7 @@ import {
   type TextureFilter,
 } from 'three';
 
-import type {TextureSource} from '../texture/types.js';
+import type {TextureSource} from './types.js';
 
 export interface TextureOptions {
   magFilter: TextureFilter;

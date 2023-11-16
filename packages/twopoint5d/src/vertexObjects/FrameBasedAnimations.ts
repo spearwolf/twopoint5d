@@ -1,8 +1,8 @@
 import {DataTexture, FloatType, RGBAFormat} from 'three';
+import {TextureAtlas} from '../texture/TextureAtlas.js';
+import {TextureCoords} from '../texture/TextureCoords.js';
+import {TileSet} from '../texture/TileSet.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
-import {TextureAtlas} from './TextureAtlas.js';
-import {TextureCoords} from './TextureCoords.js';
-import {TileSet} from './TileSet.js';
 
 type AnimName = string | symbol;
 

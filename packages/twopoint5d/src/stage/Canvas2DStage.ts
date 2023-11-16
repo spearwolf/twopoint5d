@@ -1,6 +1,6 @@
 import {eventize, type EventizeApi} from '@spearwolf/eventize';
 import {Sprite, SpriteMaterial, Texture, type Scene, type WebGLRenderer} from 'three';
-import {TextureFactory} from '../vertexObjects/TextureFactory.js';
+import {TextureFactory} from '../texture/TextureFactory.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
 
