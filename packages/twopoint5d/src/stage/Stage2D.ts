@@ -3,18 +3,24 @@ import {Camera, Scene, WebGLRenderer} from 'three';
 
 import type {IProjection} from './IProjection.js';
 
-export interface Stage2D extends Eventize {}
-
+// TODO move to events.js ?
 export interface Stage2DRenderFrameProps {
   stage: Stage2D;
   renderer: WebGLRenderer;
 
   /**
-   * you do not need to call this callback yourself. it is normally done after the event.
-   * however, you can use this callback to control when the THREE.WebGLRenderer is called.
+   * You do not need to call this callback yourself. It's normally done after the event.
+   * However, you can use this callback to control when the THREE.WebGLRenderer is called.
+   *
+   * This is how the stage is rendered: `renderer.render(stage.scene, stage.camera)`
+   *
+   * If you provide a `renderHook`, then calling renderFrame will not render anything, that's up to you.
+   * In this case, this method will just inform the stage that you have rendered this scene, and the stage should not do it.
    */
-  renderFrame: () => void;
+  renderFrame: (renderHook?: () => void) => void;
 }
+
+export interface Stage2D extends Eventize {}
 
 /**
  * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
@@ -30,6 +36,7 @@ export interface Stage2DRenderFrameProps {
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
  */
 export class Stage2D {
+  // TODO move to events.js
   static readonly Resize = 'resize';
   static readonly AfterCameraChanged = 'afterCameraChanged';
   static readonly RenderFrame = 'renderFrame';
