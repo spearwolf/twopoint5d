@@ -73,7 +73,7 @@ export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.C
 
 // ============================================================
 
-export const UnsubscribeFromParent = 'unsubscribeFromParent';
+export const RemoveFromParent = 'removeFromParent';
 
 // ============================================================
 

@@ -1,7 +1,7 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
 import type {WebGLRenderer} from 'three';
 import {Display} from '../display/Display.js';
-import {StageAdded, StageRemoved, UnsubscribeFromParent, type StageAddedProps, type StageRemovedProps} from '../events.js';
+import {RemoveFromParent, StageAdded, StageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
 import type {IStageRenderer, StageParentType, StageType} from './IStageRenderer.js';
 
 interface StageItem {
@@ -37,7 +37,7 @@ export class StageRenderer implements IStageRenderer {
   }
 
   #removeFromParent(): void {
-    this.emit(UnsubscribeFromParent);
+    this.emit(RemoveFromParent);
 
     if (!(this.#parent instanceof Display)) {
       this.#parent!.removeStage(this);
@@ -54,13 +54,13 @@ export class StageRenderer implements IStageRenderer {
 
   #addToDisplay(display: Display): void {
     this.once(
-      UnsubscribeFromParent,
+      RemoveFromParent,
       display.on('resize', ({width, height}: {width: number; height: number}) => {
         this.resize(width, height);
       }),
     );
     this.once(
-      UnsubscribeFromParent,
+      RemoveFromParent,
       display.on(
         'frame',
         ({renderer, now, deltaTime, frameNo}: {renderer: WebGLRenderer; now: number; deltaTime: number; frameNo: number}) => {
