@@ -126,10 +126,8 @@ export class Stage2DElement extends TwoPoint5DElement {
 
   readonly stage2d = new Stage2D();
 
-  readonly #firstFrame: Promise<FirstFrameProps>;
-
   firstFrame(): Promise<FirstFrameProps> {
-    return this.#firstFrame;
+    return new Promise((resolve) => this.stage2d.once(FirstFrame, resolve));
   }
 
   sceneReady(): Promise<Scene> {
@@ -148,21 +146,6 @@ export class Stage2DElement extends TwoPoint5DElement {
     this.projectionOrigin = 'bottom-left';
 
     this.retain([FirstFrame, StageResize]);
-
-    // TODO move firstFrame event to Stage2D
-    this.#firstFrame = new Promise((resolve) => {
-      this.once(StageResize, (stageResizeProps: Stage2DResizeProps) => {
-        this.once(StageRenderFrame, (stageRenderFrame: StageRenderFrameProps) => {
-          const firstFrameProps: FirstFrameProps = {
-            ...stageRenderFrame,
-            scene: stageResizeProps.stage.scene,
-          };
-          this.emit(FirstFrame, firstFrameProps);
-          this.dispatchEvent(new CustomEvent<FirstFrameProps>(FirstFrame, {bubbles: false, detail: firstFrameProps}));
-          resolve(firstFrameProps);
-        });
-      });
-    });
 
     this.stageRenderer$((stageRenderer) => {
       this.logger?.log('requested stage-renderer context', stageRenderer);
@@ -197,17 +180,24 @@ export class Stage2DElement extends TwoPoint5DElement {
       this.onViewSpecsPropsUpdate();
     }, this.#viewSpecsSignals.getSignals());
 
-    this.stage2d.on(StageResize, (resizeProps: Stage2DResizeProps) => {
-      if (isValidSize(resizeProps)) {
-        this.emit(StageResize, resizeProps);
-        this.dispatchEvent(new CustomEvent<Stage2DResizeProps>(StageResize, {bubbles: false, detail: resizeProps}));
+    this.stage2d.on(StageResize, (props: Stage2DResizeProps) => {
+      if (isValidSize(props)) {
+        this.emit(StageResize, props);
+        this.dispatchEvent(new CustomEvent<Stage2DResizeProps>(StageResize, {bubbles: false, detail: props}));
       }
     });
 
-    this.stage2d.on(StageRenderFrame, (detail: StageRenderFrameProps) => {
-      if (isValidSize(detail)) {
-        this.emit(StageRenderFrame, detail);
-        this.dispatchEvent(new CustomEvent<StageRenderFrameProps>(StageRenderFrame, {bubbles: false, detail}));
+    this.stage2d.once(FirstFrame, (props: FirstFrameProps) => {
+      if (isValidSize(props)) {
+        this.emit(FirstFrame, props);
+        this.dispatchEvent(new CustomEvent<FirstFrameProps>(FirstFrame, {bubbles: false, detail: props}));
+      }
+    });
+
+    this.stage2d.on(StageRenderFrame, (props: StageRenderFrameProps) => {
+      if (isValidSize(props)) {
+        this.emit(StageRenderFrame, props);
+        this.dispatchEvent(new CustomEvent<StageRenderFrameProps>(StageRenderFrame, {bubbles: false, detail: props}));
       }
     });
   }

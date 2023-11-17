@@ -2,9 +2,11 @@ import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
 import {
+  FirstFrame,
   StageAfterCameraChanged,
   StageRenderFrame,
   StageResize,
+  type FirstFrameProps,
   type Stage2DRenderFrameProps,
   type Stage2DResizeProps,
   type StageAfterCameraChangedArgs,
@@ -115,6 +117,8 @@ export class Stage2D implements IStage {
   constructor(projection?: IProjection, scene?: Scene) {
     eventize(this);
 
+    this.retain(FirstFrame);
+
     this.projection = projection;
     this.scene = scene ?? new Scene();
 
@@ -165,6 +169,9 @@ export class Stage2D implements IStage {
 
   #noCameraErrorCount = 0;
 
+  #isFirstFrame = true;
+  #firstFrameProps?: FirstFrameProps;
+
   renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
     const {scene, camera} = this;
     if (scene && camera) {
@@ -184,7 +191,7 @@ export class Stage2D implements IStage {
         }
       };
 
-      this.emit(StageRenderFrame, {
+      const renderFrameProps: Stage2DRenderFrameProps = {
         renderer,
         now,
         deltaTime,
@@ -193,7 +200,18 @@ export class Stage2D implements IStage {
         stage: this,
         width: this.width,
         height: this.height,
-      } as Stage2DRenderFrameProps);
+      };
+
+      if (this.#isFirstFrame) {
+        this.#firstFrameProps = {...renderFrameProps, scene: this.scene};
+        this.emit(FirstFrame, this.#firstFrameProps);
+        this.#isFirstFrame = false;
+      } else if (this.#firstFrameProps != null) {
+        Object.assign(this.#firstFrameProps, renderFrameProps);
+        this.#firstFrameProps.scene = this.scene;
+      }
+
+      this.emit(StageRenderFrame, renderFrameProps);
 
       if (!isRendered) {
         renderFrame();

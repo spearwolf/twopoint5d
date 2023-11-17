@@ -2,7 +2,7 @@ import {TextureStore} from '@spearwolf/twopoint5d';
 import {Stage2DElement} from '@spearwolf/twopoint5d-elements';
 import '@spearwolf/twopoint5d-elements/two5-display.js';
 import '@spearwolf/twopoint5d-elements/two5-stage2d.js';
-import {Color, Scene, Sprite, SpriteMaterial, Texture} from 'three';
+import {Color, Scene, Sprite, SpriteMaterial} from 'three';
 import './display.css';
 import './style.css';
 
@@ -25,12 +25,11 @@ Stage2DElement.whenDefined(document.getElementById('stage2d')).then((el) => {
   el.firstFrame().then(({renderer, scene}) => {
     textures.renderer = renderer;
 
-    const material = new SpriteMaterial({map: new Texture()});
-    const sprite = new Sprite(material);
+    const sprite = new Sprite();
 
     textures.get('ballPatternRot', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
       console.log('texture', {texture, imageCoords});
-      sprite.material.dispose();
+      sprite.material?.dispose();
       sprite.material = new SpriteMaterial({map: texture});
     });
 
