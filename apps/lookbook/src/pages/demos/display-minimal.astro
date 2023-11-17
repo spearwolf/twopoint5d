@@ -47,8 +47,8 @@ import {title} from './display-minimal.json';
     stage.resize(width, height);
   });
 
-  display.on('frame', ({renderer}) => {
-    stage.renderFrame(renderer);
+  display.on('frame', ({renderer, now, deltaTime, frameNo}) => {
+    stage.renderFrame(renderer, now, deltaTime, frameNo);
   });
 
   display.start();

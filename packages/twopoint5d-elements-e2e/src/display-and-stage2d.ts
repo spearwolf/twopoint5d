@@ -23,7 +23,7 @@ Stage2DElement.whenDefined(document.getElementById('stage2d')).then((el) => {
     scene.background = new Color(0x212121);
   });
 
-  el.firstFrame().then(({renderer, stage: {scene}}: StageFirstFrameProps) => {
+  el.firstFrame().then(({renderer, scene}: StageFirstFrameProps) => {
     textures.renderer = renderer;
 
     const material = new SpriteMaterial({map: new Texture()});

@@ -11,12 +11,17 @@ import {
   type ParallaxProjectionSpecs,
   type ProjectionPlaneDescription,
 } from '@spearwolf/twopoint5d';
-import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
+import {
+  StageRenderFrame,
+  StageResize,
+  type Stage2DResizeProps,
+  type StageRenderFrameProps,
+} from '@spearwolf/twopoint5d/events.js';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
 import {stageRendererContext} from '../context/stage-renderer-context.js';
-import {StageFirstFrame, StageResize, type StageFirstFrameProps, type StageResizeProps} from '../events.js';
+import {StageFirstFrame, type StageFirstFrameProps} from '../events.js';
 import {SignalMap} from '../utils/SignalMap.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
@@ -144,9 +149,12 @@ export class Stage2DElement extends TwoPoint5DElement {
     this.retain([StageFirstFrame, StageResize]);
 
     this.#firstFrame = new Promise((resolve) => {
-      this.once(StageResize, (stageResizeProps: StageResizeProps) => {
+      this.once(StageResize, (stageResizeProps: Stage2DResizeProps) => {
         this.once(StageRenderFrame, (stageRenderFrame: StageRenderFrameProps) => {
-          const firstFrameProps: StageFirstFrameProps = {...stageRenderFrame, stage: stageResizeProps.stage};
+          const firstFrameProps: StageFirstFrameProps = {
+            ...stageRenderFrame,
+            scene: stageResizeProps.stage.scene,
+          };
           this.emit(StageFirstFrame, firstFrameProps);
           resolve(firstFrameProps);
         });
@@ -186,18 +194,10 @@ export class Stage2DElement extends TwoPoint5DElement {
       this.onViewSpecsPropsUpdate();
     }, this.#viewSpecsSignals.getSignals());
 
-    this.stage2d.on(Stage2D.Resize, (stage2d: Stage2D) => {
-      const detail: StageResizeProps = {
-        name: stage2d.name,
-        width: stage2d.width,
-        height: stage2d.height,
-        containerWidth: stage2d.containerWidth,
-        containerHeight: stage2d.containerHeight,
-        stage: stage2d,
-      };
-      if (isValidSize(detail)) {
-        this.emit(StageResize, detail);
-        this.dispatchEvent(new CustomEvent<StageResizeProps>(StageResize, {bubbles: false, detail}));
+    this.stage2d.on(StageResize, (resizeProps: Stage2DResizeProps) => {
+      if (isValidSize(resizeProps)) {
+        this.emit(StageResize, resizeProps);
+        this.dispatchEvent(new CustomEvent<Stage2DResizeProps>(StageResize, {bubbles: false, detail: resizeProps}));
       }
     });
 

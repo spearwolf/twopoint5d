@@ -1,26 +1,27 @@
-import type {Stage2D} from '@spearwolf/twopoint5d';
-import type {StageRenderFrame, StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
-
-/**
- * published by the <two5-stage2d> element as object event and customevent
- */
-export const StageResize = 'stageResize';
-
-export interface StageResizeProps {
-  name?: string;
-  width: number;
-  height: number;
-  containerWidth: number;
-  containerHeight: number;
-  stage?: Stage2D;
-}
+import type {
+  Stage2DRenderFrameProps,
+  Stage2DResizeProps,
+  StageRenderFrame,
+  StageRenderFrameProps,
+  StageResize,
+  StageResizeProps,
+} from '@spearwolf/twopoint5d/events.js';
+import type {Scene} from 'three';
 
 export interface StageResizeEvent extends Event {
   detail?: StageResizeProps;
 }
 
+export interface Stage2DResizeEvent extends Event {
+  detail?: Stage2DResizeProps;
+}
+
 export interface StageRenderFrameEvent extends Event {
   detail?: StageRenderFrameProps;
+}
+
+export interface Stage2DRenderFrameEvent extends Event {
+  detail?: Stage2DRenderFrameProps;
 }
 
 /**
@@ -29,7 +30,7 @@ export interface StageRenderFrameEvent extends Event {
 export const StageFirstFrame = 'stageFirstFrame';
 
 export interface StageFirstFrameProps extends StageRenderFrameProps {
-  stage: Stage2D;
+  scene: Scene;
 }
 
 // https://github.com/microsoft/TypeScript/issues/28357#issuecomment-748550734

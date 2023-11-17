@@ -55,8 +55,8 @@ import {title} from './display-multi.json';
 </Layout>
 
 <script>
+  import {Display, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
-  import {TextureFactory, Stage2D, ParallaxProjection, Display} from '@spearwolf/twopoint5d';
   import assetsUrl from '~demos/utils/assetsUrl';
 
   function createCanvasSizeInfoUpdater(el: HTMLElement) {
@@ -92,8 +92,8 @@ import {title} from './display-multi.json';
       stage.resize(width, height);
     });
 
-    display.on('frame', ({renderer}) => {
-      stage.renderFrame(renderer);
+    display.on('frame', ({renderer, now, deltaTime, frameNo}) => {
+      stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
 
     const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvas as HTMLElement);

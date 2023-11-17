@@ -1,6 +1,9 @@
 import type {WebGLRenderer} from 'three';
+import type {IStage} from './index.js';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
+
+// ------------------------------------------------------------
 
 export const StageAdded = 'stageAdded';
 
@@ -9,12 +12,32 @@ export interface StageAddedProps {
   renderer: IStageRenderer;
 }
 
+// ============================================================
+
 export const StageRemoved = 'stageRemoved';
 
 export interface StageRemovedProps {
   stage: StageType;
   renderer: IStageRenderer;
 }
+
+// ============================================================
+
+export const StageResize = 'stageResize';
+
+export interface StageResizeProps {
+  width: number;
+  height: number;
+  stage: IStage;
+}
+
+export interface Stage2DResizeProps extends StageResizeProps {
+  width: number;
+  height: number;
+  stage: Stage2D;
+}
+
+// ============================================================
 
 export const StageRenderFrame = 'stageRenderFrame';
 
@@ -38,19 +61,18 @@ export interface StageRenderFrameProps {
   renderFrame: (renderHook?: () => void) => void;
 }
 
-export interface StageRenderFrameEvent extends Event {
-  detail?: StageRenderFrameProps;
-}
-
 export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
   stage: Stage2D;
 }
 
-export interface Stage2DRenderFrameEvent extends Event {
-  detail?: Stage2DRenderFrameProps;
-}
+// ============================================================
 
 export const StageAfterCameraChanged = 'afterCameraChanged';
+
 export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.Camera | undefined];
 
+// ============================================================
+
 export const UnsubscribeFromParent = 'unsubscribeFromParent';
+
+// ------------------------------------------------------------

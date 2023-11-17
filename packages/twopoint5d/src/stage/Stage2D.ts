@@ -4,7 +4,9 @@ import {Camera, Scene, WebGLRenderer} from 'three';
 import {
   StageAfterCameraChanged,
   StageRenderFrame,
+  StageResize,
   type Stage2DRenderFrameProps,
+  type Stage2DResizeProps,
   type StageAfterCameraChangedArgs,
 } from '../events.js';
 import type {IProjection} from './IProjection.js';
@@ -26,9 +28,6 @@ export interface Stage2D extends Eventize {}
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
  */
 export class Stage2D implements IStage {
-  // TODO move to events.js
-  static readonly Resize = 'resize';
-
   scene: Scene;
 
   autoClear = true;
@@ -160,7 +159,7 @@ export class Stage2D implements IStage {
     }
 
     if (prevWidth !== w || prevHeight !== h) {
-      this.emit(Stage2D.Resize, this);
+      this.emit(StageResize, {stage: this, width: w, height: h} as Stage2DResizeProps);
     }
   };
 
