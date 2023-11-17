@@ -1,7 +1,12 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
-import {StageRenderFrame, type Stage2DRenderFrameProps} from '../events.js';
+import {
+  StageAfterCameraChanged,
+  StageRenderFrame,
+  type Stage2DRenderFrameProps,
+  type StageAfterCameraChangedArgs,
+} from '../events.js';
 import type {IProjection} from './IProjection.js';
 import type {IStage} from './IStage.js';
 
@@ -23,7 +28,6 @@ export interface Stage2D extends Eventize {}
 export class Stage2D implements IStage {
   // TODO move to events.js
   static readonly Resize = 'resize';
-  static readonly AfterCameraChanged = 'afterCameraChanged';
 
   scene: Scene;
 
@@ -104,7 +108,8 @@ export class Stage2D implements IStage {
     const prevCamera = this.camera;
     updateCallback();
     if (prevCamera !== this.camera) {
-      this.emit(Stage2D.AfterCameraChanged, this, prevCamera);
+      const args: StageAfterCameraChangedArgs = [this, prevCamera];
+      this.emit(StageAfterCameraChanged, ...args);
     }
   };
 

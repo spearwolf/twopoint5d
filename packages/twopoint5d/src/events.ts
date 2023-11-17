@@ -50,4 +50,7 @@ export interface Stage2DRenderFrameEvent extends Event {
   detail?: Stage2DRenderFrameProps;
 }
 
+export const StageAfterCameraChanged = 'afterCameraChanged';
+export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.Camera | undefined];
+
 export const UnsubscribeFromParent = 'unsubscribeFromParent';

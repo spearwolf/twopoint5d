@@ -1,5 +1,6 @@
 import {createPortal, extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
 import {Stage2D as __Stage2D} from '@spearwolf/twopoint5d';
+import {StageAfterCameraChanged} from '@spearwolf/twopoint5d/events.js';
 import {
   createContext,
   forwardRef,
@@ -79,7 +80,7 @@ function Component(
     if (stage?.camera) {
       setStageCamera(toManualControlled(stage.camera));
     }
-    return stage?.on('afterCameraChanged', ({camera}) => setStageCamera(toManualControlled(camera)));
+    return stage?.on(StageAfterCameraChanged, ({camera}) => setStageCamera(toManualControlled(camera)));
   }, [stage]);
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
