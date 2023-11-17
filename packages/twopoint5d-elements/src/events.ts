@@ -4,7 +4,7 @@ import type {StageRenderFrame, StageRenderFrameProps} from '@spearwolf/twopoint5
 /**
  * published by the <two5-stage2d> element as object event and customevent
  */
-export const StageResize = 'stageresize';
+export const StageResize = 'stageResize';
 
 export interface StageResizeProps {
   name?: string;
@@ -26,7 +26,7 @@ export interface StageRenderFrameEvent extends Event {
 /**
  * published by the <two5-stage2d> element as object event and promise
  */
-export const StageFirstFrame = 'stagefirstframe';
+export const StageFirstFrame = 'stageFirstFrame';
 
 export interface StageFirstFrameProps extends StageRenderFrameProps {
   stage: Stage2D;
