@@ -1,19 +1,8 @@
 import {eventize, type Eventize} from '@spearwolf/eventize';
 import type {WebGLRenderer} from 'three';
 import {Display} from '../display/Display.js';
-import {
-  StageAdded,
-  StageRemoved,
-  StageRenderFrame,
-  UnsubscribeFromParent,
-  type StageAddedProps,
-  type StageRemovedProps,
-  type StageRenderFrameProps,
-} from '../events.js';
+import {StageAdded, StageRemoved, UnsubscribeFromParent, type StageAddedProps, type StageRemovedProps} from '../events.js';
 import type {IStageRenderer, StageParentType, StageType} from './IStageRenderer.js';
-import {Stage2D} from './Stage2D.js';
-
-export interface StageRenderer extends Eventize {}
 
 interface StageItem {
   stage: StageType;
@@ -21,7 +10,11 @@ interface StageItem {
   height: number;
 }
 
+export interface StageRenderer extends Eventize {}
+
 export class StageRenderer implements IStageRenderer {
+  readonly isStageRenderer = true;
+
   #parent?: StageParentType;
 
   width: number = 0;
@@ -99,11 +92,7 @@ export class StageRenderer implements IStageRenderer {
   }
 
   #resizeStage(stage: StageItem, width: number, height: number): void {
-    if (
-      stage.width !== width ||
-      stage.height !== height ||
-      (stage.stage instanceof Stage2D && (stage.stage.containerWidth !== width || stage.stage.containerHeight !== height))
-    ) {
+    if (stage.width !== width || stage.height !== height) {
       stage.width = width;
       stage.height = height;
       stage.stage.resize(width, height);
@@ -113,20 +102,7 @@ export class StageRenderer implements IStageRenderer {
   renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
     this.#stages.forEach((stage) => {
       this.#resizeStage(stage, this.width, this.height);
-
-      if (stage.stage instanceof Stage2D) {
-        stage.stage.emit(StageRenderFrame, {
-          width: stage.stage.width,
-          height: stage.stage.height,
-          renderer,
-          now,
-          deltaTime,
-          frameNo,
-        } as StageRenderFrameProps);
-        stage.stage.renderFrame(renderer);
-      } else {
-        stage.stage.renderFrame(renderer, now, deltaTime, frameNo);
-      }
+      stage.stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
   }
 

@@ -1,24 +1,9 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
+import {StageRenderFrame, type Stage2DRenderFrameProps} from '../events.js';
 import type {IProjection} from './IProjection.js';
-
-// TODO move to events.js ?
-export interface Stage2DRenderFrameProps {
-  stage: Stage2D;
-  renderer: WebGLRenderer;
-
-  /**
-   * You do not need to call this callback yourself. It's normally done after the event.
-   * However, you can use this callback to control when the THREE.WebGLRenderer is called.
-   *
-   * This is how the stage is rendered: `renderer.render(stage.scene, stage.camera)`
-   *
-   * If you provide a `renderHook`, then calling renderFrame will not render anything, that's up to you.
-   * In this case, this method will just inform the stage that you have rendered this scene, and the stage should not do it.
-   */
-  renderFrame: (renderHook?: () => void) => void;
-}
+import type {IStage} from './IStage.js';
 
 export interface Stage2D extends Eventize {}
 
@@ -35,11 +20,10 @@ export interface Stage2D extends Eventize {}
  *
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
  */
-export class Stage2D {
+export class Stage2D implements IStage {
   // TODO move to events.js
   static readonly Resize = 'resize';
   static readonly AfterCameraChanged = 'afterCameraChanged';
-  static readonly RenderFrame = 'renderFrame';
 
   scene: Scene;
 
@@ -130,7 +114,7 @@ export class Stage2D {
     this.projection = projection;
     this.scene = scene ?? new Scene();
 
-    // TODO set up vector of the scene??
+    // TODO set "up" vector of the scene??
   }
 
   resize(width: number, height: number): void {
@@ -177,10 +161,10 @@ export class Stage2D {
 
   #noCameraErrorCount = 0;
 
-  renderFrame(renderer: WebGLRenderer): void {
+  renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
     const {scene, camera} = this;
     if (scene && camera) {
-      const wasPreviouslyAutoClear = renderer.autoClear;
+      const previousAutoClearValue = renderer.autoClear;
       renderer.autoClear = this.autoClear;
 
       let isRendered = false;
@@ -196,10 +180,22 @@ export class Stage2D {
         }
       };
 
-      this.emit(Stage2D.RenderFrame, {stage: this, renderer, renderFrame} as Stage2DRenderFrameProps);
-      renderFrame();
+      this.emit(StageRenderFrame, {
+        renderer,
+        now,
+        deltaTime,
+        frameNo,
+        renderFrame,
+        stage: this,
+        width: this.width,
+        height: this.height,
+      } as Stage2DRenderFrameProps);
 
-      renderer.autoClear = wasPreviouslyAutoClear;
+      if (!isRendered) {
+        renderFrame();
+      }
+
+      renderer.autoClear = previousAutoClearValue;
     } else if (!camera && ++this.#noCameraErrorCount === 100) {
       this.#noCameraErrorCount = -1000;
       // eslint-disable-next-line no-console

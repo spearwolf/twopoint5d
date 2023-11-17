@@ -1,5 +1,6 @@
 export * from './Canvas2DStage.js';
 export type * from './IProjection.js';
+export type * from './IStage.js';
 export type * from './IStageRenderer.js';
 export * from './OrthographicProjection.js';
 export * from './ParallaxProjection.js';

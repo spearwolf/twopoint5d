@@ -196,7 +196,7 @@ function StageContent({
         stage.autoClear = !noAutoClear;
         stage.update();
         if (!noAutoRender) {
-          stage.renderFrame(renderer);
+          stage.renderFrame(renderer, 0, 0, 0);
         }
       }
     },
