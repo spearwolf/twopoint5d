@@ -26,15 +26,15 @@ Stage2DElement.whenDefined(document.getElementById('stage2d')).then((el) => {
     textures.renderer = renderer;
 
     const sprite = new Sprite();
+    sprite.scale.set(197, 205, 1);
+    scene.add(sprite);
 
     textures.get('ballPatternRot', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
       console.log('texture', {texture, imageCoords});
+
       sprite.material?.dispose();
       sprite.material = new SpriteMaterial({map: texture});
     });
-
-    sprite.scale.set(197, 205, 1);
-    scene.add(sprite);
   });
 
   // el.on(StageRenderFrame, (props: StageRenderFrameProps) => {
