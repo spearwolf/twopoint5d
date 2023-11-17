@@ -177,10 +177,15 @@ export class Stage2D {
       renderer.autoClear = this.autoClear;
 
       let isRendered = false;
-      const renderFrame = () => {
+
+      const renderFrame = (renderHook?: () => void) => {
         if (!isRendered) {
           isRendered = true;
-          renderer.render(scene, camera);
+          if (renderHook) {
+            renderHook();
+          } else {
+            renderer.render(scene, camera);
+          }
         }
       };
 
