@@ -1,21 +1,21 @@
 import type {WebGLRenderer} from 'three';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 
-export const StageAdded = 'stageadded';
+export const StageAdded = 'stageAdded';
 
 export interface StageAddedProps {
   stage: StageType;
   renderer: IStageRenderer;
 }
 
-export const StageRemoved = 'stageremoved';
+export const StageRemoved = 'stageRemoved';
 
 export interface StageRemovedProps {
   stage: StageType;
   renderer: IStageRenderer;
 }
 
-export const StageRenderFrame = 'stagerenderframe';
+export const StageRenderFrame = 'stageRenderFrame';
 
 export interface StageRenderFrameProps {
   width: number;
