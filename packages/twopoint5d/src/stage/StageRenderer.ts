@@ -70,7 +70,7 @@ export class StageRenderer implements IStageRenderer {
     );
   }
 
-  readonly #stages: StageItem[] = [];
+  protected readonly stages: StageItem[] = [];
 
   constructor() {
     eventize(this);
@@ -88,10 +88,10 @@ export class StageRenderer implements IStageRenderer {
     this.width = width;
     this.height = height;
 
-    this.#stages.forEach((stage) => this.#resizeStage(stage, width, height));
+    this.stages.forEach((stage) => this.resizeStage(stage, width, height));
   }
 
-  #resizeStage(stage: StageItem, width: number, height: number): void {
+  protected resizeStage(stage: StageItem, width: number, height: number): void {
     if (stage.width !== width || stage.height !== height) {
       stage.width = width;
       stage.height = height;
@@ -100,14 +100,14 @@ export class StageRenderer implements IStageRenderer {
   }
 
   renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
-    this.#stages.forEach((stage) => {
-      this.#resizeStage(stage, this.width, this.height);
+    this.stages.forEach((stage) => {
+      this.resizeStage(stage, this.width, this.height);
       stage.stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
   }
 
   #getIndex(stage: StageType): number {
-    return this.#stages.findIndex((item) => item.stage === stage);
+    return this.stages.findIndex((item) => item.stage === stage);
   }
 
   hasStage(stage: StageType): boolean {
@@ -116,7 +116,7 @@ export class StageRenderer implements IStageRenderer {
 
   addStage(stage: StageType): void {
     if (!this.hasStage(stage)) {
-      this.#stages.push({
+      this.stages.push({
         stage,
         width: 0,
         height: 0,
@@ -128,7 +128,7 @@ export class StageRenderer implements IStageRenderer {
   removeStage(stage: StageType): void {
     const index = this.#getIndex(stage);
     if (index !== -1) {
-      this.#stages.splice(index, 1);
+      this.stages.splice(index, 1);
       this.emit(StageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
   }

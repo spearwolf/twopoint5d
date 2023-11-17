@@ -12,9 +12,11 @@ import {
   type StageAfterCameraChangedArgs,
 } from '../events.js';
 import type {IProjection} from './IProjection.js';
-import type {IStage} from './IStage.js';
+import type {IStage, RenderCmdFunc} from './IStage.js';
 
 export interface Stage2D extends Eventize {}
+
+// TODO extract base class Stage
 
 /**
  * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
@@ -172,7 +174,7 @@ export class Stage2D implements IStage {
   #isFirstFrame = true;
   #firstFrameProps?: FirstFrameProps;
 
-  renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
+  renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number, renderCmd?: RenderCmdFunc): void {
     const {scene, camera} = this;
     if (scene && camera) {
       const previousAutoClearValue = renderer.autoClear;
@@ -180,11 +182,11 @@ export class Stage2D implements IStage {
 
       let isRendered = false;
 
-      const renderFrame = (renderHook?: () => void) => {
+      const renderFrame = () => {
         if (!isRendered) {
           isRendered = true;
-          if (renderHook) {
-            renderHook();
+          if (renderCmd) {
+            renderCmd(scene, camera);
           } else {
             renderer.render(scene, camera);
           }

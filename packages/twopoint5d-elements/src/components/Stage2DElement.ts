@@ -1,6 +1,7 @@
 import {consume} from '@lit/context';
 import {eventize, type Eventize} from '@spearwolf/eventize';
-import {createEffect, createSignal, value, type SignalFuncs, type SignalReader} from '@spearwolf/signalize';
+import {createEffect, type SignalReader} from '@spearwolf/signalize';
+import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {
   OrthographicProjection,
   ParallaxProjection,
@@ -53,19 +54,8 @@ export class Stage2DElement extends TwoPoint5DElement {
   @property({attribute: false})
   accessor stageRendererCtx: IStageRenderer | undefined;
 
-  readonly #stageRenderer: SignalFuncs<IStageRenderer | undefined> = createSignal();
-
-  get stageRenderer(): IStageRenderer | undefined {
-    return value(this.#stageRenderer[0]);
-  }
-
-  get stageRenderer$(): SignalReader<IStageRenderer | undefined> {
-    return this.#stageRenderer[0];
-  }
-
-  set stageRenderer(value: IStageRenderer | undefined) {
-    this.#stageRenderer[1](value);
-  }
+  @signal({readAsValue: true}) accessor stageRenderer: IStageRenderer | undefined;
+  @signalReader() accessor stageRenderer$: SignalReader<IStageRenderer | undefined>;
 
   @property({type: String, reflect: true})
   accessor fit: 'contain' | 'cover' | 'fill' | undefined;
@@ -103,6 +93,8 @@ export class Stage2DElement extends TwoPoint5DElement {
   @property({type: String, reflect: true, attribute: 'projection-type'})
   accessor projectionType: 'parallax' | 'ortho' | 'orthographic' | undefined;
 
+  // TODO add autoClear property
+
   readonly #projSignals: SignalMap;
   readonly #viewSpecsSignals: SignalMap;
 
@@ -110,19 +102,8 @@ export class Stage2DElement extends TwoPoint5DElement {
     return this.#viewSpecsSignals.getValueObject() as ParallaxProjectionSpecs | OrthographicProjectionSpecs;
   }
 
-  readonly #projection = createSignal<IProjection | undefined>();
-
-  get projection(): IProjection | undefined {
-    return value(this.#projection[0]);
-  }
-
-  get projection$(): SignalReader<IProjection | undefined> {
-    return this.#projection[0];
-  }
-
-  set projection(value: IProjection | undefined) {
-    this.#projection[1](value);
-  }
+  @signal({readAsValue: true}) accessor projection: IProjection | undefined;
+  @signalReader() accessor projection$: SignalReader<IProjection | undefined>;
 
   readonly stage2d = new Stage2D();
 
