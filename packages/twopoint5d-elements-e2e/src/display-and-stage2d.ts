@@ -1,6 +1,5 @@
 import {TextureStore} from '@spearwolf/twopoint5d';
 import {Stage2DElement} from '@spearwolf/twopoint5d-elements';
-import type {StageFirstFrameProps} from '@spearwolf/twopoint5d-elements/events.js';
 import '@spearwolf/twopoint5d-elements/two5-display.js';
 import '@spearwolf/twopoint5d-elements/two5-stage2d.js';
 import {Color, Scene, Sprite, SpriteMaterial, Texture} from 'three';
@@ -23,7 +22,7 @@ Stage2DElement.whenDefined(document.getElementById('stage2d')).then((el) => {
     scene.background = new Color(0x212121);
   });
 
-  el.firstFrame().then(({renderer, scene}: StageFirstFrameProps) => {
+  el.firstFrame().then(({renderer, scene}) => {
     textures.renderer = renderer;
 
     const material = new SpriteMaterial({map: new Texture()});

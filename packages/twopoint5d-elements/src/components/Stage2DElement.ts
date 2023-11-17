@@ -12,8 +12,10 @@ import {
   type ProjectionPlaneDescription,
 } from '@spearwolf/twopoint5d';
 import {
+  FirstFrame,
   StageRenderFrame,
   StageResize,
+  type FirstFrameProps,
   type Stage2DResizeProps,
   type StageRenderFrameProps,
 } from '@spearwolf/twopoint5d/events.js';
@@ -21,7 +23,6 @@ import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
 import {stageRendererContext} from '../context/stage-renderer-context.js';
-import {StageFirstFrame, type StageFirstFrameProps} from '../events.js';
 import {SignalMap} from '../utils/SignalMap.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
@@ -125,9 +126,9 @@ export class Stage2DElement extends TwoPoint5DElement {
 
   readonly stage2d = new Stage2D();
 
-  readonly #firstFrame: Promise<StageFirstFrameProps>;
+  readonly #firstFrame: Promise<FirstFrameProps>;
 
-  firstFrame(): Promise<StageFirstFrameProps> {
+  firstFrame(): Promise<FirstFrameProps> {
     return this.#firstFrame;
   }
 
@@ -146,16 +147,18 @@ export class Stage2DElement extends TwoPoint5DElement {
     this.projectionPlane = 'xy';
     this.projectionOrigin = 'bottom-left';
 
-    this.retain([StageFirstFrame, StageResize]);
+    this.retain([FirstFrame, StageResize]);
 
+    // TODO move firstFrame event to Stage2D
     this.#firstFrame = new Promise((resolve) => {
       this.once(StageResize, (stageResizeProps: Stage2DResizeProps) => {
         this.once(StageRenderFrame, (stageRenderFrame: StageRenderFrameProps) => {
-          const firstFrameProps: StageFirstFrameProps = {
+          const firstFrameProps: FirstFrameProps = {
             ...stageRenderFrame,
             scene: stageResizeProps.stage.scene,
           };
-          this.emit(StageFirstFrame, firstFrameProps);
+          this.emit(FirstFrame, firstFrameProps);
+          this.dispatchEvent(new CustomEvent<FirstFrameProps>(FirstFrame, {bubbles: false, detail: firstFrameProps}));
           resolve(firstFrameProps);
         });
       });

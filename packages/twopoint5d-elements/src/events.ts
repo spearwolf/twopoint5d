@@ -1,4 +1,6 @@
 import type {
+  FirstFrame,
+  FirstFrameProps,
   Stage2DRenderFrameProps,
   Stage2DResizeProps,
   StageRenderFrame,
@@ -6,7 +8,6 @@ import type {
   StageResize,
   StageResizeProps,
 } from '@spearwolf/twopoint5d/events.js';
-import type {Scene} from 'three';
 
 export interface StageResizeEvent extends Event {
   detail?: StageResizeProps;
@@ -24,13 +25,8 @@ export interface Stage2DRenderFrameEvent extends Event {
   detail?: Stage2DRenderFrameProps;
 }
 
-/**
- * published by the <two5-stage2d> element as object event and promise
- */
-export const StageFirstFrame = 'stageFirstFrame';
-
-export interface StageFirstFrameProps extends StageRenderFrameProps {
-  scene: Scene;
+export interface FirstFrameEvent extends Event {
+  detail?: FirstFrameProps;
 }
 
 // https://github.com/microsoft/TypeScript/issues/28357#issuecomment-748550734
@@ -40,5 +36,6 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [StageResize]: StageResizeEvent;
     [StageRenderFrame]: StageRenderFrameEvent;
+    [FirstFrame]: FirstFrameEvent;
   }
 }

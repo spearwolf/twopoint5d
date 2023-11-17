@@ -1,4 +1,4 @@
-import type {WebGLRenderer} from 'three';
+import type {Scene, WebGLRenderer} from 'three';
 import type {IStage} from './index.js';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
@@ -67,12 +67,20 @@ export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
 
 // ============================================================
 
-export const StageAfterCameraChanged = 'afterCameraChanged';
+export const StageAfterCameraChanged = 'stageAfterCameraChanged';
 
 export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.Camera | undefined];
 
 // ============================================================
 
 export const UnsubscribeFromParent = 'unsubscribeFromParent';
+
+// ============================================================
+
+export const FirstFrame = 'firstFrame';
+
+export interface FirstFrameProps extends StageRenderFrameProps {
+  scene: Scene;
+}
 
 // ------------------------------------------------------------
