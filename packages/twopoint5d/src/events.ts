@@ -12,6 +12,10 @@ export interface StageAddedProps {
   renderer: IStageRenderer;
 }
 
+export interface IStageAdded {
+  stageAdded(props: StageAddedProps): void;
+}
+
 // ============================================================
 
 export const StageRemoved = 'stageRemoved';
@@ -19,6 +23,10 @@ export const StageRemoved = 'stageRemoved';
 export interface StageRemovedProps {
   stage: StageType;
   renderer: IStageRenderer;
+}
+
+export interface IStageRemoved {
+  stageRemoved(props: StageRemovedProps): void;
 }
 
 // ============================================================
@@ -35,6 +43,14 @@ export interface Stage2DResizeProps extends StageResizeProps {
   width: number;
   height: number;
   stage: Stage2D;
+}
+
+export interface IStageResize {
+  stageResize(props: StageResizeProps): void;
+}
+
+export interface IStage2DResize {
+  stageResize(props: Stage2DResizeProps): void;
 }
 
 // ============================================================
@@ -60,15 +76,31 @@ export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
   stage: Stage2D;
 }
 
+export interface IStageRenderFrame {
+  stageRenderFrame(props: StageRenderFrameProps): void;
+}
+
+export interface IStage2DRenderFrame {
+  stageRenderFrame(props: Stage2DRenderFrameProps): void;
+}
+
 // ============================================================
 
 export const StageAfterCameraChanged = 'stageAfterCameraChanged';
 
 export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.Camera | undefined];
 
+export interface IStageAfterCameraChanged {
+  stageAfterCameraChanged(...args: StageAfterCameraChangedArgs): void;
+}
+
 // ============================================================
 
 export const RemoveFromParent = 'removeFromParent';
+
+export interface IRemoveFromParent {
+  removeFromParent(): void;
+}
 
 // ============================================================
 
@@ -76,6 +108,10 @@ export const FirstFrame = 'firstFrame';
 
 export interface FirstFrameProps extends StageRenderFrameProps {
   scene: Scene;
+}
+
+export interface IFirstFrame {
+  firstFrame(props: FirstFrameProps): void;
 }
 
 // ------------------------------------------------------------

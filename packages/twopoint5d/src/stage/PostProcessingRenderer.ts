@@ -1,14 +1,21 @@
 import type {WebGLRenderer} from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {StageAdded, StageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
+import {
+  StageAdded,
+  StageRemoved,
+  type IStageAdded,
+  type IStageRemoved,
+  type StageAddedProps,
+  type StageRemovedProps,
+} from '../events.js';
 import type {IStage} from './IStage.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
 
 const isRenderPassable = (stage: IStage): stage is Stage2D => stage instanceof Stage2D;
 
-export class PostEffectsRenderer extends StageRenderer {
+export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
   composer?: EffectComposer;
   renderPass: WeakMap<IStage, RenderPass> = new WeakMap();
 
@@ -24,10 +31,10 @@ export class PostEffectsRenderer extends StageRenderer {
 
     this.stages.forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
-      stage.stage.renderFrame(renderer, now, deltaTime, frameNo, (scene, camera) => {
+      stage.stage.renderFrame(renderer, now, deltaTime, frameNo, (scene, camera, autoClear) => {
         const renderPass = this.renderPass.get(stage.stage);
         if (renderPass) {
-          renderPass.clear = (stage.stage as Stage2D).autoClear;
+          renderPass.clear = autoClear;
           renderPass.scene = scene;
           renderPass.camera = camera;
         }

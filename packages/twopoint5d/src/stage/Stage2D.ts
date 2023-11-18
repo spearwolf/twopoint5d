@@ -178,7 +178,9 @@ export class Stage2D implements IStage {
     const {scene, camera} = this;
     if (scene && camera) {
       const previousAutoClearValue = renderer.autoClear;
-      renderer.autoClear = this.autoClear;
+      if (!renderCmd) {
+        renderer.autoClear = this.autoClear;
+      }
 
       let isRendered = false;
 
@@ -186,7 +188,7 @@ export class Stage2D implements IStage {
         if (!isRendered) {
           isRendered = true;
           if (renderCmd) {
-            renderCmd(scene, camera);
+            renderCmd(scene, camera, this.autoClear);
           } else {
             renderer.render(scene, camera);
           }

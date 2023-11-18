@@ -4,7 +4,7 @@ export type * from './IStage.js';
 export type * from './IStageRenderer.js';
 export * from './OrthographicProjection.js';
 export * from './ParallaxProjection.js';
-export * from './PostEffectsRenderer.js';
+export * from './PostProcessingRenderer.js';
 export * from './ProjectionPlane.js';
 export * from './Stage2D.js';
 export * from './StageRenderer.js';
