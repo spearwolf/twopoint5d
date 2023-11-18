@@ -1,5 +1,6 @@
 import type {WebGLRenderer} from 'three';
-import {EffectComposer, Pass} from 'three/addons/postprocessing/EffectComposer.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {Pass} from 'three/addons/postprocessing/Pass.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {
   StageAdded,
