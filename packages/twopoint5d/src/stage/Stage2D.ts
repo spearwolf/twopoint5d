@@ -1,6 +1,7 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
 import {Camera, Scene, WebGLRenderer} from 'three';
 
+import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass.js';
 import {
   FirstFrame,
   StageAfterCameraChanged,
@@ -11,6 +12,7 @@ import {
   type Stage2DResizeProps,
   type StageAfterCameraChangedArgs,
 } from '../events.js';
+import type {IGetRenderPass} from './IGetRenderPass.js';
 import type {IProjection} from './IProjection.js';
 import type {IStage, RenderCmdFunc} from './IStage.js';
 
@@ -31,7 +33,7 @@ export interface Stage2D extends Eventize {}
  *
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
  */
-export class Stage2D implements IStage {
+export class Stage2D implements IStage, IGetRenderPass {
   scene: Scene;
 
   autoClear = true;
@@ -229,5 +231,15 @@ export class Stage2D implements IStage {
         'Stage2D has no camera and therefore cannot be rendered! normally this only happens if you forget to call the resize() method ..',
       );
     }
+  }
+
+  #renderPass?: RenderPass;
+
+  getRenderPass(): RenderPass {
+    if (this.#renderPass == null) {
+      this.#renderPass = new RenderPass(this.scene, this.camera);
+      this.#renderPass.clear = this.autoClear;
+    }
+    return this.#renderPass;
   }
 }
