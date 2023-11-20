@@ -1,25 +1,18 @@
-import {expect, test} from '@playwright/test';
+import {expect, test, type Page} from '@playwright/test';
+
+const whenDefined = (page: Page, tagName: string) =>
+  page.evaluate(
+    (tagName: string) =>
+      customElements
+        .whenDefined(tagName)
+        .then(() => true)
+        .catch(() => false),
+    tagName,
+  );
 
 test.describe('bundle', () => {
   test.beforeEach('goto page', async ({page}) => {
     await page.goto('/pages/bundle.html');
-  });
-
-  test.describe('simple-greeting', () => {
-    test('has element', async ({page}) => {
-      await expect(page.getByTestId('simple-greeting')).toBeAttached();
-    });
-
-    test('custom element is defined', async ({page}) => {
-      expect(
-        await page.evaluate(() =>
-          customElements
-            .whenDefined('simple-greeting')
-            .then(() => true)
-            .catch(() => false),
-        ),
-      ).toBe(true);
-    });
   });
 
   test.describe('two5-display', () => {
@@ -28,14 +21,17 @@ test.describe('bundle', () => {
     });
 
     test('custom element is defined', async ({page}) => {
-      expect(
-        await page.evaluate(() =>
-          customElements
-            .whenDefined('two5-display')
-            .then(() => true)
-            .catch(() => false),
-        ),
-      ).toBe(true);
+      expect(await whenDefined(page, 'two5-display')).toBe(true);
+    });
+  });
+
+  test.describe('two5-stage2d', () => {
+    test('has element', async ({page}) => {
+      await expect(page.getByTestId('stage2d')).toBeAttached();
+    });
+
+    test('custom element is defined', async ({page}) => {
+      expect(await whenDefined(page, 'two5-stage2d')).toBe(true);
     });
   });
 
@@ -45,14 +41,7 @@ test.describe('bundle', () => {
     });
 
     test('custom element is defined', async ({page}) => {
-      expect(
-        await page.evaluate(() =>
-          customElements
-            .whenDefined('two5-texture-store')
-            .then(() => true)
-            .catch(() => false),
-        ),
-      ).toBe(true);
+      expect(await whenDefined(page, 'two5-texture-store')).toBe(true);
     });
   });
 });

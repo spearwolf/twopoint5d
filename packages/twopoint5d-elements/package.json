@@ -25,10 +25,6 @@
       "default": "./dist/src/events.js",
       "types": "./dist/src/events.d.ts"
     },
-    "./simple-greeting.js": {
-      "default": "./dist/src/simple-greeting.js",
-      "types": "./dist/src/simple-greeting.d.ts"
-    },
     "./two5-display.js": {
       "default": "./dist/src/two5-display.js",
       "types": "./dist/src/two5-display.d.ts"
@@ -43,12 +39,10 @@
     }
   },
   "sideEffects": [
-    "build/src/simple-greeting.js",
     "build/src/two5-display.js",
     "build/src/two5-stage2d.js",
     "build/src/two5-texture-store.js",
     "build/src/components/attachContextRoot.js",
-    "dist/src/simple-greeting.js",
     "dist/src/two5-display.js",
     "dist/src/two5-stage2d.js",
     "dist/src/two5-texture-store.js",
