@@ -7,7 +7,7 @@ test.describe('bundle', () => {
 
   test.describe('simple-greeting', () => {
     test('has element', async ({page}) => {
-      await expect(page.getByTestId('sg')).toBeAttached();
+      await expect(page.getByTestId('simple-greeting')).toBeAttached();
     });
 
     test('custom element is defined', async ({page}) => {
@@ -24,7 +24,7 @@ test.describe('bundle', () => {
 
   test.describe('two5-display', () => {
     test('has element', async ({page}) => {
-      await expect(page.getByTestId('two5display')).toBeAttached();
+      await expect(page.getByTestId('display')).toBeAttached();
     });
 
     test('custom element is defined', async ({page}) => {
@@ -32,6 +32,23 @@ test.describe('bundle', () => {
         await page.evaluate(() =>
           customElements
             .whenDefined('two5-display')
+            .then(() => true)
+            .catch(() => false),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  test.describe('two5-texture-store', () => {
+    test('has element', async ({page}) => {
+      await expect(page.getByTestId('texture-store')).toBeAttached();
+    });
+
+    test('custom element is defined', async ({page}) => {
+      expect(
+        await page.evaluate(() =>
+          customElements
+            .whenDefined('two5-texture-store')
             .then(() => true)
             .catch(() => false),
         ),
