@@ -10,11 +10,11 @@
     <script type="module" src="/src/display-and-stage2d.ts"></script>
     <main class="two5-display-container">
       <two5-display class="two5-display">
-        <x-texture-store src="/assets/textures.json">
+        <two5-texture-store id="texstore" src="/assets/textures.json">
           <x-frame-buffer name="out1" width="640" height="480">
             <two5-stage2d id="stage2d" projection-type="parallax" width="197" height="205"></two5-stage2d>
           </x-frame-buffer>
-        </x-texture-store>
+        </two5-texture-store>
       </two5-display>
     </main>
   </body>

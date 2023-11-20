@@ -10,9 +10,11 @@
     <script type="module" src="/src/post-processing.ts"></script>
     <main class="two5-display-container">
       <x-display class="two5-display">
-        <x-post-processing>
-          <x-stage2d id="stage2d" projection-type="parallax" width="197" height="205"></x-stage2d>
-        </x-post-processing>
+        <x-texture-store id="texstore" src="/assets/textures.json">
+          <x-post-processing debug>
+            <x-stage2d id="stage2d" projection-type="parallax" width="197" height="205"></x-stage2d>
+          </x-post-processing>
+        </x-texture-store>
       </x-display>
     </main>
   </body>
