@@ -1,4 +1,5 @@
 export * from './components/DisplayElement.js';
+export * from './components/PostProcessingElement.js';
 export * from './components/Stage2DElement.js';
 export * from './components/TextureStoreElement.js';
 export * from './components/TwoPoint5DElement.js';

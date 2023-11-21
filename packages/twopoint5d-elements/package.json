@@ -36,16 +36,22 @@
     "./two5-texture-store.js": {
       "default": "./dist/src/two5-texture-store.js",
       "types": "./dist/src/two5-texture-store.d.ts"
+    },
+    "./two5-post-processing.js": {
+      "default": "./dist/src/two5-post-processing.js",
+      "types": "./dist/src/two5-post-processing.d.ts"
     }
   },
   "sideEffects": [
     "build/src/two5-display.js",
     "build/src/two5-stage2d.js",
     "build/src/two5-texture-store.js",
+    "build/src/two5-post-processing.js",
     "build/src/components/attachContextRoot.js",
     "dist/src/two5-display.js",
     "dist/src/two5-stage2d.js",
     "dist/src/two5-texture-store.js",
+    "dist/src/two5-post-processing.js",
     "dist/src/components/attachContextRoot.js",
     "dist/src/bundle.js",
     "dist/bundle.js"

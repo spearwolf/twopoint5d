@@ -44,4 +44,14 @@ test.describe('bundle', () => {
       expect(await whenDefined(page, 'two5-texture-store')).toBe(true);
     });
   });
+
+  test.describe('two5-post-processing', () => {
+    test('has element', async ({page}) => {
+      await expect(page.getByTestId('post-processing')).toBeAttached();
+    });
+
+    test('custom element is defined', async ({page}) => {
+      expect(await whenDefined(page, 'two5-post-processing')).toBe(true);
+    });
+  });
 });

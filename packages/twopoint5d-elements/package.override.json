@@ -5,6 +5,7 @@
     "src/two5-display.js",
     "src/two5-stage2d.js",
     "src/two5-texture-store.js",
+    "src/two5-post-processing.js",
     "src/components/attachContextRoot.js"
   ],
   "scripts": null,
