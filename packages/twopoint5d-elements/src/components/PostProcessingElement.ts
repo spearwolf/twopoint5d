@@ -28,9 +28,9 @@ export class PostProcessingElement extends TwoPoint5DElement {
 
   @consume({context: stageRendererContext, subscribe: true})
   @property({attribute: false})
-  accessor stageRendererCtx: IStageRenderer | undefined;
+  @signal({readAsValue: true})
+  accessor parentRenderer: IStageRenderer | undefined;
 
-  @signal({readAsValue: true}) accessor parentRenderer: IStageRenderer | undefined;
   @signalReader() accessor parentRenderer$: SignalReader<IStageRenderer | undefined>;
 
   @provide({context: stageRendererContext})
@@ -56,8 +56,6 @@ export class PostProcessingElement extends TwoPoint5DElement {
   }
 
   override render() {
-    this.parentRenderer = this.stageRendererCtx;
-
     return html`<slot></slot>`;
   }
 }

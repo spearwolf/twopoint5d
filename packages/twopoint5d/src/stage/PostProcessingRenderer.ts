@@ -17,7 +17,7 @@ import {StageRenderer} from './StageRenderer.js';
 export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
   composer?: EffectComposer;
 
-  renderPasses: WeakMap<IStage, RenderPass> = new WeakMap();
+  stagePasses: WeakMap<IStage, RenderPass> = new WeakMap();
   passes: Pass[] = [];
 
   constructor() {
@@ -31,7 +31,7 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     this.stages.forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
       stage.stage.renderFrame(renderer, now, deltaTime, frameNo, (scene, camera, autoClear) => {
-        const renderPass = this.renderPasses.get(stage.stage);
+        const renderPass = this.stagePasses.get(stage.stage);
         if (renderPass) {
           renderPass.clear = autoClear;
           renderPass.scene = scene;
@@ -72,9 +72,9 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
   }
 
   stageAdded({stage}: StageAddedProps) {
-    if (hasGetRenderPass(stage) && !this.renderPasses.has(stage)) {
+    if (hasGetRenderPass(stage) && !this.stagePasses.has(stage)) {
       const renderPass = stage.getRenderPass();
-      this.renderPasses.set(stage, renderPass);
+      this.stagePasses.set(stage, renderPass);
       this.addPass(renderPass);
 
       console.log('stageAdded', {stage, renderPass, postProcessingRenderer: this});
@@ -82,9 +82,9 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
   }
 
   stageRemoved({stage}: StageRemovedProps) {
-    if (this.renderPasses.has(stage)) {
-      const renderPass = this.renderPasses.get(stage)!;
-      this.renderPasses.delete(stage);
+    if (this.stagePasses.has(stage)) {
+      const renderPass = this.stagePasses.get(stage)!;
+      this.stagePasses.delete(stage);
       this.removePass(renderPass);
       renderPass.dispose();
 

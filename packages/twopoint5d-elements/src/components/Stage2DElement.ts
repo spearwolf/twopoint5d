@@ -47,15 +47,18 @@ export class Stage2DElement extends TwoPoint5DElement {
     }
   `;
 
-  @property({type: String, reflect: true})
-  accessor name: string | undefined;
-
   @consume({context: stageRendererContext, subscribe: true})
   @property({attribute: false})
-  accessor stageRendererCtx: IStageRenderer | undefined;
+  @signal({readAsValue: true})
+  accessor stageRenderer: IStageRenderer | undefined;
 
-  @signal({readAsValue: true}) accessor stageRenderer: IStageRenderer | undefined;
   @signalReader() accessor stageRenderer$: SignalReader<IStageRenderer | undefined>;
+
+  @property({type: String, reflect: true})
+  @signal({readAsValue: true})
+  accessor name: string | undefined;
+
+  @signalReader() accessor name$: SignalReader<string | undefined>;
 
   @property({type: String, reflect: true})
   accessor fit: 'contain' | 'cover' | 'fill' | undefined;
@@ -128,6 +131,10 @@ export class Stage2DElement extends TwoPoint5DElement {
 
     this.retain([FirstFrame, StageResize]);
 
+    this.name$((name) => {
+      this.stage2d.name = name;
+    });
+
     this.stageRenderer$((stageRenderer) => {
       this.logger?.log('requested stage-renderer context', stageRenderer);
 
@@ -193,11 +200,9 @@ export class Stage2DElement extends TwoPoint5DElement {
   }
 
   override render() {
-    this.stageRenderer = this.stageRendererCtx;
-
-    if (this.name) {
-      this.stage2d.name = this.name;
-    }
+    // if (this.name) {
+    //   this.stage2d.name = this.name;
+    // }
 
     return html`<slot></slot>`;
   }
