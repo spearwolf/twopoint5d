@@ -36,8 +36,8 @@ importers:
         specifier: ^3.4.1
         version: 3.4.1
       '@spearwolf/signalize':
-        specifier: ^0.9.0
-        version: 0.9.0(@spearwolf/eventize@3.4.1)
+        specifier: ^0.10.1
+        version: 0.10.1(@spearwolf/eventize@3.4.1)
       '@types/jest':
         specifier: ^29.5.8
         version: 29.5.8
@@ -210,8 +210,8 @@ importers:
         specifier: ^3.4.1
         version: 3.4.1
       '@spearwolf/signalize':
-        specifier: ^0.9.0
-        version: 0.9.0(@spearwolf/eventize@3.4.1)
+        specifier: ^0.10.1
+        version: 0.10.1(@spearwolf/eventize@3.4.1)
       three:
         specifier: ^0.153
         version: 0.153.0
@@ -225,8 +225,8 @@ importers:
         specifier: ^3.4.1
         version: 3.4.1
       '@spearwolf/signalize':
-        specifier: ^0.9.0
-        version: 0.9.0(@spearwolf/eventize@3.4.1)
+        specifier: ^0.10.1
+        version: 0.10.1(@spearwolf/eventize@3.4.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -4197,8 +4197,8 @@ packages:
     resolution: {integrity: sha512-KDASnq3XTdakcP+2VmmL0vZNQ295pc+Vbiv2hAEESXe3U0OWlBm0G6bIgAFPaexcrtHLkHuL3V/5tPU3haQfqw==}
     engines: {node: '>=18.16'}
 
-  /@spearwolf/signalize@0.9.0(@spearwolf/eventize@3.4.1):
-    resolution: {integrity: sha512-CsHUYRXwGzHbOHpB89SBQkbZOyiRHCP/T1g+aDasRxKa6ld0yyxrPeWUSDAbzIDAUBPsNex9vQkoGEfia+ADQg==}
+  /@spearwolf/signalize@0.10.1(@spearwolf/eventize@3.4.1):
+    resolution: {integrity: sha512-4eLtunjuyhPEOxaXMge26szvaGTGCy/A9OoGXl9i1fli6Pj9lE8v7fO3JtnK40o0k5WVj+Crj2as/Kby3vsRuQ==}
     engines: {node: '>=18.16'}
     peerDependencies:
       '@spearwolf/eventize': ^3.4.1

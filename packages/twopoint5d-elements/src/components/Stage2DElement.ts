@@ -1,6 +1,6 @@
 import {consume} from '@lit/context';
 import {eventize, type Eventize} from '@spearwolf/eventize';
-import {createEffect, type SignalReader} from '@spearwolf/signalize';
+import {createEffect, queryObjectSignal, type SignalReader} from '@spearwolf/signalize';
 import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {
   OrthographicProjection,
@@ -52,13 +52,9 @@ export class Stage2DElement extends TwoPoint5DElement {
   @signal({readAsValue: true})
   accessor stageRenderer: IStageRenderer | undefined;
 
-  @signalReader() accessor stageRenderer$: SignalReader<IStageRenderer | undefined>;
-
   @property({type: String, reflect: true})
   @signal({readAsValue: true})
   accessor name: string | undefined;
-
-  @signalReader() accessor name$: SignalReader<string | undefined>;
 
   @property({type: String, reflect: true})
   accessor fit: 'contain' | 'cover' | 'fill' | undefined;
@@ -131,13 +127,18 @@ export class Stage2DElement extends TwoPoint5DElement {
 
     this.retain([FirstFrame, StageResize]);
 
-    this.name$((name) => {
+    queryObjectSignal(
+      this,
+      'name',
+    )((name) => {
       this.stage2d.name = name;
     });
 
-    this.stageRenderer$((stageRenderer) => {
+    queryObjectSignal(
+      this,
+      'stageRenderer',
+    )((stageRenderer) => {
       this.logger?.log('requested stage-renderer context', stageRenderer);
-
       stageRenderer.addStage(this.stage2d);
       return () => stageRenderer.removeStage(this.stage2d);
     });
@@ -200,10 +201,6 @@ export class Stage2DElement extends TwoPoint5DElement {
   }
 
   override render() {
-    // if (this.name) {
-    //   this.stage2d.name = this.name;
-    // }
-
     return html`<slot></slot>`;
   }
 

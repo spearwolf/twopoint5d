@@ -35,7 +35,7 @@
     "@react-three/test-renderer": "^8.2.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@spearwolf/eventize": "^3.4.1",
-    "@spearwolf/signalize": "^0.9.0",
+    "@spearwolf/signalize": "^0.10.1",
     "@types/jest": "^29.5.8",
     "@types/node": "^20.9.0",
     "@types/react": "^18.2.37",

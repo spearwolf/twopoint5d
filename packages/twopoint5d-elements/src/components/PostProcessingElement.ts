@@ -1,6 +1,5 @@
 import {consume, provide} from '@lit/context';
-import {createEffect, type SignalReader} from '@spearwolf/signalize';
-import {signal, signalReader} from '@spearwolf/signalize/decorators';
+import {effect, signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer, type IStageRenderer} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -25,30 +24,29 @@ export class PostProcessingElement extends TwoPoint5DElement {
 
   @consume({context: stageRendererContext, subscribe: true})
   @property({attribute: false})
-  @signal({readAsValue: true})
+  @signal()
   accessor parentRenderer: IStageRenderer | undefined;
-
-  @signalReader() accessor parentRenderer$: SignalReader<IStageRenderer | undefined>;
 
   @provide({context: stageRendererContext})
   accessor renderer = new PostProcessingRenderer();
 
+  @effect()
+  onParentRendererChange() {
+    const parent = this.parentRenderer;
+    if (parent) {
+      parent.addStage(this.renderer);
+      this.logger?.log('added renderer to parent', this);
+      return () => {
+        parent.removeStage(this.renderer);
+        this.logger?.log('removed renderer from parent', {parent, self: this});
+      };
+    }
+  }
+
   constructor() {
     super();
-
     this.loggerNS = 'two5-post-processing';
-
-    createEffect(() => {
-      const parent = this.parentRenderer;
-      if (parent) {
-        parent.addStage(this.renderer);
-        this.logger?.log('added renderer to parent', this);
-        return () => {
-          parent.removeStage(this.renderer);
-          this.logger?.log('removed renderer from parent', {parent, self: this});
-        };
-      }
-    }, [this.parentRenderer$]);
+    this.onParentRendererChange();
   }
 
   override render() {
