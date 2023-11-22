@@ -1,5 +1,4 @@
 import {consume} from '@lit/context';
-import {eventize, type Eventize} from '@spearwolf/eventize';
 import {type SignalReader} from '@spearwolf/signalize';
 import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {Display, TextureStore} from '@spearwolf/twopoint5d';
@@ -8,8 +7,6 @@ import {property} from 'lit/decorators.js';
 import {displayContext} from '../index.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
-
-export interface TextureStoreElement extends Eventize {}
 
 export class TextureStoreElement extends TwoPoint5DElement {
   static async whenDefined(el: any): Promise<TextureStoreElement> {
@@ -43,7 +40,6 @@ export class TextureStoreElement extends TwoPoint5DElement {
 
   constructor() {
     super();
-    eventize(this);
 
     this.loggerNS = 'two5-texture-store';
 

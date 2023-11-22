@@ -1,5 +1,4 @@
 import {consume, provide} from '@lit/context';
-import {eventize, type Eventize} from '@spearwolf/eventize';
 import {createEffect, type SignalReader} from '@spearwolf/signalize';
 import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer, type IStageRenderer} from '@spearwolf/twopoint5d';
@@ -8,8 +7,6 @@ import {property} from 'lit/decorators.js';
 import {stageRendererContext} from '../index.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
-
-export interface PostProcessingElement extends Eventize {}
 
 export class PostProcessingElement extends TwoPoint5DElement {
   static async whenDefined(el: any): Promise<PostProcessingElement> {
@@ -38,7 +35,6 @@ export class PostProcessingElement extends TwoPoint5DElement {
 
   constructor() {
     super();
-    eventize(this);
 
     this.loggerNS = 'two5-post-processing';
 
