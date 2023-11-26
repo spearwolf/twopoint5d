@@ -1,8 +1,13 @@
 import {createContext} from '@lit/context';
-import type {PostProcessingRenderer} from '@spearwolf/twopoint5d';
+import type {Pass} from 'three/addons/postprocessing/Pass.js';
+
+export interface PostProcessingPassElement extends HTMLElement {
+  pass: Pass;
+}
 
 export interface IPostProcessingContext {
-  renderer: PostProcessingRenderer;
+  addPassElement(el: PostProcessingPassElement): void;
+  removePassElement(el: PostProcessingPassElement): void;
 }
 
 export const postProcessingContext = createContext<IPostProcessingContext | undefined>(Symbol('post-processing'));

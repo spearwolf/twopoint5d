@@ -3,7 +3,11 @@ import {effect, signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer, type IStageRenderer} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
-import {postProcessingContext, type IPostProcessingContext} from '../context/post-processing-context.js';
+import {
+  postProcessingContext,
+  type IPostProcessingContext,
+  type PostProcessingPassElement,
+} from '../context/post-processing-context.js';
 import {stageRendererContext} from '../context/stage-renderer-context.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
@@ -58,5 +62,14 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
 
   override render() {
     return html`<slot></slot>`;
+  }
+
+  addPassElement(el: PostProcessingPassElement) {
+    // TODO sort elements by dom order
+    this.renderer.addPass(el.pass);
+  }
+
+  removePassElement(el: PostProcessingPassElement) {
+    this.renderer.removePass(el.pass);
   }
 }
