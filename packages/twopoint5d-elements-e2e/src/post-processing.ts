@@ -1,7 +1,12 @@
 import type {PostProcessingRenderer, TextureStore} from '@spearwolf/twopoint5d';
-import {DisplayElement, PostProcessingElement, Stage2DElement, TextureStoreElement} from '@spearwolf/twopoint5d-elements';
+import {
+  DisplayElement,
+  GlitchPassElement,
+  PostProcessingElement,
+  Stage2DElement,
+  TextureStoreElement,
+} from '@spearwolf/twopoint5d-elements';
 import {Color, Scene, Sprite, SpriteMaterial} from 'three';
-import {GlitchPass} from 'three/addons/postprocessing/GlitchPass.js';
 import './display.css';
 import './style.css';
 
@@ -12,6 +17,7 @@ const initialize = async (
   customElements.define('x-stage2d', Stage2DElement);
   customElements.define('x-texture-store', TextureStoreElement);
   customElements.define('x-post-processing', PostProcessingElement);
+  customElements.define('x-glitch-pass', GlitchPassElement);
 
   const [stageEl, storeEl, postProcessingEl] = await Promise.all([
     Stage2DElement.whenDefined(document.getElementById('stage2d')),
@@ -22,11 +28,8 @@ const initialize = async (
   action(await stageEl.firstFrame(), storeEl.store, postProcessingEl.renderer);
 };
 
-initialize(({scene}, textureStore, postProcessing) => {
+initialize(({scene}, textureStore, _postProcessing) => {
   scene.background = new Color(0x212121);
-
-  const glitchPass = new GlitchPass();
-  postProcessing.addPass(glitchPass);
 
   const sprite = new Sprite();
   sprite.scale.set(197, 205, 1);

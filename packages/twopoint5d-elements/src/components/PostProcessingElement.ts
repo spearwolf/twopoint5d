@@ -1,13 +1,14 @@
-import {consume, provide} from '@lit/context';
+import {ContextProvider, consume, provide} from '@lit/context';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer, type IStageRenderer} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
-import {stageRendererContext} from '../index.js';
+import {postProcessingContext, type IPostProcessingContext} from '../context/post-processing-context.js';
+import {stageRendererContext} from '../context/stage-renderer-context.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 
-export class PostProcessingElement extends TwoPoint5DElement {
+export class PostProcessingElement extends TwoPoint5DElement implements IPostProcessingContext {
   static async whenDefined(el: any): Promise<PostProcessingElement> {
     await whenDefined(el);
     if (el instanceof PostProcessingElement) {
@@ -30,7 +31,7 @@ export class PostProcessingElement extends TwoPoint5DElement {
   @provide({context: stageRendererContext})
   accessor renderer = new PostProcessingRenderer();
 
-  @effect()
+  @effect({signal: 'parentRenderer'})
   onParentRendererChange() {
     const parent = this.parentRenderer;
     if (parent) {
@@ -43,9 +44,15 @@ export class PostProcessingElement extends TwoPoint5DElement {
     }
   }
 
+  readonly #postProcessingProvider: ContextProvider<typeof postProcessingContext, typeof this>;
+
   constructor() {
     super();
     this.loggerNS = 'two5-post-processing';
+
+    this.#postProcessingProvider = new ContextProvider(this, {context: postProcessingContext});
+    this.#postProcessingProvider.setValue(this);
+
     this.onParentRendererChange();
   }
 
