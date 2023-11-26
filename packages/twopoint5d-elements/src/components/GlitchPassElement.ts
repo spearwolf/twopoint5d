@@ -39,11 +39,9 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
     const postProcessing = this.postProcessing;
     if (postProcessing != null) {
       this.logger?.log('add glitchPass to postProcessing', {postProcessing, self: this});
-      // postProcessing.renderer.addPass(this.pass);
       postProcessing.addPassElement(this);
       return () => {
         this.logger?.log('remove glitchPass from postProcessing', {postProcessing, self: this});
-        // postProcessing.renderer.removePass(this.pass);
         postProcessing.removePassElement(this);
       };
     }
