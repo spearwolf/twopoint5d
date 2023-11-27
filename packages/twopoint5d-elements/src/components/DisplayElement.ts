@@ -1,14 +1,14 @@
 import {provide} from '@lit/context';
-import {Display, StageRenderer, type DisplayParameters, type IStageRenderer} from '@spearwolf/twopoint5d';
+import {Display, StageRenderer, type DisplayParameters} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {displayContext} from '../context/display-context.js';
-import {stageRendererContext} from '../context/stage-renderer-context.js';
+import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
 import {readBooleanAttribute} from '../utils/readBooleanAttribute.js';
 import {readStringAttribute} from '../utils/readStringAttribute.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 
-export class DisplayElement extends TwoPoint5DElement {
+export class DisplayElement extends TwoPoint5DElement implements IStageRendererContext {
   static async whenDefined(el: any): Promise<DisplayElement> {
     await whenDefined(el);
     if (el instanceof DisplayElement) {
@@ -59,7 +59,9 @@ export class DisplayElement extends TwoPoint5DElement {
   accessor display: Display | undefined;
 
   @provide({context: stageRendererContext})
-  accessor stageRenderer: IStageRenderer | undefined;
+  accessor stageRendererCtx: IStageRendererContext = this;
+
+  readonly stageRenderer = new StageRenderer();
 
   get container(): HTMLElement | undefined {
     return this.renderRoot?.querySelector('.canvas-container') ?? undefined;
@@ -111,6 +113,14 @@ export class DisplayElement extends TwoPoint5DElement {
     }
   }
 
+  addStageElement(el: StageElement): void {
+    this.stageRenderer.addStage(el.getStage());
+  }
+
+  removeStageElement(el: StageElement): void {
+    this.stageRenderer.removeStage(el.getStage());
+  }
+
   #createDisplay(): void {
     if (this.display) {
       this.logger?.warn('display already created');
@@ -144,7 +154,6 @@ export class DisplayElement extends TwoPoint5DElement {
 
     this.display.on(this);
 
-    this.stageRenderer = new StageRenderer();
     this.stageRenderer.attach(this.display);
 
     this.display.start();

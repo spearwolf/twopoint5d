@@ -3,6 +3,7 @@ import {effect, signal} from '@spearwolf/signalize/decorators';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import {GlitchPass} from 'three/addons/postprocessing/GlitchPass.js';
+import type {Pass} from 'three/addons/postprocessing/Pass.js';
 import {
   postProcessingContext,
   type IPostProcessingContext,
@@ -34,7 +35,11 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
   @signal({readAsValue: true})
   accessor pass = new GlitchPass();
 
-  @effect({deps: ['postProcessing', 'glitchPass']})
+  getPass(): Pass {
+    return this.pass;
+  }
+
+  @effect({deps: ['postProcessing', 'pass']})
   onPostProcessingUpdate() {
     const postProcessing = this.postProcessing;
     if (postProcessing != null) {

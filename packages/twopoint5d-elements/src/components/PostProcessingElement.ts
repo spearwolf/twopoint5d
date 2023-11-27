@@ -1,6 +1,6 @@
-import {ContextProvider, consume, provide} from '@lit/context';
+import {ContextProvider, consume} from '@lit/context';
 import {effect, signal} from '@spearwolf/signalize/decorators';
-import {PostProcessingRenderer, type IStageRenderer} from '@spearwolf/twopoint5d';
+import {PostProcessingRenderer} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import {
@@ -8,11 +8,11 @@ import {
   type IPostProcessingContext,
   type PostProcessingPassElement,
 } from '../context/post-processing-context.js';
-import {stageRendererContext} from '../context/stage-renderer-context.js';
+import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 
-export class PostProcessingElement extends TwoPoint5DElement implements IPostProcessingContext {
+export class PostProcessingElement extends TwoPoint5DElement implements IPostProcessingContext, IStageRendererContext {
   static async whenDefined(el: any): Promise<PostProcessingElement> {
     await whenDefined(el);
     if (el instanceof PostProcessingElement) {
@@ -30,32 +30,32 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
   @consume({context: stageRendererContext, subscribe: true})
   @property({attribute: false})
   @signal()
-  accessor parentRenderer: IStageRenderer | undefined;
+  accessor parentRendererCtx: IStageRendererContext | undefined;
 
-  @provide({context: stageRendererContext})
-  accessor renderer = new PostProcessingRenderer();
+  readonly renderer = new PostProcessingRenderer();
 
-  @effect({signal: 'parentRenderer'})
+  @effect({signal: 'parentRendererCtx'})
   onParentRendererChange() {
-    const parent = this.parentRenderer;
+    const parent = this.parentRendererCtx;
     if (parent) {
-      parent.addStage(this.renderer);
+      parent.addStageElement(this);
       this.logger?.log('added renderer to parent', this);
       return () => {
-        parent.removeStage(this.renderer);
+        parent.removeStageElement(this);
         this.logger?.log('removed renderer from parent', {parent, self: this});
       };
     }
   }
 
-  readonly #postProcessingProvider: ContextProvider<typeof postProcessingContext, typeof this>;
+  readonly postProcessingProvider: ContextProvider<typeof postProcessingContext, typeof this>;
+  readonly stageRendererProvider: ContextProvider<typeof stageRendererContext, typeof this>;
 
   constructor() {
     super();
     this.loggerNS = 'two5-post-processing';
 
-    this.#postProcessingProvider = new ContextProvider(this, {context: postProcessingContext});
-    this.#postProcessingProvider.setValue(this);
+    this.postProcessingProvider = this.createContextProvider(postProcessingContext);
+    this.stageRendererProvider = this.createContextProvider(stageRendererContext);
 
     this.onParentRendererChange();
   }
@@ -64,12 +64,25 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
     return html`<slot></slot>`;
   }
 
+  getStage(): PostProcessingRenderer {
+    return this.renderer;
+  }
+
+  addStageElement(el: StageElement): void {
+    // TODO sort elements by dom order
+    this.renderer.addStage(el.getStage());
+  }
+
+  removeStageElement(el: StageElement): void {
+    this.renderer.removeStage(el.getStage());
+  }
+
   addPassElement(el: PostProcessingPassElement) {
     // TODO sort elements by dom order
-    this.renderer.addPass(el.pass);
+    this.renderer.addPass(el.getPass());
   }
 
   removePassElement(el: PostProcessingPassElement) {
-    this.renderer.removePass(el.pass);
+    this.renderer.removePass(el.getPass());
   }
 }

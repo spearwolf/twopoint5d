@@ -7,7 +7,6 @@ import {
   ParallaxProjection,
   Stage2D,
   type IProjection,
-  type IStageRenderer,
   type OrthographicProjectionSpecs,
   type ParallaxProjectionSpecs,
   type ProjectionPlaneDescription,
@@ -23,7 +22,7 @@ import {
 import {css, html} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
-import {stageRendererContext} from '../context/stage-renderer-context.js';
+import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
 import {SignalMap} from '../utils/SignalMap.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
@@ -32,7 +31,7 @@ const isValidSize = ({width, height}: {width: number; height: number}): boolean 
 
 export interface Stage2DElement extends Eventize {}
 
-export class Stage2DElement extends TwoPoint5DElement {
+export class Stage2DElement extends TwoPoint5DElement implements StageElement {
   static async whenDefined(el: any): Promise<Stage2DElement> {
     await whenDefined(el);
     if (el instanceof Stage2DElement) {
@@ -50,7 +49,7 @@ export class Stage2DElement extends TwoPoint5DElement {
   @consume({context: stageRendererContext, subscribe: true})
   @property({attribute: false})
   @signal({readAsValue: true})
-  accessor stageRenderer: IStageRenderer | undefined;
+  accessor stageRendererCtx: IStageRendererContext | undefined;
 
   @property({type: String, reflect: true})
   @signal({readAsValue: true})
@@ -136,11 +135,11 @@ export class Stage2DElement extends TwoPoint5DElement {
 
     queryObjectSignal(
       this,
-      'stageRenderer',
-    )((stageRenderer) => {
-      this.logger?.log('requested stage-renderer context', stageRenderer);
-      stageRenderer.addStage(this.stage2d);
-      return () => stageRenderer.removeStage(this.stage2d);
+      'stageRendererCtx',
+    )((stageRendererCtx) => {
+      this.logger?.log('requested stage-renderer context', stageRendererCtx);
+      stageRendererCtx.addStageElement(this);
+      return () => stageRendererCtx.removeStageElement(this);
     });
 
     this.projection$((proj) => {
@@ -202,6 +201,10 @@ export class Stage2DElement extends TwoPoint5DElement {
 
   override render() {
     return html`<slot></slot>`;
+  }
+
+  getStage(): Stage2D {
+    return this.stage2d;
   }
 
   private onProjectionPropsUpdate(): void {

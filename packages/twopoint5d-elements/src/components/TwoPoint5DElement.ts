@@ -1,3 +1,4 @@
+import {ContextProvider} from '@lit/context';
 import {LitElement} from 'lit';
 import {property} from 'lit/decorators.js';
 import {ConsoleLogger} from '../utils/ConsoleLogger.js';
@@ -56,5 +57,11 @@ export class TwoPoint5DElement extends LitElement {
     if (name === DEBUG_ATTR) {
       this.debug = readBooleanAttribute(this, DEBUG_ATTR);
     }
+  }
+
+  protected createContextProvider(context: any) {
+    const cp = new ContextProvider(this, {context});
+    cp.setValue(this);
+    return cp;
   }
 }

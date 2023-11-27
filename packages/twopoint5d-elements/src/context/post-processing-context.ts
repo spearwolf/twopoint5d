@@ -2,7 +2,7 @@ import {createContext} from '@lit/context';
 import type {Pass} from 'three/addons/postprocessing/Pass.js';
 
 export interface PostProcessingPassElement extends HTMLElement {
-  pass: Pass;
+  getPass(): Pass;
 }
 
 export interface IPostProcessingContext {
