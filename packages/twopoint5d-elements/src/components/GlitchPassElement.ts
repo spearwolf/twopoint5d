@@ -8,18 +8,9 @@ import {
   type IPostProcessingContext,
   type PostProcessingPassElement,
 } from '../context/post-processing-context.js';
-import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 
 export class GlitchPassElement extends TwoPoint5DElement implements PostProcessingPassElement {
-  static async whenDefined(el: any): Promise<GlitchPassElement> {
-    await whenDefined(el);
-    if (el instanceof GlitchPassElement) {
-      return el;
-    }
-    throw new Error('not a GlitchPassElement');
-  }
-
   static override styles = css`
     :host {
       display: inline;
@@ -40,13 +31,13 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
 
   @effect({deps: ['postProcessingCtx', 'glitchPass']})
   onPostProcessingUpdate() {
-    const postProcessing = this.postProcessingCtx;
-    if (postProcessing != null) {
-      this.logger?.log('add glitchPass to postProcessing', {postProcessing, self: this});
-      postProcessing.addPassElement(this);
+    const pp = this.postProcessingCtx;
+    if (pp != null) {
+      this.logger?.log('add glitchPass to postProcessing', {postProcessing: pp, self: this});
+      pp.addPassElement(this);
       return () => {
-        this.logger?.log('remove glitchPass from postProcessing', {postProcessing, self: this});
-        postProcessing.removePassElement(this);
+        this.logger?.log('remove glitchPass from postProcessing', {postProcessing: pp, self: this});
+        pp.removePassElement(this);
       };
     }
   }
