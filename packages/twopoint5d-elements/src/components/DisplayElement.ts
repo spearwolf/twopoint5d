@@ -1,3 +1,4 @@
+import type {ContextProvider} from '@lit/context';
 import {provide} from '@lit/context';
 import {Display, StageRenderer, type DisplayParameters} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
@@ -58,10 +59,9 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
   @provide({context: displayContext})
   accessor display: Display | undefined;
 
-  @provide({context: stageRendererContext})
-  accessor stageRendererCtx: IStageRendererContext = this;
-
   readonly stageRenderer = new StageRenderer();
+
+  readonly stageRendererProvider: ContextProvider<typeof stageRendererContext, typeof this>;
 
   get container(): HTMLElement | undefined {
     return this.renderRoot?.querySelector('.canvas-container') ?? undefined;
@@ -75,6 +75,8 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
     super();
 
     this.loggerNS = 'two5-display';
+
+    this.stageRendererProvider = this.createContextProvider(stageRendererContext);
 
     // TODO fullscreen - go fullscreen should include overlay-content
     // TODO mobile fullscreen - go fullscreen on rotation to landscape (as attribute)
