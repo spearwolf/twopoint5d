@@ -96,7 +96,6 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
         this.bloomPass.clear = this.clear;
         this.logger?.log('created bloomPass', this.bloomPass);
         return this.display.on('resize', ({width, height}) => {
-          this.logger?.log('update bloomPass resolution', this.bloomPass, width, height);
           this.bloomPass?.resolution.set(width, height);
         });
       }

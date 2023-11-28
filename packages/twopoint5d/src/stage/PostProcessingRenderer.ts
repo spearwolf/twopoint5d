@@ -12,6 +12,7 @@ import {
 } from '../events.js';
 import {hasGetRenderPass} from './IGetRenderPass.js';
 import type {IStage} from './IStage.js';
+import type {StageType} from './IStageRenderer.js';
 import {StageRenderer} from './StageRenderer.js';
 
 export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
@@ -76,8 +77,6 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
       const renderPass = stage.getRenderPass();
       this.stagePasses.set(stage, renderPass);
       this.addPass(renderPass);
-
-      console.log('stageAdded', {stage, renderPass, postProcessingRenderer: this});
     }
   }
 
@@ -87,9 +86,33 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
       this.stagePasses.delete(stage);
       this.removePass(renderPass);
       renderPass.dispose();
-
-      console.log('stageRemoved', {stage, renderPass, postProcessingRenderer: this});
     }
+  }
+
+  reorderPasses(passes: (Pass | StageType)[]) {
+    const nextPasses: Pass[] = passes
+      .map((pass) => {
+        if (pass instanceof Pass) {
+          return pass;
+        }
+        return this.stagePasses.get(pass)!;
+      })
+      .filter(Boolean);
+
+    const target = this.composer?.passes ?? this.passes;
+
+    if (target.length !== nextPasses.length) {
+      console.error(
+        '[PostProcessingRenderer] reorderPasses: nextPasses length mismatch: should be',
+        target.length,
+        'but is',
+        nextPasses.length,
+        {target, nextPasses, renderer: this},
+      );
+    }
+
+    target.length = 0;
+    target.push(...nextPasses);
   }
 
   // TODO dispose

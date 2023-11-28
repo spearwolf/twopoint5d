@@ -9,8 +9,12 @@ import {
   type PostProcessingPassElement,
 } from '../context/post-processing-context.js';
 import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
+import {sortElementsByHtmlOrder} from '../utils/sortElementsByHtmlOrder.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
+
+const isPostPass = (el: any): el is PostProcessingPassElement =>
+  !!(typeof (el as PostProcessingPassElement)?.getPass === 'function');
 
 export class PostProcessingElement extends TwoPoint5DElement implements IPostProcessingContext, IStageRendererContext {
   static async whenDefined(el: any): Promise<PostProcessingElement> {
@@ -84,21 +88,39 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
     return this.renderer;
   }
 
+  #children = new Set<StageElement | PostProcessingPassElement>();
+
   addStageElement(el: StageElement): void {
-    // TODO sort elements by dom order
     this.renderer.addStage(el.getStage());
+    this.addPostPassChild(el);
   }
 
   removeStageElement(el: StageElement): void {
+    this.removePostPassChild(el);
     this.renderer.removeStage(el.getStage());
   }
 
   addPassElement(el: PostProcessingPassElement) {
-    // TODO sort elements by dom order
     this.renderer.addPass(el.getPass());
+    this.addPostPassChild(el);
   }
 
   removePassElement(el: PostProcessingPassElement) {
+    this.removePostPassChild(el);
     this.renderer.removePass(el.getPass());
+  }
+
+  protected addPostPassChild(el: StageElement | PostProcessingPassElement) {
+    this.#children.add(el);
+
+    const sortedChildren = sortElementsByHtmlOrder(this, Array.from(this.#children)).map((el) =>
+      isPostPass(el) ? el.getPass() : (el as StageElement).getStage(),
+    );
+
+    this.renderer.reorderPasses(sortedChildren);
+  }
+
+  protected removePostPassChild(el: StageElement | PostProcessingPassElement) {
+    this.#children.delete(el);
   }
 }
