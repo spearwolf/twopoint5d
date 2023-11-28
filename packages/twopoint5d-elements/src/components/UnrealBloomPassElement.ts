@@ -1,4 +1,5 @@
 import {consume} from '@lit/context';
+import {batch} from '@spearwolf/signalize';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import type {Display} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
@@ -116,5 +117,13 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
 
   override createRenderRoot() {
     return this;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    batch(() => {
+      this.postProcessingCtx = undefined;
+      this.display = undefined;
+    });
   }
 }

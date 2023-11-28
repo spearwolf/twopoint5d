@@ -64,6 +64,22 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
     return this;
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    this.updateContextProvider(this.stageRendererProvider);
+    this.updateContextProvider(this.postProcessingProvider);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+
+    this.parentRendererCtx = undefined;
+
+    this.clearContextProvider(this.stageRendererProvider);
+    this.clearContextProvider(this.postProcessingProvider);
+  }
+
   getStage(): PostProcessingRenderer {
     return this.renderer;
   }

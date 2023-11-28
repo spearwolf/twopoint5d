@@ -47,6 +47,8 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
         this.logger?.log('remove glitchPass from postProcessing', {postProcessing: pp, self: this});
         pp.removePassElement(this);
       };
+    } else {
+      this.logger?.log('no postProcessing context', {self: this});
     }
   }
 
@@ -67,5 +69,10 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
 
   override createRenderRoot() {
     return this;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.postProcessingCtx = undefined;
   }
 }

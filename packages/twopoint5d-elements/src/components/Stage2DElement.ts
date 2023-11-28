@@ -138,6 +138,7 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
       'stageRendererCtx',
     )((stageRendererCtx) => {
       this.logger?.log('requested stage-renderer context', stageRendererCtx);
+      if (stageRendererCtx == null) return;
       stageRendererCtx.addStageElement(this);
       return () => stageRendererCtx.removeStageElement(this);
     });
@@ -201,6 +202,11 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
 
   override createRenderRoot() {
     return this;
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stageRendererCtx = undefined;
   }
 
   getStage(): Stage2D {

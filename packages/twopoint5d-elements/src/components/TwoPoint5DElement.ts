@@ -64,4 +64,13 @@ export class TwoPoint5DElement extends LitElement {
     cp.setValue(this);
     return cp;
   }
+
+  protected updateContextProvider(provider: ContextProvider<any, any>) {
+    provider.setValue(this);
+    provider.hostConnected();
+  }
+
+  protected clearContextProvider(provider: ContextProvider<any, any>) {
+    provider.setValue(undefined);
+  }
 }
