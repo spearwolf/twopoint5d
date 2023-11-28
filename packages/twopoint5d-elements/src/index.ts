@@ -4,6 +4,7 @@ export * from './components/PostProcessingElement.js';
 export * from './components/Stage2DElement.js';
 export * from './components/TextureStoreElement.js';
 export * from './components/TwoPoint5DElement.js';
+export * from './components/UnrealBloomPassElement.js';
 export * from './context/display-context.js';
 export * from './context/post-processing-context.js';
 export * from './context/stage-renderer-context.js';

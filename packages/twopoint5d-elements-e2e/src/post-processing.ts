@@ -5,6 +5,7 @@ import {
   PostProcessingElement,
   Stage2DElement,
   TextureStoreElement,
+  UnrealBloomPassElement,
 } from '@spearwolf/twopoint5d-elements';
 import {Color, Scene, Sprite, SpriteMaterial} from 'three';
 import './display.css';
@@ -18,6 +19,7 @@ const initialize = async (
   customElements.define('x-texture-store', TextureStoreElement);
   customElements.define('x-post-processing', PostProcessingElement);
   customElements.define('x-glitch-pass', GlitchPassElement);
+  customElements.define('x-unreal-bloom-pass', UnrealBloomPassElement);
 
   const [stageEl, storeEl, postProcessingEl] = await Promise.all([
     Stage2DElement.whenDefined(document.getElementById('stage2d')),

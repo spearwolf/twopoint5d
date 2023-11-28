@@ -1,6 +1,6 @@
 import {consume} from '@lit/context';
 import {effect, signal} from '@spearwolf/signalize/decorators';
-import {css, html} from 'lit';
+import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {GlitchPass} from 'three/addons/postprocessing/GlitchPass.js';
 import {
@@ -16,6 +16,14 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
       display: inline;
     }
   `;
+
+  @property({type: Boolean, reflect: true})
+  @signal({readAsValue: true})
+  accessor disabled: boolean = false;
+
+  @property({type: Boolean, reflect: true})
+  @signal({readAsValue: true})
+  accessor clear: boolean = false;
 
   @consume({context: postProcessingContext, subscribe: true})
   @property({attribute: false})
@@ -42,13 +50,22 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
     }
   }
 
+  @effect({deps: ['glitchPass', 'disabled', 'clear']})
+  onPassUpdate() {
+    if (this.glitchPass != null) {
+      this.glitchPass.enabled = !this.disabled;
+      this.glitchPass.clear = this.clear;
+    }
+  }
+
   constructor() {
     super();
     this.loggerNS = 'two5-glitch-pass';
     this.onPostProcessingUpdate();
+    this.onPassUpdate();
   }
 
-  override render() {
-    return html`<slot></slot>`;
+  override createRenderRoot() {
+    return this;
   }
 }

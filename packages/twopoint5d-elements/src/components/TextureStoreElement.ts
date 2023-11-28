@@ -2,7 +2,7 @@ import {consume} from '@lit/context';
 import {type SignalReader} from '@spearwolf/signalize';
 import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {Display, TextureStore} from '@spearwolf/twopoint5d';
-import {css, html} from 'lit';
+import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {displayContext} from '../index.js';
 import {whenDefined} from '../utils/whenDefined.js';
@@ -57,7 +57,7 @@ export class TextureStoreElement extends TwoPoint5DElement {
     });
   }
 
-  override render() {
-    return html`<slot></slot>`;
+  override createRenderRoot() {
+    return this;
   }
 }

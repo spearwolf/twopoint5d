@@ -19,7 +19,7 @@ import {
   type Stage2DResizeProps,
   type StageRenderFrameProps,
 } from '@spearwolf/twopoint5d/events.js';
-import {css, html} from 'lit';
+import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
 import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
@@ -199,8 +199,8 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
     this.#viewSpecsSignals.updateFromProps(this, propKeys);
   }
 
-  override render() {
-    return html`<slot></slot>`;
+  override createRenderRoot() {
+    return this;
   }
 
   getStage(): Stage2D {

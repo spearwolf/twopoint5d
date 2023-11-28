@@ -1,7 +1,7 @@
 import {ContextProvider, consume} from '@lit/context';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer} from '@spearwolf/twopoint5d';
-import {css, html} from 'lit';
+import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {
   postProcessingContext,
@@ -60,8 +60,8 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
     this.onParentRendererChange();
   }
 
-  override render() {
-    return html`<slot></slot>`;
+  override createRenderRoot() {
+    return this;
   }
 
   getStage(): PostProcessingRenderer {

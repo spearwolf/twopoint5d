@@ -12,8 +12,9 @@
       <x-display class="two5-display">
         <x-texture-store id="texstore" src="/assets/textures.json">
           <x-post-processing debug id="pp">
-            <x-stage2d id="stage2d" projection-type="parallax" width="197" height="205" />
-            <x-glitch-pass debug />
+            <x-stage2d id="stage2d" projection-type="parallax" width="197" height="205"></x-stage2d>
+            <x-unreal-bloom-pass debug>unreal <em>bloom!</em></x-unreal-bloom-pass>
+            <x-glitch-pass debug></x-glitch-pass>
           </x-post-processing>
         </x-texture-store>
       </x-display>
