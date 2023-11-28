@@ -44,6 +44,10 @@
     "./two5-glitch-pass.js": {
       "default": "./dist/src/two5-glitch-pass.js",
       "types": "./dist/src/two5-glitch-pass.d.ts"
+    },
+    "./two5-unreal-bloom-pass.js": {
+      "default": "./dist/src/two5-unreal-bloom-pass.js",
+      "types": "./dist/src/two5-unreal-bloom-pass.d.ts"
     }
   },
   "sideEffects": [

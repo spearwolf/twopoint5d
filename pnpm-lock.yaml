@@ -170,6 +170,9 @@ importers:
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
+      '@spearwolf/twopoint5d-elements':
+        specifier: workspace:*
+        version: link:../../packages/twopoint5d-elements
       '@spearwolf/twopoint5d-r3f':
         specifier: workspace:*
         version: link:../../packages/twopoint5d-r3f
