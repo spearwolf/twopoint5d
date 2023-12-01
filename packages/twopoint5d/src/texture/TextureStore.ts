@@ -7,6 +7,7 @@ import type {TileSetOptions} from './TileSet.js';
 
 export interface TextureStoreItem {
   imageUrl?: string;
+  overrideImageUrl?: string;
   atlasUrl?: string;
   tileSet?: TileSetOptions;
   texture?: TextureOptionClasses[];
@@ -113,9 +114,21 @@ export class TextureStore {
         } else {
           resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses);
         }
-      }
-      // TODO atlasUrl
-      else if (item.imageUrl) {
+      } else if (item.atlasUrl) {
+        if (resource) {
+          if (resource.type !== 'atlas') {
+            // TODO maybe we can throw away the old resource and create a new one?
+            throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "atlas"`);
+          }
+          batch(() => {
+            resource.atlasUrl = item.atlasUrl;
+            resource.overrideImageUrl = item.overrideImageUrl;
+            resource.textureClasses = textureClasses;
+          });
+        } else {
+          resource = TextureResource.fromAtlas(id, item.atlasUrl, item.overrideImageUrl, textureClasses);
+        }
+      } else if (item.imageUrl) {
         if (resource) {
           if (resource.type !== 'image') {
             throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "image"`);
@@ -177,8 +190,6 @@ export class TextureStore {
           unsubscribeFromSubType.push(() => {
             resource.refCount--;
           });
-
-          console.log('resource', resource);
 
           if (isMultipleTypes) {
             (type as Array<TextureResourceSubType>).forEach((t) => {

@@ -1,0 +1,83 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {title} from './splotch-starfield.json';
+---
+
+<Layout title={title}>
+  <section class="container">
+    <two5-display class="display">
+      <two5-texture-store debug id="texstore" src="/lookbook/assets/textures.json">
+        <two5-post-processing>
+          <two5-stage2d id="mystage" projection-type="parallax" width="1024" height="1024"></two5-stage2d>
+          <two5-unreal-bloom-pass strength="1.13" radius="-0.56"></two5-unreal-bloom-pass>
+        </two5-post-processing>
+      </two5-texture-store>
+    </two5-display>
+  </section>
+</Layout>
+
+<style>
+  :global(.lil-gui) :global(option) {
+    color: #555;
+  }
+
+  .container {
+    width: 100vw;
+    width: 100svw;
+    height: 100vh;
+    height: 100svh;
+    max-width: none;
+  }
+
+  .display {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<script>
+  import {TextureStore} from '@spearwolf/twopoint5d';
+  import {Stage2DElement, TextureStoreElement, whenDefined} from '@spearwolf/twopoint5d-elements';
+  import '@spearwolf/twopoint5d-elements/two5-display.js';
+  import '@spearwolf/twopoint5d-elements/two5-glitch-pass.js';
+  import '@spearwolf/twopoint5d-elements/two5-post-processing.js';
+  import '@spearwolf/twopoint5d-elements/two5-stage2d.js';
+  import '@spearwolf/twopoint5d-elements/two5-texture-store.js';
+  import '@spearwolf/twopoint5d-elements/two5-unreal-bloom-pass.js';
+  import GUI from 'lil-gui';
+  import {Color, Sprite, SpriteMaterial} from 'three';
+
+  // -----------------------------
+
+  const [textureStore, mystage] = (await Promise.all([
+    whenDefined(document.getElementById('texstore')).then((el) => (el as TextureStoreElement).store),
+    whenDefined(document.getElementById('mystage')),
+  ])) as [TextureStore, Stage2DElement];
+
+  const {scene} = await mystage.firstFrame();
+
+  scene.background = new Color(0x000000);
+
+  const sprite = new Sprite();
+  sprite.scale.set(774, 819, 1);
+  scene.add(sprite);
+
+  textureStore.get('splotchs', ['texture', 'atlas'], ([texture, atlas]) => {
+    console.log('texture', {texture, atlas});
+
+    sprite.material?.dispose();
+    sprite.material = new SpriteMaterial({map: texture});
+  });
+
+  // -----------------------------
+
+  const gui = new GUI({title: 'splotch-starfield'});
+
+  const unrealBloomFolder = gui.addFolder('unreal bloom');
+  const unrealBloom = document.querySelector('two5-unreal-bloom-pass');
+
+  unrealBloomFolder.add(unrealBloom, 'strength', 0, 5, 0.01);
+  unrealBloomFolder.add(unrealBloom, 'radius', -2, 3, 0.01);
+  unrealBloomFolder.add(unrealBloom, 'threshold', 0, 1, 0.01);
+  unrealBloomFolder.add(unrealBloom, 'disabled');
+</script>

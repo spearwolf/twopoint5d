@@ -1,0 +1,17 @@
+{
+  "title": "splotch starfield",
+  "description": "A splotch starfield demo",
+  "url": "/demos/splotch-starfield",
+  "tags": [
+    "demo",
+    "<two5-display/>",
+    "<two5-texture-store/>",
+    "TextureStore",
+    "<two5-stage2d/>",
+    "<two5-post-processing/>",
+    "<two5-unreal-bloom-pass/>",
+    "<two5-glitch-pass/>",
+    "two5-elements"
+  ],
+  "previewImage": "two5-post-processing.png"
+}

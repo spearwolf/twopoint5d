@@ -1,0 +1,84 @@
+{"frames": {
+
+"splotch0":
+{
+	"frame": {"x":1,"y":1,"w":256,"h":296},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":296},
+	"sourceSize": {"w":256,"h":296}
+},
+"splotch1":
+{
+	"frame": {"x":259,"y":557,"w":256,"h":257},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":257},
+	"sourceSize": {"w":256,"h":257}
+},
+"splotch2":
+{
+	"frame": {"x":517,"y":282,"w":256,"h":265},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":265},
+	"sourceSize": {"w":256,"h":265}
+},
+"splotch3":
+{
+	"frame": {"x":517,"y":549,"w":256,"h":265},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":265},
+	"sourceSize": {"w":256,"h":265}
+},
+"splotch4":
+{
+	"frame": {"x":259,"y":1,"w":256,"h":279},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":279},
+	"sourceSize": {"w":256,"h":279}
+},
+"splotch5":
+{
+	"frame": {"x":1,"y":581,"w":256,"h":237},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":237},
+	"sourceSize": {"w":256,"h":237}
+},
+"splotch6":
+{
+	"frame": {"x":259,"y":282,"w":256,"h":273},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":273},
+	"sourceSize": {"w":256,"h":273}
+},
+"splotch7":
+{
+	"frame": {"x":517,"y":1,"w":256,"h":279},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":279},
+	"sourceSize": {"w":256,"h":279}
+},
+"splotch8":
+{
+	"frame": {"x":1,"y":299,"w":256,"h":280},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":280},
+	"sourceSize": {"w":256,"h":280}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "splotchs-256x.png",
+	"format": "RGBA8888",
+	"size": {"w":774,"h":819},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:f83c33318078379d5d16bc503fed6692:2ecfcc4ead48bfd1663cb2780681036c:1c187b8e136b66bf1aadde3260a8ec80$"
+}
+}
