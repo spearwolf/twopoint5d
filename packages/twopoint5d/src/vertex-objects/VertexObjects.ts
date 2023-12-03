@@ -3,11 +3,9 @@ import {Material, Mesh} from 'three';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 
-export interface VertexObjects {
-  geometry: VertexObjectGeometry | InstancedVertexObjectGeometry;
-}
-
 export class VertexObjects extends Mesh {
+  override geometry: VertexObjectGeometry | InstancedVertexObjectGeometry;
+
   constructor(geometry?: VertexObjectGeometry | InstancedVertexObjectGeometry, material?: Material | Material[]) {
     super(geometry, material);
     this.name = 'VertexObjects';

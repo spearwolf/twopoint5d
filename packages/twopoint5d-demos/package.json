@@ -1,0 +1,45 @@
+{
+  "name": "@spearwolf/twopoint5d-demos",
+  "description": "demo or die",
+  "version": "0.0.1-dev",
+  "author": {
+    "name": "Wolfger Schramm",
+    "email": "wolfger@spearwolf.de",
+    "url": "https://www.spearwolf.de"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "module": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "default": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    }
+  },
+  "sideEffects": [],
+  "scripts": {
+    "tsc": "pnpm exec tsc",
+    "run-s": "pnpm exec run-s -s",
+    "build": "pnpm run-s compile:lib makePackageJson",
+    "compile:lib": "pnpm tsc -b tsconfig.lib.json",
+    "compile:tests": "pnpm tsc -b tsconfig.tests.json",
+    "vitest:run": "pnpm exec vitest tests/src --run",
+    "test": "pnpm compile:tests && pnpm vitest:run",
+    "clean": "pnpm exec rimraf build types dist lib tests",
+    "makePackageJson": "node ../../scripts/makePackageJson.mjs"
+  },
+  "dependencies": {
+    "@lit/context": "^1.0.1",
+    "@spearwolf/eventize": "^3.4.1",
+    "@spearwolf/signalize": "^0.10.1",
+    "@spearwolf/twopoint5d": "workspace:*",
+    "@spearwolf/twopoint5d-elements": "workspace:*",
+    "lit": "3.0.1",
+    "three": "~0.153.0"
+  },
+  "devDependencies": {
+    "@types/three": "~0.153.0"
+  }
+}

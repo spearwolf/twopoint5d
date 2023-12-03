@@ -170,6 +170,9 @@ importers:
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
+      '@spearwolf/twopoint5d-demos':
+        specifier: workspace:*
+        version: link:../../packages/twopoint5d-demos
       '@spearwolf/twopoint5d-elements':
         specifier: workspace:*
         version: link:../../packages/twopoint5d-elements
@@ -217,6 +220,34 @@ importers:
         version: 0.10.1(@spearwolf/eventize@3.4.1)
       three:
         specifier: ^0.153
+        version: 0.153.0
+
+  packages/twopoint5d-demos:
+    dependencies:
+      '@lit/context':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@spearwolf/eventize':
+        specifier: ^3.4.1
+        version: 3.4.1
+      '@spearwolf/signalize':
+        specifier: ^0.10.1
+        version: 0.10.1(@spearwolf/eventize@3.4.1)
+      '@spearwolf/twopoint5d':
+        specifier: workspace:*
+        version: link:../twopoint5d
+      '@spearwolf/twopoint5d-elements':
+        specifier: workspace:*
+        version: link:../twopoint5d-elements
+      lit:
+        specifier: 3.0.1
+        version: 3.0.1
+      three:
+        specifier: ~0.153.0
+        version: 0.153.0
+    devDependencies:
+      '@types/three':
+        specifier: ~0.153.0
         version: 0.153.0
 
   packages/twopoint5d-elements:

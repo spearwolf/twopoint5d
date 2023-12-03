@@ -174,7 +174,7 @@ export class TextureStore {
     const unsubscribe: () => void = () => {
       isActiveSubscription = false;
       values.clear();
-      unsubscribeFromResource();
+      unsubscribeFromResource?.();
       clearSubTypeSubscriptions();
     };
 
