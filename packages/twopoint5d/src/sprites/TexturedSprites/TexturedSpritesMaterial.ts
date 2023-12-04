@@ -56,7 +56,7 @@ const fragmentShader = `
 
 `;
 
-interface TexturedSpritesMaterialParameters extends CustomChunksShaderMaterialParameters {
+export interface TexturedSpritesMaterialParameters extends CustomChunksShaderMaterialParameters {
   colorMap?: Texture;
 }
 

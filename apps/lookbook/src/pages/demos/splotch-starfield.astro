@@ -5,10 +5,17 @@ import {title} from './splotch-starfield.json';
 
 <Layout title={title}>
   <section class="container">
-    <two5-display class="display">
+    <two5-display id="mydisplay" class="display">
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">
         <two5-post-processing>
-          <two5-stage2d id="mystage" projection-type="parallax" width="1000" height="1000" fit="contain"></two5-stage2d>
+          <two5-stage2d
+            id="mystage"
+            projection-type="parallax"
+            fit="contain"
+            width="1000"
+            height="1000"
+            distance-to-projection-plane="499"
+            far="1000"></two5-stage2d>
           <two5-unreal-bloom-pass strength="1.1" radius="2"></two5-unreal-bloom-pass>
         </two5-post-processing>
       </two5-texture-store>
@@ -36,9 +43,9 @@ import {title} from './splotch-starfield.json';
 </style>
 
 <script>
-  import {TextureStore} from '@spearwolf/twopoint5d';
-  import {Starfield} from '@spearwolf/twopoint5d-demos';
-  import {Stage2DElement, TextureStoreElement, whenDefined} from '@spearwolf/twopoint5d-elements';
+  import {Display, TextureStore} from '@spearwolf/twopoint5d';
+  import {OnMaterial, Starfield, type OnMaterialParams} from '@spearwolf/twopoint5d-demos';
+  import {DisplayElement, Stage2DElement, TextureStoreElement, whenDefined} from '@spearwolf/twopoint5d-elements';
   import '@spearwolf/twopoint5d-elements/two5-display.js';
   import '@spearwolf/twopoint5d-elements/two5-glitch-pass.js';
   import '@spearwolf/twopoint5d-elements/two5-post-processing.js';
@@ -46,21 +53,38 @@ import {title} from './splotch-starfield.json';
   import '@spearwolf/twopoint5d-elements/two5-texture-store.js';
   import '@spearwolf/twopoint5d-elements/two5-unreal-bloom-pass.js';
   import GUI from 'lil-gui';
+  import {Color} from 'three';
 
   // -----------------------------
 
-  const [textureStore, mystage] = (await Promise.all([
+  const [textureStore, mystage, display] = (await Promise.all([
     whenDefined(document.getElementById('texstore')).then((el) => (el as TextureStoreElement).store),
     whenDefined(document.getElementById('mystage')),
-  ])) as [TextureStore, Stage2DElement];
+    whenDefined(document.getElementById('mydisplay')).then((el) => (el as DisplayElement).display),
+  ])) as [TextureStore, Stage2DElement, Display];
 
   // -----------------------------
 
   const starfield = new Starfield(textureStore, mystage.stage2d, 1000, 'splotchs');
+
   starfield.setStarBox(1000, 1000, 1000);
   starfield.setStarBoxCenter(500, 500, 500);
   starfield.starSize = 5;
+  starfield.setMinMaxSizeScale(1, 1);
   starfield.starSpeed = 50;
+
+  starfield.on(OnMaterial, ({material}: OnMaterialParams) => {
+    console.log('starfield.material', material);
+
+    material.logShadersToConsole = true;
+
+    material.tintColorFar = new Color(0xff3311);
+    material.tintColorNear = new Color(0x11ff33);
+  });
+
+  display.on('resize', ({width, height}) => {
+    starfield.setScreenResolution(width, height);
+  });
 
   console.log('starfield', starfield);
 
@@ -69,7 +93,17 @@ import {title} from './splotch-starfield.json';
   const gui = new GUI({title: 'splotch-starfield'});
 
   const starfieldFolder = gui.addFolder('starfield');
+  const starfieldSettings = {
+    minSize: 1,
+    maxSize: 1,
+  };
   starfieldFolder.add(starfield, 'starSpeed', -300, 300, 1);
+  starfieldFolder.add(starfieldSettings, 'minSize', 0.1, 10, 0.1).onChange((value: number) => {
+    starfield.setMinMaxSizeScale(value, starfieldSettings.maxSize);
+  });
+  starfieldFolder.add(starfieldSettings, 'maxSize', 0.1, 10, 0.1).onChange((value: number) => {
+    starfield.setMinMaxSizeScale(starfieldSettings.minSize, value);
+  });
 
   const unrealBloomFolder = gui.addFolder('unreal bloom');
   const unrealBloom = document.querySelector('two5-unreal-bloom-pass');

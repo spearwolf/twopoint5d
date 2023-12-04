@@ -1,16 +1,26 @@
+import {eventize, type Eventize} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import {
   TextureAtlas,
   TexturedSprites,
   TexturedSpritesGeometry,
-  TexturedSpritesMaterial,
   type Stage2D,
-  type TextureStore,
   type TexturedSpritePool,
+  type TextureStore,
 } from '@spearwolf/twopoint5d';
 import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
 import {Group, Vector3, type Scene} from 'three';
+import {StarMaterial} from './StarMaterial.js';
+
+export const OnMaterial = 'material';
+
+export interface OnMaterialParams {
+  starfield: Starfield;
+  material: StarMaterial;
+}
+
+export interface Starfield extends Eventize {}
 
 export class Starfield {
   readonly textureStore: TextureStore;
@@ -19,7 +29,7 @@ export class Starfield {
 
   @signal() accessor atlasName: string;
   @signal() accessor atlas: TextureAtlas;
-  @signal() accessor material: TexturedSpritesMaterial;
+  @signal() accessor material: StarMaterial;
   @signal() accessor sprites: TexturedSprites;
 
   get scene(): Scene {
@@ -36,7 +46,14 @@ export class Starfield {
   starSize = 0.01;
   starSpeed = 1;
 
+  #screenResolution: [number, number] = [0, 0];
+  #minMaxSizeScale: [number, number] = [1, 1];
+
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
+    eventize(this);
+
+    this.retain(OnMaterial);
+
     this.textureStore = textureStore;
 
     this.stage = stage;
@@ -86,6 +103,20 @@ export class Starfield {
     }
   }
 
+  setScreenResolution(width: number, height: number) {
+    this.#screenResolution = [width, height];
+    if (this.material != null) {
+      this.material.screenResolution = this.#screenResolution;
+    }
+  }
+
+  setMinMaxSizeScale(minSizeScale: number, maxSizeScale: number) {
+    this.#minMaxSizeScale = [minSizeScale, maxSizeScale];
+    if (this.material != null) {
+      this.material.minMaxSizeScale = this.#minMaxSizeScale;
+    }
+  }
+
   animateStars(deltaTime: number, speed = this.starSpeed) {
     for (let i = 0; i < this.pool.usedCount; i++) {
       const vo = this.pool.getVO(i);
@@ -102,13 +133,20 @@ export class Starfield {
     this.geometry.touchAttributes('position');
   }
 
+  #onCreateMaterial(material: StarMaterial) {
+    material.screenResolution = this.#screenResolution;
+    material.minMaxSizeScale = this.#minMaxSizeScale;
+  }
+
   @effect({deps: ['atlasName']}) #loadAtlas() {
     return this.textureStore.get(this.atlasName, ['atlas', 'texture'], ([atlas, texture]) => {
       batch(() => {
         this.atlas = atlas;
         if (this.material != null || this.material?.colorMap != texture) {
           this.material?.dispose();
-          this.material = new TexturedSpritesMaterial({colorMap: texture, depthTest: false, depthWrite: false});
+          this.material = new StarMaterial({colorMap: texture, depthTest: false, depthWrite: false});
+          this.#onCreateMaterial(this.material);
+          this.emit(OnMaterial, {starfield: this, material: this.material} as OnMaterialParams);
         }
         if (this.sprites == null) {
           this.sprites = new TexturedSprites(this.geometry, this.material);
