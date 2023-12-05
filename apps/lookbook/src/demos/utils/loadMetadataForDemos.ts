@@ -1,14 +1,4 @@
-const baseUrl = import.meta.env.BASE_URL;
-
-const getHref = (url: string) => {
-  if (url.startsWith('http')) {
-    return url;
-  }
-  if (url.startsWith('/')) {
-    return `${baseUrl}${url.substring(1)}`;
-  }
-  return `${baseUrl}${url}`;
-};
+import {baseUrl, makeUrl} from './makeUrl.js';
 
 const tags: Map<string, {demoIds: Set<string>; relatedTags: Set<string>}> = new Map();
 
@@ -28,7 +18,7 @@ const demos = Object.entries(
       json.tags.filter((t: string) => t !== tag).forEach((t: string) => meta.relatedTags.add(t));
     });
   }
-  return {...json, id, href: getHref(json.url), tags: json.tags?.sort()};
+  return {...json, id, href: makeUrl(json.url), tags: json.tags?.sort()};
 }) as {
   id: string;
   title: string;

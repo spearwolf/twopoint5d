@@ -1,11 +1,5 @@
-const baseUrl = import.meta.env.BASE_URL;
+import {makeUrl} from './makeUrl.js';
 
 export default function demoPreviewImageUrl(url: string): string {
-  if (url.startsWith('http')) {
-    return url;
-  }
-  if (url.startsWith('/')) {
-    return `${baseUrl}images/demo-preview${url}`;
-  }
-  return `${baseUrl}images/demo-preview/${url}`;
+  return makeUrl(url, 'images/demo-preview');
 }

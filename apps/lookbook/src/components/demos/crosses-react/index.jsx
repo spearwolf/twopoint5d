@@ -1,3 +1,4 @@
+import {OrbitControls} from '@react-three/drei';
 import {Canvas} from '@react-three/fiber';
 import {Crosses} from './Crosses.jsx';
 
@@ -19,7 +20,7 @@ const makeCrosses = (geometry) => {
 function Demo() {
   return (
     <>
-      {/* <OrbitControls /> */}
+      <OrbitControls />
       <Crosses capacity={10} color={0xdd0033} onCreateGeometry={makeCrosses}></Crosses>
     </>
   );
