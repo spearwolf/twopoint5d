@@ -34,10 +34,13 @@ const StarShader = {
                         + vec4(instancePosition, 1.0);
   */
   extra_pars_vertex: `
+  
+    #define PI 3.1415926538
 
     uniform float[2] screenResolution;
     uniform float[2] minMaxSizeScale;
     uniform vec2 nearFar;
+    uniform float cameraLineOfSightEscape;
 
     varying float vDepth;
 
@@ -57,10 +60,13 @@ const StarShader = {
     vec2 minSize = vec2(quadSize.x * minMaxSizeScale[0], quadSize.y * minMaxSizeScale[0]);
     vec2 maxSize = vec2(quadSize.y * minMaxSizeScale[1], quadSize.y * minMaxSizeScale[1]);
     vec2 size = mix(minSize, maxSize, vDepth);
-
+    
     gl_Position.x += position.x * scaleToPixel.x * size.x;
     gl_Position.y += position.y * scaleToPixel.y * size.y;
 
+    float f = cameraLineOfSightEscape * 2.0 * (0.5 - (sin((PI * 0.5) + (vDepth * PI * 0.5)) * 0.5));
+    gl_Position.x += f * gl_Position.x;
+    gl_Position.y += f * gl_Position.y;
   `,
   /*
   #include <after_vertexPosition_vertex>
@@ -133,6 +139,9 @@ export class StarMaterial extends TexturedSpritesMaterial {
         tintColorFar: {
           value: new Vector4(1, 1, 1, 1),
         },
+        cameraLineOfSightEscape: {
+          value: 2,
+        },
       },
     });
 
@@ -148,6 +157,17 @@ export class StarMaterial extends TexturedSpritesMaterial {
 
     if (options?.tintColorFar) {
       this.tintColorFar = options.tintColorFar;
+    }
+  }
+
+  get cameraLineOfSightEscape(): number {
+    return this.uniforms['cameraLineOfSightEscape'].value;
+  }
+
+  set cameraLineOfSightEscape(value: number) {
+    if (this.uniforms['cameraLineOfSightEscape'].value !== value) {
+      this.uniforms['cameraLineOfSightEscape'].value = value;
+      this.uniformsNeedUpdate = true;
     }
   }
 

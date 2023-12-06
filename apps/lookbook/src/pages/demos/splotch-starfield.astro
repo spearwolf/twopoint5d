@@ -16,7 +16,7 @@ import {title} from './_splotch-starfield.json';
             height="1000"
             distance-to-projection-plane="499"
             far="1000"></two5-stage2d>
-          <two5-unreal-bloom-pass strength="4.9" radius="0.4" threshold="0.8"></two5-unreal-bloom-pass>
+          <two5-unreal-bloom-pass strength="4.9" radius="0.4" threshold="0.15"></two5-unreal-bloom-pass>
         </two5-post-processing>
       </two5-texture-store>
     </two5-display>
@@ -72,8 +72,9 @@ import {title} from './_splotch-starfield.json';
   starfield.setStarBoxCenter(500, 500, 500);
   starfield.setNearFar(0, 1000);
   starfield.starSize = 5;
-  starfield.setMinMaxSizeScale(0.1, 1);
+  starfield.setMinMaxSizeScale(0.27, 0.01);
   starfield.starSpeed = 50;
+  starfield.cameraLineOfSightEscape = 10;
 
   starfield.on(OnMaterial, ({material}: OnMaterialParams) => {
     console.log('starfield.material', material);
@@ -95,17 +96,21 @@ import {title} from './_splotch-starfield.json';
   const gui = new GUI({title: 'splotch-starfield'});
 
   const starfieldFolder = gui.addFolder('starfield');
-  const starfieldSettings = {
-    minSize: 1,
-    maxSize: 1,
-  };
+
   starfieldFolder.add(starfield, 'starSpeed', -300, 300, 1);
-  starfieldFolder.add(starfieldSettings, 'minSize', 0.1, 10, 0.1).onChange((value: number) => {
+
+  const starfieldSettings = {
+    minSize: starfield.minSizeScale,
+    maxSize: starfield.maxSizeScale,
+  };
+  starfieldFolder.add(starfieldSettings, 'minSize', 0.01, 1, 0.01).onChange((value: number) => {
     starfield.setMinMaxSizeScale(value, starfieldSettings.maxSize);
   });
-  starfieldFolder.add(starfieldSettings, 'maxSize', 0.1, 10, 0.1).onChange((value: number) => {
+  starfieldFolder.add(starfieldSettings, 'maxSize', 0.01, 5, 0.01).onChange((value: number) => {
     starfield.setMinMaxSizeScale(starfieldSettings.minSize, value);
   });
+
+  starfieldFolder.add(starfield, 'cameraLineOfSightEscape', 0, 10, 0.1).name('camLOFEsc');
 
   const unrealBloomFolder = gui.addFolder('unreal bloom');
   const unrealBloom = document.querySelector('two5-unreal-bloom-pass');

@@ -10,7 +10,7 @@ import {
   type TextureStore,
 } from '@spearwolf/twopoint5d';
 import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
-import {Group, Vector2, Vector3, type Scene} from 'three';
+import {AdditiveBlending, Group, Vector2, Vector3, type Scene} from 'three';
 import {StarMaterial} from './StarMaterial.js';
 
 export const OnMaterial = 'material';
@@ -49,6 +49,7 @@ export class Starfield {
   #screenResolution: [number, number] = [0, 0];
   #minMaxSizeScale: [number, number] = [1, 1];
   #nearFar: Vector2 = new Vector2(0, 1);
+  #cameraLineOfSightEscape = 2;
 
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
     eventize(this);
@@ -118,10 +119,37 @@ export class Starfield {
     }
   }
 
+  get minSizeScale(): number {
+    return this.#minMaxSizeScale[0];
+  }
+
+  get maxSizeScale(): number {
+    return this.#minMaxSizeScale[1];
+  }
+
+  set minSizeScale(value: number) {
+    this.setMinMaxSizeScale(value, this.maxSizeScale);
+  }
+
+  set maxSizeScale(value: number) {
+    this.setMinMaxSizeScale(this.minSizeScale, value);
+  }
+
   setNearFar(near: number, far: number) {
     this.#nearFar.set(near, far);
     if (this.material != null) {
       this.material.nearFar = this.#nearFar;
+    }
+  }
+
+  get cameraLineOfSightEscape(): number {
+    return this.#cameraLineOfSightEscape;
+  }
+
+  set cameraLineOfSightEscape(value: number) {
+    this.#cameraLineOfSightEscape = value;
+    if (this.material != null) {
+      this.material.cameraLineOfSightEscape = this.#cameraLineOfSightEscape;
     }
   }
 
@@ -145,6 +173,7 @@ export class Starfield {
     material.screenResolution = this.#screenResolution;
     material.minMaxSizeScale = this.#minMaxSizeScale;
     material.nearFar = this.#nearFar;
+    material.cameraLineOfSightEscape = this.#cameraLineOfSightEscape;
   }
 
   @effect({deps: ['atlasName']}) #loadAtlas() {
@@ -153,7 +182,12 @@ export class Starfield {
         this.atlas = atlas;
         if (this.material != null || this.material?.colorMap != texture) {
           this.material?.dispose();
-          this.material = new StarMaterial({colorMap: texture, depthTest: false, depthWrite: false});
+          this.material = new StarMaterial({
+            colorMap: texture,
+            depthTest: false,
+            depthWrite: false,
+            blending: AdditiveBlending,
+          });
           this.#onCreateMaterial(this.material);
           this.emit(OnMaterial, {starfield: this, material: this.material} as OnMaterialParams);
         }
