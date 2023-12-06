@@ -10,7 +10,7 @@ import {
   type TextureStore,
 } from '@spearwolf/twopoint5d';
 import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
-import {Group, Vector3, type Scene} from 'three';
+import {Group, Vector2, Vector3, type Scene} from 'three';
 import {StarMaterial} from './StarMaterial.js';
 
 export const OnMaterial = 'material';
@@ -48,6 +48,7 @@ export class Starfield {
 
   #screenResolution: [number, number] = [0, 0];
   #minMaxSizeScale: [number, number] = [1, 1];
+  #nearFar: Vector2 = new Vector2(0, 1);
 
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
     eventize(this);
@@ -117,6 +118,13 @@ export class Starfield {
     }
   }
 
+  setNearFar(near: number, far: number) {
+    this.#nearFar.set(near, far);
+    if (this.material != null) {
+      this.material.nearFar = this.#nearFar;
+    }
+  }
+
   animateStars(deltaTime: number, speed = this.starSpeed) {
     for (let i = 0; i < this.pool.usedCount; i++) {
       const vo = this.pool.getVO(i);
@@ -136,6 +144,7 @@ export class Starfield {
   #onCreateMaterial(material: StarMaterial) {
     material.screenResolution = this.#screenResolution;
     material.minMaxSizeScale = this.#minMaxSizeScale;
+    material.nearFar = this.#nearFar;
   }
 
   @effect({deps: ['atlasName']}) #loadAtlas() {

@@ -1,5 +1,5 @@
 import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '@spearwolf/twopoint5d';
-import {Color, Vector4} from 'three';
+import {Color, Vector2, Vector4} from 'three';
 
 const StarShader = {
   /*
@@ -37,8 +37,8 @@ const StarShader = {
 
     uniform float[2] screenResolution;
     uniform float[2] minMaxSizeScale;
+    uniform vec2 nearFar;
 
-    // varying float vTint;
     varying float vDepth;
 
   `,
@@ -51,21 +51,16 @@ const StarShader = {
 
     vec2 scaleToPixel = vec2(4.0 / screenResolution[0] * gl_Position.w, 4.0 / screenResolution[1] * gl_Position.w);
 
-    // vec2 minSize = vec2(quadSize.x * minMaxSizeScale[0], quadSize.y * minMaxSizeScale[0]);
-    // vec2 maxSize = vec2(quadSize.y * minMaxSizeScale[1], quadSize.y * minMaxSizeScale[1]);
-    //
-    // vec2 size = mix(minSize, maxSize, 1.0 - clamp(0.0, 1.0, (gl_Position.z) / 2.0));
-    // vec2 size = mix(minSize, maxSize, clamp(0.0, 1.0, (gl_Position.z + 1.0) / 2.0));
-    // vec2 size = mix(minSize, maxSize, 1.0 + (gl_Position.z / 2.0));
-    //
-    vec2 size = quadSize.xy;
+    float z = -(modelViewMatrix * vec4(instancePosition.xyz, 1.0)).z;
+    vDepth = 1.0 - clamp((z - nearFar.x) / (nearFar.y - nearFar.x), 0.0, 1.0);
+
+    vec2 minSize = vec2(quadSize.x * minMaxSizeScale[0], quadSize.y * minMaxSizeScale[0]);
+    vec2 maxSize = vec2(quadSize.y * minMaxSizeScale[1], quadSize.y * minMaxSizeScale[1]);
+    vec2 size = mix(minSize, maxSize, vDepth);
 
     gl_Position.x += position.x * scaleToPixel.x * size.x;
     gl_Position.y += position.y * scaleToPixel.y * size.y;
-    
-    // vTint = -(modelViewMatrix * vec4(instancePosition.xyz, 1.0)).z;
-    float z = -(modelViewMatrix * vec4(instancePosition.xyz, 1.0)).z;
-    vDepth = smoothstep(0.0, 1000.0, z);
+
   `,
   /*
   #include <after_vertexPosition_vertex>
@@ -75,19 +70,6 @@ const StarShader = {
   vTexCoords = texCoords.xy + (uv * texCoords.zw);
 
   #include <post_main_vertex>
-  */
-  /*
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(poiPos, 1.0);
-
-  vec2 scaleToPixel = vec2(4.0 / resolution[0] * gl_Position.w, 4.0 / resolution[1] * gl_Position.w);
-
-  vec2 minSize = vec2(minMaxSize[0], minMaxSize[1]);
-  vec2 maxSize = vec2(minMaxSize[2], minMaxSize[3]);
-
-  vec2 size = mix(minSize, maxSize, 1.0 - clamp(0.0, 1.0, gl_Position.z / 2.0));
-
-  gl_Position.x += (position.x + offset[0]) * scaleToPixel.x * size.x;
-  gl_Position.y += (position.y + offset[1]) * scaleToPixel.y * size.y;
   */
   // ---------------------------------------------------------------------------------------
   /*  
@@ -106,15 +88,17 @@ const StarShader = {
   }
   */
   extra_pars_fragment: `
+
     uniform vec4 tintColorNear;
     uniform vec4 tintColorFar;
 
-    // varying float vTint;
     varying float vDepth;
+
   `,
   post_main_fragment: `
-    // gl_FragColor.xyz = mix(tintColorFar.xyz, tintColorNear.xyz, smoothstep(0.0, 1000.0, vTint));
+
     gl_FragColor.xyz = mix(tintColorFar.xyz, tintColorNear.xyz, vDepth);
+
   `,
 };
 
@@ -140,6 +124,9 @@ export class StarMaterial extends TexturedSpritesMaterial {
         minMaxSizeScale: {
           value: [1, 1],
         },
+        nearFar: {
+          value: new Vector2(0, 1),
+        },
         tintColorNear: {
           value: new Vector4(1, 1, 1, 1),
         },
@@ -162,6 +149,22 @@ export class StarMaterial extends TexturedSpritesMaterial {
     if (options?.tintColorFar) {
       this.tintColorFar = options.tintColorFar;
     }
+  }
+
+  get nearFar(): Vector2 {
+    return this.uniforms['nearFar'].value;
+  }
+
+  set nearFar(value: Vector2) {
+    if (!this.nearFar.equals(value)) {
+      this.uniforms['nearFar'].value = value.clone();
+      this.uniformsNeedUpdate = true;
+    }
+  }
+
+  setNearFar(near: number, far: number) {
+    this.uniforms['nearFar'].value = new Vector2(near, far);
+    this.uniformsNeedUpdate = true;
   }
 
   readonly #tintColorNear: Color = new Color(1, 1, 1);

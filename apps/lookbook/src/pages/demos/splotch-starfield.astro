@@ -16,7 +16,7 @@ import {title} from './_splotch-starfield.json';
             height="1000"
             distance-to-projection-plane="499"
             far="1000"></two5-stage2d>
-          <two5-unreal-bloom-pass strength="1.1" radius="2"></two5-unreal-bloom-pass>
+          <two5-unreal-bloom-pass strength="4.9" radius="0.4" threshold="0.8"></two5-unreal-bloom-pass>
         </two5-post-processing>
       </two5-texture-store>
     </two5-display>
@@ -69,8 +69,9 @@ import {title} from './_splotch-starfield.json';
 
   starfield.setStarBox(1000, 1000, 1000);
   starfield.setStarBoxCenter(500, 500, 500);
+  starfield.setNearFar(0, 1000);
   starfield.starSize = 5;
-  starfield.setMinMaxSizeScale(1, 1);
+  starfield.setMinMaxSizeScale(0.1, 1);
   starfield.starSpeed = 50;
 
   starfield.on(OnMaterial, ({material}: OnMaterialParams) => {
@@ -78,8 +79,8 @@ import {title} from './_splotch-starfield.json';
 
     material.logShadersToConsole = true;
 
-    material.tintColorFar = new Color(0xff3311);
-    material.tintColorNear = new Color(0x11ff33);
+    material.tintColorFar = new Color(0x101030);
+    material.tintColorNear = new Color(0xffffff);
   });
 
   display.on('resize', ({width, height}) => {
@@ -108,8 +109,8 @@ import {title} from './_splotch-starfield.json';
   const unrealBloomFolder = gui.addFolder('unreal bloom');
   const unrealBloom = document.querySelector('two5-unreal-bloom-pass');
 
-  unrealBloomFolder.add(unrealBloom, 'strength', 0, 5, 0.01);
-  unrealBloomFolder.add(unrealBloom, 'radius', -2, 3, 0.01);
+  unrealBloomFolder.add(unrealBloom, 'strength', 0, 10, 0.01);
+  unrealBloomFolder.add(unrealBloom, 'radius', -5, 10, 0.01);
   unrealBloomFolder.add(unrealBloom, 'threshold', 0, 1, 0.01);
   unrealBloomFolder.add(unrealBloom, 'disabled');
 </script>
