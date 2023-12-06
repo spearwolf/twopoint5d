@@ -14,7 +14,7 @@ import {title} from './_splotch-starfield.json';
             fit="contain"
             width="1000"
             height="1000"
-            distance-to-projection-plane="499"
+            distance-to-projection-plane="500"
             far="1000"></two5-stage2d>
           <two5-unreal-bloom-pass strength="4.9" radius="0.4" threshold="0.15"></two5-unreal-bloom-pass>
         </two5-post-processing>
@@ -110,6 +110,7 @@ import {title} from './_splotch-starfield.json';
     starfield.setMinMaxSizeScale(starfieldSettings.minSize, value);
   });
 
+  starfieldFolder.add(mystage, 'distanceToProjectionPlane', 0, 1000, 1).name('camDist');
   starfieldFolder.add(starfield, 'cameraLineOfSightEscape', 0, 10, 0.1).name('camLOFEsc');
 
   const unrealBloomFolder = gui.addFolder('unreal bloom');
