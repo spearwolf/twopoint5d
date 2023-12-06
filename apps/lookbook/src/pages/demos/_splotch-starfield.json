@@ -5,12 +5,12 @@
   "tags": [
     "demo",
     "<two5-display/>",
+    "Display",
     "<two5-texture-store/>",
     "TextureStore",
     "<two5-stage2d/>",
     "<two5-post-processing/>",
     "<two5-unreal-bloom-pass/>",
-    "<two5-glitch-pass/>",
     "two5-elements"
   ],
   "previewImage": "splotch-starfield.png"
