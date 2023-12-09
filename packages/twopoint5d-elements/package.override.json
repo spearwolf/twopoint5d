@@ -7,6 +7,7 @@
     "src/two5-texture-store.js",
     "src/two5-post-processing.js",
     "src/two5-glitch-pass.js",
+    "src/two5-afterimage-pass.js",
     "src/two5-unreal-bloom-pass.js",
     "src/components/attachContextRoot.js"
   ],

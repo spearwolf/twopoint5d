@@ -48,6 +48,10 @@
     "./two5-unreal-bloom-pass.js": {
       "default": "./dist/src/two5-unreal-bloom-pass.js",
       "types": "./dist/src/two5-unreal-bloom-pass.d.ts"
+    },
+    "./two5-afterimage-pass.js": {
+      "default": "./dist/src/two5-afterimage-pass.js",
+      "types": "./dist/src/two5-afterimage-pass.d.ts"
     }
   },
   "sideEffects": [
@@ -56,6 +60,7 @@
     "build/src/two5-texture-store.js",
     "build/src/two5-post-processing.js",
     "build/src/two5-glitch-pass.js",
+    "build/src/two5-afterimage-pass.js",
     "build/src/two5-unreal-bloom-pass.js",
     "build/src/components/attachContextRoot.js",
     "dist/src/two5-display.js",
@@ -63,6 +68,7 @@
     "dist/src/two5-texture-store.js",
     "dist/src/two5-post-processing.js",
     "dist/src/two5-glitch-pass.js",
+    "dist/src/two5-afterimage-pass.js",
     "dist/src/two5-unreal-bloom-pass.js",
     "dist/src/components/attachContextRoot.js",
     "dist/src/bundle.js",

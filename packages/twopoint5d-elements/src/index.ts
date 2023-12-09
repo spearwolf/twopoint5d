@@ -1,3 +1,4 @@
+export * from './components/AfterimagePassElement.js';
 export * from './components/DisplayElement.js';
 export * from './components/GlitchPassElement.js';
 export * from './components/PostProcessingElement.js';
