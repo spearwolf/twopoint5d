@@ -63,6 +63,8 @@ export class BouncingSprites {
       sprite.rotation = Math.random() * Math.PI * 2;
       sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
 
+      sprite.setColor([1, 1, 1, 1]);
+
       this.sprites.push(sprite);
     }
   }

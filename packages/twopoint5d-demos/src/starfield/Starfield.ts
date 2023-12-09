@@ -10,7 +10,7 @@ import {
   type TextureStore,
 } from '@spearwolf/twopoint5d';
 import {StageRenderFrame, type StageRenderFrameProps} from '@spearwolf/twopoint5d/events.js';
-import {AdditiveBlending, Group, Vector2, Vector3, type Scene} from 'three';
+import {AdditiveBlending, Color, Group, Vector2, Vector3, type Scene} from 'three';
 import {StarMaterial} from './StarMaterial.js';
 
 export const OnMaterial = 'material';
@@ -19,6 +19,8 @@ export interface OnMaterialParams {
   starfield: Starfield;
   material: StarMaterial;
 }
+
+const rand = (max: number) => (Math.random() * max) | 0;
 
 export interface Starfield extends Eventize {}
 
@@ -50,6 +52,7 @@ export class Starfield {
   #minMaxSizeScale: [number, number] = [1, 1];
   #nearFar: Vector2 = new Vector2(0, 1);
   #cameraLineOfSightEscape = 2;
+  #baseColors: [number, number, number, number][];
 
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
     eventize(this);
@@ -60,6 +63,8 @@ export class Starfield {
 
     this.stage = stage;
     this.scene.add(this.origin);
+
+    this.setBaseColors([0xffffff]);
 
     this.geometry = new TexturedSpritesGeometry(capacity);
 
@@ -74,6 +79,17 @@ export class Starfield {
         this.animateStars(deltaTime);
       }
     });
+  }
+
+  setBaseColors(colors: (Color | number | string)[]) {
+    this.#baseColors = colors.map((color) => {
+      const c = new Color(color);
+      return [c.r, c.g, c.b, 1];
+    });
+  }
+
+  randomBaseColor(): [number, number, number, number] {
+    return this.#baseColors[rand(this.#baseColors.length)];
   }
 
   setStarBox(width: number, height: number, depth: number) {
@@ -102,6 +118,7 @@ export class Starfield {
       vo.setFrame(frame);
       vo.setSize(this.starSize, starHeight);
       vo.setPosition(this.starBox.x * Math.random(), this.starBox.y * Math.random(), this.starBox.z * Math.random());
+      vo.setColor(this.randomBaseColor());
     }
   }
 

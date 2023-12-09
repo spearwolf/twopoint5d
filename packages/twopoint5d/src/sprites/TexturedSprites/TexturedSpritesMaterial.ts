@@ -9,8 +9,10 @@ const vertexShader = `
   attribute vec3 instancePosition;
   attribute vec4 texCoords;
   attribute float rotation;
+  attribute vec4 color;
 
   varying vec2 vTexCoords;
+  varying vec4 vBaseColor;
 
   #include <extra_pars_vertex>
 
@@ -34,6 +36,8 @@ const vertexShader = `
 
     vTexCoords = texCoords.xy + (uv * texCoords.zw);
 
+    vBaseColor = color;
+
     #include <post_main_vertex>
   }
 
@@ -44,11 +48,14 @@ const fragmentShader = `
   uniform sampler2D colorMap;
 
   varying vec2 vTexCoords;
+  varying vec4 vBaseColor;
 
   #include <extra_pars_fragment>
 
   void main() {
-    gl_FragColor = texture2D(colorMap, vTexCoords);
+    vec4 col = texture2D(colorMap, vTexCoords);
+
+    gl_FragColor = vBaseColor * col;
 
     #include <discard_by_alpha_fragment>
     #include <post_main_fragment>

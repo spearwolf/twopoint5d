@@ -118,6 +118,8 @@ export class CloudSprites {
         z,
       );
 
+      sprite.setColor([1, 1, 1, 1]);
+
       this.#sprites.push({frame, sprite});
 
       z += this.gap;

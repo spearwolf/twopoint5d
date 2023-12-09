@@ -103,7 +103,7 @@ const StarShader = {
   `,
   post_main_fragment: `
 
-    gl_FragColor.xyz = mix(tintColorFar.xyz, tintColorNear.xyz, vDepth);
+    gl_FragColor.xyz *= mix(tintColorFar.xyz, tintColorNear.xyz, vDepth);
 
   `,
 };

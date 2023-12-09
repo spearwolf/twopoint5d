@@ -76,6 +76,8 @@ import {title} from './_splotch-starfield.json';
   starfield.starSpeed = 50;
   starfield.cameraLineOfSightEscape = 10;
 
+  starfield.setBaseColors([0x001219, 0x005f73, 0x0a9396, 0x94d2bd, 0xe9d8a6, 0xee9b00, 0xca6702, 0xbb3e03, 0xae2012, 0x9b2226]);
+
   starfield.on(OnMaterial, ({material}: OnMaterialParams) => {
     console.log('starfield.material', material);
 
