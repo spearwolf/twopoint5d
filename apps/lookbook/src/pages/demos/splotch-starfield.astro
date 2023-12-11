@@ -6,6 +6,9 @@ import {title} from './_splotch-starfield.json';
 <Layout title={title}>
   <section class="container">
     <two5-display id="mydisplay" class="display">
+      <!-- <div class="hero-container">
+        <img class="hero" src={heroImageUrl} alt="spearwolf" />
+      </div> -->
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">
         <two5-post-processing>
           <two5-stage2d
@@ -42,6 +45,18 @@ import {title} from './_splotch-starfield.json';
     height: 100%;
     background: radial-gradient(circle, rgba(27, 17, 64, 1) 0%, rgba(0, 0, 0, 1) 100%);
   }
+
+  .hero-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .hero {
+    margin: 0 2rem;
+    opacity: 0.1;
+  }
 </style>
 
 <script>
@@ -76,7 +91,8 @@ import {title} from './_splotch-starfield.json';
   starfield.starSize = 5;
   starfield.setMinMaxSizeScale(0.05, 0.15); // 0.27, 0.01);
   starfield.starSpeed = 50;
-  (starfield.cameraLineOfSightEscape = 5), 5; // 10;
+  starfield.cameraLineOfSightEscape = 5; // 10;
+  starfield.rotationSpeed = 0.05;
 
   starfield.setBaseColors([0x001219, 0x005f73, 0x0a9396, 0x94d2bd, 0xe9d8a6, 0xee9b00, 0xca6702, 0xbb3e03, 0xae2012, 0x9b2226]);
 
@@ -116,6 +132,7 @@ import {title} from './_splotch-starfield.json';
 
   starfieldFolder.add(mystage, 'distanceToProjectionPlane', 0, 1000, 1).name('camDist');
   starfieldFolder.add(starfield, 'cameraLineOfSightEscape', 0, 10, 0.1).name('camLOFEsc');
+  starfieldFolder.add(starfield, 'rotationSpeed', -1, 1, 0.01).name('rotate');
 
   const unrealBloomFolder = gui.addFolder('unreal bloom');
   const unrealBloom = document.querySelector('two5-unreal-bloom-pass');

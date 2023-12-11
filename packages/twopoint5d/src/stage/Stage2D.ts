@@ -1,5 +1,5 @@
 import {eventize, Eventize} from '@spearwolf/eventize';
-import {Camera, Scene, WebGLRenderer} from 'three';
+import {Camera, Color, Scene, WebGLRenderer} from 'three';
 
 import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass.js';
 import {
@@ -239,6 +239,9 @@ export class Stage2D implements IStage, IGetRenderPass {
     if (this.#renderPass == null) {
       this.#renderPass = new RenderPass(this.scene, this.camera);
       this.#renderPass.clear = this.autoClear;
+      // TODO how to render transparent scene within effect composer?
+      this.#renderPass.clearColor = new Color(0x000000);
+      this.#renderPass.clearAlpha = 0;
     }
     return this.#renderPass;
   }

@@ -48,6 +48,8 @@ export class Starfield {
   starSize = 0.01;
   starSpeed = 1;
 
+  rotationSpeed = 0;
+
   #screenResolution: [number, number] = [0, 0];
   #minMaxSizeScale: [number, number] = [1, 1];
   #nearFar: Vector2 = new Vector2(0, 1);
@@ -170,7 +172,13 @@ export class Starfield {
     }
   }
 
+  rotateStars(calcFn: (rotation: number) => number) {
+    this.material.rotZ = calcFn(this.material.rotZ) % (Math.PI * 2);
+  }
+
   animateStars(deltaTime: number, speed = this.starSpeed) {
+    this.rotateStars((rot) => rot + deltaTime * this.rotationSpeed);
+
     for (let i = 0; i < this.pool.usedCount; i++) {
       const vo = this.pool.getVO(i);
 

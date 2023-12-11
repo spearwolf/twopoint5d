@@ -41,6 +41,7 @@ const StarShader = {
     uniform float[2] minMaxSizeScale;
     uniform vec2 nearFar;
     uniform float cameraLineOfSightEscape;
+    uniform float rotZ;
 
     varying float vDepth;
 
@@ -51,6 +52,8 @@ const StarShader = {
 
   `,
   post_main_vertex: `
+  
+    gl_Position = rotateZ(rotZ) * gl_Position;
 
     vec2 scaleToPixel = vec2(4.0 / screenResolution[0] * gl_Position.w, 4.0 / screenResolution[1] * gl_Position.w);
 
@@ -142,6 +145,9 @@ export class StarMaterial extends TexturedSpritesMaterial {
         cameraLineOfSightEscape: {
           value: 2,
         },
+        rotZ: {
+          value: 0,
+        },
       },
     });
 
@@ -167,6 +173,17 @@ export class StarMaterial extends TexturedSpritesMaterial {
   set cameraLineOfSightEscape(value: number) {
     if (this.uniforms['cameraLineOfSightEscape'].value !== value) {
       this.uniforms['cameraLineOfSightEscape'].value = value;
+      this.uniformsNeedUpdate = true;
+    }
+  }
+
+  get rotZ(): number {
+    return this.uniforms['rotZ'].value;
+  }
+
+  set rotZ(value: number) {
+    if (this.uniforms['rotZ'].value !== value) {
+      this.uniforms['rotZ'].value = value;
       this.uniformsNeedUpdate = true;
     }
   }
