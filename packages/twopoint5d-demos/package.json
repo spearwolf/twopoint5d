@@ -33,7 +33,7 @@
   "dependencies": {
     "@lit/context": "^1.0.1",
     "@spearwolf/eventize": "^3.4.1",
-    "@spearwolf/signalize": "^0.10.1",
+    "@spearwolf/signalize": "^0.12.0",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
     "lit": "3.0.1",

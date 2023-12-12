@@ -34,7 +34,7 @@
   },
   "peerDependencies": {
     "@spearwolf/eventize": "^3.4.1",
-    "@spearwolf/signalize": "^0.10.1",
+    "@spearwolf/signalize": "^0.12.0",
     "three": "^0.153"
   }
 }
