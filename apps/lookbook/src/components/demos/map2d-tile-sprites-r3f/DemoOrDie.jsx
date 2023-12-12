@@ -10,7 +10,7 @@ import {
 } from '@spearwolf/twopoint5d-r3f';
 import {useEffect, useState} from 'react';
 import {Vector2, Vector3} from 'three';
-import assetsUrl from '../../../demos/utils/assetsUrl.ts';
+import assetsUrl from '~demos/utils/assetsUrl.ts';
 import {WiredBox} from '../WiredBox.tsx';
 
 const TILES = [
@@ -18,7 +18,7 @@ const TILES = [
   [3, 4],
 ];
 
-export const Map2DTileSpritesDemo = () => {
+export const DemoOrDie = () => {
   const [sprites, setSprites] = useState(null);
 
   useEffect(() => {

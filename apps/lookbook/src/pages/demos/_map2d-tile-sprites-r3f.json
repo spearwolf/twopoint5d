@@ -1,7 +1,7 @@
 {
-  "title": "map2d tile sprites (react)",
+  "title": "map2d tile sprites (r3f)",
   "description": "How to render tile-sprites with the Map2DTileSprites component",
-  "url": "/demos/map2d-tile-sprites-react",
+  "url": "/demos/map2d-tile-sprites-r3f",
   "tags": [
     "AABB2",
     "Map2DTile",
@@ -17,5 +17,5 @@
     "map2d",
     "react"
   ],
-  "previewImage": "map2d-tile-sprites-react.png"
+  "previewImage": "map2d-tile-sprites-r3f.png"
 }
