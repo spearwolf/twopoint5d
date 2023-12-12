@@ -6,9 +6,6 @@ import {title} from './_splotch-starfield.json';
 <Layout title={title}>
   <section class="container">
     <two5-display id="mydisplay" class="display">
-      <!-- <div class="hero-container">
-        <img class="hero" src={heroImageUrl} alt="spearwolf" />
-      </div> -->
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">
         <two5-post-processing>
           <two5-stage2d
@@ -44,18 +41,6 @@ import {title} from './_splotch-starfield.json';
     width: 100%;
     height: 100%;
     background: radial-gradient(circle, rgba(27, 17, 64, 1) 0%, rgba(0, 0, 0, 1) 100%);
-  }
-
-  .hero-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-  }
-
-  .hero {
-    margin: 0 2rem;
-    opacity: 0.1;
   }
 </style>
 
