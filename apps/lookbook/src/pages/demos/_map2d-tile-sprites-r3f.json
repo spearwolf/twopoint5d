@@ -15,7 +15,8 @@
     "tilesets",
     "textures",
     "map2d",
-    "react"
+    "react",
+    "r3f"
   ],
   "previewImage": "map2d-tile-sprites-r3f.png"
 }

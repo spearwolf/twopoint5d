@@ -18,7 +18,8 @@
     "tilesets",
     "textures",
     "map2d",
-    "react"
+    "react",
+    "r3f"
   ],
   "previewImage": "map2d-rect-visi-area.png"
 }

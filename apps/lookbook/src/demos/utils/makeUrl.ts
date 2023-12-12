@@ -9,8 +9,11 @@ function makeUrl(url: string, pathPrefix = ''): string {
     return url;
   }
   const prefix = pathPrefix.startsWith('/') ? pathPrefix.substring(1) : pathPrefix;
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${baseUrl}${prefix}${path}`;
+  let path = prefix + (url.startsWith('/') ? url : `/${url}`);
+  if (path.startsWith('/')) {
+    path = path.substring(1);
+  }
+  return `${baseUrl}${path}`;
 }
 
 export {baseUrl, makeUrl};

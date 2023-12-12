@@ -1,11 +1,14 @@
 ---
-import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
+import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos.js';
+import {baseUrl} from '~demos/utils/makeUrl.js';
 import Card from './Card.astro';
 import TagCloudFilter from './TagCloudFilter.astro';
 
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
 
 const {demos} = loadMetadataForDemos();
+
+console.log('baseUrlk', baseUrl, 'demos', demos);
 ---
 
 <main>

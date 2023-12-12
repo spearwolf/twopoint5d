@@ -1,5 +1,5 @@
 {
-  "title": "map2d layer",
+  "title": "map2d layer3d",
   "description": "Render a 2d-map layer in 3d using a rectangular visibility-area and a repeating-tiles provider",
   "url": "/demos/map2d-layer3d",
   "tags": [

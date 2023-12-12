@@ -1,5 +1,5 @@
 {
-  "title": "map2d tile sprites layer (r3f)",
+  "title": "map2d tile sprites layer",
   "description": "Map2DLayer3D with Map2DTileSprites",
   "url": "/demos/map2d-tile-sprites-layer-r3f",
   "tags": [
@@ -16,7 +16,8 @@
     "tilesets",
     "textures",
     "map2d",
-    "react"
+    "react",
+    "r3f"
   ],
-  "previewImage": ""
+  "previewImage": "map2d-tile-sprites-layer-r3f.png"
 }
