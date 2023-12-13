@@ -47,4 +47,10 @@ const {demos} = loadMetadataForDemos();
     margin-top: 33px;
     padding: 0;
   }
+
+  @media (orientation: portrait) {
+    .demo-card-grid {
+      grid-template-columns: repeat(auto-fit, minmax(32ch, 1fr));
+    }
+  }
 </style>
