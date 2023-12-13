@@ -1,0 +1,22 @@
+{
+  "title": "textured sprites from tileset (r3f)",
+  "description": "Render textured sprites from tileset image",
+  "url": "/demos/textured-sprites-from-tileset-r3f",
+  "tags": [
+    "<GetStage2D/>",
+    "<ParallaxProjection/>",
+    "<Stage2D/>",
+    "<TexturedSprites/>",
+    "<TexturedSpritesGeometry/>",
+    "<TexturedSpritesMaterial/>",
+    "<TextureRef/>",
+    "<TileSet/>",
+    "useFrameLoop",
+    "useTextureAtlas",
+    "tilesets",
+    "textures",
+    "react",
+    "r3f"
+  ],
+  "previewImage": "textured-sprites-from-tileset-r3f.png"
+}

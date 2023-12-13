@@ -1,6 +1,6 @@
 {
   "title": "animated sprites",
-  "description": "A demo showing 2d sprites in 3d with frame based animations",
+  "description": "Textured sprites with frame based animations",
   "url": "/demos/animated-sprites",
   "tags": [
     "AnimatedSprites",
