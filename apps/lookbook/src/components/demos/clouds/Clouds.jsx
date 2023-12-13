@@ -10,7 +10,7 @@ import {
   useTextureAtlas,
 } from '@spearwolf/twopoint5d-r3f';
 import {useEffect, useRef} from 'react';
-import {AdditiveBlending, FrontSide} from 'three';
+import {FrontSide} from 'three';
 import assetsUrl from '../../../demos/utils/assetsUrl.ts';
 import {createFrameLoopComponent} from '../../../demos/utils/createFrameLoopComponent.js';
 import {CloudSprites} from './CloudSprites.js';
@@ -99,18 +99,17 @@ export const Clouds = ({
 
   return (
     <>
-      <TextureAtlas name="clouds" url={assetsUrl('clouds-2.json')} overrideImageUrl={assetsUrl('clouds-2.png')} anisotrophy />
+      <TextureAtlas
+        name="clouds"
+        url={assetsUrl('clouds-2.json')}
+        overrideImageUrl={assetsUrl('clouds-2.png')}
+        anisotrophy
+        linear
+      />
 
       <TexturedSprites>
         <TexturedSpritesGeometry capacity={capacity} ref={geometry}></TexturedSpritesGeometry>
-        <TexturedSpritesMaterial
-          ref={material}
-          depthTest={false}
-          depthWrite={false}
-          blending={AdditiveBlending}
-          side={FrontSide}
-          logShadersToConsole={true}
-        >
+        <TexturedSpritesMaterial ref={material} depthTest={false} depthWrite={false} side={FrontSide} logShadersToConsole={true}>
           <TextureRef name="clouds" attach="colorMap" />
           <ShaderChunks chunks={ShaderLib} />
         </TexturedSpritesMaterial>
@@ -127,8 +126,8 @@ Clouds.defaultProps = {
   xOffset: 0,
   yOffset: 0,
   zOffset: 0,
-  speed: 5,
+  speed: 50,
   fadeInRange: 0.1,
-  fadeOutRange: 0.2,
+  fadeOutRange: 0.1,
   postAlphaMultiplier: 1.0,
 };

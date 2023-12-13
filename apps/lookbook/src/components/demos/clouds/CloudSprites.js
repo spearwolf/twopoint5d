@@ -63,7 +63,7 @@ export class CloudSprites {
     }
   }
 
-  frame(state, delta) {
+  frame(_state, delta) {
     this.#animateClouds(delta);
   }
 
@@ -106,17 +106,28 @@ export class CloudSprites {
   #createClouds() {
     let z = this.zRangeMin;
 
+    let cloudIndex;
+    let frame;
+    let x;
+    let y;
+
+    const framesPerCloud = 5;
+
     for (let i = 0; i < this.capacity; i++) {
-      const frame = this.atlas.randomFrame();
+      cloudIndex = i % framesPerCloud;
+
+      if (cloudIndex === 0) {
+        frame = this.atlas.randomFrame();
+        x = this.width * 2 * Math.random() - this.width + this.xOffset;
+        y = this.height * 2 * Math.random() - this.height + this.yOffset;
+      }
 
       const sprite = this.spritePool.createVO();
-      sprite.setSize(frame.coords.width, frame.coords.height);
+      const scale = cloudIndex * (this.gap / framesPerCloud);
+      sprite.setSize(frame.coords.width * scale, frame.coords.height * scale);
       sprite.setFrame(frame);
-      sprite.setPosition(
-        this.width * 2 * Math.random() - this.width + this.xOffset,
-        this.height * 2 * Math.random() - this.height + this.yOffset,
-        z,
-      );
+
+      sprite.setPosition(x, y, z + scale);
 
       sprite.setColor([1, 1, 1, 1]);
 
