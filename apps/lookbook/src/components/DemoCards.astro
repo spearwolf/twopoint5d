@@ -4,13 +4,15 @@ import Card from './Card.astro';
 import TagCloudFilter from './TagCloudFilter.astro';
 
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
+import logo from '../images/twopoint5d.png?url';
 
 const {demos} = loadMetadataForDemos();
 ---
 
 <main>
   <header class="lookbook-header">
-    <img class="secondary" src={lookbook} alt="lookbook title" />
+    <img class="primary" src={logo} alt="twopoint5d" />
+    <img class="secondary" src={lookbook} alt="lookbook" />
   </header>
 
   <TagCloudFilter />
@@ -34,6 +36,10 @@ const {demos} = loadMetadataForDemos();
     margin: 0;
     display: flex;
     align-items: center;
+  }
+  .lookbook-header img.primary {
+    max-height: 66px;
+    margin-left: 1rem;
   }
   .lookbook-header img.secondary {
     filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #999);
