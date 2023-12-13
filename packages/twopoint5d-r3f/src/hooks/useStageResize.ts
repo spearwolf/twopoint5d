@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useRef} from 'react';
+import {useEffect, useRef} from 'react';
 import {useStageSize} from './useStageSize.js';
 
 export type ResizeEffectCallback = (width: number, height: number) => any;
@@ -15,7 +15,7 @@ export const useStageResize = (resizeEffect: ResizeEffectCallback): void => {
   const callbackRef = useRef<ResizeEffectCallback>();
   const [width, height] = useStageSize();
 
-  useLayoutEffect(() => void (callbackRef.current = resizeEffect), [resizeEffect]);
+  callbackRef.current = resizeEffect;
 
   useEffect(() => {
     if (callbackRef.current) {

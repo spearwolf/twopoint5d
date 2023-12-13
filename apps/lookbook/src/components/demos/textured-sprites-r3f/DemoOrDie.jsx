@@ -1,5 +1,5 @@
-import { Effects } from "@react-three/drei";
-import { extend } from "@react-three/fiber";
+import {Effects} from '@react-three/drei';
+import {extend} from '@react-three/fiber';
 import {
   forwardRefValue,
   GetStage2D,
@@ -13,21 +13,24 @@ import {
   TextureRef,
   useFrameLoop,
   useTextureAtlas,
-} from "twopoint5d-r3f";
-import { useEffect, useRef, useState } from "react";
-import { FilmPass } from "three/examples/jsm/postprocessing/FilmPass";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
+} from '@spearwolf/twopoint5d-r3f';
+import {useEffect, useRef, useState} from 'react';
 
-import { LogStageSizeToConsole } from "../utils/LogStageSizeToConsole";
-import { WiredBox } from "../utils/WiredBox";
-import { BouncingSprites } from "./BouncingSprites";
+import {FilmPass} from 'three/examples/jsm/postprocessing/FilmPass';
+import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass';
 
-extend({ RenderPass, FilmPass });
+import assetsUrl from '~demos/utils/assetsUrl.ts';
 
-export const DemoOrDie = ({ capacity }) => {
+import {WiredBox} from '../WiredBox.tsx';
+import {BouncingSprites} from './BouncingSprites.js';
+import {LogStageSizeToConsole} from './LogStageSizeToConsole.jsx';
+
+extend({RenderPass, FilmPass});
+
+export function DemoOrDie({capacity}) {
   const geometry = useRef();
 
-  const atlas = useTextureAtlas("atlas0");
+  const atlas = useTextureAtlas('atlas0');
 
   const [tick, setTick] = useState(0);
   const [tack, setTack] = useState(null);
@@ -44,7 +47,7 @@ export const DemoOrDie = ({ capacity }) => {
     if (tick < 5) {
       setTimeout(() => setTick(tick + 1), 1000);
     } else {
-      setTack({ isTack: true });
+      setTack({isTack: true});
     }
   }, [tick]);
 
@@ -52,9 +55,9 @@ export const DemoOrDie = ({ capacity }) => {
     <>
       <TextureAtlas
         name="atlas0"
-        url="/examples/assets/lab-walls-tiles.json"
+        url={assetsUrl('lab-walls-tiles.json')}
         nearest
-        overrideImageUrl="/examples/assets/lab-walls-tiles.png"
+        overrideImageUrl={assetsUrl('lab-walls-tiles.png')}
       />
 
       <Stage2D name="stage0" noAutoRender noAutoClear>
@@ -66,40 +69,27 @@ export const DemoOrDie = ({ capacity }) => {
       </Stage2D>
 
       <Stage2D name="stage1" noAutoRender noAutoClear defaultCamera>
-        <ParallaxProjection
-          plane="xy"
-          origin="bottom left"
-          width={150}
-          height={150}
-          fit="contain"
-        />
+        <ParallaxProjection plane="xy" origin="bottom left" width={150} height={150} fit="contain" />
 
         <LogStageSizeToConsole />
 
         <TexturedSprites>
-          <TexturedSpritesGeometry
-            capacity={capacity}
-            ref={geometry}
-          ></TexturedSpritesGeometry>
+          <TexturedSpritesGeometry capacity={capacity} ref={geometry}></TexturedSpritesGeometry>
           <TexturedSpritesMaterial depthTest={false} depthWrite={false}>
             <TextureRef name="atlas0" attach="colorMap" />
           </TexturedSpritesMaterial>
         </TexturedSprites>
       </Stage2D>
 
-      <GetStage2D name={["stage0", "stage1"]}>
+      <GetStage2D name={['stage0', 'stage1']}>
         {(stage0, stage1) => (
           <Effects disableRenderPass={true}>
             <renderPass args={[stage0.scene, stage0.camera]} />
-            <renderPass
-              clear={false}
-              clearDepth={true}
-              args={[stage1.scene, stage1.camera, undefined, false, false]}
-            />
+            <renderPass clear={false} clearDepth={true} args={[stage1.scene, stage1.camera, undefined, false, false]} />
             <filmPass args={[1, 0.5, 10, 0]} />
           </Effects>
         )}
       </GetStage2D>
     </>
   );
-};
+}

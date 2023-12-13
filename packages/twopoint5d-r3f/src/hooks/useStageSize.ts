@@ -1,4 +1,5 @@
 import {Stage2D} from '@spearwolf/twopoint5d';
+import {StageResize} from '@spearwolf/twopoint5d/events.js';
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D.js';
 
@@ -26,8 +27,8 @@ export function useStageSize() {
     if (parentStage) {
       updateSize(parentStage.width, parentStage.height);
 
-      return parentStage.on('resize', (stage: Stage2D) => {
-        updateSize(stage.width, stage.height);
+      return parentStage.on(StageResize, ({width, height}: Stage2D) => {
+        updateSize(width, height);
       });
     }
   }, [parentStage]);

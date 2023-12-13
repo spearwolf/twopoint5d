@@ -1,0 +1,22 @@
+{
+  "title": "textured sprites (r3f)",
+  "description": "Sprites loaded from a texture atlas with post processing example",
+  "url": "/demos/textured-sprites-r3f",
+  "tags": [
+    "<GetStage2D/>",
+    "<ParallaxProjection/>",
+    "<Stage2D/>",
+    "<TextureAtlas/>",
+    "<TexturedSprites/>",
+    "<TexturedSpritesGeometry/>",
+    "<TexturedSpritesMaterial/>",
+    "<TextureRef/>",
+    "useFrameLoop",
+    "useTextureAtlas",
+    "texture-atlas",
+    "textures",
+    "react",
+    "r3f"
+  ],
+  "previewImage": "textured-sprites-r3f.png"
+}
