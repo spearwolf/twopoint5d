@@ -4,7 +4,7 @@ import Card from './Card.astro';
 import TagCloudFilter from './TagCloudFilter.astro';
 
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
-import logo from '../images/twopoint5d.png?url';
+import logo from '../images/twopoint5d-glitch.png?url';
 
 const {demos} = loadMetadataForDemos();
 ---
@@ -29,17 +29,24 @@ const {demos} = loadMetadataForDemos();
 <style>
   main {
     margin: auto auto 3rem;
-    padding: 1.5rem;
+    padding: 80px 1.5rem 1.5rem;
     max-width: 120ch;
   }
   .lookbook-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px;
     margin: 0;
     display: flex;
-    align-items: center;
+    justify-content: center;
+    background-color: rgba(13 15 20 / 80%);
+    border-bottom: 1px solid #33353a;
+    box-shadow: 0 0 10px #000;
   }
   .lookbook-header img.primary {
     max-height: 66px;
-    margin-left: 1rem;
   }
   .lookbook-header img.secondary {
     filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #999);
