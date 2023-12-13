@@ -14,7 +14,7 @@ import {title} from './_textured-sprites.json';
   }
   body {
     background-color: #391e39;
-    background: radial-gradient(circle, rgb(82 95 132) 0%, rgb(149 188 199) 100%);
+    background: radial-gradient(circle, rgb(175 82 82) 0%, rgb(90 148 191) 100%);
     color: #eee;
     font-family: sans-serif;
     font-size: 16px;
@@ -35,17 +35,17 @@ import {title} from './_textured-sprites.json';
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
   demo.on('init', async ({scene}) => {
-    const CAPACITY = 333;
+    const CAPACITY = 256;
 
     const geometry = new TexturedSpritesGeometry(CAPACITY);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
-      tileWidth: 64,
-      tileHeight: 64,
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('skinball-256.png'), {
+      tileWidth: 256,
+      tileHeight: 256,
       margin: 1,
     });
 
-    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 100, 75, 7, CAPACITY);
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 100, 75, 4, CAPACITY);
 
     bouncingSprites.createSprites();
 
