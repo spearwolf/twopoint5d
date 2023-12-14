@@ -15,8 +15,8 @@ import {title} from './_display-minimal.json';
   const canvas = document.getElementById('twopoint5d')!;
   const display = new Display(canvas);
 
-  const width = 197;
-  const height = 205;
+  const width = 2288;
+  const height = 3264;
 
   const stage = new Stage2D(
     new ParallaxProjection('xy|bottom-left', {
@@ -25,13 +25,15 @@ import {title} from './_display-minimal.json';
       fit: 'contain',
     }),
   );
+  
+  stage.scene.background = new Color('#272727');
 
   (window as any).display = display;
   (window as any).stage = stage;
 
   const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy', 'srgb']);
 
-  const textureImage = textureFactory.load(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
+  const textureImage = textureFactory.load(assetsUrl('xtc_design_spw96.png'));
 
   const material = new SpriteMaterial({map: textureImage});
   const sprite = new Sprite(material);
