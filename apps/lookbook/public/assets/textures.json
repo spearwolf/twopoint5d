@@ -4,6 +4,10 @@
       "imageUrl": "/lookbook/assets/ball-pattern-rot--not-power-of-2.png",
       "texture": ["nearest", "flipy", "srgb"]
     },
+    "happyWurmFace": {
+      "imageUrl": "/lookbook/assets/happy-wurm-face.png",
+      "texture": ["linear", "flipy", "srgb"]
+    },
     "splotchs": {
       "atlasUrl": "/lookbook/assets/splotchs-256x.json",
       "overrideImageUrl": "/lookbook/assets/splotchs-256x.png",

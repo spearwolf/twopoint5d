@@ -8,8 +8,8 @@ import {title} from './_two5-post-processing.json';
     <two5-display class="display">
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">
         <two5-post-processing debug>
-          <two5-stage2d id="mystage" projection-type="parallax" width="197" height="205"></two5-stage2d>
-          <two5-unreal-bloom-pass debug></two5-unreal-bloom-pass>
+          <two5-stage2d id="mystage" projection-type="parallax" fit="cover" width="1000" height="568"></two5-stage2d>
+          <two5-unreal-bloom-pass debug strength="0.4" radius="0.3" threshold="0.95"></two5-unreal-bloom-pass>
           <two5-glitch-pass debug></two5-glitch-pass>
         </two5-post-processing>
       </two5-texture-store>
@@ -23,14 +23,17 @@ import {title} from './_two5-post-processing.json';
   }
 
   :root {
-    --margin-top: 32px;
+    --space: 50px;
   }
 
   .container {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: var(--margin-top) auto 0;
+    margin: var(--space) auto 0;
+    overflow: hidden;
+    border: 1px solid #f06;
+    border-radius: var(--space);
   }
 
   .display {
@@ -38,7 +41,6 @@ import {title} from './_two5-post-processing.json';
     min-width: 320px;
     height: 61.8vh;
     min-height: 160px;
-    box-shadow: rgba(255, 99, 20, 0.25) 0px 0px 0px 1px;
   }
 </style>
 
@@ -66,10 +68,10 @@ import {title} from './_two5-post-processing.json';
   scene.background = new Color(0x210611);
 
   const sprite = new Sprite();
-  sprite.scale.set(197, 205, 1);
+  sprite.scale.set(1000, 568, 1);
   scene.add(sprite);
 
-  textureStore.get('ballPatternRot', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
+  textureStore.get('happyWurmFace', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
     console.log('texture', {texture, imageCoords});
 
     sprite.material?.dispose();
