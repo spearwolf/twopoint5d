@@ -18,7 +18,7 @@ import {title} from './_textured-quads-from-tileset.json';
   }
   body {
     background-color: #391e39;
-    background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
+    background: radial-gradient(circle, rgba(109 80 87) 0%, rgba(21 2 41) 100%);
   }
   .texture-preview {
     background-color: rgba(86, 101, 115, 80%);
@@ -60,9 +60,9 @@ import {title} from './_textured-quads-from-tileset.json';
 <script>
   import {TileSet, TileSetLoader, VertexObjects} from '@spearwolf/twopoint5d';
   import {DoubleSide, RawShaderMaterial, Texture} from 'three';
+  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
   import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import loadShaderSource from '~demos/utils/loadShaderSource';
@@ -87,6 +87,7 @@ import {title} from './_textured-quads-from-tileset.json';
         ]);
 
         const texCoords = tileset.atlas.randomFrame().coords;
+        console.log('texCoords', [texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
         quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
       }
     }
@@ -112,21 +113,20 @@ import {title} from './_textured-quads-from-tileset.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  const {imgEl, texture, tileSet} = await new TileSetLoader().loadAsync(
-    assetsUrl('nobinger-anim-sheet.png'),
-    {
-      tileWidth: 64,
-      tileHeight: 64,
-      margin: 1,
-    },
-    ['nearest'],
-  );
-
-  console.log('loaded tileset', {imgEl, tileSet, texture});
-
-  document.getElementById('texture-preview').appendChild(imgEl);
-
   await demo.start(async () => {
+    const {imgEl, texture, tileSet} = await new TileSetLoader().loadAsync(
+      assetsUrl('glaskugeln-2-256x.png'),
+      {
+        tileWidth: 256,
+        tileHeight: 256,
+      },
+      ['nearest'],
+    );
+
+    console.log('loaded tileset', {imgEl, tileSet, texture});
+
+    document.getElementById('texture-preview').appendChild(imgEl.cloneNode());
+
     demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
   });
 
