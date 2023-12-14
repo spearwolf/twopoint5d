@@ -1,6 +1,6 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_textured-quads-po2image-loader.json';
+import { title } from './_textured-quads-po2image-loader.json';
 ---
 
 <Layout title={title}>
@@ -16,7 +16,7 @@ import {title} from './_textured-quads-po2image-loader.json';
   }
   body {
     background-color: #391e39;
-    background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
+    background: radial-gradient(circle, rgba(93, 101, 116, 1) 0%, rgba(37, 50, 98, 1) 100%);
   }
   .texture-preview {
     background-color: rgba(86, 101, 115, 80%);
@@ -39,9 +39,9 @@ import {title} from './_textured-quads-po2image-loader.json';
 <script>
   import {PowerOf2ImageLoader, TextureCoords, VertexObjects} from '@spearwolf/twopoint5d';
   import {DoubleSide, NearestFilter, RawShaderMaterial, Texture} from 'three';
+  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
   import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import loadShaderSource from '~demos/utils/loadShaderSource';
@@ -63,8 +63,8 @@ import {title} from './_textured-quads-po2image-loader.json';
       for (let x = 0; x < columns; x++) {
         const quad = geometry.instancedPool.createVO();
 
-        quad.width = 1.0 + Math.random() * (size - 1.0);
-        quad.height = quad.width;
+        quad.width = size * (0.6 + Math.random() * 0.45);
+        quad.height = (quad.width * texCoords.height) / texCoords.width;
 
         quad.setInstancePosition([
           x * size * offset - ((columns - 1) * size * offset) / 2,
@@ -97,7 +97,7 @@ import {title} from './_textured-quads-po2image-loader.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  const data = await new PowerOf2ImageLoader().loadAsync(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
+  const data = await new PowerOf2ImageLoader().loadAsync(assetsUrl('platform-blau.png'));
 
   console.log('loaded power-of-2 image', data);
 
@@ -110,7 +110,7 @@ import {title} from './_textured-quads-po2image-loader.json';
   document.getElementById('texture-preview').appendChild(data.imgEl);
 
   await demo.start(async () => {
-    demo.scene.add(await makeMesh(16, 32, 3.5, 1, data.texCoords, texture));
+    demo.scene.add(await makeMesh(16, 32, 10, 1, data.texCoords, texture));
   });
 
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
