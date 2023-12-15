@@ -1,6 +1,6 @@
-import type {TextureAtlas, TexturedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
+import type {TextureAtlas, TexturedSprite, TexturedSpritePool} from '@spearwolf/twopoint5d';
 
-interface Sprite extends TexturedSprite {
+interface BounceSprite extends TexturedSprite {
   speedX: number;
   speedY: number;
   speedRotate: number;
@@ -18,7 +18,7 @@ export class BouncingSprites {
   upwindSpeed = 0.6;
   speedRotateFactor = 1;
 
-  spritePool: VertexObjectPool<TexturedSprite>;
+  spritePool: TexturedSpritePool;
   textureAtlas: TextureAtlas;
 
   containerWidth: number;
@@ -27,10 +27,10 @@ export class BouncingSprites {
   spriteSize: number;
   initalSpriteCount: number;
 
-  sprites: Sprite[] = [];
+  sprites: BounceSprite[] = [];
 
   constructor(
-    spritePool: VertexObjectPool<TexturedSprite>,
+    spritePool: TexturedSpritePool,
     textureAtlas: TextureAtlas,
     width = 300,
     height = 150,
@@ -49,7 +49,7 @@ export class BouncingSprites {
     const [halfWidth, halfHeight] = [this.containerWidth / 2, this.containerHeight / 2];
 
     for (let i = 0; i < count; i++) {
-      const sprite = this.spritePool.createVO() as Sprite;
+      const sprite = this.spritePool.createVO() as BounceSprite;
 
       sprite.setSize(this.spriteSize, this.spriteSize);
 
@@ -62,8 +62,6 @@ export class BouncingSprites {
 
       sprite.rotation = Math.random() * Math.PI * 2;
       sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
-
-      sprite.setColor([1, 1, 1, 1]);
 
       this.sprites.push(sprite);
     }
