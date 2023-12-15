@@ -1,4 +1,5 @@
 import {Color} from 'three';
+import {voInitialize} from '../../index.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
 
@@ -29,6 +30,10 @@ export interface TexturedSprite extends VO {
 }
 
 export class TexturedSprite {
+  [voInitialize]() {
+    this.setColor([1, 1, 1, 1]);
+  }
+
   setSize(width: number, height: number): void {
     this.setQuadSize([width, height]);
   }

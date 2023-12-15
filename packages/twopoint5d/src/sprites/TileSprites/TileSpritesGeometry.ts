@@ -7,7 +7,7 @@ export interface TileSpritesGeometry {
   instancedPool: VertexObjectPool<TileSprite>;
 }
 
-export class TileSpritesGeometry extends InstancedVertexObjectGeometry {
+export class TileSpritesGeometry extends InstancedVertexObjectGeometry<TileSprite, TileBaseSprite> {
   constructor(capacity = 100) {
     super(TileSpriteDescriptor, capacity, TileBaseSpriteDescriptor);
 

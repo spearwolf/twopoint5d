@@ -65,8 +65,10 @@ const makeAttributeValueSetter = (
   };
 };
 
-export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer, basePrototype?: object, methods?: object): object {
+export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): Object {
   const {descriptor} = voBuffer;
+  const {methods} = descriptor;
+
   const entries = descriptor.attributeNames.flatMap((attrName) => {
     const attr = descriptor.getAttribute(attrName)!;
     const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
@@ -130,8 +132,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer, basePr
     );
   }
 
-  const proto = basePrototype ?? Object.prototype;
   const props = Object.fromEntries(entries as []);
 
-  return Object.create(proto, props);
+  return Object.create(descriptor.basePrototype ?? Object.prototype, props);
 }

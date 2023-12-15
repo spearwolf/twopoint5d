@@ -16,10 +16,7 @@ type TouchInstancedBuffersType = {
   instanced?: TouchBuffersType;
 };
 
-export class InstancedVertexObjectGeometry<
-  VOInstancedType extends VO = VO,
-  VOBaseType extends VO = VO,
-> extends InstancedBufferGeometry {
+export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseType extends VO> extends InstancedBufferGeometry {
   readonly basePool?: VertexObjectPool<VOBaseType>;
   readonly baseBuffers?: Map<string, BufferLike>;
 

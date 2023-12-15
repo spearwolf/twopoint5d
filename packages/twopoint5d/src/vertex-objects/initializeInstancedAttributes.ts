@@ -6,7 +6,7 @@ import type {BufferLike} from './types.js';
 
 export function initializeInstancedAttributes(
   geometry: BufferGeometry,
-  pool: VertexObjectPool,
+  pool: VertexObjectPool<any>,
   buffers: Map<string, BufferLike>,
 ): void {
   const {descriptor} = pool;

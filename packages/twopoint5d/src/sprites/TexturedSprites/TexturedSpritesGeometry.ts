@@ -7,8 +7,8 @@ export type TexturedSpritesBasePool = VertexObjectPool<BaseSprite>;
 export type TexturedSpritePool = VertexObjectPool<TexturedSprite>;
 
 export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<TexturedSprite, BaseSprite> {
-  override basePool: TexturedSpritesBasePool;
-  override instancedPool: TexturedSpritePool;
+  declare basePool: TexturedSpritesBasePool;
+  declare instancedPool: TexturedSpritePool;
 
   constructor(
     capacity = 100,

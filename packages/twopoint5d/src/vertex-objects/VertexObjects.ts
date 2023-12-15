@@ -2,11 +2,15 @@ import {Material, Mesh} from 'three';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
+import type {VO} from './types.js';
 
-export class VertexObjects extends Mesh {
-  override geometry: VertexObjectGeometry | InstancedVertexObjectGeometry;
+export class VertexObjects<VOType extends VO, VOInstancedType extends VO = VO> extends Mesh {
+  declare geometry: VertexObjectGeometry<VOType> | InstancedVertexObjectGeometry<VOInstancedType, VOType>;
 
-  constructor(geometry?: VertexObjectGeometry | InstancedVertexObjectGeometry, material?: Material | Material[]) {
+  constructor(
+    geometry?: VertexObjectGeometry<VOType> | InstancedVertexObjectGeometry<VOInstancedType, VOType>,
+    material?: Material | Material[],
+  ) {
     super(geometry, material);
     this.name = 'VertexObjects';
   }

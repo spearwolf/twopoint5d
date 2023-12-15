@@ -5,7 +5,11 @@ import {createIndicesArray} from './createIndicesArray.js';
 import {toDrawUsage} from './toDrawUsage.js';
 import type {BufferLike} from './types.js';
 
-export function initializeAttributes(geometry: BufferGeometry, pool: VertexObjectPool, buffers: Map<string, BufferLike>): void {
+export function initializeAttributes(
+  geometry: BufferGeometry,
+  pool: VertexObjectPool<any>,
+  buffers: Map<string, BufferLike>,
+): void {
   const {descriptor, capacity} = pool;
   if (descriptor.hasIndices) {
     const {indices} = descriptor;

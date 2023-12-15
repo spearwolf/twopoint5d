@@ -1,21 +1,10 @@
 import {voBuffer, voIndex} from './constants.js';
+import {createVertexObject} from './createVertexObject.js';
 import type {VertexObjectBuffersData, VertexObjectDescription, VO} from './types.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
-const createVertexObject = (descriptor: VertexObjectDescriptor, buffer: VertexObjectBuffer, objectIndex: number) =>
-  Object.create(descriptor.voPrototype, {
-    [voBuffer]: {
-      value: buffer,
-      writable: true,
-    },
-    [voIndex]: {
-      value: objectIndex,
-      writable: true,
-    },
-  });
-
-export class VertexObjectPool<VOType = VO> {
+export class VertexObjectPool<VOType> {
   static setIndex(vo: VO, idx: number): VO {
     vo[voIndex] = idx;
     return vo;
@@ -28,6 +17,8 @@ export class VertexObjectPool<VOType = VO> {
 
   #index: Array<VOType & VO>;
   #usedCount = 0;
+
+  onCreateVO?: (vo: VOType & VO) => void;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
@@ -68,7 +59,7 @@ export class VertexObjectPool<VOType = VO> {
   createVO(): VOType & VO {
     if (this.#usedCount < this.capacity) {
       const idx = this.usedCount++;
-      const vo = createVertexObject(this.descriptor, this.buffer, idx);
+      const vo = this.#createVertexObject(idx);
       this.#index[idx] = vo;
       return vo;
     }
@@ -109,7 +100,7 @@ export class VertexObjectPool<VOType = VO> {
   getVO(idx: number): (VOType & VO) | undefined {
     let vo = this.#index[idx];
     if (vo == null && idx < this.#usedCount) {
-      vo = createVertexObject(this.descriptor, this.buffer, idx);
+      vo = this.#createVertexObject(idx);
       this.#index[idx] = vo;
     }
     return vo;
@@ -123,5 +114,13 @@ export class VertexObjectPool<VOType = VO> {
         Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray]),
       ),
     };
+  }
+
+  #createVertexObject(idx: number) {
+    const vo = createVertexObject(this.descriptor, this.buffer, idx);
+    if (this.onCreateVO != null) {
+      this.onCreateVO(vo);
+    }
+    return vo;
   }
 }
