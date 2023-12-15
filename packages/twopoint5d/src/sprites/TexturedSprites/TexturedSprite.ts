@@ -52,8 +52,7 @@ export class TexturedSprite {
   }
 
   getColor(target: Color = new Color()): Color {
-    target.set(this.r, this.g, this.b);
-    return target;
+    return target.set(this.r, this.g, this.b);
   }
 }
 
