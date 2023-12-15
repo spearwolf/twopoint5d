@@ -54,7 +54,7 @@ export class Starfield {
   #minMaxSizeScale: [number, number] = [1, 1];
   #nearFar: Vector2 = new Vector2(0, 1);
   #cameraLineOfSightEscape = 2;
-  #baseColors: [number, number, number, number][];
+  #baseColors: Color[];
 
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
     eventize(this);
@@ -84,13 +84,10 @@ export class Starfield {
   }
 
   setBaseColors(colors: (Color | number | string)[]) {
-    this.#baseColors = colors.map((color) => {
-      const c = new Color(color);
-      return [c.r, c.g, c.b, 1];
-    });
+    this.#baseColors = colors.map((color) => new Color(color));
   }
 
-  randomBaseColor(): [number, number, number, number] {
+  randomBaseColor(): Color {
     return this.#baseColors[rand(this.#baseColors.length)];
   }
 

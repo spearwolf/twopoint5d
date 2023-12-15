@@ -17,6 +17,32 @@ describe('VertexAttributeDescriptor', () => {
     expect(descriptor.normalizedData).toBe(false);
     expect(descriptor.usageType).toBe('dynamic');
     expect(descriptor.bufferName).toBe('dynamic_float32');
+    expect(descriptor.getterName).toBe('getFoo');
+    expect(descriptor.setterName).toBe('setFoo');
+  });
+
+  test('construct with getter and setter', () => {
+    const descriptor = new VertexAttributeDescriptor('foo', {
+      size: 3,
+      getter: 'getCoords',
+      setter: 'setCoords',
+    });
+    expect(descriptor).toBeDefined();
+    expect(descriptor.name).toBe('foo');
+    expect(descriptor.getterName).toBe('getCoords');
+    expect(descriptor.setterName).toBe('setCoords');
+  });
+
+  test('construct without getter and setter', () => {
+    const descriptor = new VertexAttributeDescriptor('foo', {
+      components: ['x', 'y', 'z'],
+      getter: undefined,
+      setter: false,
+    });
+    expect(descriptor).toBeDefined();
+    expect(descriptor.name).toBe('foo');
+    expect(descriptor.getterName).toBe(undefined);
+    expect(descriptor.setterName).toBe(undefined);
   });
 
   test('construct with size', () => {

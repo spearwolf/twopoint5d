@@ -45,7 +45,10 @@ export interface VASizeDescription extends VADescription {
   size: number;
 }
 
-export type VertexAttributeDescription = VAComponentsDescription | VASizeDescription;
+export type VertexAttributeDescription = (VAComponentsDescription | VASizeDescription) & {
+  getter?: string | boolean;
+  setter?: string | boolean;
+};
 
 export type VertexAttributesType = Record<string, VertexAttributeDescription>;
 

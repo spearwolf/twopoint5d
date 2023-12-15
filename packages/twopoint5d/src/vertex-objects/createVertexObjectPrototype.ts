@@ -3,8 +3,6 @@ import {voBuffer, voIndex} from './constants.js';
 import {createTypedArray} from './createTypedArray.js';
 import type {VO} from './types.js';
 
-const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) => m1.toUpperCase());
-
 const makeAttributeGetter = (bufferName: string, instanceOffset: number, attrOffset: number) => {
   return function getAttribute(this: VO) {
     const idx = this[voIndex] * instanceOffset + attrOffset;
@@ -73,9 +71,9 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): Objec
     const attr = descriptor.getAttribute(attrName)!;
     const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
     const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
-    const AttrName = toPascalCase(attrName);
 
     const methods: unknown[] = [];
+
     if (descriptor.vertexCount === 1 && attr.size === 1) {
       methods.push([
         attrName,
@@ -86,23 +84,22 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): Objec
         },
       ]);
     } else {
-      methods.push(
-        [
-          `get${AttrName}`,
-          {
-            enumerable: true,
-            value: makeAttributeValuesGetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
-          },
-        ],
-        [
-          `set${AttrName}`,
-          {
-            enumerable: true,
-            value: makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
-          },
-        ],
-      );
+      methods.push([
+        attr.getterName,
+        {
+          enumerable: true,
+          value: makeAttributeValuesGetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+        },
+      ]);
+      methods.push([
+        attr.setterName,
+        {
+          enumerable: true,
+          value: makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+        },
+      ]);
     }
+
     if (attr.hasComponents) {
       attr.components.forEach((component, componentIndex) => {
         for (let vertexIndex = 0; vertexIndex < descriptor.vertexCount; vertexIndex++) {

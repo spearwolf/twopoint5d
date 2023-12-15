@@ -18,7 +18,7 @@ export class VertexObjectPool<VOType> {
   #index: Array<VOType & VO>;
   #usedCount = 0;
 
-  onCreateVO?: (vo: VOType & VO) => void;
+  onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
@@ -119,7 +119,7 @@ export class VertexObjectPool<VOType> {
   #createVertexObject(idx: number) {
     const vo = createVertexObject(this.descriptor, this.buffer, idx);
     if (this.onCreateVO != null) {
-      this.onCreateVO(vo);
+      return this.onCreateVO(vo) ?? vo;
     }
     return vo;
   }
