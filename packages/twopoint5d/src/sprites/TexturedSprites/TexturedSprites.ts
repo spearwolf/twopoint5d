@@ -10,7 +10,5 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     super(geometry, material);
 
     this.name = 'twopoint5d.TexturedSprites';
-
-    this.frustumCulled = false;
   }
 }

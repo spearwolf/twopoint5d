@@ -10,7 +10,5 @@ export class TileSprites extends VertexObjects<TileSpritesGeometry> {
     super(geometry, material);
 
     this.name = 'twopoint5d.TileSprites';
-
-    this.frustumCulled = false;
   }
 }

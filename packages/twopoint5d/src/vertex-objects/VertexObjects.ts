@@ -8,7 +8,10 @@ export class VertexObjects<GeoType extends VertexObjectGeometry<any> | Instanced
 
   constructor(geometry?: GeoType, material?: Material | Material[]) {
     super(geometry, material);
+
     this.name = 'VertexObjects';
+
+    this.frustumCulled = false;
   }
 
   override onBeforeRender = (): void => {

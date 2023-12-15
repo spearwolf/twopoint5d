@@ -8,7 +8,5 @@ export class AnimatedSprites extends VertexObjects<AnimatedSpritesGeometry> {
     super(geometry, material);
 
     this.name = 'twopoint5d.AnimatedSprites';
-
-    this.frustumCulled = false;
   }
 }
