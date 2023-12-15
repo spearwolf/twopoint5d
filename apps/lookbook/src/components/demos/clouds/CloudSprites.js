@@ -129,8 +129,6 @@ export class CloudSprites {
 
       sprite.setPosition(x, y, z + scale);
 
-      sprite.setColor([1, 1, 1, 1]);
-
       this.#sprites.push({frame, sprite});
 
       z += this.gap;
