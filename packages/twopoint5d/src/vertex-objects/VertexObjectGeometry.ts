@@ -63,9 +63,6 @@ export class VertexObjectGeometry<VOType extends VO> extends BufferGeometry {
   }
 
   #updateBuffersUpdateRange() {
-    // for (const [name, {itemSize}] of this.pool.buffer.buffers) {
-    //   this.buffers.get(name).updateRange.count = itemSize * this.pool.usedCount * this.pool.descriptor.vertexCount;
-    // }
     updateUpdateRange(this.pool, this.buffers);
   }
 
