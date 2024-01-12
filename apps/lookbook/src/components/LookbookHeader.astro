@@ -1,0 +1,70 @@
+---
+import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
+---
+
+<header class="lookbook-header">
+  <img class="secondary" src={lookbook} alt="lookbook" />
+
+  <div class="rainbow-line">
+    <div class="rainbow-line-25"></div>
+    <div class="rainbow-line-50"></div>
+    <div class="rainbow-line-100"></div>
+    <div class="rainbow-line-50"></div>
+    <div class="rainbow-line-25"></div>
+  </div>
+</header>
+
+<style>
+  .lookbook-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    background-color: rgba(20 20 20 / 65%);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 20px #4c4c42;
+  }
+
+  .rainbow-line {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background: linear-gradient(180deg, rgba(20 20 20 / 65%) 0%, rgb(0 0 0) 100%);
+  }
+
+  .rainbow-line > div {
+    width: 100%;
+    height: 1px;
+  }
+
+  .rainbow-line-25 {
+    background: linear-gradient(in hsl longer hue 45deg, #401 0 0);
+  }
+
+  .rainbow-line-50 {
+    background: linear-gradient(in hsl longer hue 45deg, #802 0 0);
+  }
+
+  .rainbow-line-100 {
+    background: linear-gradient(in hsl longer hue 45deg, #f00 0 0);
+    height: 2px;
+  }
+
+  /* .lookbook-header img.primary {
+    max-height: 66px;
+    display: none;
+  } */
+
+  .lookbook-header img.secondary {
+    filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #999);
+    max-height: 48px; /* 66 */
+    margin-left: 1rem;
+  }
+</style>
