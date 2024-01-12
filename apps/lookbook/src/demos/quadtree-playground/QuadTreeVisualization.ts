@@ -53,7 +53,20 @@ export class QuadTreeVisualization {
     //   this.ctx.fillRect(chunk.left, chunk.top, chunk.right - chunk.left, chunk.bottom - chunk.top);
     // }
 
-    this.renderChunkFrame(root, 0, 0, width, height);
+    const stats = {
+      leafs: 0,
+      noLeafs: 0,
+      totalFrames: 0,
+      maxChunksPerFrame: 0,
+      averageChunksPerFrame: 0,
+    };
+
+    this.renderChunkFrame(root, 0, 0, width, height, stats);
+
+    stats.totalFrames = stats.leafs + stats.noLeafs;
+    stats.averageChunksPerFrame = Math.round(stats.averageChunksPerFrame / stats.totalFrames);
+
+    console.log('render chunks stats', stats);
 
     this.canvasStage.needsUpdate = true;
   }
@@ -64,11 +77,20 @@ export class QuadTreeVisualization {
     top: number,
     right: number,
     bottom: number,
+    stats: {leafs: number; noLeafs: number; totalFrames: number; maxChunksPerFrame: number; averageChunksPerFrame: number},
   ) {
     if (chunk.isLeaf) {
       this.ctx.fillStyle = 'rgba(255, 0, 66, 0.5)';
+      stats.leafs++;
     } else {
       this.ctx.fillStyle = 'rgba(255, 255, 66, 0.25)';
+      stats.noLeafs++;
+    }
+
+    stats.averageChunksPerFrame += chunk.chunks.length;
+
+    if (chunk.chunks.length > stats.maxChunksPerFrame) {
+      stats.maxChunksPerFrame = chunk.chunks.length;
     }
 
     for (const c of chunk.chunks) {
@@ -84,14 +106,14 @@ export class QuadTreeVisualization {
       this.ctx.lineTo(chunk.originX, bottom);
       this.ctx.stroke();
 
-      chunk.nodes.northWest && this.renderChunkFrame(chunk.nodes.northWest, left, top, chunk.originX, chunk.originY);
-      chunk.nodes.northEast && this.renderChunkFrame(chunk.nodes.northEast, chunk.originX, top, right, chunk.originY);
-      chunk.nodes.southWest && this.renderChunkFrame(chunk.nodes.southWest, left, chunk.originY, chunk.originX, bottom);
-      chunk.nodes.southEast && this.renderChunkFrame(chunk.nodes.southEast, chunk.originX, chunk.originY, right, bottom);
+      chunk.nodes.northWest && this.renderChunkFrame(chunk.nodes.northWest, left, top, chunk.originX, chunk.originY, stats);
+      chunk.nodes.northEast && this.renderChunkFrame(chunk.nodes.northEast, chunk.originX, top, right, chunk.originY, stats);
+      chunk.nodes.southWest && this.renderChunkFrame(chunk.nodes.southWest, left, chunk.originY, chunk.originX, bottom, stats);
+      chunk.nodes.southEast && this.renderChunkFrame(chunk.nodes.southEast, chunk.originX, chunk.originY, right, bottom, stats);
     }
   }
 
-  makeRandomQuadTree(count = 100, maxChunkNodes = 2) {
+  makeRandomQuadTree(randomCount = 100, sortedCount = 100, maxChunkNodes = 2) {
     const WIDTH = 1000;
     const HEIGHT = 600;
 
@@ -101,11 +123,33 @@ export class QuadTreeVisualization {
 
     const chunks: NumberDataChunk2D[] = [];
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < randomCount; i++) {
       const w = Math.ceil(Math.max(MIN_SIZE, Math.random() * MAX_SIZE));
       const h = Math.ceil(Math.max(MIN_SIZE, Math.random() * MAX_SIZE));
       const x = Math.round(Math.random() * (WIDTH - MARGIN * 2) + MARGIN) - w / 2;
       const y = Math.round(Math.random() * (HEIGHT - MARGIN * 2) + MARGIN) - h / 2;
+      chunks.push(
+        new NumberDataChunk2D({
+          x,
+          y,
+          width: w,
+          height: h,
+        }),
+      );
+    }
+
+    const minDimension = Math.min(WIDTH, HEIGHT);
+    const rows = Math.ceil(Math.sqrt(sortedCount));
+    const cellSize = Math.ceil(minDimension / rows);
+
+    const centerX = (WIDTH - rows * cellSize) * -0.5;
+    const centerY = (HEIGHT - rows * cellSize) * -0.5;
+
+    for (let i = 0; i < sortedCount; i++) {
+      const w = Math.ceil(cellSize + (Math.random() - 1) * cellSize * 0.25);
+      const h = Math.ceil(cellSize + (Math.random() - 1) * cellSize * 0.25);
+      const y = Math.floor(i / rows) * cellSize - centerY + (Math.random() - 1) * cellSize * 0.25;
+      const x = (i % rows) * cellSize - centerX + (Math.random() - 1) * cellSize * 0.25;
       chunks.push(
         new NumberDataChunk2D({
           x,

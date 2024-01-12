@@ -18,9 +18,6 @@ interface IChunkAxis {
   noSubdivide: boolean;
 }
 
-const INTERSECT_DISTANCE_FACTOR = Math.PI;
-const BEFORE_AFTER_DELTA_FACTOR = Math.PI;
-
 type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
 const calcAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey, chunk: IDataChunk2D): IChunkAxis => {
@@ -48,12 +45,15 @@ const calcAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
   const intersectCount = intersectChunks.length;
   const afterCount = afterChunks.length;
   const beforeDistance = Math.abs(0.5 - beforeCount / chunksCount);
-  const intersectDistance = Math.abs(intersectCount / chunksCount) * INTERSECT_DISTANCE_FACTOR;
+  const intersectDistance = Math.abs(intersectCount / chunksCount) * ChunkQuadTreeNode.IntersectDistanceFactor;
   const afterDistance = Math.abs(0.5 - afterCount / chunksCount);
 
   return {
     distance:
-      beforeDistance + intersectDistance + afterDistance + Math.abs(afterDistance - beforeDistance) * BEFORE_AFTER_DELTA_FACTOR,
+      beforeDistance +
+      intersectDistance +
+      afterDistance +
+      Math.abs(afterDistance - beforeDistance) * ChunkQuadTreeNode.BeforeAfterDeltaFactor,
     noSubdivide:
       (beforeCount === 0 && intersectCount === 0) ||
       (beforeCount === 0 && afterCount === 0) ||
@@ -86,6 +86,9 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
  * With `findChunks*()` all chunks in a certain area are found.
  */
 export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
+  static IntersectDistanceFactor = Math.PI;
+  static BeforeAfterDeltaFactor = Math.PI;
+
   //
   //               -y
   //

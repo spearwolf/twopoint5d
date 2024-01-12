@@ -14,21 +14,15 @@ import {title} from './_quadtree-playground.json';
 </style>
 
 <script>
-  import {Display, type DisplayEventArgs} from '@spearwolf/twopoint5d';
+  import {ChunkQuadTreeNode, Display, type DisplayEventArgs} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~demos/quadtree-playground/QuadTreeVisualization';
 
   // -----------------------------
 
-  // -----------------------------
-
   const display = new Display(document.getElementById('twopoint5d')!);
 
-  const visual = new QuadTreeVisualization(display.renderer, 256, 256);
-
-  // visual.canvasStage.on('resize', () => {
-  //   visual.render();
-  // });
+  const visual = new QuadTreeVisualization(display.renderer, 1024, 1024);
 
   visual.makeRandomQuadTree();
 
@@ -49,15 +43,24 @@ import {title} from './_quadtree-playground.json';
   const gui = new GUI({title: 'quadtree playground'});
 
   const actions = {
-    chunkCount: 100,
-    maxChunkNodes: 5,
+    randomChunkCount: 100,
+    sortedChunkCount: 100,
+    maxChunkNodes: 10,
+    intersectDistanceFactor: ChunkQuadTreeNode.IntersectDistanceFactor,
+    beforeAfterDeltaFactor: ChunkQuadTreeNode.BeforeAfterDeltaFactor,
 
     makeRandomQuadTree: () => {
-      visual.makeRandomQuadTree(actions.chunkCount, actions.maxChunkNodes);
+      ChunkQuadTreeNode.IntersectDistanceFactor = actions.intersectDistanceFactor;
+      ChunkQuadTreeNode.BeforeAfterDeltaFactor = actions.beforeAfterDeltaFactor;
+
+      visual.makeRandomQuadTree(actions.randomChunkCount, actions.sortedChunkCount, actions.maxChunkNodes);
     },
   };
 
-  gui.add(actions, 'chunkCount', 1, 1000, 1).name('chunk count');
+  gui.add(actions, 'randomChunkCount', 0, 1000, 1).name('random placed chunks');
+  gui.add(actions, 'sortedChunkCount', 0, 1000, 1).name('sorted grid chunks');
   gui.add(actions, 'maxChunkNodes', 2, 30, 1).name('max chunk nodes');
+  gui.add(actions, 'intersectDistanceFactor', 0.1, 10).name('intersect distance factor');
+  gui.add(actions, 'beforeAfterDeltaFactor', 0.1, 10).name('before after delta factor');
   gui.add(actions, 'makeRandomQuadTree').name('make random chunks');
 </script>
