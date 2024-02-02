@@ -1,9 +1,11 @@
 ---
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
+import twopoint5d from '../images/twopoint5d-bangers-white.png?url';
 ---
 
 <header class="lookbook-header">
   <img class="secondary" src={lookbook} alt="lookbook" />
+  <img class="primary" src={twopoint5d} alt="twopoint5d" />
 
   <div class="rainbow-line">
     <div class="rainbow-line-25"></div>
@@ -23,7 +25,8 @@ import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
     padding: 10px;
     margin: 0;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
+    align-items: center;
     background-color: rgba(20 20 20 / 65%);
     backdrop-filter: blur(5px);
     box-shadow: 0 0 20px #4c4c42;
@@ -57,10 +60,10 @@ import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
     height: 2px;
   }
 
-  /* .lookbook-header img.primary {
-    max-height: 66px;
-    display: none;
-  } */
+  .lookbook-header img.primary {
+    max-height: 38px;
+    margin-left: 0.75rem;
+  }
 
   .lookbook-header img.secondary {
     filter: drop-shadow(0 0 2px #ccc) drop-shadow(0 0 15px #999);

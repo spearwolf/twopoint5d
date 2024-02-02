@@ -58,7 +58,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     display: flex;
     padding: 0;
     background-color: var(--color-background-dark);
-    border-radius: 0.5rem;
+    border-radius: 1rem;
     padding: 0;
     overflow: hidden;
   }
@@ -87,7 +87,9 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     font-size: 0.95rem;
   }
   .link-card:is(:hover, :focus-within) {
-    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
+    box-shadow:
+      0 0 1px 1px var(--color-primary-highlight),
+      0 0 10px 10px rgba(235 239 247 / 9%);
   }
   .link-card:is(:hover, :focus-within) h2 {
     color: var(--color-primary-highlight);
@@ -108,10 +110,10 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
   .tag {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     background-color: var(--color-background);
     margin: 0.2rem;
-    padding: 0.05rem 0.3em 0.1rem;
-    border-radius: 0.4rem;
+    padding: 0.1rem 0.75em 0.3rem;
+    border-radius: 0.75rem;
   }
 </style>
