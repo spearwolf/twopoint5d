@@ -58,7 +58,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     display: flex;
     padding: 0;
     background-color: var(--color-background-dark);
-    border-radius: 1rem;
+    border-radius: var(--card-border-radius);
     padding: 0;
     overflow: hidden;
   }
@@ -110,10 +110,10 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
   .tag {
     display: inline-block;
-    font-size: 0.75rem;
     background-color: var(--color-background);
     margin: 0.2rem;
-    padding: 0.1rem 0.75em 0.3rem;
-    border-radius: 0.75rem;
+    font-size: var(--tag-font-size);
+    padding: var(--tag-padding);
+    border-radius: var(--tag-border-radius);
   }
 </style>

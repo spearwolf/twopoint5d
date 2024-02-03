@@ -27,12 +27,12 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   }
   .tag {
     display: inline-block;
-    font-size: 0.75rem;
     background-color: var(--color-background-light);
-    margin: 0.3rem 0.3rem;
-    padding: 0.1rem 0.75em 0.3rem;
-    border-radius: 0.75rem;
     cursor: pointer;
+    margin: 0.3rem 0.3rem;
+    font-size: var(--tag-font-size);
+    padding: var(--tag-padding);
+    border-radius: var(--tag-border-radius);
   }
   .tag.active {
     color: var(--color-background-dark);
@@ -41,6 +41,9 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   .tag.inactive {
     color: var(--color-primary-inactive);
     background-color: transparent;
+  }
+  .tag:is(:hover, :focus-within) {
+    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
   }
 </style>
 
