@@ -12,23 +12,23 @@
     "astro": "pnpm exec astro"
   },
   "dependencies": {
-    "@astrojs/react": "^3.0.7",
-    "@astrojs/tailwind": "^5.0.3",
+    "@astrojs/react": "^3.0.9",
+    "@astrojs/tailwind": "^5.1.0",
     "@react-three/drei": "^9.90.0",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-demos": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
     "@spearwolf/twopoint5d-r3f": "workspace:*",
-    "@types/react": "^18.2.42",
-    "@types/react-dom": "^18.2.17",
-    "astro": "^4.0.2",
+    "@types/react": "^18.2.52",
+    "@types/react-dom": "^18.2.18",
+    "astro": "^4.3.2",
     "leva": "^0.9.35",
     "lil-gui": "^0.19.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sass": "^1.63.6",
-    "styled-components": "^6.0.5",
-    "tailwindcss": "^3.3.6"
+    "sass": "^1.70.0",
+    "styled-components": "^6.1.8",
+    "tailwindcss": "^3.4.1"
   },
   "nx": {
     "targets": {
