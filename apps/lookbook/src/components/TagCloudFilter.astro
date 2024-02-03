@@ -1,25 +1,37 @@
 ---
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
+import xmarkCircle from '../images/iconoir/xmark-circle-solid.svg?url';
 
 const {uniqTagKeys, tags} = loadMetadataForDemos();
 ---
 
-<ul class="tags tag-cloud-filter">
-  {
-    uniqTagKeys.sort().map((tag) => (
-      <li
-        class="tag"
-        data-tag={tag}
-        data-related-demos={Array.from(tags.get(tag).demoIds).join(',')}
-        data-related-tags={Array.from(tags.get(tag).relatedTags).join(',')}
-      >
-        {tag}
-      </li>
-    ))
-  }
-</ul>
+<section class="tags">
+  <ul class="tag-cloud-filter">
+    {
+      uniqTagKeys.sort().map((tag) => (
+        <li
+          class="tag"
+          data-tag={tag}
+          data-related-demos={Array.from(tags.get(tag).demoIds).join(',')}
+          data-related-tags={Array.from(tags.get(tag).relatedTags).join(',')}
+        >
+          {tag}
+        </li>
+      ))
+    }
+  </ul>
+  <button class="clear-tags-action"><img src={xmarkCircle} />clear selection</button>
+</section>
 
 <style>
+  .clear-tags-action {
+    color: var(--color-primary-inactive);
+    font-size: var(--tag-font-size);
+    display: inline-flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+  }
   .tags {
     margin: 2rem 0;
     color: var(--color-primary);
