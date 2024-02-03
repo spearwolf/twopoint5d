@@ -1,6 +1,6 @@
 ---
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
-import xmarkCircle from '../images/iconoir/xmark-circle-solid.svg?url';
+import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 
 const {uniqTagKeys, tags} = loadMetadataForDemos();
 ---
@@ -20,18 +20,41 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
       ))
     }
   </ul>
-  <button class="clear-tags-action"><img src={xmarkCircle} />clear selection</button>
+  <div class="flex flex-row justify-end">
+    <button class="clear-tags-action inactive"
+      ><Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span></button
+    >
+  </div>
 </section>
 
 <style>
   .clear-tags-action {
-    color: var(--color-primary-inactive);
+    color: var(--color-primary);
+    background-color: var(--color-background-light);
     font-size: var(--tag-font-size);
+    padding: 0.3em 0.6em;
+    border-radius: 2em;
     display: inline-flex;
     flex-direction: row;
     align-items: flex-start;
     justify-content: center;
+    gap: 0.5em;
   }
+  .clear-tags-action.inactive {
+    color: var(--color-primary-inactive);
+    background-color: transparent;
+    cursor: default;
+  }
+  .clear-tags-action:is(:hover, :focus-within) {
+    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
+  }
+  .clear-tags-action.inactive:is(:hover, :focus-within) {
+    box-shadow: none;
+  }
+  .clear-tags-action .label {
+    line-height: 1.8;
+  }
+
   .tags {
     margin: 2rem 0;
     color: var(--color-primary);
@@ -64,6 +87,8 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   const ATTR_RELATED_DEMOS = 'data-related-demos';
   const ATTR_RELATED_TAGS = 'data-related-tags';
 
+  const CSS_TAG_CLOUD_FILTER = '.tag-cloud-filter';
+
   const CSS_ACTIVE = 'active';
   const CSS_INACTIVE = 'inactive';
 
@@ -78,7 +103,11 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
     return target;
   }
 
+  const getClearTagsAction = () => document.querySelector('.tags .clear-tags-action') as HTMLButtonElement;
+
   function dispatchShowDemosEvent(payload: {showAll: boolean; filterById?: string[]}): void {
+    getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
+
     document.dispatchEvent(
       new CustomEvent('lookbook.showDemos', {
         detail: {
@@ -88,7 +117,17 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
     );
   }
 
-  document.querySelectorAll('.tag-cloud-filter').forEach(($el) => {
+  function clearTags() {
+    for (const $tag of document.querySelector(CSS_TAG_CLOUD_FILTER).querySelectorAll(`[${ATTR_TAG}]`)) {
+      $tag.classList.remove(CSS_INACTIVE);
+      $tag.classList.remove(CSS_ACTIVE);
+    }
+    dispatchShowDemosEvent({showAll: true});
+  }
+
+  getClearTagsAction().addEventListener('pointerdown', () => clearTags());
+
+  document.querySelectorAll(CSS_TAG_CLOUD_FILTER).forEach(($el) => {
     $el.addEventListener(
       'pointerdown',
       (event: any) => {
