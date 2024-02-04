@@ -3,29 +3,40 @@ import DemoCardsGrid from '~components/DemoCardsGrid.astro';
 import LookbookHeader from '~components/LookbookHeader.astro';
 import TagCloudFilter from '~components/TagCloudFilter.astro';
 import Layout from '~layouts/Layout.astro';
+import backPattern from '../images/ricepaper-reduced-dark.png?url';
 ---
 
 <Layout title="2.5d lookbook">
-  <LookbookHeader />
+  <div class="back-pattern">
+    <LookbookHeader />
 
-  <div class="grid grid-cols-only-content lg:grid-cols-sidebar-content">
-    <div class="fixed top-0 py-0 lg:sticky start-0 end-0">
-      <div class="sticky top-16 lg:bottom-0 lg:h-[calc(100vh-4rem)] flex flex-col">
-        <div class="overflow-y-auto px-2 no-bg-scrollbar lg:w-[400px] grow overscroll-contain">
-          <aside class="lg:grow flex-col w-full pb-8 lg:pb-0 lg:max-w-custom-xs z-10 hidden lg:block">
-            <nav class="w-full pt-6 scrolling-touch lg:h-auto grow pe-0 lg:pe-5 lg:pb-16 md:pt-4 lg:pt-4 scrolling-gpu">
-              <TagCloudFilter />
-            </nav>
-          </aside>
+    <div class="grid grid-cols-only-content lg:grid-cols-sidebar-content">
+      <div class="fixed top-0 py-0 lg:sticky start-0 end-0">
+        <div class="sticky top-16 lg:bottom-0 lg:h-[calc(100vh-4rem)] flex flex-col">
+          <div class="overflow-y-auto px-2 no-bg-scrollbar lg:w-[400px] grow overscroll-contain">
+            <aside class="lg:grow flex-col w-full pb-8 lg:pb-0 lg:max-w-custom-xs z-10 hidden lg:block">
+              <nav class="w-full pt-6 scrolling-touch lg:h-auto grow pe-0 lg:pe-5 lg:pb-16 md:pt-4 lg:pt-4 scrolling-gpu">
+                <TagCloudFilter />
+              </nav>
+            </aside>
+          </div>
         </div>
       </div>
+      <main class="isolate">
+        <div class="px-5 sm:px-12">
+          <div class="max-w-7xl mx-auto pt-4 pb-6">
+            <DemoCardsGrid />
+          </div>
+        </div>
+      </main>
     </div>
-    <main class="isolate">
-      <div class="px-5 sm:px-12">
-        <div class="max-w-7xl mx-auto pt-4 pb-6">
-          <DemoCardsGrid />
-        </div>
-      </div>
-    </main>
   </div>
 </Layout>
+
+<style define:vars={{'page-background-pattern': `url(${backPattern})`}}>
+  .back-pattern {
+    background-color: var(--color-background);
+    background-image: var(--page-background-pattern);
+    background-repeat: repeat;
+  }
+</style>
