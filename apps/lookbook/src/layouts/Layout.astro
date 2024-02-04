@@ -21,7 +21,7 @@ const {title} = Astro.props;
 </html>
 
 <style lang="scss" is:global>
-  $color-background: rgb(9 14 26); // rgb(35 39 47);
+  $color-background: rgb(15 30 45); // rgb(35 39 47);
   $color-primary: rgb(173 175 180);
   $hue-shift: 10deg;
 
@@ -30,7 +30,7 @@ const {title} = Astro.props;
     --color-background-dark: #{darken($color-background, 5%)};
     --color-background-light: #{lighten($color-background, 5%)};
 
-    --color-header-background: rgba(0 0 3 / 65%);
+    --color-header-background: rgba(0 15 30 / 65%);
 
     --color-primary: #{$color-primary};
     --color-primary-darker: #{adjust-hue(darken($color-primary, 20%), -$hue-shift)};
