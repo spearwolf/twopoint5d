@@ -3,32 +3,24 @@ import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
 import twopoint5d from '../images/twopoint5d-bangers-white.png?url';
 ---
 
-<header class="lookbook-header">
-  <img class="secondary" src={lookbook} alt="lookbook" />
-  <img class="primary" src={twopoint5d} alt="twopoint5d" />
+<div class="z-50 sticky top-0 y-0">
+  <header class="lookbook-header flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-16 backdrop-blur-sm">
+    <img class="secondary" src={lookbook} alt="lookbook" />
+    <img class="primary" src={twopoint5d} alt="twopoint5d" />
 
-  <div class="rainbow-line">
-    <div class="rainbow-line-25"></div>
-    <div class="rainbow-line-50"></div>
-    <div class="rainbow-line-100"></div>
-    <div class="rainbow-line-50"></div>
-    <div class="rainbow-line-25"></div>
-  </div>
-</header>
+    <div class="rainbow-line">
+      <div class="rainbow-line-25"></div>
+      <div class="rainbow-line-50"></div>
+      <div class="rainbow-line-100"></div>
+      <div class="rainbow-line-50"></div>
+      <div class="rainbow-line-25"></div>
+    </div>
+  </header>
+</div>
 
 <style>
   .lookbook-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 10px;
-    margin: 0;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    background-color: rgba(20 20 20 / 65%);
-    backdrop-filter: blur(5px);
+    background-color: var(--color-header-background);
     box-shadow: 0 0 20px #4c4c42;
   }
 
@@ -39,7 +31,7 @@ import twopoint5d from '../images/twopoint5d-bangers-white.png?url';
     display: flex;
     flex-direction: column;
     width: 100%;
-    background: linear-gradient(180deg, rgba(20 20 20 / 65%) 0%, rgb(0 0 0) 100%);
+    background: linear-gradient(180deg, var(--color-header-background) 0%, rgb(0 0 0) 100%);
   }
 
   .rainbow-line > div {

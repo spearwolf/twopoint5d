@@ -5,7 +5,7 @@ import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 const {uniqTagKeys, tags} = loadMetadataForDemos();
 ---
 
-<section class="tags">
+<section class="tags select-none">
   <ul class="tag-cloud-filter">
     {
       uniqTagKeys.sort().map((tag) => (
@@ -20,8 +20,8 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
       ))
     }
   </ul>
-  <div class="flex flex-row justify-end">
-    <button class="clear-tags-action inactive"
+  <div class="flex flex-row justify-end lg:justify-start pt-4">
+    <button class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2"
       ><Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span></button
     >
   </div>
@@ -34,11 +34,6 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
     font-size: var(--tag-font-size);
     padding: 0.3em 0.6em;
     border-radius: 2em;
-    display: inline-flex;
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 0.5em;
   }
   .clear-tags-action.inactive {
     color: var(--color-primary-inactive);
@@ -56,9 +51,7 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   }
 
   .tags {
-    margin: 2rem 0;
     color: var(--color-primary);
-    user-select: none;
   }
   .tag {
     display: inline-block;

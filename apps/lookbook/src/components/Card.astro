@@ -16,27 +16,25 @@ const {id, href, title, body, image, tags} = Astro.props;
 const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
 
-<li class="link-card" data-demo-id={id}>
-  <a href={href}>
-    <div class="card-image-container">
-      <img src={previewImage} class="card-image" />
-    </div>
-    <h2>
-      {title}
-    </h2>
-    <p>
-      {body}
-    </p>
-    {
-      tags && tags.length > 0 && (
-        <ul class="tags">
-          {tags.map((tag) => (
-            <li class="tag">{tag}</li>
-          ))}
-        </ul>
-      )
-    }
+<li class="link-card relative" data-demo-id={id}>
+  <a href={href} class="group aspect-h-7 aspect-w-10 block w-full overflow-hidden">
+    <img src={previewImage} class="card-image pointer-events-none object-cover group-hover:opacity-75" />
   </a>
+  <h2 class="absolute inline-block top-0">
+    {title}
+  </h2>
+  <p>
+    {body}
+  </p>
+  {
+    tags && tags.length > 0 && (
+      <ul class="tags">
+        {tags.map((tag) => (
+          <li class="tag">{tag}</li>
+        ))}
+      </ul>
+    )
+  }
 </li>
 
 <script>
@@ -53,65 +51,52 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 </script>
 
 <style>
-  .link-card {
-    list-style: none;
-    display: flex;
-    padding: 0;
-    background-color: var(--color-background-dark);
-    border-radius: var(--card-border-radius);
-    padding: 0;
-    overflow: hidden;
-  }
-
   .link-card.hidden {
     display: none;
   }
 
   .link-card > a {
-    width: 100%;
-    text-decoration: none;
-    line-height: 1.4;
-    padding: 0 1.3rem 0.7rem;
-    border-radius: 0.35rem;
     color: var(--color-primary);
+    border-radius: var(--card-border-radius);
   }
+
+  .link-card:is(:hover, :focus-within) > a {
+    box-shadow:
+      0 0 1px 1px var(--color-primary-highlight),
+      0 0 10px 10px rgba(235 239 247 / 9%);
+  }
+
+  .link-card:is(:hover, :focus-within) h2 {
+    color: var(--color-primary-highlight);
+  }
+
   h2 {
-    margin: 1rem 0 0.5rem;
+    padding: 0.1em 0.75em 0.2em 0.5em;
     font-size: 1rem;
-    font-weight: bold;
+    font-weight: normal;
+    color: var(--color-primary-darker);
+    background-color: rgba(0 0 0 / 70%);
+    border-top-left-radius: var(--card-border-radius);
+    border-top-right-radius: var(--card-border-radius);
+    border-bottom-right-radius: var(--card-border-radius);
   }
+
   p {
     margin-top: 0.5rem;
     margin-bottom: 1rem;
     color: var(--color-primary-darker);
     font-size: 0.95rem;
   }
-  .link-card:is(:hover, :focus-within) {
-    box-shadow:
-      0 0 1px 1px var(--color-primary-highlight),
-      0 0 10px 10px rgba(235 239 247 / 9%);
-  }
-  .link-card:is(:hover, :focus-within) h2 {
-    color: var(--color-primary-highlight);
-  }
-  .card-image-container {
-    margin: 0 -1.3rem;
-    aspect-ratio: 16/10;
-    overflow: hidden;
-  }
-  .card-image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: cover;
-    aspect-ratio: 16/10;
-  }
+
   .tags {
     margin: -0.1rem -0.3rem 0.5rem;
   }
+
   .tag {
     display: inline-block;
-    background-color: var(--color-background);
-    margin: 0.2rem;
+    color: var(--color-primary-darker);
+    background-color: var(--color-background-dark);
+    margin: 0.1rem;
     font-size: var(--tag-font-size);
     padding: var(--tag-padding);
     border-radius: var(--tag-border-radius);
