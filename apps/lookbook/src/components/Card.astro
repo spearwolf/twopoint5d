@@ -51,6 +51,14 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 </script>
 
 <style>
+  .link-card {
+    border-radius: var(--card-border-radius);
+    background-color: var(--color-background-light);
+    box-shadow:
+      0 0 0px 5px var(--color-background-light),
+      0 0 1px 6px var(--color-background-lighter);
+  }
+
   .link-card.hidden {
     display: none;
   }
@@ -62,7 +70,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
   .link-card:is(:hover, :focus-within) > a {
     box-shadow:
-      0 0 1px 1px var(--color-primary-highlight),
+      0 0 0px 1px var(--color-primary-highlight),
       0 0 10px 10px rgba(235 239 247 / 9%);
   }
 
@@ -71,15 +79,15 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
 
   h2 {
-    top: 1px;
-    padding: 0.1em 0.75em 0.2em 0.5em;
-    font-size: 0.8rem;
-    font-weight: normal;
-    color: var(--color-primary-darker);
-    background-color: rgba(0 0 0 / 70%);
-    border-top-left-radius: var(--card-border-radius);
-    border-top-right-radius: var(--card-border-radius);
-    border-bottom-right-radius: var(--card-border-radius);
+    top: var(--card-border-radius);
+    padding: 0.2em 0.6em 0.1em 0.5em;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    background-color: rgba(0 0 0 / 60%);
+    text-transform: uppercase;
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
   }
 
   p {
@@ -96,10 +104,11 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   .tag {
     display: inline-block;
     color: var(--color-primary-darker);
-    background-color: var(--color-background-dark);
+    background-color: var(--color-background);
     margin: 0.1rem;
     font-size: var(--tag-font-size);
     padding: var(--tag-padding);
     border-radius: var(--tag-border-radius);
+    box-shadow: 0 0 1px 1px var(--color-background-lighter);
   }
 </style>
