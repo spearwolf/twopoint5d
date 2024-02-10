@@ -2,7 +2,7 @@ import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
-export class VertexBufferPool {
+export class VOBufferPool {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
 

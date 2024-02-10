@@ -1,23 +1,23 @@
 import {BufferGeometry} from 'three';
 
+import {VOBufferPool} from './VOBufferPool.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
 import {updateUpdateRange} from './updateUpdateRange.js';
-import {VertexBufferPool} from './VertexBufferPool.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
-export class VertexBufferGeometry extends BufferGeometry {
-  readonly pool: VertexBufferPool;
+export class VOBufferGeometry extends BufferGeometry {
+  readonly pool: VOBufferPool;
   readonly buffers: Map<string, BufferLike> = new Map();
 
-  constructor(source: VertexBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
+  constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super();
-    this.pool = source instanceof VertexBufferPool ? source : new VertexBufferPool(source, capacity);
-    this.name = 'VertexBufferGeometry';
+    this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
+    this.name = 'VOBufferGeometry';
     initializeAttributes(this, this.pool, this.buffers);
   }
 

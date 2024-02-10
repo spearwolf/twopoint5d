@@ -1,14 +1,13 @@
 import {BufferGeometry, InstancedBufferGeometry} from 'three';
-
+import {VOBufferPool} from './VOBufferPool.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
 import {updateUpdateRange} from './updateUpdateRange.js';
-import {VertexBufferPool} from './VertexBufferPool.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
-import {VertexObjectPool} from './VertexObjectPool.js';
 
 type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
@@ -17,40 +16,40 @@ type TouchInstancedBuffersType = {
   instanced?: TouchBuffersType;
 };
 
-export class InstancedVertexBufferGeometry extends InstancedBufferGeometry {
-  readonly basePool?: VertexBufferPool;
+export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
+  readonly basePool?: VOBufferPool;
   readonly baseBuffers?: Map<string, BufferLike>;
 
-  readonly instancedPool: VertexBufferPool;
+  readonly instancedPool: VOBufferPool;
   readonly instancedBuffers: Map<string, BufferLike> = new Map();
 
-  readonly extraInstancedPools: Map<string, VertexBufferPool> = new Map();
+  readonly extraInstancedPools: Map<string, VOBufferPool> = new Map();
   readonly extraInstancedBuffers: Map<string, Map<string, BufferLike>> = new Map();
 
   constructor(
     ...args:
-      | [VertexBufferPool | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
+      | [VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
       | [
-          VertexBufferPool | VertexObjectDescriptor | VertexObjectDescription,
+          VOBufferPool | VertexObjectDescriptor | VertexObjectDescription,
           number,
-          VertexBufferPool | VertexObjectDescriptor | VertexObjectDescription,
+          VOBufferPool | VertexObjectDescriptor | VertexObjectDescription,
           number?,
         ]
   ) {
     super();
 
-    this.name = 'InstancedVertexBufferGeometry';
+    this.name = 'InstancedVOBufferGeometry';
 
     const [instancedSource, instancedCapacity] = args;
     this.instancedPool =
-      instancedSource instanceof VertexBufferPool ? instancedSource : new VertexBufferPool(instancedSource, instancedCapacity);
+      instancedSource instanceof VOBufferPool ? instancedSource : new VOBufferPool(instancedSource, instancedCapacity);
 
     if (args[2] instanceof BufferGeometry) {
       this.copy(args[2] as any);
     } else {
       const baseSource = args[2];
       const baseCapacity = args[3] ?? 1;
-      this.basePool = baseSource instanceof VertexBufferPool ? baseSource : new VertexBufferPool(baseSource, baseCapacity);
+      this.basePool = baseSource instanceof VOBufferPool ? baseSource : new VOBufferPool(baseSource, baseCapacity);
       this.baseBuffers = new Map();
       initializeAttributes(this, this.basePool, this.baseBuffers);
     }
@@ -97,7 +96,7 @@ export class InstancedVertexBufferGeometry extends InstancedBufferGeometry {
     return pool;
   }
 
-  detachInstancedPool(name: string): VertexBufferPool | undefined {
+  detachInstancedPool(name: string): VOBufferPool | undefined {
     const pool = this.extraInstancedPools.get(name);
     this.extraInstancedPools.delete(name);
     this.extraInstancedBuffers.delete(name);

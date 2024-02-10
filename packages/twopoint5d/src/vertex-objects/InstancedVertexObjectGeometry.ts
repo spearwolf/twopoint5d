@@ -1,6 +1,6 @@
 import {BufferGeometry} from 'three';
 
-import {InstancedVertexBufferGeometry} from './InstancedVertexBufferGeometry.js';
+import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import type {VertexObjectDescription, VO} from './types.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -10,10 +10,7 @@ const asPool = <T>(
   capacity = 1,
 ): VertexObjectPool<T> => (pool instanceof VertexObjectPool ? pool : new VertexObjectPool<T>(pool, capacity));
 
-export class InstancedVertexObjectGeometry<
-  VOInstancedType extends VO,
-  VOBaseType extends VO,
-> extends InstancedVertexBufferGeometry {
+export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseType extends VO> extends InstancedVOBufferGeometry {
   declare readonly basePool?: VertexObjectPool<VOBaseType>;
   declare readonly instancedPool: VertexObjectPool<VOInstancedType>;
 

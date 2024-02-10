@@ -1,9 +1,9 @@
 import {Material, Mesh} from 'three';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
-import type {VertexBufferGeometry} from './VertexBufferGeometry.js';
+import type {VOBufferGeometry} from './VOBufferGeometry.js';
 
-export class VertexObjects<GeoType extends VertexBufferGeometry | InstancedVertexObjectGeometry<any, any>> extends Mesh {
+export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObjectGeometry<any, any>> extends Mesh {
   declare geometry: GeoType;
 
   constructor(geometry?: GeoType, material?: Material | Material[]) {

@@ -1,11 +1,11 @@
-import {VertexBufferPool} from './VertexBufferPool.js';
+import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {voBuffer, voIndex} from './constants.js';
 import {createVertexObject} from './createVertexObject.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
-export class VertexObjectPool<VOType> extends VertexBufferPool {
+export class VertexObjectPool<VOType> extends VOBufferPool {
   static setIndex(vo: VO, idx: number): VO {
     vo[voIndex] = idx;
     return vo;
