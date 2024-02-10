@@ -1,10 +1,11 @@
+import {VertexBufferPool} from './VertexBufferPool.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {voBuffer, voIndex} from './constants.js';
 import {createVertexObject} from './createVertexObject.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
-export class VertexObjectPool<VOType> {
+export class VertexObjectPool<VOType> extends VertexBufferPool {
   static setIndex(vo: VO, idx: number): VO {
     vo[voIndex] = idx;
     return vo;
@@ -22,55 +23,18 @@ export class VertexObjectPool<VOType> {
     vo[voBuffer] = buffer;
   }
 
-  readonly descriptor: VertexObjectDescriptor;
-  readonly capacity: number;
-
-  buffer: VertexObjectBuffer;
-
   #voIndex: Array<VOType & VO>;
-  #usedCount = 0;
 
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
   onDestroyVO?: (vo: VOType & VO) => void;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
-    this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
-    if (typeof capacityOrData === 'number') {
-      const capacity = capacityOrData;
-      this.capacity = capacity;
-      this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
-    } else {
-      const buffersData = capacityOrData;
-      this.capacity = buffersData.capacity;
-      this.#usedCount = buffersData.usedCount;
-      this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
-    }
+    super(descriptor, capacityOrData);
     this.#voIndex = new Array(this.capacity);
   }
 
-  get usedCount(): number {
-    return this.#usedCount;
-  }
-
-  set usedCount(value: number) {
-    // TODO write test
-    if (value < this.#usedCount) {
-      // @ts-ignore
-      this.#voIndex.fill(undefined, value, this.#usedCount);
-    }
-    this.#usedCount = value < this.capacity ? value : this.capacity;
-  }
-
-  get availableCount(): number {
-    return this.capacity - this.#usedCount;
-  }
-
-  clear(): void {
-    this.usedCount = 0;
-  }
-
   createVO(): VOType & VO {
-    if (this.#usedCount < this.capacity) {
+    if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;
       const vo = this.#createVO(idx);
       this.#voIndex[idx] = vo;
@@ -78,13 +42,6 @@ export class VertexObjectPool<VOType> {
     }
     // @ts-ignore
     return undefined;
-  }
-
-  createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIdx: number] {
-    const firstObjectIdx = this.#usedCount;
-    const objectCount = this.buffer.copyAttributes(attributes, firstObjectIdx);
-    this.#usedCount += objectCount;
-    return [objectCount, firstObjectIdx];
   }
 
   containsVO(vo: VO): boolean {
@@ -99,7 +56,7 @@ export class VertexObjectPool<VOType> {
     if (!this.containsVO(vo)) return;
 
     const idx = VertexObjectPool.getIndex(vo);
-    const lastUsedIdx = this.#usedCount - 1;
+    const lastUsedIdx = this.usedCount - 1;
 
     if (idx === lastUsedIdx) {
       this.#destroyVO(idx);
@@ -117,21 +74,11 @@ export class VertexObjectPool<VOType> {
 
   getVO(idx: number): (VOType & VO) | undefined {
     let vo = this.#voIndex[idx];
-    if (vo == null && idx < this.#usedCount) {
+    if (vo == null && idx < this.usedCount) {
       vo = this.#createVO(idx);
       this.#voIndex[idx] = vo;
     }
     return vo;
-  }
-
-  toBuffersData(): VertexObjectBuffersData {
-    return {
-      capacity: this.capacity,
-      usedCount: this.usedCount,
-      buffers: Object.fromEntries(
-        Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray]),
-      ),
-    };
   }
 
   #destroyVO(idx: number) {
