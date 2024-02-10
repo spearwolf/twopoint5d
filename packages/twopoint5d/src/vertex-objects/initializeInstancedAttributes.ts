@@ -1,12 +1,11 @@
 import {BufferGeometry, InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute} from 'three';
-
-import {VertexObjectPool} from './VertexObjectPool.js';
+import type {VertexBufferPool} from './VertexBufferPool.js';
 import {toDrawUsage} from './toDrawUsage.js';
 import type {BufferLike} from './types.js';
 
 export function initializeInstancedAttributes(
   geometry: BufferGeometry,
-  pool: VertexObjectPool<any>,
+  pool: VertexBufferPool,
   buffers: Map<string, BufferLike>,
 ): void {
   const {descriptor} = pool;

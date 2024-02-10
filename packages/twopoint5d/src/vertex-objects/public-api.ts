@@ -1,3 +1,4 @@
+export * from './InstancedVertexBufferGeometry.js';
 export * from './InstancedVertexObjectGeometry.js';
 export * from './VertexAttributeDescriptor.js';
 export * from './VertexBufferGeometry.js';
