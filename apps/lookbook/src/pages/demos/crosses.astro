@@ -20,11 +20,11 @@ import {title} from './_crosses.json';
 <script>
   import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
   import {DoubleSide, MeshBasicMaterial} from 'three';
+  import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import {CrossDescriptor, Cross} from '~demos/crosses/Crosses';
 
   function makeCrossMesh(capacity: number, size: number, offset = 1.2) {
-    const geometry = new VertexObjectGeometry(CrossDescriptor, capacity);
+    const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, capacity);
 
     for (let i = 0; i < capacity; i++) {
       const cross = geometry.pool.createVO() as Cross;

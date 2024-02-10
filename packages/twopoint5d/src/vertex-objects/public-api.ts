@@ -1,5 +1,6 @@
 export * from './InstancedVertexObjectGeometry.js';
 export * from './VertexAttributeDescriptor.js';
+export * from './VertexBufferGeometry.js';
 export * from './VertexBufferPool.js';
 export * from './VertexObjectBuffer.js';
 export * from './VertexObjectDescriptor.js';
