@@ -97,6 +97,7 @@ export class VertexObjectBuffer {
       }
 
       this.bufferNameAttributes = new Map();
+
       for (const bufAttr of this.bufferAttributes.values()) {
         const {bufferName} = bufAttr;
         if (this.bufferNameAttributes.has(bufferName)) {
@@ -112,33 +113,37 @@ export class VertexObjectBuffer {
     }
   }
 
-  copy(otherVob: VertexObjectBuffer, objectOffset = 0): void {
-    const {vertexCount} = this.descriptor;
+  /**
+   * Both objects should use the same vertex-object-description
+   */
+  copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
     for (const {bufferName, typedArray, itemSize} of this.buffers.values()) {
-      typedArray.set(otherVob.buffers.get(bufferName)!.typedArray, objectOffset * vertexCount * itemSize);
+      typedArray.set(other.buffers.get(bufferName)!.typedArray, targetObjectOffset * this.descriptor.vertexCount * itemSize);
     }
+    return this;
   }
 
   clone(): VertexObjectBuffer {
-    const clone = new VertexObjectBuffer(this, this.capacity);
-    clone.copy(this);
-    return clone;
+    return new VertexObjectBuffer(this, this.capacity).copy(this);
   }
 
-  copyArray(source: TypedArray, bufferName: string, objectOffset = 0): void {
-    const {vertexCount} = this.descriptor;
+  copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
     const {typedArray, itemSize} = this.buffers.get(bufferName)!;
-    typedArray.set(source, objectOffset * vertexCount * itemSize);
+    typedArray.set(source, targetObjectOffset * this.descriptor.vertexCount * itemSize);
   }
 
-  copyWithin(target: number, start: number, end = this.capacity): void {
+  copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
     const {vertexCount} = this.descriptor;
     for (const {typedArray, itemSize} of this.buffers.values()) {
-      typedArray.copyWithin(target * vertexCount * itemSize, start * vertexCount * itemSize, end * vertexCount * itemSize);
+      typedArray.copyWithin(
+        targetIndex * vertexCount * itemSize,
+        startIndex * vertexCount * itemSize,
+        endIndex * vertexCount * itemSize,
+      );
     }
   }
 
-  copyAttributes(attributes: Record<string, ArrayLike<number>>, objectOffset = 0): number {
+  copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
     let copiedObjCount = 0;
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);
@@ -148,8 +153,8 @@ export class VertexObjectBuffer {
         const {vertexCount} = this.descriptor;
         const attrSize = this.descriptor.getAttribute(attrName)!.size;
         let idx = 0;
-        let bufIdx = objectOffset * vertexCount * buffer.itemSize;
-        while (idx < data.length && attrObjCount + objectOffset < this.capacity) {
+        let bufIdx = targetObjectOffset * vertexCount * buffer.itemSize;
+        while (idx < data.length && attrObjCount + targetObjectOffset < this.capacity) {
           for (let i = 0; i < vertexCount; i++) {
             buffer.typedArray.set(Array.prototype.slice.call(data, idx, idx + attrSize), bufIdx + attr.offset);
             idx += attrSize;
@@ -165,7 +170,7 @@ export class VertexObjectBuffer {
     return copiedObjCount;
   }
 
-  toAttributeArrays(attributeNames: string[], start = 0, end = this.capacity): Record<string, TypedArray> {
+  toAttributeArrays(attributeNames: string[], startIndex = 0, endIndex = this.capacity): Record<string, TypedArray> {
     return Object.fromEntries(
       attributeNames.map((attrName) => {
         const attr = this.bufferAttributes.get(attrName);
@@ -174,12 +179,12 @@ export class VertexObjectBuffer {
           const {vertexCount} = this.descriptor;
           const attrSize = this.descriptor.getAttribute(attrName)!.size;
 
-          const targetArray = createTypedArray(buffer.dataType, (end - start) * vertexCount * attrSize);
+          const targetArray = createTypedArray(buffer.dataType, (endIndex - startIndex) * vertexCount * attrSize);
 
           let targetIdx = 0;
-          let bufferIdx = start * vertexCount * buffer.itemSize + attr.offset;
+          let bufferIdx = startIndex * vertexCount * buffer.itemSize + attr.offset;
 
-          for (let objIdx = start; objIdx < end; objIdx++) {
+          for (let objIdx = startIndex; objIdx < endIndex; objIdx++) {
             for (let i = 0; i < vertexCount; i++) {
               targetArray.set(buffer.typedArray.subarray(bufferIdx, bufferIdx + attrSize), targetIdx);
               targetIdx += attrSize;

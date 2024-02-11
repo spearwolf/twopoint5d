@@ -2,6 +2,7 @@ export * from './InstancedVOBufferGeometry.js';
 export * from './InstancedVertexObjectGeometry.js';
 export * from './VOBufferGeometry.js';
 export * from './VOBufferPool.js';
+export * from './VOUtils.js';
 export * from './VertexAttributeDescriptor.js';
 export * from './VertexObjectBuffer.js';
 export * from './VertexObjectDescriptor.js';

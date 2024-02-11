@@ -1,4 +1,5 @@
 import {beforeEach, describe, expect, test} from 'vitest';
+import {VOUtils} from './VOUtils.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex} from './constants.js';
 import type {VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
@@ -265,11 +266,11 @@ describe('VertexObjectPool', () => {
       vo.setBar([1, 2, 3, 4]);
 
       pool.usedCount = 2;
-      VertexObjectPool.setIndex(vo, 1);
+      VOUtils.setIndex(vo, 1);
 
       vo.setBar([5, 6, 7, 8]);
 
-      VertexObjectPool.setIndex(vo, 0);
+      VOUtils.setIndex(vo, 0);
 
       expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
       expect(Array.from(pool.getVO(1).getBar())).toEqual([5, 6, 7, 8]);

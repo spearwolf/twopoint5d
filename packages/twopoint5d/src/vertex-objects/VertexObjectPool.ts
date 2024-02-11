@@ -1,28 +1,10 @@
 import {VOBufferPool} from './VOBufferPool.js';
-import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {VOUtils} from './VOUtils.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
-import {voBuffer, voIndex} from './constants.js';
 import {createVertexObject} from './createVertexObject.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 export class VertexObjectPool<VOType> extends VOBufferPool {
-  static setIndex(vo: VO, idx: number): VO {
-    vo[voIndex] = idx;
-    return vo;
-  }
-
-  static getIndex(vo: VO): number {
-    return vo[voIndex];
-  }
-
-  static getBuffer(vo: VO): VertexObjectBuffer | undefined {
-    return vo[voBuffer];
-  }
-
-  static setBuffer(vo: VO, buffer: VertexObjectBuffer | undefined): void {
-    vo[voBuffer] = buffer;
-  }
-
   #voIndex: Array<VOType & VO>;
 
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
@@ -45,7 +27,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   }
 
   containsVO(vo: VO): boolean {
-    return VertexObjectPool.getBuffer(vo) === this.buffer;
+    return VOUtils.isBuffer(vo, this.buffer);
   }
 
   /**
@@ -55,7 +37,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   freeVO(vo: VO): void {
     if (!this.containsVO(vo)) return;
 
-    const idx = VertexObjectPool.getIndex(vo);
+    const idx = VOUtils.getIndex(vo);
     const lastUsedIdx = this.usedCount - 1;
 
     if (idx === lastUsedIdx) {
@@ -63,13 +45,13 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     } else {
       this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
       const lastUsedVO = this.#voIndex[lastUsedIdx];
-      VertexObjectPool.setIndex(lastUsedVO, idx);
+      VOUtils.setIndex(lastUsedVO, idx);
       this.#voIndex[idx] = lastUsedVO;
     }
 
     this.usedCount--;
 
-    VertexObjectPool.setBuffer(vo, undefined);
+    VOUtils.clearBuffer(vo);
   }
 
   getVO(idx: number): (VOType & VO) | undefined {

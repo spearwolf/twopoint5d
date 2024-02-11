@@ -39,11 +39,11 @@ export class VOBufferPool {
     this.usedCount = 0;
   }
 
-  createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIdx: number] {
-    const firstObjectIdx = this.#usedCount;
-    const objectCount = this.buffer.copyAttributes(attributes, firstObjectIdx);
+  createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIndex: number] {
+    const firstObjectIndex = this.#usedCount;
+    const objectCount = this.buffer.copyAttributes(attributes, firstObjectIndex);
     this.#usedCount += objectCount;
-    return [objectCount, firstObjectIdx];
+    return [objectCount, firstObjectIndex];
   }
 
   toBuffersData(): VertexObjectBuffersData {
@@ -57,7 +57,11 @@ export class VOBufferPool {
   }
 
   /**
-   * capacity must be the same as the original pool
+   * NOTE: The capacity must be the same as the original pool.
+   *
+   * @param copyTypedArrays By default, the typed-array references are simply shared (no copy).
+   *                        If `copyTypedArrays` is set to `true`, the internal typed-arrays
+   *                        remain the same but the data is copied.
    */
   fromBuffersData(buffersData: VertexObjectBuffersData, copyTypedArrays = false): void {
     if (buffersData.capacity !== this.capacity) {
