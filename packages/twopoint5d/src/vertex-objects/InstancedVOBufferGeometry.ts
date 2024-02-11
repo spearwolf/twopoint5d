@@ -20,11 +20,15 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly basePool?: VOBufferPool;
   readonly baseBuffers?: Map<string, BufferLike>;
 
+  readonly baseBufferSerials: Map<string, number> = new Map();
+  readonly instancedBufferSerials: Map<string, number> = new Map();
+
   readonly instancedPool: VOBufferPool;
   readonly instancedBuffers: Map<string, BufferLike> = new Map();
 
   readonly extraInstancedPools: Map<string, VOBufferPool> = new Map();
   readonly extraInstancedBuffers: Map<string, Map<string, BufferLike>> = new Map();
+  readonly extraInstancedBufferSerials: Map<string, Map<string, number>> = new Map();
 
   constructor(
     ...args:
@@ -51,10 +55,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       const baseCapacity = args[3] ?? 1;
       this.basePool = baseSource instanceof VOBufferPool ? baseSource : new VOBufferPool(baseSource, baseCapacity);
       this.baseBuffers = new Map();
-      initializeAttributes(this, this.basePool, this.baseBuffers);
+      initializeAttributes(this, this.basePool, this.baseBuffers, this.baseBufferSerials);
     }
 
-    initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers);
+    initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
   }
 
   /**
@@ -87,7 +91,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     const buffers = new Map<string, BufferLike>();
     this.extraInstancedBuffers.set(name, buffers);
 
-    initializeInstancedAttributes(this, pool, buffers);
+    const bufferSerials = new Map<string, number>();
+    this.extraInstancedBufferSerials.set(name, bufferSerials);
+
+    initializeInstancedAttributes(this, pool, buffers, bufferSerials);
 
     // reset auto-touch
     this.#autoTouchAttrNames = undefined;
@@ -100,6 +107,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     const pool = this.extraInstancedPools.get(name);
     this.extraInstancedPools.delete(name);
     this.extraInstancedBuffers.delete(name);
+    this.extraInstancedBufferSerials.delete(name);
     this.#autoTouchAttrNames = undefined;
     return pool;
   }
@@ -186,9 +194,37 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   update(): void {
     this.instanceCount = this.instancedPool.usedCount;
+    this.#checkBufferSerials();
     this.#updateBuffersUpdateRange();
     this.#autoTouchAttributes();
     this.#updateDrawRange();
+  }
+
+  #checkBufferSerials(): void {
+    const checkBufferSerials = (pool: VOBufferPool, buffers: Map<string, BufferLike>, bufferSerials: Map<string, number>) => {
+      for (const [bufferName, buffer] of buffers) {
+        const serial = bufferSerials.get(bufferName);
+        const bufSerial = pool.buffer.buffers.get(bufferName)!.serial;
+        if (serial !== bufSerial) {
+          buffer.needsUpdate = true;
+          bufferSerials.set(bufferName, bufSerial);
+        }
+      }
+    };
+
+    if (this.basePool) {
+      checkBufferSerials(this.basePool, this.baseBuffers, this.baseBufferSerials);
+    }
+
+    if (this.instancedPool) {
+      checkBufferSerials(this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
+    }
+
+    for (const [name, pool] of this.extraInstancedPools) {
+      const buffers = this.extraInstancedBuffers.get(name);
+      const bufferSerials = this.extraInstancedBufferSerials.get(name);
+      checkBufferSerials(pool, buffers, bufferSerials);
+    }
   }
 
   #updateBuffersUpdateRange() {

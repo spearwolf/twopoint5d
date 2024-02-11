@@ -78,6 +78,7 @@ export class VOBufferPool {
         } else {
           buffer.typedArray = typedArray;
         }
+        buffer.serial++;
       }
     }
   }

@@ -5,7 +5,12 @@ import {createIndicesArray} from './createIndicesArray.js';
 import {toDrawUsage} from './toDrawUsage.js';
 import type {BufferLike} from './types.js';
 
-export function initializeAttributes(geometry: BufferGeometry, pool: VOBufferPool, buffers: Map<string, BufferLike>): void {
+export function initializeAttributes(
+  geometry: BufferGeometry,
+  pool: VOBufferPool,
+  buffers: Map<string, BufferLike>,
+  bufferSerials: Map<string, number>,
+): void {
   const {descriptor, capacity} = pool;
   if (descriptor.hasIndices) {
     const {indices} = descriptor;
@@ -19,6 +24,7 @@ export function initializeAttributes(geometry: BufferGeometry, pool: VOBufferPoo
       const interleavedBuffer = new InterleavedBuffer(buffer.typedArray, buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
+      bufferSerials.set(buffer.bufferName, buffer.serial);
       for (const bufAttr of attributes) {
         const attrDesc = descriptor.attributes.get(bufAttr.attributeName);
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
@@ -32,6 +38,7 @@ export function initializeAttributes(geometry: BufferGeometry, pool: VOBufferPoo
       attr.setUsage(toDrawUsage(buffer.usageType));
       attr.name = bufAttr.attributeName;
       buffers.set(buffer.bufferName, attr);
+      bufferSerials.set(buffer.bufferName, buffer.serial);
       geometry.setAttribute(attrDesc.name, attr);
     }
   }

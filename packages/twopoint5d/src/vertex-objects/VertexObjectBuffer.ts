@@ -15,10 +15,7 @@ interface Buffer {
   dataType: VertexAttributeDataType;
   usageType: VertexAttributeUsageType;
   typedArray: TypedArray;
-  // serial?
-  // needsUpdate?
-  // autoTouch
-  // THREE->bufferAttribute?
+  serial: number;
 }
 
 export class VertexObjectBuffer {
@@ -57,6 +54,7 @@ export class VertexObjectBuffer {
           dataType: buffer.dataType,
           usageType: buffer.usageType,
           typedArray: createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
+          serial: 0,
         });
       }
     } else {
@@ -81,6 +79,7 @@ export class VertexObjectBuffer {
             usageType: attribute.usageType,
             // @ts-ignore
             typedArray: undefined,
+            serial: 0,
           });
         }
         this.bufferAttributes.set(attributeName, {
@@ -117,8 +116,12 @@ export class VertexObjectBuffer {
    * Both objects should use the same vertex-object-description
    */
   copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
-    for (const {bufferName, typedArray, itemSize} of this.buffers.values()) {
-      typedArray.set(other.buffers.get(bufferName)!.typedArray, targetObjectOffset * this.descriptor.vertexCount * itemSize);
+    for (const buf of this.buffers.values()) {
+      buf.typedArray.set(
+        other.buffers.get(buf.bufferName)!.typedArray,
+        targetObjectOffset * this.descriptor.vertexCount * buf.itemSize,
+      );
+      buf.serial++;
     }
     return this;
   }
@@ -128,18 +131,20 @@ export class VertexObjectBuffer {
   }
 
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
-    const {typedArray, itemSize} = this.buffers.get(bufferName)!;
-    typedArray.set(source, targetObjectOffset * this.descriptor.vertexCount * itemSize);
+    const buf = this.buffers.get(bufferName)!;
+    buf.typedArray.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
+    buf.serial++;
   }
 
   copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
     const {vertexCount} = this.descriptor;
-    for (const {typedArray, itemSize} of this.buffers.values()) {
-      typedArray.copyWithin(
-        targetIndex * vertexCount * itemSize,
-        startIndex * vertexCount * itemSize,
-        endIndex * vertexCount * itemSize,
+    for (const buf of this.buffers.values()) {
+      buf.typedArray.copyWithin(
+        targetIndex * vertexCount * buf.itemSize,
+        startIndex * vertexCount * buf.itemSize,
+        endIndex * vertexCount * buf.itemSize,
       );
+      buf.serial++;
     }
   }
 
@@ -165,6 +170,7 @@ export class VertexObjectBuffer {
         if (attrObjCount > copiedObjCount) {
           copiedObjCount = attrObjCount;
         }
+        buffer.serial++;
       }
     }
     return copiedObjCount;
@@ -196,5 +202,11 @@ export class VertexObjectBuffer {
         return [attrName];
       }),
     );
+  }
+
+  touch(): void {
+    for (const buffer of this.buffers.values()) {
+      buffer.serial++;
+    }
   }
 }

@@ -73,6 +73,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   #createVO(idx: number) {
     const vo = createVertexObject(this.descriptor, this.buffer, idx);
+    this.buffer.touch();
     if (this.onCreateVO != null) {
       return this.onCreateVO(vo) ?? vo;
     }

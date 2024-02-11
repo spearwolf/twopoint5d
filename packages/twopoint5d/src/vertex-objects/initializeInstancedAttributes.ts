@@ -7,6 +7,7 @@ export function initializeInstancedAttributes(
   geometry: BufferGeometry,
   pool: VOBufferPool,
   buffers: Map<string, BufferLike>,
+  bufferSerials: Map<string, number>,
 ): void {
   const {descriptor} = pool;
   const meshPerAttribute = descriptor.meshCount;
@@ -16,6 +17,7 @@ export function initializeInstancedAttributes(
       const interleavedBuffer = new InstancedInterleavedBuffer(buffer.typedArray, buffer.itemSize, meshPerAttribute);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
+      bufferSerials.set(buffer.bufferName, buffer.serial);
       for (const bufAttr of attributes) {
         const attrDesc = descriptor.attributes.get(bufAttr.attributeName);
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
@@ -29,6 +31,7 @@ export function initializeInstancedAttributes(
       attr.setUsage(toDrawUsage(buffer.usageType));
       attr.name = bufAttr.attributeName;
       buffers.set(buffer.bufferName, attr);
+      bufferSerials.set(buffer.bufferName, buffer.serial);
       geometry.setAttribute(attrDesc.name, attr);
     }
   }

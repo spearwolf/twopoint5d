@@ -12,13 +12,15 @@ type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
 export class VOBufferGeometry extends BufferGeometry {
   readonly pool: VOBufferPool;
+
   readonly buffers: Map<string, BufferLike> = new Map();
+  readonly bufferSerials: Map<string, number> = new Map();
 
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super();
     this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
     this.name = 'VOBufferGeometry';
-    initializeAttributes(this, this.pool, this.buffers);
+    initializeAttributes(this, this.pool, this.buffers, this.bufferSerials);
   }
 
   override dispose(): void {
@@ -57,9 +59,21 @@ export class VOBufferGeometry extends BufferGeometry {
   }
 
   update(): void {
+    this.#checkBufferSerials();
     this.#autoTouchAttributes();
     this.#updateBuffersUpdateRange();
     this.#updateDrawRange();
+  }
+
+  #checkBufferSerials(): void {
+    for (const [bufferName, buffer] of this.buffers) {
+      const serial = this.bufferSerials.get(bufferName);
+      const bufSerial = this.pool.buffer.buffers.get(bufferName)!.serial;
+      if (serial !== bufSerial) {
+        buffer.needsUpdate = true;
+        this.bufferSerials.set(bufferName, bufSerial);
+      }
+    }
   }
 
   #updateBuffersUpdateRange() {
