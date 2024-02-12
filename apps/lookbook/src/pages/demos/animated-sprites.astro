@@ -50,6 +50,9 @@ import {title} from './_animated-sprites.json';
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 500, 75, 7);
+    
+    bouncingSprites.startSpeedBaseX = 10;
+    bouncingSprites.startSpeedX = 50;
 
     bouncingSprites.createSprites(CAPACITY, animId);
 
