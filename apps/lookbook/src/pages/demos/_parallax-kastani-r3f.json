@@ -1,0 +1,26 @@
+{
+  "title": "kastani parallax demo",
+  "description": "An endlessly scrolling parallax scene made of chestnuts and skulls (yes, really ;)",
+  "url": "/demos/parallax-kastani-r3f",
+  "tags": [
+    "Map2DLayer3D",
+    "Map2DTileSprites",
+    "PanControl2D",
+    "ParallaxProjection",
+    "CameraBasedVisibility",
+    "RepeatingTilessimpleProvider",
+    "Stage2D",
+    "TextureRef",
+    "TileSet",
+    "TileSetRef",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "parallax",
+    "map2d",
+    "react",
+    "r3f"
+  ],
+  "previewImage": "parallax-kastani-r3f.png"
+}
