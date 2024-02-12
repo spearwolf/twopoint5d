@@ -33,7 +33,9 @@ import {title} from './_animated-sprites.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  demo.on('init', async ({scene}) => {
+  demo.on('init', async ({scene, camera}) => {
+    camera.position.z = 60;
+
     const CAPACITY = 333;
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
