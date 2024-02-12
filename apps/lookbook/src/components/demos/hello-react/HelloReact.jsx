@@ -10,5 +10,10 @@ export default function HelloReact() {
     }, 1000);
   }, [count]);
 
-  return <div>hello react! {count}</div>;
+  return (
+    <div className="flex flex-col justify-center items-center h-screen gap-2">
+      <p>Hello &lt;React&gt; !</p>
+      <p>You&apos;ve been staring at this for {count} seconds.</p>
+    </div>
+  );
 }

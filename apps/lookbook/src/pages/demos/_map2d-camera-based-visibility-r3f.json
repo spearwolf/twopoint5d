@@ -1,0 +1,24 @@
+{
+  "title": "map2d camera based visibility",
+  "description": "A map2d playground with camera based visibility",
+  "url": "/demos/map2d-camera-based-visibility-r3f",
+  "tags": [
+    "Map2DLayer3D",
+    "Map2DTileSprites",
+    "PanControl2D",
+    "ParallaxProjection",
+    "CameraBasedVisibility",
+    "RepeatingTilesProvider",
+    "TextureRef",
+    "TileSet",
+    "TileSetRef",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "map2d",
+    "react",
+    "r3f"
+  ],
+  "previewImage": "map2d-camera-based-visibility-r3f.png"
+}

@@ -1,8 +1,8 @@
-import styled from "styled-components";
+import styled from 'styled-components';
 
 const SIZE = 30;
 const THICKNESS = 2;
-const COLOR = "rgba(0, 0, 0, 0.5)";
+const COLOR = 'rgba(0, 0, 0, 0.5)';
 
 const Container = styled.div`
   position: fixed;

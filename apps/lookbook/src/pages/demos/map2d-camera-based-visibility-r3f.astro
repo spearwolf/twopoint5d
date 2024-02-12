@@ -1,0 +1,22 @@
+---
+import DemoOrDie from '~components/demos/map2d-camera-based-visibility-r3f/index.jsx';
+import Layout from '~layouts/ReactDemo.astro';
+import {title} from './_map2d-camera-based-visibility-r3f.json';
+---
+
+<Layout title={title}>
+  <DemoOrDie client:only />
+</Layout>
+
+<style>
+  html {
+    font-size: 15px;
+  }
+  body {
+    margin: 0;
+    height: 100vh;
+    overflow-y: hidden;
+    background-image: linear-gradient(to right bottom, #43667e 0, #07203c 66%, #8b0041);
+    color: #eee;
+  }
+</style>

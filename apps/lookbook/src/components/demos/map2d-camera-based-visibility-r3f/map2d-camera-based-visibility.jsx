@@ -1,9 +1,6 @@
-import { OrbitControls } from "@react-three/drei";
-import { extend, useThree } from "@react-three/fiber";
-import { useControls } from "leva";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CameraHelper, Matrix4, PerspectiveCamera } from "three";
-import { CameraBasedVisibility } from "twopoint5d";
+import {OrbitControls} from '@react-three/drei';
+import {extend, useThree} from '@react-three/fiber';
+import {CameraBasedVisibility} from '@spearwolf/twopoint5d';
 import {
   Map2DLayer3D,
   Map2DTileSprites,
@@ -14,16 +11,21 @@ import {
   TileSetRef,
   TileSpritesGeometry,
   TileSpritesMaterial,
-} from "twopoint5d-r3f";
-import { useDemoStore } from "./useDemoStore";
+} from '@spearwolf/twopoint5d-r3f';
+import {useControls} from 'leva';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {CameraHelper, Matrix4, PerspectiveCamera} from 'three';
 
-extend({ CameraBasedVisibility, CameraHelper });
+import assetsUrl from '../../../demos/utils/assetsUrl.ts';
+import {useDemoStore} from './useDemoStore.js';
+
+extend({CameraBasedVisibility, CameraHelper});
 
 const TILES = [
   {
-    name: "pixelart",
+    name: 'pixelart',
 
-    tilesUrl: "/examples/assets/ball-patterns.png",
+    tilesUrl: assetsUrl('ball-patterns.png'),
 
     tileWidth: 128,
     tileHeight: 128,
@@ -54,9 +56,9 @@ const TILES = [
     ],
   },
   {
-    name: "heilstätten tiles",
+    name: 'heilstätten tiles',
 
-    tilesUrl: "/examples/assets/fliesen-tile-1000x579.png",
+    tilesUrl: assetsUrl('fliesen-tile-1000x579.png'),
 
     tileWidth: 1000,
     tileHeight: 579,
@@ -70,9 +72,9 @@ const TILES = [
     tilesData: [[1]],
   },
   {
-    name: "a random tile",
+    name: 'a random tile',
 
-    tilesUrl: "/examples/assets/tiles-made-with-sd.png",
+    tilesUrl: assetsUrl('tiles-made-with-sd.png'),
 
     tileWidth: 512,
     tileHeight: 512,
@@ -103,7 +105,7 @@ const containerTransform = new Matrix4()
   .multiply(new Matrix4().makeTranslation(0, 0, 0));
 
 export const DemoOrDie = () => {
-  const [center, setCenter] = useState({ x: 0, y: 0 });
+  const [center, setCenter] = useState({x: 0, y: 0});
   const activeCamera = useDemoStore((state) => state.activeCameraName);
   const setThree = useThree((state) => state.set);
   const camera = useThree((state) => state.camera);
@@ -111,82 +113,56 @@ export const DemoOrDie = () => {
   const [tileSprites, setTileSprites] = useState();
   const map2dLayerRef = useRef();
 
-  const { lookAtCenter, tiles } = useControls({
+  const {lookAtCenter, tiles} = useControls({
     lookAtCenter: false,
-    tiles: { options: TILES.map((t) => t.name) },
+    tiles: {options: TILES.map((t) => t.name)},
   });
 
-  const { tiles: showTileBoxes, camera: showCameraHelper } = useControls(
-    "show helpers",
-    {
-      tiles: false,
-      camera: true,
-    }
-  );
+  const {tiles: showTileBoxes, camera: showCameraHelper} = useControls('show helpers', {
+    tiles: false,
+    camera: true,
+  });
 
-  const {
-    tilesUrl,
-    tileWidth,
-    tileHeight,
-    map2dTileWidth,
-    map2dTileHeight,
-    map2dTileOffsetX,
-    map2dTileOffsetY,
-    tilesData,
-  } = useMemo(() => {
-    const tile = TILES.find((t) => t.name === tiles);
-    return {
-      ...tile,
-      tilesData:
-        typeof tile.tilesData === "function"
-          ? tile.tilesData()
-          : tile.tilesData,
-    };
-  }, [tiles]);
+  const {tilesUrl, tileWidth, tileHeight, map2dTileWidth, map2dTileHeight, map2dTileOffsetX, map2dTileOffsetY, tilesData} =
+    useMemo(() => {
+      const tile = TILES.find((t) => t.name === tiles);
+      return {
+        ...tile,
+        tilesData: typeof tile.tilesData === 'function' ? tile.tilesData() : tile.tilesData,
+      };
+    }, [tiles]);
 
   useEffect(
     () =>
-      tileSprites?.on(["tileSetChanged", "tileDataChanged"], () => {
+      tileSprites?.on(['tileSetChanged', 'tileDataChanged'], () => {
         map2dLayerRef.current?.resetTiles();
       }),
-    [tileSprites]
+    [tileSprites],
   );
 
-  const pointerPanDisabled = activeCamera !== "cam0";
-  const orbitAround = activeCamera === "cam1";
-  const controlMap2DCamera = activeCamera === "cam2" || activeCamera === "cam3";
+  const pointerPanDisabled = activeCamera !== 'cam0';
+  const orbitAround = activeCamera === 'cam1';
+  const controlMap2DCamera = activeCamera === 'cam2' || activeCamera === 'cam3';
 
   useEffect(() => {
-    if (activeCamera === "cam3") {
-      setThree({ camera: map2dCamera });
+    if (activeCamera === 'cam3') {
+      setThree({camera: map2dCamera});
     } else {
-      setThree({ camera: defaultCamera });
+      setThree({camera: defaultCamera});
     }
   }, [activeCamera]);
 
   return (
     <>
-      <PanControl2D
-        onUpdate={setCenter}
-        pointerDisabled={pointerPanDisabled}
-        pixelsPerSecond={300}
-      />
+      <PanControl2D onUpdate={setCenter} pointerDisabled={pointerPanDisabled} pixelsPerSecond={300} />
 
       {orbitAround && <OrbitControls makeDefault />}
 
-      {controlMap2DCamera && (
-        <OrbitControls camera={map2dCamera} makeDefault enableDamping={false} />
-      )}
+      {controlMap2DCamera && <OrbitControls camera={map2dCamera} makeDefault enableDamping={false} />}
 
       {showCameraHelper && <cameraHelper args={[map2dCamera]} />}
 
-      <TileSet
-        name="tiles"
-        url={tilesUrl}
-        tileWidth={tileWidth}
-        tileHeight={tileHeight}
-        anisotrophy
-      />
+      <TileSet name="tiles" url={tilesUrl} tileWidth={tileWidth} tileHeight={tileHeight} anisotrophy />
 
       <group matrix={containerTransform} matrixAutoUpdate={false}>
         <Map2DLayer3D

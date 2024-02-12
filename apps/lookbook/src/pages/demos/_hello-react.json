@@ -1,6 +1,6 @@
 {
   "title": "hello react",
-  "description": "A very minimalistic react demo",
+  "description": "A minimal react demo that can be used as a starting point for a new react based demo",
   "url": "/demos/hello-react",
   "tags": ["react"],
   "previewImage": ""
