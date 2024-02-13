@@ -8,6 +8,16 @@
 
 please see [../README](../../README.md) for a general description of this project.
 
+> ‼️ ATTENTION! The components for react-three-fiber still work and are documented and used in the LOOKBOOK.
+>
+> HOWEVER, development is currently ON HOLD.
+> Unfortunately, it has happened far too often in the past that an update of the react-three-fiber library has led to incompatibilities with other libraries (especially the @react-three/test-renderer currently used for testing). keeping up with this is far too resource-intensive for me.
+> I think it makes more sense to design the vanilla API so that it can be used without a wrapper within the react universe.
+>
+> However, if you are having fun with r3f, you might find something useful here.
+> 
+> _Note to self:_ the react components need to be refactored to use the new texture-store from the core library (the new texture-store is also much more complete than this one).
+
 ---
 
 The idea is roughly the following:
@@ -76,5 +86,4 @@ _is checked when implemented and ready to use_
 - [x] `<ShaderChunks>`
 
 
-have fun!
-:rocket:
+have fun! 🚀
