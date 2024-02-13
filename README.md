@@ -1,7 +1,13 @@
 <p align="center">
   <img width="350" src="docs/images/twopoint5d-700x168.png">
   <br>
-  <em>a library to create 2.5d realtime graphics and pixelart with three.js</em>
+  <em>A javascript side project about rendering 2.5D realtime graphics on the web.</em>
+</p>
+
+<p align="center">
+  <b>
+    fast rendering of 2D sprites &bull; billboards &bull; texture atlas &bull; frame-based animation &bull; parallax &bull; tiled 2D maps &bull; pixelart
+  </b>
 </p>
 
 <div align="center">
@@ -13,61 +19,59 @@
 
 ![twopoint5d cover](cover.png)
 
-A collection of typescript classes and helper functions in the shape of a monorepo. Most of these are centered around building 2.5D games, demos and realtime gfx on the web platform.
+## Introduction
 
-:rocket: Some of the features are already quite stable, others are still experimental.
+It all started with the desire to render 2d sprites (lots of them!) in the browser. it has been a long way, starting with a naive html-canvas-based solution. the second iteration used a custom webgl renderer, which turned out to be quite complex in the long run. today, in its current form, the library uses three.js as the rendering layer.
 
-The library comes in two flavors:
-- [twopoint5d](packages/twopoint5d) : based on _three.js_ and _vanilla js_ all the main features are inside here
-- [twopoint5d-r3f](packages/twopoint5d-r3f) : based on _@react-three/fiber_ and offers all the features as _react_ components and hooks for those who prefer it in a more declarative way
+A declarative description (called a "vertex object description") is used to describe the sprite properties (how many vertices, indices, texture coords, etc.).
 
-## What are the goals of this project ?
+Using the _vertex object description_, the library can create javascript objects that provide getters and setters for the respective sprite properties. the actual data ends up in internal buffers that are efficiently rendered in batches by three.js/webgl, usually via instanced rendering.
 
-- Make the creation of 2.5D games, demos and realtime gfx as easy and satisfying as possible
-- Super easy import and use of gamedev assets and 2D resources from the internet
-- First-class pixel-art support and responsive-design awareness
+While the developer can use the "sprites" / _vertex objects_ comfortably and conveniently via javascript objects, the "backend" of the library ensures that webgl can render the current sprite pool with high performance with a single draw call. the cumbersome handling of webgl buffers and state setup becomes transparent for the developer.
 
-## What are the core features ?
+Whether a "sprite" is a classic quad with a texture or a freeform polygon with special properties used in a custom vertex shader is completely up to the creator of the vertex object description and the associated shaders that use those properties.
 
-- Creation, management and efficient display of 2.5D sprites/particles
-  - texture-atlas support
-  - sprite-sheet animations
-  - billboards!
-- Creation, management and display of 2.5D maps
-- Import of common texture atlas formats (TexturePacker) and 2.5D-maps (tiled, LDtk)
-  - _OK, to be honest: this point is still rather in the planning phase and not yet implemented, more like wok in progress_ :wink:
-- Advanced api for extending and customizing sprite features and 2.5D-map renderers
+> :rocket: In other words, this library wants to empower the developer's creativity by allowing him to quickly and easily create his own sprites, particles or whatever using instanced rendering and his own custom shaders, without having to study the documentation every time to understand the boring details of the WebGL API.  
 
-:warning: However, there are currently no detailed tutorials or comprehensive documentation available - instead, there are
-- a number of examples that illustrate the respective features and usage of the api
-- some unsorted documents about selected features in the [docs/](docs/) directory
+Of course, this library offers several ready-to-use sprite shaders (better known as `Mesh` in three.js) based on this. the developer can just use them and doesn't have to worry about how.
 
-## Usage Examples
+There are sprite shaders that render textured quads as billboards or on a plane in the 3d space. there is also a sprite shader that uses animated  textures (using frame-based animations). and there are other highly specialized sprite shaders that are used for rendering tiled 2d maps, among other things.
 
-Almost all of these examples serve to show individual aspects and usage of the api. Therefore, don't expect any visual masterpieces at this point. This is given to the user of the libraries as an exercise :wink:
+Obviously, textures can be loaded from _texture atlases_ or _tilesets_.
 
-> At the moment a new [lookbook](./apps/lookbook/) app is being developed, which combines all examples. you can start it simply by:
+> ‼️ However, the developer should not expect an all-encompassing sprite engine, that is not the intention of this library, it rather wants to reduce and speed up the developer's workload to do what he wants to do (but without hiding the rendering API three.js).
 
-```sh
-$ pnpm lookbook
-```
+_There are a few more features that this library offers to make the life of a creative web developer easier, but not to take all the fun out of discovering them, let's just mention them here_ :wink:
 
-But as long as not all examples have been migrated, the _old_ examples can still be found here:
+## What's in this repository 👀
 
-- [examples/vanilla](./examples/vanilla/)
-  - vanilla three.js examples (no build step required)
-- [examples/r3f](./examples/r3f/)
-  - examples for the usage of _twopoint5d_ components and hooks in a react context based on the fantastic _@react-three/fiber_
+_twopoint5d_ is a monorepo that contains the following javascript / typescript libraries:
 
-## Getting involved
+- [@spearwolf/twopoint5d](packages/twopoint5d) : is the "vanilla" core library and relies on [three.js](https://threejs.org/) as a rendering framework
+- [@spearwolf/twopoint5d-r3f](packages/twopoint5d-r3f) : builds on top of this and provides react components based on [@react-three/fiber](https://github.com/pmndrs/react-three-fiber/)
+- In contrast, [@spearwolf/twopoint5d-elements](packages/twopoint5d-elements) goes the way of vanilla web components
 
-Everyone is welcome to contribute to this project, no matter if it's just bug-fixes, new features, ideas or documentation or graphics!
+So it's up to you if you want to go the _react_, _web components_ or "vanilla" way :wink:
 
-### Development Setup
 
-this repository is structured as a monorepo; based on [nx](https://nx.dev/) !
+## 📖 Documentation
 
-#### 1. Install dependencies
+Some features have been around for a long time and are stable, others are in flux and highly experimental. as an independent solo developer, it is not possible for me to create detailed written documentation and keep it up to date. this is a living open source project and is subject to constant change. therefore, the developer is advised to do the following
+
+> _"Read the source, Luke!"_
+
+To take this to the extreme, there is a LOOKBOOK app with lots of code examples, all of which can be used as a starting point for new projects or as documentation for one or the other feature.
+
+> :rocket: The LOOKBOOK app can easily be started locally using `pnpm lookbook`. See next section [Development Setup](#development-setup) for details.
+
+And of course there are one or two READMEs in the `**/src/*` subdirectories that provide a high-level overview of the features. _Enjoy exploring!_
+
+
+## Development Setup
+
+This repository is structured as a monorepo; based on [nx](https://nx.dev/) !
+
+### 1. Install dependencies
 
 First, you need a current [node v18+](https://nodejs.org/) with [PNpm as package manager](https://pnpm.io/) setup.
 Install the dependencies with:
@@ -76,20 +80,25 @@ Install the dependencies with:
 $ pnpm install
 ```
 
-#### 2. Build and test everything
+### 2. Build and test everything
 
 ```sh
 $ pnpm cbt  # => pnpm run clean > build > test
 ```
 
-#### 3. Run the local lookbook app
+### 3. Run the local LOOKBOOK app
 
 ```sh
 $ pnpm lookbook
 ```
 
+## Getting involved
+
+Everyone is welcome to contribute to this project, no matter if it's just bug-fixes, new features, ideas or documentation or graphics!
+
+
 ## Copyright and License
 
-Copyright &copy; 2023 by Wolfger Schramm &lt;wolfger@spearwolf.de&gt;
+Copyright &copy; 2021-2024 by [Wolfger Schramm](mailto:wolfger@spearwolf.de?subject=[GitHub]%20twopoint5d).
 
 The source code is licensed under the [Apache-2.0 License](./LICENSE).
