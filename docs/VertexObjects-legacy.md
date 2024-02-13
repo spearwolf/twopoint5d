@@ -1,4 +1,6 @@
-> :warning: TODO rewrite - this is the old introduction to the `@spearwolf/vertex-objects` library and needs a complete rewrite, because it is now a part of the new `twopoint5d` package
+> :warning: TODO rewrite - this is the old introduction to the `@spearwolf/vertex-objects` library and needs a complete rewrite, because it is now a part of the new `twopoint5d` package.
+>
+> ‼️ so be warned, adventurer: some of the information here is likely to be very confusing or misleading. this file has not been deleted yet, only because it is supposed to serve as a backup for my memory until a comprehensible documentation of the vertex object api is finally written.
 
 # vertex-objects
 
