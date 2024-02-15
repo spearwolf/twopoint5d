@@ -194,11 +194,79 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   update(): void {
     this.instanceCount = this.instancedPool.usedCount;
+    this.#updateDrawRange();
     this.#checkBufferSerials();
     this.#updateBuffersUpdateRange();
     this.#autoTouchAttributes();
-    this.#updateDrawRange();
+    // this.#cloneAttributeArrays();
   }
+
+  /* XXX i think this is not needed, but for now let's keep it
+
+  #serials: Map<string, number> = new Map();
+  #updateAttributes = new Map<string, BufferAttribute | InterleavedBuffer>();
+
+  #cloneAttributeArrays() {
+    // 1. find all attributes that need to be updated
+    this.#updateAttributes.clear();
+
+    for (const [name, attr] of Object.entries(this.attributes)) {
+      const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+        ? (attr as InterleavedBufferAttribute).data
+        : (attr as BufferAttribute);
+      const version = bufAttr.version;
+      if (this.#serials.has(name)) {
+        if (this.#serials.get(name) !== version) {
+          this.#updateAttributes.set(name, bufAttr);
+          this.#serials.set(name, version);
+        }
+      } else {
+        this.#updateAttributes.set(name, bufAttr);
+        this.#serials.set(name, version);
+      }
+    }
+
+    // 2. clone buffer attribute arrays
+    const clonedArrays = new Map<string, TypedArray>();
+
+    for (const [name, bufAttr] of this.#updateAttributes) {
+      let bufInfo = this.instancedPool.buffer.bufferAttributes.get(name);
+      if (bufInfo) {
+        const buf = this.instancedPool.buffer.buffers.get(bufInfo.bufferName);
+        if (buf) {
+          const arr = clonedArrays.get(bufInfo.bufferName);
+          if (arr) {
+            bufAttr.array = arr;
+            // console.log('reuse cloned', name, bufInfo.bufferName);
+          } else {
+            bufAttr.array = new (bufAttr.array.constructor as any)(buf.typedArray.length);
+            bufAttr.array.set(buf.typedArray);
+            clonedArrays.set(bufInfo.bufferName, bufAttr.array);
+            // console.log('cloned', name, bufInfo.bufferName, bufAttr.array);
+          }
+        }
+      } else {
+        bufInfo = this.basePool.buffer.bufferAttributes.get(name);
+        if (bufInfo) {
+          const buf = this.basePool.buffer.buffers.get(bufInfo.bufferName);
+          if (buf) {
+            const arrId = `base__${bufInfo.bufferName}`;
+            const arr = clonedArrays.get(arrId);
+            if (arr) {
+              bufAttr.array = arr;
+              // console.log('reuse cloned', name, arrId);
+            } else {
+              bufAttr.array = new (bufAttr.array.constructor as any)(buf.typedArray.length);
+              bufAttr.array.set(buf.typedArray);
+              // console.log('cloned', name, arrId, bufAttr.array);
+              clonedArrays.set(arrId, bufAttr.array);
+            }
+          }
+        } // TODO else extra instanced pools
+      }
+    }
+  }
+  */
 
   #checkBufferSerials(): void {
     const checkBufferSerials = (pool: VOBufferPool, buffers: Map<string, BufferLike>, bufferSerials: Map<string, number>) => {

@@ -26,6 +26,8 @@ export class VertexObjectBuffer {
   readonly attributeNames: readonly string[];
 
   readonly buffers: Map<string, Buffer>;
+
+  /** map attribute name to buffer-attribute info */
   readonly bufferAttributes: Map<string, BufferAttribute>;
 
   /** buffer name -> list of buffer attributes */

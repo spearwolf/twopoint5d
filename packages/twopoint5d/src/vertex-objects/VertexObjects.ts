@@ -14,9 +14,11 @@ export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObj
     this.frustumCulled = false;
   }
 
-  override onBeforeRender = (): void => {
+  // XXX onBeforeRender is too late for updating the geometry (array buffers)
+  // override onBeforeRender = (): void => {
+  update(): void {
     if (typeof this.geometry?.update === 'function') {
       this.geometry.update();
     }
-  };
+  }
 }
