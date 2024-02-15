@@ -158,6 +158,8 @@ describe('vertex-buffers-geometry-updates', () => {
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBe(0);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBe(0);
 
+      expect(geometry.drawRange).toEqual({start: 0, count: Infinity});
+
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBeGreaterThan(0);
@@ -165,6 +167,8 @@ describe('vertex-buffers-geometry-updates', () => {
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(0);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(0);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(0);
+
+      expect(geometry.instanceCount).toEqual(3);
     });
 
     test('dynamic auto update', () => {
@@ -251,6 +255,8 @@ describe('vertex-buffers-geometry-updates', () => {
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(bar_serial);
+
+      expect(geometry.instanceCount).toEqual(4);
     });
 
     test('freeVO:last', () => {
@@ -280,6 +286,8 @@ describe('vertex-buffers-geometry-updates', () => {
         bar: new Float32Array([101, 102, 104, 105]),
         impact: new Uint32Array([1000, 1001]),
       });
+
+      expect(geometry.instanceCount).toEqual(2);
     });
 
     test('freeVO:not(last)', () => {
@@ -310,7 +318,7 @@ describe('vertex-buffers-geometry-updates', () => {
         impact: new Uint32Array([1000, 1002]),
       });
 
-      // expect(geometry.drawRange).toEqual({start: 0, count: 2});
+      expect(geometry.instanceCount).toEqual(2);
     });
   });
 });
