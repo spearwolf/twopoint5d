@@ -28,6 +28,7 @@
     "build": "pnpm run-s -sn compile makePackageJson",
     "clean": "pnpm rimraf build types dist",
     "test": "pnpm vitest --run",
+    "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm no-resolution",
     "publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
