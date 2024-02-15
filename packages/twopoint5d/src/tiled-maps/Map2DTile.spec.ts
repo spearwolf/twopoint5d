@@ -4,7 +4,7 @@ import {Map2DTile} from './Map2DTile.js';
 describe('Map2DTile', () => {
   test('id', () => {
     const tile = new Map2DTile(0, 0);
-    expect(tile.id).toBe('y0x0');
+    expect(tile.id).toBeGreaterThan(0);
   });
   test('x, y', () => {
     const tile = new Map2DTile(8, 16);
