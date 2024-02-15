@@ -309,6 +309,8 @@ describe('vertex-buffers-geometry-updates', () => {
         bar: new Float32Array([101, 102, 107, 108]),
         impact: new Uint32Array([1000, 1002]),
       });
+
+      // expect(geometry.drawRange).toEqual({start: 0, count: 2});
     });
   });
 });
