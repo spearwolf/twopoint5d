@@ -13,7 +13,7 @@ export interface Map2DTileSprites extends Eventize {}
 export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer {
   #tileData?: IMap2DTileDataProvider;
 
-  #tiles = new Map<number, TileSprite>();
+  #tiles = new Map<string, TileSprite>();
 
   #deferredTiles = new Set<Map2DTile>();
 

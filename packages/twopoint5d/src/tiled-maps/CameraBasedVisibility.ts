@@ -47,8 +47,7 @@ const toAABB2 = ({top, left, width, height}: TilesWithinCoords, xOffset: number,
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, target = new Frustum()): Frustum =>
   target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
 
-const findTileIndex = (tiles: Map2DTile[], x: number, y: number): number =>
-  tiles.findIndex((tile) => tile.x === x && tile.y === y);
+const findTileIndex = (tiles: Map2DTile[], id: string): number => tiles.findIndex((tile) => tile.id === id);
 
 const insertAndSortByDistance = (arr: TileBox[], tile: TileBox): void => {
   const index = arr.findIndex((t) => tile.distanceToCamera < t.distanceToCamera);
@@ -333,7 +332,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
           tile.map2dTile = new Map2DTile(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
 
-          const previousTilesIndex = findTileIndex(previousTiles, tile.x, tile.y);
+          const previousTilesIndex = findTileIndex(previousTiles, Map2DTile.createID(tile.x, tile.y));
 
           if (previousTilesIndex >= 0) {
             previousTiles.splice(previousTilesIndex, 1);
