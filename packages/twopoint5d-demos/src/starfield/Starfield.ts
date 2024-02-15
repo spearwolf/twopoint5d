@@ -79,6 +79,7 @@ export class Starfield {
     this.stage.on(StageRenderFrame, ({deltaTime}: StageRenderFrameProps) => {
       if (this.sprites) {
         this.animateStars(deltaTime);
+        this.sprites.update();
       }
     });
   }

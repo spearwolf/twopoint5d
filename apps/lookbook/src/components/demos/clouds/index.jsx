@@ -5,6 +5,36 @@ import {useControls} from 'leva';
 
 import {Clouds} from './Clouds.jsx';
 
+const Demo = ({speed, alpha}) => (
+  <>
+    <Stage2D name="stage1" defaultCamera renderPriority={1}>
+      <ParallaxProjection
+        plane="xy"
+        origin="bottom left"
+        width={1024}
+        height={768}
+        distanceToProjectionPlane={250}
+        fit="contain"
+      />
+
+      <Clouds
+        capacity={400}
+        gap={5}
+        speed={speed}
+        width={2500}
+        height={600}
+        yOffset={-400}
+        zOffset={-660}
+        fadeInRange={0.1}
+        fadeOutRange={0.2}
+        postAlphaMultiplier={alpha}
+      />
+    </Stage2D>
+
+    <OrbitControls />
+  </>
+);
+
 export default function DemoOrDie() {
   const {speed, alpha} = useControls({
     speed: {value: 100, min: 0, max: 250, step: 1},
@@ -13,31 +43,7 @@ export default function DemoOrDie() {
 
   return (
     <Canvas dpr={[1, 2]} camera={{position: [0, 0, 50]}}>
-      <Stage2D name="stage1" defaultCamera renderPriority={1}>
-        <ParallaxProjection
-          plane="xy"
-          origin="bottom left"
-          width={1024}
-          height={768}
-          distanceToProjectionPlane={250}
-          fit="contain"
-        />
-
-        <Clouds
-          capacity={400}
-          gap={5}
-          speed={speed}
-          width={2500}
-          height={600}
-          yOffset={-400}
-          zOffset={-660}
-          fadeInRange={0.1}
-          fadeOutRange={0.2}
-          postAlphaMultiplier={alpha}
-        />
-      </Stage2D>
-
-      <OrbitControls />
+      <Demo speed={speed} alpha={alpha} />
     </Canvas>
   );
 }

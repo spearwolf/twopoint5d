@@ -192,6 +192,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
   #syncGeometryBuffers(): void {
     this.geometry.touch('quadSize', 'texCoords', 'instancePosition');
+    this.update();
   }
 
   dispose(): void {

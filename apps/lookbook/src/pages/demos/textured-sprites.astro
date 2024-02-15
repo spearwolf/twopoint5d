@@ -49,15 +49,16 @@ import {title} from './_textured-sprites.json';
 
     bouncingSprites.createSprites();
 
-    demo.on('frame', ({deltaTime}) => {
-      bouncingSprites.animate(deltaTime);
-    });
-
     const material = new TexturedSpritesMaterial({colorMap: texture, depthTest: false, depthWrite: false});
 
     const mesh = new TexturedSprites(geometry, material);
 
     scene.add(mesh);
+
+    demo.on('frame', ({deltaTime}) => {
+      bouncingSprites.animate(deltaTime);
+      mesh.update();
+    });
 
     console.log('bouncingSprites', bouncingSprites);
     console.log('TexturedSpritesMesh', mesh);
