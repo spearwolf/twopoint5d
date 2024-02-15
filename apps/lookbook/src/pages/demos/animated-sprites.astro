@@ -5,17 +5,38 @@ import {title} from './_animated-sprites.json';
 
 <Layout title={title}>
   <canvas id="canvas-container" resize-to="window"></canvas>
+  <section class="fixed top-4 right-4 flex gap-2">
+    <div class="actionBtn moreSprites">MORE</div>
+    <div class="spriteCount">0</div>
+    <div class="actionBtn lessSprites">LESS</div>
+  </section>
 </Layout>
 
 <style>
   body {
     height: 100vh;
     overflow-y: hidden;
-  }
-  body {
     background-color: #391e39;
     background: radial-gradient(circle, rgb(82 95 132) 0%, rgb(149 188 199) 100%);
     color: #eee;
+  }
+  .spriteCount {
+    padding: 0.5rem 1rem;
+    color: #eee;
+    font-weight: bold;
+    min-width: 3em;
+  }
+  .actionBtn {
+    padding: 0.5rem 1rem;
+    background-color: rgba(0 0 33 / 50%);
+    color: #eee;
+    border-radius: 1rem;
+    cursor: pointer;
+  }
+  .actionBtn:hover {
+    background-color: rgba(0 0 33 / 70%);
+    color: #fff;
+    user-select: none;
   }
 </style>
 
@@ -32,11 +53,16 @@ import {title} from './_animated-sprites.json';
   import assetsUrl from '~demos/utils/assetsUrl';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  
+  const renderSpriteCount = (count: number) => {
+    document.querySelector('.spriteCount').textContent = count.toString();
+  };
 
   demo.on('init', async ({scene, camera}) => {
     camera.position.z = 60;
 
-    const CAPACITY = 333;
+    const CAPACITY = 1000;
+    const INITIAL_SPRITE_COUNT = 500;
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
@@ -50,12 +76,14 @@ import {title} from './_animated-sprites.json';
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 500, 75, 7);
-    
+
     bouncingSprites.startSpeedBaseX = 10;
     bouncingSprites.startSpeedX = 50;
 
-    bouncingSprites.createSprites(CAPACITY, animId);
-
+    bouncingSprites.createSprites(INITIAL_SPRITE_COUNT, animId);
+    
+    renderSpriteCount(INITIAL_SPRITE_COUNT);
+    
     const material = new AnimatedSpritesMaterial();
 
     material.colorMap = texture;
@@ -76,6 +104,16 @@ import {title} from './_animated-sprites.json';
 
     console.log('BouncingSprites', bouncingSprites);
     console.log('AnimatedSprites', mesh);
+
+    document.querySelector('.moreSprites').addEventListener('click', () => {
+      bouncingSprites.createSprites(20, animId);
+      renderSpriteCount(bouncingSprites.sprites.length);
+    });
+
+    document.querySelector('.lessSprites').addEventListener('click', () => {
+      bouncingSprites.destroySprites(20);
+      renderSpriteCount(bouncingSprites.sprites.length);
+    });
   });
 
   demo.start();

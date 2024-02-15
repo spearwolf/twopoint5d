@@ -44,6 +44,13 @@ export class BouncingSprites {
   createSprites(count: number, animId: number) {
     const [halfWidth, halfHeight] = [this.containerWidth / 2, this.containerHeight / 2];
 
+    if (this.sprites.length + count > this.spritePool.capacity) {
+      count = this.spritePool.capacity - this.sprites.length;
+      if (count <= 0) {
+        return;
+      }
+    }
+
     for (let i = 0; i < count; i++) {
       const sprite = this.spritePool.createVO() as Sprite;
 
@@ -65,6 +72,16 @@ export class BouncingSprites {
       sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
 
       this.sprites.push(sprite);
+    }
+  }
+
+  destroySprites(count: number) {
+    count = count > this.sprites.length ? this.sprites.length : count;
+
+    for (let i = 0; i < count; i++) {
+      const spriteIndex = Math.floor(Math.random() * this.sprites.length);
+      this.spritePool.freeVO(this.sprites[spriteIndex]);
+      this.sprites.splice(spriteIndex, 1);
     }
   }
 
