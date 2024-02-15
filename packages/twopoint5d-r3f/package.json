@@ -33,7 +33,7 @@
     "@spearwolf/eventize": "^3.4.1",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.2.0",
-    "three": "^0.153",
+    "three": "~0.161.0",
     "use-asset": "^1.0.4",
     "zustand": "^4.3.8"
   }

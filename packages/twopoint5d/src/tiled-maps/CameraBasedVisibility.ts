@@ -15,7 +15,6 @@ import {
   PlaneHelper,
   Vector2,
   Vector3,
-  type Event,
 } from 'three';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
@@ -474,11 +473,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return new Box3(new Vector3(left - sw, ground, top - sh), new Vector3(left + width + sw, ceiling, top + height + sh));
   }
 
-  addToScene(scene: Object3D<Event>): void {
+  addToScene(scene: Object3D): void {
     this.#helpers.scene = scene;
   }
 
-  removeFromScene(scene: Object3D<Event>): void {
+  removeFromScene(scene: Object3D): void {
     this.#helpers.removeFromScene(scene);
   }
 }

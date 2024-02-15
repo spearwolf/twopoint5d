@@ -11,7 +11,7 @@ export interface TextureImage {
 }
 
 type OnLoadCallback = (textureData: TextureImage) => void;
-type OnErrorCallback = ((event: Event) => void) | undefined;
+type OnErrorCallback = ((err: unknown) => void) | undefined;
 
 export class TextureImageLoader {
   imageLoader: PowerOf2ImageLoader;

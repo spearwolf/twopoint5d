@@ -93,9 +93,9 @@
     "@spearwolf/signalize": "^0.12",
     "@spearwolf/twopoint5d": "workspace:*",
     "lit": "3.0.1",
-    "three": "~0.153.0"
+    "three": "~0.161.0"
   },
   "devDependencies": {
-    "@types/three": "~0.153.0"
+    "@types/three": "~0.161.2"
   }
 }

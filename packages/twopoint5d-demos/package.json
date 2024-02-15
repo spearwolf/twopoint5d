@@ -37,9 +37,9 @@
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
     "lit": "3.0.1",
-    "three": "~0.153.0"
+    "three": "~0.161.0"
   },
   "devDependencies": {
-    "@types/three": "~0.153.0"
+    "@types/three": "~0.161.2"
   }
 }

@@ -9,7 +9,7 @@ export interface ImageWithTexCoords {
 }
 
 type OnImageLoadCallback = (image: ImageWithTexCoords) => void;
-type OnErrorCallback = ((event: Event) => void) | undefined;
+type OnErrorCallback = ((err: unknown) => void) | undefined;
 
 export class PowerOf2ImageLoader {
   #imageLoader?: ImageLoader;

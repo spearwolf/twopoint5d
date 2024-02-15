@@ -1,6 +1,12 @@
 /* eslint-disable no-console */
 
-import {MathUtils, ShaderMaterial, WebGLRenderer, type Shader, type ShaderMaterialParameters} from 'three';
+import {
+  MathUtils,
+  ShaderMaterial,
+  WebGLRenderer,
+  type ShaderMaterialParameters,
+  type WebGLProgramParametersWithUniforms,
+} from 'three';
 
 export interface CustomChunksShaderMaterialParameters extends ShaderMaterialParameters {}
 
@@ -104,7 +110,7 @@ export class CustomChunksShaderMaterial extends ShaderMaterial {
 
   logShadersToConsole = false;
 
-  override onBeforeCompile(shader: Shader, _renderer: WebGLRenderer): void {
+  override onBeforeCompile(shader: WebGLProgramParametersWithUniforms, _renderer: WebGLRenderer): void {
     const customChunks = this.#customChunks();
 
     const replaceChunk = (shaderType: 'vertexShader' | 'fragmentShader') => (chunkName: string) => {

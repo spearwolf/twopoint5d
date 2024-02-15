@@ -13,7 +13,7 @@ export interface TileSetData {
 }
 
 type OnLoadCallback = (tileSetData: TileSetData) => void;
-type OnErrorCallback = ((event: Event) => void) | undefined;
+type OnErrorCallback = ((err: unknown) => void) | undefined;
 
 export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;

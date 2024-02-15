@@ -14,7 +14,7 @@ export interface TextureAtlasLoadOptions {
 }
 
 type OnLoadCallback = (textureData: TextureAtlasData) => void;
-type OnErrorCallback = ((event: Event) => void) | undefined;
+type OnErrorCallback = ((err: unknown) => void) | undefined;
 
 const makeFileLoader = () => {
   const loader = new FileLoader();

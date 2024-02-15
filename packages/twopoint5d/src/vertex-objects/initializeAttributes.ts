@@ -15,7 +15,7 @@ export function initializeAttributes(
   if (descriptor.hasIndices) {
     const {indices} = descriptor;
     const bufAttr = new BufferAttribute(createIndicesArray(indices, capacity), 3);
-    bufAttr.count = capacity * indices.length;
+    // bufAttr.count = capacity * indices.length;
     geometry.setIndex(bufAttr);
   }
   for (const buffer of pool.buffer.buffers.values()) {
