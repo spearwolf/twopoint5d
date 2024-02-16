@@ -79,13 +79,10 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     }
   }
 
-  override onBeforeRender = (): void => {
+  override update() {
+    super.update();
     this.#checkReady();
-
-    if (typeof this.geometry?.update === 'function') {
-      this.geometry.update();
-    }
-  };
+  }
 
   beginUpdate(offset: Vector2, translate: Vector3): void {
     this.position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
@@ -197,6 +194,6 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
   dispose(): void {
     // eslint-disable-next-line no-console
-    console.warn('Map2DTileSpritesRenderer3D.dispose() is not implemented');
+    console.warn('TODO Map2DTileSpritesRenderer3D.dispose() is not implemented');
   }
 }
