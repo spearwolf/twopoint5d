@@ -1,4 +1,4 @@
-import {BufferGeometry} from 'three';
+import {BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute} from 'three';
 
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
@@ -59,10 +59,57 @@ export class VOBufferGeometry extends BufferGeometry {
   }
 
   update(): void {
+    this.#updateDrawRange();
+
     this.#checkBufferSerials();
     this.#autoTouchAttributes();
     this.#updateBuffersUpdateRange();
-    this.#updateDrawRange();
+
+    this.#syncAttributeArrays();
+  }
+
+  #serials: Map<string, number> = new Map();
+  #updateAttributes = new Map<string, BufferAttribute | InterleavedBuffer>();
+
+  /**
+   * If the references to the attribute arrays in a {@link VOBufferPool} are swapped,
+   * e.g. via a {@link VOBufferPool#fromBuffersData()} call, then of course the references
+   * to the typed arrays within the `THREE.BufferAttribute` structure must also be changed.
+   *
+   * TODO add tests
+   */
+  #syncAttributeArrays() {
+    this.#updateAttributes.clear();
+
+    // 1. find all attributes that need to be updated
+    //
+    for (const [attrName, attr] of Object.entries(this.attributes)) {
+      const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+        ? (attr as InterleavedBufferAttribute).data
+        : (attr as BufferAttribute);
+      const version = bufAttr.version;
+      if (this.#serials.has(attrName)) {
+        if (this.#serials.get(attrName) !== version) {
+          this.#updateAttributes.set(attrName, bufAttr);
+          this.#serials.set(attrName, version);
+        }
+      } else {
+        this.#updateAttributes.set(attrName, bufAttr);
+        this.#serials.set(attrName, version);
+      }
+    }
+
+    // 2. sync buffer attribute arrays
+    //
+    for (const [attrName, bufAttr] of this.#updateAttributes) {
+      const poolBufInfo = this.pool.buffer.bufferAttributes.get(attrName);
+      if (poolBufInfo) {
+        const poolBuf = this.pool.buffer.buffers.get(poolBufInfo.bufferName);
+        if (poolBuf) {
+          bufAttr.array = poolBuf.typedArray;
+        }
+      }
+    }
   }
 
   #checkBufferSerials(): void {
