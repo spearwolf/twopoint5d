@@ -15,6 +15,7 @@ describe('vertex-buffers-geometry-updates', () => {
         position: {
           components: ['x', 'y', 'z'],
           type: 'float32',
+          bufferName: 'positions',
         },
       },
     });
@@ -119,13 +120,13 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position', () => {
         const [geometry] = makeInstancedGeometry();
 
-        const static_float32 = geometry.baseBuffers.get('static_float32').array;
+        const static_float32 = geometry.baseBuffers.get('positions').array;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
         // @ts-ignore
         expect(positionAttribute.isBufferAttribute).toBe(true);
         expect(positionAttribute.array).toBe(static_float32);
-        expect(static_float32).toBe(geometry.basePool.buffer.buffers.get('static_float32').typedArray);
+        expect(static_float32).toBe(geometry.basePool.buffer.buffers.get('positions').typedArray);
       });
 
       test('color', () => {
@@ -176,11 +177,11 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position: zero-copy', () => {
         const [geometry, , , , , base] = makeInstancedGeometry();
 
-        const buffer = geometry.baseBuffers.get('static_float32');
-        const bufferArray = buffer.array;
+        const buffer = geometry.basePool.buffer.buffers.get('positions');
+        const initialPositions = buffer.typedArray;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
-        expect(positionAttribute.array).toBe(bufferArray);
+        expect(positionAttribute.array).toBe(initialPositions);
         expect(geometry.basePool.capacity).toBe(1);
 
         expect(base.x0).toBe(0);
@@ -202,7 +203,7 @@ describe('vertex-buffers-geometry-updates', () => {
           capacity: 1,
           usedCount: 1,
           buffers: {
-            static_float32: positions,
+            positions,
           },
         });
 
@@ -213,10 +214,110 @@ describe('vertex-buffers-geometry-updates', () => {
         expect(base.y3).toBe(110);
         expect(base.z3).toBe(111);
 
+        expect(buffer.typedArray).not.toBe(initialPositions);
+        expect(buffer.typedArray).toBe(positions);
+        expect(positionAttribute.array).toBe(initialPositions);
+
         geometry.update();
 
         expect(positionAttribute.array).toBe(positions);
-        expect(positionAttribute.array).not.toBe(bufferArray);
+        expect(positionAttribute.array).not.toBe(initialPositions);
+      });
+
+      test('position: copy', () => {
+        const [geometry, , , , , base] = makeInstancedGeometry();
+
+        const buffer = geometry.baseBuffers.get('positions');
+        const initialPositions = buffer.array;
+        const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
+
+        expect(positionAttribute.array).toBe(initialPositions);
+        expect(geometry.basePool.capacity).toBe(1);
+
+        expect(base.x0).toBe(0);
+        expect(base.y0).toBe(1);
+        expect(base.z0).toBe(2);
+        expect(base.x3).toBe(9);
+        expect(base.y3).toBe(10);
+        expect(base.z3).toBe(11);
+
+        // prettier-ignore
+        const positions = new Float32Array([
+          100, 101, 102,
+          103, 104, 105,
+          106, 107, 108,
+          109, 110, 111,
+        ]);
+
+        geometry.basePool.fromBuffersData(
+          {
+            capacity: 1,
+            usedCount: 1,
+            buffers: {
+              positions,
+            },
+          },
+          true,
+        );
+
+        expect(base.x0).toBe(100);
+        expect(base.y0).toBe(101);
+        expect(base.z0).toBe(102);
+        expect(base.x3).toBe(109);
+        expect(base.y3).toBe(110);
+        expect(base.z3).toBe(111);
+
+        geometry.update();
+
+        expect(positionAttribute.array).not.toBe(positions);
+        expect(positionAttribute.array).toBe(initialPositions);
+      });
+
+      test('foo: zero-copy', () => {
+        const [geometry, , vo0, vo1, vo2] = makeInstancedGeometry();
+
+        const buffer = geometry.instancedBuffers.get('static_float32');
+        const initialDataArray = buffer.array;
+        const fooAttribute = geometry.getAttribute('foo')! as InterleavedBufferAttribute;
+
+        expect(fooAttribute.data.array).toBe(initialDataArray);
+        expect(geometry.instancedPool.capacity).toBe(10);
+
+        expect(vo0.foo).toBe(100);
+        expect(vo1.foo).toBe(103);
+        expect(vo2.foo).toBe(106);
+
+        // prettier-ignore
+        const dataArray = new Float32Array([
+          // mh.. here we don't know if foo or bar[2] is first, so we need to set all to same value
+          500, 500, 500,
+          503, 503, 503,
+          506, 506, 506,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0, 0,
+        ]);
+
+        geometry.instancedPool.fromBuffersData({
+          capacity: 10,
+          usedCount: 3,
+          buffers: {
+            static_float32: dataArray,
+          },
+        });
+
+        expect(vo0.foo).toBe(500);
+        expect(vo1.foo).toBe(503);
+        expect(vo2.foo).toBe(506);
+
+        geometry.update();
+
+        expect(fooAttribute.array).toBe(dataArray);
+        expect(fooAttribute.array).not.toBe(initialDataArray);
       });
     });
 

@@ -60,8 +60,8 @@ export class VOBufferPool {
    * NOTE: The capacity should be the same as the original pool.
    *
    * @param copyTypedArrays By default, the typed-array references are simply shared (zero-copy) if possible.
-   *                        But if `copyTypedArrays` is set to `true` or the typed-array from the input is smaller than
-   *                        the current array from the buffer then the data is copied.
+   *                        But if `copyTypedArrays` is set to `true` or the typed-array from the input is smaller
+   *                        than the current array from the buffer then the data is copied.
    */
   fromBuffersData(buffersData: VertexObjectBuffersData, copyTypedArrays = false): void {
     if (buffersData.capacity !== this.capacity) {
