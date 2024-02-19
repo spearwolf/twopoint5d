@@ -43,6 +43,29 @@ describe('vertex-buffers-geometry-updates', () => {
       },
     });
 
+    interface MyBaseVO extends VO {
+      x0: number;
+      y0: number;
+      z0: number;
+      x1: number;
+      y1: number;
+      z1: number;
+      x2: number;
+      y2: number;
+      z2: number;
+      x3: number;
+      y3: number;
+      z3: number;
+
+      // prettier-ignore
+      setPosition(values: [
+        number, number, number,
+        number, number, number,
+        number, number, number,
+        number, number, number,
+      ]): void;
+    }
+
     interface MyInstancedVO extends VO {
       r: number;
       g: number;
@@ -59,7 +82,7 @@ describe('vertex-buffers-geometry-updates', () => {
     }
 
     const makeInstancedGeometry = () => {
-      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, VO>(instancedDesc, 10, baseDesc, 1);
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const pool = geometry.instancedPool;
 
       const vo0 = pool.createVO();
@@ -80,7 +103,16 @@ describe('vertex-buffers-geometry-updates', () => {
       vo2.setBar([107, 108]);
       vo2.impact = 1002;
 
-      return [geometry, pool, vo0, vo1, vo2] as const;
+      const base = geometry.basePool.createVO();
+      // prettier-ignore
+      base.setPosition([
+        0, 1, 2,
+        3, 4, 5,
+        6, 7, 8,
+        9, 10, 11,
+      ]);
+
+      return [geometry, pool, vo0, vo1, vo2, base] as const;
     };
 
     describe('create buffers and arrays', () => {
@@ -137,6 +169,54 @@ describe('vertex-buffers-geometry-updates', () => {
         // @ts-ignore
         expect(impactAttribute.isInstancedBufferAttribute).toBe(true);
         expect(impactAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray);
+      });
+    });
+
+    describe('fromBuffersData', () => {
+      test('position: zero-copy', () => {
+        const [geometry, , , , , base] = makeInstancedGeometry();
+
+        const buffer = geometry.baseBuffers.get('static_float32');
+        const bufferArray = buffer.array;
+        const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
+
+        expect(positionAttribute.array).toBe(bufferArray);
+        expect(geometry.basePool.capacity).toBe(1);
+
+        expect(base.x0).toBe(0);
+        expect(base.y0).toBe(1);
+        expect(base.z0).toBe(2);
+        expect(base.x3).toBe(9);
+        expect(base.y3).toBe(10);
+        expect(base.z3).toBe(11);
+
+        // prettier-ignore
+        const positions = new Float32Array([
+          100, 101, 102,
+          103, 104, 105,
+          106, 107, 108,
+          109, 110, 111,
+        ]);
+
+        geometry.basePool.fromBuffersData({
+          capacity: 1,
+          usedCount: 1,
+          buffers: {
+            static_float32: positions,
+          },
+        });
+
+        expect(base.x0).toBe(100);
+        expect(base.y0).toBe(101);
+        expect(base.z0).toBe(102);
+        expect(base.x3).toBe(109);
+        expect(base.y3).toBe(110);
+        expect(base.z3).toBe(111);
+
+        geometry.update();
+
+        expect(positionAttribute.array).toBe(positions);
+        expect(positionAttribute.array).not.toBe(bufferArray);
       });
     });
 
