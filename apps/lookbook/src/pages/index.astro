@@ -3,8 +3,8 @@ import DemoCardsGrid from '~components/DemoCardsGrid.astro';
 import LookbookHeader from '~components/LookbookHeader.astro';
 import TagCloudFilter from '~components/TagCloudFilter.astro';
 import Layout from '~layouts/Layout.astro';
-import backPattern from '../images/ricepaper-reduced-dark.png?url';
-import gradientBack from '../images/so-mi-gradient-back-666x.webp?url';
+import backPattern from '../images/ball-pattern-dark-blueish-4x-30deck.webp?url';
+import gradientBack from '../images/so-mi-gradient-back-gr.webp?url';
 ---
 
 <Layout title="2.5d lookbook">
@@ -36,11 +36,13 @@ import gradientBack from '../images/so-mi-gradient-back-666x.webp?url';
 
 <style define:vars={{'page-background-pattern': `url(${backPattern})`, 'page-gradient-back': `url(${gradientBack})`}}>
   .back-pattern {
-    background-color: var(--color-background);
-    /* background-image: var(--page-background-pattern), var(--page-gradient-back);
+    /* background-color: var(--color-background);
+    background-image: var(--page-background-pattern), var(--page-gradient-back);
     background-repeat: repeat, no-repeat;
     background-size: auto, contain;
-    background-position: top left, top center; */
+    background-position:
+      top left,
+      top center; */
     background-image: var(--page-gradient-back);
     background-repeat: no-repeat;
     background-size: contain;
