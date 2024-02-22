@@ -223,8 +223,8 @@ importers:
         specifier: ^3.4.1
         version: 3.4.1
       '@spearwolf/signalize':
-        specifier: ^0.12.0
-        version: 0.12.0(@spearwolf/eventize@3.4.1)
+        specifier: ^0.13.0
+        version: 0.13.0(@spearwolf/eventize@3.4.1)
       three:
         specifier: ~0.161.0
         version: 0.161.0
@@ -4377,7 +4377,6 @@ packages:
       '@spearwolf/eventize': ^3.4.1
     dependencies:
       '@spearwolf/eventize': 3.4.1
-    dev: true
 
   /@stitches/react@1.2.8(react@18.2.0):
     resolution: {integrity: sha512-9g9dWI4gsSVe8bNLlb+lMkBYsnIKCZTmvqvDG+Avnn69XfmHZKiaMrx7cgTaddq7aTPPmXiTsbFcUy0xgI4+wA==}
