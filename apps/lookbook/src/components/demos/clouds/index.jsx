@@ -13,20 +13,20 @@ const Demo = ({speed, alpha}) => (
         origin="bottom left"
         width={1024}
         height={768}
-        distanceToProjectionPlane={250}
+        distanceToProjectionPlane={1500}
         fit="contain"
       />
 
       <Clouds
         capacity={400}
-        gap={5}
+        gap={20}
         speed={speed}
-        width={2500}
+        width={3500}
         height={600}
-        yOffset={-400}
-        zOffset={-660}
-        fadeInRange={0.1}
-        fadeOutRange={0.2}
+        yOffset={-1750}
+        zOffset={-15000}
+        fadeInRange={0.3}
+        fadeOutRange={0.3}
         postAlphaMultiplier={alpha}
       />
     </Stage2D>
@@ -37,8 +37,8 @@ const Demo = ({speed, alpha}) => (
 
 export default function DemoOrDie() {
   const {speed, alpha} = useControls({
-    speed: {value: 100, min: 0, max: 250, step: 1},
-    alpha: {value: 0.9, min: 0.01, max: 0.99, step: 0.01},
+    speed: {value: 1300, min: 0, max: 5000, step: 1},
+    alpha: {value: 0.23, min: 0.01, max: 0.99, step: 0.01},
   });
 
   return (
