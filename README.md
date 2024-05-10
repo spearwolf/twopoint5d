@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>
-    fast rendering of 2D sprites &bull; billboards &bull; texture atlas &bull; frame-based animation &bull; parallax &bull; tiled 2D maps &bull; pixelart
+    ultra fast rendering of 2D sprites in 3D space &bull; billboards &bull; texture atlas &bull; frame-based animations &bull; parallax &bull; tiled 2D maps &bull; pixelart
   </b>
 </p>
 
