@@ -1,0 +1,29 @@
+---
+import twopoint5d from '../images/twopoint5d-logo.svg?url';
+---
+
+<div class="absolute bottom-0 z-50 -rotate-90 origin-bottom-left transform-gpu container pointer-events-none">
+  <div class="flex justify-center">
+    <header class="demo-navbar flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-10 backdrop-blur-sm pointer-events-auto">
+      <img class="primary" src={twopoint5d} alt="twopoint5d" />
+    </header>
+  </div>
+</div>
+
+<style>
+  .container {
+    width: 100vh;
+    height: 0;
+    right: calc(-100vh + 100vw);
+  }
+
+  .demo-navbar {
+    --bg-col: var(--color-demo-navbar-background, rgba(18 22 25 / 75%));
+    background-color: var(--bg-col);
+  }
+
+  .demo-navbar img.primary {
+    max-height: 32px;
+    margin-left: 0.75rem;
+  }
+</style>
