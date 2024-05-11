@@ -5,7 +5,9 @@ import twopoint5d from '../images/twopoint5d-logo.svg?url';
 <div class="absolute bottom-0 z-50 -rotate-90 origin-bottom-left transform-gpu container pointer-events-none">
   <div class="flex justify-center">
     <header class="demo-navbar flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-10 backdrop-blur-sm pointer-events-auto">
-      <img class="primary" src={twopoint5d} alt="twopoint5d" />
+      <a href={import.meta.env.BASE_URL}>
+        <img class="primary" src={twopoint5d} alt="twopoint5d" />
+      </a>
     </header>
   </div>
 </div>
