@@ -1,18 +1,58 @@
 ---
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
+import CloseDialogIcon from './icons/CloseDialogIcon.astro';
+import CodeIcon from './icons/CodeIcon.astro';
+import HomeIcon from './icons/HomeIcon.astro';
 ---
 
 <div class="absolute bottom-0 z-50 -rotate-90 origin-bottom-left transform-gpu container pointer-events-none">
   <div class="flex justify-center">
-    <header class="demo-navbar flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-10 backdrop-blur-sm pointer-events-auto">
+    <header
+      class="demo-navbar gap-2 flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-10 backdrop-blur-sm pointer-events-auto"
+    >
       <a href={import.meta.env.BASE_URL}>
         <img class="primary" src={twopoint5d} alt="twopoint5d" />
       </a>
+      <a href={import.meta.env.BASE_URL} class="interactive-action rotate-90">
+        <HomeIcon />
+      </a>
+      <button class="interactive-action open-show-source-dialog-action rotate-90">
+        <CodeIcon />
+      </button>
     </header>
   </div>
 </div>
 
+<dialog class="show-source-dialog p-4 rounded-md backdrop-blur-sm">
+  <header class="flex flex-col items-end mb-2">
+    <button autofocus>
+      <CloseDialogIcon />
+    </button>
+  </header>
+  <p class="text-xl">This modal dialog has a groovy backdrop!</p>
+</dialog>
+
 <style>
+  .show-source-dialog {
+    background-color: rgba(18 22 25 / 75%);
+    color: #fff;
+    outline: 1px solid #ffe;
+    box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
+  }
+
+  .show-source-dialog::backdrop {
+    background: rgb(187, 0, 51);
+    background: linear-gradient(
+      22deg,
+      rgba(187, 0, 51, 0.66) 0%,
+      rgba(143, 0, 132, 0.66) 13%,
+      rgba(8, 101, 92, 0.66) 61%,
+      rgba(0, 96, 102, 0.66) 64%,
+      rgba(0, 35, 97, 0.66) 86%,
+      rgba(0, 2, 102, 0.66) 100%
+    );
+  }
+
   .container {
     width: 100vh;
     height: 0;
@@ -22,10 +62,36 @@ import twopoint5d from '../images/twopoint5d-logo.svg?url';
   .demo-navbar {
     --bg-col: var(--color-demo-navbar-background, rgba(18 22 25 / 75%));
     background-color: var(--bg-col);
+    color: #ddd;
   }
 
   .demo-navbar img.primary {
     max-height: 32px;
     margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+
+  .interactive-action:hover {
+    color: #fff;
+    background-color: #333;
+    border-radius: 2px;
+  }
+
+  .interactive-action:focus-visible {
+    outline: 0;
   }
 </style>
+
+<script>
+  const dialog = document.querySelector('dialog.show-source-dialog') as HTMLDialogElement;
+  const closeButton = dialog.querySelector('button');
+  const showButton = document.querySelector('button.open-show-source-dialog-action');
+
+  showButton.addEventListener('click', () => {
+    dialog.showModal();
+  });
+
+  closeButton.addEventListener('click', () => {
+    dialog.close();
+  });
+</script>
