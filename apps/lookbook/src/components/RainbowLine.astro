@@ -1,0 +1,24 @@
+---
+interface Props {
+  shadow?: boolean;
+}
+
+const {shadow = false} = Astro.props;
+---
+
+<rainbow-line class="rainbow"></rainbow-line>
+{shadow && <rainbow-line class="rainbow-shadow" />}
+
+<script is:inline async type="module" src={`${import.meta.env.BASE_URL}/js/rainbow-line-v0.2.1.js`}></script>
+
+<style>
+  .rainbow {
+    height: var(--rainbow-line-height, 4px);
+  }
+  .rainbow-shadow {
+    --height: var(--rainbow-shadow-height, 12px);
+    height: var(--height);
+    opacity: var(--rainbow-shadow-opacity, 0.4);
+    filter: blur(var(--height));
+  }
+</style>

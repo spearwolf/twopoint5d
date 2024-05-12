@@ -1,4 +1,6 @@
 ---
+import RainbowLine from './RainbowLine.astro';
+
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
 ---
@@ -8,12 +10,8 @@ import twopoint5d from '../images/twopoint5d-logo.svg?url';
     <img class="primary" src={twopoint5d} alt="twopoint5d" />
     <img class="secondary" src={lookbook} alt="lookbook" />
 
-    <div class="rainbow-line">
-      <div class="rainbow-line-25"></div>
-      <div class="rainbow-line-50"></div>
-      <div class="rainbow-line-100"></div>
-      <div class="rainbow-line-50"></div>
-      <div class="rainbow-line-25"></div>
+    <div class="rainbow-line-container">
+      <RainbowLine shadow />
     </div>
   </header>
 </div>
@@ -24,32 +22,14 @@ import twopoint5d from '../images/twopoint5d-logo.svg?url';
     box-shadow: 0 0 20px #4c4c42;
   }
 
-  .rainbow-line {
+  .rainbow-line-container {
     position: absolute;
     bottom: 0;
     left: 0;
-    display: flex;
-    flex-direction: column;
+    display: block;
     width: 100%;
-    background: linear-gradient(180deg, var(--color-header-background) 0%, rgb(0 0 0) 100%);
-  }
-
-  .rainbow-line > div {
-    width: 100%;
-    height: 1px;
-  }
-
-  .rainbow-line-25 {
-    background: linear-gradient(in hsl longer hue 45deg, #401 0 0);
-  }
-
-  .rainbow-line-50 {
-    background: linear-gradient(in hsl longer hue 45deg, #802 0 0);
-  }
-
-  .rainbow-line-100 {
-    background: linear-gradient(in hsl longer hue 45deg, #f00 0 0);
-    height: 2px;
+    height: 0;
+    pointer-events: none;
   }
 
   .lookbook-header img.primary {
