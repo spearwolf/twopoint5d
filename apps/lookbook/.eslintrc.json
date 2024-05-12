@@ -1,4 +1,4 @@
 {
   "extends": ["../../.eslintrc.json"],
-  "ignorePatterns": ["!**/*", "src/env.d.ts"]
+  "ignorePatterns": ["!**/*", "src/env.d.ts", "public/**/*.js"]
 }
