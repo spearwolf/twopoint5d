@@ -2,6 +2,7 @@
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
 import CloseDialogIcon from './icons/CloseDialogIcon.astro';
 import CodeIcon from './icons/CodeIcon.astro';
+import GitHubInvertocatIcon from './icons/GitHubInvertocatIcon.astro';
 import HomeIcon from './icons/HomeIcon.astro';
 ---
 
@@ -10,12 +11,12 @@ import HomeIcon from './icons/HomeIcon.astro';
     <header
       class="demo-navbar gap-2 flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-10 backdrop-blur-sm pointer-events-auto"
     >
-      <a href={import.meta.env.BASE_URL}>
-        <img class="primary" src={twopoint5d} alt="twopoint5d" />
-      </a>
       <a href={import.meta.env.BASE_URL} class="interactive-action rotate-90">
         <HomeIcon />
       </a>
+      <button class="interactive-action open-show-source-dialog-action">
+        <img class="primary" src={twopoint5d} alt="twopoint5d" />
+      </button>
       <button class="interactive-action open-show-source-dialog-action rotate-90">
         <CodeIcon />
       </button>
@@ -23,20 +24,43 @@ import HomeIcon from './icons/HomeIcon.astro';
   </div>
 </div>
 
-<dialog class="show-source-dialog p-4 rounded-md backdrop-blur-sm">
-  <header class="flex flex-col items-end mb-2">
+<dialog class="show-source-dialog px-6 py-4 rounded-md backdrop-blur-sm">
+  <header class="flex flex-row items-center justify-between mb-4">
+    <figure class="flex items-center justify-start text-slate-300">
+      <figcaption>a</figcaption>
+      <a href={import.meta.env.BASE_URL}>
+        <img class="h-8" src={twopoint5d} alt="twopoint5d" />
+      </a>
+      <figcaption>demo</figcaption>
+    </figure>
     <button autofocus>
       <CloseDialogIcon />
     </button>
   </header>
-  <p class="text-xl">This modal dialog has a groovy backdrop!</p>
+  <section>
+    <h2 class="text-2xl">Explore Source Code</h2>
+    <p class="text-sm">Want to see how it is done?</p>
+    <ul class="mt-4 mb-6">
+      <li class="ring-1 ring-white rounded-md hover:bg-slate-800">
+        <a class="flex flex-row justify-center items-center text-sm py-2 gap-2" href="">
+          <GitHubInvertocatIcon class="h-10" />
+          <span>Show source on GitHub</span>
+        </a>
+      </li>
+    </ul>
+    <a class="block mb-1 text-xs text-center text-slate-400 underline" href="https://github.com/spearwolf/twopoint5d"
+      >Just take me to the project repository</a
+    >
+    <a class="block mb-1 text-xs text-center text-slate-400 underline" href={import.meta.env.BASE_URL}>Explore LookBook</a>
+  </section>
 </dialog>
 
 <style>
   .show-source-dialog {
+    min-width: 320px;
     background-color: rgba(18 22 25 / 75%);
     color: #fff;
-    outline: 1px solid #ffe;
+    outline: 1px solid #e5e500;
     box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
   }
 
@@ -51,6 +75,7 @@ import HomeIcon from './icons/HomeIcon.astro';
       rgba(0, 35, 97, 0.66) 86%,
       rgba(0, 2, 102, 0.66) 100%
     );
+    backdrop-filter: blur(2px);
   }
 
   .container {
@@ -67,8 +92,6 @@ import HomeIcon from './icons/HomeIcon.astro';
 
   .demo-navbar img.primary {
     max-height: 32px;
-    margin-left: 0.75rem;
-    margin-right: 0.75rem;
   }
 
   .interactive-action:hover {
@@ -85,11 +108,13 @@ import HomeIcon from './icons/HomeIcon.astro';
 <script>
   const dialog = document.querySelector('dialog.show-source-dialog') as HTMLDialogElement;
   const closeButton = dialog.querySelector('button');
-  const showButton = document.querySelector('button.open-show-source-dialog-action');
+  const showButtons = document.querySelectorAll('button.open-show-source-dialog-action');
 
-  showButton.addEventListener('click', () => {
-    dialog.showModal();
-  });
+  for (const showButton of showButtons) {
+    showButton.addEventListener('click', () => {
+      dialog.showModal();
+    });
+  }
 
   closeButton.addEventListener('click', () => {
     dialog.close();
