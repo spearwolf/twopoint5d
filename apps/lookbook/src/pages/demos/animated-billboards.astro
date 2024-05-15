@@ -1,9 +1,9 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_animated-billboards.json';
+import {showSource, title} from './_animated-billboards.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 

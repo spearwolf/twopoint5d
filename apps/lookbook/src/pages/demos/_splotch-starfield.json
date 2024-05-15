@@ -13,5 +13,8 @@
     "<two5-unreal-bloom-pass/>",
     "two5-elements"
   ],
-  "previewImage": "splotch-starfield.png"
+  "previewImage": "splotch-starfield.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/splotch-starfield.astro"
+  }
 }

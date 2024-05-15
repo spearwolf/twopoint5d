@@ -14,5 +14,8 @@
     "vanilla",
     "demo"
   ],
-  "previewImage": "animated-billboards.png"
+  "previewImage": "animated-billboards.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/animated-billboards.astro"
+  }
 }

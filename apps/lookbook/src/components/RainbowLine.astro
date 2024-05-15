@@ -1,13 +1,29 @@
 ---
 interface Props {
   shadow?: boolean;
+  colorSliceWidth?: number;
+  sliceCycleTime?: number;
+  cycleDirection?: 'left' | 'right';
 }
 
-const {shadow = false} = Astro.props;
+const {shadow = false, colorSliceWidth = 10, sliceCycleTime = 7, cycleDirection = 'right'} = Astro.props;
 ---
 
-<rainbow-line class="rainbow"></rainbow-line>
-{shadow && <rainbow-line class="rainbow-shadow" />}
+<rainbow-line
+  class="rainbow"
+  color-slice-width={colorSliceWidth}
+  slice-cycle-time={sliceCycleTime}
+  cycle-direction={cycleDirection}></rainbow-line>
+{
+  shadow && (
+    <rainbow-line
+      class="rainbow-shadow"
+      color-slice-width={colorSliceWidth}
+      slice-cycle-time={sliceCycleTime}
+      cycle-direction={cycleDirection}
+    />
+  )
+}
 
 <script is:inline async type="module" src={`${import.meta.env.BASE_URL}/js/rainbow-line-v0.2.1.js`}></script>
 

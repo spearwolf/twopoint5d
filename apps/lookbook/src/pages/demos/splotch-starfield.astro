@@ -1,9 +1,9 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_splotch-starfield.json';
+import {showSource, title} from './_splotch-starfield.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <section class="container">
     <two5-display id="mydisplay" class="display">
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">
