@@ -1,11 +1,13 @@
 ---
 import DemoOrDie from '~components/demos/clouds/index.jsx';
 import Layout from '~layouts/ReactDemo.astro';
-import {title} from './_clouds.json';
+import {description, showSource, title} from './_clouds.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <DemoOrDie client:only />
+
+  <p slot="demo-description">{description}</p>
 </Layout>
 
 <style>

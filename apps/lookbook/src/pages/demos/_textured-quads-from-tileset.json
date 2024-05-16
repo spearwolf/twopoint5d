@@ -3,5 +3,8 @@
   "description": "Render instanced quads with texture frames from a tileset",
   "url": "/demos/textured-quads-from-tileset",
   "tags": ["TileSet", "TileSetLoader", "VertexObjects", "instanced", "tilesets", "textures", "vanilla"],
-  "previewImage": "textured-quads-from-tileset.png"
+  "previewImage": "textured-quads-from-tileset.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/textured-quads-from-tileset.astro"
+  }
 }

@@ -1,15 +1,17 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_animated-sprites.json';
+import {description, showSource, title} from './_animated-sprites.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <canvas id="canvas-container" resize-to="window"></canvas>
   <section class="fixed top-4 right-4 flex gap-2">
     <div class="actionBtn moreSprites">MORE</div>
     <div class="spriteCount">0</div>
     <div class="actionBtn lessSprites">LESS</div>
   </section>
+
+  <p slot="demo-description">{description}</p>
 </Layout>
 
 <style>
@@ -53,7 +55,7 @@ import {title} from './_animated-sprites.json';
   import assetsUrl from '~demos/utils/assetsUrl';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
-  
+
   const renderSpriteCount = (count: number) => {
     document.querySelector('.spriteCount').textContent = count.toString();
   };
@@ -81,9 +83,9 @@ import {title} from './_animated-sprites.json';
     bouncingSprites.startSpeedX = 50;
 
     bouncingSprites.createSprites(INITIAL_SPRITE_COUNT, animId);
-    
+
     renderSpriteCount(INITIAL_SPRITE_COUNT);
-    
+
     const material = new AnimatedSpritesMaterial();
 
     material.colorMap = texture;

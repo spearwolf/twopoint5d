@@ -15,5 +15,8 @@
     "map2d",
     "vanilla"
   ],
-  "previewImage": "map2d-layer3d.png"
+  "previewImage": "map2d-layer3d.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/map2d-layer3d.astro"
+  }
 }

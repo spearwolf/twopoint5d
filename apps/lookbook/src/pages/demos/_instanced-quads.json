@@ -3,5 +3,8 @@
   "description": "A minimal example of how to render instanced vertex-objects",
   "url": "/demos/instanced-quads",
   "tags": ["InstancedVertexObjectGeometry", "VO", "VertexObjects", "instanced", "vanilla"],
-  "previewImage": "instanced-quads.png"
+  "previewImage": "instanced-quads.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/instanced-quads.astro"
+  }
 }

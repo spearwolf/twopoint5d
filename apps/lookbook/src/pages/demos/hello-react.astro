@@ -1,10 +1,12 @@
 ---
 import DemoOrDie from '~components/demos/hello-react/HelloReact.jsx';
 import Layout from '~layouts/ReactDemo.astro';
-import {title} from './_hello-react.json';
+import {description, showSource, title} from './_hello-react.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <DemoOrDie client:only />
 </Layout>
 

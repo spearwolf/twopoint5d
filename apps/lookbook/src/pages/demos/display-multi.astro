@@ -1,9 +1,11 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_display-multi.json';
+import {description, showSource, title} from './_display-multi.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <section class="gridContainer">
     <div class="gridCell">
       <div class="canvasContainer border-box">

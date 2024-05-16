@@ -1,10 +1,12 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_display-minimal.json';
+import {description, showSource, title} from './_display-minimal.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <canvas id="twopoint5d" resize-to="window"></canvas>
+
+  <p slot="demo-description">{description}</p>
 </Layout>
 
 <script>
@@ -25,7 +27,7 @@ import {title} from './_display-minimal.json';
       fit: 'contain',
     }),
   );
-  
+
   stage.scene.background = new Color('#272727');
 
   (window as any).display = display;

@@ -1,9 +1,11 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_quadtree-playground.json';
+import {description, showSource, title} from './_quadtree-playground.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <canvas id="twopoint5d" resize-to="window"></canvas>
 </Layout>
 

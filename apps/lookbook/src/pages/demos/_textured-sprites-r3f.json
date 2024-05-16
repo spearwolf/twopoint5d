@@ -18,5 +18,8 @@
     "react",
     "r3f"
   ],
-  "previewImage": "textured-sprites-r3f.png"
+  "previewImage": "textured-sprites-r3f.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/components/demos/textured-sprites-r3f/index.jsx"
+  }
 }

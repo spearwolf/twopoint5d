@@ -1,9 +1,11 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_textured-quads.json';
+import {description, showSource, title} from './_textured-quads.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <div id="texture-preview" class="texture-preview"></div>

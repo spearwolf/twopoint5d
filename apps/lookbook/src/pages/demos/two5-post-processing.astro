@@ -1,9 +1,11 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {title} from './_two5-post-processing.json';
+import {description, showSource, title} from './_two5-post-processing.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <section class="container">
     <two5-display class="display">
       <two5-texture-store id="texstore" src="/lookbook/assets/textures.json">

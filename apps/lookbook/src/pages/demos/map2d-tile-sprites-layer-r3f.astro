@@ -1,10 +1,12 @@
 ---
 import DemoOrDie from '~components/demos/map2d-tile-sprites-layer-r3f/index.jsx';
 import Layout from '~layouts/ReactDemo.astro';
-import {title} from './_map2d-tile-sprites-layer-r3f.json';
+import {description, showSource, title} from './_map2d-tile-sprites-layer-r3f.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
+  <p slot="demo-description">{description}</p>
+
   <DemoOrDie client:only />
 </Layout>
 

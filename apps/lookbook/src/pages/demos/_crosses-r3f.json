@@ -3,5 +3,8 @@
   "description": "A minimal example of how to use the VertexObjcts mesh with react-three/fiber",
   "url": "/demos/crosses-r3f",
   "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "react", "r3f"],
-  "previewImage": "crosses-r3f.png"
+  "previewImage": "crosses-r3f.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/components/demos/crosses-r3f/index.jsx"
+  }
 }

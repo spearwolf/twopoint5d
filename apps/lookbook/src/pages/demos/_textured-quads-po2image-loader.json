@@ -3,5 +3,8 @@
   "description": "Render instanced quads with a power-of-2 image texture",
   "url": "/demos/textured-quads-po2image-loader",
   "tags": ["PowerOf2ImageLoader", "TextureCoords", "VertexObjects", "instanced", "textures", "vanilla"],
-  "previewImage": "textured-quads-po2image-loader.png"
+  "previewImage": "textured-quads-po2image-loader.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/textured-quads-po2image-loader.astro"
+  }
 }

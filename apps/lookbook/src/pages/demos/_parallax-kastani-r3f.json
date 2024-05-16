@@ -22,5 +22,8 @@
     "react",
     "r3f"
   ],
-  "previewImage": "parallax-kastani-r3f.png"
+  "previewImage": "parallax-kastani-r3f.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/components/demos/parallax-kastani-r3f/index.jsx"
+  }
 }

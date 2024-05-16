@@ -21,5 +21,8 @@
     "react",
     "r3f"
   ],
-  "previewImage": "map2d-rect-visi-area.png"
+  "previewImage": "map2d-rect-visi-area.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/components/demos/map2d-rect-visi-area/index.jsx"
+  }
 }

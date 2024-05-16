@@ -11,5 +11,8 @@
     "textures",
     "vanilla"
   ],
-  "previewImage": "textured-sprites.png"
+  "previewImage": "textured-sprites.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/textured-sprites.astro"
+  }
 }

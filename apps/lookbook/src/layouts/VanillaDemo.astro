@@ -19,7 +19,9 @@ const {title, showSource} = Astro.props;
     <title>2.5d lookbook &#x2022; {title} demo</title>
   </head>
   <body>
-    <DemoNavBar title={title} showSource={showSource} />
+    <DemoNavBar title={title} showSource={showSource}>
+      <slot name="demo-description" slot="description" />
+    </DemoNavBar>
     <slot />
   </body>
 </html>

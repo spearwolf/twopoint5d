@@ -3,5 +3,8 @@
   "description": "A visual playground for the quadtree data structure",
   "url": "/demos/quadtree-playground",
   "tags": ["Stage2D", "OrthographicProjection", "Display", "ChunkQuadTreeNode", "vanilla", "playground"],
-  "previewImage": "quadtree-playground.png"
+  "previewImage": "quadtree-playground.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/quadtree-playground.astro"
+  }
 }

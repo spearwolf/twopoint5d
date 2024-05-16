@@ -1,11 +1,13 @@
 ---
 import DemoOrDie from '~components/demos/crosses-r3f/index.jsx';
 import Layout from '~layouts/ReactDemo.astro';
-import {title} from './_crosses-r3f.json';
+import {description, showSource, title} from './_crosses-r3f.json';
 ---
 
-<Layout title={title}>
+<Layout title={title} showSource={showSource}>
   <DemoOrDie client:only />
+
+  <p slot="demo-description">{description}</p>
 </Layout>
 
 <style>
