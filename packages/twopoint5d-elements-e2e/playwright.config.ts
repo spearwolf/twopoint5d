@@ -35,22 +35,24 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        headless: true,
-      },
-    },
-
-    {
       name: 'firefox',
       use: {...devices['Desktop Firefox'], headless: true},
     },
 
-    {
-      name: 'webkit',
-      use: {...devices['Desktop Safari'], headless: true},
-    },
+    ...(process.env.CI ? [] : [
+      {
+        name: 'chromium',
+        use: {
+          ...devices['Desktop Chrome'],
+          headless: true,
+        },
+      },
+      {
+        name: 'webkit',
+        use: {...devices['Desktop Safari'], headless: true},
+      },
+    ])
+  ],
 
     /* Test against mobile viewports. */
     // {
@@ -71,7 +73,7 @@ export default defineConfig({
     //   name: 'Google Chrome',
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
-  ],
+  // ],
 
   /* Run your local dev server before starting the tests */
   webServer: {

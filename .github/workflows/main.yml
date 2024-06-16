@@ -22,13 +22,12 @@ jobs:
         env:
           NPM_TOKEN: xxx
 
-      - uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
+      - uses: browser-actions/setup-firefox@v1
 
       - name: Run all checks
         run: xvfb-run pnpm run ci
         env:
+          CI: 1
           NPM_TOKEN: xxx
 
       - name: Upload twopoint5d-elements-e2e test-results artifacts
