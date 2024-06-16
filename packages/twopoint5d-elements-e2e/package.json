@@ -20,11 +20,11 @@
   "dependencies": {
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
-    "three": "~0.161.0"
+    "three": "~0.165.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.38.1",
-    "@types/three": "~0.161.2",
+    "@types/three": "~0.165.0",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",

@@ -1,5 +1,5 @@
 import '@react-three/fiber';
-import {FC, PropsWithChildren, useMemo} from 'react';
+import {useMemo, type FC, type PropsWithChildren} from 'react';
 import {BoxGeometry} from 'three';
 
 export interface WiredBoxProps extends PropsWithChildren<JSX.IntrinsicElements['lineSegments']> {

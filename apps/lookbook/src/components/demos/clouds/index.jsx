@@ -35,15 +35,16 @@ const Demo = ({speed, alpha}) => (
   </>
 );
 
+const Main = ({speed, alpha}) => (
+  <Canvas dpr={[1, 2]} camera={{position: [0, 0, 50]}}>
+    <Demo speed={speed} alpha={alpha} />
+  </Canvas>
+);
+
 export default function DemoOrDie() {
   const {speed, alpha} = useControls({
     speed: {value: 1300, min: 0, max: 5000, step: 1},
     alpha: {value: 0.23, min: 0.01, max: 0.99, step: 0.01},
   });
-
-  return (
-    <Canvas dpr={[1, 2]} camera={{position: [0, 0, 50]}}>
-      <Demo speed={speed} alpha={alpha} />
-    </Canvas>
-  );
+  return <Main speed={speed} alpha={alpha} />;
 }

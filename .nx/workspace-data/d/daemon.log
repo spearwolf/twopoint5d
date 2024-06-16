@@ -1,0 +1,21 @@
+[NX Daemon Server] - 2024-06-16T13:01:36.333Z - Started listening on: \\.\pipe\nx\C:\Users\wolfg\AppData\Local\Temp\1dd9dce90ceddcd0fd16\d.sock
+[NX Daemon Server] - 2024-06-16T13:01:36.337Z - [WATCHER]: Subscribed to changes within: d:\spaceland\twopoint5d (native)
+[NX Daemon Server] - 2024-06-16T13:01:36.338Z - Established a connection. Number of open connections: 1
+[NX Daemon Server] - 2024-06-16T13:01:36.339Z - Closed a connection. Number of open connections: 0
+[NX Daemon Server] - 2024-06-16T13:01:36.339Z - Established a connection. Number of open connections: 1
+[NX Daemon Server] - 2024-06-16T13:01:36.341Z - [REQUEST]: Client Request for Project Graph Received
+[NX Daemon Server] - 2024-06-16T13:01:36.353Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX Daemon Server] - 2024-06-16T13:01:36.362Z - [REQUEST]: 
+[NX Daemon Server] - 2024-06-16T13:01:36.362Z - [REQUEST]: 
+[NX Daemon Server] - 2024-06-16T13:01:37.001Z - [REQUEST]: Responding to the client. project-graph
+[NX Daemon Server] - 2024-06-16T13:01:37.007Z - Time taken for 'total for creating and serializing project graph' 659.7563000004739ms
+[NX Daemon Server] - 2024-06-16T13:01:37.009Z - Done responding to the client project-graph
+[NX Daemon Server] - 2024-06-16T13:01:37.009Z - Handled REQUEST_PROJECT_GRAPH. Handling time: 660. Response time: 8.
+[NX Daemon Server] - 2024-06-16T13:01:37.015Z - [REQUEST]: Responding to the client. handleContextFileData
+[NX Daemon Server] - 2024-06-16T13:01:37.015Z - Done responding to the client handleContextFileData
+[NX Daemon Server] - 2024-06-16T13:01:37.015Z - Handled GET_CONTEXT_FILE_DATA. Handling time: 1. Response time: 0.
+[NX Daemon Server] - 2024-06-16T13:01:37.016Z - Closed a connection. Number of open connections: 0
+[NX Daemon Server] - 2024-06-16T13:01:41.765Z - [WATCHER]: Processing file changes in outputs
+[NX Daemon Server] - 2024-06-16T13:01:41.765Z - [WATCHER]: Stopping the watcher for d:\spaceland\twopoint5d (sources)
+[NX Daemon Server] - 2024-06-16T13:01:41.765Z - [WATCHER]: Stopping the watcher for d:\spaceland\twopoint5d (outputs)
+[NX Daemon Server] - 2024-06-16T13:01:41.765Z - Server stopped because: "LOCK_FILES_CHANGED"

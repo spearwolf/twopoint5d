@@ -1,4 +1,4 @@
-import type {Scene, WebGLRenderer} from 'three';
+import type {Camera, Scene, WebGLRenderer} from 'three';
 import type {IStage} from './index.js';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
@@ -88,7 +88,7 @@ export interface IStage2DRenderFrame {
 
 export const StageAfterCameraChanged = 'stageAfterCameraChanged';
 
-export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: THREE.Camera | undefined];
+export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: Camera | undefined];
 
 export interface IStageAfterCameraChanged {
   stageAfterCameraChanged(...args: StageAfterCameraChangedArgs): void;

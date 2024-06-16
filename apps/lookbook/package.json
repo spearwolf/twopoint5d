@@ -14,7 +14,7 @@
   "dependencies": {
     "@astrojs/react": "^3.0.9",
     "@astrojs/tailwind": "^5.1.0",
-    "@react-three/drei": "^9.90.0",
+    "@react-three/drei": "^9.107.0",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-demos": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
@@ -26,11 +26,12 @@
     "lil-gui": "^0.19.1",
     "nanostores": "^0.10.3",
     "r3f-perf": "^7.1.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "sass": "^1.70.0",
     "styled-components": "^6.1.8",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "three": "~0.165.0"
   },
   "nx": {
     "targets": {
