@@ -27,7 +27,7 @@ jobs:
           chrome-version: stable
 
       - name: Run all checks
-        run: xvfb-run pnpm run ci:install
+        run: xvfb-run pnpm run ci
         env:
           NPM_TOKEN: xxx
 
