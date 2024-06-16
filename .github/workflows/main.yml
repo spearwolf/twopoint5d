@@ -22,9 +22,9 @@ jobs:
         env:
           NPM_TOKEN: xxx
 
-      - name: Install playwright dependencies
-        run: pnpm exec playwright install
-        
+      - name: Install playwright browsers
+        run: pnpm exec playwright install chrome firefox
+
       - name: Run all checks
         run: xvfb-run pnpm run ci
         env:
