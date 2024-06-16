@@ -23,13 +23,13 @@
     "three": "~0.165.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.38.1",
+    "@playwright/test": "^1.44.1",
     "@types/three": "~0.165.0",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.31",
-    "tailwindcss": "^3.3.5",
-    "typescript": "^5.2.2",
-    "vite": "^4.4.5"
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.1"
   },
   "nx": {
     "targets": {

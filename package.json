@@ -23,7 +23,9 @@
     "update": "pnpm dlx npm-check --update",
     "cbt": "pnpm run-s -sn clean build test",
     "lookbook": "pnpm nx dev lookbook",
-    "ci": "pnpm run-s -sn build lint test"
+    "ci": "pnpm run-s -sn build lint test",
+    "playwright:install": "pnpm exec playwright install",
+    "ci:install": "pnpm run-s -sn playwright:install ci"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.15.3",
