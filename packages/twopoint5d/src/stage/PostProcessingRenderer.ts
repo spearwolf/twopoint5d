@@ -107,7 +107,7 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
         target.length,
         'but is',
         nextPasses.length,
-        {target, nextPasses, renderer: this},
+        {target, passes, nextPasses, renderer: this},
       );
     }
 

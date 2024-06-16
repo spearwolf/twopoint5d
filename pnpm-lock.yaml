@@ -235,8 +235,8 @@ importers:
         specifier: ^0.13.0
         version: 0.13.0(@spearwolf/eventize@3.4.2)
       three:
-        specifier: ~0.161.0
-        version: 0.161.0
+        specifier: ~0.165.0
+        version: 0.165.0
 
   packages/twopoint5d-demos:
     dependencies:
@@ -6018,9 +6018,6 @@ packages:
     resolution: {integrity: sha512-rYr8PqMljMza+Ct8kQk90Y7y+YcWoPu1thfYv5YGCp0hytNRbxSQWXY4GpdTGymCj3bDggEBpxso53C3pPwhIw==}
     peerDependencies:
       three: '>=0.128.0'
-
-  three@0.161.0:
-    resolution: {integrity: sha512-LC28VFtjbOyEu5b93K0bNRLw1rQlMJ85lilKsYj6dgTu+7i17W+JCCEbvrpmNHF1F3NAUqDSWq50UD7w9H2xQw==}
 
   three@0.165.0:
     resolution: {integrity: sha512-cc96IlVYGydeceu0e5xq70H8/yoVT/tXBxV/W8A/U6uOq7DXc4/s1Mkmnu6SqoYGhSRWWYFOhVwvq6V0VtbplA==}
@@ -13814,8 +13811,6 @@ snapshots:
       fflate: 0.6.10
       potpack: 1.0.2
       three: 0.165.0
-
-  three@0.161.0: {}
 
   three@0.165.0: {}
 
