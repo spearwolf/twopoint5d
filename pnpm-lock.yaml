@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      playwright:
+        specifier: ^1.44.1
+        version: 1.44.1
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.15.3
