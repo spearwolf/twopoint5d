@@ -1,38 +1,29 @@
 {
-  "name": "lookbook",
+  "name": "landing-page",
   "type": "module",
   "version": "0.0.1",
-  "private": true,
   "scripts": {
-    "dev": "pnpm exec astro dev",
-    "start": "pnpm exec astro dev",
-    "build": "pnpm exec astro build",
-    "preview": "pnpm exec astro preview",
-    "update": "pnpm dlx npm-check --update",
-    "astro:check": "pnpm exec astro check",
-    "astro": "pnpm exec astro"
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
   },
   "dependencies": {
     "@astrojs/react": "^3.5.0",
     "@astrojs/tailwind": "^5.1.0",
-    "@react-three/drei": "^9.107.0",
     "@spearwolf/twopoint5d": "workspace:*",
-    "@spearwolf/twopoint5d-demos": "workspace:*",
-    "@spearwolf/twopoint5d-elements": "workspace:*",
-    "@spearwolf/twopoint5d-r3f": "workspace:*",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.165.0",
     "astro": "^4.10.2",
-    "leva": "^0.9.35",
-    "lil-gui": "^0.19.2",
+    "@astrojs/check": "^0.7.0",
     "nanostores": "^0.10.3",
-    "r3f-perf": "^7.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sass": "^1.77.5",
-    "styled-components": "^6.1.11",
     "tailwindcss": "^3.4.4",
-    "three": "~0.165.0"
+    "three": "~0.165.0",
+    "typescript": "^5.4.5"
   },
   "nx": {
     "targets": {

@@ -8,9 +8,9 @@ import tailwind from '@astrojs/tailwind';
 
 // https://astro.build/config
 export default defineConfig({
-  base: '/lookbook',
   server: {
     host: true,
+    port: 4322,
   },
   integrations: [react(), tailwind()],
 });
