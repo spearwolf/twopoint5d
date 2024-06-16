@@ -38,15 +38,15 @@ export default defineConfig({
       name: 'firefox',
       use: {...devices['Desktop Firefox'], headless: true},
     },
-    {
-      name: 'chrome',
-      use: {
-        ...devices['Desktop Chrome'],
-        headless: true,
-      },
-    },
 
     ...(process.env.CI ? [] : [
+      {
+        name: 'chrome',
+        use: {
+          ...devices['Desktop Chrome'],
+          headless: true,
+        },
+      },
       {
         name: 'webkit',
         use: {...devices['Desktop Safari'], headless: true},

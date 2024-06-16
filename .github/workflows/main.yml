@@ -23,7 +23,7 @@ jobs:
           NPM_TOKEN: xxx
 
       - name: Install playwright browsers
-        run: pnpm exec playwright install chrome firefox
+        run: pnpm exec playwright install firefox
 
       - name: Run all checks
         run: xvfb-run pnpm run ci
