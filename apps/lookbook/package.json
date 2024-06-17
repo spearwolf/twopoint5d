@@ -16,6 +16,7 @@
     "@astrojs/react": "^3.5.0",
     "@astrojs/tailwind": "^5.1.0",
     "@react-three/drei": "^9.107.0",
+    "@spearwolf/astro-rainbow-line": "workspace:*",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-demos": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",

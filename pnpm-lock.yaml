@@ -219,6 +219,9 @@ importers:
       '@react-three/drei':
         specifier: ^9.107.0
         version: 9.107.0(@react-three/fiber@8.16.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.165.0))(@types/react@18.3.3)(@types/three@0.165.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.165.0)
+      '@spearwolf/astro-rainbow-line':
+        specifier: workspace:*
+        version: link:../../packages/astro-rainbow-line
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -274,6 +277,8 @@ importers:
       '@tailwindcss/aspect-ratio':
         specifier: ^0.4.2
         version: 0.4.2(tailwindcss@3.4.4(ts-node@10.9.2(@types/node@20.14.2)(typescript@5.4.5)))
+
+  packages/astro-rainbow-line: {}
 
   packages/twopoint5d:
     dependencies:
