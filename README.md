@@ -53,7 +53,7 @@ _twopoint5d_ is a monorepo that contains the following javascript / typescript l
 
 So it's up to you if you want to go the _react_, _web components_ or "vanilla" way :wink:
 
-| 🔎 However, it should also be mentioned at this point that the _vanilla_ library is the only real and stable library here. both the react / r3f library and the _web components_ library are rather experimental in nature. in the end, i do not consider either technology to be optimal for a rendering engine. currently (as a side note), i am working on a component architecture that works offscreen in web workers, for the brave among you who dare to take a look at it, here is the link: [spearwolf/visual-fx-web-components](https://github.com/spearwolf/visual-fx-web-components)
+| 🔎 However, it should also be mentioned at this point that the _vanilla_ library is the only real and stable library here. both the react / r3f library and the _web components_ library are rather experimental in nature. in the end, i do not consider either technology to be optimal for a rendering engine. currently (as a side note), i am working on a component architecture that works offscreen in web workers, for the brave among you who dare to take a look at it, here is the link: [spearwolf/shadow-objects](https://github.com/spearwolf/shadow-objects)
 
 
 ## 📖 Documentation
