@@ -13,7 +13,7 @@
     "astro": "pnpm exec astro"
   },
   "dependencies": {
-    "@astrojs/react": "^3.5.0",
+    "@astrojs/react": "^3.6.2",
     "@astrojs/tailwind": "^5.1.0",
     "@react-three/drei": "^9.107.0",
     "@spearwolf/astro-rainbow-line": "workspace:*",
@@ -23,7 +23,7 @@
     "@spearwolf/twopoint5d-r3f": "workspace:*",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "astro": "^4.10.2",
+    "astro": "^4.13.3",
     "leva": "^0.9.35",
     "lil-gui": "^0.19.2",
     "nanostores": "^0.10.3",
