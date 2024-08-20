@@ -6,13 +6,10 @@
   "license": "Apache-2.0",
   "private": true,
   "engines": {
-    "node": ">=18.16",
-    "pnpm": ">=8.8"
+    "node": ">=20.12",
+    "pnpm": ">=9.7"
   },
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "packageManager": "pnpm@9.7",
   "scripts": {
     "build": "pnpm nx run-many -t build",
     "test": "pnpm nx run-many -t test",
@@ -79,6 +76,5 @@
     "use-asset": "^1.0.4",
     "vitest": "^1.6.0",
     "zustand": "^4.5.2"
-  },
-  "packageManager": "pnpm@9.7.1"
+  }
 }
