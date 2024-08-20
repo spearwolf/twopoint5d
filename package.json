@@ -7,9 +7,9 @@
   "private": true,
   "engines": {
     "node": ">=20.12",
-    "pnpm": ">=9.7"
+    "pnpm": "=9.7.1"
   },
-  "packageManager": "pnpm@9.7",
+  "packageManager": "pnpm@9.7.1",
   "scripts": {
     "build": "pnpm nx run-many -t build",
     "test": "pnpm nx run-many -t test",
