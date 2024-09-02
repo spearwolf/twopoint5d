@@ -5,7 +5,7 @@ import {description, showSource, title} from './_clouds.json';
 ---
 
 <Layout title={title} showSource={showSource}>
-  <DemoOrDie client:only />
+  <DemoOrDie client:only="react" />
 
   <p slot="demo-description">{description}</p>
 </Layout>

@@ -6,24 +6,25 @@
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro check && astro build",
+    "update": "pnpm dlx npm-check --update",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/react": "^3.5.0",
+    "@astrojs/check": "^0.9.3",
+    "@astrojs/react": "^3.6.2",
     "@astrojs/tailwind": "^5.1.0",
     "@spearwolf/twopoint5d": "workspace:*",
-    "@types/react": "^18.3.3",
+    "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/three": "^0.165.0",
-    "astro": "^4.10.2",
-    "@astrojs/check": "^0.7.0",
-    "nanostores": "^0.10.3",
+    "astro": "^4.15.2",
+    "nanostores": "^0.11.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwindcss": "^3.4.4",
+    "tailwindcss": "^3.4.10",
     "three": "~0.165.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.5.4"
   },
   "nx": {
     "targets": {
