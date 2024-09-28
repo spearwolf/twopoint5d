@@ -1,5 +1,6 @@
 import {OrbitControls} from '@react-three/drei';
 import {extend, useThree} from '@react-three/fiber';
+import {on} from '@spearwolf/eventize';
 import {CameraBasedVisibility} from '@spearwolf/twopoint5d';
 import {
   Map2DLayer3D,
@@ -134,9 +135,11 @@ export const DemoOrDie = () => {
 
   useEffect(
     () =>
-      tileSprites?.on(['tileSetChanged', 'tileDataChanged'], () => {
-        map2dLayerRef.current?.resetTiles();
-      }),
+      tileSprites
+        ? on(tileSprites, ['tileSetChanged', 'tileDataChanged'], () => {
+            map2dLayerRef.current?.resetTiles();
+          })
+        : undefined,
     [tileSprites],
   );
 

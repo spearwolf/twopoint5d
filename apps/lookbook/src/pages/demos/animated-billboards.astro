@@ -1,6 +1,6 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_animated-billboards.json';
+import { description, showSource, title } from './_animated-billboards.json';
 ---
 
 <Layout title={title} showSource={showSource}>
@@ -22,7 +22,8 @@ import {description, showSource, title} from './_animated-billboards.json';
 </style>
 
 <script>
-  import {
+  import { on } from '@spearwolf/eventize';
+import {
     AnimatedSprites,
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
@@ -68,7 +69,7 @@ import {description, showSource, title} from './_animated-billboards.json';
 
     demo.scene.add(mesh);
 
-    demo.on('frame', ({deltaTime, now}) => {
+    on(demo, 'frame', ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
       material.uniforms['time'].value = now;
       mesh.update();

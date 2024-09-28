@@ -29,6 +29,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 </style>
 
 <script>
+  import {on} from '@spearwolf/eventize';
   import {TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial, TileSetLoader} from '@spearwolf/twopoint5d';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -36,7 +37,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  demo.on('init', async ({scene}) => {
+  on(demo, 'init', async ({scene}) => {
     const CAPACITY = 256;
 
     const geometry = new TexturedSpritesGeometry(CAPACITY);
@@ -57,7 +58,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     scene.add(mesh);
 
-    demo.on('frame', ({deltaTime}) => {
+    on(demo, 'frame', ({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       mesh.update();
     });

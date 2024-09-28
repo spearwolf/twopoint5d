@@ -81,7 +81,7 @@ function Component(
     if (stage?.camera) {
       setStageCamera(toManualControlled(stage.camera));
     }
-    return stage && on(stage, StageAfterCameraChanged, ({camera}) => setStageCamera(toManualControlled(camera)));
+    return stage ? on(stage, StageAfterCameraChanged, ({camera}) => setStageCamera(toManualControlled(camera))) : undefined;
   }, [stage]);
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
@@ -107,12 +107,11 @@ function Component(
       stage.resize(canvasSize.width, canvasSize.height);
     }
 
-    return (
-      parentStage &&
-      on(parentStage, StageResize, ({width, height}: StageResizeProps) => {
-        stage.resize(width, height);
-      })
-    );
+    return parentStage
+      ? on(parentStage, StageResize, ({width, height}: StageResizeProps) => {
+          stage.resize(width, height);
+        })
+      : undefined;
   }, [stage, parentStage, canvasSize.width, canvasSize.height]);
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――

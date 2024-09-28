@@ -43,6 +43,7 @@ import {description, showSource, title} from './_animated-sprites.json';
 </style>
 
 <script>
+  import {on} from '@spearwolf/eventize';
   import {
     AnimatedSprites,
     AnimatedSpritesGeometry,
@@ -60,7 +61,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     document.querySelector('.spriteCount').textContent = count.toString();
   };
 
-  demo.on('init', async ({scene, camera}) => {
+  on(demo, 'init', async ({scene, camera}) => {
     camera.position.z = 60;
 
     const CAPACITY = 1000;
@@ -99,7 +100,7 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     scene.add(mesh);
 
-    demo.on('frame', ({deltaTime, now}) => {
+    on(demo, 'frame', ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
       material.uniforms['time'].value = now;
       mesh.update();

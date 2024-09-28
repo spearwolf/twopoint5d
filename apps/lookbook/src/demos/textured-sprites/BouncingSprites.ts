@@ -25,7 +25,7 @@ export class BouncingSprites {
   containerHeight: number;
 
   spriteSize: number;
-  initalSpriteCount: number;
+  initialSpriteCount: number;
 
   sprites: BounceSprite[] = [];
 
@@ -35,17 +35,17 @@ export class BouncingSprites {
     width = 300,
     height = 150,
     spriteSize = 10,
-    initalSpriteCount = 256,
+    initialSpriteCount = 256,
   ) {
     this.spritePool = spritePool;
     this.textureAtlas = textureAtlas;
     this.containerWidth = width;
     this.containerHeight = height;
     this.spriteSize = spriteSize;
-    this.initalSpriteCount = initalSpriteCount;
+    this.initialSpriteCount = initialSpriteCount;
   }
 
-  createSprites(count = this.initalSpriteCount, frameId?: number) {
+  createSprites(count = this.initialSpriteCount, frameId?: number) {
     const [halfWidth, halfHeight] = [this.containerWidth / 2, this.containerHeight / 2];
 
     for (let i = 0; i < count; i++) {

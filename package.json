@@ -19,7 +19,7 @@
     "clean": "pnpm nx run-many -t clean && rimraf dist",
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
-    "cbt": "pnpm run-s -sn clean build test",
+    "cbt": "pnpm run-s -sn clean build test:ci",
     "lookbook": "pnpm nx dev lookbook",
     "landing-page": "pnpm nx dev landing-page",
     "ci": "pnpm run-s -sn build lint test:ci",

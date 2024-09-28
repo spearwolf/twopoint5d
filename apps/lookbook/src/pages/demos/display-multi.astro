@@ -57,6 +57,7 @@ import {description, showSource, title} from './_display-multi.json';
 </Layout>
 
 <script>
+  import {on} from '@spearwolf/eventize';
   import {Display, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -86,21 +87,21 @@ import {description, showSource, title} from './_display-multi.json';
     sprite.scale.set(100, 100, 0); // => should result in a 200x200 (css pixels) pixelart/crisp image
     stage.scene.add(sprite);
 
-    display.on('init', ({renderer}) => {
+    on(display, 'init', ({renderer}) => {
       renderer.setClearColor(new Color('#304050'), 1.0);
     });
 
-    display.on('resize', ({width, height}) => {
+    on(display, 'resize', ({width, height}) => {
       stage.resize(width, height);
     });
 
-    display.on('frame', ({renderer, now, deltaTime, frameNo}) => {
+    on(display, 'frame', ({renderer, now, deltaTime, frameNo}) => {
       stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
 
     const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvas as HTMLElement);
 
-    display.on('resize', ({width, height, display}) => updateCanvasSizeInfo(width, height, display.pixelRatio));
+    on(display, 'resize', ({width, height, display}) => updateCanvasSizeInfo(width, height, display.pixelRatio));
 
     display.start();
   }

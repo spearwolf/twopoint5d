@@ -28,7 +28,7 @@ function Component({onUpdate, children, ...props}: Map2DPanControlProps, ref: Fo
 
   useEffect(() => {
     if (panControl && onUpdate) {
-      return panControl && on(panControl, 'update', onUpdate);
+      return panControl ? on(panControl, 'update', onUpdate) : undefined;
     }
   }, [panControl, onUpdate]);
 

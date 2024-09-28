@@ -47,6 +47,7 @@ import {description, showSource, title} from './_splotch-starfield.json';
 </style>
 
 <script>
+  import {on} from '@spearwolf/eventize';
   import {Display, TextureStore} from '@spearwolf/twopoint5d';
   import {OnMaterial, Starfield, type OnMaterialParams} from '@spearwolf/twopoint5d-demos';
   import {DisplayElement, Stage2DElement, TextureStoreElement, whenDefined} from '@spearwolf/twopoint5d-elements';
@@ -83,7 +84,7 @@ import {description, showSource, title} from './_splotch-starfield.json';
 
   starfield.setBaseColors([0x001219, 0x005f73, 0x0a9396, 0x94d2bd, 0xe9d8a6, 0xee9b00, 0xca6702, 0xbb3e03, 0xae2012, 0x9b2226]);
 
-  starfield.on(OnMaterial, ({material}: OnMaterialParams) => {
+  on(starfield, OnMaterial, ({material}: OnMaterialParams) => {
     console.log('starfield.material', material);
 
     material.logShadersToConsole = true;
@@ -92,7 +93,7 @@ import {description, showSource, title} from './_splotch-starfield.json';
     material.tintColorNear = new Color(0xffffff);
   });
 
-  display.on('resize', ({width, height}) => {
+  on(display, 'resize', ({width, height}) => {
     starfield.setScreenResolution(width, height);
   });
 

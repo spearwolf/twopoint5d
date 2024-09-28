@@ -1,4 +1,4 @@
-import {Priority} from '@spearwolf/eventize';
+import {on, Priority} from '@spearwolf/eventize';
 import {Display} from '@spearwolf/twopoint5d';
 import {Color, PerspectiveCamera, Scene} from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
@@ -24,12 +24,12 @@ export class PerspectiveOrbitDemo extends Display {
 
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 
-    this.on('resize', Priority.BB, ({camera, width, height}) => {
+    on(this, 'resize', Priority.BB, ({camera, width, height}) => {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     });
 
-    this.on('frame', Priority.Low, ({controls, renderer, scene, camera}) => {
+    on(this, 'frame', Priority.Low, ({controls, renderer, scene, camera}) => {
       controls.update();
       renderer.render(scene, camera);
     });

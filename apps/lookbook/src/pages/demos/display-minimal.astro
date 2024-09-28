@@ -10,6 +10,7 @@ import {description, showSource, title} from './_display-minimal.json';
 </Layout>
 
 <script>
+  import {on} from '@spearwolf/eventize';
   import {Display, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -43,15 +44,15 @@ import {description, showSource, title} from './_display-minimal.json';
   sprite.scale.set(width, height, 1);
   stage.scene.add(sprite);
 
-  display.on('init', ({renderer}) => {
+  on(display, 'init', ({renderer}) => {
     renderer.setClearColor(new Color('#0050A0'), 1.0);
   });
 
-  display.on('resize', ({width, height}) => {
+  on(display, 'resize', ({width, height}) => {
     stage.resize(width, height);
   });
 
-  display.on('frame', ({renderer, now, deltaTime, frameNo}) => {
+  on(display, 'frame', ({renderer, now, deltaTime, frameNo}) => {
     stage.renderFrame(renderer, now, deltaTime, frameNo);
   });
 

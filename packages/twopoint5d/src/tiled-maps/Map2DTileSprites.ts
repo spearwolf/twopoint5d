@@ -1,4 +1,4 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize, on} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three';
 import type {TileSprite} from '../sprites/TileSprites/descriptors.js';
 import {TileSprites} from '../sprites/TileSprites/TileSprites.js';
@@ -7,8 +7,6 @@ import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import {Map2DTile} from './Map2DTile.js';
-
-export interface Map2DTileSprites extends Eventize {}
 
 export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer {
   #tileData?: IMap2DTileDataProvider;
@@ -31,7 +29,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
     this.name = 'twopoint5d.Map2DTileSprites';
 
-    this.on('ready', () => this.#addDeferredTiles());
+    on(this, 'ready', () => this.#addDeferredTiles());
   }
 
   get tileData(): IMap2DTileDataProvider | undefined {
@@ -45,7 +43,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     this.#checkReady();
 
     if (previousTileData !== tileData) {
-      this.emit('tileDataChanged', tileData, previousTileData);
+      emit(this, 'tileDataChanged', tileData, previousTileData);
     }
   }
 
@@ -60,7 +58,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     this.#checkReady();
 
     if (previousTileSet !== tileSet) {
-      this.emit('tileSetChanged', tileSet, previousTileSet);
+      emit(this, 'tileSetChanged', tileSet, previousTileSet);
     }
   }
 
@@ -75,7 +73,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
   #checkReady(): void {
     if (!this.#isReady && this.#updateReadyState()) {
-      this.emit('ready');
+      emit(this, 'ready');
     }
   }
 
