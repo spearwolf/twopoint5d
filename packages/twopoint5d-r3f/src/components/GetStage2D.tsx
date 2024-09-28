@@ -16,7 +16,7 @@ export function GetStage2D({name, children, fallback}: GetStage2DProps) {
   const stageNames = Array.isArray(name) ? name : [name];
   const stages = stageNames.map((stageName) => useStage2D(stageName));
 
-  return stages.every((stage) => stage != null) ? children(...(stages as Stage2D[])) : fallback ?? null;
+  return stages.every((stage) => stage != null) ? children(...(stages as Stage2D[])) : (fallback ?? null);
 }
 
 GetStage2D.displayName = 'GetStage2D';
