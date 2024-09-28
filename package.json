@@ -13,6 +13,7 @@
   "scripts": {
     "build": "pnpm nx run-many -t build",
     "test": "pnpm nx run-many -t test",
+    "test:ci": "pnpm nx run-many -t test --projects=tag:ci",
     "lint": "pnpm nx run-many -t lint",
     "test:affected": "pnpm nx affected -t test",
     "clean": "pnpm nx run-many -t clean && rimraf dist",
@@ -21,7 +22,7 @@
     "cbt": "pnpm run-s -sn clean build test",
     "lookbook": "pnpm nx dev lookbook",
     "landing-page": "pnpm nx dev landing-page",
-    "ci": "pnpm run-s -sn build lint test",
+    "ci": "pnpm run-s -sn build lint test:ci",
     "playwright:install": "pnpm exec playwright install",
     "ci:install": "pnpm run-s -sn playwright:install ci"
   },

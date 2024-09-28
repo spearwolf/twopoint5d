@@ -20,5 +20,5 @@
       "dependsOn": ["^build"]
     }
   },
-  "tags": []
+  "tags": ["ci"]
 }
