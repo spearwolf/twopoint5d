@@ -1,5 +1,5 @@
-import {eventize, type Eventize} from '@spearwolf/eventize';
-import {batch, createEffect, createSignal, touch, value, type SignalFuncs, type SignalReader} from '@spearwolf/signalize';
+import {emit, eventize, retain} from '@spearwolf/eventize';
+import {batch, createEffect, createSignal, SignalObject, touch, value, type SignalReader} from '@spearwolf/signalize';
 import {signal, signalReader} from '@spearwolf/signalize/decorators';
 import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
 import type {TextureAtlas} from './TextureAtlas.js';
@@ -47,8 +47,6 @@ const cmpTileSetOptions = (a: TileSetOptions | undefined, b: TileSetOptions | un
   }
   return false;
 };
-
-export interface TextureResource extends Eventize {}
 
 export class TextureResource {
   static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): TextureResource {
@@ -100,13 +98,13 @@ export class TextureResource {
     return resource;
   }
 
-  #atlasUrl?: SignalFuncs<string | undefined>;
-  #atlasJson?: SignalFuncs<TexturePackerJsonData | undefined>;
-  #overrideImageUrl?: SignalFuncs<string | undefined>;
-  #atlas?: SignalFuncs<TextureAtlas | undefined>;
-  #tileSetOptions?: SignalFuncs<TileSetOptions | undefined>;
-  #tileSet?: SignalFuncs<TileSet | undefined>;
-  #textureClasses: SignalFuncs<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
+  #atlasUrl?: SignalObject<string | undefined>;
+  #atlasJson?: SignalObject<TexturePackerJsonData | undefined>;
+  #overrideImageUrl?: SignalObject<string | undefined>;
+  #atlas?: SignalObject<TextureAtlas | undefined>;
+  #tileSetOptions?: SignalObject<TileSetOptions | undefined>;
+  #tileSet?: SignalObject<TileSet | undefined>;
+  #textureClasses: SignalObject<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
 
   #createTileSetOptionsSignal(tileSetOptions: TileSetOptions | undefined) {
     if (this.#tileSetOptions == null) {
@@ -241,7 +239,7 @@ export class TextureResource {
     this.id = id;
     this.type = type;
 
-    this.retain(['imageCoords', 'atlas', 'tileSet', 'texture']);
+    retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture']);
   }
 
   /**
@@ -256,19 +254,19 @@ export class TextureResource {
       this.#load = true;
 
       this.imageCoords$((value) => {
-        this.emit('imageCoords', value);
+        emit(this, 'imageCoords', value);
       });
 
       this.atlas$?.((value) => {
-        this.emit('atlas', value);
+        emit(this, 'atlas', value);
       });
 
       this.tileSet$?.((value) => {
-        this.emit('tileSet', value);
+        emit(this, 'tileSet', value);
       });
 
       this.texture$((value) => {
-        this.emit('texture', value);
+        emit(this, 'texture', value);
       });
 
       createEffect(() => {
@@ -307,7 +305,7 @@ export class TextureResource {
         createEffect(() => {
           if (this.atlasUrl) {
             fetch(this.atlasUrl)
-              .then((respsonse) => respsonse.json())
+              .then((response) => response.json())
               .then((atlasJson) => {
                 this.atlasJson = atlasJson;
               });

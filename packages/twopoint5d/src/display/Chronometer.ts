@@ -12,13 +12,13 @@ export class Chronometer {
   #lostTime: number;
 
   /** Time lost due to pause after the previous time */
-  #recentyLostTime: number;
+  #recentlyLostTime: number;
 
   #isRunning: boolean;
 
   /** Time past since the beginning (w/o the lost/pause time) */
   get time(): number {
-    return this.#currentTime - this.#timeStart - this.#lostTime - this.#recentyLostTime;
+    return this.#currentTime - this.#timeStart - this.#lostTime - this.#recentlyLostTime;
   }
 
   /**
@@ -36,7 +36,7 @@ export class Chronometer {
 
   /** Time lost due to pause */
   get lostTime(): number {
-    return this.#lostTime + this.#recentyLostTime;
+    return this.#lostTime + this.#recentlyLostTime;
   }
 
   /** The pause state */
@@ -51,7 +51,7 @@ export class Chronometer {
     this.#currentTime = curTime;
     this.#deltaTime = 0;
     this.#lostTime = 0;
-    this.#recentyLostTime = 0;
+    this.#recentlyLostTime = 0;
     this.#isRunning = true;
   }
 
@@ -63,7 +63,7 @@ export class Chronometer {
     if (this.#isRunning) {
       this.#deltaTime = deltaTime;
     } else {
-      this.#recentyLostTime += deltaTime;
+      this.#recentlyLostTime += deltaTime;
     }
   }
 
@@ -74,7 +74,7 @@ export class Chronometer {
   stop(): void {
     if (this.#isRunning) {
       this.#isRunning = false;
-      this.#recentyLostTime = 0;
+      this.#recentlyLostTime = 0;
     }
   }
 
@@ -82,8 +82,8 @@ export class Chronometer {
   start(): void {
     if (!this.#isRunning) {
       this.#isRunning = true;
-      this.#lostTime += this.#recentyLostTime;
-      this.#recentyLostTime = 0;
+      this.#lostTime += this.#recentlyLostTime;
+      this.#recentlyLostTime = 0;
     }
   }
 }

@@ -1,4 +1,4 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize, retain} from '@spearwolf/eventize';
 import {Camera, Color, Scene, WebGLRenderer} from 'three';
 
 import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -15,8 +15,6 @@ import {
 import type {IGetRenderPass} from './IGetRenderPass.js';
 import type {IProjection} from './IProjection.js';
 import type {IStage, RenderCmdFunc} from './IStage.js';
-
-export interface Stage2D extends Eventize {}
 
 // TODO extract base class Stage
 
@@ -99,7 +97,7 @@ export class Stage2D implements IStage, IGetRenderPass {
    * This will then take precedence over the automatically created camera.
    *
    * If the camera is manually set back to `null | undefined`, the next call of `resize()`
-   * will create (or resuse) the camera (created by the projection) as described above.
+   * will create (or reuse) the camera (created by the projection) as described above.
    */
   get camera(): Camera | undefined {
     return this.#cameraUserOverride ?? this.#cameraFromProjection;
@@ -114,14 +112,14 @@ export class Stage2D implements IStage, IGetRenderPass {
     updateCallback();
     if (prevCamera !== this.camera) {
       const args: StageAfterCameraChangedArgs = [this, prevCamera];
-      this.emit(StageAfterCameraChanged, ...args);
+      emit(this, StageAfterCameraChanged, ...args);
     }
   };
 
   constructor(projection?: IProjection, scene?: Scene) {
     eventize(this);
 
-    this.retain(FirstFrame);
+    retain(this, FirstFrame);
 
     this.projection = projection;
     this.scene = scene ?? new Scene();
@@ -167,7 +165,7 @@ export class Stage2D implements IStage, IGetRenderPass {
     }
 
     if (prevWidth !== w || prevHeight !== h) {
-      this.emit(StageResize, {stage: this, width: w, height: h} as Stage2DResizeProps);
+      emit(this, StageResize, {stage: this, width: w, height: h} as Stage2DResizeProps);
     }
   };
 
@@ -210,14 +208,14 @@ export class Stage2D implements IStage, IGetRenderPass {
 
       if (this.#isFirstFrame) {
         this.#firstFrameProps = {...renderFrameProps, scene: this.scene};
-        this.emit(FirstFrame, this.#firstFrameProps);
+        emit(this, FirstFrame, this.#firstFrameProps);
         this.#isFirstFrame = false;
       } else if (this.#firstFrameProps != null) {
         Object.assign(this.#firstFrameProps, renderFrameProps);
         this.#firstFrameProps.scene = this.scene;
       }
 
-      this.emit(StageRenderFrame, renderFrameProps);
+      emit(this, StageRenderFrame, renderFrameProps);
 
       if (!isRendered) {
         renderFrame();

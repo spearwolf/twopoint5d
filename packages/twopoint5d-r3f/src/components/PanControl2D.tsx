@@ -1,4 +1,5 @@
 import {extend, ReactThreeFiber, useFrame} from '@react-three/fiber';
+import {on} from '@spearwolf/eventize';
 import {PanControl2D as __PanControl2D} from '@spearwolf/twopoint5d';
 import {forwardRef, memo, useEffect, useRef, useState, type ForwardedRef} from 'react';
 import {mergeRefs} from '../utils/mergeRefs.js';
@@ -27,7 +28,7 @@ function Component({onUpdate, children, ...props}: Map2DPanControlProps, ref: Fo
 
   useEffect(() => {
     if (panControl && onUpdate) {
-      return panControl.on('update', onUpdate);
+      return panControl && on(panControl, 'update', onUpdate);
     }
   }, [panControl, onUpdate]);
 

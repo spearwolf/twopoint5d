@@ -1,3 +1,4 @@
+import {on} from '@spearwolf/eventize';
 import type {WebGLRenderer} from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {Pass} from 'three/addons/postprocessing/Pass.js';
@@ -23,7 +24,7 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
 
   constructor() {
     super();
-    this.on([StageAdded, StageRemoved], this);
+    on(this, [StageAdded, StageRemoved], this);
   }
 
   override renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {

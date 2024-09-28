@@ -1,12 +1,10 @@
-import {eventize, type EventizeApi} from '@spearwolf/eventize';
+import {emit, eventize} from '@spearwolf/eventize';
 import {Sprite, SpriteMaterial, Texture, type Scene, type WebGLRenderer} from 'three';
 import {TextureFactory} from '../texture/TextureFactory.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
-
-export interface Canvas2DStage extends EventizeApi {}
 
 export class Canvas2DStage {
   readonly renderer: WebGLRenderer;
@@ -152,6 +150,6 @@ export class Canvas2DStage {
   }
 
   private dispatchEvent(eventName: string) {
-    this.emit(eventName, this);
+    emit(this, eventName, this);
   }
 }

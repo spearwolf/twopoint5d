@@ -30,7 +30,7 @@
   },
   "peerDependencies": {
     "@react-three/fiber": "^8.16.8",
-    "@spearwolf/eventize": "^3.4.2",
+    "@spearwolf/eventize": "^4.0.1",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.3.0",
     "three": "~0.165.0",

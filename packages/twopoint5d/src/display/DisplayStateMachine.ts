@@ -1,8 +1,6 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize} from '@spearwolf/eventize';
 
 export type DisplayStateName = 'new' | 'running' | 'paused';
-
-export interface DisplayStateMachine extends Eventize {}
 
 export class DisplayStateMachine {
   static NEW: DisplayStateName = 'new';
@@ -102,7 +100,7 @@ export class DisplayStateMachine {
   #pause = (): void => {
     if (this.state !== DisplayStateMachine.PAUSED) {
       this.state = DisplayStateMachine.PAUSED;
-      this.emit(DisplayStateMachine.Pause);
+      emit(this, DisplayStateMachine.Pause);
     }
   };
 
@@ -111,9 +109,9 @@ export class DisplayStateMachine {
   #initOrRestart = (): void => {
     if (this.#initMustBeCalled) {
       this.#initMustBeCalled = false;
-      this.emit(DisplayStateMachine.Init);
+      emit(this, DisplayStateMachine.Init);
     } else {
-      this.emit(DisplayStateMachine.Restart);
+      emit(this, DisplayStateMachine.Restart);
     }
   };
 
@@ -126,7 +124,7 @@ export class DisplayStateMachine {
           if (!isPaused) {
             this.#initOrRestart();
             this.state = DisplayStateMachine.RUNNING;
-            this.emit(DisplayStateMachine.Start);
+            emit(this, DisplayStateMachine.Start);
           } else {
             this.#pause();
           }
@@ -136,7 +134,7 @@ export class DisplayStateMachine {
           if (!isPaused) {
             this.#initOrRestart();
             this.state = DisplayStateMachine.RUNNING;
-            this.emit(DisplayStateMachine.Start);
+            emit(this, DisplayStateMachine.Start);
           }
           break;
       }

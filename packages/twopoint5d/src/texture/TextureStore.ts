@@ -1,4 +1,4 @@
-import {eventize, type Eventize} from '@spearwolf/eventize';
+import {emit, eventize, on, once, onceAsync, retain} from '@spearwolf/eventize';
 import {batch, createSignal, value, type SignalReader} from '@spearwolf/signalize';
 import type {WebGLRenderer} from 'three';
 import type {TextureOptionClasses} from './TextureFactory.js';
@@ -30,8 +30,6 @@ const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): T
   return undefined;
 };
 
-export interface TextureStore extends Eventize {}
-
 export class TextureStore {
   static async load(url: string | URL): Promise<TextureStore> {
     return new TextureStore().load(url);
@@ -57,10 +55,10 @@ export class TextureStore {
 
   constructor() {
     eventize(this);
-    this.retain([OnReady, OnRendererChanged]);
+    retain(this, [OnReady, OnRendererChanged]);
 
     this.renderer$((renderer) => {
-      this.emit(OnRendererChanged, renderer);
+      emit(this, OnRendererChanged, renderer);
     });
   }
 
@@ -70,13 +68,13 @@ export class TextureStore {
       callback(resource);
       return () => {};
     }
-    return this.on(`${OnResource}:${id}`, (resource) => {
+    return on(this, `${OnResource}:${id}`, (resource) => {
       callback(resource);
     });
   }
 
   async whenReady(): Promise<TextureStore> {
-    await this.onceAsync(OnReady);
+    await onceAsync(this, OnReady);
     return this;
   }
 
@@ -144,16 +142,16 @@ export class TextureStore {
 
       if (resource) {
         this.#resources.set(id, resource);
-        this.on(resource);
+        on(this, resource);
         // TODO on delete resource: off(resource)
         updatedResources.push(resource);
       }
     }
 
-    this.emit(OnReady, this);
+    emit(this, OnReady, this);
 
     updatedResources.forEach((resource) => {
-      this.emit(`${OnResource}:${resource.id}`, resource);
+      emit(this, `${OnResource}:${resource.id}`, resource);
     });
   }
 
@@ -178,7 +176,7 @@ export class TextureStore {
       clearSubTypeSubscriptions();
     };
 
-    this.once(OnReady, () => {
+    once(this, OnReady, () => {
       if (isActiveSubscription) {
         unsubscribeFromResource = this.onResource(id, (resource) => {
           clearSubTypeSubscriptions();
@@ -194,7 +192,7 @@ export class TextureStore {
           if (isMultipleTypes) {
             (type as Array<TextureResourceSubType>).forEach((t) => {
               unsubscribeFromSubType.push(
-                resource.on(t, (val) => {
+                on(resource, t, (val) => {
                   values.set(t, val);
                   const valuesArg = (type as Array<TextureResourceSubType>).map((t) => values.get(t)).filter((v) => v != null);
                   if (valuesArg.length === type.length) {
@@ -205,7 +203,7 @@ export class TextureStore {
             });
           } else {
             unsubscribeFromSubType.push(
-              resource.on(type, (val) => {
+              on(resource, type, (val) => {
                 callback(val);
               }),
             );

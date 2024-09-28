@@ -45,13 +45,13 @@ export class HelpersManager {
   }
 
   removeFromScene(scene: Object3D): void {
-    const removeChilds: Object3D[] = [];
+    const removeChildren: Object3D[] = [];
     for (const childNode of scene.children) {
       if (childNode.userData['isHelper'] && childNode.userData['createdBy'] === this.uuid) {
-        removeChilds.push(childNode);
+        removeChildren.push(childNode);
       }
     }
-    for (const childNode of removeChilds) {
+    for (const childNode of removeChildren) {
       childNode.removeFromParent();
       (childNode as unknown as {dispose?: () => void}).dispose?.();
     }

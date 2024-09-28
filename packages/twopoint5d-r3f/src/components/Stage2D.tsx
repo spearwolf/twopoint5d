@@ -1,4 +1,5 @@
 import {createPortal, extend, ReactThreeFiber, useFrame, useThree} from '@react-three/fiber';
+import {on} from '@spearwolf/eventize';
 import {Stage2D as __Stage2D} from '@spearwolf/twopoint5d';
 import {StageAfterCameraChanged, StageResize, type StageResizeProps} from '@spearwolf/twopoint5d/events.js';
 import {
@@ -80,7 +81,7 @@ function Component(
     if (stage?.camera) {
       setStageCamera(toManualControlled(stage.camera));
     }
-    return stage?.on(StageAfterCameraChanged, ({camera}) => setStageCamera(toManualControlled(camera)));
+    return stage && on(stage, StageAfterCameraChanged, ({camera}) => setStageCamera(toManualControlled(camera)));
   }, [stage]);
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
@@ -106,9 +107,12 @@ function Component(
       stage.resize(canvasSize.width, canvasSize.height);
     }
 
-    return parentStage?.on(StageResize, ({width, height}: StageResizeProps) => {
-      stage.resize(width, height);
-    });
+    return (
+      parentStage &&
+      on(parentStage, StageResize, ({width, height}: StageResizeProps) => {
+        stage.resize(width, height);
+      })
+    );
   }, [stage, parentStage, canvasSize.width, canvasSize.height]);
 
   // ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――

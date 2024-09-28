@@ -1,21 +1,21 @@
-import {batch, createSignal, value, type SignalFuncs, type SignalReader} from '@spearwolf/signalize';
+import {batch, createSignal, SignalObject, value, type SignalReader} from '@spearwolf/signalize';
 
 export class SignalMap {
   static fromProps<T extends Object>(o: T, propKeys: (keyof T)[]): SignalMap {
-    const smap = new SignalMap();
+    const sm = new SignalMap();
     for (const key of propKeys) {
-      smap.#signals.set(
+      sm.#signals.set(
         key,
         createSignal(() => o[key], {lazy: true}),
       );
     }
-    return smap;
+    return sm;
   }
 
-  #signals: Map<PropertyKey, SignalFuncs<any>> = new Map();
+  #signals: Map<PropertyKey, SignalObject<any>> = new Map();
 
   getSignals(): SignalReader<unknown>[] {
-    return Array.from(this.#signals.values()).map(([sig]) => sig);
+    return Array.from(this.#signals.values()).map(([sig]) => sig as SignalReader<unknown>);
   }
 
   update(props: Map<PropertyKey, unknown>): void {
@@ -45,7 +45,7 @@ export class SignalMap {
   getValueObject(): Record<PropertyKey, unknown> {
     return Object.fromEntries(
       Array.from(this.#signals.entries())
-        .map(([key, [sig]]) => [key, value(sig)])
+        .map(([key, [sig]]) => [key, value(sig as any)])
         .filter(([, val]) => val != null),
     );
   }

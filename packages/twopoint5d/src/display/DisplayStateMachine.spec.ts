@@ -1,3 +1,4 @@
+import {off, on} from '@spearwolf/eventize';
 import {describe, expect, it, vi} from 'vitest';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 
@@ -19,7 +20,7 @@ describe('DisplayStateMachine', () => {
     const stateMachine = new DisplayStateMachine();
 
     const eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.start();
 
@@ -36,7 +37,7 @@ describe('DisplayStateMachine', () => {
     stateMachine.start();
 
     const eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.pausedByUser = true;
 
@@ -54,7 +55,7 @@ describe('DisplayStateMachine', () => {
     stateMachine.pausedByUser = true;
 
     const eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.pausedByUser = false;
 
@@ -73,7 +74,7 @@ describe('DisplayStateMachine', () => {
     stateMachine.documentIsVisible = false;
 
     const eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.pausedByUser = false;
 
@@ -89,7 +90,7 @@ describe('DisplayStateMachine', () => {
     const stateMachine = new DisplayStateMachine();
 
     let eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.pausedByUser = true;
     stateMachine.documentIsVisible = false;
@@ -113,9 +114,10 @@ describe('DisplayStateMachine', () => {
     expect(eventMocks[DisplayStateMachine.Pause]).toBeCalled();
     expect(eventMocks[DisplayStateMachine.Restart]).not.toBeCalled();
 
-    stateMachine.off(eventMocks);
+    off(stateMachine, eventMocks);
+
     eventMocks = createEventMocks();
-    stateMachine.on(eventMocks);
+    on(stateMachine, eventMocks);
 
     stateMachine.pausedByUser = false;
     stateMachine.documentIsVisible = true;

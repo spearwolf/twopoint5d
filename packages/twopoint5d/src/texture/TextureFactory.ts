@@ -22,7 +22,7 @@ export interface TextureOptions {
 }
 
 const TextureClasses = {
-  // TODO encoding classses
+  // TODO encoding classes
   anisotrophy: {
     anisotrophy: Infinity,
   },

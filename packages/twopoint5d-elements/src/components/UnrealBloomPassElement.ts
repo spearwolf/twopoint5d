@@ -13,6 +13,7 @@ import {
 } from '../context/post-processing-context.js';
 import {displayContext} from '../index.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
+import { on } from '@spearwolf/eventize';
 
 export class UnrealBloomPassElement extends TwoPoint5DElement implements PostProcessingPassElement {
   static override styles = css`
@@ -95,7 +96,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
         this.bloomPass.enabled = !this.disabled;
         this.bloomPass.clear = this.clear;
         this.logger?.log('created bloomPass', this.bloomPass);
-        return this.display.on('resize', ({width, height}) => {
+        return on(this.display, 'resize', ({width, height}) => {
           this.bloomPass?.resolution.set(width, height);
         });
       }

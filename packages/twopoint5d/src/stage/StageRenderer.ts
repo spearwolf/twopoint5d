@@ -1,4 +1,4 @@
-import {eventize, type Eventize} from '@spearwolf/eventize';
+import {emit, eventize, on, once} from '@spearwolf/eventize';
 import type {WebGLRenderer} from 'three';
 import {Display} from '../display/Display.js';
 import {RemoveFromParent, StageAdded, StageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
@@ -9,8 +9,6 @@ interface StageItem {
   width: number;
   height: number;
 }
-
-export interface StageRenderer extends Eventize {}
 
 export class StageRenderer implements IStageRenderer {
   readonly isStageRenderer = true;
@@ -37,7 +35,7 @@ export class StageRenderer implements IStageRenderer {
   }
 
   #removeFromParent(): void {
-    this.emit(RemoveFromParent);
+    emit(this, RemoveFromParent);
 
     if (!(this.#parent instanceof Display)) {
       this.#parent!.removeStage(this);
@@ -53,15 +51,18 @@ export class StageRenderer implements IStageRenderer {
   }
 
   #addToDisplay(display: Display): void {
-    this.once(
+    once(
+      this,
       RemoveFromParent,
-      display.on('resize', ({width, height}: {width: number; height: number}) => {
+      on(display, 'resize', ({width, height}: {width: number; height: number}) => {
         this.resize(width, height);
       }),
     );
-    this.once(
+    once(
+      this,
       RemoveFromParent,
-      display.on(
+      on(
+        display,
         'frame',
         ({renderer, now, deltaTime, frameNo}: {renderer: WebGLRenderer; now: number; deltaTime: number; frameNo: number}) => {
           this.renderFrame(renderer, now, deltaTime, frameNo);
@@ -121,7 +122,7 @@ export class StageRenderer implements IStageRenderer {
         width: 0,
         height: 0,
       });
-      this.emit(StageAdded, {stage, renderer: this} as StageAddedProps);
+      emit(this, StageAdded, {stage, renderer: this} as StageAddedProps);
     }
   }
 
@@ -129,7 +130,7 @@ export class StageRenderer implements IStageRenderer {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);
-      this.emit(StageRemoved, {stage, renderer: this} as StageRemovedProps);
+      emit(this, StageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
   }
 }

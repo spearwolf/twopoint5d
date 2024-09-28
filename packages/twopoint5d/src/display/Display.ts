@@ -1,4 +1,4 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 
 import {Chronometer} from './Chronometer.js';
@@ -20,8 +20,6 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
     canvasMaxResolutionWarningWasShown = true;
   }
 }
-
-export interface Display extends Eventize {}
 
 export class Display {
   static MaxResolution = 8192;
@@ -56,7 +54,7 @@ export class Display {
   constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
     eventize(this);
 
-    this.retain(['init', 'start', 'resize']);
+    retain(this, ['init', 'start', 'resize']);
 
     this.#chronometer.stop();
 
@@ -76,7 +74,7 @@ export class Display {
           container,
           Display.CssRulesPrefixContainer,
           // we create another container div here to avoid the if container-has-no-discrete-size
-          // then line-height-and-font-height-styles-give-weird-client-rect-behaviour issue
+          // then line-height-and-font-height-styles-give-weird-client-rect-behavior issue
           'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;',
           this.styleSheetRoot,
         );
@@ -107,7 +105,7 @@ export class Display {
 
     this.resize();
 
-    this.#stateMachine.on({
+    on(this.#stateMachine, {
       [DisplayStateMachine.Init]: () => this.#emitEvent('init'),
       [DisplayStateMachine.Restart]: () => this.#emitEvent('restart'),
 
@@ -133,7 +131,7 @@ export class Display {
 
         this.#chronometer.stop();
 
-        this.retainClear('start');
+        retainClear(this, 'start');
 
         this.#emitEvent('pause');
       },
@@ -145,7 +143,7 @@ export class Display {
       };
 
       document.addEventListener('visibilitychange', onDocVisibilityChange, false);
-      this.once('dispose', () => {
+      once(this, 'dispose', () => {
         document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
 
@@ -330,8 +328,8 @@ export class Display {
 
   dispose(): void {
     this.stop();
-    this.emit('dispose');
-    this.off();
+    emit(this, 'dispose');
+    off(this);
     this.renderer?.dispose();
     delete this.renderer;
   }
@@ -353,6 +351,6 @@ export class Display {
   }
 
   #emitEvent = (eventName: string): void => {
-    this.emit(eventName, this.getEventArgs());
+    emit(this, eventName, this.getEventArgs());
   };
 }

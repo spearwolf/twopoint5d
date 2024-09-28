@@ -1,4 +1,4 @@
-import {eventize, type Eventize} from '@spearwolf/eventize';
+import {emit, eventize, on, retain} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import {
@@ -21,8 +21,6 @@ export interface OnMaterialParams {
 }
 
 const rand = (max: number) => (Math.random() * max) | 0;
-
-export interface Starfield extends Eventize {}
 
 export class Starfield {
   readonly textureStore: TextureStore;
@@ -59,7 +57,7 @@ export class Starfield {
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
     eventize(this);
 
-    this.retain(OnMaterial);
+    retain(this, OnMaterial);
 
     this.textureStore = textureStore;
 
@@ -76,7 +74,7 @@ export class Starfield {
 
     this.atlasName = atlasName;
 
-    this.stage.on(StageRenderFrame, ({deltaTime}: StageRenderFrameProps) => {
+    on(this.stage, StageRenderFrame, ({deltaTime}: StageRenderFrameProps) => {
       if (this.sprites) {
         this.animateStars(deltaTime);
         this.sprites.update();
@@ -212,7 +210,7 @@ export class Starfield {
             blending: AdditiveBlending,
           });
           this.#onCreateMaterial(this.material);
-          this.emit(OnMaterial, {starfield: this, material: this.material} as OnMaterialParams);
+          emit(this, OnMaterial, {starfield: this, material: this.material} as OnMaterialParams);
         }
         if (this.sprites == null) {
           this.sprites = new TexturedSprites(this.geometry, this.material);

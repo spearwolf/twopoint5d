@@ -1,4 +1,5 @@
 import {expect, test} from '@playwright/test';
+import {onceAsync} from '@spearwolf/eventize';
 import {DisplayElement} from '@spearwolf/twopoint5d-elements';
 
 test.describe('display', () => {
@@ -26,7 +27,7 @@ test.describe('display', () => {
       await page.evaluate(() =>
         window
           .whenDefined<DisplayElement>(document.querySelector('two5-display'))
-          .then((el: DisplayElement) => el.display.onceAsync('start'))
+          .then((el: DisplayElement) => onceAsync(el.display, 'start'))
           .then(() => true),
       ),
     ).toBe(true);

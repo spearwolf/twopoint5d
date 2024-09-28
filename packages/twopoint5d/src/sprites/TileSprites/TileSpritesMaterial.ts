@@ -47,12 +47,12 @@ const fragmentShader = `
   }
 `;
 
-export interface TileSpritesMaterialParamters extends ShaderMaterialParameters {
+export interface TileSpritesMaterialParameters extends ShaderMaterialParameters {
   colorMap?: Texture;
 }
 
 export class TileSpritesMaterial extends ShaderMaterial {
-  constructor({colorMap, ...options}: TileSpritesMaterialParamters = {}) {
+  constructor({colorMap, ...options}: TileSpritesMaterialParameters = {}) {
     super({
       vertexShader,
       fragmentShader,

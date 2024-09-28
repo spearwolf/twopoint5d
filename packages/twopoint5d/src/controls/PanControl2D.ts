@@ -1,4 +1,4 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize, off} from '@spearwolf/eventize';
 
 import {Stylesheets} from '../display/Stylesheets.js';
 import {InputControlBase} from './InputControlBase.js';
@@ -91,8 +91,6 @@ export interface PanControl2DOptions {
   disableKeyboard?: boolean;
 }
 
-export interface PanControl2D extends Eventize {}
-
 export class PanControl2D extends InputControlBase {
   pixelsPerSecond = 0;
 
@@ -147,7 +145,7 @@ export class PanControl2D extends InputControlBase {
     Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`);
 
   #panView: PanViewState;
-  #isFirstPanViewUpate = true;
+  #isFirstPanViewUpdate = true;
 
   get panView(): PanViewState {
     return this.#panView;
@@ -156,7 +154,7 @@ export class PanControl2D extends InputControlBase {
   set panView(panView: PanViewState | undefined) {
     const prevPanView = this.#panView;
     this.#panView = panView ?? {x: 0, y: 0, pixelRatio: globalThis.devicePixelRatio ?? 1};
-    this.#isFirstPanViewUpate = prevPanView !== this.#panView;
+    this.#isFirstPanViewUpdate = prevPanView !== this.#panView;
   }
 
   get keyboardDisabled(): boolean {
@@ -212,12 +210,12 @@ export class PanControl2D extends InputControlBase {
     }
 
     if (!this.#keyboardDisabled || !this.#pointerDisabled) {
-      if (this.#isFirstPanViewUpate || prevX !== this.panView.x || prevY !== this.panView.y) {
-        this.emit('update', {x: this.panView.x, y: this.panView.y});
+      if (this.#isFirstPanViewUpdate || prevX !== this.panView.x || prevY !== this.panView.y) {
+        emit(this, 'update', {x: this.panView.x, y: this.panView.y});
       }
 
-      if (this.#isFirstPanViewUpate) {
-        this.#isFirstPanViewUpate = false;
+      if (this.#isFirstPanViewUpdate) {
+        this.#isFirstPanViewUpdate = false;
       }
     }
   }
@@ -260,7 +258,7 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.add(this.#cursorPanClass);
     }
-    this.emit('hideCursor', this);
+    emit(this, 'hideCursor', this);
   }
 
   #onPointerUp = (event: PointerEvent): void => {
@@ -284,7 +282,7 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
-    this.emit('restoreCursor', this);
+    emit(this, 'restoreCursor', this);
   }
 
   #onPointerMove = (event: PointerEvent): void => {
@@ -361,6 +359,6 @@ export class PanControl2D extends InputControlBase {
 
   dispose(): void {
     this.destroyAllListeners();
-    this.off();
+    off(this);
   }
 }

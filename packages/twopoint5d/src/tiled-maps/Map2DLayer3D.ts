@@ -6,7 +6,7 @@ import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';
 import {Map2DLayer} from './Map2DLayer.js';
 
 /**
- * A fascade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
+ * A facade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
  */
 export class Map2DLayer3D extends Group implements IMap2DLayer {
   #renderers: Set<IMap2DTileRenderer> = new Set();

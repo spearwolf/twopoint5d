@@ -1,5 +1,6 @@
 import type {ContextProvider} from '@lit/context';
 import {provide} from '@lit/context';
+import {on} from '@spearwolf/eventize';
 import {Display, StageRenderer, type DisplayParameters} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {displayContext} from '../context/display-context.js';
@@ -160,7 +161,7 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
 
     this.display = new Display(this.container!, options);
 
-    this.display.on(this);
+    on(this.display, this);
 
     this.stageRenderer.attach(this.display);
 

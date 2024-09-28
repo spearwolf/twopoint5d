@@ -1,4 +1,4 @@
-import {eventize, Eventize} from '@spearwolf/eventize';
+import {emit, eventize, on} from '@spearwolf/eventize';
 import {TextureAtlas, TileSet, type TextureAtlasData, type TileSetData} from '@spearwolf/twopoint5d';
 import {createContext} from 'react';
 import {Texture} from 'three';
@@ -60,8 +60,6 @@ const asTileSet = (item: AssetItem): TileSet | undefined => {
   }
 };
 
-export interface AssetStore extends Eventize {}
-
 export class AssetStore {
   static AssetInsertEvent = 'asset:insert';
 
@@ -91,11 +89,11 @@ export class AssetStore {
     // eslint-disable-next-line no-console
     console.log('[AssetStore]', AssetStore.AssetInsertEvent, item);
 
-    this.emit(AssetStore.AssetInsertEvent, item!.name);
+    emit(this, AssetStore.AssetInsertEvent, item!.name);
   }
 
   onAssetInsert(assetName: AssetName, callback: (assetName: AssetName, assetStore: AssetStore) => void): () => void {
-    return this.on(AssetStore.AssetInsertEvent, (name: AssetName) => {
+    return on(this, AssetStore.AssetInsertEvent, (name: AssetName) => {
       if (assetName === name) {
         callback(assetName, this);
       }
