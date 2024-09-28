@@ -14,44 +14,44 @@
   "types": "dist/src/index.d.ts",
   "exports": {
     ".": {
-      "default": "./dist/src/index.js",
-      "types": "./dist/src/index.d.ts"
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
     },
     "./bundle.js": {
-      "default": "./dist/bundle.js",
-      "types": "./dist/src/bundle.d.ts"
+      "types": "./dist/src/bundle.d.ts",
+      "import": "./dist/bundle.js"
     },
     "./events.js": {
-      "default": "./dist/src/events.js",
-      "types": "./dist/src/events.d.ts"
+      "types": "./dist/src/events.d.ts",
+      "import": "./dist/src/events.js"
     },
     "./two5-display.js": {
-      "default": "./dist/src/two5-display.js",
-      "types": "./dist/src/two5-display.d.ts"
+      "types": "./dist/src/two5-display.d.ts",
+      "import": "./dist/src/two5-display.js"
     },
     "./two5-stage2d.js": {
-      "default": "./dist/src/two5-stage2d.js",
-      "types": "./dist/src/two5-stage2d.d.ts"
+      "types": "./dist/src/two5-stage2d.d.ts",
+      "import": "./dist/src/two5-stage2d.js"
     },
     "./two5-texture-store.js": {
-      "default": "./dist/src/two5-texture-store.js",
-      "types": "./dist/src/two5-texture-store.d.ts"
+      "types": "./dist/src/two5-texture-store.d.ts",
+      "import": "./dist/src/two5-texture-store.js"
     },
     "./two5-post-processing.js": {
-      "default": "./dist/src/two5-post-processing.js",
-      "types": "./dist/src/two5-post-processing.d.ts"
+      "types": "./dist/src/two5-post-processing.d.ts",
+      "import": "./dist/src/two5-post-processing.js"
     },
     "./two5-glitch-pass.js": {
-      "default": "./dist/src/two5-glitch-pass.js",
-      "types": "./dist/src/two5-glitch-pass.d.ts"
+      "types": "./dist/src/two5-glitch-pass.d.ts",
+      "import": "./dist/src/two5-glitch-pass.js"
     },
     "./two5-unreal-bloom-pass.js": {
-      "default": "./dist/src/two5-unreal-bloom-pass.js",
-      "types": "./dist/src/two5-unreal-bloom-pass.d.ts"
+      "types": "./dist/src/two5-unreal-bloom-pass.d.ts",
+      "import": "./dist/src/two5-unreal-bloom-pass.js"
     },
     "./two5-afterimage-pass.js": {
-      "default": "./dist/src/two5-afterimage-pass.js",
-      "types": "./dist/src/two5-afterimage-pass.d.ts"
+      "types": "./dist/src/two5-afterimage-pass.d.ts",
+      "import": "./dist/src/two5-afterimage-pass.js"
     }
   },
   "sideEffects": [
