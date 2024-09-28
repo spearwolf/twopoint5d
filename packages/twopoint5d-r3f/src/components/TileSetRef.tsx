@@ -20,4 +20,4 @@ function Component({name, children, ...props}: TileSetRefProps, ref: ForwardedRe
 
 Component.displayName = 'TileSetRef';
 
-export const TileSetRef = forwardRef<TileSet, TileSetRefProps>(Component);
+export const TileSetRef = forwardRef<TileSet, TileSetRefProps>(Component as any);
