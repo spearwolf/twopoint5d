@@ -1,4 +1,5 @@
 import {consume} from '@lit/context';
+import {on} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import type {Display} from '@spearwolf/twopoint5d';
@@ -13,7 +14,6 @@ import {
 } from '../context/post-processing-context.js';
 import {displayContext} from '../index.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
-import { on } from '@spearwolf/eventize';
 
 export class UnrealBloomPassElement extends TwoPoint5DElement implements PostProcessingPassElement {
   static override styles = css`

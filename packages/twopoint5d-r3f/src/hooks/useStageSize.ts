@@ -1,8 +1,8 @@
+import {on} from '@spearwolf/eventize';
 import {Stage2D} from '@spearwolf/twopoint5d';
 import {StageResize} from '@spearwolf/twopoint5d/events.js';
 import {useContext, useEffect, useState} from 'react';
 import {Stage2DContext} from '../components/Stage2D.js';
-import { on } from '@spearwolf/eventize';
 
 /**
  * Use this hook if you simply want to know the stage size.

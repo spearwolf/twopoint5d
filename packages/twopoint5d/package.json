@@ -1,7 +1,7 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
-  "version": "0.4.0",
+  "version": "0.5.0-dev",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
