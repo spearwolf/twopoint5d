@@ -1,6 +1,6 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import { description, showSource, title } from './_animated-billboards.json';
+import {description, showSource, title} from './_animated-billboards.json';
 ---
 
 <Layout title={title} showSource={showSource}>
@@ -16,21 +16,21 @@ import { description, showSource, title } from './_animated-billboards.json';
   }
   body {
     background-color: rgb(46 64 82);
-    background: radial-gradient(circle, rgb(120 71 117) 0%, rgb(38 46 54) 42%);
+    background: radial-gradient(circle, rgba(255, 255, 0, 0.276) 0%, rgb(17, 28, 38) 32%);
     color: #eee;
   }
 </style>
 
 <script>
-  import { on } from '@spearwolf/eventize';
-import {
+  import {on} from '@spearwolf/eventize';
+  import {
     AnimatedSprites,
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
     TileSetLoader,
   } from '@spearwolf/twopoint5d';
-  import {CylinderGeometry, Mesh, MeshPhongMaterial, PointLight} from 'three';
+  import {LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PlaneGeometry, TextureLoader} from 'three';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -38,7 +38,7 @@ import {
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
   demo.start(async () => {
-    demo.camera.position.set(0, 70, -210);
+    demo.camera.position.set(0, 70, -220);
 
     const CAPACITY = 400;
 
@@ -77,21 +77,20 @@ import {
 
     console.log('BouncingSprites', bouncingSprites);
 
-    const cylinderGeometry = new CylinderGeometry(170, 170, 3, 180);
-    const cylinderMaterial = new MeshPhongMaterial({
-      color: 0x8394a5,
-      emissive: 0x1f2133, // 0x223344, // 1f2133
+    const blueGroundTexture = await new TextureLoader().loadAsync(assetsUrl('blue-ground-2048x.webp'));
+    blueGroundTexture.colorSpace = LinearSRGBColorSpace;
+
+    const planeGeometry = new PlaneGeometry(400, 400);
+    const planeMaterial = new MeshBasicMaterial({
+      transparent: true,
+      map: blueGroundTexture,
     });
 
-    const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
-    cylinder.position.set(0, -1.5, 0);
+    const plane = new Mesh(planeGeometry, planeMaterial);
+    plane.rotation.x = -Math.PI / 2;
+    plane.rotation.z = Math.PI;
 
-    demo.scene.add(cylinder);
-
-    const mainLight = new PointLight(0xcccccc, 1.5, 250);
-    mainLight.position.y = 60;
-
-    demo.scene.add(mainLight);
+    demo.scene.add(plane);
 
     console.log('AnimatedSprites', mesh);
   });
