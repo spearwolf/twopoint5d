@@ -1,6 +1,5 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {batch, createEffect, createSignal, SignalObject, touch, value, type SignalReader} from '@spearwolf/signalize';
-import {signal, signalReader} from '@spearwolf/signalize/decorators';
+import {batch, createEffect, createSignal, SignalObject, touch} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -70,7 +69,7 @@ export class TextureResource {
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.#createTileSetOptionsSignal(tileSetOptions);
+      resource.#tileSetOptions = createSignal(tileSetOptions, {compareFn: cmpTileSetOptions});
       resource.#tileSet = createSignal();
       resource.#atlas = createSignal();
       resource.textureClasses = textureClasses?.splice(0);
@@ -104,132 +103,118 @@ export class TextureResource {
   #atlas?: SignalObject<TextureAtlas | undefined>;
   #tileSetOptions?: SignalObject<TileSetOptions | undefined>;
   #tileSet?: SignalObject<TileSet | undefined>;
-  #textureClasses: SignalObject<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
 
-  #createTileSetOptionsSignal(tileSetOptions: TileSetOptions | undefined) {
-    if (this.#tileSetOptions == null) {
-      this.#tileSetOptions = createSignal(tileSetOptions, {compareFn: cmpTileSetOptions});
-    }
-  }
+  #textureClasses: SignalObject<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
+  #imageUrl = createSignal<string | undefined>();
+  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compareFn: cmpTexCoords});
+
+  #textureFactory = createSignal<TextureFactory | undefined>();
+  #texture = createSignal<Texture | undefined>();
+  #renderer = createSignal<WebGLRenderer | undefined>();
 
   readonly id: string;
   readonly type: TextureResourceType;
 
   refCount: number = 0;
 
-  @signal({readAsValue: true}) accessor imageUrl: string | undefined;
-  @signalReader() accessor imageUrl$: SignalReader<string | undefined>;
-
-  @signal({readAsValue: true, compareFn: cmpTexCoords}) accessor imageCoords: TextureCoords | undefined;
-  @signalReader() accessor imageCoords$: SignalReader<TextureCoords | undefined>;
-
-  get atlasUrl(): string | undefined {
-    return this.#atlasUrl && value(this.#atlasUrl[0]);
+  get imageUrl(): string | undefined {
+    return this.#imageUrl.value;
   }
 
-  get atlasUrl$(): SignalReader<string | undefined> | undefined {
-    return this.#atlasUrl && this.#atlasUrl[0];
+  set imageUrl(val: string | undefined) {
+    this.#imageUrl.set(val);
+  }
+
+  get imageCoords(): TextureCoords | undefined {
+    return this.#imageCoords.value;
+  }
+
+  set imageCoords(val: TextureCoords | undefined) {
+    this.#imageCoords.set(val);
+  }
+
+  get atlasUrl(): string | undefined {
+    return this.#atlasUrl?.value;
   }
 
   set atlasUrl(value: string | undefined) {
-    if (this.#atlasUrl) {
-      this.#atlasUrl[1](value);
-    }
+    this.#atlasUrl?.set(value);
   }
 
   get atlasJson(): TexturePackerJsonData | undefined {
-    return this.#atlasJson && value(this.#atlasJson[0]);
-  }
-
-  get atlasJson$(): SignalReader<TexturePackerJsonData | undefined> | undefined {
-    return this.#atlasJson && this.#atlasJson[0];
+    return this.#atlasJson?.value;
   }
 
   set atlasJson(value: TexturePackerJsonData | undefined) {
-    if (this.#atlasJson) {
-      this.#atlasJson[1](value);
-    }
+    this.#atlasJson?.set(value);
   }
 
   get overrideImageUrl(): string | undefined {
-    return this.#overrideImageUrl && value(this.#overrideImageUrl[0]);
-  }
-
-  get overrideImageUrl$(): SignalReader<string | undefined> | undefined {
-    return this.#overrideImageUrl && this.#overrideImageUrl[0];
+    return this.#overrideImageUrl?.value;
   }
 
   set overrideImageUrl(value: string | undefined) {
-    if (this.#overrideImageUrl) {
-      this.#overrideImageUrl[1](value);
-    }
+    this.#overrideImageUrl?.set(value);
   }
 
   get atlas(): TextureAtlas | undefined {
-    return this.#atlas && value(this.#atlas[0]);
-  }
-
-  get atlas$(): SignalReader<TextureAtlas | undefined> | undefined {
-    return this.#atlas && this.#atlas[0];
+    return this.#atlas?.value;
   }
 
   set atlas(value: TextureAtlas | undefined) {
-    if (this.#atlas) {
-      this.#atlas[1](value);
-    }
+    this.#atlas?.set(value);
   }
 
   get tileSetOptions(): TileSetOptions | undefined {
-    return this.#tileSetOptions && value(this.#tileSetOptions[0]);
-  }
-
-  get tileSetOptions$(): SignalReader<TileSetOptions | undefined> | undefined {
-    return this.#tileSetOptions && this.#tileSetOptions[0];
+    return this.#tileSetOptions?.value;
   }
 
   set tileSetOptions(value: TileSetOptions | undefined) {
-    if (this.#tileSetOptions) {
-      this.#tileSetOptions[1](value);
-    }
+    this.#tileSetOptions?.set(value);
   }
 
   get tileSet(): TileSet | undefined {
-    return this.#tileSet && value(this.#tileSet[0]);
-  }
-
-  get tileSet$(): SignalReader<TileSet | undefined> | undefined {
-    return this.#tileSet && this.#tileSet[0];
+    return this.#tileSet?.value;
   }
 
   set tileSet(value: TileSet | undefined) {
-    if (this.#tileSet) {
-      this.#tileSet[1](value);
-    }
+    this.#tileSet?.set(value);
   }
 
   get textureClasses(): TextureOptionClasses[] | undefined {
-    return value(this.#textureClasses[0]);
-  }
-
-  get textureClasses$(): SignalReader<TextureOptionClasses[] | undefined> {
-    return this.#textureClasses[0];
+    return this.#textureClasses.value;
   }
 
   set textureClasses(value: TextureOptionClasses[] | undefined) {
     if (Array.isArray(value) && value.length === 0) {
       value = undefined;
     }
-    this.#textureClasses[1](value);
+    this.#textureClasses.set(value);
   }
 
-  @signal({readAsValue: true}) accessor textureFactory: TextureFactory | undefined;
-  @signalReader() accessor textureFactory$: SignalReader<TextureFactory | undefined>;
+  get textureFactory(): TextureFactory | undefined {
+    return this.#textureFactory.value;
+  }
 
-  @signal({readAsValue: true}) accessor texture: Texture | undefined;
-  @signalReader() accessor texture$: SignalReader<Texture | undefined>;
+  set textureFactory(value: TextureFactory | undefined) {
+    this.#textureFactory.set(value);
+  }
 
-  @signal({readAsValue: true}) accessor renderer: WebGLRenderer | undefined;
-  @signalReader() accessor renderer$: SignalReader<WebGLRenderer | undefined>;
+  get texture(): Texture | undefined {
+    return this.#texture.value;
+  }
+
+  set texture(value: Texture | undefined) {
+    this.#texture.set(value);
+  }
+
+  get renderer(): WebGLRenderer | undefined {
+    return this.#renderer.value;
+  }
+
+  set renderer(value: WebGLRenderer | undefined) {
+    this.#renderer.set(value);
+  }
 
   #load = false;
 
@@ -253,19 +238,19 @@ export class TextureResource {
     if (!this.#load) {
       this.#load = true;
 
-      this.imageCoords$((value) => {
+      this.#imageCoords.onChange((value) => {
         emit(this, 'imageCoords', value);
       });
 
-      this.atlas$?.((value) => {
+      this.#atlas?.onChange((value) => {
         emit(this, 'atlas', value);
       });
 
-      this.tileSet$?.((value) => {
+      this.#tileSet?.onChange((value) => {
         emit(this, 'tileSet', value);
       });
 
-      this.texture$((value) => {
+      this.#texture.onChange((value) => {
         emit(this, 'texture', value);
       });
 
@@ -291,14 +276,14 @@ export class TextureResource {
             texture.dispose();
           }
         };
-      }, [this.textureFactory$, this.imageUrl$]);
+      }, [this.#textureFactory, this.#imageUrl]);
 
       if (this.tileSetOptions) {
         createEffect(() => {
           if (this.imageCoords && this.tileSetOptions) {
             this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
           }
-        }, [this.imageCoords$, this.tileSetOptions$]);
+        }, [this.#imageCoords, this.#tileSetOptions]);
       }
 
       if (this.atlasUrl) {
@@ -310,22 +295,22 @@ export class TextureResource {
                 this.atlasJson = atlasJson;
               });
           }
-        }, [this.atlasUrl$]);
+        }, [this.#atlasUrl]);
 
         createEffect(() => {
           if (this.atlasJson) {
             this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
           }
-        }, [this.atlasJson$, this.overrideImageUrl$]);
+        }, [this.#atlasJson, this.#overrideImageUrl]);
 
         createEffect(() => {
           if (this.atlasJson && this.imageCoords) {
             const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
             this.atlas = atlas;
           }
-        }, [this.atlasJson$, this.imageCoords$]);
+        }, [this.#atlasJson, this.#imageCoords]);
 
-        touch(this.atlasUrl$);
+        touch(this.#atlasUrl);
       }
 
       // this effect is dynamic and comes last,
@@ -333,7 +318,7 @@ export class TextureResource {
       // that the renderer has already been set
       createEffect(() => {
         if (this.renderer) {
-          this.textureFactory = new TextureFactory(this.renderer$(), this.textureClasses$());
+          this.textureFactory = new TextureFactory(this.#renderer.get(), this.#textureClasses.get());
         }
       });
     }

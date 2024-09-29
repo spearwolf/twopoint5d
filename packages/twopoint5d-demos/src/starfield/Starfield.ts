@@ -1,4 +1,4 @@
-import {emit, eventize, on, retain} from '@spearwolf/eventize';
+import {emit, on, retain} from '@spearwolf/eventize';
 import {batch} from '@spearwolf/signalize';
 import {effect, signal} from '@spearwolf/signalize/decorators';
 import {
@@ -55,8 +55,6 @@ export class Starfield {
   #baseColors: Color[];
 
   constructor(textureStore: TextureStore, stage: Stage2D, capacity: number, atlasName: string) {
-    eventize(this);
-
     retain(this, OnMaterial);
 
     this.textureStore = textureStore;

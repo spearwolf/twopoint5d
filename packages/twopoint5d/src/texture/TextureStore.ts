@@ -1,5 +1,5 @@
-import {emit, eventize, on, once, onceAsync, retain} from '@spearwolf/eventize';
-import {batch, createSignal, value, type SignalReader} from '@spearwolf/signalize';
+import {emit, on, once, onceAsync, retain} from '@spearwolf/eventize';
+import {batch, createSignal} from '@spearwolf/signalize';
 import type {WebGLRenderer} from 'three';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
@@ -40,24 +40,19 @@ export class TextureStore {
   #renderer = createSignal<WebGLRenderer | undefined>();
 
   get renderer(): WebGLRenderer | undefined {
-    return value(this.#renderer[0]);
-  }
-
-  get renderer$(): SignalReader<WebGLRenderer | undefined> {
-    return this.#renderer[0];
+    return this.#renderer.value;
   }
 
   set renderer(value: WebGLRenderer | undefined) {
-    this.#renderer[1](value);
+    this.#renderer.set(value);
   }
 
   #resources = new Map<string, TextureResource>();
 
   constructor() {
-    eventize(this);
     retain(this, [OnReady, OnRendererChanged]);
 
-    this.renderer$((renderer) => {
+    this.#renderer.onChange((renderer) => {
       emit(this, OnRendererChanged, renderer);
     });
   }

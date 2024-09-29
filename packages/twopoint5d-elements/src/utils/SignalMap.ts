@@ -1,4 +1,4 @@
-import {batch, createSignal, SignalObject, value, type SignalReader} from '@spearwolf/signalize';
+import {batch, createSignal, SignalObject} from '@spearwolf/signalize';
 
 export class SignalMap {
   static fromProps<T extends Object>(o: T, propKeys: (keyof T)[]): SignalMap {
@@ -6,26 +6,23 @@ export class SignalMap {
     for (const key of propKeys) {
       sm.#signals.set(
         key,
-        createSignal(() => o[key], {lazy: true}),
+        createSignal(() => o[key] as unknown, {lazy: true}),
       );
     }
     return sm;
   }
 
-  #signals: Map<PropertyKey, SignalObject<any>> = new Map();
+  #signals: Map<PropertyKey, SignalObject<unknown>> = new Map();
 
-  getSignals(): SignalReader<unknown>[] {
-    return Array.from(this.#signals.values()).map(([sig]) => sig as SignalReader<unknown>);
+  getSignals(): SignalObject<unknown>[] {
+    return Array.from(this.#signals.values());
   }
 
   update(props: Map<PropertyKey, unknown>): void {
     if (props.size) {
       batch(() => {
         for (const [key, val] of props.entries()) {
-          const sig = this.#signals.get(key);
-          if (sig) {
-            sig[1](val);
-          }
+          this.#signals.get(key)?.set(val);
         }
       });
     }
@@ -34,10 +31,7 @@ export class SignalMap {
   updateFromProps<T extends Object>(o: T, propKeys: (keyof T)[]): void {
     batch(() => {
       for (const key of propKeys) {
-        const sig = this.#signals.get(key);
-        if (sig) {
-          sig[1](o[key]);
-        }
+        this.#signals.get(key)?.set(o[key]);
       }
     });
   }
@@ -45,7 +39,7 @@ export class SignalMap {
   getValueObject(): Record<PropertyKey, unknown> {
     return Object.fromEntries(
       Array.from(this.#signals.entries())
-        .map(([key, [sig]]) => [key, value(sig as any)])
+        .map(([key, sig]) => [key, sig.value])
         .filter(([, val]) => val != null),
     );
   }
