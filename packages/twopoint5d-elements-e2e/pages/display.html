@@ -7,7 +7,6 @@
     <title>display (twopoint5d-elements-e2e)</title>
   </head>
   <body>
-    <script type="module" src="/src/display.ts"></script>
     <main class="two5-display-container">
       <two5-display class="two5-display" data-testid="two5display" debug>
         <p class="mono-text" slot="top-left">top-left</p>
@@ -17,5 +16,16 @@
         hej-ho!
       </two5-display>
     </main>
+
+    <script type="module">
+      document.querySelector('two5-display').addEventListener('displayStart', (...event) => {
+        const el = document.createElement('div');
+        el.setAttribute('data-testid', 'display-started');
+        document.body.appendChild(el);
+        console.debug('DISPLAY STARTED', {event, testElement: el});
+      });
+    </script>
+
+    <script type="module" src="/src/display.ts"></script>
   </body>
 </html>

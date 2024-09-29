@@ -1,6 +1,4 @@
 import {expect, test} from '@playwright/test';
-import {onceAsync} from '@spearwolf/eventize';
-import {DisplayElement} from '@spearwolf/twopoint5d-elements';
 
 test.describe('display', () => {
   test.beforeEach('goto page', async ({page}) => {
@@ -23,13 +21,6 @@ test.describe('display', () => {
   });
 
   test('display started', async ({page}) => {
-    expect(
-      await page.evaluate(() =>
-        window
-          .whenDefined<DisplayElement>(document.querySelector('two5-display'))
-          .then((el: DisplayElement) => onceAsync(el.display, 'start'))
-          .then(() => true),
-      ),
-    ).toBe(true);
+    await expect(page.getByTestId('display-started')).toBeAttached();
   });
 });

@@ -1,10 +1,11 @@
 import type {ContextProvider} from '@lit/context';
 import {provide} from '@lit/context';
-import {on} from '@spearwolf/eventize';
+import {on, Priority} from '@spearwolf/eventize';
 import {Display, StageRenderer, type DisplayParameters} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {displayContext} from '../context/display-context.js';
 import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
+import type {DisplayDisposeEventDetail, DisplayEventDetail} from '../events.js';
 import {readBooleanAttribute} from '../utils/readBooleanAttribute.js';
 import {readStringAttribute} from '../utils/readStringAttribute.js';
 import {whenDefined} from '../utils/whenDefined.js';
@@ -163,10 +164,49 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
 
     on(this.display, this);
 
+    this.#connectCustomEvents();
+
     this.stageRenderer.attach(this.display);
 
     this.display.start();
 
     this.logger?.log('display created', {display: this.display, stageRenderer: this.stageRenderer});
+  }
+
+  #connectCustomEvents(): void {
+    on(this.display, 'start', Priority.Low, (args) => {
+      this.dispatchEvent(
+        new CustomEvent<DisplayEventDetail>('displayStart', {bubbles: true, detail: {...args, displayElement: this}}),
+      );
+    });
+
+    on(this.display, 'resize', Priority.Low, (args) => {
+      this.dispatchEvent(
+        new CustomEvent<DisplayEventDetail>('displayResize', {bubbles: true, detail: {...args, displayElement: this}}),
+      );
+    });
+
+    on(this.display, 'pause', Priority.Low, (args) => {
+      this.dispatchEvent(
+        new CustomEvent<DisplayEventDetail>('displayPause', {bubbles: true, detail: {...args, displayElement: this}}),
+      );
+    });
+
+    on(this.display, 'restart', Priority.Low, (args) => {
+      this.dispatchEvent(
+        new CustomEvent<DisplayEventDetail>('displayRestart', {bubbles: true, detail: {...args, displayElement: this}}),
+      );
+    });
+
+    on(this.display, 'dispose', Priority.Low, () => {
+      this.dispatchEvent(
+        new CustomEvent<DisplayDisposeEventDetail>('displayDispose', {
+          bubbles: true,
+          detail: {display: this.display, displayElement: this},
+        }),
+      );
+    });
+
+    // TODO DisplayElement: dispose!
   }
 }
