@@ -57,8 +57,8 @@ export interface VertexObjectDescription {
   indices?: number[];
   meshCount?: number;
   attributes: VertexAttributesType;
-  basePrototype?: Object | null | undefined;
-  methods?: Object | null | undefined;
+  basePrototype?: object | null | undefined;
+  methods?: object | null | undefined;
 }
 
 export interface VO {

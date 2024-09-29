@@ -3,7 +3,7 @@ import {describe, expect, test} from 'vitest';
 
 import {Dependencies} from './Dependencies.js';
 
-type Ref = {current: Object};
+type Ref = {current: object};
 
 const refEquals = (a: Ref, b: Ref) => a?.current === b?.current;
 

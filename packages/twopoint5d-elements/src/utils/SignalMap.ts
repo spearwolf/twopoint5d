@@ -1,7 +1,7 @@
 import {batch, createSignal, SignalObject} from '@spearwolf/signalize';
 
 export class SignalMap {
-  static fromProps<T extends Object>(o: T, propKeys: (keyof T)[]): SignalMap {
+  static fromProps<T extends object>(o: T, propKeys: (keyof T)[]): SignalMap {
     const sm = new SignalMap();
     for (const key of propKeys) {
       sm.#signals.set(
@@ -28,7 +28,7 @@ export class SignalMap {
     }
   }
 
-  updateFromProps<T extends Object>(o: T, propKeys: (keyof T)[]): void {
+  updateFromProps<T extends object>(o: T, propKeys: (keyof T)[]): void {
     batch(() => {
       for (const key of propKeys) {
         this.#signals.get(key)?.set(o[key]);

@@ -21,6 +21,7 @@
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
     "cbt": "pnpm run-s -sn clean build test:ci",
+    "test:all": "pnpm run-s -sn lint clean build test:ci test:playwright",
     "lookbook": "pnpm nx dev lookbook",
     "landing-page": "pnpm nx dev landing-page",
     "ci": "pnpm run-s -sn build lint test:ci",
@@ -28,7 +29,7 @@
     "ci:install": "pnpm run-s -sn playwright:install ci"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.15.3",
+    "@arethetypeswrong/cli": "^0.16.4",
     "@nx/eslint-plugin": "^19.8.2",
     "@nx/jest": "^19.8.2",
     "@nx/js": "^19.8.2",
@@ -43,8 +44,8 @@
     "@types/react": "^18.3.10",
     "@types/sinon": "^17.0.3",
     "@types/three": "~0.165.0",
-    "@typescript-eslint/eslint-plugin": "^7.13.0",
-    "@typescript-eslint/parser": "^7.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.7.0",
+    "@typescript-eslint/parser": "^8.7.0",
     "@vitejs/plugin-react": "^4.3.1",
     "canvas": "^2.11.2",
     "esbuild": "^0.24.0",
@@ -57,7 +58,7 @@
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-require-extensions": "^0.1.3",
-    "happy-dom": "^14.12.0",
+    "happy-dom": "^15.7.4",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "npm-run-all": "^4.1.5",
@@ -66,9 +67,9 @@
     "prettier": "^3.3.3",
     "prettier-plugin-astro": "^0.14.1",
     "react": "^18.3.1",
-    "rimraf": "^5.0.7",
+    "rimraf": "^6.0.1",
     "rollup": "^4.22.5",
-    "sinon": "^18.0.0",
+    "sinon": "^19.0.2",
     "three": "~0.165.0",
     "ts-jest": "^29.2.5",
     "ts-node": "10.9.2",
@@ -76,7 +77,7 @@
     "tsup": "^8.3.0",
     "typescript": "^5.6.2",
     "use-asset": "^1.0.4",
-    "vitest": "^1.6.0",
+    "vitest": "^2.1.1",
     "zustand": "^4.5.5"
   }
 }

@@ -106,10 +106,10 @@ export class QuadTreeVisualization {
       this.ctx.lineTo(chunk.originX, bottom);
       this.ctx.stroke();
 
-      chunk.nodes.northWest && this.renderChunkFrame(chunk.nodes.northWest, left, top, chunk.originX, chunk.originY, stats);
-      chunk.nodes.northEast && this.renderChunkFrame(chunk.nodes.northEast, chunk.originX, top, right, chunk.originY, stats);
-      chunk.nodes.southWest && this.renderChunkFrame(chunk.nodes.southWest, left, chunk.originY, chunk.originX, bottom, stats);
-      chunk.nodes.southEast && this.renderChunkFrame(chunk.nodes.southEast, chunk.originX, chunk.originY, right, bottom, stats);
+      if (chunk.nodes.northWest) this.renderChunkFrame(chunk.nodes.northWest, left, top, chunk.originX, chunk.originY, stats);
+      if (chunk.nodes.northEast) this.renderChunkFrame(chunk.nodes.northEast, chunk.originX, top, right, chunk.originY, stats);
+      if (chunk.nodes.southWest) this.renderChunkFrame(chunk.nodes.southWest, left, chunk.originY, chunk.originX, bottom, stats);
+      if (chunk.nodes.southEast) this.renderChunkFrame(chunk.nodes.southEast, chunk.originX, chunk.originY, right, bottom, stats);
     }
   }
 

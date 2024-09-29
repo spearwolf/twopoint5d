@@ -63,7 +63,7 @@ const makeAttributeValueSetter = (
   };
 };
 
-export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): Object {
+export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): object {
   const {descriptor} = voBuffer;
   const {methods} = descriptor;
 

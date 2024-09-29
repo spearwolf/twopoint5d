@@ -8,7 +8,8 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from 'three';
 
-export interface CustomChunksShaderMaterialParameters extends ShaderMaterialParameters {}
+// export interface CustomChunksShaderMaterialParameters extends ShaderMaterialParameters {}
+export type CustomChunksShaderMaterialParameters = ShaderMaterialParameters;
 
 export interface CustomShaderChunks {
   [chunkName: string]: string;
