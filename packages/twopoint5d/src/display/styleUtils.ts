@@ -1,13 +1,9 @@
 export function getVerticalPadding(style: CSSStyleDeclaration): number {
-  return (
-    parseFloat(style.getPropertyValue('padding-top') || '0') + parseFloat(style.getPropertyValue('padding-bottom') || '0')
-  );
+  return parseFloat(style.getPropertyValue('padding-top') || '0') + parseFloat(style.getPropertyValue('padding-bottom') || '0');
 }
 
 export function getHorizontalPadding(style: CSSStyleDeclaration): number {
-  return (
-    parseFloat(style.getPropertyValue('padding-left') || '0') + parseFloat(style.getPropertyValue('padding-right') || '0')
-  );
+  return parseFloat(style.getPropertyValue('padding-left') || '0') + parseFloat(style.getPropertyValue('padding-right') || '0');
 }
 
 export function getVerticalBorder(style: CSSStyleDeclaration): number {
@@ -49,16 +45,6 @@ export function getContentAreaSize(
     height: elementSize.height - verticalInnerMargin,
   };
 }
-
-/*
-export function getVerticalMargin(style: CSSStyleDeclaration): number {
-  return parseInt(style.getPropertyValue('margin-top') || '0', 10) + parseInt(style.getPropertyValue('margin-bottom') || '0', 10);
-}
-
-export function getHorizontalMargin(style: CSSStyleDeclaration): number {
-  return parseInt(style.getPropertyValue('margin-left') || '0', 10) + parseInt(style.getPropertyValue('margin-right') || '0', 10);
-}
-*/
 
 export function getIsContentBox(style: CSSStyleDeclaration): boolean {
   return style.getPropertyValue('box-sizing') === 'content-box';
