@@ -7,9 +7,7 @@ import {description, showSource, title} from './_animated-billboards.json';
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <div class="loading-wrapper">
-    <div class="loading-content">
-      .&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.
-    </div>
+    <div class="loading-content">.&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.</div>
   </div>
 
   <p slot="demo-description">{description}</p>
@@ -112,5 +110,5 @@ import {description, showSource, title} from './_animated-billboards.json';
     console.log('AnimatedSprites', mesh);
   });
 
-  document.querySelector('.loading-wrapper').style.display = 'none';
+  (document.querySelector('.loading-wrapper') as HTMLDivElement).style.display = 'none';
 </script>
