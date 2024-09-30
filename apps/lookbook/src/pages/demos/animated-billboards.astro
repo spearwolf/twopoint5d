@@ -6,6 +6,12 @@ import {description, showSource, title} from './_animated-billboards.json';
 <Layout title={title} showSource={showSource}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 
+  <div class="loading-wrapper">
+    <div class="loading-content">
+      .&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.
+    </div>
+  </div>
+
   <p slot="demo-description">{description}</p>
 </Layout>
 
@@ -15,9 +21,20 @@ import {description, showSource, title} from './_animated-billboards.json';
     overflow-y: hidden;
   }
   body {
-    background-color: rgb(46 64 82);
-    background: radial-gradient(circle, rgba(255, 255, 0, 0.276) 0%, rgb(17, 28, 38) 32%);
+    background-color: rgb(17 28 38);
     color: #eee;
+  }
+  .loading-wrapper {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .loading-content {
+    margin: auto;
+    text-transform: lowercase;
+    font-size: 24px;
+    font-family: monospace;
   }
 </style>
 
@@ -37,7 +54,7 @@ import {description, showSource, title} from './_animated-billboards.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  demo.start(async () => {
+  await demo.start(async () => {
     demo.camera.position.set(0, 70, -220);
 
     const CAPACITY = 400;
@@ -94,4 +111,6 @@ import {description, showSource, title} from './_animated-billboards.json';
 
     console.log('AnimatedSprites', mesh);
   });
+
+  document.querySelector('.loading-wrapper').style.display = 'none';
 </script>
