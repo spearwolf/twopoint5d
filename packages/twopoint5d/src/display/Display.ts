@@ -247,11 +247,6 @@ export class Display {
       cssHeight += canvasVerticalInnerMargin;
     }
 
-    wPx = Math.floor(wPx);
-    hPx = Math.floor(hPx);
-    cssWidth = Math.floor(cssWidth);
-    cssHeight = Math.floor(cssHeight);
-
     if (wPx < 0) {
       wPx = 0;
     }

@@ -1,26 +1,26 @@
 export function getVerticalPadding(style: CSSStyleDeclaration): number {
   return (
-    parseInt(style.getPropertyValue('padding-top') || '0', 10) + parseInt(style.getPropertyValue('padding-bottom') || '0', 10)
+    parseFloat(style.getPropertyValue('padding-top') || '0') + parseFloat(style.getPropertyValue('padding-bottom') || '0')
   );
 }
 
 export function getHorizontalPadding(style: CSSStyleDeclaration): number {
   return (
-    parseInt(style.getPropertyValue('padding-left') || '0', 10) + parseInt(style.getPropertyValue('padding-right') || '0', 10)
+    parseFloat(style.getPropertyValue('padding-left') || '0') + parseFloat(style.getPropertyValue('padding-right') || '0')
   );
 }
 
 export function getVerticalBorder(style: CSSStyleDeclaration): number {
   return (
-    parseInt(style.getPropertyValue('border-top-width') || '0', 10) +
-    parseInt(style.getPropertyValue('border-bottom-width') || '0', 10)
+    parseFloat(style.getPropertyValue('border-top-width') || '0') +
+    parseFloat(style.getPropertyValue('border-bottom-width') || '0')
   );
 }
 
 export function getHorizontalBorder(style: CSSStyleDeclaration): number {
   return (
-    parseInt(style.getPropertyValue('border-right-width') || '0', 10) +
-    parseInt(style.getPropertyValue('border-left-width') || '0', 10)
+    parseFloat(style.getPropertyValue('border-right-width') || '0') +
+    parseFloat(style.getPropertyValue('border-left-width') || '0')
   );
 }
 
