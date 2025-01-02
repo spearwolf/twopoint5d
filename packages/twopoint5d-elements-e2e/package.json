@@ -41,7 +41,8 @@
       },
       "test:ui": {
         "dependsOn": [
-          "^build"
+          "^build",
+          "lint"
         ]
       }
     }

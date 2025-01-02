@@ -25,7 +25,6 @@ function Component({capacity, children, ...props}: TileSpritesGeometryProps, ref
         setInitialCapacity(capacity);
       }
     } else if (capacity !== initialCapacity) {
-      // eslint-disable-next-line no-console
       console.warn('TileSpritesGeometry: capacity cannot be changed after initialization');
     }
   }, [initialCapacity, capacity]);

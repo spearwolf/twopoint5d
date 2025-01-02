@@ -15,13 +15,11 @@ export class StageRenderer {
 
     // XXX remove me
     on(this, REGISTER, (name, stage) => {
-      // eslint-disable-next-line no-console
       console.log(`${STAGE_RENDERER}:${REGISTER}`, name, stage);
     });
 
     // XXX remove me
     on(this, UNREGISTER, (name, stage) => {
-      // eslint-disable-next-line no-console
       console.log(`${STAGE_RENDERER}:${UNREGISTER}`, name, stage);
     });
   }

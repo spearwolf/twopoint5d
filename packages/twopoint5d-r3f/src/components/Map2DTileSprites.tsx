@@ -16,7 +16,6 @@ declare global {
 export type Map2DTileSpritesProps = JSX.IntrinsicElements['map2DTileSprites']; // & {};
 
 const attach: any = (parent: Object3D & IMap2DLayer, self: __Map2DTileSprites) => {
-  // eslint-disable-next-line no-console
   console.log('<Map2DTileSprites> attach: addTileRenderer', {parent, self});
 
   parent.add(self);
@@ -26,7 +25,6 @@ const attach: any = (parent: Object3D & IMap2DLayer, self: __Map2DTileSprites) =
   }
 
   return () => {
-    // eslint-disable-next-line no-console
     console.log('<Map2DTileSprites> attach: removeTileRenderer', {parent, self});
 
     if (typeof parent.removeTileRenderer === 'function') {

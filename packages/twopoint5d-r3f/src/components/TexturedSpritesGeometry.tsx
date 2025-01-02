@@ -28,7 +28,6 @@ function Component(
         setInitialCapacity(capacity);
       }
     } else if (capacity !== initialCapacity) {
-      // eslint-disable-next-line no-console
       console.warn('TexturedSpritesGeometry: capacity cannot be changed after initialization');
     }
   }, [initialCapacity, capacity]);

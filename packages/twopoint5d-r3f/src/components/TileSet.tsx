@@ -25,12 +25,10 @@ function Component({name, url, children, ...props}: TileSetProps, ref: Forwarded
         setTileSet(data);
       },
       cancel(data) {
-        // eslint-disable-next-line no-console
         console.log('<TileSet> cancel tile-set', data);
         data.texture?.dispose();
       },
       dispose(data) {
-        // eslint-disable-next-line no-console
         console.log('<TileSet> dispose tile-set', data);
         data.texture?.dispose();
       },

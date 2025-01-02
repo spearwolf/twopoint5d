@@ -86,7 +86,6 @@ export class AssetStore {
       this.#assets.set(name, item!);
     }
 
-    // eslint-disable-next-line no-console
     console.log('[AssetStore]', AssetStore.AssetInsertEvent, item);
 
     emit(this, AssetStore.AssetInsertEvent, item!.name);
@@ -109,7 +108,6 @@ export class AssetStore {
     const item = this.#assets.get(name);
     if (item) {
       item.refCount++;
-      // eslint-disable-next-line no-console
       console.log('[AssetStore] increase refCount to', item.refCount, 'for asset', item.name);
       return item.refCount;
     }
@@ -129,7 +127,6 @@ export class AssetStore {
   disposeTextureRef(name: AssetName): void {
     const item = this.#assets.get(name);
     if (item && item.refCount > 0) {
-      // eslint-disable-next-line no-console
       console.log('[AssetStore] decrease refCount to', item.refCount, 'for asset', item.name);
       if (--item.refCount === 0) {
         asTexture(item)?.dispose();

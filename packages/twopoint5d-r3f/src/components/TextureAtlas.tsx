@@ -30,12 +30,10 @@ function Component({name, url, overrideImageUrl, children, ...props}: TextureAtl
         setTextureAtlas(data);
       },
       cancel(data) {
-        // eslint-disable-next-line no-console
         console.log('<TextureAtlas> cancel texture-atlas', data);
         data.texture?.dispose();
       },
       dispose(data) {
-        // eslint-disable-next-line no-console
         console.log('<TextureAtlas> dispose texture-atlas', data);
         data.texture?.dispose();
       },
