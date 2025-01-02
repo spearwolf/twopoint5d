@@ -38,6 +38,7 @@ initialize(({scene}, textureStore, _postProcessing) => {
   scene.add(sprite);
 
   textureStore.get('ballPatternRot', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
+    // eslint-disable-next-line no-console
     console.log('texture', {texture, imageCoords});
 
     sprite.material?.dispose();

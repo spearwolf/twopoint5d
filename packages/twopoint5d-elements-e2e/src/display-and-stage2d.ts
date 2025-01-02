@@ -23,6 +23,7 @@ initialize((stageEl, {store}) => {
     scene.add(sprite);
 
     store.get('ballPatternRot', ['texture', 'imageCoords'], ([texture, imageCoords]) => {
+      // eslint-disable-next-line no-console
       console.log('texture', {texture, imageCoords});
 
       sprite.material?.dispose();

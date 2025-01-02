@@ -12,4 +12,5 @@ declare global {
 
 window.DisplayElement = DisplayElement;
 
+// eslint-disable-next-line no-console
 console.log('hello, hello');
