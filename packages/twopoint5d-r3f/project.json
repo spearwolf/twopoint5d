@@ -6,11 +6,17 @@
   "projectType": "library",
   "targets": {
     "lint": {
-      "executor": "@nx/linter:eslint",
-      "outputs": ["{options.outputFile}"],
+      "executor": "nx:run-script",
       "options": {
-        "lintFilePatterns": ["packages/twopoint5d-r3f/**/*.ts", "packages/twopoint5d-r3f/**/*.tsx"]
+        "script": "lint"
       }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "dependsOn": ["^build", "lint"]
     }
   },
   "tags": ["ci"]

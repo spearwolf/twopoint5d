@@ -103,6 +103,7 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     const target = this.composer?.passes ?? this.passes;
 
     if (target.length !== nextPasses.length) {
+      // eslint-disable-next-line no-console
       console.error(
         '[PostProcessingRenderer] reorderPasses: nextPasses length mismatch: should be',
         target.length,

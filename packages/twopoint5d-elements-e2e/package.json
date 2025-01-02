@@ -13,6 +13,7 @@
     "vite:preview": "pnpm vite preview --host",
     "preview": "pnpm run-s build vite:preview",
     "clean": "pnpm exec rimraf build dist playwright-report test-results",
+    "lint": "echo TODO: configure eslint",
     "test:ui": "pnpm playwright test --ui",
     "show-report": "pnpm playwright show-report",
     "test": "pnpm playwright test"

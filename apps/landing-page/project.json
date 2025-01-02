@@ -4,19 +4,6 @@
   "root": "apps/landing-page",
   "sourceRoot": "apps/landing-page/src",
   "projectType": "application",
-  "targets": {
-    "lint": {
-      "executor": "@nx/linter:eslint",
-      "outputs": ["{options.outputFile}"],
-      "options": {
-        "lintFilePatterns": [
-          "apps/landing-page/**/*.js",
-          "apps/landing-page/**/*.jsx",
-          "apps/landing-page/**/*.ts",
-          "apps/landing-page/**/*.tsx"
-        ]
-      }
-    }
-  },
+  "targets": {},
   "tags": []
 }

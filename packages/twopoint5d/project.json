@@ -6,11 +6,17 @@
   "projectType": "library",
   "targets": {
     "lint": {
-      "executor": "@nx/linter:eslint",
-      "outputs": ["{options.outputFile}"],
+      "executor": "nx:run-script",
       "options": {
-        "lintFilePatterns": ["{projectRoot}/**/*.ts"]
+        "script": "lint"
       }
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "test"
+      },
+      "dependsOn": ["lint"]
     }
   },
   "tags": ["ci"]

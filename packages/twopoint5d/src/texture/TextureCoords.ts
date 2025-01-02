@@ -69,7 +69,6 @@ export class TextureCoords {
   }
 
   get root(): TextureCoords | undefined {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let root: TextureCoords = this;
     while (root.parent) {
       root = root.parent;

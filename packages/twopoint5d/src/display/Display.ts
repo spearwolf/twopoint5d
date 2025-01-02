@@ -13,7 +13,6 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
     // eslint-disable-next-line no-console
     console.warn(
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       `Oops, the canvas width or height should not bigger than ${Display.MaxResolution} pixels (${w}x${h} was requested).`,
       'If you need more, please set Display.MaxResolution before you create a Display!',
     );

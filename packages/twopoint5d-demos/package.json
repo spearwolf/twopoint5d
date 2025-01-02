@@ -26,6 +26,7 @@
     "compile:lib": "pnpm tsc -b tsconfig.lib.json",
     "compile:tests": "pnpm tsc -b tsconfig.tests.json",
     "vitest:run": "pnpm exec vitest tests/src --run --passWithNoTests",
+    "lint": "pnpm eslint .",
     "test": "pnpm compile:tests && pnpm vitest:run",
     "clean": "pnpm exec rimraf build types dist lib tests",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs"

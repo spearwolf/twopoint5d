@@ -1,9 +1,9 @@
+import {exec, execSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {exec, execSync} from 'node:child_process';
 
-const DRY_RUN = false || process.argv.includes('--dry-run');
+const DRY_RUN = process.argv.includes('--dry-run');
 
 const workspaceRoot = path.resolve(fileURLToPath(import.meta.url), '../../');
 const projectRoot = path.resolve(process.cwd());

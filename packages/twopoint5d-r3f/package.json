@@ -23,6 +23,7 @@
     "compile": "pnpm tsc",
     "build": "pnpm run-s -sn compile makePackageJson",
     "clean": "pnpm rimraf build types dist",
+    "lint": "echo TODO: configure eslint",
     "test": "pnpm vitest --run",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm",

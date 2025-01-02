@@ -6,10 +6,9 @@
   "projectType": "library",
   "targets": {
     "lint": {
-      "executor": "@nx/linter:eslint",
-      "outputs": ["{options.outputFile}"],
+      "executor": "nx:run-script",
       "options": {
-        "lintFilePatterns": ["{projectRoot}/**/*.ts"]
+        "script": "lint"
       }
     },
     "test": {
@@ -17,7 +16,7 @@
       "options": {
         "script": "test"
       },
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "lint"]
     }
   },
   "tags": []

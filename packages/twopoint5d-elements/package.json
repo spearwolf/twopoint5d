@@ -82,6 +82,7 @@
     "compile:bundle": "pnpm tsc -b tsconfig.bundle.json",
     "compile:tests": "pnpm tsc -b tsconfig.tests.json",
     "bundle": "pnpm exec node bundle.mjs",
+    "lint": "pnpm exec eslint .",
     "vitest:run": "pnpm exec vitest tests/src --run",
     "test": "pnpm compile:tests && pnpm vitest:run",
     "clean": "pnpm exec rimraf build types dist lib tests",

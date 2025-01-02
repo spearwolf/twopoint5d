@@ -272,6 +272,7 @@ export class TextureResource {
         return () => {
           // TODO test
           if (texture) {
+            // eslint-disable-next-line no-console
             console.log('dispose texture', texture);
             texture.dispose();
           }
