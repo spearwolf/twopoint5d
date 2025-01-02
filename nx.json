@@ -16,15 +16,6 @@
     "build": {
       "dependsOn": ["^build"]
     },
-    "lint": {
-      "inputs": [
-        "default",
-        "{workspaceRoot}/.eslintignore",
-        "{workspaceRoot}/.eslintrc.json",
-        "{workspaceRoot}/.prettierrc",
-        "{workspaceRoot}/.prettierignore"
-      ]
-    },
     "test": {
       "executor": "nx:run-script",
       "options": {
