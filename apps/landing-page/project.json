@@ -1,9 +1,0 @@
-{
-  "name": "landing-page",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "root": "apps/landing-page",
-  "sourceRoot": "apps/landing-page/src",
-  "projectType": "application",
-  "targets": {},
-  "tags": []
-}
