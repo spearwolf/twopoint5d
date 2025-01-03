@@ -1,12 +1,40 @@
 {
   "name": "twopoint5d-demos",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "root": "packages/twopoint5d-demos",
   "sourceRoot": "{projectRoot}/src",
-  "projectType": "library",
   "targets": {
+    "build": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "!{projectRoot}/src/**/*.spec.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/package.override.json",
+        "{projectRoot}/tsconfig.json",
+        "{projectRoot}/tsconfig.lib.json",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json",
+        "{workspaceRoot}/scripts/makePackageJson.mjs"
+      ],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "lint": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/eslint.config.mjs",
+        "{workspaceRoot}/eslint.shared.mjs"
+      ]
+    },
     "test": {
-      "dependsOn": ["^build", "lint"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/tsconfig.json",
+        "{projectRoot}/tsconfig.tests.json",
+        "{projectRoot}/vite.config.ts",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json"
+      ]
     }
   }
 }

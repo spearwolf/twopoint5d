@@ -1,13 +1,37 @@
 {
   "name": "twopoint5d",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "tags": ["ci"],
   "root": "packages/twopoint5d",
   "sourceRoot": "{projectRoot}/src",
-  "projectType": "library",
   "targets": {
+    "build": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "!{projectRoot}/src/**/*.spec.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/package.override.json",
+        "{projectRoot}/tsconfig.json",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json",
+        "{workspaceRoot}/scripts/makePackageJson.mjs"
+      ],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "lint": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/eslint.config.mjs",
+        "{workspaceRoot}/eslint.shared.mjs"
+      ]
+    },
     "test": {
-      "dependsOn": ["lint"]
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/tsconfig.json",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json"
+      ]
     }
-  },
-  "tags": ["ci"]
+  }
 }

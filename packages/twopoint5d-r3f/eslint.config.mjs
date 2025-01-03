@@ -22,7 +22,10 @@ export default [
     },
   },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: [
+      'src/**/*.{ts,tsx}',
+      'src/**/*.spec.{ts,tsx}'
+    ],
     languageOptions: {
       globals: globals.browser,
       ...reactPlugin.configs.flat.recommended.languageOptions,

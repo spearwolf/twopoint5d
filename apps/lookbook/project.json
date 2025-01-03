@@ -1,9 +1,7 @@
 {
   "name": "lookbook",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "root": "apps/lookbook",
-  "sourceRoot": "apps/lookbook/src",
-  "projectType": "application",
+  "sourceRoot": "{projectRoot}/src",
   "targets": {
     "dev": {
       "dependsOn": ["^build"]

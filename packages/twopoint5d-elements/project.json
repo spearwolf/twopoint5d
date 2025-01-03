@@ -1,13 +1,46 @@
 {
   "name": "twopoint5d-elements",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "tags": ["ci"],
   "root": "packages/twopoint5d-elements",
   "sourceRoot": "{projectRoot}/src",
-  "projectType": "library",
   "targets": {
+    "build": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "!{projectRoot}/src/**/*.spec.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/package.override.json",
+        "{projectRoot}/tsconfig.json",
+        "{projectRoot}/tsconfig.lib.json",
+        "{projectRoot}/tsconfig.bundle.json",
+        "{projectRoot}/bundle.mjs",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json",
+        "{workspaceRoot}/scripts/makePackageJson.mjs",
+        "{workspaceRoot}/scripts/makeBanner.mjs",
+        "{workspaceRoot}/scripts/makeBanner/*.mjs"
+      ],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "lint": {
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/*.mjs",
+        "{projectRoot}/eslint.config.mjs",
+        "{workspaceRoot}/eslint.shared.mjs"
+      ]
+    },
     "test": {
-      "dependsOn": ["^build", "lint"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/package.json",
+        "{projectRoot}/tsconfig.json",
+        "{projectRoot}/tsconfig.tests.json",
+        "{projectRoot}/vite.config.ts",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/tsconfig.json"
+      ]
     }
-  },
-  "tags": ["ci"]
+  }
 }
