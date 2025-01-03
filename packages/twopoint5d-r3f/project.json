@@ -6,10 +6,6 @@
   "projectType": "library",
   "targets": {
     "test": {
-      "executor": "nx:run-script",
-      "options": {
-        "script": "test"
-      },
       "dependsOn": ["^build", "lint"]
     }
   },

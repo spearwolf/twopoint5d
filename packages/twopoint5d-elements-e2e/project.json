@@ -12,10 +12,6 @@
       "dependsOn": ["^build", "lint"]
     },
     "test": {
-      "executor": "nx:run-script",
-      "options": {
-        "script": "test"
-      },
       "outputs": ["{projectRoot}/playwright-report", "{projectRoot}/test-results"],
       "dependsOn": ["^build", "build"]
     }
