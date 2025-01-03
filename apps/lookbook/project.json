@@ -4,6 +4,15 @@
   "root": "apps/lookbook",
   "sourceRoot": "apps/lookbook/src",
   "projectType": "application",
-  "targets": {},
-  "tags": []
+  "targets": {
+    "dev": {
+      "dependsOn": ["^build"]
+    },
+    "start": {
+      "dependsOn": ["^build"]
+    },
+    "preview": {
+      "dependsOn": ["build"]
+    }
+  }
 }

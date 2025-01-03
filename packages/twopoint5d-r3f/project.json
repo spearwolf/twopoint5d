@@ -5,12 +5,6 @@
   "sourceRoot": "{projectRoot}/src",
   "projectType": "library",
   "targets": {
-    "lint": {
-      "executor": "nx:run-script",
-      "options": {
-        "script": "lint"
-      }
-    },
     "test": {
       "executor": "nx:run-script",
       "options": {

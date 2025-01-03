@@ -5,6 +5,12 @@
   "sourceRoot": "{projectRoot}/src",
   "projectType": "application",
   "targets": {
+    "dev": {
+      "dependsOn": ["^build"]
+    },
+    "test:ui": {
+      "dependsOn": ["^build", "lint"]
+    },
     "test": {
       "executor": "nx:run-script",
       "options": {
