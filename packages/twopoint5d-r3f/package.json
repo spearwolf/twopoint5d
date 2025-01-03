@@ -30,7 +30,7 @@
     "_publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
-    "@react-three/fiber": "^8.16.8",
+    "@react-three/fiber": "8.16.*",
     "@spearwolf/eventize": "^4.0.1",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.3.0",
