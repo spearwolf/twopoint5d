@@ -11,6 +11,7 @@
         "highp",
         "lowp",
         "mediump",
+        "nanostores",
         "parentless",
         "Renderable",
         "renderables",

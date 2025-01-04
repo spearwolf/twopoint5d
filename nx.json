@@ -27,6 +27,13 @@
       },
       "cache": true
     },
+    "checkPkgTypes": {
+      "executor": "nx:run-script",
+      "dependsOn": ["build"],
+      "options": {
+        "script": "checkPkgTypes"
+      }
+    },
     "publishNpmPkg": {
       "executor": "nx:run-script",
       "dependsOn": ["build"],

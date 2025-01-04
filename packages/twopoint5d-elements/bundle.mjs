@@ -2,8 +2,6 @@ import * as esbuild from 'esbuild';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-// import {createBanner} from '../../scripts/rollup/createBanner.mjs';
-// import {makeVersionWithBuild} from '../../scripts/rollup/makeVersionWithBuild.mjs';
 import {makeBanner} from '../../scripts/makeBanner.mjs';
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
@@ -11,13 +9,6 @@ const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
 
 const buildDir = path.join(projectDir, 'build');
 const distDir = path.join(projectDir, 'dist');
-
-// const projectShortName = path.basename(projectDir);
-
-// const makeBanner = (build) => {
-//   const version = makeVersionWithBuild(build)(packageJson.version);
-//   return createBanner({...packageJson, version});
-// };
 
 await esbuild.build({
   entryPoints: [path.join(buildDir, 'src/bundle.js')],
