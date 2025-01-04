@@ -2,7 +2,6 @@
   "name": "twopoint5d-elements-e2e",
   "tags": ["playwright"],
   "root": "packages/twopoint5d-elements-e2e",
-  "sourceRoot": "{projectRoot}/src",
   "targets": {
     "dev": {
       "dependsOn": ["^build"]

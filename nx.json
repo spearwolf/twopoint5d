@@ -1,10 +1,9 @@
 {
+  "defaultBase": "main",
   "parallel": 6,
   "targetDefaults": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
+      "dependsOn": ["^build"],
       "cache": true
     },
     "lint": {
@@ -12,6 +11,13 @@
       "options": {
         "script": "lint"
       },
+      "inputs": [
+        "eslintDefaults",
+        "{projectRoot}/src/**/*.js",
+        "{projectRoot}/src/**/*.jsx",
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/src/**/*.tsx"
+      ],
       "cache": true
     },
     "test": {
@@ -23,13 +29,19 @@
     },
     "publishNpmPkg": {
       "executor": "nx:run-script",
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "script": "publishNpmPkg"
       }
     }
   },
-  "defaultBase": "main"
+  "namedInputs": {
+    "eslintDefaults": [
+      "{projectRoot}/eslint.config.mjs",
+      "{workspaceRoot}/eslint.shared.mjs",
+      {
+        "externalDependencies": ["eslint", "eslint-config-prettier", "eslint-plugin-react", "typescript-eslint", "globals"]
+      }
+    ]
+  }
 }

@@ -2,7 +2,6 @@
   "name": "twopoint5d-elements",
   "tags": ["ci"],
   "root": "packages/twopoint5d-elements",
-  "sourceRoot": "{projectRoot}/src",
   "targets": {
     "build": {
       "inputs": [
@@ -23,12 +22,7 @@
       "outputs": ["{projectRoot}/dist"]
     },
     "lint": {
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/*.mjs",
-        "{projectRoot}/eslint.config.mjs",
-        "{workspaceRoot}/eslint.shared.mjs"
-      ]
+      "inputs": ["eslintDefaults", "{projectRoot}/*.mjs"]
     },
     "test": {
       "dependsOn": ["^build"],

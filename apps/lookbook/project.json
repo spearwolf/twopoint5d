@@ -1,7 +1,6 @@
 {
   "name": "lookbook",
   "root": "apps/lookbook",
-  "sourceRoot": "{projectRoot}/src",
   "targets": {
     "dev": {
       "dependsOn": ["^build"]

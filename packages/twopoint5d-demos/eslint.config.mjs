@@ -7,10 +7,10 @@ import {jsRules, tsRules} from '../../eslint.shared.mjs';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ['dist/*'],
+    ignores: ['dist/*', 'tests/*'],
   },
   {
-    files: ['**/*.{js,ts}'],
+    files: ['src/**/*.{js,ts}'],
   },
   {languageOptions: {globals: globals.browser}},
   pluginJs.configs.recommended,

@@ -2,7 +2,6 @@
   "name": "twopoint5d-r3f",
   "tags": ["ci"],
   "root": "packages/twopoint5d-r3f",
-  "sourceRoot": "{projectRoot}/src",
   "targets": {
     "build": {
       "inputs": [
@@ -18,14 +17,6 @@
         "{workspaceRoot}/scripts/makePackageJson.mjs"
       ],
       "outputs": ["{projectRoot}/dist"]
-    },
-    "lint": {
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/src/**/*.tsx",
-        "{projectRoot}/eslint.config.mjs",
-        "{workspaceRoot}/eslint.shared.mjs"
-      ]
     },
     "test": {
       "dependsOn": ["^build"],
