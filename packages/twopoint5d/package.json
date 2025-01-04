@@ -35,8 +35,8 @@
     "publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
-    "@spearwolf/eventize": "^4.0.1",
-    "@spearwolf/signalize": "^0.16.0",
-    "three": "~0.165.0"
+    "@spearwolf/eventize": "catalog:",
+    "@spearwolf/signalize": "catalog:",
+    "three": "catalog:"
   }
 }

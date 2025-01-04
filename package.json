@@ -31,14 +31,11 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.2",
     "@eslint/js": "^9.17.0",
-    "@react-three/fiber": "8.16.*",
     "@react-three/test-renderer": "^8.2.1",
-    "@spearwolf/eventize": "^4.0.1",
-    "@spearwolf/signalize": "^0.16.0",
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.10",
     "@types/sinon": "^17.0.3",
-    "@types/three": "~0.165.0",
+    "@types/three": "catalog:",
     "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.24.2",
     "eslint": "^9.17.0",
@@ -51,10 +48,8 @@
     "playwright": "^1.49.1",
     "prettier": "^3.4.2",
     "prettier-plugin-astro": "^0.14.1",
-    "react": "^18.3.1",
     "rimraf": "^6.0.1",
     "sinon": "^19.0.2",
-    "three": "~0.165.0",
     "ts-node": "10.9.2",
     "tslib": "^2.8.1",
     "tsup": "^8.3.5",
@@ -62,6 +57,6 @@
     "typescript-eslint": "^8.19.0",
     "use-asset": "^1.0.4",
     "vitest": "^2.1.8",
-    "zustand": "^4.5.5"
+    "yaml": "^2.7.0"
   }
 }

@@ -33,13 +33,10 @@
   },
   "dependencies": {
     "@lit/context": "^1.1.2",
-    "@spearwolf/eventize": "^4.0.1",
-    "@spearwolf/signalize": "^0.16.0",
+    "@spearwolf/eventize": "catalog:",
+    "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "lit": "3.1.4",
-    "three": "~0.165.0"
-  },
-  "devDependencies": {
-    "@types/three": "~0.165.0"
+    "three": "catalog:"
   }
 }

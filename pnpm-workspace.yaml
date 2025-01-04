@@ -1,3 +1,9 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+
+catalog:
+  three: ~0.165.0
+  "@types/three": ~0.165.0
+  "@spearwolf/eventize": ^4.0.1
+  "@spearwolf/signalize": ^0.16.0

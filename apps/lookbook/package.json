@@ -16,7 +16,10 @@
     "@astrojs/react": "^3.6.2",
     "@astrojs/tailwind": "^5.1.4",
     "@react-three/drei": "^9.120.5",
+    "@react-three/fiber": "8.16.*",
     "@spearwolf/astro-rainbow-line": "^1.3.0",
+    "@spearwolf/eventize": "catalog:",
+    "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-demos": "workspace:*",
     "@spearwolf/twopoint5d-elements": "workspace:*",
@@ -31,9 +34,10 @@
     "r3f-perf": "^7.2.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sass": "^1.83.0",
-    "styled-components": "^6.1.13",
+    "sass": "^1.83.1",
+    "styled-components": "^6.1.14",
     "tailwindcss": "^3.4.17",
-    "three": "~0.165.0"
+    "three": "catalog:",
+    "zustand": "^4.5.5"
   }
 }

@@ -25,17 +25,20 @@
     "clean": "pnpm rimraf build types dist",
     "lint": "pnpm exec eslint .",
     "test": "pnpm vitest --run",
+    "update": "pnpm dlx npm-check --update",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm",
     "_publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@react-three/fiber": "8.16.*",
-    "@spearwolf/eventize": "^4.0.1",
+    "use-asset": "^1.0.4",
+    "zustand": "^4.5.5"
+  },
+  "peerDependencies": {
+    "@spearwolf/eventize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.3.0",
-    "three": "~0.165.0",
-    "use-asset": "^1.0.4",
-    "zustand": "^4.3.8"
+    "three": "catalog:"
   }
 }
