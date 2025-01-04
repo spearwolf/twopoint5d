@@ -13,11 +13,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.10.0
+          version: 9.15.2
           run_install: true
         env:
           NPM_TOKEN: xxx
@@ -53,11 +53,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.10.0
+          version: 9.15.2
           run_install: true
         env:
           NPM_TOKEN: xxx
