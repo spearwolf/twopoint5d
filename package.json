@@ -24,7 +24,6 @@
     "cbt": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "test:all": "pnpm run-s -sn clean lint build checkPkgTypes test:ci test:playwright",
     "lookbook": "pnpm nx dev lookbook",
-    "landing-page": "pnpm nx dev landing-page",
     "ci": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "playwright:install": "pnpm exec playwright install",
     "ci:install": "pnpm run-s -sn playwright:install ci"
@@ -54,7 +53,6 @@
     "prettier-plugin-astro": "^0.14.1",
     "react": "^18.3.1",
     "rimraf": "^6.0.1",
-    "rollup": "^4.29.1",
     "sinon": "^19.0.2",
     "three": "~0.165.0",
     "ts-node": "10.9.2",
