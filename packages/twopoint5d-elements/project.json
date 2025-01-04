@@ -7,17 +7,12 @@
       "inputs": [
         "{projectRoot}/src/**/*.ts",
         "!{projectRoot}/src/**/*.spec.ts",
-        "{projectRoot}/package.json",
-        "{projectRoot}/package.override.json",
-        "{projectRoot}/tsconfig.json",
+        "sharedTsconfigs",
         "{projectRoot}/tsconfig.lib.json",
         "{projectRoot}/tsconfig.bundle.json",
+        "makePackageJson",
         "{projectRoot}/bundle.mjs",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json",
-        "{workspaceRoot}/scripts/makePackageJson.mjs",
-        "{workspaceRoot}/scripts/makeBanner.mjs",
-        "{workspaceRoot}/scripts/makeBanner/*.mjs"
+        "makeBanner"
       ],
       "outputs": ["{projectRoot}/dist"]
     },
@@ -26,15 +21,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/package.json",
-        "{projectRoot}/tsconfig.json",
-        "{projectRoot}/tsconfig.tests.json",
-        "{projectRoot}/vite.config.ts",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json"
-      ]
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts", "{projectRoot}/tsconfig.tests.json"]
     }
   }
 }

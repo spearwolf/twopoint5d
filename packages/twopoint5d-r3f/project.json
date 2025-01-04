@@ -10,26 +10,13 @@
         "!{projectRoot}/src/**/*.spec.ts",
         "!{projectRoot}/src/**/*.spec.tsx",
         "{projectRoot}/package.json",
-        "{projectRoot}/package.override.json",
-        "{projectRoot}/tsconfig.json",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json",
-        "{workspaceRoot}/scripts/makePackageJson.mjs"
+        "sharedTsconfigs"
       ],
       "outputs": ["{projectRoot}/dist"]
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/src/**/*.tsx",
-        "{projectRoot}/package.json",
-        "{projectRoot}/tsconfig.json",
-        "{projectRoot}/vite.config.js",
-        "{projectRoot}/setup-tests.js",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json"
-      ]
+      "inputs": ["{projectRoot}/src/**/*.ts", "{projectRoot}/src/**/*.tsx", "vitestDefaults", "{projectRoot}/setup-tests.js"]
     }
   }
 }

@@ -4,26 +4,11 @@
   "root": "packages/twopoint5d",
   "targets": {
     "build": {
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "!{projectRoot}/src/**/*.spec.ts",
-        "{projectRoot}/package.json",
-        "{projectRoot}/package.override.json",
-        "{projectRoot}/tsconfig.json",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json",
-        "{workspaceRoot}/scripts/makePackageJson.mjs"
-      ],
+      "inputs": ["{projectRoot}/src/**/*.ts", "!{projectRoot}/src/**/*.spec.ts", "sharedTsconfigs", "makePackageJson"],
       "outputs": ["{projectRoot}/dist"]
     },
     "test": {
-      "inputs": [
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/package.json",
-        "{projectRoot}/tsconfig.json",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/tsconfig.json"
-      ]
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
     }
   }
 }

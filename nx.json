@@ -36,11 +36,28 @@
     }
   },
   "namedInputs": {
+    "sharedTsconfigs": ["{projectRoot}/tsconfig.json", "{workspaceRoot}/tsconfig.json"],
+    "makePackageJson": [
+      "{projectRoot}/package.json",
+      "{projectRoot}/package.override.json",
+      "{workspaceRoot}/scripts/makePackageJson.mjs"
+    ],
+    "makeBanner": ["{workspaceRoot}/scripts/makeBanner.mjs", "{workspaceRoot}/scripts/makeBanner/*.mjs"],
     "eslintDefaults": [
       "{projectRoot}/eslint.config.mjs",
       "{workspaceRoot}/eslint.shared.mjs",
       {
         "externalDependencies": ["eslint", "eslint-config-prettier", "eslint-plugin-react", "typescript-eslint", "globals"]
+      }
+    ],
+    "vitestDefaults": [
+      "{projectRoot}/vite.config.js",
+      "{projectRoot}/vite.config.ts",
+      "{projectRoot}/vite.config.mjs",
+      "{projectRoot}/package.json",
+      "sharedTsconfigs",
+      {
+        "externalDependencies": ["vitest", "happy-dom"]
       }
     ]
   }
