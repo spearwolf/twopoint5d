@@ -1,6 +1,6 @@
 import {consume} from '@lit/context';
-import {type SignalReader} from '@spearwolf/signalize';
-import {signal, signalReader} from '@spearwolf/signalize/decorators';
+import {findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {Display, TextureStore} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -27,14 +27,10 @@ export class TextureStoreElement extends TwoPoint5DElement {
   @signal({readAsValue: true})
   accessor src: string | undefined;
 
-  @signalReader() accessor src$: SignalReader<string | undefined>;
-
   @consume({context: displayContext, subscribe: true})
   @property({attribute: false})
   @signal({readAsValue: true})
   accessor display: Display | undefined;
-
-  @signalReader() accessor display$: SignalReader<Display | undefined>;
 
   readonly store = new TextureStore();
 
@@ -43,12 +39,12 @@ export class TextureStoreElement extends TwoPoint5DElement {
 
     this.loggerNS = 'two5-texture-store';
 
-    this.display$((display) => {
+    findObjectSignalByName(this, 'display').onChange((display) => {
       this.store.renderer = display?.renderer;
       this.logger?.log('received display', {display, el: this});
     });
 
-    this.src$((src) => {
+    findObjectSignalByName(this, 'src').onChange((src) => {
       if (src?.trim()) {
         const url = new URL(src, window.location.href).href;
         this.logger?.log('load texture-store from', {url, el: this});

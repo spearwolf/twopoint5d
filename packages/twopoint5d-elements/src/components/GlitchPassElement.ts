@@ -1,5 +1,6 @@
 import {consume} from '@lit/context';
-import {effect, signal} from '@spearwolf/signalize/decorators';
+import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {GlitchPass} from 'three/addons/postprocessing/GlitchPass.js';
@@ -37,7 +38,6 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
     return this.glitchPass;
   }
 
-  @effect({deps: ['postProcessingCtx', 'glitchPass']})
   onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     if (pp != null) {
@@ -50,7 +50,6 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
     }
   }
 
-  @effect({deps: ['glitchPass', 'disabled', 'clear']})
   onPassUpdate() {
     if (this.glitchPass != null) {
       this.glitchPass.enabled = !this.disabled;
@@ -60,9 +59,21 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
 
   constructor() {
     super();
+
     this.loggerNS = 'two5-glitch-pass';
-    this.onPostProcessingUpdate();
-    this.onPassUpdate();
+
+    createEffect(
+      () => this.onPostProcessingUpdate(),
+      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'glitchPass')],
+    );
+    createEffect(
+      () => this.onPassUpdate(),
+      [
+        findObjectSignalByName(this, 'glitchPass'),
+        findObjectSignalByName(this, 'disabled'),
+        findObjectSignalByName(this, 'clear'),
+      ],
+    );
   }
 
   override createRenderRoot() {

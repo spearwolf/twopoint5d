@@ -1,5 +1,5 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {batch, createEffect, createSignal, SignalObject, touch} from '@spearwolf/signalize';
+import {batch, createEffect, createSignal, Signal, touch} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -69,7 +69,7 @@ export class TextureResource {
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.#tileSetOptions = createSignal(tileSetOptions, {compareFn: cmpTileSetOptions});
+      resource.#tileSetOptions = createSignal(tileSetOptions, {compare: cmpTileSetOptions});
       resource.#tileSet = createSignal();
       resource.#atlas = createSignal();
       resource.textureClasses = textureClasses?.splice(0);
@@ -97,16 +97,16 @@ export class TextureResource {
     return resource;
   }
 
-  #atlasUrl?: SignalObject<string | undefined>;
-  #atlasJson?: SignalObject<TexturePackerJsonData | undefined>;
-  #overrideImageUrl?: SignalObject<string | undefined>;
-  #atlas?: SignalObject<TextureAtlas | undefined>;
-  #tileSetOptions?: SignalObject<TileSetOptions | undefined>;
-  #tileSet?: SignalObject<TileSet | undefined>;
+  #atlasUrl?: Signal<string | undefined>;
+  #atlasJson?: Signal<TexturePackerJsonData | undefined>;
+  #overrideImageUrl?: Signal<string | undefined>;
+  #atlas?: Signal<TextureAtlas | undefined>;
+  #tileSetOptions?: Signal<TileSetOptions | undefined>;
+  #tileSet?: Signal<TileSet | undefined>;
 
-  #textureClasses: SignalObject<TextureOptionClasses[] | undefined> = createSignal(undefined, {compareFn: cmpTexClasses});
+  #textureClasses: Signal<TextureOptionClasses[] | undefined> = createSignal(undefined, {compare: cmpTexClasses});
   #imageUrl = createSignal<string | undefined>();
-  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compareFn: cmpTexCoords});
+  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpTexCoords});
 
   #textureFactory = createSignal<TextureFactory | undefined>();
   #texture = createSignal<Texture | undefined>();

@@ -1,7 +1,7 @@
 import {consume} from '@lit/context';
 import {on} from '@spearwolf/eventize';
-import {batch} from '@spearwolf/signalize';
-import {effect, signal} from '@spearwolf/signalize/decorators';
+import {batch, createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import type {Display} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -59,7 +59,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
     return this.bloomPass;
   }
 
-  @effect({deps: ['postProcessingCtx', 'bloomPass']})
+  // @effect({deps: ['postProcessingCtx', 'bloomPass']})
   onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     const bloomPass = this.bloomPass;
@@ -73,7 +73,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
     }
   }
 
-  @effect({deps: ['bloomPass', 'disabled', 'clear', 'strength', 'radius', 'threshold']})
+  // @effect({deps: ['bloomPass', 'disabled', 'clear', 'strength', 'radius', 'threshold']})
   onPassUpdate() {
     if (this.bloomPass != null) {
       this.bloomPass.enabled = !this.disabled;
@@ -84,7 +84,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
     }
   }
 
-  @effect({deps: ['display']})
+  // @effect({deps: ['display']})
   onDisplayUpdate() {
     if (this.display != null) {
       const resolution = new Vector2(this.display.width, this.display.height);
@@ -109,10 +109,27 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
 
   constructor() {
     super();
+
     this.loggerNS = 'two5-unreal-bloom-pass';
-    this.onDisplayUpdate();
-    this.onPostProcessingUpdate();
-    this.onPassUpdate();
+
+    createEffect(() => this.onDisplayUpdate(), [findObjectSignalByName(this, 'display')]);
+
+    createEffect(
+      () => this.onPostProcessingUpdate(),
+      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'bloomPass')],
+    );
+
+    createEffect(
+      () => this.onPassUpdate(),
+      [
+        findObjectSignalByName(this, 'bloomPass'),
+        findObjectSignalByName(this, 'disabled'),
+        findObjectSignalByName(this, 'clear'),
+        findObjectSignalByName(this, 'strength'),
+        findObjectSignalByName(this, 'radius'),
+        findObjectSignalByName(this, 'threshold'),
+      ],
+    );
   }
 
   override createRenderRoot() {

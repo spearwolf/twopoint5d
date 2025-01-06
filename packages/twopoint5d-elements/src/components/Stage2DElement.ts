@@ -1,7 +1,7 @@
 import {consume} from '@lit/context';
 import {emit, eventize, on, once, retain} from '@spearwolf/eventize';
-import {createEffect, queryObjectSignal, type SignalReader} from '@spearwolf/signalize';
-import {signal, signalReader} from '@spearwolf/signalize/decorators';
+import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {
   OrthographicProjection,
   ParallaxProjection,
@@ -99,7 +99,7 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
   }
 
   @signal({readAsValue: true}) accessor projection: IProjection | undefined;
-  @signalReader() accessor projection$: SignalReader<IProjection | undefined>;
+  // @signalReader() accessor projection$: SignalReader<IProjection | undefined>;
 
   readonly stage2d = new Stage2D();
 
@@ -124,24 +124,18 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
 
     retain(this, [FirstFrame, StageResize]);
 
-    queryObjectSignal(
-      this,
-      'name',
-    )((name) => {
+    findObjectSignalByName(this, 'name').onChange((name) => {
       this.stage2d.name = name;
     });
 
-    queryObjectSignal(
-      this,
-      'stageRendererCtx',
-    )((stageRendererCtx) => {
+    findObjectSignalByName(this, 'stageRendererCtx').onChange((stageRendererCtx) => {
       this.logger?.log('requested stage-renderer context', stageRendererCtx);
       if (stageRendererCtx == null) return;
       stageRendererCtx.addStageElement(this);
       return () => stageRendererCtx.removeStageElement(this);
     });
 
-    this.projection$((proj) => {
+    findObjectSignalByName(this, 'projection').onChange((proj) => {
       this.stage2d.projection = proj;
     });
 

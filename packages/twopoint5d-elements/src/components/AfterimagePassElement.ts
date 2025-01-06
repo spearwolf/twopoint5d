@@ -1,5 +1,6 @@
 import {consume} from '@lit/context';
-import {effect, signal} from '@spearwolf/signalize/decorators';
+import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {AfterimagePass} from 'three/addons/postprocessing/AfterimagePass.js';
@@ -41,7 +42,6 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
     return this.afterimagePass;
   }
 
-  @effect({deps: ['postProcessingCtx', 'afterimagePass']})
   onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     if (pp != null) {
@@ -54,7 +54,6 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
     }
   }
 
-  @effect({deps: ['disabled', 'clear', 'damp']})
   onPassUpdate() {
     this.afterimagePass.enabled = !this.disabled;
     this.afterimagePass.clear = this.clear;
@@ -63,9 +62,18 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
 
   constructor() {
     super();
+
     this.loggerNS = 'two5-afterimage-pass';
-    this.onPostProcessingUpdate();
-    this.onPassUpdate();
+
+    createEffect(
+      () => this.onPostProcessingUpdate(),
+      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'afterimagePass')],
+    );
+
+    createEffect(
+      () => this.onPassUpdate(),
+      [findObjectSignalByName(this, 'disabled'), findObjectSignalByName(this, 'clear'), findObjectSignalByName(this, 'damp')],
+    );
   }
 
   override createRenderRoot() {

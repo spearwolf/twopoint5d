@@ -1,5 +1,6 @@
 import {ContextProvider, consume} from '@lit/context';
-import {effect, signal} from '@spearwolf/signalize/decorators';
+import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -38,7 +39,6 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
 
   readonly renderer = new PostProcessingRenderer();
 
-  @effect({signal: 'parentRendererCtx'})
   onParentRendererChange() {
     const parent = this.parentRendererCtx;
     if (parent) {
@@ -61,7 +61,7 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
     this.postProcessingProvider = this.createContextProvider(postProcessingContext);
     this.stageRendererProvider = this.createContextProvider(stageRendererContext);
 
-    this.onParentRendererChange();
+    createEffect(() => this.onParentRendererChange(), [findObjectSignalByName(this, 'parentRendererCtx')]);
   }
 
   override createRenderRoot() {

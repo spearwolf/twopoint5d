@@ -1,4 +1,4 @@
-import {batch, createSignal, SignalObject} from '@spearwolf/signalize';
+import {batch, createSignal, Signal} from '@spearwolf/signalize';
 
 export class SignalMap {
   static fromProps<T extends object>(o: T, propKeys: (keyof T)[]): SignalMap {
@@ -12,9 +12,9 @@ export class SignalMap {
     return sm;
   }
 
-  #signals: Map<PropertyKey, SignalObject<unknown>> = new Map();
+  #signals: Map<PropertyKey, Signal<unknown>> = new Map();
 
-  getSignals(): SignalObject<unknown>[] {
+  getSignals(): Signal<unknown>[] {
     return Array.from(this.#signals.values());
   }
 

@@ -10,8 +10,8 @@ catalogs:
       specifier: ^4.0.1
       version: 4.0.1
     '@spearwolf/signalize':
-      specifier: ^0.16.0
-      version: 0.16.0
+      specifier: ^0.18.1
+      version: 0.18.1
     '@types/three':
       specifier: ~0.165.0
       version: 0.165.0
@@ -133,7 +133,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.16.0(@spearwolf/eventize@4.0.1)
+        version: 0.18.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -199,7 +199,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.16.0(@spearwolf/eventize@4.0.1)
+        version: 0.18.1(@spearwolf/eventize@4.0.1)
       three:
         specifier: 'catalog:'
         version: 0.165.0
@@ -214,7 +214,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.16.0(@spearwolf/eventize@4.0.1)
+        version: 0.18.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -235,7 +235,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.16.0(@spearwolf/eventize@4.0.1)
+        version: 0.18.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -1820,8 +1820,8 @@ packages:
     resolution: {integrity: sha512-0RgKoF6zIjLzYyy62cyZy7TdiqVpIdrIDNvIbJRmeQ1lSh/CtHxu3Euv4jijbJSPoZX82jp954iQm7nMIad9dw==}
     engines: {node: '>=18.16'}
 
-  '@spearwolf/signalize@0.16.0':
-    resolution: {integrity: sha512-eAgRDYC+P/xfqGXersb14hCRb1WLuI5sXQLeiL6bpjo2dQ7cwoxbzZpyBgRpHm7Co1EM+BhdHN2THESKtGlNGQ==}
+  '@spearwolf/signalize@0.18.1':
+    resolution: {integrity: sha512-rzkGZYTK1ITot6yLflmvvO7jk6/mDsqNSkTNR3/94sjRQWRDVD6H3LNH0AiB5jG9naIyPs8g1xyMd/0OgvFy7g==}
     engines: {node: '>=20.12'}
     peerDependencies:
       '@spearwolf/eventize': ^4.0.1
@@ -7051,7 +7051,7 @@ snapshots:
 
   '@spearwolf/eventize@4.0.1': {}
 
-  '@spearwolf/signalize@0.16.0(@spearwolf/eventize@4.0.1)':
+  '@spearwolf/signalize@0.18.1(@spearwolf/eventize@4.0.1)':
     dependencies:
       '@spearwolf/eventize': 4.0.1
 

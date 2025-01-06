@@ -1,6 +1,6 @@
 import {emit, on, retain} from '@spearwolf/eventize';
-import {batch} from '@spearwolf/signalize';
-import {effect, signal} from '@spearwolf/signalize/decorators';
+import {batch, createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {signal} from '@spearwolf/signalize/decorators';
 import {
   TextureAtlas,
   TexturedSprites,
@@ -66,9 +66,9 @@ export class Starfield {
 
     this.geometry = new TexturedSpritesGeometry(capacity);
 
-    this.#loadAtlas();
-    this.#appendSpritesToStage();
-    this.#createSprites();
+    createEffect(() => this.#loadAtlas(), [findObjectSignalByName(this, 'atlasName')]);
+    createEffect(() => this.#appendSpritesToStage(), [findObjectSignalByName(this, 'sprites')]);
+    createEffect(() => this.#createSprites(), [findObjectSignalByName(this, 'sprites'), findObjectSignalByName(this, 'atlas')]);
 
     this.atlasName = atlasName;
 
@@ -195,7 +195,7 @@ export class Starfield {
     material.cameraLineOfSightEscape = this.#cameraLineOfSightEscape;
   }
 
-  @effect({deps: ['atlasName']}) #loadAtlas() {
+  #loadAtlas() {
     return this.textureStore.get(this.atlasName, ['atlas', 'texture'], ([atlas, texture]) => {
       batch(() => {
         this.atlas = atlas;
@@ -218,7 +218,7 @@ export class Starfield {
     });
   }
 
-  @effect({deps: ['sprites']}) #appendSpritesToStage() {
+  #appendSpritesToStage() {
     const {origin, sprites} = this;
     if (sprites) {
       origin.add(sprites);
@@ -228,7 +228,7 @@ export class Starfield {
     }
   }
 
-  @effect({deps: ['sprites', 'atlas']}) #createSprites() {
+  #createSprites() {
     if (this.atlas && this.sprites) {
       this.createStars(this.pool.availableCount);
     }
