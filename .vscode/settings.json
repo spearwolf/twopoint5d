@@ -17,6 +17,7 @@
         "renderables",
         "spatialized",
         "starfield",
+        "threejs",
         "tileset",
         "Tsconfigs",
         "tsup",

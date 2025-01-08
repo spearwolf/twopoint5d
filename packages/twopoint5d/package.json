@@ -1,7 +1,21 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
-  "version": "0.5.0",
+  "version": "0.6.0",
+  "keywords": [
+    "sprites",
+    "particles",
+    "instancing",
+    "instanced-rendering",
+    "2.5d",
+    "3d",
+    "pixelart",
+    "retro",
+    "game-development",
+    "webgl",
+    "three",
+    "threejs"
+  ],
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -34,7 +48,7 @@
     "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm no-resolution",
     "publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
     "three": "catalog:"

@@ -32,13 +32,11 @@
   },
   "dependencies": {
     "@react-three/fiber": "8.16.*",
-    "use-asset": "^1.0.4",
-    "zustand": "^4.5.5"
-  },
-  "peerDependencies": {
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.3.0",
-    "three": "catalog:"
+    "three": "catalog:",
+    "use-asset": "^1.0.4",
+    "zustand": "^4.5.5"
   }
 }
