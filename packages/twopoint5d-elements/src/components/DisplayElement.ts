@@ -144,7 +144,7 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
         'power-preference',
         ['default', 'high-performance', 'low-power'],
         'high-performance',
-      ),
+      ) as WebGLPowerPreference,
       preserveDrawingBuffer: readBooleanAttribute(this, 'preserve-drawing-buffer'),
       premultipliedAlpha: readBooleanAttribute(this, 'premultiplied-alpha', true),
       stencil: readBooleanAttribute(this, 'stencil'),
