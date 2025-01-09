@@ -74,7 +74,7 @@ display.start()
 
 ### Display(domElementOrRenderer, options?)
 
-**domElementOrRenderer** : _HTMLElement | WebGLRenderer_ - The constructor normally expects the canvas element as first parameter.
+**domElementOrRenderer** : _HTMLElement | WebGLRenderer | WebGPURenderer_ - The constructor normally expects the canvas element as first parameter.
 
 Alternatively, any other element can be used. In this case the canvas is automatically generated and placed below the specified element in the dom. In this case the size of the canvas depends on the size of the container. If for some reason the container does not have its own size, the canvas simply uses its default size.
 
@@ -82,31 +82,34 @@ You don't really need to worry about this, in most cases the canvas will behave 
 
 This behavior is shown in the example [multiple displays](../examples/vanilla/display.html).
 
-> TODO init: canvas vs. dom-el, vs webglrenderer
+> TODO init: canvas vs. dom-el, vs webglrenderer vs webgpurenderer
 
 > TODO css classes: display3\_\_Display, display3\_\_fullscreen, display3\_\_Container
 
 
-**options** : _object_ - optional options object that can hold every valid argument from [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the _canvas_ parameter, it will be simply ignored).
+**options** : _object_ - optional options object that can hold every valid argument from the `three/webgpu:WebGPURenderer` or the [THREE.WebGLRenderer](https://threejs.org/docs/index.html?q=webglre#api/en/renderers/WebGLRenderer) (except the _canvas_ parameter, it will be simply ignored).
+
 In addition, there are also the following options:
 
 | option | type | description |
 |--------|------|-------------|
+| webgpu | boolean | optional - if set to `true`, the new `WebGPURenderer` from `three/webgpu` will be used instead of the good old `THREE.WebGLRenderer` |
 | resizeTo | `(display: Display) => [width: number, height: number]` | optional callback - if specified, this function is called on each frame and the result is used to update the dimension of the canvas |
 | resizeToElement | `HTMLElement` | normally the canvas or the container element is used for (re)sizing. with this you can explicitly set the reference element. can be very helpful if you create the canvas e.g. in a shadow-dom, but want to use the web-component element from the parent dom as reference for the size |
 | resizeToAttributeEl | `HTMLElement` | the element where a `resize-to` attribute is listened for. this is by default the canvas itself |
 | styleSheetRoot | `HTMLElement` or `ShadowRoot` | where to install the stylesheets. this is by default the `document.head`, but can of course also be a shadow-dom root |
 
-The following parameters for the _WebGLRenderer_ are set as default unless otherwise specified:
+The following parameters for the renderer are set as default unless otherwise specified:
 
-| parameter | default |
-|-----------|---------|
-| precision | `highp` |
-| preserveDrawingBuffer | _false_ |
-| powerPreference | `high-performance` |
-| stencil | _false_ |
-| alpha | _true_ |
-| antialias | _true_ |
+| parameter | default | notes |
+|-----------|---------|-------|
+| forceWebGL | _false_ | only relevant for the `WebGPURenderer` from `three/webgpu` |
+| precision | `highp` | only relevant for the `THREE.WebGLRenderer` |
+| preserveDrawingBuffer | _false_ | only relevant for the `THREE.WebGLRenderer`|
+| powerPreference | `high-performance` | |
+| stencil | _false_ | |
+| alpha | _true_ | |
+| antialias | _true_ | |
 
 
 ## Properties
@@ -121,7 +124,7 @@ The following parameters for the _WebGLRenderer_ are set as default unless other
 
 .__resizeToCallback__ : _(display: Display) => [width: number, height: number] | undefined_ - if specified, this function is called on each frame and the result is used to update the dimension of the canvas
 
-.__renderer__ : _THREE.WebGLRenderer_ - the renderer instance
+.__renderer__ : _THREE.WebGLRenderer_ | _WebGPURenderer_ - the renderer instance
 
 .__now__ : _number_ - The current time in seconds. starts at 0. 0 is the time at which the display is instantiated. time does not elapse until the display has been started with `.start()`. at the beginning of an _animation frame_ the time is updated. within a frame the time remains unchanged.
 

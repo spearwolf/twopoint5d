@@ -1,6 +1,7 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 
+import {WebGPURenderer} from 'three/webgpu';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {Stylesheets} from './Stylesheets.js';
@@ -48,9 +49,9 @@ export class Display {
 
   styleSheetRoot: HTMLElement | ShadowRoot;
 
-  renderer?: WebGLRenderer;
+  renderer?: WebGLRenderer | WebGPURenderer;
 
-  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer, options?: DisplayParameters) {
+  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
 
     retain(this, ['init', 'start', 'resize']);
@@ -60,7 +61,7 @@ export class Display {
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
-    if (domElementOrRenderer instanceof WebGLRenderer) {
+    if (domElementOrRenderer instanceof WebGLRenderer || domElementOrRenderer instanceof WebGPURenderer) {
       this.renderer = domElementOrRenderer;
       this.resizeToElement = domElementOrRenderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
@@ -83,16 +84,25 @@ export class Display {
         container.appendChild(canvas);
       }
       this.resizeToElement = domElementOrRenderer;
-      this.renderer = new WebGLRenderer({
-        canvas,
-        precision: 'highp',
-        preserveDrawingBuffer: false,
-        powerPreference: 'high-performance',
-        stencil: false,
-        alpha: true,
-        antialias: true,
-        ...options,
-      });
+      this.renderer = options?.webgpu
+        ? new WebGPURenderer({
+            canvas,
+            stencil: false,
+            alpha: true,
+            antialias: true,
+            ...options,
+            powerPreference: 'high-performance',
+          })
+        : new WebGLRenderer({
+            canvas,
+            precision: 'highp',
+            preserveDrawingBuffer: false,
+            powerPreference: 'high-performance',
+            stencil: false,
+            alpha: true,
+            antialias: true,
+            ...options,
+          });
     }
 
     const {domElement: canvas} = this.renderer!;
@@ -105,7 +115,13 @@ export class Display {
     this.resize();
 
     on(this.#stateMachine, {
-      [DisplayStateMachine.Init]: () => this.#emitEvent('init'),
+      [DisplayStateMachine.Init]: async () => {
+        if ((this.renderer as WebGPURenderer).isWebGPURenderer) {
+          await (this.renderer as WebGPURenderer).init();
+        }
+        this.#emitEvent('init');
+      },
+
       [DisplayStateMachine.Restart]: () => this.#emitEvent('restart'),
 
       [DisplayStateMachine.Start]: () => {

@@ -1,10 +1,10 @@
-import {WebGLRenderer, type WebGLRendererParameters} from 'three';
-
+import type {WebGLRenderer, WebGLRendererParameters} from 'three';
+import type {WebGPURenderer} from 'three/webgpu';
 import type {Display} from './Display.js';
 
 export interface DisplayEventArgs {
   display: Display;
-  renderer: WebGLRenderer;
+  renderer: WebGLRenderer | WebGPURenderer;
   width: number;
   height: number;
   now: number;
@@ -14,10 +14,22 @@ export interface DisplayEventArgs {
 
 export type ResizeCallback = (display: Display) => [width: number, height: number];
 
-export type DisplayParameters = Partial<Omit<WebGLRendererParameters, 'canvas'>> & {
+type RendererParameters =
+  | (Partial<Omit<WebGLRendererParameters, 'canvas'>> & {webgpu?: false})
+  | {
+      webgpu: true;
+      forceWebGL?: boolean;
+      logarithmicDepthBuffer?: boolean | undefined;
+      alpha?: boolean | undefined;
+      depth?: boolean | undefined;
+      stencil?: boolean | undefined;
+      antialias?: boolean | undefined;
+      samples?: number | undefined;
+    };
+
+export type DisplayParameters = RendererParameters & {
   resizeTo?: ResizeCallback;
   resizeToElement?: HTMLElement;
   resizeToAttributeEl?: HTMLElement;
-
   styleSheetRoot?: HTMLElement | ShadowRoot;
 };

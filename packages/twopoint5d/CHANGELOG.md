@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 &mldr;
 
+## [0.7.0] - 2024-01-09
+
+### Added
+
+- The `Display` class now supports the _optional_ `webgpu: true` parameter
+  - If enabled, the new `WebGPURenderer` from `three/gpu` is used
+  - The default is still the good old `THREE.WebGLRenderer`
+
+
 ## [0.6.0] - 2024-01-08
 
 ### Changed
