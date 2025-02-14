@@ -43,3 +43,4 @@ Thumbs.db
 .nx/
 .nx/workspace-data
 
+playwright.browsers

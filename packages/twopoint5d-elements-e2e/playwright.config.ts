@@ -1,5 +1,33 @@
 import {defineConfig, devices} from '@playwright/test';
 
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs';
+
+const __topdir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const browsersFile = path.join(__topdir, 'playwright.browsers');
+
+const allowedBrowsers: string[] = [];
+
+if (fs.existsSync(browsersFile)) {
+  const configuredBrowsers: string[] = fs.readFileSync(browsersFile, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  allowedBrowsers.push(
+    ...Array.from(new Set(configuredBrowsers))
+  );
+}
+
+function filterProjectsByBrowsers<T extends {name: string}>(projects: T[]): T[] {
+  return projects.filter((project) => {
+    if (allowedBrowsers.length === 0) {
+      return true;
+    }
+    return allowedBrowsers.includes(project.name);
+  });
+}
+
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -33,7 +61,7 @@ export default defineConfig({
   },
 
   /* Configure projects for major browsers */
-  projects: [
+  projects: filterProjectsByBrowsers([
     {
       name: 'firefox',
       use: {...devices['Desktop Firefox'], headless: true},
@@ -54,7 +82,7 @@ export default defineConfig({
             use: {...devices['Desktop Safari'], headless: true},
           },
         ]),
-  ],
+  ]),
 
   /* Test against mobile viewports. */
   // {
