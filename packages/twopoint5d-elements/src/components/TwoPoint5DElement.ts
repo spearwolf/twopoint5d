@@ -1,6 +1,7 @@
 import {ContextProvider} from '@lit/context';
 import {LitElement} from 'lit';
 import {property} from 'lit/decorators.js';
+import {createEffect, findObjectSignalByName, Signal, SignalGroup} from '@spearwolf/signalize';
 import {ConsoleLogger} from '../utils/ConsoleLogger.js';
 import {asBoolean} from '../utils/asBoolean.js';
 import {readBooleanAttribute} from '../utils/readBooleanAttribute.js';
@@ -46,10 +47,34 @@ export class TwoPoint5DElement extends LitElement {
     }
   }
 
+  #signalGroup?: SignalGroup;
+
   constructor() {
     super();
     this.#loggerNS = UNNAMED;
     this.#debug = readBooleanAttribute(this, DEBUG_ATTR);
+  }
+
+  override disconnectedCallback() {
+    this.destroySignalGroup();
+  }
+
+  protected get signalGroup(): SignalGroup {
+    if (this.#signalGroup == null) {
+      this.#signalGroup = SignalGroup.findOrCreate(this);
+    }
+    return this.#signalGroup;
+  }
+
+  protected destroySignalGroup() {
+    if (this.#signalGroup != null) {
+      this.#signalGroup.destroy();
+      this.#signalGroup = undefined;
+    }
+  }
+
+  protected createEffect(fn: () => void, signals: (keyof this)[]) {
+    return createEffect(fn, this.signals(...signals), {attach: this.signalGroup});
   }
 
   override attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
@@ -72,5 +97,15 @@ export class TwoPoint5DElement extends LitElement {
 
   protected clearContextProvider(provider: ContextProvider<any, any>) {
     provider.setValue(undefined);
+  }
+
+  protected signal(name: keyof this): Signal<any> {
+    return findObjectSignalByName(this, name);
+  }
+
+  protected signals(...names: (keyof this)[]): Signal<any>[] {
+    return Array.from(new Set(names))
+      .map((name) => findObjectSignalByName(this, name))
+      .filter(Boolean);
   }
 }

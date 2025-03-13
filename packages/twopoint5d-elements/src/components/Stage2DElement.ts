@@ -1,6 +1,6 @@
 import {consume} from '@lit/context';
 import {emit, eventize, on, once, retain} from '@spearwolf/eventize';
-import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {createEffect, SignalAutoMap} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import {
   OrthographicProjection,
@@ -23,7 +23,7 @@ import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import type {Scene} from 'three';
 import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
-import {SignalMap} from '../utils/SignalMap.js';
+import {asValueObject} from '../utils/asValueObject.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 
@@ -45,7 +45,6 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
   `;
 
   @consume({context: stageRendererContext, subscribe: true})
-  @property({attribute: false})
   @signal({readAsValue: true})
   accessor stageRendererCtx: IStageRendererContext | undefined;
 
@@ -91,15 +90,14 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
 
   // TODO add autoClear property
 
-  readonly #projSignals: SignalMap;
-  readonly #viewSpecsSignals: SignalMap;
+  readonly #projSignals: SignalAutoMap;
+  readonly #viewSpecsSignals: SignalAutoMap;
 
   private getViewSpecs(): ParallaxProjectionSpecs | OrthographicProjectionSpecs {
-    return this.#viewSpecsSignals.getValueObject() as ParallaxProjectionSpecs | OrthographicProjectionSpecs;
+    return asValueObject(this.#viewSpecsSignals) as ParallaxProjectionSpecs | OrthographicProjectionSpecs;
   }
 
   @signal({readAsValue: true}) accessor projection: IProjection | undefined;
-  // @signalReader() accessor projection$: SignalReader<IProjection | undefined>;
 
   readonly stage2d = new Stage2D();
 
@@ -124,24 +122,23 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
 
     retain(this, [FirstFrame, StageResize]);
 
-    findObjectSignalByName(this, 'name').onChange((name) => {
+    this.signal('name').onChange((name) => {
       this.stage2d.name = name;
     });
 
-    findObjectSignalByName(this, 'stageRendererCtx').onChange((stageRendererCtx) => {
+    this.signal('stageRendererCtx').onChange((stageRendererCtx) => {
       this.logger?.log('requested stage-renderer context', stageRendererCtx);
       if (stageRendererCtx == null) return;
       stageRendererCtx.addStageElement(this);
       return () => stageRendererCtx.removeStageElement(this);
     });
 
-    findObjectSignalByName(this, 'projection').onChange((proj) => {
+    this.signal('projection').onChange((proj) => {
       this.stage2d.projection = proj;
     });
 
-    this.#projSignals = SignalMap.fromProps(this, ['projectionPlane', 'projectionOrigin', 'projectionType']);
-
-    this.#viewSpecsSignals = SignalMap.fromProps(this, [
+    this.#projSignals = SignalAutoMap.fromProps(this, ['projectionPlane', 'projectionOrigin', 'projectionType']);
+    this.#viewSpecsSignals = SignalAutoMap.fromProps(this, [
       'fit',
       'width',
       'height',
@@ -155,11 +152,11 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
 
     createEffect(() => {
       this.onProjectionPropsUpdate();
-    }, this.#projSignals.getSignals());
+    }, Array.from(this.#projSignals.signals()));
 
     createEffect(() => {
       this.onViewSpecsPropsUpdate();
-    }, this.#viewSpecsSignals.getSignals());
+    }, Array.from(this.#viewSpecsSignals.signals()));
 
     on(this.stage2d, StageResize, (props: Stage2DResizeProps) => {
       if (isValidSize(props)) {
@@ -197,8 +194,8 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
   }
 
   override disconnectedCallback(): void {
-    super.disconnectedCallback();
     this.stageRendererCtx = undefined;
+    super.disconnectedCallback();
   }
 
   getStage(): Stage2D {
@@ -206,7 +203,7 @@ export class Stage2DElement extends TwoPoint5DElement implements StageElement {
   }
 
   private onProjectionPropsUpdate(): void {
-    const {projectionPlane, projectionOrigin, projectionType} = this.#projSignals.getValueObject();
+    const {projectionPlane, projectionOrigin, projectionType} = asValueObject(this.#projSignals);
 
     if ([projectionPlane, projectionOrigin, projectionType].some((val) => val == null)) return;
 

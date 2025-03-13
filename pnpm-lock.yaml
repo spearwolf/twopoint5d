@@ -10,8 +10,8 @@ catalogs:
       specifier: ^4.0.1
       version: 4.0.1
     '@spearwolf/signalize':
-      specifier: ^0.18.1
-      version: 0.18.1
+      specifier: ^0.19.1
+      version: 0.19.1
     '@types/three':
       specifier: ~0.172.0
       version: 0.172.0
@@ -133,7 +133,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.18.1(@spearwolf/eventize@4.0.1)
+        version: 0.19.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -199,7 +199,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.18.1(@spearwolf/eventize@4.0.1)
+        version: 0.19.1(@spearwolf/eventize@4.0.1)
       three:
         specifier: 'catalog:'
         version: 0.172.0
@@ -214,7 +214,7 @@ importers:
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.18.1(@spearwolf/eventize@4.0.1)
+        version: 0.19.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -228,20 +228,20 @@ importers:
   packages/twopoint5d-elements:
     dependencies:
       '@lit/context':
-        specifier: ^1.1.2
-        version: 1.1.2
+        specifier: ^1.1.4
+        version: 1.1.4
       '@spearwolf/eventize':
         specifier: 'catalog:'
         version: 4.0.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.18.1(@spearwolf/eventize@4.0.1)
+        version: 0.19.1(@spearwolf/eventize@4.0.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
       lit:
-        specifier: 3.1.4
-        version: 3.1.4
+        specifier: 3.2.1
+        version: 3.2.1
       three:
         specifier: 'catalog:'
         version: 0.172.0
@@ -1148,6 +1148,9 @@ packages:
   '@lit/context@1.1.2':
     resolution: {integrity: sha512-S0nw2C6Tkm7fVX5TGYqeROGD+Z9Coa2iFpW+ysYBDH3YvCqOY3wVQvSgwbaliLJkjTnSEYCBe9qFqKV8WUFpVw==}
 
+  '@lit/context@1.1.4':
+    resolution: {integrity: sha512-0b8wOWNUPcXjGHFtVP+odwhrZBZw+PpCjKWn8IGO10iHT95Xd6FcUAxe1aE7PUtOBvHZoxvrfdBzweYnDW7VNQ==}
+
   '@lit/reactive-element@2.0.4':
     resolution: {integrity: sha512-GFn91inaUa2oHLak8awSIigYz0cU0Payr1rcFsrkf5OJ5eSPxElyZfKh0f2p9FsTiZWXQdWGJeXZICEfXXYSXQ==}
 
@@ -1820,8 +1823,8 @@ packages:
     resolution: {integrity: sha512-0RgKoF6zIjLzYyy62cyZy7TdiqVpIdrIDNvIbJRmeQ1lSh/CtHxu3Euv4jijbJSPoZX82jp954iQm7nMIad9dw==}
     engines: {node: '>=18.16'}
 
-  '@spearwolf/signalize@0.18.1':
-    resolution: {integrity: sha512-rzkGZYTK1ITot6yLflmvvO7jk6/mDsqNSkTNR3/94sjRQWRDVD6H3LNH0AiB5jG9naIyPs8g1xyMd/0OgvFy7g==}
+  '@spearwolf/signalize@0.19.1':
+    resolution: {integrity: sha512-8dVlwD2PQQoc5Vghw3W17dXP8beBtWGQ6MaX/RP1jg7rBcoLBhO+sCCmxlHc89hUZNuPUH0BdxXsSxVwj8e4/w==}
     engines: {node: '>=20.12'}
     peerDependencies:
       '@spearwolf/eventize': ^4.0.1
@@ -3707,11 +3710,20 @@ packages:
   lit-element@4.0.6:
     resolution: {integrity: sha512-U4sdJ3CSQip7sLGZ/uJskO5hGiqtlpxndsLr6mt3IQIjheg93UKYeGQjWMRql1s/cXNOaRrCzC2FQwjIwSUqkg==}
 
+  lit-element@4.1.1:
+    resolution: {integrity: sha512-HO9Tkkh34QkTeUmEdNYhMT8hzLid7YlMlATSi1q4q17HE5d9mrrEHJ/o8O2D0cMi182zK1F3v7x0PWFjrhXFew==}
+
   lit-html@3.1.4:
     resolution: {integrity: sha512-yKKO2uVv7zYFHlWMfZmqc+4hkmSbFp8jgjdZY9vvR9jr4J8fH6FUMXhr+ljfELgmjpvlF7Z1SJ5n5/Jeqtc9YA==}
 
+  lit-html@3.2.1:
+    resolution: {integrity: sha512-qI/3lziaPMSKsrwlxH/xMgikhQ0EGOX2ICU73Bi/YHFvz2j/yMCIrw4+puF2IpQ4+upd3EWbvnHM9+PnJn48YA==}
+
   lit@3.1.4:
     resolution: {integrity: sha512-q6qKnKXHy2g1kjBaNfcoLlgbI3+aSOZ9Q4tiGa9bGYXq5RBXxkVTqTIVmP2VWMp29L4GyvCFm8ZQ2o56eUAMyA==}
+
+  lit@3.2.1:
+    resolution: {integrity: sha512-1BBa1E/z0O9ye5fZprPtdqnc0BFzxIxTTOO/tQFmyC/hj1O3jL4TfmLBw0WEwjAokdLwpclkvGgDJwTIh0/22w==}
 
   load-json-file@4.0.0:
     resolution: {integrity: sha512-Kx8hMakjX03tiGTLAIdJ+lL0htKnXjEZN6hk/tozf/WOuYGdZBJrZ+rCJRbVCugsjB3jMLn9746NsQIf5VjBMw==}
@@ -3735,6 +3747,7 @@ packages:
 
   lodash.get@4.4.2:
     resolution: {integrity: sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==}
+    deprecated: This package is deprecated. Use the optional chaining (?.) operator instead.
 
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
@@ -6498,6 +6511,10 @@ snapshots:
     dependencies:
       '@lit/reactive-element': 2.0.4
 
+  '@lit/context@1.1.4':
+    dependencies:
+      '@lit/reactive-element': 2.0.4
+
   '@lit/reactive-element@2.0.4':
     dependencies:
       '@lit-labs/ssr-dom-shim': 1.2.0
@@ -7057,7 +7074,7 @@ snapshots:
 
   '@spearwolf/eventize@4.0.1': {}
 
-  '@spearwolf/signalize@0.18.1(@spearwolf/eventize@4.0.1)':
+  '@spearwolf/signalize@0.19.1(@spearwolf/eventize@4.0.1)':
     dependencies:
       '@spearwolf/eventize': 4.0.1
 
@@ -9368,7 +9385,17 @@ snapshots:
       '@lit/reactive-element': 2.0.4
       lit-html: 3.1.4
 
+  lit-element@4.1.1:
+    dependencies:
+      '@lit-labs/ssr-dom-shim': 1.2.0
+      '@lit/reactive-element': 2.0.4
+      lit-html: 3.2.1
+
   lit-html@3.1.4:
+    dependencies:
+      '@types/trusted-types': 2.0.7
+
+  lit-html@3.2.1:
     dependencies:
       '@types/trusted-types': 2.0.7
 
@@ -9377,6 +9404,12 @@ snapshots:
       '@lit/reactive-element': 2.0.4
       lit-element: 4.0.6
       lit-html: 3.1.4
+
+  lit@3.2.1:
+    dependencies:
+      '@lit/reactive-element': 2.0.4
+      lit-element: 4.1.1
+      lit-html: 3.2.1
 
   load-json-file@4.0.0:
     dependencies:

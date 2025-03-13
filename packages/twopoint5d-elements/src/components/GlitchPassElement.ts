@@ -1,5 +1,4 @@
 import {consume} from '@lit/context';
-import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -27,18 +26,38 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
   accessor clear: boolean = false;
 
   @consume({context: postProcessingContext, subscribe: true})
-  @property({attribute: false})
   @signal({readAsValue: true})
   accessor postProcessingCtx: IPostProcessingContext | undefined;
 
-  @signal({readAsValue: true})
+  @signal()
   accessor glitchPass = new GlitchPass();
 
   getPass(): GlitchPass {
     return this.glitchPass;
   }
 
-  onPostProcessingUpdate() {
+  constructor() {
+    super();
+    this.loggerNS = 'two5-glitch-pass';
+  }
+
+  override createRenderRoot() {
+    return this;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    this.createEffect(() => this.onPostProcessingUpdate(), ['postProcessingCtx', 'glitchPass']);
+    this.createEffect(() => this.onPassUpdate(), ['glitchPass', 'disabled', 'clear']);
+  }
+
+  override disconnectedCallback(): void {
+    this.postProcessingCtx = undefined;
+    super.disconnectedCallback();
+  }
+
+  private onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     if (pp != null) {
       this.logger?.log('add glitchPass to postProcessing', {postProcessing: pp, self: this});
@@ -50,38 +69,10 @@ export class GlitchPassElement extends TwoPoint5DElement implements PostProcessi
     }
   }
 
-  onPassUpdate() {
+  private onPassUpdate() {
     if (this.glitchPass != null) {
       this.glitchPass.enabled = !this.disabled;
       this.glitchPass.clear = this.clear;
     }
-  }
-
-  constructor() {
-    super();
-
-    this.loggerNS = 'two5-glitch-pass';
-
-    createEffect(
-      () => this.onPostProcessingUpdate(),
-      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'glitchPass')],
-    );
-    createEffect(
-      () => this.onPassUpdate(),
-      [
-        findObjectSignalByName(this, 'glitchPass'),
-        findObjectSignalByName(this, 'disabled'),
-        findObjectSignalByName(this, 'clear'),
-      ],
-    );
-  }
-
-  override createRenderRoot() {
-    return this;
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.postProcessingCtx = undefined;
   }
 }

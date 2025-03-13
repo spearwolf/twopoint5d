@@ -1,5 +1,4 @@
 import {consume} from '@lit/context';
-import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
@@ -31,7 +30,6 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
   accessor damp: number = 0.8;
 
   @consume({context: postProcessingContext, subscribe: true})
-  @property({attribute: false})
   @signal({readAsValue: true})
   accessor postProcessingCtx: IPostProcessingContext | undefined;
 
@@ -42,7 +40,28 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
     return this.afterimagePass;
   }
 
-  onPostProcessingUpdate() {
+  constructor() {
+    super();
+    this.loggerNS = 'two5-afterimage-pass';
+  }
+
+  override createRenderRoot() {
+    return this;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    this.createEffect(() => this.onPostProcessingUpdate(), ['postProcessingCtx', 'afterimagePass']);
+    this.createEffect(() => this.onPassUpdate(), ['disabled', 'clear', 'damp']);
+  }
+
+  override disconnectedCallback(): void {
+    this.postProcessingCtx = undefined;
+    super.disconnectedCallback();
+  }
+
+  private onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     if (pp != null) {
       this.logger?.log('add afterimagePass to postProcessing', {postProcessing: pp, self: this});
@@ -54,34 +73,9 @@ export class AfterimagePassElement extends TwoPoint5DElement implements PostProc
     }
   }
 
-  onPassUpdate() {
+  private onPassUpdate() {
     this.afterimagePass.enabled = !this.disabled;
     this.afterimagePass.clear = this.clear;
     (this.afterimagePass.uniforms as {damp: {value: number}}).damp.value = this.damp;
-  }
-
-  constructor() {
-    super();
-
-    this.loggerNS = 'two5-afterimage-pass';
-
-    createEffect(
-      () => this.onPostProcessingUpdate(),
-      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'afterimagePass')],
-    );
-
-    createEffect(
-      () => this.onPassUpdate(),
-      [findObjectSignalByName(this, 'disabled'), findObjectSignalByName(this, 'clear'), findObjectSignalByName(this, 'damp')],
-    );
-  }
-
-  override createRenderRoot() {
-    return this;
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.postProcessingCtx = undefined;
   }
 }

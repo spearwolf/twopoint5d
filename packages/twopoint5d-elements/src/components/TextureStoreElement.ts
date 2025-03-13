@@ -1,5 +1,4 @@
 import {consume} from '@lit/context';
-import {findObjectSignalByName} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import {Display, TextureStore} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
@@ -28,7 +27,6 @@ export class TextureStoreElement extends TwoPoint5DElement {
   accessor src: string | undefined;
 
   @consume({context: displayContext, subscribe: true})
-  @property({attribute: false})
   @signal({readAsValue: true})
   accessor display: Display | undefined;
 
@@ -39,12 +37,12 @@ export class TextureStoreElement extends TwoPoint5DElement {
 
     this.loggerNS = 'two5-texture-store';
 
-    findObjectSignalByName(this, 'display').onChange((display) => {
+    this.signal('display').onChange((display) => {
       this.store.renderer = display?.renderer;
       this.logger?.log('received display', {display, el: this});
     });
 
-    findObjectSignalByName(this, 'src').onChange((src) => {
+    this.signal('src').onChange((src) => {
       if (src?.trim()) {
         const url = new URL(src, window.location.href).href;
         this.logger?.log('load texture-store from', {url, el: this});

@@ -113,14 +113,14 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
   }
 
   override disconnectedCallback(): void {
-    super.disconnectedCallback();
-
     if (this.display) {
       this.display.stop();
       this.logger?.log('display stopped', this.display);
     }
 
     this.clearContextProvider(this.stageRendererProvider);
+
+    super.disconnectedCallback();
   }
 
   addStageElement(el: StageElement): void {

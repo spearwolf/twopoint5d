@@ -1,6 +1,6 @@
 import {consume} from '@lit/context';
 import {on} from '@spearwolf/eventize';
-import {batch, createEffect, findObjectSignalByName} from '@spearwolf/signalize';
+import {batch} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import type {Display} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
@@ -43,24 +43,47 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
   accessor threshold: number = 0.85;
 
   @consume({context: postProcessingContext, subscribe: true})
-  @property({attribute: false})
   @signal({readAsValue: true})
   accessor postProcessingCtx: IPostProcessingContext | undefined;
 
   @consume({context: displayContext, subscribe: true})
-  @property({attribute: false})
-  @signal()
+  @signal({readAsValue: true})
   accessor display: Display | undefined;
 
-  @signal({readAsValue: true})
+  @signal()
   accessor bloomPass: UnrealBloomPass | undefined;
 
   getPass(): UnrealBloomPass {
     return this.bloomPass;
   }
 
-  // @effect({deps: ['postProcessingCtx', 'bloomPass']})
-  onPostProcessingUpdate() {
+  constructor() {
+    super();
+    this.loggerNS = 'two5-unreal-bloom-pass';
+  }
+
+  override createRenderRoot() {
+    return this;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    this.createEffect(() => this.onDisplayUpdate(), ['display']);
+    this.createEffect(() => this.onPostProcessingUpdate(), ['postProcessingCtx', 'bloomPass']);
+    this.createEffect(() => this.onPassUpdate(), ['bloomPass', 'disabled', 'clear', 'strength', 'radius', 'threshold']);
+  }
+
+  override disconnectedCallback(): void {
+    batch(() => {
+      this.postProcessingCtx = undefined;
+      this.display = undefined;
+    });
+
+    super.disconnectedCallback();
+  }
+
+  private onPostProcessingUpdate() {
     const pp = this.postProcessingCtx;
     const bloomPass = this.bloomPass;
     if (pp != null && bloomPass != null) {
@@ -73,8 +96,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
     }
   }
 
-  // @effect({deps: ['bloomPass', 'disabled', 'clear', 'strength', 'radius', 'threshold']})
-  onPassUpdate() {
+  private onPassUpdate() {
     if (this.bloomPass != null) {
       this.bloomPass.enabled = !this.disabled;
       this.bloomPass.clear = this.clear;
@@ -84,8 +106,7 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
     }
   }
 
-  // @effect({deps: ['display']})
-  onDisplayUpdate() {
+  private onDisplayUpdate() {
     if (this.display != null) {
       const resolution = new Vector2(this.display.width, this.display.height);
       if (this.bloomPass != null && !resolution.equals(this.bloomPass.resolution)) {
@@ -105,42 +126,5 @@ export class UnrealBloomPassElement extends TwoPoint5DElement implements PostPro
       this.bloomPass.dispose();
       this.bloomPass = undefined;
     }
-  }
-
-  constructor() {
-    super();
-
-    this.loggerNS = 'two5-unreal-bloom-pass';
-
-    createEffect(() => this.onDisplayUpdate(), [findObjectSignalByName(this, 'display')]);
-
-    createEffect(
-      () => this.onPostProcessingUpdate(),
-      [findObjectSignalByName(this, 'postProcessingCtx'), findObjectSignalByName(this, 'bloomPass')],
-    );
-
-    createEffect(
-      () => this.onPassUpdate(),
-      [
-        findObjectSignalByName(this, 'bloomPass'),
-        findObjectSignalByName(this, 'disabled'),
-        findObjectSignalByName(this, 'clear'),
-        findObjectSignalByName(this, 'strength'),
-        findObjectSignalByName(this, 'radius'),
-        findObjectSignalByName(this, 'threshold'),
-      ],
-    );
-  }
-
-  override createRenderRoot() {
-    return this;
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    batch(() => {
-      this.postProcessingCtx = undefined;
-      this.display = undefined;
-    });
   }
 }

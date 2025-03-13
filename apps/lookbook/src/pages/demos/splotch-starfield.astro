@@ -47,17 +47,11 @@ import {description, showSource, title} from './_splotch-starfield.json';
 </style>
 
 <script>
+  import '@spearwolf/twopoint5d-elements/bundle.js';
   import {on} from '@spearwolf/eventize';
   import {Display, TextureStore} from '@spearwolf/twopoint5d';
   import {OnMaterial, Starfield, type OnMaterialParams} from '@spearwolf/twopoint5d-demos';
   import {DisplayElement, Stage2DElement, TextureStoreElement, whenDefined} from '@spearwolf/twopoint5d-elements';
-  import '@spearwolf/twopoint5d-elements/two5-afterimage-pass.js';
-  import '@spearwolf/twopoint5d-elements/two5-display.js';
-  import '@spearwolf/twopoint5d-elements/two5-glitch-pass.js';
-  import '@spearwolf/twopoint5d-elements/two5-post-processing.js';
-  import '@spearwolf/twopoint5d-elements/two5-stage2d.js';
-  import '@spearwolf/twopoint5d-elements/two5-texture-store.js';
-  import '@spearwolf/twopoint5d-elements/two5-unreal-bloom-pass.js';
   import GUI from 'lil-gui';
   import {Color} from 'three';
 
@@ -87,8 +81,7 @@ import {description, showSource, title} from './_splotch-starfield.json';
   // starfield.setBaseColors([0x111317, 0x313337, 0x003056, 0x715327, 0x660033, 0x919397, 0xb1b3b7]);
 
   on(starfield, OnMaterial, ({material}: OnMaterialParams) => {
-    console.log('starfield.material', material);
-
+    console.debug('starfield.material', material);
     material.logShadersToConsole = true;
 
     material.tintColorFar = new Color(0x101030);

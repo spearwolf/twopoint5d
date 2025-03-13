@@ -3,7 +3,6 @@ import {createEffect, findObjectSignalByName} from '@spearwolf/signalize';
 import {signal} from '@spearwolf/signalize/decorators';
 import {PostProcessingRenderer} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
-import {property} from 'lit/decorators.js';
 import {
   postProcessingContext,
   type IPostProcessingContext,
@@ -33,7 +32,6 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
   `;
 
   @consume({context: stageRendererContext, subscribe: true})
-  @property({attribute: false})
   @signal()
   accessor parentRendererCtx: IStageRendererContext | undefined;
 
@@ -76,12 +74,12 @@ export class PostProcessingElement extends TwoPoint5DElement implements IPostPro
   }
 
   override disconnectedCallback(): void {
-    super.disconnectedCallback();
-
     this.parentRendererCtx = undefined;
 
     this.clearContextProvider(this.stageRendererProvider);
     this.clearContextProvider(this.postProcessingProvider);
+
+    super.disconnectedCallback();
   }
 
   getStage(): PostProcessingRenderer {

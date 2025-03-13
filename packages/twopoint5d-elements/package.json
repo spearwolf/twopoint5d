@@ -89,11 +89,11 @@
     "makePackageJson": "node ../../scripts/makePackageJson.mjs"
   },
   "dependencies": {
-    "@lit/context": "^1.1.2",
+    "@lit/context": "^1.1.4",
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
-    "lit": "3.1.4",
+    "lit": "3.2.1",
     "three": "catalog:"
   }
 }
