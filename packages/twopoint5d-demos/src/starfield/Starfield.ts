@@ -88,7 +88,7 @@ export class Starfield {
     return this.#baseColors[rand(this.#baseColors.length)];
   }
 
-  setStarBox(width: number, height: number, depth: number) {
+  setStarBox(width: number, height: number, depth: number = this.starBox.z) {
     this.starBox.set(width, height, depth);
   }
 

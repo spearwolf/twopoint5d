@@ -56,6 +56,7 @@ const StarShader = {
     gl_Position = rotateZ(rotZ) * gl_Position;
 
     vec2 scaleToPixel = vec2(4.0 / screenResolution[0] * gl_Position.w, 4.0 / screenResolution[1] * gl_Position.w);
+    float ratio = clamp(screenResolution[0] / screenResolution[1], 0.5, 2.0);
 
     float z = -(modelViewMatrix * vec4(instancePosition.xyz, 1.0)).z;
     vDepth = 1.0 - clamp((z - nearFar.x) / (nearFar.y - nearFar.x), 0.0, 1.0);
@@ -69,7 +70,7 @@ const StarShader = {
 
     float f = cameraLineOfSightEscape * 2.0 * (0.5 - (sin((PI * 0.5) + (vDepth * PI * 0.5)) * 0.5));
     gl_Position.x += f * gl_Position.x;
-    gl_Position.y += f * gl_Position.y;
+    gl_Position.y += f * ratio * gl_Position.y;
   `,
   /*
   #include <after_vertexPosition_vertex>
