@@ -21,6 +21,10 @@
       "types": "./dist/src/bundle.d.ts",
       "import": "./dist/bundle.js"
     },
+    "./elements.js": {
+      "types": "./dist/src/bundle.d.ts",
+      "import": "./dist/elements.js"
+    },
     "./events.js": {
       "types": "./dist/src/events.d.ts",
       "import": "./dist/src/events.js"
@@ -72,7 +76,8 @@
     "dist/src/two5-unreal-bloom-pass.js",
     "dist/src/components/attachContextRoot.js",
     "dist/src/bundle.js",
-    "dist/bundle.js"
+    "dist/bundle.js",
+    "dist/elements.js"
   ],
   "scripts": {
     "tsc": "pnpm exec tsc",

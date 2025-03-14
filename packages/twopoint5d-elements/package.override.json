@@ -1,6 +1,7 @@
 {
   "sideEffects": [
     "bundle.js",
+    "elements.js",
     "src/bundle.js",
     "src/two5-display.js",
     "src/two5-stage2d.js",
