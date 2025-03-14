@@ -7,8 +7,8 @@ import {
   postProcessingContext,
   type IPostProcessingContext,
   type PostProcessingPassElement,
-} from '../context/post-processing-context.js';
-import {TwoPoint5DElement} from './TwoPoint5DElement.js';
+} from '../../context/post-processing-context.js';
+import {TwoPoint5DElement} from '../TwoPoint5DElement.js';
 
 export class AfterimagePassElement extends TwoPoint5DElement implements PostProcessingPassElement {
   static override styles = css`

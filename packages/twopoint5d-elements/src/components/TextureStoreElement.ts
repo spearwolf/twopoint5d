@@ -3,7 +3,7 @@ import {signal} from '@spearwolf/signalize/decorators';
 import {Display, TextureStore} from '@spearwolf/twopoint5d';
 import {css} from 'lit';
 import {property} from 'lit/decorators.js';
-import {displayContext} from '../index.js';
+import {displayContext} from '../context/display-context.js';
 import {whenDefined} from '../utils/whenDefined.js';
 import {TwoPoint5DElement} from './TwoPoint5DElement.js';
 

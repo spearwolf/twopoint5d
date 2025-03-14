@@ -7,13 +7,13 @@ import {css} from 'lit';
 import {property} from 'lit/decorators.js';
 import {Vector2} from 'three';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {displayContext} from '../../context/display-context.js';
 import {
   postProcessingContext,
   type IPostProcessingContext,
   type PostProcessingPassElement,
-} from '../context/post-processing-context.js';
-import {displayContext} from '../index.js';
-import {TwoPoint5DElement} from './TwoPoint5DElement.js';
+} from '../../context/post-processing-context.js';
+import {TwoPoint5DElement} from '../TwoPoint5DElement.js';
 
 export class UnrealBloomPassElement extends TwoPoint5DElement implements PostProcessingPassElement {
   static override styles = css`
