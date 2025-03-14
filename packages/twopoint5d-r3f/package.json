@@ -31,12 +31,12 @@
     "_publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "dependencies": {
-    "@react-three/fiber": "8.16.*",
+    "@react-three/fiber": "catalog:",
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "react": "^18.3.0",
     "three": "catalog:",
     "use-asset": "^1.0.4",
-    "zustand": "^4.5.5"
+    "zustand": "catalog:"
   }
 }

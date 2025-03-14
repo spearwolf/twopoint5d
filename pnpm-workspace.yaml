@@ -1,9 +1,14 @@
 packages:
-  - 'packages/*'
-  - 'apps/*'
-
+  - packages/*
+  - apps/*
 catalog:
   three: ~0.172.0
-  "@types/three": ~0.172.0
-  "@spearwolf/eventize": ^4.0.1
-  "@spearwolf/signalize": ^0.19.1
+  '@types/three': ~0.172.0
+  '@spearwolf/eventize': ^4.0.1
+  '@spearwolf/signalize': ^0.19.1
+  lit: 3.2.1
+  '@lit/context': ^1.1.4
+  '@react-three/fiber': 8.16.*
+  zustand: ^4.5.5
+onlyBuiltDependencies:
+  - sharp

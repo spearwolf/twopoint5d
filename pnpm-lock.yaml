@@ -6,6 +6,12 @@ settings:
 
 catalogs:
   default:
+    '@lit/context':
+      specifier: ^1.1.4
+      version: 1.1.4
+    '@react-three/fiber':
+      specifier: 8.16.*
+      version: 8.16.8
     '@spearwolf/eventize':
       specifier: ^4.0.1
       version: 4.0.1
@@ -15,9 +21,15 @@ catalogs:
     '@types/three':
       specifier: ~0.172.0
       version: 0.172.0
+    lit:
+      specifier: 3.2.1
+      version: 3.2.1
     three:
       specifier: ~0.172.0
       version: 0.172.0
+    zustand:
+      specifier: ^4.5.5
+      version: 4.5.5
 
 importers:
 
@@ -123,7 +135,7 @@ importers:
         specifier: ^9.120.5
         version: 9.120.5(@react-three/fiber@8.16.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.172.0))(@types/react@18.3.5)(@types/three@0.172.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.172.0)(use-sync-external-store@1.2.2(react@18.3.1))
       '@react-three/fiber':
-        specifier: 8.16.*
+        specifier: 'catalog:'
         version: 8.16.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.172.0)
       '@spearwolf/astro-rainbow-line':
         specifier: ^1.3.0
@@ -189,7 +201,7 @@ importers:
         specifier: 'catalog:'
         version: 0.172.0
       zustand:
-        specifier: ^4.5.5
+        specifier: 'catalog:'
         version: 4.5.5(@types/react@18.3.5)(react@18.3.1)
 
   packages/twopoint5d:
@@ -207,28 +219,7 @@ importers:
   packages/twopoint5d-demos:
     dependencies:
       '@lit/context':
-        specifier: ^1.1.2
-        version: 1.1.2
-      '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 4.0.1
-      '@spearwolf/signalize':
-        specifier: 'catalog:'
-        version: 0.19.1(@spearwolf/eventize@4.0.1)
-      '@spearwolf/twopoint5d':
-        specifier: workspace:*
-        version: link:../twopoint5d
-      lit:
-        specifier: 3.1.4
-        version: 3.1.4
-      three:
-        specifier: 'catalog:'
-        version: 0.172.0
-
-  packages/twopoint5d-elements:
-    dependencies:
-      '@lit/context':
-        specifier: ^1.1.4
         version: 1.1.4
       '@spearwolf/eventize':
         specifier: 'catalog:'
@@ -240,7 +231,28 @@ importers:
         specifier: workspace:*
         version: link:../twopoint5d
       lit:
-        specifier: 3.2.1
+        specifier: 'catalog:'
+        version: 3.2.1
+      three:
+        specifier: 'catalog:'
+        version: 0.172.0
+
+  packages/twopoint5d-elements:
+    dependencies:
+      '@lit/context':
+        specifier: 'catalog:'
+        version: 1.1.4
+      '@spearwolf/eventize':
+        specifier: 'catalog:'
+        version: 4.0.1
+      '@spearwolf/signalize':
+        specifier: 'catalog:'
+        version: 0.19.1(@spearwolf/eventize@4.0.1)
+      '@spearwolf/twopoint5d':
+        specifier: workspace:*
+        version: link:../twopoint5d
+      lit:
+        specifier: 'catalog:'
         version: 3.2.1
       three:
         specifier: 'catalog:'
@@ -277,7 +289,7 @@ importers:
   packages/twopoint5d-r3f:
     dependencies:
       '@react-three/fiber':
-        specifier: 8.16.*
+        specifier: 'catalog:'
         version: 8.16.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.172.0)
       '@spearwolf/eventize':
         specifier: 'catalog:'
@@ -295,7 +307,7 @@ importers:
         specifier: ^1.0.4
         version: 1.0.4(react@18.3.1)
       zustand:
-        specifier: ^4.5.5
+        specifier: 'catalog:'
         version: 4.5.5(@types/react@18.3.10)(react@18.3.1)
 
 packages:
@@ -564,10 +576,6 @@ packages:
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
-
-  '@babel/runtime@7.23.2':
-    resolution: {integrity: sha512-mM8eg4yl5D6i3lu2QKPuPH4FArvJ8KhTofbE7jwMUv9KX5mBvwPAqnV3MlyBNqdp9RyRKP6Yck8TrfYrPvX3bg==}
-    engines: {node: '>=6.9.0'}
 
   '@babel/runtime@7.24.7':
     resolution: {integrity: sha512-UwgBRMjJP+xv857DCngvqXI3Iq6J4v0wXmwc6sapg+zyhbwmQX67LUEFrkK5tbyJ30jGuG3ZvWpBiB9LCy1kWw==}
@@ -1147,9 +1155,6 @@ packages:
 
   '@lit-labs/ssr-dom-shim@1.2.0':
     resolution: {integrity: sha512-yWJKmpGE6lUURKAaIltoPIE/wrbY3TEkqQt+X0m+7fQNnAv0keydnYvbiJFP1PnMhizmIWRWOG5KLhYyc/xl+g==}
-
-  '@lit/context@1.1.2':
-    resolution: {integrity: sha512-S0nw2C6Tkm7fVX5TGYqeROGD+Z9Coa2iFpW+ysYBDH3YvCqOY3wVQvSgwbaliLJkjTnSEYCBe9qFqKV8WUFpVw==}
 
   '@lit/context@1.1.4':
     resolution: {integrity: sha512-0b8wOWNUPcXjGHFtVP+odwhrZBZw+PpCjKWn8IGO10iHT95Xd6FcUAxe1aE7PUtOBvHZoxvrfdBzweYnDW7VNQ==}
@@ -3622,20 +3627,11 @@ packages:
     resolution: {integrity: sha512-cNOjgCnLB+FnvWWtyRTzmB3POJ+cXxTA81LoW7u8JdmhfXzriropYwpjShnz1QLLWsQwY7nIxoDmcPTwphDK9w==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  lit-element@4.0.6:
-    resolution: {integrity: sha512-U4sdJ3CSQip7sLGZ/uJskO5hGiqtlpxndsLr6mt3IQIjheg93UKYeGQjWMRql1s/cXNOaRrCzC2FQwjIwSUqkg==}
-
   lit-element@4.1.1:
     resolution: {integrity: sha512-HO9Tkkh34QkTeUmEdNYhMT8hzLid7YlMlATSi1q4q17HE5d9mrrEHJ/o8O2D0cMi182zK1F3v7x0PWFjrhXFew==}
 
-  lit-html@3.1.4:
-    resolution: {integrity: sha512-yKKO2uVv7zYFHlWMfZmqc+4hkmSbFp8jgjdZY9vvR9jr4J8fH6FUMXhr+ljfELgmjpvlF7Z1SJ5n5/Jeqtc9YA==}
-
   lit-html@3.2.1:
     resolution: {integrity: sha512-qI/3lziaPMSKsrwlxH/xMgikhQ0EGOX2ICU73Bi/YHFvz2j/yMCIrw4+puF2IpQ4+upd3EWbvnHM9+PnJn48YA==}
-
-  lit@3.1.4:
-    resolution: {integrity: sha512-q6qKnKXHy2g1kjBaNfcoLlgbI3+aSOZ9Q4tiGa9bGYXq5RBXxkVTqTIVmP2VWMp29L4GyvCFm8ZQ2o56eUAMyA==}
 
   lit@3.2.1:
     resolution: {integrity: sha512-1BBa1E/z0O9ye5fZprPtdqnc0BFzxIxTTOO/tQFmyC/hj1O3jL4TfmLBw0WEwjAokdLwpclkvGgDJwTIh0/22w==}
@@ -4466,9 +4462,6 @@ packages:
   reflect.getprototypeof@1.0.9:
     resolution: {integrity: sha512-r0Ay04Snci87djAsI4U+WNRcSw5S4pOH7qFjd/veA5gC7TbqESR3tcj28ia95L/fYUDw11JKP7uqUKUAfVvV5Q==}
     engines: {node: '>= 0.4'}
-
-  regenerator-runtime@0.14.0:
-    resolution: {integrity: sha512-srw17NI0TUWHuGa5CFGGmhfNIeja30WMBfbslPNhf6JrqQlLN5gcrvig1oqPxiVaXb0oW0XRKtH6Nngs5lKCIA==}
 
   regenerator-runtime@0.14.1:
     resolution: {integrity: sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==}
@@ -5933,10 +5926,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/runtime@7.23.2':
-    dependencies:
-      regenerator-runtime: 0.14.0
-
   '@babel/runtime@7.24.7':
     dependencies:
       regenerator-runtime: 0.14.1
@@ -6379,10 +6368,6 @@ snapshots:
 
   '@lit-labs/ssr-dom-shim@1.2.0': {}
 
-  '@lit/context@1.1.2':
-    dependencies:
-      '@lit/reactive-element': 2.0.4
-
   '@lit/context@1.1.4':
     dependencies:
       '@lit/reactive-element': 2.0.4
@@ -6784,7 +6769,7 @@ snapshots:
 
   '@react-three/fiber@8.16.8(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.172.0)':
     dependencies:
-      '@babel/runtime': 7.23.2
+      '@babel/runtime': 7.26.0
       '@types/react-reconciler': 0.26.7
       '@types/webxr': 0.5.16
       base64-js: 1.5.1
@@ -9097,31 +9082,15 @@ snapshots:
 
   lines-and-columns@2.0.3: {}
 
-  lit-element@4.0.6:
-    dependencies:
-      '@lit-labs/ssr-dom-shim': 1.2.0
-      '@lit/reactive-element': 2.0.4
-      lit-html: 3.1.4
-
   lit-element@4.1.1:
     dependencies:
       '@lit-labs/ssr-dom-shim': 1.2.0
       '@lit/reactive-element': 2.0.4
       lit-html: 3.2.1
 
-  lit-html@3.1.4:
-    dependencies:
-      '@types/trusted-types': 2.0.7
-
   lit-html@3.2.1:
     dependencies:
       '@types/trusted-types': 2.0.7
-
-  lit@3.1.4:
-    dependencies:
-      '@lit/reactive-element': 2.0.4
-      lit-element: 4.0.6
-      lit-html: 3.1.4
 
   lit@3.2.1:
     dependencies:
@@ -10194,8 +10163,6 @@ snapshots:
       get-intrinsic: 1.2.6
       gopd: 1.2.0
       which-builtin-type: 1.2.1
-
-  regenerator-runtime@0.14.0: {}
 
   regenerator-runtime@0.14.1: {}
 
