@@ -2,9 +2,11 @@ import type {WebGLRenderer, WebGLRendererParameters} from 'three';
 import type {WebGPURenderer} from 'three/webgpu';
 import type {Display} from './Display.js';
 
+export type ThreeRendererType = WebGLRenderer | WebGPURenderer;
+
 export interface DisplayEventArgs {
   display: Display;
-  renderer: WebGLRenderer | WebGPURenderer;
+  renderer: ThreeRendererType;
   width: number;
   height: number;
   now: number;

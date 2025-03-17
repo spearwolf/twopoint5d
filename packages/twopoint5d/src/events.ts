@@ -1,5 +1,5 @@
-import type {Camera, Scene, WebGLRenderer} from 'three';
-import type {IStage} from './index.js';
+import type {Camera, Scene} from 'three';
+import type {ThreeRendererType, IStage} from './index.js';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
 
@@ -60,14 +60,14 @@ export const StageRenderFrame = 'stageRenderFrame';
 export interface StageRenderFrameProps {
   width: number;
   height: number;
-  renderer: WebGLRenderer;
+  renderer: ThreeRendererType;
   now: number;
   deltaTime: number;
   frameNo: number;
 
   /**
    * You do not need to call this callback yourself. It's normally done after the event.
-   * However, you can use this callback to control when the THREE.WebGLRenderer is called.
+   * However, you can use this callback to control when the three renderer is called.
    */
   renderFrame: () => void;
 }

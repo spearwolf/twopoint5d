@@ -1,6 +1,6 @@
 import {emit, eventize, on, once} from '@spearwolf/eventize';
-import type {WebGLRenderer} from 'three';
 import {Display} from '../display/Display.js';
+import type {ThreeRendererType} from '../display/types.js';
 import {RemoveFromParent, StageAdded, StageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
 import type {IStageRenderer, StageParentType, StageType} from './IStageRenderer.js';
 
@@ -64,7 +64,7 @@ export class StageRenderer implements IStageRenderer {
       on(
         display,
         'frame',
-        ({renderer, now, deltaTime, frameNo}: {renderer: WebGLRenderer; now: number; deltaTime: number; frameNo: number}) => {
+        ({renderer, now, deltaTime, frameNo}: {renderer: ThreeRendererType; now: number; deltaTime: number; frameNo: number}) => {
           this.renderFrame(renderer, now, deltaTime, frameNo);
         },
       ),
@@ -100,7 +100,7 @@ export class StageRenderer implements IStageRenderer {
     }
   }
 
-  renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
+  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
     this.stages.forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
       stage.stage.renderFrame(renderer, now, deltaTime, frameNo);

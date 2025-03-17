@@ -15,6 +15,8 @@ import {hasGetRenderPass} from './IGetRenderPass.js';
 import type {IStage} from './IStage.js';
 import type {StageType} from './IStageRenderer.js';
 import {StageRenderer} from './StageRenderer.js';
+import type {ThreeRendererType} from '../display/types.js';
+import {WebGPURenderer} from 'three/webgpu';
 
 export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
   composer?: EffectComposer;
@@ -27,7 +29,7 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     on(this, [StageAdded, StageRemoved], this);
   }
 
-  override renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number): void {
+  override renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
     const composer = this.getComposer(renderer);
 
     this.stages.forEach((stage) => {
@@ -64,9 +66,12 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     }
   }
 
-  getComposer(renderer: WebGLRenderer): EffectComposer {
+  getComposer(renderer: ThreeRendererType): EffectComposer {
     if (this.composer == null) {
-      this.composer = new EffectComposer(renderer);
+      if ((renderer as WebGPURenderer).isWebGPURenderer) {
+        throw new Error('PostProcessingRenderer: WebGPURenderer not supported');
+      }
+      this.composer = new EffectComposer(renderer as WebGLRenderer);
       this.passes.forEach((pass) => this.composer.addPass(pass));
       this.passes.length = 0;
     }

@@ -1,7 +1,8 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {Camera, Color, Scene, WebGLRenderer} from 'three';
+import {Camera, Color, Scene} from 'three';
 
 import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass.js';
+import type {ThreeRendererType} from '../display/types.js';
 import {
   FirstFrame,
   StageAfterCameraChanged,
@@ -29,7 +30,7 @@ import type {IStage, RenderCmdFunc} from './IStage.js';
  * Based on the container dimension and the *projection* description
  * the effective width and size is calculated and finally a camera is created.
  *
- * After the camera is created the scene can be rendered with the method `renderFrame(renderer: THREE.WebGLRenderer)`
+ * After the camera is created the scene can be rendered with the method `renderFrame(renderer: DisplayGLRenderer)`
  */
 export class Stage2D implements IStage, IGetRenderPass {
   scene: Scene;
@@ -174,7 +175,7 @@ export class Stage2D implements IStage, IGetRenderPass {
   #isFirstFrame = true;
   #firstFrameProps?: FirstFrameProps;
 
-  renderFrame(renderer: WebGLRenderer, now: number, deltaTime: number, frameNo: number, renderCmd?: RenderCmdFunc): void {
+  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, renderCmd?: RenderCmdFunc): void {
     const {scene, camera} = this;
     if (scene && camera) {
       const previousAutoClearValue = renderer.autoClear;

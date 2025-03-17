@@ -6,7 +6,7 @@ import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
-import type {DisplayEventArgs, DisplayParameters, ResizeCallback} from './types.js';
+import type {DisplayEventArgs, ThreeRendererType, DisplayParameters, ResizeCallback} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -49,9 +49,9 @@ export class Display {
 
   styleSheetRoot: HTMLElement | ShadowRoot;
 
-  renderer?: WebGLRenderer | WebGPURenderer;
+  renderer?: ThreeRendererType;
 
-  constructor(domElementOrRenderer: HTMLElement | WebGLRenderer | WebGPURenderer, options?: DisplayParameters) {
+  constructor(domElementOrRenderer: HTMLElement | ThreeRendererType, options?: DisplayParameters) {
     eventize(this);
 
     retain(this, ['init', 'start', 'resize']);

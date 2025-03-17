@@ -1,7 +1,7 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, Signal, touch} from '@spearwolf/signalize';
-import {ImageLoader, type Texture, type WebGLRenderer} from 'three';
-import type {WebGPURenderer} from 'three/webgpu';
+import {ImageLoader, type Texture} from 'three';
+import type {ThreeRendererType} from '../display/types.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -111,7 +111,7 @@ export class TextureResource {
 
   #textureFactory = createSignal<TextureFactory | undefined>();
   #texture = createSignal<Texture | undefined>();
-  #renderer = createSignal<WebGLRenderer | WebGPURenderer | undefined>();
+  #renderer = createSignal<ThreeRendererType | undefined>();
 
   readonly id: string;
   readonly type: TextureResourceType;
@@ -209,11 +209,11 @@ export class TextureResource {
     this.#texture.set(value);
   }
 
-  get renderer(): WebGLRenderer | WebGPURenderer | undefined {
+  get renderer(): ThreeRendererType | undefined {
     return this.#renderer.value;
   }
 
-  set renderer(value: WebGLRenderer | WebGPURenderer | undefined) {
+  set renderer(value: ThreeRendererType | undefined) {
     this.#renderer.set(value);
   }
 
@@ -231,7 +231,7 @@ export class TextureResource {
   /**
    * is called by the TextureStore
    */
-  rendererChanged(renderer: WebGLRenderer | WebGPURenderer | undefined) {
+  rendererChanged(renderer: ThreeRendererType | undefined) {
     this.renderer = renderer;
   }
 
