@@ -95,10 +95,23 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
       return this.passes;
     }
 
+    const otherNames = new Set<string>(Array.from(this.passesByName.keys()));
+
+    renderOrder.forEach((name) => {
+      if (name !== '*') {
+        otherNames.delete(name);
+      }
+    });
+
     const orderedPasses: Pass[] = renderOrder
       .map((name) => {
+        if (name === '*') {
+          return Array.from(otherNames)
+            .map((name) => Array.from(this.passesByName.get(name)!))
+            .flat();
+        }
         if (this.passesByName.has(name)) {
-          return Array.from(this.passesByName.get(name)!);
+          return Array.from(this.passesByName.get(name));
         }
       })
       .flat()
