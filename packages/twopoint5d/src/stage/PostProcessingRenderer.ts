@@ -3,6 +3,8 @@ import type {WebGLRenderer} from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {Pass} from 'three/addons/postprocessing/Pass.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {WebGPURenderer} from 'three/webgpu';
+import type {ThreeRendererType} from '../display/types.js';
 import {
   StageAdded,
   StageRemoved,
@@ -15,14 +17,31 @@ import {hasGetRenderPass} from './IGetRenderPass.js';
 import type {IStage} from './IStage.js';
 import type {StageType} from './IStageRenderer.js';
 import {StageRenderer} from './StageRenderer.js';
-import type {ThreeRendererType} from '../display/types.js';
-import {WebGPURenderer} from 'three/webgpu';
 
 export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
+  override name = 'PostProcessingRenderer';
+
+  /**
+   * A temporary cache in which the passes are stored temporarily before a composer is created.
+   * After the composer has been created, the passes can be found in the composer.passes array,
+   * and this array is then empty.
+   */
+  protected passes: Pass[] = [];
+
+  #orderedPasses?: Pass[];
+
+  passesNeedsUpdate = true;
+
   composer?: EffectComposer;
 
-  stagePasses: WeakMap<IStage, RenderPass> = new WeakMap();
-  passes: Pass[] = [];
+  /**
+   * The post processing renderer uses an effect composer.
+   * All stages are rendered as a pass.
+   * The stage-pass relation is stored here.
+   */
+  stagePass: WeakMap<IStage, RenderPass> = new WeakMap();
+
+  passesByName = new Map<string, Set<Pass>>();
 
   constructor() {
     super();
@@ -30,12 +49,13 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
   }
 
   override renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
-    const composer = this.getComposer(renderer);
+    // preface - before we render the stage passes with the effect composer,
+    // we want to give all stages the opportunity to react to the current dimension and update their render pass settings.
 
     this.stages.forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
       stage.stage.renderFrame(renderer, now, deltaTime, frameNo, (scene, camera, autoClear) => {
-        const renderPass = this.stagePasses.get(stage.stage);
+        const renderPass = this.stagePass.get(stage.stage);
         if (renderPass) {
           renderPass.clear = autoClear;
           renderPass.scene = scene;
@@ -44,26 +64,79 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
       });
     });
 
+    // render the stage passes
+
+    const composer = this.getComposer(renderer);
+
+    if (this.passesNeedsUpdate) {
+      composer.passes.length = 0;
+      composer.passes.push(...this.getOrderedPasses());
+      this.passesNeedsUpdate = false;
+    }
+
     composer.render();
   }
 
-  addPass(pass: Pass) {
-    if (this.composer) {
-      this.composer.addPass(pass);
-    } else {
-      this.passes.push(pass);
+  protected override onRenderOrderChanged(): void {
+    this.#orderedPasses = undefined;
+  }
+
+  getOrderedPasses(): Pass[] {
+    if (this.#orderedPasses) {
+      return this.#orderedPasses;
     }
+
+    this.passesNeedsUpdate = true;
+
+    const renderOrder = this.renderOrderArray;
+
+    if (renderOrder.length === 0 || (renderOrder.length === 1 && (renderOrder[0] === '' || renderOrder[0] === '*'))) {
+      this.#orderedPasses = this.passes;
+      return this.passes;
+    }
+
+    const orderedPasses: Pass[] = renderOrder
+      .map((name) => {
+        if (this.passesByName.has(name)) {
+          return Array.from(this.passesByName.get(name)!);
+        }
+      })
+      .flat()
+      .filter(Boolean) as Pass[];
+
+    this.#orderedPasses = orderedPasses;
+    return orderedPasses;
+  }
+
+  addPass(pass: Pass, name?: string) {
+    this.passes.push(pass);
+    this.composer?.addPass(pass);
+
+    name = name || '*';
+    if (this.passesByName.has(name)) {
+      this.passesByName.get(name)!.add(pass);
+    } else {
+      this.passesByName.set(name, new Set([pass]));
+    }
+
+    this.#orderedPasses = undefined;
   }
 
   removePass(pass: Pass) {
-    if (this.composer) {
-      this.composer.removePass(pass);
-    } else {
-      const index = this.passes.indexOf(pass);
-      if (index !== -1) {
-        this.passes.splice(index, 1);
+    this.composer?.removePass(pass);
+
+    const index = this.passes.indexOf(pass);
+    if (index !== -1) {
+      this.passes.splice(index, 1);
+    }
+
+    for (const [, passes] of this.passesByName) {
+      if (passes.has(pass)) {
+        passes.delete(pass);
       }
     }
+
+    this.#orderedPasses = undefined;
   }
 
   getComposer(renderer: ThreeRendererType): EffectComposer {
@@ -73,39 +146,42 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
       }
       this.composer = new EffectComposer(renderer as WebGLRenderer);
       this.passes.forEach((pass) => this.composer.addPass(pass));
-      this.passes.length = 0;
     }
     return this.composer;
   }
 
   stageAdded({stage}: StageAddedProps) {
-    if (hasGetRenderPass(stage) && !this.stagePasses.has(stage)) {
+    if (hasGetRenderPass(stage) && !this.stagePass.has(stage)) {
       const renderPass = stage.getRenderPass();
-      this.stagePasses.set(stage, renderPass);
-      this.addPass(renderPass);
+      this.stagePass.set(stage, renderPass);
+      this.addPass(renderPass, stage.name);
     }
   }
 
   stageRemoved({stage}: StageRemovedProps) {
-    if (this.stagePasses.has(stage)) {
-      const renderPass = this.stagePasses.get(stage)!;
-      this.stagePasses.delete(stage);
+    if (this.stagePass.has(stage)) {
+      const renderPass = this.stagePass.get(stage)!;
+      this.stagePass.delete(stage);
       this.removePass(renderPass);
       renderPass.dispose();
     }
   }
 
+  /**
+   * @deprecated do not use
+   */
   reorderPasses(passes: (Pass | StageType)[]) {
     const nextPasses: Pass[] = passes
       .map((pass) => {
         if (pass instanceof Pass) {
           return pass;
         }
-        return this.stagePasses.get(pass)!;
+        return this.stagePass.get(pass)!;
       })
       .filter(Boolean);
 
-    const target = this.composer?.passes ?? this.passes;
+    // const target = this.composer?.passes ?? this.passes;
+    const target = this.passes;
 
     if (target.length !== nextPasses.length) {
       // eslint-disable-next-line no-console
@@ -122,5 +198,15 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     target.push(...nextPasses);
   }
 
-  // TODO dispose
+  dispose() {
+    this.passes.forEach((pass) => pass.dispose());
+    this.passes.length = 0;
+    if (this.composer) {
+      this.composer.dispose();
+      this.composer = undefined;
+    }
+    this.passesByName.clear();
+    this.passesNeedsUpdate = true;
+    this.#orderedPasses = undefined;
+  }
 }

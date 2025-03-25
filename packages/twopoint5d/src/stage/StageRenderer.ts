@@ -10,13 +10,66 @@ interface StageItem {
   height: number;
 }
 
+/**
+ * The StageRenderer gets its dimension from the parent or the display.
+ * Use `attach()` to attach it to a parent (or display).
+ *
+ * It can contains multiple stages.
+ *
+ * When `renderFrame()` is called, all stages that were added using `addStage()` are rendered.
+ * If an explicit `renderOrder` is set, the stages are rendered in the order defined there.
+ */
 export class StageRenderer implements IStageRenderer {
   readonly isStageRenderer = true;
+
+  name = 'StageRenderer';
 
   #parent?: StageParentType;
 
   width: number = 0;
   height: number = 0;
+
+  /**
+   * All stages are included here, but unsorted. The render order is not included here yet.
+   * see `renderOrder` and `getOrderedStages()`
+   */
+  readonly stages: StageItem[] = [];
+
+  #renderOrder = '*';
+  #orderedStages?: StageItem[];
+
+  /**
+   * A comma separated list of stage names (see `IStage#name`) or '*' for all other stages which are not listed explicitly
+   */
+  set renderOrder(order: string | undefined) {
+    order = order || '*';
+    if (this.#renderOrder !== order) {
+      this.#renderOrder = order;
+      this.#renderOrderArray = undefined;
+      this.#orderedStages = undefined;
+      this.onRenderOrderChanged();
+    }
+  }
+
+  protected onRenderOrderChanged(): void {
+    // ntdh
+  }
+
+  get renderOrder(): string {
+    return this.#renderOrder;
+  }
+
+  #renderOrderArray?: string[] = [];
+
+  get renderOrderArray(): string[] {
+    if (!this.#renderOrderArray) {
+      this.#renderOrderArray = this.renderOrder
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    return this.#renderOrderArray;
+  }
 
   get parent(): StageParentType | undefined {
     return this.#parent;
@@ -71,8 +124,6 @@ export class StageRenderer implements IStageRenderer {
     );
   }
 
-  protected readonly stages: StageItem[] = [];
-
   constructor() {
     eventize(this);
   }
@@ -101,10 +152,49 @@ export class StageRenderer implements IStageRenderer {
   }
 
   renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
-    this.stages.forEach((stage) => {
+    this.getOrderedStages().forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
       stage.stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
+  }
+
+  getOrderedStages(): StageItem[] {
+    if (this.#orderedStages) return this.#orderedStages;
+
+    const renderOrder = this.renderOrderArray;
+
+    if (renderOrder.length === 0 || (renderOrder.length === 1 && (renderOrder[0] === '' || renderOrder[0] === '*'))) {
+      return this.stages;
+    }
+
+    const explicitlyNamedStages = new Map<string, StageItem>();
+    const otherStages = this.stages.slice();
+
+    renderOrder.forEach((name) => {
+      if (name !== '*') {
+        const index = otherStages.findIndex((stage) => stage.stage.name === name);
+        if (index !== -1) {
+          const stage = otherStages.splice(index, 1)[0];
+          explicitlyNamedStages.set(name, stage);
+        }
+      }
+    });
+
+    const orderedStages = renderOrder
+      .map((name) => {
+        if (name === '*') {
+          return otherStages;
+        }
+        return explicitlyNamedStages.get(name);
+      })
+      .flat()
+      .filter(Boolean) as StageItem[];
+
+    explicitlyNamedStages.clear();
+
+    this.#orderedStages = orderedStages;
+
+    return orderedStages;
   }
 
   #getIndex(stage: StageType): number {
@@ -122,6 +212,7 @@ export class StageRenderer implements IStageRenderer {
         width: 0,
         height: 0,
       });
+      this.#orderedStages = undefined;
       emit(this, StageAdded, {stage, renderer: this} as StageAddedProps);
     }
   }
@@ -130,6 +221,7 @@ export class StageRenderer implements IStageRenderer {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);
+      this.#orderedStages = undefined;
       emit(this, StageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
   }

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 &mldr;
 
+## [0.9.0] - 2025-03-25
+
+- add _renderOrder_ feature to `StageRenderer` and `PostProcessingRenderer`
+- the `IStage` interface have a _name_ property now
+
 ## [0.7.0] - 2024-01-09
 
 ### Added
