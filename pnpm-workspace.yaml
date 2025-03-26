@@ -5,7 +5,7 @@ catalog:
   three: ~0.174.0
   '@types/three': ~0.174.0
   '@spearwolf/eventize': ^4.0.1
-  '@spearwolf/signalize': ^0.19.1
+  '@spearwolf/signalize': ^0.20.1
   lit: 3.2.1
   '@lit/context': ^1.1.4
   '@react-three/fiber': 8.16.*

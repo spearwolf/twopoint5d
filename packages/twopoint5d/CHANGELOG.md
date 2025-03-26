@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 &mldr;
 
+## [0.9.3] - 2025-03-26
+
+- upgrade to `@spearwolf/signalize@0.20.1`
+
 ## [0.9.2] - 2025-03-26
 
 - fix `PostProcessingRenderer` resize issues
