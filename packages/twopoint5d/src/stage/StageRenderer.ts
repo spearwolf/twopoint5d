@@ -28,6 +28,7 @@ export class StageRenderer implements IStageRenderer {
 
   width: number = 0;
   height: number = 0;
+  pixelRatio: number = 1;
 
   /**
    * All stages are included here, but unsorted. The render order is not included here yet.
@@ -108,7 +109,7 @@ export class StageRenderer implements IStageRenderer {
       this,
       RemoveFromParent,
       on(display, 'resize', ({width, height}: {width: number; height: number}) => {
-        this.resize(width, height);
+        this.resize(width, height, display.pixelRatio);
       }),
     );
     once(
@@ -136,11 +137,18 @@ export class StageRenderer implements IStageRenderer {
     this.parent = undefined;
   }
 
-  resize(width: number, height: number): void {
+  resize(width: number, height: number, pixelRatio: number = 1): void {
     this.width = width;
     this.height = height;
+    this.pixelRatio = pixelRatio;
 
     this.stages.forEach((stage) => this.resizeStage(stage, width, height));
+
+    this.onResizeRenderer(width, height, pixelRatio);
+  }
+
+  protected onResizeRenderer(_width: number, _height: number, _pixelRatio: number): void {
+    // ntdh
   }
 
   protected resizeStage(stage: StageItem, width: number, height: number): void {

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 &mldr;
 
+## [0.9.2] - 2025-03-26
+
+- fix `PostProcessingRenderer` resize issues
+
+## [0.9.1] - 2025-03-25
+
+- fix _renderOrder_ '*' behavior
+
 ## [0.9.0] - 2025-03-25
 
 - add _renderOrder_ feature to `StageRenderer` and `PostProcessingRenderer`
