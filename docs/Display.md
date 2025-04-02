@@ -118,6 +118,10 @@ The following parameters for the renderer are set as default unless otherwise sp
 
 .__height__ : _number_ - height of the canvas
 
+.__pixelRatio__ : _readonly number_ - the device pixel ratio. if `pixelZoom` set to greater than 0, then `pixelRatio` will be 1
+
+.__pixelZoom__ : _number_ - default is 0. if set to greater than 0, will be used to _zoom_ the pixels (e.g. `2` means that all pixels are doubled (_css pixel space_))
+
 .__frameNo__ : _number_ - the current frame number. starts at 0
 
 .__resizeToElement__ : _HTMLElement | undefined_ - the element which is taken as reference for the dimension of the canvas
@@ -132,9 +136,7 @@ The following parameters for the renderer are set as default unless otherwise sp
 
 .__pause__ : _boolean_ - the pause status. readable but also settable. note a paused display freezes the time and will never emit a _frame_ event. this is also the reason why the `deltaTime` does not continue to tick. only again when the pause is ended.
 
-.__pixelRatio__ : _number_ - the device pixel ratio. if `pixelZoom` set to greater than 0, then `pixelRatio` will be 1
-
-.__pixelZoom__ : _number_ - default is 0. if set to greater than 0, will be used to _zoom_ the pixels (e.g. `2` means that all pixels are doubled (_css pixel space_))
+.__styleImageRendering__ : `"auto"` | `"pixelated"` | _undefined_ - set the `image-rendering` css style value of the canvas element. The display renderer automatically sets the style value to `"pixelated"` when the `pixelZoom` is greater than 0. Otherwise (which is the default), `"auto"` is used. If you want to explicitly specify a value here, set.
 
 ## Methods
 
