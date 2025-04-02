@@ -38,6 +38,14 @@ export class Display {
   #fullscreenCssRules?: string;
   #fullscreenCssRulesMustBeRemoved = false;
 
+  pixelZoom = 0; // 0 or lower means => just use devicePixelRatio, greater than 0 means => scale cssPixels by pixelZoom
+
+  /**
+   * if set, will be used to set the `image-rendering` css property on the canvas element
+   * otherwise will be set to "pixelated" if pixelZoom > 0, or "auto" if pixelZoom <= 0
+   */
+  styleImageRendering?: 'pixelated' | 'auto' = undefined;
+
   width = 0;
   height = 0;
 
@@ -183,6 +191,9 @@ export class Display {
   }
 
   get pixelRatio(): number {
+    if (this.pixelZoom > 0) {
+      return 1.0;
+    }
     return window.devicePixelRatio ?? 1;
   }
 
@@ -285,20 +296,26 @@ export class Display {
       showCanvasMaxResolutionWarning(wPx, hPx);
     }
 
-    const {pixelRatio} = this;
-    const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio}`;
+    const {pixelRatio, pixelZoom} = this;
+    const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio},${pixelZoom}`;
 
     if (resizeHash !== this.#lastResizeHash) {
       this.#lastResizeHash = resizeHash;
 
-      this.width = wPx;
-      this.height = hPx;
+      if (pixelZoom > 0) {
+        this.width = wPx / pixelZoom;
+        this.height = hPx / pixelZoom;
+      } else {
+        this.width = wPx;
+        this.height = hPx;
+      }
 
       this.renderer!.setPixelRatio(pixelRatio);
-      this.renderer!.setSize(wPx, hPx, false);
+      this.renderer!.setSize(this.width, this.height, false);
 
       canvasElement.style.width = `${cssWidth}px`;
       canvasElement.style.height = `${cssHeight}px`;
+      canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
 
       if (this.frameNo > 0) {
         // no need to emit this inside construction phase
@@ -352,6 +369,7 @@ export class Display {
 
       width: this.width,
       height: this.height,
+      pixelRatio: this.pixelRatio,
 
       now: this.now,
       deltaTime: this.deltaTime,

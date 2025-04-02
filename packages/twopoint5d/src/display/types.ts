@@ -9,6 +9,7 @@ export interface DisplayEventArgs {
   renderer: ThreeRendererType;
   width: number;
   height: number;
+  pixelRatio: number;
   now: number;
   deltaTime: number;
   frameNo: number;

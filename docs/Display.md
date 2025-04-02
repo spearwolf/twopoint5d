@@ -132,7 +132,9 @@ The following parameters for the renderer are set as default unless otherwise sp
 
 .__pause__ : _boolean_ - the pause status. readable but also settable. note a paused display freezes the time and will never emit a _frame_ event. this is also the reason why the `deltaTime` does not continue to tick. only again when the pause is ended.
 
-.__pixelRatio__ : _number_ - the current device pixel ratio. is also read by the .resize() method.
+.__pixelRatio__ : _number_ - the device pixel ratio. if `pixelZoom` set to greater than 0, then `pixelRatio` will be 1
+
+.__pixelZoom__ : _number_ - default is 0. if set to greater than 0, will be used to _zoom_ the pixels (e.g. `2` means that all pixels are doubled (_css pixel space_))
 
 ## Methods
 
