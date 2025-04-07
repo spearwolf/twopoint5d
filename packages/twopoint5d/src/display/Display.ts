@@ -103,13 +103,13 @@ export class Display {
           })
         : new WebGLRenderer({
             canvas,
-            precision: 'highp',
+            precision: 'highp',  // TODO maybe use 'mediump' for mobile devices
             preserveDrawingBuffer: false,
-            powerPreference: 'high-performance',
             stencil: false,
             alpha: true,
             antialias: true,
             ...options,
+            powerPreference: 'high-performance',
           });
     }
 
@@ -166,6 +166,7 @@ export class Display {
       };
 
       document.addEventListener('visibilitychange', onDocVisibilityChange, false);
+
       once(this, 'dispose', () => {
         document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
@@ -200,6 +201,10 @@ export class Display {
   resize(): void {
     let wPx = 300;
     let hPx = 150;
+
+    // TODO fix flickering with subpixel rendering
+    // https://web.dev/articles/device-pixel-content-box?hl=de
+    // https://github.com/xtermjs/xterm.js/issues/4922
 
     const canvasElement = this.renderer!.domElement;
 
@@ -309,6 +314,9 @@ export class Display {
         this.width = wPx;
         this.height = hPx;
       }
+      
+      this.width = Math.floor(this.width);
+      this.height = Math.floor(this.height);
 
       this.renderer!.setPixelRatio(pixelRatio);
       this.renderer!.setSize(this.width, this.height, false);

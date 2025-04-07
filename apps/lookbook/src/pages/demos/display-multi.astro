@@ -69,12 +69,13 @@ import {description, showSource, title} from './_display-multi.json';
     }
     canvasSizeInfo = canvasSizeInfo.querySelector('.canvasSizeInfo')!;
     return (width: number, height: number, pixelRatio: number) => {
-      canvasSizeInfo.textContent = `${width | 0}x${height | 0}x${pixelRatio}`;
+      canvasSizeInfo.textContent = `${width}x${height}x${pixelRatio}`;
     };
   }
 
   for (const canvas of document.querySelectorAll('.create-canvas-here')) {
     const display = new Display(canvas as HTMLElement);
+    // display.pixelZoom = 2;
 
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {pixelZoom: 2}));
 
