@@ -98,18 +98,18 @@ export class Display {
             stencil: false,
             alpha: true,
             antialias: true,
-            ...options,
             powerPreference: 'high-performance',
+            ...options,
           })
         : new WebGLRenderer({
             canvas,
-            precision: 'highp',  // TODO maybe use 'mediump' for mobile devices
+            precision: 'highp',
             preserveDrawingBuffer: false,
             stencil: false,
             alpha: true,
             antialias: true,
-            ...options,
             powerPreference: 'high-performance',
+            ...options,
           });
     }
 
@@ -314,7 +314,7 @@ export class Display {
         this.width = wPx;
         this.height = hPx;
       }
-      
+
       this.width = Math.floor(this.width);
       this.height = Math.floor(this.height);
 
