@@ -37,6 +37,9 @@ export class Stage2D implements IStage, IGetRenderPass {
 
   autoClear = true;
 
+  clearColor = new Color(0x000000);
+  clearAlpha = 0;
+
   /**
    * with this flag you can tell the .update() method that the projection calculation needs an update
    * (e.g. the settings in the projection have changed)
@@ -189,9 +192,16 @@ export class Stage2D implements IStage, IGetRenderPass {
         if (!isRendered) {
           isRendered = true;
           if (renderCmd) {
+            if (this.#renderPass) {
+              // TODO create getter/setter for clearColor and clearAlpha
+              this.#renderPass.clearColor = this.clearColor;
+              this.#renderPass.clearAlpha = this.clearAlpha;
+            }
             renderCmd(scene, camera, this.autoClear);
           } else {
+            renderer.setClearColor(this.clearColor, this.clearAlpha);
             renderer.render(scene, camera);
+            // TODO restore previous clearColor?
           }
         }
       };
@@ -239,8 +249,8 @@ export class Stage2D implements IStage, IGetRenderPass {
       this.#renderPass = new RenderPass(this.scene, this.camera);
       this.#renderPass.clear = this.autoClear;
       // TODO how to render transparent scene within effect composer?
-      this.#renderPass.clearColor = new Color(0x000000);
-      this.#renderPass.clearAlpha = 0;
+      this.#renderPass.clearColor = this.clearColor;
+      this.#renderPass.clearAlpha = this.clearAlpha;
     }
     return this.#renderPass;
   }
