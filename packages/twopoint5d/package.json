@@ -1,7 +1,7 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
-  "version": "0.11.0-dev",
+  "version": "0.11.0",
   "keywords": [
     "sprites",
     "particles",

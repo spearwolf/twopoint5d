@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 &mldr;
 
+## [0.11.0] - 2025-04-26
+
+- remove auto creation of `WebGPURenderer` in `Display` when using `webgpu: true`
+  - to avoid confusion with `three`and `three/webgpu` imports when using resolve aliases
+  - you can still pass `renderer: new WebGPURenderer()` to the `Display` constructor (no need to pass `webgpu: true` in this case)
+- convert last `three/examples/jsm` import to `three/addons`
+- deactivate some hook tests in twopoint5d-r3f
+  - time to ditch react-three-fiber support
+    - the maintainance cost is too high
+
 ## [0.9.3] - 2025-03-26
 
 - upgrade to `@spearwolf/signalize@0.20.1`

@@ -1,7 +1,6 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
-
-import {WebGPURenderer} from 'three/webgpu';
+import type {WebGPURenderer} from 'three/webgpu';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {Stylesheets} from './Stylesheets.js';
@@ -69,9 +68,9 @@ export class Display {
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
-    if (domElementOrRenderer instanceof WebGLRenderer || domElementOrRenderer instanceof WebGPURenderer) {
-      this.renderer = domElementOrRenderer;
-      this.resizeToElement = domElementOrRenderer.domElement;
+    if (domElementOrRenderer instanceof WebGLRenderer || (domElementOrRenderer as WebGPURenderer).isWebGPURenderer) {
+      this.renderer = domElementOrRenderer as ThreeRendererType;
+      this.resizeToElement = this.renderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
       let canvas: HTMLCanvasElement;
       if (domElementOrRenderer.tagName === 'CANVAS') {
@@ -92,25 +91,41 @@ export class Display {
         container.appendChild(canvas);
       }
       this.resizeToElement = domElementOrRenderer;
-      this.renderer = options?.webgpu
-        ? new WebGPURenderer({
-            canvas,
-            stencil: false,
-            alpha: true,
-            antialias: true,
-            powerPreference: 'high-performance',
-            ...options,
-          })
-        : new WebGLRenderer({
-            canvas,
-            precision: 'highp',
-            preserveDrawingBuffer: false,
-            stencil: false,
-            alpha: true,
-            antialias: true,
-            powerPreference: 'high-performance',
-            ...options,
-          });
+      if (options?.webgpu) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          'WebGPU is not supported yet. If you want to use WebGPU, please create a WebGPURenderer instance and pass it to the :renderer option!',
+        );
+      }
+      this.renderer = new WebGLRenderer({
+        canvas,
+        precision: 'highp',
+        preserveDrawingBuffer: false,
+        stencil: false,
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+        ...options,
+      });
+      // this.renderer = options?.webgpu
+      //   ? new WebGPURenderer({
+      //     canvas,
+      //     stencil: false,
+      //     alpha: true,
+      //     antialias: true,
+      //     powerPreference: 'high-performance',
+      //     ...options,
+      //   })
+      //   : new WebGLRenderer({
+      //     canvas,
+      //     precision: 'highp',
+      //     preserveDrawingBuffer: false,
+      //     stencil: false,
+      //     alpha: true,
+      //     antialias: true,
+      //     powerPreference: 'high-performance',
+      //     ...options,
+      //   });
     }
 
     const {domElement: canvas} = this.renderer!;
@@ -201,10 +216,6 @@ export class Display {
   resize(): void {
     let wPx = 300;
     let hPx = 150;
-
-    // TODO fix flickering with subpixel rendering
-    // https://web.dev/articles/device-pixel-content-box?hl=de
-    // https://github.com/xtermjs/xterm.js/issues/4922
 
     const canvasElement = this.renderer!.domElement;
 

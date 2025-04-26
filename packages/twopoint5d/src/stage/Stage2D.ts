@@ -1,7 +1,7 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
 import {Camera, Color, Scene} from 'three';
 
-import {RenderPass} from 'three/examples/jsm/postprocessing/RenderPass.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import type {ThreeRendererType} from '../display/types.js';
 import {
   FirstFrame,
