@@ -1,7 +1,6 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {Camera, Color, Scene} from 'three';
+import {Camera, Color, Scene, WebGLRenderer} from 'three';
 
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import type {ThreeRendererType} from '../display/types.js';
 import {
   FirstFrame,
@@ -13,11 +12,10 @@ import {
   type Stage2DResizeProps,
   type StageAfterCameraChangedArgs,
 } from '../events.js';
-import type {IGetRenderPass} from './IGetRenderPass.js';
 import type {IProjection} from './IProjection.js';
-import type {IStage, RenderCmdFunc} from './IStage.js';
+import type {IStage} from './IStage.js';
 
-// TODO extract base class Stage
+const _oldClearColor = new Color();
 
 /**
  * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
@@ -32,7 +30,9 @@ import type {IStage, RenderCmdFunc} from './IStage.js';
  *
  * After the camera is created the scene can be rendered with the method `renderFrame(renderer: DisplayGLRenderer)`
  */
-export class Stage2D implements IStage, IGetRenderPass {
+export class Stage2D implements IStage {
+  isStage2D = true;
+
   scene: Scene;
 
   autoClear = true;
@@ -173,85 +173,81 @@ export class Stage2D implements IStage, IGetRenderPass {
     }
   };
 
-  #noCameraErrorCount = 0;
+  isFirstFrame = true;
 
-  #isFirstFrame = true;
   #firstFrameProps?: FirstFrameProps;
 
-  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, renderCmd?: RenderCmdFunc): void {
+  #noCameraErrorCount = 0;
+
+  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, skipRenderCall = false): void {
     const {scene, camera} = this;
-    if (scene && camera) {
-      const previousAutoClearValue = renderer.autoClear;
-      if (!renderCmd) {
-        renderer.autoClear = this.autoClear;
+
+    if (scene == null || camera == null) {
+      if (!camera && ++this.#noCameraErrorCount === 100) {
+        this.#noCameraErrorCount = -1000;
+        // eslint-disable-next-line no-console
+        console.warn(
+          'Stage2D has no camera and therefore cannot be rendered! normally this only happens if you forget to call the resize() method ..',
+        );
       }
-
-      let isRendered = false;
-
-      const renderFrame = () => {
-        if (!isRendered) {
-          isRendered = true;
-          if (renderCmd) {
-            if (this.#renderPass) {
-              // TODO create getter/setter for clearColor and clearAlpha
-              this.#renderPass.clearColor = this.clearColor;
-              this.#renderPass.clearAlpha = this.clearAlpha;
-            }
-            renderCmd(scene, camera, this.autoClear);
-          } else {
-            renderer.setClearColor(this.clearColor, this.clearAlpha);
-            renderer.render(scene, camera);
-            // TODO restore previous clearColor?
-          }
-        }
-      };
-
-      const renderFrameProps: Stage2DRenderFrameProps = {
-        renderer,
-        now,
-        deltaTime,
-        frameNo,
-        renderFrame,
-        stage: this,
-        width: this.width,
-        height: this.height,
-      };
-
-      if (this.#isFirstFrame) {
-        this.#firstFrameProps = {...renderFrameProps, scene: this.scene};
-        emit(this, FirstFrame, this.#firstFrameProps);
-        this.#isFirstFrame = false;
-      } else if (this.#firstFrameProps != null) {
-        Object.assign(this.#firstFrameProps, renderFrameProps);
-        this.#firstFrameProps.scene = this.scene;
-      }
-
-      emit(this, StageRenderFrame, renderFrameProps);
-
-      if (!isRendered) {
-        renderFrame();
-      }
-
-      renderer.autoClear = previousAutoClearValue;
-    } else if (!camera && ++this.#noCameraErrorCount === 100) {
-      this.#noCameraErrorCount = -1000;
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Stage2D has no camera and therefore cannot be rendered! normally this only happens if you forget to call the resize() method ..',
-      );
+      return;
     }
-  }
 
-  #renderPass?: RenderPass;
+    const renderFrameProps: Stage2DRenderFrameProps = {
+      renderer,
+      now,
+      deltaTime,
+      frameNo,
+      stage: this,
+      width: this.width,
+      height: this.height,
+    };
 
-  getRenderPass(): RenderPass {
-    if (this.#renderPass == null) {
-      this.#renderPass = new RenderPass(this.scene, this.camera);
-      this.#renderPass.clear = this.autoClear;
-      // TODO how to render transparent scene within effect composer?
-      this.#renderPass.clearColor = this.clearColor;
-      this.#renderPass.clearAlpha = this.clearAlpha;
+    if (this.isFirstFrame) {
+      this.#firstFrameProps = {...renderFrameProps, scene: this.scene};
+      emit(this, FirstFrame, this.#firstFrameProps);
+      this.isFirstFrame = false;
+    } else if (this.#firstFrameProps != null) {
+      Object.assign(this.#firstFrameProps, renderFrameProps);
+      this.#firstFrameProps.scene = this.scene;
     }
-    return this.#renderPass;
+
+    emit(this, StageRenderFrame, renderFrameProps);
+
+    if (skipRenderCall) return;
+
+    // -------------------------------------------------------------------------------
+    // remember the current state
+    // -------------------------------------------------------------------------------
+
+    const previousAutoClearValue = renderer.autoClear;
+    const oldClearAlpha = renderer.getClearAlpha();
+    if (this.autoClear) {
+      (renderer as WebGLRenderer).getClearColor(_oldClearColor);
+    }
+
+    // -------------------------------------------------------------------------------
+    // render the scene
+    // -------------------------------------------------------------------------------
+
+    renderer.autoClear = this.autoClear;
+
+    if (this.autoClear) {
+      renderer.setClearColor(this.clearColor, this.clearAlpha);
+      renderer.setClearAlpha(this.clearAlpha);
+    }
+
+    renderer.render(scene, camera);
+
+    // -------------------------------------------------------------------------------
+    // restore the previous state
+    // -------------------------------------------------------------------------------
+
+    renderer.autoClear = previousAutoClearValue;
+
+    if (this.autoClear) {
+      renderer.setClearColor(_oldClearColor, oldClearAlpha);
+      renderer.setClearAlpha(oldClearAlpha);
+    }
   }
 }

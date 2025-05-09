@@ -13,9 +13,10 @@ import {
   type StageAddedProps,
   type StageRemovedProps,
 } from '../events.js';
-import {hasGetRenderPass} from './IGetRenderPass.js';
 import type {IStage} from './IStage.js';
 import type {StageType} from './IStageRenderer.js';
+import type {Stage2D} from './Stage2D.js';
+import {Stage2DRenderPass} from './Stage2DRenderPass.js';
 import {StageRenderer} from './StageRenderer.js';
 
 export class PostProcessingRenderer extends StageRenderer implements IStageAdded, IStageRemoved {
@@ -48,20 +49,19 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
     on(this, [StageAdded, StageRemoved], this);
   }
 
-  override renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
+  override renderFrame(
+    renderer: ThreeRendererType,
+    now: number,
+    deltaTime: number,
+    frameNo: number,
+    skipRenderCall = false,
+  ): void {
     // preface - before we render the stage passes with the effect composer,
     // we want to give all stages the opportunity to react to the current dimension and update their render pass settings.
 
     this.stages.forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
-      stage.stage.renderFrame(renderer, now, deltaTime, frameNo, (scene, camera, autoClear) => {
-        const renderPass = this.stagePass.get(stage.stage);
-        if (renderPass) {
-          renderPass.clear = autoClear;
-          renderPass.scene = scene;
-          renderPass.camera = camera;
-        }
-      });
+      stage.stage.renderFrame(renderer, now, deltaTime, frameNo, true);
     });
 
     // render the stage passes
@@ -70,11 +70,15 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
 
     if (this.passesNeedsUpdate) {
       composer.passes.length = 0;
-      composer.passes.push(...this.getOrderedPasses());
+      for (const pass of this.getOrderedPasses()) {
+        composer.addPass(pass);
+      }
       this.passesNeedsUpdate = false;
     }
 
-    composer.render();
+    if (!skipRenderCall) {
+      composer.render();
+    }
   }
 
   protected override onRenderOrderChanged(): void {
@@ -158,8 +162,8 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
         throw new Error('PostProcessingRenderer: WebGPURenderer not supported');
       }
       this.composer = new EffectComposer(renderer as WebGLRenderer);
-      this.onResizeRenderer(this.width, this.height, this.pixelRatio);
       this.passes.forEach((pass) => this.composer.addPass(pass));
+      this.onResizeRenderer(this.width, this.height, this.pixelRatio);
     }
     return this.composer;
   }
@@ -172,11 +176,19 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
   }
 
   stageAdded({stage}: StageAddedProps) {
-    if (hasGetRenderPass(stage) && !this.stagePass.has(stage)) {
-      const renderPass = stage.getRenderPass();
-      this.stagePass.set(stage, renderPass);
+    if (!this.stagePass.has(stage)) {
+      const renderPass = this.createRenderPass(stage);
       this.addPass(renderPass, stage.name);
     }
+  }
+
+  private createRenderPass(stage: IStage): RenderPass {
+    if ((stage as Stage2D).isStage2D) {
+      const pass = new Stage2DRenderPass(stage as Stage2D);
+      this.stagePass.set(stage, pass);
+      return pass;
+    }
+    throw new Error(`[PostProcessingRenderer] stage ${stage.name} is not a Stage2D - so, no render pass can be created`);
   }
 
   stageRemoved({stage}: StageRemovedProps) {

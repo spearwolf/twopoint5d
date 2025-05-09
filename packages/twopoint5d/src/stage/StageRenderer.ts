@@ -159,10 +159,10 @@ export class StageRenderer implements IStageRenderer {
     }
   }
 
-  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number): void {
+  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, skipRenderCall = false): void {
     this.getOrderedStages().forEach((stage) => {
       this.resizeStage(stage, this.width, this.height);
-      stage.stage.renderFrame(renderer, now, deltaTime, frameNo);
+      stage.stage.renderFrame(renderer, now, deltaTime, frameNo, skipRenderCall);
     });
   }
 

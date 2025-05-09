@@ -64,12 +64,6 @@ export interface StageRenderFrameProps {
   now: number;
   deltaTime: number;
   frameNo: number;
-
-  /**
-   * You do not need to call this callback yourself. It's normally done after the event.
-   * However, you can use this callback to control when the three renderer is called.
-   */
-  renderFrame: () => void;
 }
 
 export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
