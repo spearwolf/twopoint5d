@@ -1,7 +1,15 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 import type {WebGPURenderer} from 'three/webgpu';
-import {OnRenderFrame, OnResize} from '../events.js';
+import {
+  OnDisposeDisplay,
+  OnInitDisplay,
+  OnPauseDisplay,
+  OnRenderFrame,
+  OnResize,
+  OnRestartDisplay,
+  OnStartDisplay,
+} from '../events.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {Stylesheets} from './Stylesheets.js';
@@ -66,7 +74,7 @@ export class Display {
   constructor(domElementOrRenderer: HTMLElement | ThreeRendererType, options?: DisplayParameters) {
     eventize(this);
 
-    retain(this, ['init', 'start', OnResize]);
+    retain(this, [OnInitDisplay, OnStartDisplay, OnResize]);
 
     this.#chronometer.stop();
 
@@ -147,10 +155,10 @@ export class Display {
         if ((this.renderer as WebGPURenderer).isWebGPURenderer) {
           await (this.renderer as WebGPURenderer).init();
         }
-        this.#emitEvent('init');
+        this.#emit(OnInitDisplay);
       },
 
-      [DisplayStateMachine.Restart]: () => this.#emitEvent('restart'),
+      [DisplayStateMachine.Restart]: () => this.#emit(OnRestartDisplay),
 
       [DisplayStateMachine.Start]: () => {
         this.#chronometer.start();
@@ -166,7 +174,7 @@ export class Display {
 
         this.#rafID = window.requestAnimationFrame(renderFrame);
 
-        this.#emitEvent('start');
+        this.#emit(OnStartDisplay);
       },
 
       [DisplayStateMachine.Pause]: () => {
@@ -174,9 +182,9 @@ export class Display {
 
         this.#chronometer.stop();
 
-        retainClear(this, 'start');
+        retainClear(this, OnStartDisplay);
 
-        this.#emitEvent('pause');
+        this.#emit(OnPauseDisplay);
       },
     });
 
@@ -187,7 +195,7 @@ export class Display {
 
       document.addEventListener('visibilitychange', onDocVisibilityChange, false);
 
-      once(this, 'dispose', () => {
+      once(this, OnDisposeDisplay, () => {
         document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
 
@@ -346,7 +354,7 @@ export class Display {
       canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
 
       const isConstructing = this.frameNo === 0;
-      if (!isConstructing) this.#emitEvent(OnResize);
+      if (!isConstructing) this.#emit(OnResize);
     }
   }
 
@@ -355,9 +363,9 @@ export class Display {
 
     this.resize();
 
-    if (this.isFirstFrame) this.#emitEvent(OnResize);
+    if (this.isFirstFrame) this.#emit(OnResize);
 
-    this.#emitEvent(OnRenderFrame);
+    this.#emit(OnRenderFrame);
 
     ++this.frameNo;
   }
@@ -379,7 +387,7 @@ export class Display {
 
   dispose(): void {
     this.stop();
-    emit(this, 'dispose');
+    emit(this, OnDisposeDisplay, this);
     off(this);
     this.renderer?.dispose();
     delete this.renderer;
@@ -402,7 +410,9 @@ export class Display {
     };
   }
 
-  #emitEvent = (eventName: string): void => {
-    emit(this, eventName, this.getEventArgs());
+  #emit = (eventName: string): void => {
+    if (this.renderer != null) {
+      emit(this, eventName, this.getEventArgs());
+    }
   };
 }

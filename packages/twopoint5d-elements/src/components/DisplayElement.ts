@@ -1,7 +1,16 @@
 import type {ContextProvider} from '@lit/context';
 import {provide} from '@lit/context';
 import {on, Priority} from '@spearwolf/eventize';
-import {Display, StageRenderer, type DisplayParameters} from '@spearwolf/twopoint5d';
+import {
+  Display,
+  OnDisposeDisplay,
+  OnPauseDisplay,
+  OnResize,
+  OnRestartDisplay,
+  OnStartDisplay,
+  StageRenderer,
+  type DisplayParameters,
+} from '@spearwolf/twopoint5d';
 import {css, html} from 'lit';
 import {displayContext} from '../context/display-context.js';
 import {stageRendererContext, type IStageRendererContext, type StageElement} from '../context/stage-renderer-context.js';
@@ -174,31 +183,31 @@ export class DisplayElement extends TwoPoint5DElement implements IStageRendererC
   }
 
   #connectCustomEvents(): void {
-    on(this.display, 'start', Priority.Low, (args) => {
+    on(this.display, OnStartDisplay, Priority.Low, (args) => {
       this.dispatchEvent(
         new CustomEvent<DisplayEventDetail>('displayStart', {bubbles: true, detail: {...args, displayElement: this}}),
       );
     });
 
-    on(this.display, 'resize', Priority.Low, (args) => {
+    on(this.display, OnResize, Priority.Low, (args) => {
       this.dispatchEvent(
         new CustomEvent<DisplayEventDetail>('displayResize', {bubbles: true, detail: {...args, displayElement: this}}),
       );
     });
 
-    on(this.display, 'pause', Priority.Low, (args) => {
+    on(this.display, OnPauseDisplay, Priority.Low, (args) => {
       this.dispatchEvent(
         new CustomEvent<DisplayEventDetail>('displayPause', {bubbles: true, detail: {...args, displayElement: this}}),
       );
     });
 
-    on(this.display, 'restart', Priority.Low, (args) => {
+    on(this.display, OnRestartDisplay, Priority.Low, (args) => {
       this.dispatchEvent(
         new CustomEvent<DisplayEventDetail>('displayRestart', {bubbles: true, detail: {...args, displayElement: this}}),
       );
     });
 
-    on(this.display, 'dispose', Priority.Low, () => {
+    on(this.display, OnDisposeDisplay, Priority.Low, () => {
       this.dispatchEvent(
         new CustomEvent<DisplayDisposeEventDetail>('displayDispose', {
           bubbles: true,

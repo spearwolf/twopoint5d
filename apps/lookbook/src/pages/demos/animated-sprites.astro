@@ -49,6 +49,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
+    OnInitDisplay,
     OnRenderFrame,
     TileSetLoader,
   } from '@spearwolf/twopoint5d';
@@ -62,7 +63,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     document.querySelector('.spriteCount').textContent = count.toString();
   };
 
-  on(demo, 'init', async ({scene, camera}) => {
+  on(demo, OnInitDisplay, async ({scene, camera}) => {
     camera.position.z = 60;
 
     const CAPACITY = 1000;

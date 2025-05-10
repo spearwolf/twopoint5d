@@ -11,7 +11,15 @@ import {description, showSource, title} from './_display-minimal.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {Display, OnRenderFrame, OnResize, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
+  import {
+    Display,
+    OnInitDisplay,
+    OnRenderFrame,
+    OnResize,
+    ParallaxProjection,
+    Stage2D,
+    TextureFactory,
+  } from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -44,7 +52,7 @@ import {description, showSource, title} from './_display-minimal.json';
   sprite.scale.set(width, height, 1);
   stage.scene.add(sprite);
 
-  on(display, 'init', ({renderer}) => {
+  on(display, OnInitDisplay, ({renderer}) => {
     renderer.setClearColor(new Color('#0050A0'), 1.0);
   });
 

@@ -1,5 +1,7 @@
 import type {Camera, Scene} from 'three';
-import type {ThreeRendererType, IStage} from './index.js';
+import type {Display} from './display/Display.js';
+import type {DisplayEventArgs, ThreeRendererType} from './display/types.js';
+import type {IStage} from './stage/IStage.js';
 import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
 
@@ -20,7 +22,7 @@ export interface OnResizeProps {
 }
 
 export interface IOnResize {
-  resize(props: OnResizeProps): void;
+  [OnResize](props: OnResizeProps): void;
 }
 
 // ------------------------------------------------------------
@@ -36,7 +38,35 @@ export interface OnRenderFrameProps {
 }
 
 export interface IOnRenderFrame {
-  renderFrame(props: OnRenderFrameProps): void;
+  [OnRenderFrame](props: OnRenderFrameProps): void;
+}
+
+// ------------------------------------------------------------
+
+export const OnInitDisplay = 'init';
+export const OnStartDisplay = 'start';
+export const OnRestartDisplay = 'restart';
+export const OnPauseDisplay = 'pause';
+export const OnDisposeDisplay = 'dispose';
+
+export interface IOnInitDisplay {
+  [OnInitDisplay](props: DisplayEventArgs): void;
+}
+
+export interface IOnStartDisplay {
+  [OnStartDisplay](props: DisplayEventArgs): void;
+}
+
+export interface IOnRestartDisplay {
+  [OnRestartDisplay](props: DisplayEventArgs): void;
+}
+
+export interface IOnPauseDisplay {
+  [OnPauseDisplay](props: DisplayEventArgs): void;
+}
+
+export interface IOnDisposeDisplay {
+  [OnDisposeDisplay](display: Display): void;
 }
 
 // ------------------------------------------------------------

@@ -21,7 +21,7 @@ import {description, showSource, title} from './_crosses.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
+  import {OnInitDisplay, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
   import {DoubleSide, MeshBasicMaterial} from 'three';
   import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -49,7 +49,7 @@ import {description, showSource, title} from './_crosses.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
-  on(demo, 'init', ({scene}) => {
+  on(demo, OnInitDisplay, ({scene}) => {
     scene.add(makeCrossMesh(10, 10));
   });
 
