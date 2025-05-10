@@ -162,13 +162,16 @@ export class PostProcessingRenderer extends StageRenderer implements IStageAdded
         throw new Error('PostProcessingRenderer: WebGPURenderer not supported');
       }
       this.composer = new EffectComposer(renderer as WebGLRenderer);
-      this.passes.forEach((pass) => this.composer.addPass(pass));
+      // this.passes.forEach((pass) => this.composer.addPass(pass));
       this.onResizeRenderer(this.width, this.height, this.pixelRatio);
     }
     return this.composer;
   }
 
   protected override onResizeRenderer(width: number, height: number, pixelRatio: number): void {
+    // eslint-disable-next-line no-console
+    console.log('PostProcessingRenderer.onResizeRenderer', {composer: !!this.composer, width, height, pixelRatio});
+
     if (this.composer) {
       this.composer.setPixelRatio(pixelRatio);
       this.composer.setSize(width, height);
