@@ -30,7 +30,13 @@ import {description, showSource, title} from './_textured-sprites.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {TexturedSprites, TexturedSpritesGeometry, TexturedSpritesMaterial, TileSetLoader} from '@spearwolf/twopoint5d';
+  import {
+    OnRenderFrame,
+    TexturedSprites,
+    TexturedSpritesGeometry,
+    TexturedSpritesMaterial,
+    TileSetLoader,
+  } from '@spearwolf/twopoint5d';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -58,7 +64,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     scene.add(mesh);
 
-    on(demo, 'frame', ({deltaTime}) => {
+    on(demo, OnRenderFrame, ({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       mesh.update();
     });

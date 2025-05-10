@@ -1,7 +1,17 @@
 import {emit, eventize, on, once} from '@spearwolf/eventize';
 import {Display} from '../display/Display.js';
 import type {ThreeRendererType} from '../display/types.js';
-import {RemoveFromParent, StageAdded, StageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
+import {
+  OnRenderFrame,
+  OnResize,
+  RemoveFromParent,
+  StageAdded,
+  StageRemoved,
+  type OnRenderFrameProps,
+  type OnResizeProps,
+  type StageAddedProps,
+  type StageRemovedProps,
+} from '../events.js';
 import type {IStageRenderer, StageParentType, StageType} from './IStageRenderer.js';
 
 interface StageItem {
@@ -108,20 +118,16 @@ export class StageRenderer implements IStageRenderer {
     once(
       this,
       RemoveFromParent,
-      on(display, 'resize', ({width, height}: {width: number; height: number}) => {
-        this.resize(width, height, display.pixelRatio);
+      on(display, OnResize, ({width, height, pixelRatio}: OnResizeProps) => {
+        this.resize(width, height, pixelRatio);
       }),
     );
     once(
       this,
       RemoveFromParent,
-      on(
-        display,
-        'frame',
-        ({renderer, now, deltaTime, frameNo}: {renderer: ThreeRendererType; now: number; deltaTime: number; frameNo: number}) => {
-          this.renderFrame(renderer, now, deltaTime, frameNo);
-        },
-      ),
+      on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}: OnRenderFrameProps) => {
+        this.renderFrame(renderer, now, deltaTime, frameNo);
+      }),
     );
   }
 

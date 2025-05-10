@@ -15,7 +15,7 @@ export interface DisplayEventArgs {
   frameNo: number;
 }
 
-export type ResizeCallback = (display: Display) => [width: number, height: number];
+export type ResizeToCallbackFn = (display: Display) => [width: number, height: number];
 
 type RendererParameters =
   | (Partial<Omit<WebGLRendererParameters, 'canvas'>> & {webgpu?: false})
@@ -31,7 +31,7 @@ type RendererParameters =
     };
 
 export type DisplayParameters = RendererParameters & {
-  resizeTo?: ResizeCallback;
+  resizeTo?: ResizeToCallbackFn;
   resizeToElement?: HTMLElement;
   resizeToAttributeEl?: HTMLElement;
   styleSheetRoot?: HTMLElement | ShadowRoot;

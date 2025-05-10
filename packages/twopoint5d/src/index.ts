@@ -1,5 +1,6 @@
 export * from './controls/public-api.js';
 export * from './display/public-api.js';
+export * from './events.js';
 export * from './sprites/public-api.js';
 export * from './stage/public-api.js';
 export * from './texture/public-api.js';

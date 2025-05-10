@@ -1,7 +1,13 @@
 import {on, Priority} from '@spearwolf/eventize';
-import {Display} from '@spearwolf/twopoint5d';
+import {Display, OnRenderFrame, OnResize, type DisplayEventArgs} from '@spearwolf/twopoint5d';
 import {Color, PerspectiveCamera, Scene} from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+
+export interface PerspectiveOrbitDemoEventArgs extends DisplayEventArgs {
+  scene: Scene;
+  camera: PerspectiveCamera;
+  controls: OrbitControls;
+}
 
 /**
  * Create a [[Display]] with a scene, perspective camera and an orbit control that as a transparent background.
@@ -24,12 +30,12 @@ export class PerspectiveOrbitDemo extends Display {
 
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 
-    on(this, 'resize', Priority.BB, ({camera, width, height}) => {
+    on(this, OnResize, Priority.BB, ({camera, width, height}) => {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     });
 
-    on(this, 'frame', Priority.Low, ({controls, renderer, scene, camera}) => {
+    on(this, OnRenderFrame, Priority.Low, ({controls, renderer, scene, camera}: PerspectiveOrbitDemoEventArgs) => {
       controls.update();
       renderer.render(scene, camera);
     });
@@ -37,7 +43,7 @@ export class PerspectiveOrbitDemo extends Display {
     (window as any).display = this;
   }
 
-  override getEventArgs() {
+  override getEventArgs(): PerspectiveOrbitDemoEventArgs {
     return {
       ...super.getEventArgs(),
       scene: this.scene,

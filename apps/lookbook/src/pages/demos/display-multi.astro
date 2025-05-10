@@ -58,7 +58,7 @@ import {description, showSource, title} from './_display-multi.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {Display, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
+  import {Display, OnRenderFrame, OnResize, ParallaxProjection, Stage2D, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -92,11 +92,11 @@ import {description, showSource, title} from './_display-multi.json';
       renderer.setClearColor(new Color('#304050'), 1.0);
     });
 
-    on(display, 'resize', ({width, height}) => {
+    on(display, OnResize, ({width, height}) => {
       stage.resize(width, height);
     });
 
-    on(display, 'frame', ({renderer, now, deltaTime, frameNo}) => {
+    on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
       stage.renderFrame(renderer, now, deltaTime, frameNo);
     });
 

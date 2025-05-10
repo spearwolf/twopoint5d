@@ -5,6 +5,42 @@ import type {Stage2D} from './stage/Stage2D.js';
 
 // ------------------------------------------------------------
 
+export const OnResize = 'resize';
+
+export interface OnResizeProps {
+  renderer: ThreeRendererType;
+
+  width: number;
+  height: number;
+  pixelRatio: number;
+
+  now: number;
+  deltaTime: number;
+  frameNo: number;
+}
+
+export interface IOnResize {
+  resize(props: OnResizeProps): void;
+}
+
+// ------------------------------------------------------------
+
+export const OnRenderFrame = 'renderFrame';
+
+export interface OnRenderFrameProps {
+  renderer: ThreeRendererType;
+
+  now: number;
+  deltaTime: number;
+  frameNo: number;
+}
+
+export interface IOnRenderFrame {
+  renderFrame(props: OnRenderFrameProps): void;
+}
+
+// ------------------------------------------------------------
+
 export const StageAdded = 'stageAdded';
 
 export interface StageAddedProps {

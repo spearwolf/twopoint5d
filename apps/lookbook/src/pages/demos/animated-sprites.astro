@@ -49,6 +49,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
+    OnRenderFrame,
     TileSetLoader,
   } from '@spearwolf/twopoint5d';
   import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
@@ -100,7 +101,7 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     scene.add(mesh);
 
-    on(demo, 'frame', ({deltaTime, now}) => {
+    on(demo, OnRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
       material.uniforms['time'].value = now;
       mesh.update();

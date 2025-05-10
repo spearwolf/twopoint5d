@@ -1,11 +1,12 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 import type {WebGPURenderer} from 'three/webgpu';
+import {OnRenderFrame, OnResize} from '../events.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
-import type {DisplayEventArgs, ThreeRendererType, DisplayParameters, ResizeCallback} from './types.js';
+import type {DisplayEventArgs, DisplayParameters, ResizeToCallbackFn, ThreeRendererType} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -50,8 +51,12 @@ export class Display {
 
   frameNo = 0;
 
+  get isFirstFrame(): boolean {
+    return this.frameNo === 0;
+  }
+
   resizeToElement?: HTMLElement;
-  resizeToCallback?: ResizeCallback;
+  resizeToCallback?: ResizeToCallbackFn;
   resizeToAttributeEl: HTMLElement;
 
   styleSheetRoot: HTMLElement | ShadowRoot;
@@ -61,7 +66,7 @@ export class Display {
   constructor(domElementOrRenderer: HTMLElement | ThreeRendererType, options?: DisplayParameters) {
     eventize(this);
 
-    retain(this, ['init', 'start', 'resize']);
+    retain(this, ['init', 'start', OnResize]);
 
     this.#chronometer.stop();
 
@@ -210,6 +215,10 @@ export class Display {
     if (this.pixelZoom > 0) {
       return 1.0;
     }
+    return this.devicePixelRatio;
+  }
+
+  get devicePixelRatio(): number {
     return window.devicePixelRatio ?? 1;
   }
 
@@ -336,10 +345,8 @@ export class Display {
       canvasElement.style.height = `${cssHeight}px`;
       canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
 
-      if (this.frameNo > 0) {
-        // no need to emit this inside construction phase
-        this.#emitEvent('resize');
-      }
+      const isConstructing = this.frameNo === 0;
+      if (!isConstructing) this.#emitEvent(OnResize);
     }
   }
 
@@ -348,11 +355,9 @@ export class Display {
 
     this.resize();
 
-    if (this.frameNo === 0) {
-      this.#emitEvent('resize'); // always emit resize event before render the first frame!
-    }
+    if (this.isFirstFrame) this.#emitEvent(OnResize);
 
-    this.#emitEvent('frame');
+    this.#emitEvent(OnRenderFrame);
 
     ++this.frameNo;
   }

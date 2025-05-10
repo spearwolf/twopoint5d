@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- refactor `Display` &rarr; `resize`, `renderFrame` events
+  - add types, constants and interfaces for `OnResize` and `OnRenderFrame`
+  - _MIGRATION NOTE:_ the `frame` event has been renamed to `renderFrame`
+- the types and constants from `/events.js` are now also included in the main module
+  - _MIGRATION NOTE:_ the import of `@spearwolf/twopoint5d/events.js` is now deprecated and should no longer be used. Just use `@spearwolf/twopoint5d` instead.
+
+
+## [0.12.0] - 2025-05-10
+
 - refactor `IStage`, `PostProcessingRenderer`, add `Stage2DRenderPass`
 
 &mldr;
-
 
 ## [0.11.0] - 2025-04-26
 
