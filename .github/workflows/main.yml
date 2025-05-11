@@ -17,7 +17,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.2
+          version: 10.10.0
           run_install: true
         env:
           NPM_TOKEN: xxx
@@ -26,23 +26,6 @@ jobs:
         run: pnpm run ci
         env:
           NPM_TOKEN: xxx
-
-      # - name: Install playwright browsers
-      #   run: pnpm exec playwright install
-
-      # - name: Run all checks
-      #   run: xvfb-run pnpm run ci
-      #   env:
-      #     NPM_TOKEN: xxx
-
-      # - name: Upload twopoint5d-elements-e2e test-results artifacts
-      #   uses: actions/upload-artifact@v3
-      #   if: failure()
-      #   with:
-      #     retention-days: 3
-      #     name: twopoint5d-elements-e2e-test-results
-      #     path: |
-      #       packages/twopoint5d-elements-e2e/test-results
 
   deploy:
     name: Deploy packages
@@ -57,7 +40,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.2
+          version: 10.10.0
           run_install: true
         env:
           NPM_TOKEN: xxx

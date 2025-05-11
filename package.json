@@ -6,15 +6,14 @@
   "license": "Apache-2.0",
   "private": true,
   "engines": {
-    "node": ">=22.12",
-    "pnpm": ">=10.6.2"
+    "node": ">=22.13",
+    "pnpm": ">=10.10.0"
   },
-  "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39",
+  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "build": "pnpm nx run-many -t build",
     "test": "pnpm nx run-many -t test",
     "test:ci": "pnpm nx run-many -t test --projects=tag:ci",
-    "test:playwright": "pnpm nx run-many -t test --projects=tag:playwright",
     "lint": "pnpm nx run-many -t lint",
     "test:affected": "pnpm nx affected -t test",
     "clean": "pnpm nx run-many -t clean && rimraf dist",
@@ -22,16 +21,14 @@
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
     "cbt": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
-    "test:all": "pnpm run-s -sn clean lint build checkPkgTypes test:ci test:playwright",
+    "test:all": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "lookbook": "pnpm nx dev lookbook",
     "ci": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
-    "playwright:install": "pnpm exec playwright install",
-    "ci:install": "pnpm run-s -sn playwright:install ci"
+    "ci:install": "pnpm run-s -sn ci"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.1",
     "@eslint/js": "^9.26.0",
-    "@react-three/test-renderer": "^8.2.1",
     "@types/node": "^22.15.17",
     "@types/react": "^18.3.10",
     "@types/sinon": "^17.0.4",
@@ -45,7 +42,6 @@
     "happy-dom": "^16.3.0",
     "npm-run-all": "^4.1.5",
     "nx": "20.5.0",
-    "playwright": "^1.52.0",
     "prettier": "^3.5.3",
     "prettier-plugin-astro": "^0.14.1",
     "rimraf": "^6.0.1",
