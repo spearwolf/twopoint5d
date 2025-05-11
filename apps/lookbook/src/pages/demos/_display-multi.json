@@ -2,7 +2,14 @@
   "title": "multiple displays",
   "description": "A test-page demonstrating the sizing behavior of the canvas element created by the Display helper class in different css contexts",
   "url": "/demos/display-multi",
-  "tags": ["TextureFactory", "Stage2D", "ParallaxProjection", "Display", "vanilla"],
+  "tags": [
+    "TextureFactory",
+    "Stage2D",
+    "StageRenderer",
+    "ParallaxProjection",
+    "Display",
+    "vanilla"
+  ],
   "previewImage": "multiple-displays.png",
   "showSource": {
     "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/display-multi.astro"

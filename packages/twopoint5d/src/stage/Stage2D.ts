@@ -1,21 +1,17 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {Camera, Color, Scene, WebGLRenderer} from 'three';
+import {Camera, Color, Scene} from 'three';
 
-import type {ThreeRendererType} from '../display/types.js';
 import {
-  FirstFrame,
+  OnStageFirstFrame,
+  OnStageUpdateFrame,
   StageAfterCameraChanged,
-  StageRenderFrame,
   StageResize,
-  type FirstFrameProps,
-  type Stage2DRenderFrameProps,
   type Stage2DResizeProps,
   type StageAfterCameraChangedArgs,
+  type StageUpdateFrameProps,
 } from '../events.js';
 import type {IProjection} from './IProjection.js';
 import type {IStage} from './IStage.js';
-
-const _oldClearColor = new Color();
 
 /**
  * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
@@ -86,7 +82,7 @@ export class Stage2D implements IStage {
     if (this.#projection !== projection) {
       this.#projection = projection;
       this.#cameraFromProjection = undefined;
-      this.update(true);
+      this.updateProjection(true);
     }
   }
 
@@ -122,11 +118,16 @@ export class Stage2D implements IStage {
 
   constructor(projection?: IProjection, scene?: Scene) {
     eventize(this);
-
-    retain(this, FirstFrame);
+    retain(this, OnStageFirstFrame);
 
     this.projection = projection;
-    this.scene = scene ?? new Scene();
+
+    if (scene) {
+      this.scene = scene;
+    } else {
+      this.scene = new Scene();
+      this.scene.name = 'Stage2D';
+    }
 
     // TODO set "up" vector of the scene??
   }
@@ -142,7 +143,7 @@ export class Stage2D implements IStage {
     }
   }
 
-  update(forceUpdate = false): void {
+  updateProjection(forceUpdate = false): void {
     if ((forceUpdate || this.needsUpdate) && this.projection) {
       this.#updateProjection(this.#containerWidth, this.#containerHeight);
     }
@@ -175,11 +176,9 @@ export class Stage2D implements IStage {
 
   isFirstFrame = true;
 
-  #firstFrameProps?: FirstFrameProps;
-
   #noCameraErrorCount = 0;
 
-  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, skipRenderCall = false): void {
+  updateFrame(now: number, deltaTime: number, frameNo: number): void {
     const {scene, camera} = this;
 
     if (scene == null || camera == null) {
@@ -193,61 +192,18 @@ export class Stage2D implements IStage {
       return;
     }
 
-    const renderFrameProps: Stage2DRenderFrameProps = {
-      renderer,
+    const updateFrameProps: StageUpdateFrameProps = {
+      stage: this,
       now,
       deltaTime,
       frameNo,
-      stage: this,
-      width: this.width,
-      height: this.height,
     };
 
     if (this.isFirstFrame) {
-      this.#firstFrameProps = {...renderFrameProps, scene: this.scene};
-      emit(this, FirstFrame, this.#firstFrameProps);
+      emit(this, OnStageFirstFrame, updateFrameProps);
       this.isFirstFrame = false;
-    } else if (this.#firstFrameProps != null) {
-      Object.assign(this.#firstFrameProps, renderFrameProps);
-      this.#firstFrameProps.scene = this.scene;
     }
 
-    emit(this, StageRenderFrame, renderFrameProps);
-
-    if (skipRenderCall) return;
-
-    // -------------------------------------------------------------------------------
-    // remember the current state
-    // -------------------------------------------------------------------------------
-
-    const previousAutoClearValue = renderer.autoClear;
-    const oldClearAlpha = renderer.getClearAlpha();
-    if (this.autoClear) {
-      (renderer as WebGLRenderer).getClearColor(_oldClearColor);
-    }
-
-    // -------------------------------------------------------------------------------
-    // render the scene
-    // -------------------------------------------------------------------------------
-
-    renderer.autoClear = this.autoClear;
-
-    if (this.autoClear) {
-      renderer.setClearColor(this.clearColor, this.clearAlpha);
-      renderer.setClearAlpha(this.clearAlpha);
-    }
-
-    renderer.render(scene, camera);
-
-    // -------------------------------------------------------------------------------
-    // restore the previous state
-    // -------------------------------------------------------------------------------
-
-    renderer.autoClear = previousAutoClearValue;
-
-    if (this.autoClear) {
-      renderer.setClearColor(_oldClearColor, oldClearAlpha);
-      renderer.setClearAlpha(oldClearAlpha);
-    }
+    emit(this, OnStageUpdateFrame, updateFrameProps);
   }
 }

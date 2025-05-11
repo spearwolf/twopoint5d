@@ -60,11 +60,11 @@ import {description, showSource, title} from './_display-multi.json';
   import {on} from '@spearwolf/eventize';
   import {
     Display,
-    OnInitDisplay,
     OnRenderFrame,
     OnResize,
     ParallaxProjection,
     Stage2D,
+    StageRenderer,
     TextureFactory,
   } from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
@@ -87,6 +87,10 @@ import {description, showSource, title} from './_display-multi.json';
 
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {pixelZoom: 2}));
 
+    const stageRenderer = new StageRenderer(display);
+    stageRenderer.clearColor = new Color('#304050');
+    stageRenderer.addStage(stage);
+
     const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy']);
 
     const textureImage = textureFactory.load(assetsUrl('ball-pattern-rot--not-power-of-2.png'));
@@ -96,16 +100,9 @@ import {description, showSource, title} from './_display-multi.json';
     sprite.scale.set(100, 100, 0); // => should result in a 200x200 (css pixels) pixelart/crisp image
     stage.scene.add(sprite);
 
-    on(display, OnInitDisplay, ({renderer}) => {
-      renderer.setClearColor(new Color('#304050'), 1.0);
-    });
-
-    on(display, OnResize, ({width, height}) => {
-      stage.resize(width, height);
-    });
-
     on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
-      stage.renderFrame(renderer, now, deltaTime, frameNo);
+      stageRenderer.updateFrame(now, deltaTime, frameNo);
+      stageRenderer.renderFrame(renderer);
     });
 
     const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvas as HTMLElement);

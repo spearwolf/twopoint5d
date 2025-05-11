@@ -1,6 +1,5 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
-import type {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisposeDisplay,
   OnInitDisplay,
@@ -12,6 +11,8 @@ import {
 } from '../events.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
+import {isWebGLRenderer} from './isWebGLRenderer.js';
+import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {DisplayEventArgs, DisplayParameters, ResizeToCallbackFn, ThreeRendererType} from './types.js';
@@ -81,7 +82,7 @@ export class Display {
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
-    if (domElementOrRenderer instanceof WebGLRenderer || (domElementOrRenderer as WebGPURenderer).isWebGPURenderer) {
+    if (isWebGLRenderer(domElementOrRenderer) || isWebGPURenderer(domElementOrRenderer)) {
       this.renderer = domElementOrRenderer as ThreeRendererType;
       this.resizeToElement = this.renderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
@@ -152,8 +153,8 @@ export class Display {
 
     on(this.#stateMachine, {
       [DisplayStateMachine.Init]: async () => {
-        if ((this.renderer as WebGPURenderer).isWebGPURenderer) {
-          await (this.renderer as WebGPURenderer).init();
+        if (isWebGPURenderer(this.renderer)) {
+          await this.renderer.init();
         }
         this.#emit(OnInitDisplay);
       },

@@ -1,9 +1,9 @@
-import type {Camera, Scene} from 'three';
+import type {Camera} from 'three';
 import type {Display} from './display/Display.js';
 import type {DisplayEventArgs, ThreeRendererType} from './display/types.js';
 import type {IStage} from './stage/IStage.js';
-import type {IStageRenderer, StageType} from './stage/IStageRenderer.js';
 import type {Stage2D} from './stage/Stage2D.js';
+import type {StageRenderer} from './stage/StageRenderer.js';
 
 // ------------------------------------------------------------
 
@@ -74,12 +74,12 @@ export interface IOnDisposeDisplay {
 export const StageAdded = 'stageAdded';
 
 export interface StageAddedProps {
-  stage: StageType;
-  renderer: IStageRenderer;
+  stage: IStage;
+  renderer: StageRenderer;
 }
 
 export interface IStageAdded {
-  stageAdded(props: StageAddedProps): void;
+  [StageAdded](props: StageAddedProps): void;
 }
 
 // ============================================================
@@ -87,12 +87,12 @@ export interface IStageAdded {
 export const StageRemoved = 'stageRemoved';
 
 export interface StageRemovedProps {
-  stage: StageType;
-  renderer: IStageRenderer;
+  stage: IStage;
+  renderer: StageRenderer;
 }
 
 export interface IStageRemoved {
-  stageRemoved(props: StageRemovedProps): void;
+  [StageRemoved](props: StageRemovedProps): void;
 }
 
 // ============================================================
@@ -121,34 +121,51 @@ export interface IStage2DResize {
 
 // ============================================================
 
-export const StageRenderFrame = 'stageRenderFrame';
+export const OnStageUpdateFrame = 'stageUpdateFrame';
+export const OnStageFirstFrame = 'stageFirstFrame';
+export const OnStageRenderFrame = 'stageRenderFrame';
 
-export interface StageRenderFrameProps {
-  width: number;
-  height: number;
-  renderer: ThreeRendererType;
+export interface StageUpdateFrameProps {
+  stage: IStage;
   now: number;
   deltaTime: number;
   frameNo: number;
 }
 
-export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
-  stage: Stage2D;
+export interface StageRenderFrameProps {
+  stage: IStage;
+  renderer: ThreeRendererType;
+}
+
+export interface IStageFirstFrame {
+  [OnStageFirstFrame](props: StageUpdateFrameProps): void;
+}
+
+export interface IStageUpdateFrame {
+  [OnStageUpdateFrame](props: StageUpdateFrameProps): void;
 }
 
 export interface IStageRenderFrame {
-  stageRenderFrame(props: StageRenderFrameProps): void;
+  [OnStageRenderFrame](props: StageRenderFrameProps): void;
 }
 
-export interface IStage2DRenderFrame {
-  stageRenderFrame(props: Stage2DRenderFrameProps): void;
-}
+// export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
+//   stage: Stage2D;
+// }
+
+// export interface IStageRenderFrame {
+//   stageRenderFrame(props: StageRenderFrameProps): void;
+// }
+
+// export interface IStage2DRenderFrame {
+//   stageRenderFrame(props: Stage2DRenderFrameProps): void;
+// }
 
 // ============================================================
 
 export const StageAfterCameraChanged = 'stageAfterCameraChanged';
 
-export type StageAfterCameraChangedArgs = [stage: StageType, prevCamera: Camera | undefined];
+export type StageAfterCameraChangedArgs = [stage: IStage, prevCamera: Camera | undefined];
 
 export interface IStageAfterCameraChanged {
   stageAfterCameraChanged(...args: StageAfterCameraChangedArgs): void;
@@ -164,14 +181,14 @@ export interface IRemoveFromParent {
 
 // ============================================================
 
-export const FirstFrame = 'firstFrame';
+// export const OnFirstFrame = 'firstFrame';
 
-export interface FirstFrameProps extends StageRenderFrameProps {
-  scene: Scene;
-}
+// export interface FirstFrameProps extends StageRenderFrameProps {
+//   scene: Scene;
+// }
 
-export interface IFirstFrame {
-  firstFrame(props: FirstFrameProps): void;
-}
+// export interface IFirstFrame {
+//   firstFrame(props: FirstFrameProps): void;
+// }
 
 // ------------------------------------------------------------

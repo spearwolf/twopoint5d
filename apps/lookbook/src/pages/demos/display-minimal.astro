@@ -10,16 +10,7 @@ import {description, showSource, title} from './_display-minimal.json';
 </Layout>
 
 <script>
-  import {on} from '@spearwolf/eventize';
-  import {
-    Display,
-    OnInitDisplay,
-    OnRenderFrame,
-    OnResize,
-    ParallaxProjection,
-    Stage2D,
-    TextureFactory,
-  } from '@spearwolf/twopoint5d';
+  import {Display, ParallaxProjection, Stage2D, StageRenderer, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -37,10 +28,15 @@ import {description, showSource, title} from './_display-minimal.json';
     }),
   );
 
-  stage.scene.background = new Color('#272727');
+  const stageRenderer = new StageRenderer(display);
+  stageRenderer.clearColor = new Color('#d0d0e0');
+  stageRenderer.addStage(stage);
+
+  // stage.scene.background = new Color('#272727');
 
   (window as any).display = display;
   (window as any).stage = stage;
+  (window as any).stageRenderer = stageRenderer;
 
   const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy', 'srgb']);
 
@@ -51,18 +47,6 @@ import {description, showSource, title} from './_display-minimal.json';
 
   sprite.scale.set(width, height, 1);
   stage.scene.add(sprite);
-
-  on(display, OnInitDisplay, ({renderer}) => {
-    renderer.setClearColor(new Color('#0050A0'), 1.0);
-  });
-
-  on(display, OnResize, ({width, height}) => {
-    stage.resize(width, height);
-  });
-
-  on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
-    stage.renderFrame(renderer, now, deltaTime, frameNo);
-  });
 
   display.start();
 

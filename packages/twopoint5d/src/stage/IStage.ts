@@ -1,9 +1,12 @@
-import type {ThreeRendererType} from '../display/types.js';
+import type {Camera, Scene} from 'three';
 
 export interface IStage {
   name: string;
 
+  scene?: Scene;
+  camera?: Camera;
+
   resize(width: number, height: number): void;
 
-  renderFrame(renderer: ThreeRendererType, now: number, deltaTime: number, frameNo: number, skipRenderCall?: boolean): void;
+  updateFrame(now: number, deltaTime: number, frameNo: number): void;
 }

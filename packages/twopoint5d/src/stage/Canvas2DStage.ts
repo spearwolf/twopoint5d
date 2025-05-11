@@ -1,14 +1,16 @@
-import { emit, eventize } from '@spearwolf/eventize';
-import { Sprite, SpriteMaterial, Texture, type Scene } from 'three';
-import type { ThreeRendererType } from '../display/types.js';
-import { TextureFactory } from '../texture/TextureFactory.js';
-import { OrthographicProjection } from './OrthographicProjection.js';
-import { Stage2D } from './Stage2D.js';
+import {emit, eventize} from '@spearwolf/eventize';
+import {Sprite, SpriteMaterial, Texture, type Scene} from 'three';
+import type {ThreeRendererType} from '../display/types.js';
+import {TextureFactory} from '../texture/TextureFactory.js';
+import {OrthographicProjection} from './OrthographicProjection.js';
+import {Stage2D} from './Stage2D.js';
+import {StageRenderer} from './StageRenderer.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
 
 export class Canvas2DStage {
   readonly renderer: ThreeRendererType;
+  readonly stageRenderer: StageRenderer;
 
   #fit: Canvas2DStageFitType = 'contain';
 
@@ -20,7 +22,7 @@ export class Canvas2DStage {
     if (this.#fit === value) return;
     this.#fit = value;
     this.projection.viewSpecs.fit = value;
-    this.stage.update(true);
+    this.stage.updateProjection(true);
   }
 
   readonly canvas: HTMLCanvasElement;
@@ -64,6 +66,7 @@ export class Canvas2DStage {
     eventize(this);
 
     this.renderer = renderer;
+    this.stageRenderer = new StageRenderer();
 
     if (typeof args[0] === 'number') {
       const [width, height, fit] = args as [width: number, height: number, fit: Canvas2DStageFitType];
@@ -88,6 +91,7 @@ export class Canvas2DStage {
     });
 
     this.stage = new Stage2D(this.projection);
+    this.stageRenderer.addStage(this.stage);
 
     const material = new SpriteMaterial({map: new Texture()});
     this.sprite = new Sprite(material);
@@ -133,21 +137,24 @@ export class Canvas2DStage {
     viewSpecs.width = width;
     viewSpecs.height = height;
 
-    this.stage.update(true);
+    this.stage.updateProjection(true);
   }
 
+  // TODO rename to renderFrame
   render() {
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
       this.dispatchEvent('resize');
+
       this.#lastWidth = this.width;
       this.#lastHeight = this.height;
     }
 
+    // TODO rename to renderFrame
     this.dispatchEvent('render');
 
     this.updateTexture();
 
-    this.stage.renderFrame(this.renderer, 0, 0, 0);
+    this.stageRenderer.renderFrame(this.renderer);
   }
 
   private dispatchEvent(eventName: string) {

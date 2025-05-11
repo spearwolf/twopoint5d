@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/twopoint5d",
-  "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
+  "description": "Create 2.5D realtime graphics and pixelart with WebGL and three.js",
   "version": "0.13.0-dev",
   "keywords": [
     "sprites",
@@ -28,10 +28,6 @@
     ".": {
       "types": "./dist/lib/index.d.ts",
       "import": "./dist/lib/index.js"
-    },
-    "./events.js": {
-      "types": "./dist/lib/events.d.ts",
-      "import": "./dist/lib/events.js"
     }
   },
   "main": "dist/lib/index.js",

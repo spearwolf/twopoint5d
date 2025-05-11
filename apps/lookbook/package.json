@@ -22,8 +22,6 @@
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "@spearwolf/twopoint5d-demos": "workspace:*",
-    "@spearwolf/twopoint5d-elements": "workspace:*",
-    "@spearwolf/twopoint5d-r3f": "workspace:*",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
