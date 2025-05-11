@@ -140,7 +140,6 @@ export class Canvas2DStage {
     this.stage.updateProjection(true);
   }
 
-  // TODO rename to renderFrame
   render() {
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
       this.dispatchEvent('resize');
@@ -149,7 +148,6 @@ export class Canvas2DStage {
       this.#lastHeight = this.height;
     }
 
-    // TODO rename to renderFrame
     this.dispatchEvent('render');
 
     this.updateTexture();
