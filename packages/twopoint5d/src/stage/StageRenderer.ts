@@ -4,11 +4,11 @@ import {Display} from '../display/Display.js';
 import {isWebGPURenderer} from '../display/isWebGPURenderer.js';
 import type {ThreeRendererType} from '../display/types.js';
 import {
+  OnRemoveFromParent,
   OnRenderFrame,
   OnResize,
-  RemoveFromParent,
-  StageAdded,
-  StageRemoved,
+  OnStageAdded,
+  OnStageRemoved,
   type OnRenderFrameProps,
   type OnResizeProps,
   type StageAddedProps,
@@ -20,8 +20,6 @@ export type StageRendererParentType = Display | StageRenderer;
 
 interface StageItem {
   stage: IStage;
-
-  // TODO insertionNumber: number;
 
   width: number;
   height: number;
@@ -107,7 +105,7 @@ export class StageRenderer implements IStage {
   #removeFromParent(): void {
     if (this.#parent == null) return;
 
-    emit(this, RemoveFromParent);
+    emit(this, OnRemoveFromParent);
 
     if (!(this.#parent instanceof Display)) {
       this.#parent!.removeStage(this);
@@ -125,14 +123,14 @@ export class StageRenderer implements IStage {
   #addToDisplay(display: Display): void {
     once(
       this,
-      RemoveFromParent,
+      OnRemoveFromParent,
       on(display, OnResize, ({width, height}: OnResizeProps) => {
         this.resize(width, height);
       }),
     );
     once(
       this,
-      RemoveFromParent,
+      OnRemoveFromParent,
       on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}: OnRenderFrameProps) => {
         this.updateFrame(now, deltaTime, frameNo);
         this.renderFrame(renderer);
@@ -175,7 +173,7 @@ export class StageRenderer implements IStage {
   }
 
   updateFrame(now: number, deltaTime: number, frameNo: number): void {
-    for (const {stage} of this.getOrderedStages()) {
+    for (const {stage} of this.orderedStages) {
       stage.updateFrame(now, deltaTime, frameNo);
     }
   }
@@ -198,7 +196,7 @@ export class StageRenderer implements IStage {
 
     renderer.autoClear = false;
 
-    for (const stageItem of this.getOrderedStages()) {
+    for (const stageItem of this.orderedStages) {
       this.renderStage(stageItem, renderer);
     }
 
@@ -224,7 +222,7 @@ export class StageRenderer implements IStage {
     }
   }
 
-  getOrderedStages(): StageItem[] {
+  get orderedStages(): StageItem[] {
     if (this.#orderedStages) return this.#orderedStages;
 
     const renderOrder = this.renderOrderArray;
@@ -281,7 +279,7 @@ export class StageRenderer implements IStage {
       this.stages.push(si);
       this.#orderedStages = undefined;
       this.resizeStage(si, this.width, this.height);
-      emit(this, StageAdded, {stage, renderer: this} as StageAddedProps);
+      emit(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
     }
   }
 
@@ -290,7 +288,7 @@ export class StageRenderer implements IStage {
     if (index !== -1) {
       this.stages.splice(index, 1);
       this.#orderedStages = undefined;
-      emit(this, StageRemoved, {stage, renderer: this} as StageRemovedProps);
+      emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
   }
 }

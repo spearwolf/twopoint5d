@@ -3,28 +3,26 @@ import {Camera, Color, Scene} from 'three';
 
 import {
   OnStageFirstFrame,
+  OnStageResize,
   OnStageUpdateFrame,
-  StageAfterCameraChanged,
-  StageResize,
-  type Stage2DResizeProps,
+  OnStageAfterCameraChanged,
   type StageAfterCameraChangedArgs,
+  type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
 import type {IProjection} from './IProjection.js';
 import type {IStage} from './IStage.js';
 
 /**
- * The `Stage2D` is a facade for a `THREE.Scene` with a `THREE.Camera`.
- * The camera is managed by means of a *projection* description.
+ * A 2D stage has a scene with 3D objects and a 2D projection.
+ * The camera is automatically generated based on the projection.
+ * A stage can be rendered by a StageRenderer.
  *
- * A stage is always embedded in a logical 2d container that has a width and height.
- * Such a container can be e.g. the canvas element or another stage.
- * The stage doesn't need to know this in detail, but it gets the size of the container using the `resize(width, height)` method.
- *
- * Based on the container dimension and the *projection* description
- * the effective width and size is calculated and finally a camera is created.
- *
- * After the camera is created the scene can be rendered with the method `renderFrame(renderer: DisplayGLRenderer)`
+ * The width and height of a stage are calculated based on the properties
+ * of the projection and the container dimension.
+ * The container size is usually the same as the canvas element dimension,
+ * but this is not always the case.
+ * The StageRenderer passes the container size to the stage by calling the resize() method.
  */
 export class Stage2D implements IStage {
   isStage2D = true;
@@ -37,7 +35,7 @@ export class Stage2D implements IStage {
   clearAlpha = 0;
 
   /**
-   * with this flag you can tell the .update() method that the projection calculation needs an update
+   * with this flag you can tell the updateProjection() method that the projection calculation needs an update
    * (e.g. the settings in the projection have changed)
    */
   needsUpdate = false;
@@ -112,7 +110,7 @@ export class Stage2D implements IStage {
     updateCallback();
     if (prevCamera !== this.camera) {
       const args: StageAfterCameraChangedArgs = [this, prevCamera];
-      emit(this, StageAfterCameraChanged, ...args);
+      emit(this, OnStageAfterCameraChanged, ...args);
     }
   };
 
@@ -132,13 +130,13 @@ export class Stage2D implements IStage {
     // TODO set "up" vector of the scene??
   }
 
-  resize(width: number, height: number): void {
-    if (width !== this.#containerWidth || height !== this.#containerHeight) {
-      this.#containerWidth = width;
-      this.#containerHeight = height;
+  resize(containerWidth: number, containerHeight: number): void {
+    if (containerWidth !== this.#containerWidth || containerHeight !== this.#containerHeight) {
+      this.#containerWidth = containerWidth;
+      this.#containerHeight = containerHeight;
 
       if (this.projection) {
-        this.#updateProjection(width, height);
+        this.#updateProjection(containerWidth, containerHeight);
       }
     }
   }
@@ -170,7 +168,12 @@ export class Stage2D implements IStage {
     }
 
     if (prevWidth !== w || prevHeight !== h) {
-      emit(this, StageResize, {stage: this, width: w, height: h} as Stage2DResizeProps);
+      const props: StageResizeProps = {
+        stage: this,
+        width: w,
+        height: h,
+      };
+      emit(this, OnStageResize, props);
     }
   };
 

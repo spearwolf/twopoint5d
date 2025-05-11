@@ -2,7 +2,6 @@ import type {Camera} from 'three';
 import type {Display} from './display/Display.js';
 import type {DisplayEventArgs, ThreeRendererType} from './display/types.js';
 import type {IStage} from './stage/IStage.js';
-import type {Stage2D} from './stage/Stage2D.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
 
 // ------------------------------------------------------------
@@ -71,33 +70,30 @@ export interface IOnDisposeDisplay {
 
 // ------------------------------------------------------------
 
-export const StageAdded = 'stageAdded';
+export const OnStageAdded = 'stageAdded';
+export const OnStageRemoved = 'stageRemoved';
 
 export interface StageAddedProps {
   stage: IStage;
   renderer: StageRenderer;
 }
 
-export interface IStageAdded {
-  [StageAdded](props: StageAddedProps): void;
-}
-
-// ============================================================
-
-export const StageRemoved = 'stageRemoved';
-
 export interface StageRemovedProps {
   stage: IStage;
   renderer: StageRenderer;
 }
 
-export interface IStageRemoved {
-  [StageRemoved](props: StageRemovedProps): void;
+export interface IStageAdded {
+  [OnStageAdded](props: StageAddedProps): void;
 }
 
-// ============================================================
+export interface IStageRemoved {
+  [OnStageRemoved](props: StageRemovedProps): void;
+}
 
-export const StageResize = 'stageResize';
+// ------------------------------------------------------------
+
+export const OnStageResize = 'stageResize';
 
 export interface StageResizeProps {
   width: number;
@@ -105,25 +101,14 @@ export interface StageResizeProps {
   stage: IStage;
 }
 
-export interface Stage2DResizeProps extends StageResizeProps {
-  width: number;
-  height: number;
-  stage: Stage2D;
-}
-
 export interface IStageResize {
-  stageResize(props: StageResizeProps): void;
+  [OnStageResize](props: StageResizeProps): void;
 }
 
-export interface IStage2DResize {
-  stageResize(props: Stage2DResizeProps): void;
-}
-
-// ============================================================
+// ------------------------------------------------------------
 
 export const OnStageUpdateFrame = 'stageUpdateFrame';
 export const OnStageFirstFrame = 'stageFirstFrame';
-export const OnStageRenderFrame = 'stageRenderFrame';
 
 export interface StageUpdateFrameProps {
   stage: IStage;
@@ -145,50 +130,20 @@ export interface IStageUpdateFrame {
   [OnStageUpdateFrame](props: StageUpdateFrameProps): void;
 }
 
-export interface IStageRenderFrame {
-  [OnStageRenderFrame](props: StageRenderFrameProps): void;
-}
+// ------------------------------------------------------------
 
-// export interface Stage2DRenderFrameProps extends StageRenderFrameProps {
-//   stage: Stage2D;
-// }
-
-// export interface IStageRenderFrame {
-//   stageRenderFrame(props: StageRenderFrameProps): void;
-// }
-
-// export interface IStage2DRenderFrame {
-//   stageRenderFrame(props: Stage2DRenderFrameProps): void;
-// }
-
-// ============================================================
-
-export const StageAfterCameraChanged = 'stageAfterCameraChanged';
+export const OnStageAfterCameraChanged = 'stageAfterCameraChanged';
 
 export type StageAfterCameraChangedArgs = [stage: IStage, prevCamera: Camera | undefined];
 
 export interface IStageAfterCameraChanged {
-  stageAfterCameraChanged(...args: StageAfterCameraChangedArgs): void;
+  [OnStageAfterCameraChanged](...args: StageAfterCameraChangedArgs): void;
 }
-
-// ============================================================
-
-export const RemoveFromParent = 'removeFromParent';
-
-export interface IRemoveFromParent {
-  removeFromParent(): void;
-}
-
-// ============================================================
-
-// export const OnFirstFrame = 'firstFrame';
-
-// export interface FirstFrameProps extends StageRenderFrameProps {
-//   scene: Scene;
-// }
-
-// export interface IFirstFrame {
-//   firstFrame(props: FirstFrameProps): void;
-// }
 
 // ------------------------------------------------------------
+
+export const OnRemoveFromParent = 'removeFromParent';
+
+export interface IRemoveFromParent {
+  [OnRemoveFromParent](): void;
+}
