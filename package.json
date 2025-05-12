@@ -16,13 +16,13 @@
     "test:ci": "NX_TUI=false pnpm nx run-many -t test --projects=tag:ci",
     "lint": "pnpm nx run-many -t lint",
     "test:affected": "pnpm nx affected -t test",
-    "clean": "pnpm nx run-many -t clean && rimraf dist",
+    "clean": "NX_TUI=false pnpm nx run-many -t clean && rimraf dist",
     "checkPkgTypes": "pnpm nx run-many -t checkPkgTypes",
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
-    "cbt": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
-    "test:all": "pnpm run-s -sn clean lint build checkPkgTypes test:ci",
-    "lookbook": "pnpm nx dev lookbook",
+    "cbt": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
+    "test:all": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
+    "lookbook": "NX_TUI=false pnpm nx dev lookbook",
     "ci": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci"
   },
   "devDependencies": {

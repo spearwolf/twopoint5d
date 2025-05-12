@@ -1,6 +1,9 @@
 {
   "defaultBase": "main",
   "parallel": 6,
+  "tui": {
+    "autoExit": true
+  },
   "targetDefaults": {
     "build": {
       "dependsOn": ["^build"],

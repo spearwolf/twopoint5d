@@ -16,6 +16,7 @@ import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {DisplayEventArgs, DisplayParameters, ResizeToCallbackFn, ThreeRendererType} from './types.js';
+import {FrameLoop} from './FrameLoop.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -31,6 +32,10 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
 }
 
 export class Display {
+  /**
+   * If the width or height determined from the display is greater than this value, an exception is thrown.
+   * However, this value can also be adjusted if desired.
+   */
   static MaxResolution = 8192;
 
   static CssRulesPrefixContainer = 'twopoint5d-container';
@@ -41,33 +46,75 @@ export class Display {
 
   #stateMachine = new DisplayStateMachine();
 
-  #rafID = -1;
   #lastResizeHash = '';
 
   #fullscreenCssRules?: string;
   #fullscreenCssRulesMustBeRemoved = false;
 
-  pixelZoom = 0; // 0 or lower means => just use devicePixelRatio, greater than 0 means => scale cssPixels by pixelZoom
+  /**
+   * The pixelZoom factor is 0 by default and is therefore not used.
+   *
+   * If it is greater than 0, the _devicePixelRatio_ value is ignored and
+   * _cssPixel * pixelZoom_ is used as the effective pixelRatio of the display.
+   *
+   * This is interesting for pixelart: a value of 2 means that each CSS pixel is rendered twice as large,
+   * regardless of the devicePixelRatio.
+   */
+  pixelZoom = 0;
 
   /**
-   * if set, will be used to set the `image-rendering` css property on the canvas element
-   * otherwise will be set to "pixelated" if pixelZoom > 0, or "auto" if pixelZoom <= 0
+   * If set, will be used to set the `image-rendering` css style property on the canvas element.
+   *
+   * Otherwise will be set to `"pixelated"` if _pixelZoom_ greater than `0` or `"auto"` if pixelZoom is less or equal to `0`.
+   *
+   * If you want to explicitly specify a value here, set.
+   *
+   * see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/image-rendering}
+   * for more information.
+   *
+   * see {@link Display.pixelZoom}
    */
   styleImageRendering?: 'pixelated' | 'auto' = undefined;
 
+  /**
+   * The width of the canvas is recalculated for each frame.
+   */
   width = 0;
+
+  /**
+   * The height of the canvas is recalculated for each frame.
+   */
   height = 0;
 
+  /**
+   * The current frame number. Starts at 0.
+   */
   frameNo = 0;
 
   get isFirstFrame(): boolean {
     return this.frameNo === 0;
   }
 
+  readonly frameLoop: FrameLoop;
+
+  /**
+   * see {@link DisplayParameters.maxFps}
+   */
   resizeToElement?: HTMLElement;
+
+  /**
+   * see {@link DisplayParameters.resizeTo}
+   */
   resizeToCallback?: ResizeToCallbackFn;
+
+  /**
+   * see {@link DisplayParameters.resizeToElement}
+   */
   resizeToAttributeEl: HTMLElement;
 
+  /**
+   * see {@link DisplayParameters.styleSheetRoot}
+   */
   styleSheetRoot: HTMLElement | ShadowRoot;
 
   renderer?: ThreeRendererType;
@@ -78,6 +125,8 @@ export class Display {
     retain(this, [OnInitDisplay, OnStartDisplay, OnResize]);
 
     this.#chronometer.stop();
+
+    this.frameLoop = new FrameLoop(options?.maxFps ?? 0);
 
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
@@ -165,22 +214,10 @@ export class Display {
         this.#chronometer.start();
         this.#chronometer.update();
 
-        const renderFrame = (now: number) => {
-          if (!this.pause) {
-            this.renderFrame(now);
-          }
-
-          this.#rafID = window.requestAnimationFrame(renderFrame);
-        };
-
-        this.#rafID = window.requestAnimationFrame(renderFrame);
-
         this.#emit(OnStartDisplay);
       },
 
       [DisplayStateMachine.Pause]: () => {
-        window.cancelAnimationFrame(this.#rafID);
-
         this.#chronometer.stop();
 
         retainClear(this, OnStartDisplay);
@@ -202,8 +239,18 @@ export class Display {
 
       onDocVisibilityChange();
     }
+
+    this.frameLoop.start(this);
   }
 
+  /**
+   * The current time in seconds. Starts at `0`.
+   *
+   * Time does not elapse until the display has been started with {@link start}.
+   *
+   * At the beginning of a frame the time is updated.
+   * Within a frame the time remains unchanged.
+   */
   get now(): number {
     return this.#chronometer.time;
   }
@@ -359,6 +406,16 @@ export class Display {
     }
   }
 
+  [FrameLoop.OnFrame](): void {
+    if (!this.pause) {
+      this.renderFrame();
+    }
+  }
+
+  /**
+   * You don't need to call this up yourself.
+   * It happens automatically after you call {@link start}.
+   */
   renderFrame(now = window.performance.now()): void {
     this.#chronometer.update(now / 1000);
 
@@ -388,13 +445,16 @@ export class Display {
 
   dispose(): void {
     this.stop();
+    this.frameLoop.stop(this);
     emit(this, OnDisposeDisplay, this);
     off(this);
     this.renderer?.dispose();
     delete this.renderer;
   }
 
-  /** this is a public method so it's easy to override if you want */
+  /**
+   * This is a public method so it's easy to override if you want
+   */
   getEventArgs(): DisplayEventArgs {
     return {
       display: this,
