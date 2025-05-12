@@ -89,7 +89,7 @@ import {description, showSource, title} from './_display-multi.json';
 
     const stageRenderer = new StageRenderer(display);
     stageRenderer.clearColor = new Color('#304050');
-    stageRenderer.addStage(stage);
+    stageRenderer.add(stage);
 
     const textureFactory = new TextureFactory(display.renderer, ['nearest', 'flipy']);
 

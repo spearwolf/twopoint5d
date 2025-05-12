@@ -108,7 +108,7 @@ export class StageRenderer implements IStage {
     emit(this, OnRemoveFromParent);
 
     if (!(this.#parent instanceof Display)) {
-      this.#parent!.removeStage(this);
+      this.#parent!.remove(this);
     }
   }
 
@@ -116,7 +116,7 @@ export class StageRenderer implements IStage {
     if (this.#parent instanceof Display) {
       this.#addToDisplay(this.#parent);
     } else {
-      this.#parent!.addStage(this);
+      this.#parent!.add(this);
     }
   }
 
@@ -269,7 +269,7 @@ export class StageRenderer implements IStage {
     return this.#getIndex(stage) !== -1;
   }
 
-  addStage(stage: IStage): void {
+  add(stage: IStage): void {
     if (!this.hasStage(stage)) {
       const si: StageItem = {
         stage,
@@ -283,7 +283,7 @@ export class StageRenderer implements IStage {
     }
   }
 
-  removeStage(stage: IStage): void {
+  remove(stage: IStage): void {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);

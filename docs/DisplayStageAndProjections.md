@@ -110,6 +110,7 @@ const stage = new Stage2D(projection)
 const display = new Display(document.querySelector("canvas"))
 
 const stageRenderer = new StageRenderer(display)
+stageRenderer.clearColor = new THREE.Color(0x4800f0)
 stageRenderer.add(stage)
 
 display.start()

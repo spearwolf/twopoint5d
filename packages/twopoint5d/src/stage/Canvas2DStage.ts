@@ -91,7 +91,7 @@ export class Canvas2DStage {
     });
 
     this.stage = new Stage2D(this.projection);
-    this.stageRenderer.addStage(this.stage);
+    this.stageRenderer.add(this.stage);
 
     const material = new SpriteMaterial({map: new Texture()});
     this.sprite = new Sprite(material);
