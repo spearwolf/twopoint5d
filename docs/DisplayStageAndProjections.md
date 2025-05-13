@@ -1,3 +1,5 @@
+<img width="150" src="images/twopoint5d-700x168.png">
+
 # Display, Stage and Projections
 
 ![Display, Stage and Projections](./display/display-stage-renderer.excalidraw.svg)
