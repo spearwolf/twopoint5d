@@ -9,20 +9,6 @@
       "dependsOn": ["^build"],
       "cache": true
     },
-    "lint": {
-      "executor": "nx:run-script",
-      "options": {
-        "script": "lint"
-      },
-      "inputs": [
-        "eslintDefaults",
-        "{projectRoot}/src/**/*.js",
-        "{projectRoot}/src/**/*.jsx",
-        "{projectRoot}/src/**/*.ts",
-        "{projectRoot}/src/**/*.tsx"
-      ],
-      "cache": true
-    },
     "test": {
       "executor": "nx:run-script",
       "options": {
@@ -54,13 +40,6 @@
       "{workspaceRoot}/pnpm-workspace.yaml"
     ],
     "makeBanner": ["{workspaceRoot}/scripts/makeBanner.mjs", "{workspaceRoot}/scripts/makeBanner/*.mjs"],
-    "eslintDefaults": [
-      "{projectRoot}/eslint.config.mjs",
-      "{workspaceRoot}/eslint.shared.mjs",
-      {
-        "externalDependencies": ["eslint", "eslint-config-prettier", "eslint-plugin-react", "typescript-eslint", "globals"]
-      }
-    ],
     "vitestDefaults": [
       "{projectRoot}/vite.config.js",
       "{projectRoot}/vite.config.ts",
