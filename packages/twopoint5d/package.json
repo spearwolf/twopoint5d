@@ -37,7 +37,6 @@
     "compile": "pnpm tsc",
     "build": "pnpm run-s -sn compile makePackageJson",
     "clean": "pnpm rimraf build types dist",
-    "lint": "pnpm eslint .",
     "test": "pnpm vitest --run",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",

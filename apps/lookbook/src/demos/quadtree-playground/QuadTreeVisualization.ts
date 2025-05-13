@@ -41,6 +41,7 @@ export class QuadTreeVisualization {
   }
 
   visualizeChunkQuadTree(root: ChunkQuadTreeNode<NumberDataChunk2D>, width: number, height: number) {
+    // eslint-disable-next-line no-console
     console.log('visualizeChunkQuadTree', root, width, height);
 
     this.canvasStage.setCanvasSize(width, height);
@@ -65,6 +66,7 @@ export class QuadTreeVisualization {
     stats.totalFrames = stats.leafs + stats.noLeafs;
     stats.averageChunksPerFrame = Math.round(stats.averageChunksPerFrame / stats.totalFrames);
 
+    // eslint-disable-next-line no-console
     console.log('render chunks stats', stats);
 
     this.canvasStage.needsUpdate = true;
