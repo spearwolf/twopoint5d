@@ -6,3 +6,5 @@ catalog:
   '@types/three': ~0.176.0
   '@spearwolf/eventize': ^4.0.1
   '@spearwolf/signalize': ^0.20.1
+onlyBuiltDependencies:
+  - sharp
