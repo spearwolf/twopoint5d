@@ -24,5 +24,6 @@
         "visibilitor",
         "Visibilitor",
         "visibles"
-    ]
+    ],
+    "nxConsole.generateAiAgentRules": true
 }
