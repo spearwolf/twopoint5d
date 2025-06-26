@@ -11,7 +11,7 @@ import {
 } from 'three';
 
 import type {WebGPURenderer} from 'three/webgpu';
-import type {ThreeRendererType} from '../display/types.js';
+import type {DisplayRendererType} from '../display/types.js';
 import type {TextureSource} from './types.js';
 
 export interface TextureOptions {
@@ -101,7 +101,7 @@ export class TextureFactory {
   textureLoader: TextureLoader;
 
   constructor(
-    maxAnisotrophyOrRenderer: number | ThreeRendererType = 0,
+    maxAnisotrophyOrRenderer: DisplayRendererType | number = 0,
     defaultClassNames: Array<TextureOptionClasses> = ['nearest'],
     defaultOptions?: Partial<TextureOptions>,
   ) {

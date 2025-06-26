@@ -1,71 +1,46 @@
 import type {Camera} from 'three';
 import type {Display} from './display/Display.js';
-import type {DisplayEventArgs, ThreeRendererType} from './display/types.js';
+import type {DisplayEventProps, DisplayRendererType} from './display/types.js';
 import type {IStage} from './stage/IStage.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
 
 // ------------------------------------------------------------
 
-export const OnResize = 'resize';
+export const OnDisplayResize = 'resize';
+export const OnDisplayRenderFrame = 'renderFrame';
 
-export interface OnResizeProps {
-  renderer: ThreeRendererType;
+export const OnDisplayInit = 'init';
+export const OnDisplayStart = 'start';
+export const OnDisplayRestart = 'restart';
+export const OnDisplayPause = 'pause';
+export const OnDisplayDispose = 'dispose';
 
-  width: number;
-  height: number;
-  pixelRatio: number;
-
-  now: number;
-  deltaTime: number;
-  frameNo: number;
+export interface IOnDisplayResize {
+  [OnDisplayResize](props: DisplayEventProps): void;
 }
 
-export interface IOnResize {
-  [OnResize](props: OnResizeProps): void;
+export interface IOnDisplayRenderFrame {
+  [OnDisplayRenderFrame](props: DisplayEventProps): void;
 }
 
-// ------------------------------------------------------------
-
-export const OnRenderFrame = 'renderFrame';
-
-export interface OnRenderFrameProps {
-  renderer: ThreeRendererType;
-
-  now: number;
-  deltaTime: number;
-  frameNo: number;
+export interface IOnDisplayInit {
+  [OnDisplayInit](props: DisplayEventProps): void;
 }
 
-export interface IOnRenderFrame {
-  [OnRenderFrame](props: OnRenderFrameProps): void;
+export interface IOnDisplayStart {
+  [OnDisplayStart](props: DisplayEventProps): void;
 }
 
-// ------------------------------------------------------------
-
-export const OnInitDisplay = 'init';
-export const OnStartDisplay = 'start';
-export const OnRestartDisplay = 'restart';
-export const OnPauseDisplay = 'pause';
-export const OnDisposeDisplay = 'dispose';
-
-export interface IOnInitDisplay {
-  [OnInitDisplay](props: DisplayEventArgs): void;
+export interface IOnDisplayRestart {
+  [OnDisplayRestart](props: DisplayEventProps): void;
 }
 
-export interface IOnStartDisplay {
-  [OnStartDisplay](props: DisplayEventArgs): void;
+export interface IOnDisplayPause {
+  [OnDisplayPause](props: DisplayEventProps): void;
 }
 
-export interface IOnRestartDisplay {
-  [OnRestartDisplay](props: DisplayEventArgs): void;
-}
-
-export interface IOnPauseDisplay {
-  [OnPauseDisplay](props: DisplayEventArgs): void;
-}
-
-export interface IOnDisposeDisplay {
-  [OnDisposeDisplay](display: Display): void;
+export interface IOnDisplayDispose {
+  [OnDisplayDispose](display: Display): void;
 }
 
 // ------------------------------------------------------------
@@ -119,7 +94,7 @@ export interface StageUpdateFrameProps {
 
 export interface StageRenderFrameProps {
   stage: IStage;
-  renderer: ThreeRendererType;
+  renderer: DisplayRendererType;
 }
 
 export interface IStageFirstFrame {

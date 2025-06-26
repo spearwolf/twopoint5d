@@ -1,22 +1,28 @@
 import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 import {
-  OnDisposeDisplay,
-  OnInitDisplay,
-  OnPauseDisplay,
-  OnRenderFrame,
-  OnResize,
-  OnRestartDisplay,
-  OnStartDisplay,
+  OnDisplayDispose,
+  OnDisplayInit,
+  OnDisplayPause,
+  OnDisplayRenderFrame,
+  OnDisplayResize,
+  OnDisplayRestart,
+  OnDisplayStart,
 } from '../events.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
+import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
-import type {DisplayEventArgs, DisplayParameters, ResizeToCallbackFn, ThreeRendererType} from './types.js';
-import {FrameLoop} from './FrameLoop.js';
+import type {
+  CreateRendererParameters,
+  DisplayEventProps,
+  DisplayParameters,
+  DisplayRendererType,
+  ResizeDisplayToFn,
+} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -30,6 +36,8 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
     canvasMaxResolutionWarningWasShown = true;
   }
 }
+
+type EventHandler = (handler: (props: DisplayEventProps) => any) => ReturnType<typeof on>;
 
 export class Display {
   /**
@@ -76,15 +84,22 @@ export class Display {
    */
   styleImageRendering?: 'pixelated' | 'auto' = undefined;
 
+  #width = 0;
+  #height = 0;
+
   /**
    * The width of the canvas is recalculated for each frame.
    */
-  width = 0;
+  get width(): number {
+    return this.#width;
+  }
 
   /**
    * The height of the canvas is recalculated for each frame.
    */
-  height = 0;
+  get height(): number {
+    return this.#height;
+  }
 
   /**
    * The current frame number. Starts at 0.
@@ -105,7 +120,7 @@ export class Display {
   /**
    * see {@link DisplayParameters.resizeTo}
    */
-  resizeToCallback?: ResizeToCallbackFn;
+  resizeToCallback?: ResizeDisplayToFn;
 
   /**
    * see {@link DisplayParameters.resizeToElement}
@@ -117,12 +132,12 @@ export class Display {
    */
   styleSheetRoot: HTMLElement | ShadowRoot;
 
-  renderer?: ThreeRendererType;
+  renderer?: DisplayRendererType;
 
-  constructor(domElementOrRenderer: HTMLElement | ThreeRendererType, options?: DisplayParameters) {
+  constructor(domElementOrRenderer: HTMLElement | DisplayRendererType, options?: DisplayParameters) {
     eventize(this);
 
-    retain(this, [OnInitDisplay, OnStartDisplay, OnResize]);
+    retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
 
     this.#chronometer.stop();
 
@@ -132,7 +147,7 @@ export class Display {
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
     if (isWebGLRenderer(domElementOrRenderer) || isWebGPURenderer(domElementOrRenderer)) {
-      this.renderer = domElementOrRenderer as ThreeRendererType;
+      this.renderer = domElementOrRenderer as DisplayRendererType;
       this.resizeToElement = this.renderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
       let canvas: HTMLCanvasElement;
@@ -154,41 +169,33 @@ export class Display {
         container.appendChild(canvas);
       }
       this.resizeToElement = domElementOrRenderer;
-      if (options?.webgpu) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          'WebGPU is not supported yet. If you want to use WebGPU, please create a WebGPURenderer instance and pass it to the :renderer option!',
-        );
-      }
-      this.renderer = new WebGLRenderer({
+
+      const createRenderer =
+        options?.createRenderer ??
+        ((params: CreateRendererParameters) => {
+          if (params.webgpu) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              'Automatic creation of a WebGPURenderer instance is currently not supported. By default, a WebGLRenderer is created.',
+              'Alternatively, a custom renderer instance can be passed directly as the first Display(renderer) constructor argument,',
+              'or the Display(el, {createRenderer}) option callback can be used.',
+            );
+          }
+          return new WebGLRenderer({
+            precision: 'highp',
+            preserveDrawingBuffer: false,
+            ...params,
+          });
+        });
+
+      this.renderer = createRenderer({
         canvas,
-        precision: 'highp',
-        preserveDrawingBuffer: false,
         stencil: false,
         alpha: true,
         antialias: true,
         powerPreference: 'high-performance',
         ...options,
-      });
-      // this.renderer = options?.webgpu
-      //   ? new WebGPURenderer({
-      //     canvas,
-      //     stencil: false,
-      //     alpha: true,
-      //     antialias: true,
-      //     powerPreference: 'high-performance',
-      //     ...options,
-      //   })
-      //   : new WebGLRenderer({
-      //     canvas,
-      //     precision: 'highp',
-      //     preserveDrawingBuffer: false,
-      //     stencil: false,
-      //     alpha: true,
-      //     antialias: true,
-      //     powerPreference: 'high-performance',
-      //     ...options,
-      //   });
+      } as CreateRendererParameters);
     }
 
     const {domElement: canvas} = this.renderer!;
@@ -205,24 +212,24 @@ export class Display {
         if (isWebGPURenderer(this.renderer)) {
           await this.renderer.init();
         }
-        this.#emit(OnInitDisplay);
+        this.#emit(OnDisplayInit);
       },
 
-      [DisplayStateMachine.Restart]: () => this.#emit(OnRestartDisplay),
+      [DisplayStateMachine.Restart]: () => this.#emit(OnDisplayRestart),
 
       [DisplayStateMachine.Start]: () => {
         this.#chronometer.start();
         this.#chronometer.update();
 
-        this.#emit(OnStartDisplay);
+        this.#emit(OnDisplayStart);
       },
 
       [DisplayStateMachine.Pause]: () => {
         this.#chronometer.stop();
 
-        retainClear(this, OnStartDisplay);
+        retainClear(this, OnDisplayStart);
 
-        this.#emit(OnPauseDisplay);
+        this.#emit(OnDisplayPause);
       },
     });
 
@@ -233,7 +240,7 @@ export class Display {
 
       document.addEventListener('visibilitychange', onDocVisibilityChange, false);
 
-      once(this, OnDisposeDisplay, () => {
+      once(this, OnDisplayDispose, () => {
         document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
 
@@ -384,15 +391,15 @@ export class Display {
       this.#lastResizeHash = resizeHash;
 
       if (pixelZoom > 0) {
-        this.width = wPx / pixelZoom;
-        this.height = hPx / pixelZoom;
+        this.#width = wPx / pixelZoom;
+        this.#height = hPx / pixelZoom;
       } else {
-        this.width = wPx;
-        this.height = hPx;
+        this.#width = wPx;
+        this.#height = hPx;
       }
 
-      this.width = Math.floor(this.width);
-      this.height = Math.floor(this.height);
+      this.#width = Math.floor(this.#width);
+      this.#height = Math.floor(this.#height);
 
       this.renderer!.setPixelRatio(pixelRatio);
       this.renderer!.setSize(this.width, this.height, false);
@@ -402,7 +409,7 @@ export class Display {
       canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
 
       const isConstructing = this.frameNo === 0;
-      if (!isConstructing) this.#emit(OnResize);
+      if (!isConstructing) this.#emit(OnDisplayResize);
     }
   }
 
@@ -421,16 +428,16 @@ export class Display {
 
     this.resize();
 
-    if (this.isFirstFrame) this.#emit(OnResize);
+    if (this.isFirstFrame) this.#emit(OnDisplayResize);
 
-    this.#emit(OnRenderFrame);
+    this.#emit(OnDisplayRenderFrame);
 
     ++this.frameNo;
   }
 
-  async start(beforeStartCallback?: (args: DisplayEventArgs) => Promise<void> | void): Promise<Display> {
+  async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
     if (typeof beforeStartCallback === 'function') {
-      await beforeStartCallback(this.getEventArgs());
+      await beforeStartCallback(this.getEventProps());
     }
 
     this.#stateMachine.pausedByUser = false;
@@ -446,7 +453,7 @@ export class Display {
   dispose(): void {
     this.stop();
     this.frameLoop.stop(this);
-    emit(this, OnDisposeDisplay, this);
+    emit(this, OnDisplayDispose, this);
     off(this);
     this.renderer?.dispose();
     delete this.renderer;
@@ -455,7 +462,7 @@ export class Display {
   /**
    * This is a public method so it's easy to override if you want
    */
-  getEventArgs(): DisplayEventArgs {
+  getEventProps(): DisplayEventProps {
     return {
       display: this,
       renderer: this.renderer!,
@@ -473,7 +480,17 @@ export class Display {
 
   #emit = (eventName: string): void => {
     if (this.renderer != null) {
-      emit(this, eventName, this.getEventArgs());
+      emit(this, eventName, this.getEventProps());
     }
   };
+
+  readonly onResize = on.bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
+  readonly onRenderFrame = on.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
+
+  readonly onInit = on.bind(undefined, this, OnDisplayInit) as unknown as EventHandler;
+  readonly onStart = on.bind(undefined, this, OnDisplayStart) as unknown as EventHandler;
+  readonly onRestart = on.bind(undefined, this, OnDisplayRestart) as unknown as EventHandler;
+  readonly onPause = on.bind(undefined, this, OnDisplayPause) as unknown as EventHandler;
+
+  readonly onDispose = once.bind(undefined, this, OnDisplayDispose) as unknown as EventHandler;
 }

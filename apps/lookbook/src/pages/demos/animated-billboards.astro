@@ -43,8 +43,8 @@ import {description, showSource, title} from './_animated-billboards.json';
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
+    OnDisplayRenderFrame,
     TileSetLoader,
-    OnRenderFrame,
   } from '@spearwolf/twopoint5d';
   import {LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PlaneGeometry, TextureLoader} from 'three';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
@@ -85,7 +85,7 @@ import {description, showSource, title} from './_animated-billboards.json';
 
     demo.scene.add(mesh);
 
-    on(demo, OnRenderFrame, ({deltaTime, now}) => {
+    on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
       material.uniforms['time'].value = now;
       mesh.update();

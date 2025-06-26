@@ -60,8 +60,8 @@ import {description, showSource, title} from './_display-multi.json';
   import {on} from '@spearwolf/eventize';
   import {
     Display,
-    OnRenderFrame,
-    OnResize,
+    OnDisplayRenderFrame,
+    OnDisplayResize,
     ParallaxProjection,
     Stage2D,
     StageRenderer,
@@ -100,14 +100,14 @@ import {description, showSource, title} from './_display-multi.json';
     sprite.scale.set(100, 100, 0); // => should result in a 200x200 (css pixels) pixelart/crisp image
     stage.scene.add(sprite);
 
-    on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
+    on(display, OnDisplayRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
       stageRenderer.updateFrame(now, deltaTime, frameNo);
       stageRenderer.renderFrame(renderer);
     });
 
     const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvas as HTMLElement);
 
-    on(display, OnResize, ({width, height, display}) => updateCanvasSizeInfo(width, height, display.pixelRatio));
+    on(display, OnDisplayResize, ({width, height, display}) => updateCanvasSizeInfo(width, height, display.pixelRatio));
 
     display.start();
   }

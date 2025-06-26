@@ -2,11 +2,11 @@ import type {WebGLRenderer, WebGLRendererParameters} from 'three';
 import type {WebGPURenderer} from 'three/webgpu';
 import type {Display} from './Display.js';
 
-export type ThreeRendererType = WebGLRenderer | WebGPURenderer;
+export type DisplayRendererType = WebGLRenderer | WebGPURenderer;
 
-export interface DisplayEventArgs {
+export interface DisplayEventProps {
   display: Display;
-  renderer: ThreeRendererType;
+  renderer: DisplayRendererType;
   width: number;
   height: number;
   pixelRatio: number;
@@ -15,22 +15,15 @@ export interface DisplayEventArgs {
   frameNo: number;
 }
 
-export type ResizeToCallbackFn = (display: Display) => [width: number, height: number];
+export type ResizeDisplayToFn = (display: Display) => [width: number, height: number];
 
-type RendererParameters =
-  | (Partial<Omit<WebGLRendererParameters, 'canvas'>> & {webgpu?: false})
-  | {
-      webgpu: true;
-      forceWebGL?: boolean;
-      logarithmicDepthBuffer?: boolean | undefined;
-      alpha?: boolean | undefined;
-      depth?: boolean | undefined;
-      stencil?: boolean | undefined;
-      antialias?: boolean | undefined;
-      samples?: number | undefined;
-    };
+export type DisplayRendererParameters =
+  | ({webgpu?: false} & Partial<Omit<WebGLRendererParameters, 'canvas'>>)
+  | ({webgpu: true} & Partial<Omit<ConstructorParameters<typeof WebGPURenderer>, 'canvas'>>);
 
-export type DisplayParameters = RendererParameters & {
+export type CreateRendererParameters = DisplayRendererParameters & {canvas: HTMLCanvasElement};
+
+export type DisplayParameters = DisplayRendererParameters & {
   /**
    * Limit the maximum number of frames per second.
    *
@@ -47,7 +40,7 @@ export type DisplayParameters = RendererParameters & {
    *
    * In this case, no further attempt is made to automatically determine a size.
    */
-  resizeTo?: ResizeToCallbackFn;
+  resizeTo?: ResizeDisplayToFn;
 
   /**
    * If an HTML element is specified here, the size of this element is determined
@@ -79,4 +72,12 @@ export type DisplayParameters = RendererParameters & {
    * to install the styles only in this shadow root.
    */
   styleSheetRoot?: HTMLElement | ShadowRoot;
+
+  /**
+   * Automatic creation of a `THREE.WebGPURenderer` instance is currently not supported.
+   * By default, a `THREE.WebGLRenderer` is created. As an alternative, you can create your own renderer instance using this callback.
+   *
+   * @returns The return value here is expected to be a `THREE.WebGLRenderer` or `THREE.WebGPURenderer` instance.
+   */
+  createRenderer?: (params: CreateRendererParameters) => DisplayRendererType;
 };

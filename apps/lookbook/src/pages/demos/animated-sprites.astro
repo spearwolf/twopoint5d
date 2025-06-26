@@ -49,8 +49,8 @@ import {description, showSource, title} from './_animated-sprites.json';
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
-    OnInitDisplay,
-    OnRenderFrame,
+    OnDisplayInit,
+    OnDisplayRenderFrame,
     TileSetLoader,
   } from '@spearwolf/twopoint5d';
   import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
@@ -63,7 +63,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     document.querySelector('.spriteCount').textContent = count.toString();
   };
 
-  on(demo, OnInitDisplay, async ({scene, camera}) => {
+  on(demo, OnDisplayInit, async ({scene, camera}) => {
     camera.position.z = 60;
 
     const CAPACITY = 1000;
@@ -102,7 +102,7 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     scene.add(mesh);
 
-    on(demo, OnRenderFrame, ({deltaTime, now}) => {
+    on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
       material.uniforms['time'].value = now;
       mesh.update();

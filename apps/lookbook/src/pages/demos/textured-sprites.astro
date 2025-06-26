@@ -31,8 +31,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {
-    OnInitDisplay,
-    OnRenderFrame,
+    OnDisplayInit,
     TexturedSprites,
     TexturedSpritesGeometry,
     TexturedSpritesMaterial,
@@ -44,7 +43,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  on(demo, OnInitDisplay, async ({scene}) => {
+  on(demo, OnDisplayInit, async ({scene}) => {
     const CAPACITY = 256;
 
     const geometry = new TexturedSpritesGeometry(CAPACITY);
@@ -65,7 +64,12 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     scene.add(mesh);
 
-    on(demo, OnRenderFrame, ({deltaTime}) => {
+    // on(demo, OnDisplayRenderFrame, ({deltaTime}) => {
+    //   bouncingSprites.animate(deltaTime);
+    //   mesh.update();
+    // });
+
+    demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       mesh.update();
     });

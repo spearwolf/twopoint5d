@@ -1,6 +1,6 @@
 import {emit, on, once, onceAsync, retain} from '@spearwolf/eventize';
 import {batch, createSignal} from '@spearwolf/signalize';
-import type {ThreeRendererType} from '../display/types.js';
+import type {DisplayRendererType} from '../display/types.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSetOptions} from './TileSet.js';
@@ -37,13 +37,13 @@ export class TextureStore {
 
   defaultTextureClasses: TextureOptionClasses[] = [];
 
-  #renderer = createSignal<ThreeRendererType | undefined>();
+  #renderer = createSignal<DisplayRendererType | undefined>();
 
-  get renderer(): ThreeRendererType | undefined {
+  get renderer(): DisplayRendererType | undefined {
     return this.#renderer.value;
   }
 
-  set renderer(value: ThreeRendererType | undefined) {
+  set renderer(value: DisplayRendererType | undefined) {
     this.#renderer.set(value);
   }
 

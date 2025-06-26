@@ -1,7 +1,7 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, Signal, touch} from '@spearwolf/signalize';
 import {ImageLoader, type Texture} from 'three';
-import type {ThreeRendererType} from '../display/types.js';
+import type {DisplayRendererType} from '../display/types.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -111,7 +111,7 @@ export class TextureResource {
 
   #textureFactory = createSignal<TextureFactory | undefined>();
   #texture = createSignal<Texture | undefined>();
-  #renderer = createSignal<ThreeRendererType | undefined>();
+  #renderer = createSignal<DisplayRendererType | undefined>();
 
   readonly id: string;
   readonly type: TextureResourceType;
@@ -209,11 +209,11 @@ export class TextureResource {
     this.#texture.set(value);
   }
 
-  get renderer(): ThreeRendererType | undefined {
+  get renderer(): DisplayRendererType | undefined {
     return this.#renderer.value;
   }
 
-  set renderer(value: ThreeRendererType | undefined) {
+  set renderer(value: DisplayRendererType | undefined) {
     this.#renderer.set(value);
   }
 
@@ -226,13 +226,6 @@ export class TextureResource {
     this.type = type;
 
     retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture']);
-  }
-
-  /**
-   * is called by the TextureStore
-   */
-  rendererChanged(renderer: ThreeRendererType | undefined) {
-    this.renderer = renderer;
   }
 
   load(): TextureResource {

@@ -1,19 +1,9 @@
-import {emit, eventize, on, once} from '@spearwolf/eventize';
+import {emit, eventize, once} from '@spearwolf/eventize';
 import {Color, type WebGLRenderer} from 'three';
 import {Display} from '../display/Display.js';
 import {isWebGPURenderer} from '../display/isWebGPURenderer.js';
-import type {ThreeRendererType} from '../display/types.js';
-import {
-  OnRemoveFromParent,
-  OnRenderFrame,
-  OnResize,
-  OnStageAdded,
-  OnStageRemoved,
-  type OnRenderFrameProps,
-  type OnResizeProps,
-  type StageAddedProps,
-  type StageRemovedProps,
-} from '../events.js';
+import type {DisplayRendererType} from '../display/types.js';
+import {OnRemoveFromParent, OnStageAdded, OnStageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
 import type {IStage} from './IStage.js';
 
 export type StageRendererParentType = Display | StageRenderer;
@@ -124,14 +114,14 @@ export class StageRenderer implements IStage {
     once(
       this,
       OnRemoveFromParent,
-      on(display, OnResize, ({width, height}: OnResizeProps) => {
+      display.onResize(({width, height}) => {
         this.resize(width, height);
       }),
     );
     once(
       this,
       OnRemoveFromParent,
-      on(display, OnRenderFrame, ({renderer, now, deltaTime, frameNo}: OnRenderFrameProps) => {
+      display.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
         this.updateFrame(now, deltaTime, frameNo);
         this.renderFrame(renderer);
       }),
@@ -178,7 +168,7 @@ export class StageRenderer implements IStage {
     }
   }
 
-  renderFrame(renderer: ThreeRendererType): void {
+  renderFrame(renderer: DisplayRendererType): void {
     if (isWebGPURenderer(renderer)) {
       throw new Error('WebGPU renderer is not supported yet');
     }

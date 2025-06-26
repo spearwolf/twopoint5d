@@ -1,9 +1,9 @@
 import {on, Priority} from '@spearwolf/eventize';
-import {Display, OnRenderFrame, OnResize, type DisplayEventArgs} from '@spearwolf/twopoint5d';
+import {Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
 import {Color, PerspectiveCamera, Scene} from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 
-export interface PerspectiveOrbitDemoEventArgs extends DisplayEventArgs {
+export interface PerspectiveOrbitDemoEventProps extends DisplayEventProps {
   scene: Scene;
   camera: PerspectiveCamera;
   controls: OrbitControls;
@@ -30,12 +30,12 @@ export class PerspectiveOrbitDemo extends Display {
 
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 
-    on(this, OnResize, Priority.BB, ({camera, width, height}) => {
+    on(this, OnDisplayResize, Priority.BB, ({camera, width, height}) => {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     });
 
-    on(this, OnRenderFrame, Priority.Low, ({controls, renderer, scene, camera}: PerspectiveOrbitDemoEventArgs) => {
+    on(this, OnDisplayRenderFrame, Priority.Low, ({controls, renderer, scene, camera}: PerspectiveOrbitDemoEventProps) => {
       controls.update();
       renderer.render(scene, camera);
     });
@@ -43,9 +43,9 @@ export class PerspectiveOrbitDemo extends Display {
     (window as any).display = this;
   }
 
-  override getEventArgs(): PerspectiveOrbitDemoEventArgs {
+  override getEventProps(): PerspectiveOrbitDemoEventProps {
     return {
-      ...super.getEventArgs(),
+      ...super.getEventProps(),
       scene: this.scene,
       camera: this.camera,
       controls: this.controls,

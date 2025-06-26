@@ -17,7 +17,13 @@ import {description, showSource, title} from './_quadtree-playground.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {ChunkQuadTreeNode, Display, OnRenderFrame, OnResize, type OnResizeProps} from '@spearwolf/twopoint5d';
+  import {
+    ChunkQuadTreeNode,
+    Display,
+    OnDisplayRenderFrame,
+    OnDisplayResize,
+    type OnDisplayResizeProps,
+  } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~demos/quadtree-playground/QuadTreeVisualization';
 
@@ -30,11 +36,11 @@ import {description, showSource, title} from './_quadtree-playground.json';
   visual.makeRandomQuadTree();
 
   on(display, {
-    [OnResize]: ({width, height}: OnResizeProps) => {
+    [OnDisplayResize]: ({width, height}: OnDisplayResizeProps) => {
       visual.canvasStage.setContainerSize(width, height);
     },
 
-    [OnRenderFrame]: () => {
+    [OnDisplayRenderFrame]: () => {
       visual.canvasStage.render();
     },
   });

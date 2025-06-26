@@ -8,11 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - refactor `Display` &rarr; `resize`, `renderFrame` events
-  - add types, constants and interfaces for `OnResize` and `OnRenderFrame`
+  - add types, constants and interfaces for `OnDisplayResize` and `OnDisplayRenderFrame`
   - _MIGRATION NOTE:_ the `frame` event has been renamed to `renderFrame`
+  - add new helpers:
+    - `display.onResize(callback)`
+    - `display.onRenderFrame(callback)`
+    - `display.onInit(callback)`
+    - `display.onStart(callback)`
+    - `display.onPause(callback)`
+    - `display.onRestart(callback)`
+    - `display.onDispose(callback)`
 - the types and constants from `/events.js` are now also included in the main module
   - _MIGRATION NOTE:_ the import of `@spearwolf/twopoint5d/events.js` is now deprecated and should no longer be used. Just use `@spearwolf/twopoint5d` instead.
-- add new constants and types: `OnInitDisplay`, `OnStartDisplay`, `OnRestartDisplay`, `OnPauseDisplay` and `OnDisposeDisplay`
+- _MIGRATION NOTE:_ renamed `DisplayEventArgs` to `DisplayEventProps`
+- _MIGRATION NOTE:_ dropped `OnResizeProps` and `OnRenderFrameProps`. the only truth is `DisplayEventProps`
+- add new constants and types: `OnDisplayInit`, `OnDisplayStart`, `OntDisplayRestart`, `OnDisplayPause` and `OnDisplayDispose`
 
 
 ## [0.12.0] - 2025-05-10
