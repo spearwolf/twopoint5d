@@ -37,7 +37,7 @@ jobs:
           NPM_TOKEN: xxx
 
       - name: Archive Playwright test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-results
