@@ -24,6 +24,8 @@ jobs:
 
       - name: Install Playwright Browsers
         run: pnpm exec playwright install --with-deps chromium firefox
+        env:
+          NPM_TOKEN: xxx
 
       - name: Run all tests
         run: pnpm run ci

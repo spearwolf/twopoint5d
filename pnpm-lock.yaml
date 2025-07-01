@@ -68,6 +68,9 @@ importers:
       nx:
         specifier: 21.0.3
         version: 21.0.3
+      playwright:
+        specifier: ^1.53.1
+        version: 1.53.1
       prettier:
         specifier: ^3.5.3
         version: 3.5.3
