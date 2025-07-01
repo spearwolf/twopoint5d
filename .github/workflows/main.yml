@@ -9,10 +9,6 @@ jobs:
     name: Build, Lint and Test
     runs-on: ubuntu-latest
     steps:
-      # - name: Set up xvfb
-      #   run: |
-      #     sudo apt-get install -y xvfb
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -31,7 +27,7 @@ jobs:
         env:
           NPM_TOKEN: xxx
 
-      - name: Run all tests
+      - name: Build packages and run all tests
         run: xvfb-run pnpm run ci
         env:
           NPM_TOKEN: xxx
