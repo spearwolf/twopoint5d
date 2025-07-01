@@ -1,4 +1,4 @@
-import {emit, eventize, off, on, once, retain, retainClear} from '@spearwolf/eventize';
+import {emit, eventize, off, on, once, onceAsync, retain, retainClear} from '@spearwolf/eventize';
 import {WebGLRenderer} from 'three';
 import {
   OnDisplayDispose,
@@ -102,12 +102,14 @@ export class Display {
   }
 
   /**
-   * The current frame number. Starts at 0.
+   * The current frame number. Starts at 1.
    */
   frameNo = 0;
 
+  #isFirstFrame = true;
+
   get isFirstFrame(): boolean {
-    return this.frameNo === 0;
+    return this.#isFirstFrame;
   }
 
   readonly frameLoop: FrameLoop;
@@ -424,6 +426,9 @@ export class Display {
    * It happens automatically after you call {@link start}.
    */
   renderFrame(now = window.performance.now()): void {
+    this.#isFirstFrame = this.frameNo === 0;
+    this.frameNo += 1;
+
     this.#chronometer.update(now / 1000);
 
     this.resize();
@@ -431,8 +436,6 @@ export class Display {
     if (this.isFirstFrame) this.#emit(OnDisplayResize);
 
     this.#emit(OnDisplayRenderFrame);
-
-    ++this.frameNo;
   }
 
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
@@ -485,7 +488,9 @@ export class Display {
   };
 
   readonly onResize = on.bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
+
   readonly onRenderFrame = on.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
+  readonly nextFrame = onceAsync.bind(undefined, this, OnDisplayRenderFrame) as unknown as Promise<DisplayEventProps>;
 
   readonly onInit = on.bind(undefined, this, OnDisplayInit) as unknown as EventHandler;
   readonly onStart = on.bind(undefined, this, OnDisplayStart) as unknown as EventHandler;
