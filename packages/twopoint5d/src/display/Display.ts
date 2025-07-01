@@ -490,6 +490,7 @@ export class Display {
   readonly onResize = on.bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
 
   readonly onRenderFrame = on.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
+  readonly onNextFrame = once.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
   readonly nextFrame = onceAsync.bind(undefined, this, OnDisplayRenderFrame) as unknown as Promise<DisplayEventProps>;
 
   readonly onInit = on.bind(undefined, this, OnDisplayInit) as unknown as EventHandler;

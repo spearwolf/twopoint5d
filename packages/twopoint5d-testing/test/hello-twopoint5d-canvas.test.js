@@ -1,6 +1,5 @@
-import { expect } from '@esm-bundle/chai';
-import { Display } from '@spearwolf/twopoint5d';
-import { once } from '@spearwolf/eventize';
+import {expect} from '@esm-bundle/chai';
+import {Display} from '@spearwolf/twopoint5d';
 
 let display;
 let firstFrameNo = -1;
@@ -16,7 +15,7 @@ describe('hello twopoint5d canvas', () => {
     const el = document.querySelector('canvas#test-canvas');
     display = new Display(el);
 
-    once(display, 'renderFrame', ({frameNo}) => {
+    display.onNextFrame(({frameNo}) => {
       if (display.isFirstFrame) {
         firstFrameNo = frameNo;
         console.debug(`Display: first frame rendered with frameNo=${firstFrameNo}`);
@@ -44,7 +43,7 @@ describe('hello twopoint5d canvas', () => {
       renderer: _renderer ? '[Object]' : 'undefined',
     });
 
-    expect(firstFrameNo).to.equal(1, "first frameNo should be 1");
-    expect(display.frameNo).to.greaterThan(0, "current frameNo should be equal or greater");
+    expect(firstFrameNo).to.equal(1, 'first frameNo should be 1');
+    expect(display.frameNo).to.greaterThan(0, 'current frameNo should be equal or greater');
   });
 });
