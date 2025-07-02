@@ -2,8 +2,8 @@ packages:
   - packages/*
   - apps/*
 catalog:
-  three: ~0.176.0
-  '@types/three': ~0.176.0
+  three: ~0.178.0
+  '@types/three': ~0.178.0
   '@spearwolf/eventize': ^4.0.1
   '@spearwolf/signalize': ^0.20.1
 onlyBuiltDependencies:
