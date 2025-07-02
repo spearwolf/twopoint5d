@@ -11,6 +11,7 @@ Dieses Dokument gibt eine Übersicht über das `twopoint5d`-Projekt, um die KI-g
 -   `packages/twopoint5d`: Die Kernbibliothek. Enthält die Hauptlogik und die dazugehörigen Unit-Tests (mit `vitest`).
 -   `packages/twopoint5d-testing`: Ein separates Paket für Browser-basierte Integrations- und End-to-End-Tests (mit `@web/test-runner`).
 -   `apps/lookbook`: Eine Demo-Anwendung (erstellt mit [Astro](https://astro.build/)), die als visuelles Schaufenster für die Features der Bibliothek dient.
+-   `docs`: Enthält loose Dokumentation und unsortierte Anleitungen für die Verwendung der `twopoint5d` Bibliothek.
 
 ## 2. Wichtige Technologien
 

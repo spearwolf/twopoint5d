@@ -1,0 +1,7 @@
+{
+  "contextFileName": "AGENTS.md",
+  "checkpointing": {
+    "enabled": true
+  },
+  "usageStatisticsEnabled": false
+}
