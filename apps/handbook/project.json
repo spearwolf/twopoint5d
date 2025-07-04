@@ -1,0 +1,5 @@
+{
+  "name": "handbook",
+  "root": "apps/handbook",
+  "targets": { }
+}

@@ -23,6 +23,7 @@
     "cbt": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "test:all": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "lookbook": "NX_TUI=false pnpm nx dev lookbook",
+    "handbook": "NX_TUI=false pnpm nx dev handbook",
     "ci": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci"
   },
   "devDependencies": {

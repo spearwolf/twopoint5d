@@ -1,0 +1,14 @@
+{
+  "name": "twopoint5d-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vitepress dev docs --host",
+    "_build": "vitepress build docs",
+    "_preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

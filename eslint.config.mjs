@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ['.nx/*', '.vscode/*', 'docs/*', '**/dist', '**/.astro', '**/lookbook/public', '**/*.d.ts'],
+    ignores: ['.nx/*', '.vscode/*', 'docs/*', '**/dist', '**/.astro', '**/lookbook/public', '**/*.d.ts', '**/.vitepress', '**/node_modules'],
   },
   {
     files: ['**/*.{js,ts}'],
