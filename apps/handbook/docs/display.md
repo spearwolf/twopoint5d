@@ -2,6 +2,8 @@
 outline: deep
 ---
 
+<img src="/images/twopoint5d-700x168.png" style="padding-bottom: 2rem" width="175" height="42" alt="twopoint5d">
+
 # Display
 
 The `Display` class is a convenience helper in `twopoint5d`. It simplifies the process of initializing an HTML canvas element, setting up a `three.js` renderer, and starting a render loop.
@@ -64,29 +66,112 @@ This mechanism provides a flexible alternative to the programmatic `resizeTo` an
 
 ## Examples
 
-In the `lookbook` application, the `Display` class is rarely instantiated directly. Instead, an extended class named `PerspectiveOrbitDemo` is used, which comes pre-configured with a `PerspectiveCamera` and `OrbitControls`.
+The `Display` class can be used on its own, but it truly shines as a foundation for more complex rendering setups. The following examples demonstrate how to use it in combination with `Stage2D` and `StageRenderer` to create layered 2.5D scenes.
 
-This is a common pattern for creating reusable setups.
+### Basic Display Setup
 
-**Example from `apps/lookbook/src/pages/demos/textured-sprites.astro`:**
+Here is a minimal example of how to use the `Display` class to set up a `three.js` scene. It creates a renderer, a camera, and a scene and handles the render loop and resizing.
 
-```typescript
-import { PerspectiveOrbitDemo } from '../../demos/utils/PerspectiveOrbitDemo';
+```jsx
+import * as THREE from 'three';
+import { Display } from '@spearwolf/twopoint5d';
 
-// A DOM element (e.g., a div) is passed as a container for the canvas.
-const container = document.getElementById('canvas-container');
+const display = new Display( document.getElementById( "twopoint5d" ) );
 
-// The options { antialias: false } are forwarded to the three.js renderer.
-const demo = new PerspectiveOrbitDemo(container, { antialias: false });
+let camera, scene;
 
-// ... more code to add objects to the scene ...
+display.on({
 
-// The render loop must be started explicitly - without this call,
-// nothing will be rendered.
-demo.start();
+    init ({ renderer, width, height }) {
+
+        camera = new THREE.PerspectiveCamera( 70, width / height, 1, 1000 );
+        camera.position.z = 400;
+
+        scene = new THREE.Scene();
+
+    },
+
+    resize ({ width, height }) {
+
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+
+    },
+
+    renderFrame ({ renderer }) {
+
+        renderer.render( scene, camera );
+
+    }
+
+})
+
+display.start();
 ```
 
-This example shows how easy it is to initialize a 2.5D scene. The `PerspectiveOrbitDemo` class (which inherits from `Display`) handles all the boilerplate setup. **Important:** The render loop does not start automatically—an explicit call to `start()` is required to begin rendering.
+> [!NOTE]
+> The library [@spearwolf/eventize](https://github.com/spearwolf/eventize) is used for event handling.
+
+### Using Display with Stage2D and Projections
+
+A `Stage2D` represents a two-dimensional scene with a camera that is automatically managed by a `Projection`. This example shows how to combine `Display` with a `Stage2D` and a `ParallaxProjection` to create a simple 2.5D setup.
+
+```javascript
+import { Display, Stage2D, ParallaxProjection } from "@spearwolf/twopoint5d"
+
+const projection = new ParallaxProjection("xy|bottom-left", {
+    width: 640,
+    height: 480,
+    fit: "contain",
+    minPixelZoom: 2
+});
+
+const stage = new Stage2D(projection);
+
+const display = new Display(document.querySelector("canvas"));
+
+display.on({
+    resize({ width: canvasWidth, height: canvasHeight }) {
+        stage.resize(canvasWidth, canvasHeight);
+    },
+
+    renderFrame({ renderer }) {
+        renderer.render(stage.scene, stage.camera);
+    }
+});
+
+display.start();
+```
+
+### Managing Multiple Stages with StageRenderer
+
+For more complex scenes with multiple layers (e.g., background, main scene, foreground), the `StageRenderer` is the perfect tool. It manages one or more `Stage2D` instances and handles their rendering order automatically.
+
+```javascript
+import * as THREE from 'three';
+import { Display, Stage2D, StageRenderer, OrthographicProjection } from "@spearwolf/twopoint5d";
+
+const projection = new OrthographicProjection("xy|bottom-left", {
+    fit: 'contain',
+    width: 320
+});
+
+const stage = new Stage2D(projection);
+
+const display = new Display(document.querySelector("canvas"));
+
+const stageRenderer = new StageRenderer(display);
+stageRenderer.clearColor = new THREE.Color(0x4800f0);
+stageRenderer.add(stage);
+
+display.start();
+```
+
+### Extending the Display Class
+
+In practice, it is often useful to create specialized classes that inherit from `Display` to build reusable components. The `lookbook` application, for instance, uses a `PerspectiveOrbitDemo` class that comes pre-configured with a `PerspectiveCamera` and `OrbitControls`.
+
+This pattern encapsulates the setup logic and makes it easy to create consistent demos.
 
 ## Public API
 
@@ -152,15 +237,4 @@ Convenience shortcut methods are available for the most important events:
 -   `nextFrame()`: Returns a `Promise` that resolves on the next frame.
 -   `onDispose(handler)`
 
-## Lookbook Examples
 
-Here are some links to demos in the lookbook app that use the `Display` class (via `PerspectiveOrbitDemo`):
-
--   [/demos/animated-billboards](/demos/animated-billboards)
--   [/demos/animated-sprites](/demos/animated-sprites)
--   [/demos/crosses](/demos/crosses)
--   [/demos/instanced-quads](/demos/instanced-quads)
--   [/demos/map2d-layer3d](/demos/map2d-layer3d)
--   [/demos/map2d-tile-sprites](/demos/map2d-tile-sprites)
--   [/demos/textured-quads](/demos/textured-quads)
--   [/demos/textured-sprites](/demos/textured-sprites)

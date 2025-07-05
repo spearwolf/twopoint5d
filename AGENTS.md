@@ -1,4 +1,4 @@
-# Gemini Project Context: `twopoint5d`
+# Agent Project Context: `twopoint5d`
 
 Dieses Dokument bietet eine umfassende Übersicht über das `twopoint5d`-Projekt, um die KI-gestützte Entwicklung zu beschleunigen. Es dient als primäre Wissensquelle für jeden Agenten, der an diesem Projekt arbeitet.
 
@@ -11,6 +11,8 @@ Die Bibliothek ist **kein** Framework, das three.js kapselt, sondern eine Sammlu
 Das Projekt ist als **Monorepo** mit **NX** und **pnpm Workspaces** strukturiert.
 
 Ignoriere alle anderen Dateien im Repository, die in den .gitignore-Dateien ausgeschlossen sind. Konzentriere dich ausschließlich auf die Dateien im `packages/`- und `apps/`-Verzeichnis.
+
+Ignore den kompletten Ordner apps/handbook/docs/.vitepress/cache und lese niemals daraus Files ein.
 
 ---
 
