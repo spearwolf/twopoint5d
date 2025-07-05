@@ -10,6 +10,8 @@ Die Bibliothek ist **kein** Framework, das three.js kapselt, sondern eine Sammlu
 
 Das Projekt ist als **Monorepo** mit **NX** und **pnpm Workspaces** strukturiert.
 
+Ignoriere alle anderen Dateien im Repository, die in den .gitignore-Dateien ausgeschlossen sind. Konzentriere dich ausschließlich auf die Dateien im `packages/`- und `apps/`-Verzeichnis.
+
 ---
 
 ## 2. Entwicklungs-Workflow & Wichtige Befehle

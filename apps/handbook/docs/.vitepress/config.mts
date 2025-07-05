@@ -30,6 +30,7 @@ export default defineConfig({
       {
         text: 'API',
         items: [
+          { text: 'Overview', link: '/overview' },
           { text: 'Display', link: '/display' },
           { text: 'Map2D', link: '/map-2d' }
         ]
