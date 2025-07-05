@@ -21,10 +21,18 @@ export default defineConfig({
         ]
       },
       {
+        text: 'Core Concepts',
+        items: [
+          { text: 'Vertex Objects', link: '/vertex-objects' },
+          { text: 'Textures', link: '/textures' },
+          { text: 'Textures Cheat Sheet', link: '/cheat-sheet-textures' }
+        ]
+      },
+      {
         text: 'Manual (legacy)',
         items: [
           
-          { text: 'Vertex Objects', link: '/vertex-objects-legacy' }
+          { text: 'Vertex Objects (Legacy)', link: '/vertex-objects-legacy' }
         ]
       },
       {
