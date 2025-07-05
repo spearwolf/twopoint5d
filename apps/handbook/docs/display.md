@@ -23,6 +23,8 @@ The `Display` class abstracts away recurring tasks when setting up a `three.js` 
 
 A typical use case is the rapid creation of a prototype or demo without having to worry about the details of renderer configuration.
 
+![Display, Stage and Projections](./display/display-stage-renderer.excalidraw.svg)
+
 ## State Model
 
 The `Display` class uses an internal state machine (`DisplayStateMachine`) to manage its lifecycle. The main states are:
@@ -35,6 +37,9 @@ The state changes automatically under the following conditions:
 -   An explicit call to `display.start()` or `display.stop()` (or setting `display.pause = true`).
 -   The document's visibility changes (e.g., when the user switches tabs).
 -   The canvas element moves into or out of the visible viewport (Intersection Observer).
+
+> [!NOTE]
+> The automatic pause and restart based on the `IntersectionObserver` is planned for a future version and is not yet implemented.
 
 This ensures that no unnecessary resources are consumed when the display is not visible.
 
@@ -80,37 +85,24 @@ const display = new Display( document.getElementById( "twopoint5d" ) );
 
 let camera, scene;
 
-display.on({
+display.onInit(({ renderer, width, height }) => {
+    camera = new THREE.PerspectiveCamera( 70, width / height, 1, 1000 );
+    camera.position.z = 400;
 
-    init ({ renderer, width, height }) {
+    scene = new THREE.Scene();
+});
 
-        camera = new THREE.PerspectiveCamera( 70, width / height, 1, 1000 );
-        camera.position.z = 400;
+display.onResize(({ width, height }) => {
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+});
 
-        scene = new THREE.Scene();
-
-    },
-
-    resize ({ width, height }) {
-
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-
-    },
-
-    renderFrame ({ renderer }) {
-
-        renderer.render( scene, camera );
-
-    }
-
-})
+display.onRenderFrame(({ renderer }) => {
+    renderer.render( scene, camera );
+});
 
 display.start();
 ```
-
-> [!NOTE]
-> The library [@spearwolf/eventize](https://github.com/spearwolf/eventize) is used for event handling.
 
 ### Using Display with Stage2D and Projections
 
@@ -130,14 +122,12 @@ const stage = new Stage2D(projection);
 
 const display = new Display(document.querySelector("canvas"));
 
-display.on({
-    resize({ width: canvasWidth, height: canvasHeight }) {
-        stage.resize(canvasWidth, canvasHeight);
-    },
+display.onResize(({ width: canvasWidth, height: canvasHeight }) => {
+    stage.resize(canvasWidth, canvasHeight);
+});
 
-    renderFrame({ renderer }) {
-        renderer.render(stage.scene, stage.camera);
-    }
+display.onRenderFrame(({ renderer }) => {
+    renderer.render(stage.scene, stage.camera);
 });
 
 display.start();
@@ -213,6 +203,8 @@ This pattern encapsulates the setup logic and makes it easy to create consistent
 
 The `Display` class is an `eventize` object and provides several lifecycle events. You can listen to them using `on(display, EventName, handler)`.
 
+![Display State and Events](./display/display-state-and-events.svg)
+
 | Event Name | Module Export | Description |
 |------------|---------------|-------------|
 | _"init"_ | `OnDisplayInit` | Fired once after initialization. |
@@ -236,5 +228,3 @@ Convenience shortcut methods are available for the most important events:
 -   `onNextFrame(handler)` (fires the handler only once on the next frame)
 -   `nextFrame()`: Returns a `Promise` that resolves on the next frame.
 -   `onDispose(handler)`
-
-

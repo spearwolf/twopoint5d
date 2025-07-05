@@ -23,7 +23,7 @@ export default defineConfig({
       {
         text: 'Manual (legacy)',
         items: [
-          { text: 'Display, Stage and Projections', link: '/display-stage-projections' },
+          
           { text: 'Vertex Objects', link: '/vertex-objects-legacy' }
         ]
       },

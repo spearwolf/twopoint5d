@@ -2,70 +2,210 @@
 outline: deep
 ---
 
-# Map2D
+<img src="/images/twopoint5d-700x168.png" style="padding-bottom: 2rem" width="175" height="42" alt="twopoint5d">
 
-Create and render visual tiled maps which are laid out in a 2D spatial grid map data structure
+# Map2D: Creating Tile-Based Worlds
 
+The `Map2D` module in `twopoint5d` provides a powerful and flexible system for creating and rendering 2D tile-based maps. This guide will walk you through the core concepts, from the basic structure of a tile map to advanced rendering techniques.
 
-## A Grid of Tiles
+## Overview: The Anatomy of a 2D Map
 
-### Tiled Maps
+At its core, a tile-based map is a grid of tiles. In `twopoint5d`, this concept is broken down into several key components that work together:
 
-All tiles are generally determined by a numerical (`uint32`) ID.
-For simplicity, it is assumed that the tiles are located in a 2D coordinate system.
+1.  **`Map2DLayer`**: This is the central organizational unit. It represents a single layer of your map and manages a grid of tiles. You can have multiple layers to create depth and complex scenes (e.g., a background layer, a main gameplay layer, and a foreground layer).
 
-![the tile coordinates system](tiledMaps/tile-coordinates.svg)
+2.  **Tile Data Provider (`IMap2DTileDataProvider`)**: This component is responsible for supplying the tile data—specifically, the ID of the tile at any given `(x, y)` coordinate in the grid. It acts as the "source of truth" for your map's layout.
 
-#### The Source of the Tile IDs
+3.  **Visibility Manager (`IMap2DVisibilitor`)**: This determines which tiles of a `Map2DLayer` are currently visible to the camera. This is crucial for performance, as it ensures that only the necessary tiles are processed and rendered at any given time (a technique known as culling).
 
-The tile IDs are read out via the [IMap2DTileDataProvider](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/IMap2DTileDataProvider.ts) interface.
+4.  **Tile Renderer (`IMap2DTileRenderer`)**: This component handles the actual drawing of the visible tiles. It takes the tile data and translates it into visual geometry that can be rendered by `three.js`.
 
-Tile IDs start at `1` and are unsigned integers, where `0` means there is no tile there.
+This modular architecture allows you to mix and match different components to suit your specific needs.
 
-##### RepeatingTilesProvider
+![The relationship between Map2DLayer, Data Provider, Visibility, and Renderer](tiledMaps/Map2dLayer.svg)
 
-The [RepeatingTilesProvider](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/RepeatingTilesProvider.ts) is an easy to use tile data provider which repeats a 2D pattern of tile IDs endlessly.
-Very handy when you just want a constantly repeating background.
+## 1. Defining the Map Layout: Tile Data Providers
 
-If you want you can limit the repeat to only horizontal or only vertical.
+The first step in creating a map is to define its layout. This is done using a class that implements the `IMap2DTileDataProvider` interface. This interface has one primary method: `getTileIdAt(col, row)`, which returns the ID of the tile at the specified integer coordinates. A tile ID of `0` signifies an empty space.
 
-![repeating-tiles-provider cheat-sheet](tiledMaps/RepeatingTilesProvider.svg)
+`twopoint5d` comes with a convenient, ready-to-use provider:
 
-#### From Tile to 2D Coordinates
+### `RepeatingTilesProvider`
 
-The [Map2DTileCoordsUtil](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/Map2DTileCoordsUtil.ts) does the mapping from 2D _world_ coordinates to _tile_ coordinates.
+This provider is perfect for creating infinitely repeating backgrounds or patterns. You give it a 2D array of tile IDs, and it will repeat that pattern endlessly in all directions.
 
-the origin of the 2D coordinate system is assumed to be in the upper left corner (with the y-axis pointing down).
+![How the RepeatingTilesProvider works](tiledMaps/RepeatingTilesProvider.svg)
 
-![map2d-tile-coords-util cheat-sheet](tiledMaps/Map2dTileCoordsUtil.svg)
+**Example: Creating a repeating pattern**
 
-#### Map2DLayer
+```javascript
+import { RepeatingTilesProvider } from '@spearwolf/twopoint5d';
 
-> TODO the docs are a bit outdated, the IMap2DVisibilitor interface is a recently added feature
+// Creates a 2x2 pattern of tiles that will repeat indefinitely.
+const tileProvider = new RepeatingTilesProvider([
+  [1, 2], // Row 1
+  [3, 4], // Row 2
+]);
 
-In a [Map2DLayer](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/Map2DLayer.ts), the world is divided into a static grid with [tiles](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/Map2DTile.ts) of equal size.
-Which tiles are displayed is determined by the _view area_ (which is an [AABB2](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/AABB2.ts)) of the layer.
+// Get the tile ID at a specific coordinate
+const tileId = tileProvider.getTileIdAt(10, 5); // Will be calculated based on the repeating pattern
+```
 
-![Map2dLayer class diagram](tiledMaps/Map2dLayer.svg)
+### Creating a Custom Data Provider
 
-The layer does not render the tiles itself, it only manages which tiles are visible, which are created and which can be removed (because they are outside the view area).
+For more complex maps, such as those loaded from a level editor or generated procedurally, you can create your own data provider by implementing the `IMap2DTileDataProvider` interface.
 
-![Map2dLayer update](tiledMaps/Map2dLayer-renderViewArea.svg)
+```typescript
+import { IMap2DTileDataProvider } from '@spearwolf/twopoint5d';
 
-Every time the _view area_ is updated (by calling `map2dLayer.update()` in combination with changes to the map2d layer properties), the [IMap2DTileRenderer](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/IMap2DTileRenderer.ts) is informed about it using callbacks - these callbacks are always called in the same order:
+class MyCustomMapProvider implements IMap2DTileDataProvider {
+  private mapData: number[][];
 
-![Map2dLayer update view area](tiledMaps/Map2dLayer-update-view-area.svg)
+  constructor(levelData: number[][]) {
+    this.mapData = levelData;
+  }
 
-The [IMap2DTileRenderer](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/tiled-maps/IMap2DTileRenderer.ts) is responsible for the display of the tiles.
+  getTileIdAt(col: number, row: number): number {
+    if (this.mapData[row] && this.mapData[row][col]) {
+      return this.mapData[row][col];
+    }
+    return 0; // Return 0 for empty or out-of-bounds tiles
+  }
 
-##### CameraBasedVisibility
+  // This method is optional but can provide performance benefits
+  getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array {
+    // ... implementation to return a block of tiles
+  }
+}
+```
 
-how it works: ![CameraBasedVisibility](tiledMaps/camera-based-visibility.jpg)
+## 2. Determining What's on Screen: Visibility Managers
 
+Once you have a map layout, you need to decide which part of it is visible. This is the job of the `IMap2DVisibilitor`. It calculates the set of tiles that fall within the camera's view.
 
-## Lookbook Examples
-- [tiled-maps-basic-layer-tiles-renderer](../examples/vanilla/tiled-maps-basic-layer-tiles-renderer.html) (vanilla)
-- [map2d-tile-sprites](../examples/r3f/src/map2d-tile-sprites/map2d-tile-sprites.jsx) (react)
-- [map2d-tile-sprites-layer](../examples/r3f/src/map2d-tile-sprites-layer/map2d-tile-sprites-layer.jsx) (react)
-- [map2d-camera-based-visibility](../examples/r3f/src/map2d-camera-based-visibility/map2d-camera-based-visibility.jsx) (react)
+`twopoint5d` provides two main visibility managers:
 
+### `RectangularVisibilityArea`
+
+This is the simplest visibility manager. It defines a fixed-size rectangular area. Any tiles that fall within this rectangle are considered visible. This is useful for 2D games where the camera follows the player within a defined viewport.
+
+### `CameraBasedVisibility`
+
+This is a more advanced visibility manager designed for 3D scenes where the `Map2DLayer` is placed on a 3D plane (like a floor or a wall). It uses the camera's view frustum to determine which tiles are visible. This allows for dynamic and perspective-correct culling in a 3D world.
+
+![How CameraBasedVisibility works](tiledMaps/camera-based-visibility.jpg)
+
+## 3. Putting It All Together: The `Map2DLayer`
+
+The `Map2DLayer` is where you combine your data provider and visibility manager. It acts as a `three.js` `Object3D`, so you can add it directly to your scene.
+
+**Example: Setting up a `Map2DLayer`**
+
+This example from the `lookbook` demo shows how to create a `Map2DLayer3D` (a specialized layer for 3D space) and configure it.
+
+```javascript
+import {
+  Map2DLayer3D,
+  RepeatingTilesProvider,
+  RectangularVisibilityArea,
+  Map2DTileSprites,
+  TileSetLoader,
+} from '@spearwolf/twopoint5d';
+import { Scene } from 'three';
+
+const scene = new Scene();
+
+// 1. Create the layer
+const mapLayer = new Map2DLayer3D();
+mapLayer.tileWidth = 256;
+mapLayer.tileHeight = 256;
+
+// 2. Assign a visibility manager
+mapLayer.visibilitor = new RectangularVisibilityArea(640, 480);
+
+// 3. Create a tile renderer (more on this below)
+const tileRenderer = new Map2DTileSprites();
+
+// 4. Assign a data provider to the renderer
+tileRenderer.tileData = new RepeatingTilesProvider([ [1, 2], [3, 4] ]);
+
+// 5. Load the tile graphics
+const { tileSet, texture } = await new TileSetLoader().loadAsync(/*...*/);
+tileRenderer.tileSet = tileSet;
+tileRenderer.material.uniforms.colorMap.value = texture;
+
+// 6. Add the renderer to the layer
+mapLayer.add(tileRenderer);
+mapLayer.addTileRenderer(tileRenderer);
+
+// 7. Add the layer to the scene
+scene.add(mapLayer);
+
+// 8. In your render loop, update the layer
+function animate() {
+  mapLayer.update();
+  // ... render scene
+}
+```
+
+## 4. Rendering the Tiles: The `IMap2DTileRenderer`
+
+The final piece of the puzzle is the renderer. The `Map2DLayer` delegates the actual drawing of tiles to an object that implements the `IMap2DTileRenderer` interface. This interface defines methods that the layer calls when tiles need to be added, removed, or reused.
+
+- `beginUpdate()`: Called at the start of an update cycle.
+- `addTile(tile)`: Called when a new tile becomes visible.
+- `reuseTile(tile)`: Called for a tile that was already visible and remains visible.
+- `removeTile(tile)`: Called when a tile is no longer visible.
+- `endUpdate()`: Called at the end of an update cycle.
+
+![The update flow between Map2DLayer and the Tile Renderer](tiledMaps/Map2dLayer-update-view-area.svg)
+
+### `Map2DTileSprites`: The Go-To Renderer
+
+`twopoint5d` includes `Map2DTileSprites`, a highly optimized renderer that uses instancing (`TileSprites`) to draw a large number of tiles with very high performance. It's the recommended renderer for most use cases.
+
+### Creating a Custom Tile Renderer
+
+You can create a custom renderer to achieve unique visual effects or to integrate with other rendering systems. For example, you could create a renderer that uses `three.js` `CSS2DObject`s instead of `Mesh`es.
+
+```typescript
+import { IMap2DTileRenderer, Map2DTile } from '@spearwolf/twopoint5d';
+import { Object3D, Vector2, Vector3 } from 'three';
+
+class MyCustomTileRenderer extends Object3D implements IMap2DTileRenderer {
+  private activeTiles = new Map<string, MyTileObject>();
+
+  beginUpdate(offset: Vector2, translate: Vector3) {
+    this.position.set(offset.x + translate.x, translate.y, offset.y + translate.z);
+  }
+
+  addTile(tile: Map2DTile) {
+    const tileObject = new MyTileObject(tile); // Your custom tile object
+    this.activeTiles.set(tile.id, tileObject);
+    this.add(tileObject); // Add it to the scene graph
+  }
+
+  reuseTile(tile: Map2DTile) {
+    // The tile is still visible, maybe update its position if needed
+    const tileObject = this.activeTiles.get(tile.id);
+    if (tileObject) {
+      tileObject.position.set(tile.view.left, 0, tile.view.top);
+    }
+  }
+
+  removeTile(tile: Map2DTile) {
+    const tileObject = this.activeTiles.get(tile.id);
+    if (tileObject) {
+      this.remove(tileObject); // Remove from scene graph
+      this.activeTiles.delete(tile.id);
+      // Optional: dispose geometry/material
+    }
+  }
+
+  endUpdate() {
+    // Post-update logic, if any
+  }
+
+  // ... other required methods: resetTiles, dispose
+}
+```
