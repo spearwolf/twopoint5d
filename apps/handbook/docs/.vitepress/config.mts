@@ -24,8 +24,16 @@ export default defineConfig({
         text: 'Core Concepts',
         items: [
           { text: 'Vertex Objects', link: '/vertex-objects' },
-          { text: 'Textures', link: '/textures' },
-          { text: 'Textures Cheat Sheet', link: '/cheat-sheet-textures' }
+          { text: 'Textures', link: '/textures' }
+        ]
+      },
+      {
+        text: 'API',
+        items: [
+          { text: 'Overview', link: '/overview' },
+          { text: 'Display', link: '/display' },
+          { text: 'Map2D', link: '/map-2d' },
+          { text: 'Textures', link: '/cheat-sheet-textures' }
         ]
       },
       {
