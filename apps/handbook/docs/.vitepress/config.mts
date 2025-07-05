@@ -17,14 +17,7 @@ export default defineConfig({
         text: 'Manual',
         items: [
           { text: 'Installation', link: '/installation' },
-          { text: 'Quick Start', link: '/quick-start' },
-        ]
-      },
-      {
-        text: 'Core Concepts',
-        items: [
-          { text: 'Vertex Objects', link: '/vertex-objects' },
-          { text: 'Textures', link: '/textures' }
+          { text: 'Textures and Atlases', link: '/textures' }
         ]
       },
       {
@@ -37,18 +30,9 @@ export default defineConfig({
         ]
       },
       {
-        text: 'Manual (legacy)',
+        text: 'Advanced Topics',
         items: [
-          
-          { text: 'Vertex Objects (Legacy)', link: '/vertex-objects-legacy' }
-        ]
-      },
-      {
-        text: 'API',
-        items: [
-          { text: 'Overview', link: '/overview' },
-          { text: 'Display', link: '/display' },
-          { text: 'Map2D', link: '/map-2d' }
+          { text: 'Vertex Objects', link: '/vertex-objects' }
         ]
       },
       {
