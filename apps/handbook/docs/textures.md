@@ -6,7 +6,7 @@ outline: deep
 
 In `twopoint5d`, efficient texture management is crucial for rendering a large number of sprites and other 2D elements. The library provides a set of classes to handle texture coordinates, texture atlases, tilesets, and frame-based animations, all designed to optimize GPU usage and simplify asset management.
 
-## 1. `TextureCoords`
+## `TextureCoords`
 
 The `TextureCoords` class represents a rectangular region within a larger texture. It's fundamental for defining where a specific sprite or tile is located on a spritesheet or texture atlas. It also handles texture flipping.
 
@@ -56,7 +56,7 @@ spriteCoords.flipHorizontal();
 console.log(spriteCoords.flipH); // true
 ```
 
-## 2. `TextureAtlas`
+## `TextureAtlas`
 
 A `TextureAtlas` (also known as a spritesheet) is a single large image that contains multiple smaller images (frames). This technique reduces the number of texture binds and draw calls, significantly improving rendering performance. The `TextureAtlas` class in `twopoint5d` manages these frames and provides methods to access them.
 
@@ -125,7 +125,7 @@ async function createTexturedSprites() {
 }
 ```
 
-## 3. `TileSet`
+## `TileSet`
 
 A `TileSet` is a specialized `TextureAtlas` optimized for grid-aligned tiles, typically used in tile-based maps. It simplifies the process of extracting `TextureCoords` for tiles of a uniform size from a spritesheet, often with defined margins, spacing, and padding.
 
@@ -206,7 +206,7 @@ async function createTileSprites() {
 }
 ```
 
-## 4. Loading Texture Atlas Definitions with `TextureAtlasLoader`
+## Loading Texture Atlas Definitions with `TextureAtlasLoader`
 
 The `TextureAtlasLoader` is responsible for loading texture atlas definitions, typically in JSON format (e.g., from TexturePacker), and the associated image file. It then parses this data to create a `TextureAtlas` instance.
 
@@ -234,7 +234,7 @@ async function loadAtlas() {
 // after initial loading, as it handles caching.
 ```
 
-## 5. `FrameBasedAnimations`
+## `FrameBasedAnimations`
 
 The `FrameBasedAnimations` class helps manage sequences of `TextureCoords` that represent animation frames. It can bake these animation definitions into a `DataTexture` that can be sampled in a shader to drive frame-based animations on the GPU, further optimizing performance.
 
@@ -309,7 +309,7 @@ async function createAnimatedSprites() {
 }
 ```
 
-## 6. `TextureStore`
+## `TextureStore`
 
 The `TextureStore` is a central, singleton service for loading, caching, and managing all texture-related resources in your `twopoint5d` application. It promotes a declarative approach to asset management, allowing you to define your textures, atlases, and tilesets in a JSON configuration file. This simplifies resource loading and ensures efficient reuse of textures across your application.
 
@@ -487,68 +487,4 @@ const tileSet = textureResource.tileSet; // If it's a tileset
 ```
 
 This demonstrates the declarative nature: the demo code simply *requests* a texture resource by its ID, and the `TextureStore` handles the loading, parsing, and caching based on the JSON configuration.
-
-## Cheat Sheet: Texture Domain API
-
-Here's a quick reference to the main classes and methods in the `twopoint5d` texture domain:
-
-### Classes
-
--   **`TextureCoords`**
-    -   `constructor(x?, y?, width?, height?)`
-    -   `constructor(parent, x?, y?, width?, height?)`
-    -   `s`, `t`, `s1`, `t1`, `u`, `v` (getters for normalized UVs)
-    -   `flipHorizontal()`, `flipVertical()`, `flipDiagonal()`
-
--   **`TextureAtlas`**
-    -   `add(coords: TextureCoords, data?)`
-    -   `add(name, coords: TextureCoords, data?)`
-    -   `get(id: number)`
-    -   `frame(name: string | symbol)`
-    -   `randomFrame()`
-
--   **`TileSet`**
-    -   `constructor(atlas: TextureAtlas, baseCoords: TextureCoords, options?: TileSetOptions)`
-    -   `constructor(baseCoords: TextureCoords, options?: TileSetOptions)`
-    -   `tileWidth`, `tileHeight`, `firstId`, `lastId`
-    -   `frame(tileId: number)`
-    -   `randomTileId()`, `randomFrameId()`
-
--   **`TextureAtlasLoader`**
-    -   `load(url, textureClasses, options, onLoadCallback, onErrorCallback?)`
-    -   `loadAsync(url, textureClasses?, options?)`
-
--   **`TextureStore`** (Singleton for caching and retrieving texture resources)
-    -   `static load(url: string | URL): Promise<TextureStore>`
-    -   `add(name: string, textureData: TextureAtlasData)`
-    -   `get(id: string): Promise<TextureAtlasData | TextureImageData>` (Updated return type)
-    -   `has(name: string): boolean`
-    -   `renderer: DisplayRendererType | undefined` (setter/getter)
-    -   `whenReady(): Promise<TextureStore>`
-
--   **`FrameBasedAnimations`**
-    -   `add(name, duration, texCoords: TextureCoords[])`
-    -   `add(name, duration, atlas: TextureAtlas, frameNameQuery?)`
-    -   `add(name, duration, tileSet: TileSet, firstTileId?, tileCount?)`
-    -   `add(name, duration, tileSet: TileSet, tileIds: number[])`
-    -   `bakeDataTexture(options?: BakeTextureOptions): DataTexture`
-    -   `animId(name: string | symbol): number`
-
--   **`TextureFactory`**
-    -   `constructor(maxAnisotrophyOrRenderer, defaultClassNames?, defaultOptions?)`
-    -   `create(source: TextureSource, ...classNames: TextureOptionClasses[]): Texture`
-    -   `update(texture: Texture, ...classNames: TextureOptionClasses[]): Texture`
-    -   `load(url: string, ...classNames: TextureOptionClasses[]): Texture`
-
-### Interfaces/Types
-
--   `TextureAtlasFrame`
--   `TileSetOptions`
--   `TextureAtlasData`
--   `TextureStoreItem`
--   `FrameBasedAnimDef`
--   `TextureOptionClasses` (from `TextureFactory`)
--   `TextureOptions` (from `TextureFactory`)
--   `TextureResourceSubType` (from `TextureStore` internal types)
--   `TextureImageData` (new type for single image resources)
 
