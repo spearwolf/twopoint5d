@@ -152,17 +152,18 @@ function animate() {
 
 The final piece of the puzzle is the renderer. The `Map2DLayer` delegates the actual drawing of tiles to an object that implements the `IMap2DTileRenderer` interface. This interface defines methods that the layer calls when tiles need to be added, removed, or reused.
 
+![The update flow between Map2DLayer and the Tile Renderer](tiledMaps/Map2dLayer-update-view-area.svg)
+
 - `beginUpdate()`: Called at the start of an update cycle.
 - `addTile(tile)`: Called when a new tile becomes visible.
 - `reuseTile(tile)`: Called for a tile that was already visible and remains visible.
 - `removeTile(tile)`: Called when a tile is no longer visible.
 - `endUpdate()`: Called at the end of an update cycle.
 
-![The update flow between Map2DLayer and the Tile Renderer](tiledMaps/Map2dLayer-update-view-area.svg)
 
 ### `Map2DTileSprites`: The Go-To Renderer
 
-`twopoint5d` includes `Map2DTileSprites`, a highly optimized renderer that uses instancing (`TileSprites`) to draw a large number of tiles with very high performance. It's the recommended renderer for most use cases.
+`twopoint5d` includes `Map2DTileSprites`, a highly optimized renderer that uses instancing (`TileSprites`) to draw a large number of tiles with very high performance. It's the recommended renderer for getting started quickly.
 
 ### Creating a Custom Tile Renderer
 

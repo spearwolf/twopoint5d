@@ -17,7 +17,10 @@ export default defineConfig({
         text: 'Manual',
         items: [
           { text: 'Installation', link: '/installation' },
-          { text: 'Textures and Atlases', link: '/textures' }
+          { text: 'Sprites', link: '/sprites' },
+          { text: 'Textures and Atlases', link: '/textures' },
+          { text: 'Map2D', link: '/map-2d' },
+          { text: 'Vertex Objects', link: '/vertex-objects' }
         ]
       },
       {
@@ -25,14 +28,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/overview' },
           { text: 'Display', link: '/display' },
-          { text: 'Map2D', link: '/map-2d' },
           { text: 'Textures', link: '/cheat-sheet-textures' }
-        ]
-      },
-      {
-        text: 'Advanced Topics',
-        items: [
-          { text: 'Vertex Objects', link: '/vertex-objects' }
         ]
       },
       {

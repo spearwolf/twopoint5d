@@ -8,7 +8,9 @@ outline: deep
 
 The `Display` class is a convenience helper in `twopoint5d`. It simplifies the process of initializing an HTML canvas element, setting up a `three.js` renderer, and starting a render loop.
 
+::: info
 **Using the `Display` class is optional.** All core features of `twopoint5d`, such as Vertex Objects, Tiled Maps, or Sprites, can be used directly with a `three.js` renderer without this class.
+:::
 
 ## Introduction
 
@@ -17,41 +19,45 @@ The `Display` class abstracts away recurring tasks when setting up a `three.js` 
 -   **Canvas Creation:** Automatically creates a `<canvas>` element within a specified DOM container or uses an existing one.
 -   **Renderer Management:** Initializes a `WebGLRenderer` (or optionally a `WebGPURenderer`) and automatically resizes it to fit the parent element.
 -   **Render Loop:** Provides an optimized `requestAnimationFrame` loop that can be used for animations and interactions. The frame rate can be controlled via the `maxFps` option in the constructor or the `frameLoop` property.
--   **Event System:** Offers a robust event system (based on `eventize`) for lifecycle and render events.
+-   **Event System:** Offers a robust event system (based on [eventize](https://github.com/spearwolf/eventize)) for lifecycle and render events.
 -   **Time Management:** Keeps track of the elapsed time and the time delta between frames.
 -   **State Management:** Internally manages the display's state (e.g., `running`, `paused`).
 
 A typical use case is the rapid creation of a prototype or demo without having to worry about the details of renderer configuration.
 
-![Display, Stage and Projections](./display/display-stage-renderer.excalidraw.svg)
-
 ## State Model
 
-The `Display` class uses an internal state machine (`DisplayStateMachine`) to manage its lifecycle. The main states are:
+The `Display` class uses an internal state machine ([DisplayStateMachine](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/display/DisplayStateMachine.ts)) to manage its lifecycle.
+
+![Display State and Events](./display/display-state-and-events.svg)
+
+::: warning
+The automatic pause and restart based on _document visibility_ and on the `IntersectionObserver` is planned for a future version and is not yet implemented.
+:::
+
+The main states are:
 
 -   `'new'`: The initial state before `start()` is called.
 -   `'running'`: The render loop is active, and the scene is being drawn.
 -   `'paused'`: The render loop is suspended.
 
 The state changes automatically under the following conditions:
--   An explicit call to `display.start()` or `display.stop()` (or setting `display.pause = true`).
--   The document's visibility changes (e.g., when the user switches tabs).
--   The canvas element moves into or out of the visible viewport (Intersection Observer).
 
-> [!NOTE]
-> The automatic pause and restart based on the `IntersectionObserver` is planned for a future version and is not yet implemented.
+An explicit call to ..
+-   `display.start()` or `display.stop()`
+-   `display.pause()` or setting `display.pause = true`
+-   `display.dispose()`
 
-This ensures that no unnecessary resources are consumed when the display is not visible.
 
 ## Declarative Resizing with `resize-to`
 
-The `Display` class offers a powerful declarative way to control the canvas size using the `resize-to` HTML attribute. This allows you to manage layout behavior directly in your HTML, separating it from your JavaScript logic.
+The `Display` class offers an optional declarative way to control the canvas size using the custom `resize-to` HTML attribute. This allows you to manage layout behavior directly in your HTML, separating it from your JavaScript logic.
 
 By default, `Display` inspects the `<canvas>` element itself for this attribute. You can change which element is inspected by providing the `resizeToAttributeEl` option to the constructor.
 
 The `resize-to` attribute can have the following values:
 
--   **`"fullscreen"`** or **`"window"`**: The canvas will be resized to fill the entire browser window. `Display` will add the necessary CSS (`position: fixed`, etc.) to achieve this.
+-   **`"fullscreen"`** or **`"window"`**: The canvas will be resized to fill the entire browser window. `Display` will automatically add the necessary CSS styles (`position: fixed`, etc.) to achieve this.
     ```html
     <canvas resize-to="fullscreen"></canvas>
     ```
@@ -61,8 +67,9 @@ The `resize-to` attribute can have the following values:
     <div id="render-area" style="width: 800px; height: 600px;"></div>
     <canvas resize-to="#render-area"></canvas>
     ```
+    > Note: Only the size is synchronized; the position of the canvas is _not_ adjusted to the element.
 
--   **`"self"`**: The canvas will be resized to fit the dimensions of its own containing element (as determined by the `resizeToElement` option).
+-   **`"self"`**: The canvas will be resized to fit the dimensions of its own containing element (taking into account the `resizeToElement` option). This is the default, no need to be set explicitly.
 
 This mechanism provides a flexible alternative to the programmatic `resizeTo` and `resizeToElement` options. The order of precedence is:
 1. `resizeTo` callback function (if provided)
@@ -71,7 +78,7 @@ This mechanism provides a flexible alternative to the programmatic `resizeTo` an
 
 ## Examples
 
-The `Display` class can be used on its own, but it truly shines as a foundation for more complex rendering setups. The following examples demonstrate how to use it in combination with `Stage2D` and `StageRenderer` to create layered 2.5D scenes.
+The `Display` class can be used independently, but is also suitable as a basis for more complex rendering configurations. The following examples demonstrate how to use it in combination with `Stage2D` and `StageRenderer`.
 
 ### Basic Display Setup
 
@@ -157,11 +164,9 @@ stageRenderer.add(stage);
 display.start();
 ```
 
-### Extending the Display Class
+## Relationship between Display, Stage and StageRenderer
 
-In practice, it is often useful to create specialized classes that inherit from `Display` to build reusable components. The `lookbook` application, for instance, uses a `PerspectiveOrbitDemo` class that comes pre-configured with a `PerspectiveCamera` and `OrbitControls`.
-
-This pattern encapsulates the setup logic and makes it easy to create consistent demos.
+![Display, Stage and StageRenderer](./display/display-stage-renderer_2x.excalidraw.png)
 
 ## Public API
 
@@ -199,14 +204,20 @@ This pattern encapsulates the setup logic and makes it easy to create consistent
 -   `resize()`: Forces a recalculation of the canvas size. Usually called automatically.
 -   `getEventProps()`: Returns an object with the current event properties that are passed to event handlers.
 
+### Extending the Display Class
+
+In practice, it is often useful to create specialized classes that inherit from `Display` to build reusable components.
+
+The *lookbook* application, for instance, uses a [PerspectiveOrbitDemo](https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/demos/utils/PerspectiveOrbitDemo.ts) class that comes pre-configured with a `PerspectiveCamera` and `OrbitControls`.
+
+This pattern encapsulates the setup logic and makes it easy to create consistent demos.
+
 ## Events
 
-The `Display` class is an `eventize` object and provides several lifecycle events. You can listen to them using `on(display, EventName, handler)`.
+The `Display` class is an *eventized* object and provides several lifecycle events. You can listen to them using `on(display, EventName, handler)` or any other methods provided by the [eventize](https://github.com/spearwolf/eventize) library.
 
-![Display State and Events](./display/display-state-and-events.svg)
-
-| Event Name | Module Export | Description |
-|------------|---------------|-------------|
+| Event Name | as Module Export | Description |
+|------------|------------------|-------------|
 | _"init"_ | `OnDisplayInit` | Fired once after initialization. |
 | _"start"_ | `OnDisplayStart` | Fired when the render loop starts. |
 | _"pause"_ | `OnDisplayPause` | Fired when the loop is paused. |

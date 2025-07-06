@@ -1,20 +1,25 @@
+---
+outline: deep
+---
+
+<img src="/images/twopoint5d-700x168.png" style="padding-bottom: 2rem" width="175" height="42" alt="twopoint5d">
+
 # Installation
 
-`twopoint5d` is a TypeScript library for 2.5D rendering in HTML5 Canvas, built on top of [three.js](https://threejs.org/).
+*twopoint5d* is a JavaScript library for 2.5D rendering in HTML5 Canvas, built on top of [three.js](https://threejs.org/).
 
-## Prerequisites
+The package is delivered in **ES module** format and transpiled for **ES2022**. TypeScript **types** are also included.
 
-Before installing `twopoint5d`, ensure you have `three.js` installed in your project, as it is a peer dependency.
+In addition to *three.js*, the *twopoint5d* package still requires the two _event-_ and _signal-based_ libraries as peer dependencies:
+- [eventize](https://github.com/spearwolf/eventize)
+- [signalize](https://github.com/spearwolf/signalize)
 
-```bash
-npm install three
-# or
-pnpm add three
-```
+There are no other dependencies.
 
-## Install `twopoint5d`
 
-You can install `twopoint5d` using npm or pnpm:
+## Install `@spearwolf/twopoint5d`
+
+You can install *twopoint5d* using npm or pnpm:
 
 ```bash
 npm install @spearwolf/twopoint5d

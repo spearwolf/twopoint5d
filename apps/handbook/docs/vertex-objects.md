@@ -2,6 +2,8 @@
 outline: deep
 ---
 
+<img src="/images/twopoint5d-700x168.png" style="padding-bottom: 2rem" width="175" height="42" alt="twopoint5d">
+
 # Vertex Objects
 
 `twopoint5d` leverages the concept of **Vertex Objects** to achieve highly efficient 2.5D rendering, especially for scenarios involving a large number of similar graphical elements like sprites or particles. Instead of creating thousands of individual `three.js` Mesh objects, which can incur significant CPU overhead, Vertex Objects allow you to aggregate data for many objects into a single, large `BufferGeometry` instance. This approach minimizes JavaScript-side processing and maximizes GPU throughput by enabling **instanced rendering** with a single WebGL draw call.

@@ -3,31 +3,25 @@
 layout: home
 
 hero:
-  name: "My Awesome Project"
-  text: "Documentation for the twopoint5d library"
-  tagline: My great project tagline
+  name: "twopoint5d handbook"
+  text: "The official documentation for the twopoint5d library"
+  tagline: Render sprites and pixelart in 2.5D with three.js
   actions:
     - theme: brand
-      text: Overview
+      text: API Overview
       link: /overview
     - theme: alt
-      text: Markdown Examples
-      link: /markdown-examples
-    - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Installation
+      link: /installation
     - theme: alt
       text: Display
       link: /display
     - theme: alt
-      text: Display, Stage and Projections
-      link: /display-stage-projections
+      text: Textures API
+      link: /cheat-sheet-textures
     - theme: alt
       text: Map2D
       link: /map-2d
-    - theme: alt
-      text: Vertex Objects (legacy)
-      link: /vertex-objects-legacy
 
 features:
   - title: Feature A

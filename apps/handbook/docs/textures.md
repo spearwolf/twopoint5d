@@ -2,6 +2,8 @@
 outline: deep
 ---
 
+<img src="/images/twopoint5d-700x168.png" style="padding-bottom: 2rem" width="175" height="42" alt="twopoint5d">
+
 # Textures and Atlases
 
 In `twopoint5d`, efficient texture management is crucial for rendering a large number of sprites and other 2D elements. The library provides a set of classes to handle texture coordinates, texture atlases, tilesets, and frame-based animations, all designed to optimize GPU usage and simplify asset management.
