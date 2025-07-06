@@ -21,11 +21,14 @@ There are no other dependencies.
 
 You can install *twopoint5d* using npm or pnpm:
 
-```bash
+::: code-group
+```bash [npm]
 npm install @spearwolf/twopoint5d
-# or
+```
+```bash [pnpm]
 pnpm add @spearwolf/twopoint5d
 ```
+:::
 
 ## Usage in Your Project
 

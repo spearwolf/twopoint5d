@@ -7,6 +7,13 @@ export default defineConfig({
   base: '/docs/',
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
+
+    siteTitle: 'handbook',
+    logo: {
+      light: '/images/twopoint5d-dark.png',
+      dark: '/images/twopoint5d-light.png'
+    },
+
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Lookbook', link: '/lookbook' }
