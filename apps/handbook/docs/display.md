@@ -166,11 +166,12 @@ display.start();
 
 ## Relationship between Display, Stage and StageRenderer
 
-![Display, Stage and StageRenderer](./display/display-stage-renderer_2x.excalidraw.png)
+![Display, Stage and StageRenderer](./display/display-stage-renderer_2x.light.png){.light-only}
+![Display, Stage and StageRenderer](./display/display-stage-renderer_2x.excalidraw.png){.dark-only}
 
 ## Public API
 
-### `constructor(domElementOrRenderer, options?)`
+### `new Display(domElementOrRenderer, options?)`
 
 -   `domElementOrRenderer`: Either an `HTMLElement` (like `div` or `canvas`) to serve as a container, or a pre-existing `WebGLRenderer` or `WebGPURenderer` instance.
 -   `options` (optional): An object with configuration parameters.
