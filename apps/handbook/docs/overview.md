@@ -6,41 +6,40 @@ outline: deep
 
 # Overview
 
-Welcome to `twopoint5d`. This guide will help you understand the library's architecture and submodules. `twopoint5d` is not a standalone engine, but a collection of tools specifically designed to enhance your `three.js` projects with ready-to-use 2.5D features.
+Welcome to `twopoint5d`. This guide will help you understand the library's architecture and submodules. `twopoint5d` is not a standalone engine, but a collection of functions and classes specifically designed to enhance your `three.js` projects with ready-to-use 2.5D features.
 
 
 ## Modules
 
-The source code is organized into several submodules, each focusing on a specific area of functionality. All source files are located in [packages/twopoint5d/src](https://github.com/spearwolf/twopoint5d/tree/main/packages/twopoint5d/src).
+The source code is organized into several submodules, each focusing on a specific area of functionality. The source files are located in [./packages/twopoint5d/src/](https://github.com/spearwolf/twopoint5d/tree/main/packages/twopoint5d/src).
 
 
 ### Sprites
 
 The main purpose of the `twopoint5d` library is to provide everything you need to render 2D images in a 3D world. It uses instanced rendering for high performance, building on the concept of _vertex objects_:
 
-#### Vertex Objects
+#### Vertex Objects?
 
-Instead of managing thousands of `three.js` objects, `twopoint5d` batches the data for similar objects (like sprites) into large `BufferGeometry` instances. This approach drastically reduces the number of WebGL draw calls, a primary bottleneck in complex scenes. The `vertex-objects` API provides an _intuitive, object-oriented interface to manipulate individual entities_ within these buffers, and changes are efficiently transferred to the GPU.
+Instead of managing thousands of `three.js` objects (`Object3D` &rarr; `Mesh`), `twopoint5d` batches the data for similar objects (like sprites) into large `BufferGeometry` instances. This approach drastically reduces the number of WebGL draw calls, a primary bottleneck in complex scenes. The _vertex objects_ API provides an _intuitive, object-oriented interface to manipulate individual entities_ within these buffers, and changes are efficiently transferred to the GPU.
 
-For a more detailed guide on vertex objects, refer to the [Vertex Objects](./vertex-objects.md)  guide.
+For a more detailed guide on _vertex objects_, refer to the [Vertex Objects](./vertex-objects.md)  guide.
 
-To avoid reinventing the wheel each time, the `twopoint5d` library offers ready-made sprite objects based on vertex objects:
+In addition to the option of creating customized sprites based on _vertex objects_, the `twopoint5d` library offers several predefined, ready-to-use sprites:
 
--   **`TexturedSprites`**: The base class for rendering static, textured sprites. Ideal for backgrounds, icons, or other non-animated image elements.
--   **`AnimatedSprites`**: Enables rendering of sprites with frame-based animations. Animations are calculated directly on the GPU, allowing for the smooth display of hundreds or thousands of animated objects.
--   **`TileSprites`**: A highly optimized class for rendering large tile-based maps.
+-   **`TexturedSprites`**: Pretty solid base class for rendering static, textured sprites. Ideal for backgrounds, icons, or other non-animated image elements.
+-   **`AnimatedSprites`**: Sprites with frame-based animations. Animations are calculated directly on the GPU, allowing for realtime rendering of hundreds or thousands of animated 2D image sprites.
+-   **`TileSprites`**: A highly optimized class for rendering large tile-based 2D maps.
 
 
 ### Textures
 
 Efficient texture management is crucial for performance. This module provides tools for loading, managing, and using textures and sprite sheets.
-`TextureAtlas` and `TileSet` are key classes for working with sprite sheets, while the `TextureStore` serves as a central asset store that can be loaded via a JSON catalog.
 
--   **`TextureStore`**: A global cache for texture resources. It ensures that each texture is loaded only once and simplifies access throughout the project. The `TextureStore` follows a declarative approach; the texture resources are loaded via a JSON catalog.
--   **`TextureAtlas`**: Represents a sprite sheet and allows access to individual frames by name or index.
+-   **`TextureStore`**: A store for texture resources. It ensures that each texture is loaded only once and simplifies access throughout the project. The `TextureStore` follows a declarative approach; the texture resources are loaded via a JSON catalog.
+-   **`TextureAtlas`**: A helper class for working with sprite sheets and allows access to individual texture coordinates and frames by name or index.
 -   **`TextureAtlasLoader`**: Loads sprite sheet definitions from JSON files, such as those exported from tools like TexturePacker.
--   **`TileSet`**: A specialized version of `TextureAtlas`, optimized for grid-based tile sets.
--   **`FrameBasedAnimations`**: A helper class for defining and managing animations based on the frames of a `TextureAtlas`.
+-   **`TileSet`**: A specialized version of `TextureAtlas`, optimized for grid-based tile sets from a single image.
+-   **`FrameBasedAnimations`**: A helper class for defining and managing animations based on the frames of a `TextureAtlas`. Creates a `DataTexture` that can be used by the `AnimatedSprites`.
 
 For a more detailed guide on textures and their usage, see the [Textures and Atlases](./textures.md) or [Textures API](./cheat-sheet-textures.md) docs.
 
@@ -67,13 +66,13 @@ For a more detailed guide on how to render 2d-maps, refer to the [Map2D](./map-2
 
 ### Display
 
-This module simplifies the setup and management of the `three.js` rendering environment. While its use is optional, the `Display` class serves as a convenient wrapper for bootstrapping a `three.js` application, handling common boilerplate code.
+This module simplifies the setup and management of a `three.js` rendering environment. While its use is optional, the `Display` class serves as a convenient wrapper for bootstrapping a `three.js` project, handling common boilerplate code.
 
 -   **`Display`**: The main class for managing the canvas, renderer, and render loop. Its key features include:
     -   **Render Loop**: Manages an optimized `requestAnimationFrame` loop with built-in time tracking (delta time). The frame rate can be capped using the `maxFps` property.
     -   **Responsive Canvas**: Automatically handles canvas resizing. It can be configured to fill its parent element, the entire window, or any other element via a CSS selector using a `resize-to` HTML attribute.
-    -   **Pixelated Rendering**: For retro-style graphics, setting the `pixelated` property to `true` ensures crisp, sharp pixels by disabling anti-aliasing.
-    -   **Event System**: Provides lifecycle events like `onInit`, `onResize`, and `onRenderFrame` for clean application structure.
+    -   **Pixelated Rendering**: For retro-style graphics, setting the `pixelated` property to `true` ensures crisp, sharp pixels.
+    -   **Event System**: Provides lifecycle events and helpers like `onInit`, `onResize`, and `onRenderFrame` for clean application structure.
 
 For a more detailed guide on state management, declarative resizing, and advanced usage, see the [Display](./display.md) documentation.
 
@@ -81,7 +80,7 @@ For a more detailed guide on state management, declarative resizing, and advance
 
 This module introduces the concept of a `Stage`, which links a `three.js` scene to a camera and a virtual 2D render output. It provides a structured way to manage 2D scenes within a 3D space.
 
--   **`Stage2D`**: Represents a 2D scene. It contains a `three.js` `Scene` and is associated with a `Projection` that controls the camera.
+-   **`Stage2D`**: Represents a 2D scene. It contains a `Scene` and is associated with a `Projection` that controls the camera.
 -   **`StageRenderer`**: Manages and renders one or more `Stage2D` instances. This is the primary tool for composing scenes from multiple layers, for example to create parallax effects.
 
 **Projections**
@@ -95,7 +94,7 @@ A `Projection` is an alternative way to create and manage a `three.js` camera. I
 
 ### Controls
 
-This module contains UI controls and interaction helpers.
+This module contains some optional UI controls and interaction helpers:
 
--   **`InputControlBase`**: A base class for creating input controls that handle event listeners for mouse and keyboard events.
+-   **`InputControlBase`**: A common base class for creating input controls that handle event listeners for mouse and keyboard events.
 -   **`PanControl2D`**: Implements a 2D panning control that allows moving the view via mouse drag or keyboard (WASD).
