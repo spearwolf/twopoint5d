@@ -1,0 +1,35 @@
+{
+  "hiddenTags": [
+    "react",
+    "vanilla"
+  ],
+  "defaultCategory": {
+    "name": "Other",
+    "order": 9999,
+    "description": "Tags that do not fit into any specific category."
+  },
+  "categories": [
+    {
+      "name": "Sprites",
+      "tagId": "sprites",
+      "description": "Predefined sprites meshes",
+      "includeTags": [
+        "AnimatedSprites",
+        "AnimatedSpritesGeometry",
+        "AnimatedSpritesMaterial",
+        "billboards"
+      ]
+    },
+    {
+      "name": "Textures",
+      "tagId": "textures",
+      "description": "Helpers for loading and managing textures, atlases and tilesets",
+      "includeTags": [
+        "FrameBasedAnimations",
+        "TileSetLoader",
+        "tilesets",
+        "textures"
+      ]
+    }
+  ]
+}

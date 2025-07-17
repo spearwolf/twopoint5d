@@ -1,4 +1,33 @@
+import tagCategoriesJson from '../../data/tag-categories.json' assert {type: 'json'};
 import {baseUrl, makeUrl} from './makeUrl.js';
+
+interface IDemo {
+  id: string;
+  title: string;
+  description?: string;
+  url: string;
+  href: string;
+  previewImage?: string;
+  tags?: string[];
+}
+
+interface ICategory {
+  name: string;
+  description?: string;
+  order?: number;
+  tagId?: string;
+  includeTags: string[];
+  tags: string[];
+}
+
+const tagCategories: Map<string, ICategory> = new Map();
+
+tagCategoriesJson.categories.forEach((category) => {
+  tagCategories.set(category.name, {
+    ...category,
+    tags: []
+  });
+});
 
 const tags: Map<string, {demoIds: Set<string>; relatedTags: Set<string>}> = new Map();
 
@@ -31,9 +60,33 @@ const demos = Object.entries(
 
 const uniqTagKeys = Array.from(tags.keys()).sort();
 
+const defaultCategory: ICategory = {
+  ...tagCategoriesJson.defaultCategory,
+  includeTags: [],
+  tags: []
+};
+
+uniqTagKeys.forEach((tag) => {
+  let foundCategory = false;
+  for (const category of tagCategories.values()) {
+    if (category.includeTags.includes(tag)) {
+      category.tags.push(tag);
+      foundCategory = true;
+      break;
+    }
+  }
+  if (!foundCategory) {
+    if (!tagCategories.has(defaultCategory.name)) {
+      tagCategories.set(defaultCategory.name, defaultCategory);
+    }
+    tagCategories.get(defaultCategory.name)!.tags.push(tag);
+  }
+});
+
 export const loadMetadataForDemos = () => ({
   baseUrl,
   demos,
   tags,
   uniqTagKeys,
+  tagCategories: Array.from(tagCategories.values()).sort((a, b) => a.order ?? 0 - b.order ?? 0),
 });

@@ -2,25 +2,33 @@
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
 import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 
-const {uniqTagKeys, tags} = loadMetadataForDemos();
+const {uniqTagKeys, tags, tagCategories} = loadMetadataForDemos();
 ---
 
 <section class="tags select-none">
-  <ul class="tag-cloud-filter">
-    {
-      uniqTagKeys.sort().map((tag) => (
-        <li
-          class="tag"
-          data-tag={tag}
-          data-related-demos={Array.from(tags.get(tag).demoIds).join(',')}
-          data-related-tags={Array.from(tags.get(tag).relatedTags).join(',')}
-        >
-          {tag}
-        </li>
-      ))
-    }
-  </ul>
-  <div class="flex flex-row justify-end lg:justify-start pt-4">
+  {
+    tagCategories.map((category) => (
+      <h3 class="tag-category">{category.name}</h3>
+      <p class="tag-catgeory-description">
+        {category.description}
+      </p>
+      <ul class="tag-cloud-filter">
+        {
+          category.tags.sort().map((tag) => (
+            <li
+              class="tag"
+              data-tag={tag}
+              data-related-demos={Array.from(tags.get(tag).demoIds).join(',')}
+              data-related-tags={Array.from(tags.get(tag).relatedTags).join(',')}
+            >
+              {tag}
+            </li>
+          ))
+        }
+      </ul>
+    ))
+  }
+  <div class="flex flex-row justify-end lg:justify-start mt-8 pt-2 border-t border-dashed border-[var(--color-primary-inactive)]">
     <button class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2"
       ><Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span></button
     >
@@ -74,6 +82,18 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   .tag:is(:hover, :focus-within) {
     box-shadow: 0 0 1px 1px var(--color-primary-highlight);
   }
+
+  .tag-category {
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-primary);
+  }
+  .tag-catgeory-description {
+    margin-bottom: 0.5rem;
+    color: var(--color-primary);
+    font-size: var(--tag-font-size);
+  }
 </style>
 
 <script>
@@ -112,9 +132,11 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
   }
 
   function clearTags() {
-    for (const $tag of document.querySelector(CSS_TAG_CLOUD_FILTER).querySelectorAll(`[${ATTR_TAG}]`)) {
-      $tag.classList.remove(CSS_INACTIVE);
-      $tag.classList.remove(CSS_ACTIVE);
+    for (const $container of document.querySelectorAll(CSS_TAG_CLOUD_FILTER)) {
+      for (const $tag of $container.querySelectorAll(`[${ATTR_TAG}]`)) {
+        $tag.classList.remove(CSS_INACTIVE);
+        $tag.classList.remove(CSS_ACTIVE);
+      }
     }
     dispatchShowDemosEvent({showAll: true});
   }
@@ -127,7 +149,7 @@ const {uniqTagKeys, tags} = loadMetadataForDemos();
       (event: any) => {
         if (event.isPrimary && event.button === 0 && event.target.hasAttribute(ATTR_TAG)) {
           const $tag = event.target;
-          const $container = $tag.parentNode;
+          const $container = $tag.parentNode.parentNode as HTMLElement;
           const $allTags = $container.querySelectorAll(`[${ATTR_TAG}]`);
 
           if ($tag.classList.contains(CSS_INACTIVE)) {
