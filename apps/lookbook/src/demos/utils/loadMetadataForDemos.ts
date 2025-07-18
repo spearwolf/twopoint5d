@@ -93,5 +93,5 @@ export const loadMetadataForDemos = () => ({
   demos,
   tags,
   uniqTagKeys,
-  tagCategories: Array.from(tagCategories.values()).sort((a, b) => a.order ?? 0 - b.order ?? 0),
+  tagCategories: Array.from(tagCategories.values()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
 });
