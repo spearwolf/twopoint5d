@@ -1,15 +1,15 @@
 import tagCategoriesJson from '../../data/tag-categories.json' assert {type: 'json'};
 import {baseUrl, makeUrl} from './makeUrl.js';
 
-interface IDemo {
-  id: string;
-  title: string;
-  description?: string;
-  url: string;
-  href: string;
-  previewImage?: string;
-  tags?: string[];
-}
+// interface IDemo {
+//   id: string;
+//   title: string;
+//   description?: string;
+//   url: string;
+//   href: string;
+//   previewImage?: string;
+//   tags?: string[];
+// }
 
 interface ICategory {
   name: string;
@@ -19,6 +19,8 @@ interface ICategory {
   includeTags: string[];
   tags: string[];
 }
+
+const hiddenTags = new Set(tagCategoriesJson.hiddenTags || []);
 
 const tagCategories: Map<string, ICategory> = new Map();
 
@@ -39,6 +41,9 @@ const demos = Object.entries(
   const id = filepath.replace(/.*\/([^/.]+)\.json$/, '$1');
   if (json.tags) {
     json.tags.forEach((tag: string) => {
+      if (hiddenTags.has(tag)) {
+        return; // Skip hidden tags
+      }
       if (!tags.has(tag)) {
         tags.set(tag, {demoIds: new Set(), relatedTags: new Set()});
       }

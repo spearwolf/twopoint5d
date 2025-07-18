@@ -53,10 +53,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 <style>
   .link-card {
     border-radius: var(--card-border-radius);
-    background-color: var(--color-background-light);
-    box-shadow:
-      0 0 0px 5px var(--color-background-light),
-      0 0 1px 6px var(--color-background-lighter);
+    background-color: var(--color-background-dark);
+    box-shadow: 0 0 0 6px var(--color-background-dark);
   }
 
   .link-card.hidden {
@@ -70,7 +68,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
   .link-card:is(:hover, :focus-within) > a {
     box-shadow:
-      0 0 0px 1px var(--color-primary-highlight),
+      0 0 0px 2px var(--color-primary-highlight),
       0 0 10px 10px rgba(235 239 247 / 9%);
   }
 
@@ -79,36 +77,33 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
 
   h2 {
-    top: var(--card-border-radius);
-    padding: 0.05em 0.6em 0.05em 0.5em;
+    padding: 0.1em 0.6em;
     font-size: 0.9rem;
     font-weight: 600;
     color: var(--color-primary);
-    background-color: rgba(0 0 0 / 60%);
-    text-transform: uppercase;
-    border-top-right-radius: 2px;
-    border-bottom-right-radius: 2px;
+    background-color: rgba(0 0 0 / 80%);
+    border-top-left-radius: var(--card-border-radius);
+    border-bottom-right-radius: var(--card-border-radius);
   }
 
   p {
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
-    color: var(--color-primary-darker);
-    font-size: 0.95rem;
+    margin: 0.5rem 0.5em 0.8rem;
+    color: var(--color-primary);
+    font-size: 0.8rem;
   }
 
   .tags {
-    margin: -0.1rem -0.3rem 0.5rem;
+    margin: -0.1rem -0.1rem 0.5rem;
   }
 
   .tag {
     display: inline-block;
-    color: var(--color-primary-darker);
-    background-color: var(--color-background);
+    color: var(--color-primary);
+    background-color: var(--color-background-light);
     margin: 0.1rem;
     font-size: var(--tag-font-size);
     padding: var(--tag-padding);
     border-radius: var(--tag-border-radius);
-    box-shadow: 0 0 1px 1px var(--color-background-lighter);
+    /* box-shadow: 0 0 1px 1px var(--color-background-lighter); */
   }
 </style>

@@ -1,7 +1,8 @@
 {
   "hiddenTags": [
     "react",
-    "vanilla"
+    "vanilla",
+    "demo"
   ],
   "defaultCategory": {
     "name": "Other",
@@ -12,23 +13,72 @@
     {
       "name": "Sprites",
       "tagId": "sprites",
-      "description": "Predefined sprites meshes",
       "includeTags": [
         "AnimatedSprites",
         "AnimatedSpritesGeometry",
         "AnimatedSpritesMaterial",
+        "TexturedSprites",
+        "TexturedSpritesGeometry",
+        "TexturedSpritesMaterial",
         "billboards"
       ]
     },
     {
       "name": "Textures",
       "tagId": "textures",
-      "description": "Helpers for loading and managing textures, atlases and tilesets",
       "includeTags": [
         "FrameBasedAnimations",
-        "TileSetLoader",
         "tilesets",
-        "textures"
+        "textures",
+        "texture-atlas",
+        "TextureAtlas",
+        "TextureAtlasLoader",
+        "TextureCoords",
+        "TextureFactory",
+        "TextureImageLoader",
+        "TileSet",
+        "TileSetLoader",
+        "PowerOf2ImageLoader"
+      ]
+    },
+    {
+      "name": "Map2D",
+      "tagId": "map2d",
+      "includeTags": [
+        "AABB2",
+        "ChunkQuadTreeNode",
+        "Map2DLayer3D",
+        "Map2DTile",
+        "Map2DTileSprites",
+        "RectangularVisibilityArea",
+        "RepeatingTilesProvider",
+        "TileSpritesGeometry",
+        "TileSpritesMaterial",
+        "map2d"
+      ]
+    },
+    {
+      "name": "Display, Stage and Projections",
+      "tagId": "display-stage-projections",
+      "includeTags": [
+        "Display",
+        "Stage",
+        "OrthographicProjection",
+        "ParallaxProjection",
+        "Stage2D",
+        "StageRenderer"
+      ]
+    },
+    {
+      "name": "Vertex Objects",
+      "tagId": "vertex-objects",
+      "includeTags": [
+        "VO",
+        "InstancedVertexObjectGeometry",
+        "VertexObjectGeometry",
+        "VertexObjects",
+        "getDescriptorOf",
+        "instanced"
       ]
     }
   ]

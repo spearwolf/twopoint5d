@@ -3,7 +3,7 @@ import DemoCardsGrid from '~components/DemoCardsGrid.astro';
 import LookbookHeader from '~components/LookbookHeader.astro';
 import TagCloudFilter from '~components/TagCloudFilter.astro';
 import Layout from '~layouts/Layout.astro';
-import backPattern from '../images/ball-pattern-dark-blueish-4x-30deck.webp?url';
+import backPattern from '../images/ball-pattern-dark-blueish-4x-30deck-doubled.webp?url';
 import gradientBack from '../images/so-mi-gradient-back-gr.webp?url';
 ---
 
@@ -24,7 +24,7 @@ import gradientBack from '../images/so-mi-gradient-back-gr.webp?url';
         </div>
       </div>
       <main class="isolate">
-        <div class="px-5 sm:px-12">
+        <div class="mt-4 mb-16 px-5 sm:px-12">
           <div class="mx-auto pt-4 pb-6">
             <DemoCardsGrid />
           </div>
@@ -36,16 +36,17 @@ import gradientBack from '../images/so-mi-gradient-back-gr.webp?url';
 
 <style define:vars={{'page-background-pattern': `url(${backPattern})`, 'page-gradient-back': `url(${gradientBack})`}}>
   .back-pattern {
-    /* background-color: var(--color-background);
-    background-image: var(--page-background-pattern), var(--page-gradient-back);
+    background-color: var(--color-background);
+    /* background-image: var(--page-background-pattern), var(--page-gradient-back); */
+    background-image: var(--page-background-pattern);
     background-repeat: repeat, no-repeat;
     background-size: auto, contain;
     background-position:
       top left,
-      top center; */
-    background-image: var(--page-gradient-back);
-    background-repeat: no-repeat;
-    background-size: contain;
-    background-position: top center;
+      top center;
+    /* background-image: var(--page-gradient-back); */
+    /* background-repeat: no-repeat; */
+    /* background-size: contain; */
+    /* background-position: top center; */
   }
 </style>
