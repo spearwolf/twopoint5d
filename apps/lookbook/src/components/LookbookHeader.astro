@@ -1,8 +1,8 @@
 ---
 import RainbowLine from '@spearwolf/astro-rainbow-line';
-
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
+import SearchLookbook from './SearchLookbook.astro';
 ---
 
 <div class="z-50 sticky top-0 y-0">
@@ -10,8 +10,12 @@ import twopoint5d from '../images/twopoint5d-logo.svg?url';
     <img class="primary" src={twopoint5d} alt="twopoint5d" />
     <img class="secondary" src={lookbook} alt="lookbook" />
 
+    <div class="flex-1 flex justify-end items-center">
+      <SearchLookbook />
+    </div>
+
     <div class="rainbow-line-container">
-      <RainbowLine shadow colorSliceWidth="32" />
+      <RainbowLine shadow colorSliceWidth={32} />
     </div>
   </header>
 </div>

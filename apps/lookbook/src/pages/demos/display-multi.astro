@@ -6,54 +6,56 @@ import {description, showSource, title} from './_display-multi.json';
 <Layout title={title} showSource={showSource}>
   <p slot="demo-description">{description}</p>
 
-  <section class="gridContainer">
-    <div class="gridCell">
-      <div class="canvasContainer border-box">
-        <canvas class="content-box create-canvas-here"></canvas>
+  <div class="pt-[28px] h-full">
+    <section class="gridContainer">
+      <div class="gridCell">
+        <div class="canvasContainer border-box">
+          <canvas class="content-box create-canvas-here"></canvas>
+        </div>
+        <div class="gridInfo">
+          div &gt; <b>canvas</b>.content-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-      <div class="gridInfo">
-        div &gt; <b>canvas</b>.content-box
-        <span class="canvasSizeInfo"></span>
+      <div class="gridCell">
+        <div class="canvasContainer content-box create-canvas-here debug"></div>
+        <div class="gridInfo">
+          <b>div</b>.no-size.content-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-    </div>
-    <div class="gridCell">
-      <div class="canvasContainer content-box create-canvas-here debug"></div>
-      <div class="gridInfo">
-        <b>div</b>.no-size.content-box
-        <span class="canvasSizeInfo"></span>
+      <div class="gridCell">
+        <div class="canvasContainer content-box size-100 create-canvas-here"></div>
+        <div class="gridInfo">
+          <b>div</b>.size-100%.content-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-    </div>
-    <div class="gridCell">
-      <div class="canvasContainer content-box size-100 create-canvas-here"></div>
-      <div class="gridInfo">
-        <b>div</b>.size-100%.content-box
-        <span class="canvasSizeInfo"></span>
+      <div class="gridCell">
+        <div class="canvasContainer">
+          <canvas class="border-box create-canvas-here"></canvas>
+        </div>
+        <div class="gridInfo">
+          div &gt; <b>canvas</b>.border-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-    </div>
-    <div class="gridCell">
-      <div class="canvasContainer">
-        <canvas class="border-box create-canvas-here"></canvas>
+      <div class="gridCell">
+        <div class="canvasContainer border-box create-canvas-here"></div>
+        <div class="gridInfo">
+          <b>div</b>.no-size.border-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-      <div class="gridInfo">
-        div &gt; <b>canvas</b>.border-box
-        <span class="canvasSizeInfo"></span>
+      <div class="gridCell">
+        <div class="canvasContainer size-100 border-box create-canvas-here"></div>
+        <div class="gridInfo">
+          <b>div</b>.size-100%.border-box
+          <span class="canvasSizeInfo"></span>
+        </div>
       </div>
-    </div>
-    <div class="gridCell">
-      <div class="canvasContainer border-box create-canvas-here"></div>
-      <div class="gridInfo">
-        <b>div</b>.no-size.border-box
-        <span class="canvasSizeInfo"></span>
-      </div>
-    </div>
-    <div class="gridCell">
-      <div class="canvasContainer size-100 border-box create-canvas-here"></div>
-      <div class="gridInfo">
-        <b>div</b>.size-100%.border-box
-        <span class="canvasSizeInfo"></span>
-      </div>
-    </div>
-  </section>
+    </section>
+  </div>
 </Layout>
 
 <script>
@@ -119,9 +121,10 @@ import {description, showSource, title} from './_display-multi.json';
     height: 100%;
   }
   body {
+    height: 100%;
     margin: 0;
-    background-color: #292a2d;
     color: #f0f0f0;
+    background-color: #123;
     font-family: sans-serif;
     font-size: 13px;
     line-height: 2;

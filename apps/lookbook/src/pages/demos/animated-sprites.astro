@@ -5,10 +5,10 @@ import {description, showSource, title} from './_animated-sprites.json';
 
 <Layout title={title} showSource={showSource}>
   <canvas id="canvas-container" resize-to="window"></canvas>
-  <section class="fixed top-4 right-4 flex gap-2">
-    <div class="actionBtn moreSprites">MORE</div>
+  <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
+    <div class="actionBtn lessSprites">less</div>
     <div class="spriteCount">0</div>
-    <div class="actionBtn lessSprites">LESS</div>
+    <div class="actionBtn moreSprites">more</div>
   </section>
 
   <p slot="demo-description">{description}</p>
@@ -19,24 +19,30 @@ import {description, showSource, title} from './_animated-sprites.json';
     height: 100vh;
     overflow-y: hidden;
     background-color: #391e39;
-    background: radial-gradient(circle, rgb(82 95 132) 0%, rgb(149 188 199) 100%);
+    background: radial-gradient(circle, rgb(118, 174, 141) 0%, rgb(13, 77, 75) 80%, rgb(3, 11, 28) 100%);
     color: #eee;
   }
   .spriteCount {
-    padding: 0.5rem 1rem;
     color: #eee;
     font-weight: bold;
+    font-size: 250%;
     min-width: 3em;
+    text-align: center;
   }
   .actionBtn {
-    padding: 0.5rem 1rem;
-    background-color: rgba(0 0 33 / 50%);
+    padding: 0.5em;
+    background-color: rgba(50 20 90 / 60%);
     color: #eee;
-    border-radius: 1rem;
+    border-radius: 4px;
+    border: 1px solid rgba(11, 15, 17);
+    box-shadow: 4px 4px 0 rgba(11, 15, 17);
+    font-size: 100%;
+    font-weight: bold;
     cursor: pointer;
+    display: inline-fl;
   }
   .actionBtn:hover {
-    background-color: rgba(0 0 33 / 70%);
+    background-color: rgba(90 50 180 / 70%);
     color: #fff;
     user-select: none;
   }
@@ -66,7 +72,7 @@ import {description, showSource, title} from './_animated-sprites.json';
   on(demo, OnDisplayInit, async ({scene, camera}) => {
     camera.position.z = 60;
 
-    const CAPACITY = 1000;
+    const CAPACITY = 3000;
     const INITIAL_SPRITE_COUNT = 500;
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);

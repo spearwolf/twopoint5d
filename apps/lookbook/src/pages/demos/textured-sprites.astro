@@ -64,11 +64,6 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     scene.add(mesh);
 
-    // on(demo, OnDisplayRenderFrame, ({deltaTime}) => {
-    //   bouncingSprites.animate(deltaTime);
-    //   mesh.update();
-    // });
-
     demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       mesh.update();

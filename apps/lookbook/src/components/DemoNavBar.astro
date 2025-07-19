@@ -17,19 +17,27 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
 //      see https://github.com/danielgjackson/qrcodejs
 ---
 
-<div class="absolute bottom-0 z-50 -rotate-90 origin-bottom-left transform-gpu container pointer-events-none">
-  <div class="flex justify-center">
-    <header
-      class="demo-navbar gap-2 flex justify-start items-center px-1.5 lg:pe-3 lg:ps-3 h-10 backdrop-blur-sm pointer-events-auto rounded-b-sm"
-    >
+<div class="z-50 sticky top-0 y-0">
+  <header class="lookbook-demo-header flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-14 backdrop-blur-sm">
+    <figure class="flex items-center justify-start text-slate-400">
+      <figcaption>a</figcaption>
       <button class="interactive-action open-show-source-dialog-action">
-        <img class="primary" src={twopoint5d} alt="twopoint5d" />
+        <img class="h-8" src={twopoint5d} alt="twopoint5d" />
       </button>
-    </header>
-  </div>
+      <figcaption>demo::</figcaption>
+    </figure>
+
+    <div class="pl-1 flex-1 flex justify-start items-center font-bold text-white">{title}</div>
+
+    <div class="rainbow-line-container">
+      <RainbowLine shadow colorSliceWidth={32} />
+    </div>
+  </header>
 </div>
 
-<dialog class="show-source-dialog min-w-80 max-w-xl px-6 py-4 rounded-md backdrop-blur-sm">
+<dialog
+  class="show-source-dialog w-full md:min-w-md max-w-xl px-6 py-4 rounded-md backdrop-blur-sm border-t border-b md:border-r md:border-l border-[#e5e500]"
+>
   <header class="flex flex-row items-center justify-between mb-4">
     <figure class="flex items-center justify-start text-slate-300">
       <figcaption>a</figcaption>
@@ -50,10 +58,11 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
       </section>
     )
   }
-  <section class="demo-description mb-4 text-sm text-slate-200">
+  <section class="demo-description mb-16 text-sm text-slate-200">
     <slot name="description" />
   </section>
-  <section>
+
+  <section class="text-center">
     <h2 class="text-2xl">Explore Source Code</h2>
     <p class="text-sm text-slate-200">Want to see how it is done?</p>
     <ul class="max-w-xs mx-auto mt-4 mb-6">
@@ -68,14 +77,34 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
         )
       }
     </ul>
-    <a class="block mb-1 text-xs text-center text-slate-400 underline" href="https://github.com/spearwolf/twopoint5d"
+    <a class="block mb-4 text-xs text-center text-slate-400 underline" href="https://github.com/spearwolf/twopoint5d"
       >Just take me to the project repository</a
     >
-    <a class="block mb-1 text-xs text-center text-slate-400 underline" href={import.meta.env.BASE_URL}>Explore LookBook</a>
+    <a class="block mb-4 text-xs text-center text-slate-400 underline" href={import.meta.env.BASE_URL}>Explore LookBook</a>
   </section>
 </dialog>
 
 <style>
+  .lookbook-demo-header {
+    background-color: rgba(0 0 0 / 0.5);
+    box-shadow: 0 0 20px #4c4c42;
+  }
+
+  .rainbow-line-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .lookbook-demo-header img.primary {
+    max-height: 32px;
+    margin-left: 0.75rem;
+  }
+
   .demo-title {
     --rainbow-line-height: 2px;
   }
@@ -83,7 +112,6 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
   .show-source-dialog {
     background-color: rgba(18 22 25 / 75%);
     color: #fff;
-    outline: 1px solid #e5e500;
     box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
     text-shadow: none;
   }

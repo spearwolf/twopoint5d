@@ -1,0 +1,78 @@
+---
+import CloseDialogIcon from './icons/CloseDialogIcon.astro';
+import SearchIcon from './icons/SearchIcon.astro';
+import RainbowLine from '@spearwolf/astro-rainbow-line';
+---
+
+<button class="open-search-dialog-action inline-flex flex-row items-start justify-center gap-2">
+  <SearchIcon />
+  <span class="leading-[2]">Ctrl K</span>
+</button>
+
+<dialog class="search-lookbook-dialog min-w-80 max-w-xl px-6 py-4 rounded-md backdrop-blur-sm">
+  <header class="flex flex-row items-center justify-end mb-4">
+    <button autofocus>
+      <CloseDialogIcon />
+    </button>
+  </header>
+
+  <section class="mb-4">
+    <h1 class="text-l">Search lookbook</h1>
+    <RainbowLine colorSliceWidth={8} cycleDirection="left" />
+  </section>
+
+  <section class="mb-4 text-sm text-slate-200">TODO search lookbook</section>
+</dialog>
+
+<style>
+  .open-search-dialog-action {
+    color: var(--color-primary);
+    background-color: var(--color-background-dark);
+    box-shadow: 0 0 1px 1px var(--color-background-light);
+    font-size: var(--tag-font-size);
+    padding: 0.2em 0.8em 0.2em 0.3em;
+    border-radius: 2em;
+  }
+
+  .open-search-dialog-action:is(:hover, :focus-within) {
+    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
+  }
+
+  .search-lookbook-dialog {
+    background-color: rgba(18 22 25 / 75%);
+    color: #fff;
+    outline: 1px solid #e5e500;
+    box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
+    text-shadow: none;
+  }
+
+  .search-lookbook-dialog::backdrop {
+    background: rgb(187, 0, 51);
+    background: linear-gradient(
+      22deg,
+      rgba(187, 0, 51, 0.66) 0%,
+      rgba(143, 0, 132, 0.66) 13%,
+      rgba(8, 101, 92, 0.66) 61%,
+      rgba(0, 96, 102, 0.66) 64%,
+      rgba(0, 35, 97, 0.66) 86%,
+      rgba(0, 2, 102, 0.66) 100%
+    );
+    backdrop-filter: blur(2px);
+  }
+</style>
+
+<script>
+  const dialog = document.querySelector('dialog.search-lookbook-dialog') as HTMLDialogElement;
+  const closeButton = dialog.querySelector('button');
+  const showButtons = document.querySelectorAll('button.open-search-dialog-action');
+
+  for (const showButton of showButtons) {
+    showButton.addEventListener('click', () => {
+      dialog.showModal();
+    });
+  }
+
+  closeButton.addEventListener('click', () => {
+    dialog.close();
+  });
+</script>
