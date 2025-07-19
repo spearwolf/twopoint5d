@@ -1,15 +1,16 @@
 import tagCategoriesJson from '../../data/tag-categories.json' assert {type: 'json'};
 import {baseUrl, makeUrl} from './makeUrl.js';
 
-// interface IDemo {
-//   id: string;
-//   title: string;
-//   description?: string;
-//   url: string;
-//   href: string;
-//   previewImage?: string;
-//   tags?: string[];
-// }
+interface IDemo {
+  id: string;
+  title: string;
+  shortDescription?: string;
+  description?: string;
+  url: string;
+  href: string;
+  previewImage?: string;
+  tags?: string[];
+}
 
 interface ICategory {
   name: string;
@@ -27,7 +28,7 @@ const tagCategories: Map<string, ICategory> = new Map();
 tagCategoriesJson.categories.forEach((category) => {
   tagCategories.set(category.name, {
     ...category,
-    tags: []
+    tags: [],
   });
 });
 
@@ -53,22 +54,14 @@ const demos = Object.entries(
     });
   }
   return {...json, id, href: makeUrl(json.url), tags: json.tags?.sort()};
-}) as {
-  id: string;
-  title: string;
-  description?: string;
-  url: string;
-  href: string;
-  previewImage?: string;
-  tags?: string[];
-}[];
+}) as IDemo[];
 
 const uniqTagKeys = Array.from(tags.keys()).sort();
 
 const defaultCategory: ICategory = {
   ...tagCategoriesJson.defaultCategory,
   includeTags: [],
-  tags: []
+  tags: [],
 };
 
 uniqTagKeys.forEach((tag) => {

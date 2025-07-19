@@ -7,8 +7,8 @@ const {demos} = loadMetadataForDemos();
 
 <ul role="list" class="grid grid-cols-demo-cards gap-x-4 gap-y-8 sm:gap-x-6 xl:gap-x-8">
   {
-    demos.map(({id, title, description, href, previewImage, tags}) => (
-      <Card id={id} href={href} title={title} body={description} image={previewImage} tags={tags} />
+    demos.map(({id, title, shortDescription, description, href, previewImage, tags}) => (
+      <Card id={id} href={href} title={title} body={shortDescription ?? description} image={previewImage} tags={tags} />
     ))
   }
 </ul>
