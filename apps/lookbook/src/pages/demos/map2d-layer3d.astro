@@ -7,6 +7,11 @@ import {description, showSource, title} from './_map2d-layer3d.json';
   <p slot="demo-description">{description}</p>
 
   <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <div class="info-controls text-sky-200 pt-4 pl-1">
+    <p>Use the W, A, S, and D keys to scroll the map.</p>
+    <p>Use the mouse to rotate the camera.</p>
+  </div>
 </Layout>
 
 <style>
@@ -25,6 +30,7 @@ import {description, showSource, title} from './_map2d-layer3d.json';
   import {
     Map2DLayer3D,
     Map2DTileSprites,
+    PanControl2D,
     RectangularVisibilityArea,
     RepeatingTilesProvider,
     TileSetLoader,
@@ -33,8 +39,8 @@ import {description, showSource, title} from './_map2d-layer3d.json';
   } from '@spearwolf/twopoint5d';
   import {BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments} from 'three';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import {makePoints} from '~demos/utils/makePoints';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {makePoints} from '~demos/utils/makePoints';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
@@ -132,5 +138,20 @@ import {description, showSource, title} from './_map2d-layer3d.json';
       128, 11, 384,
       384, 11, 384,
     ]));
+
+    // add a pan control
+    // ------------------------------------------------------
+
+    const panControl = new PanControl2D({
+      disablePointer: true,
+      speed: 200,
+    });
+
+    demo.onRenderFrame(({deltaTime}) => {
+      panControl.update(deltaTime);
+      map2dLayer.centerX = panControl.panView.x;
+      map2dLayer.centerY = panControl.panView.y;
+      map2dLayer.update();
+    });
   });
 </script>
