@@ -4,9 +4,10 @@ import DemoNavBar from '~components/DemoNavBar.astro';
 export interface Props {
   title: string;
   showSource?: Record<string, string>;
+  description?: string;
 }
 
-const {title, showSource} = Astro.props;
+const {title, showSource, description} = Astro.props;
 ---
 
 <!doctype html>
@@ -19,7 +20,7 @@ const {title, showSource} = Astro.props;
     <title>2.5d lookbook &#x2022; {title} demo</title>
   </head>
   <body>
-    <DemoNavBar title={title} showSource={showSource}>
+    <DemoNavBar title={title} showSource={showSource} description={description}>
       <slot name="demo-description" slot="description" />
     </DemoNavBar>
     <slot />

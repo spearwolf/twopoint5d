@@ -3,9 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_map2d-layer3d.json';
 ---
 
-<Layout title={title} showSource={showSource}>
-  <p slot="demo-description">{description}</p>
-
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <div class="info-controls text-sky-200 pt-4 pl-1">

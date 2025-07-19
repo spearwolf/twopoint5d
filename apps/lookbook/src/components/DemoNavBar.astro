@@ -1,4 +1,5 @@
 ---
+import {marked} from 'marked';
 import RainbowLine from '@spearwolf/astro-rainbow-line';
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
 import CloseDialogIcon from './icons/CloseDialogIcon.astro';
@@ -7,9 +8,10 @@ import GitHubInvertocatIcon from './icons/GitHubInvertocatIcon.astro';
 export interface Props {
   title: string;
   showSource?: Record<string, string>;
+  description?: string;
 }
 
-const {title, showSource = {}} = Astro.props;
+const {title, showSource = {}, description = ""} = Astro.props;
 
 const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoint5d/tree/main';
 
@@ -50,6 +52,7 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
       <CloseDialogIcon />
     </button>
   </header>
+
   {
     title && (
       <section class="demo-title mb-4">
@@ -58,7 +61,9 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
       </section>
     )
   }
-  <section class="demo-description mb-16 text-sm text-slate-200">
+
+  <section class="demo-description mb-16 text-sm text-slate-200 [&>p]:mb-2 [&>p:last-child]:mb-0">
+    <Fragment set:html={marked.parse(description)} />
     <slot name="description" />
   </section>
 
@@ -77,9 +82,11 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
         )
       }
     </ul>
+
     <a class="block mb-4 text-xs text-center text-slate-400 underline" href="https://github.com/spearwolf/twopoint5d"
       >Just take me to the project repository</a
     >
+
     <a class="block mb-4 text-xs text-center text-slate-400 underline" href={import.meta.env.BASE_URL}>Explore LookBook</a>
   </section>
 </dialog>
