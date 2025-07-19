@@ -26,7 +26,7 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
 <script>
   import {
-    Map2DLayer3D,
+    Map2DLayerObject3D,
     Map2DTileSprites,
     PanControl2D,
     RectangularVisibilityArea,
@@ -56,22 +56,22 @@ import {description, showSource, title} from './_map2d-layer3d.json';
     // create a map2d layer and add to scene
     // ------------------------------------------------------
 
-    const map2dLayer = new Map2DLayer3D();
+    const map2d = new Map2DLayerObject3D();
 
-    map2dLayer.tileWidth = 256;
-    map2dLayer.tileHeight = 256;
-    map2dLayer.xOffset = -128;
-    map2dLayer.yOffset = -128;
+    map2d.tileWidth = 256;
+    map2d.tileHeight = 256;
+    map2d.xOffset = -128;
+    map2d.yOffset = -128;
 
-    map2dLayer.visibilitor = new RectangularVisibilityArea(640, 480);
+    map2d.visibilitor = new RectangularVisibilityArea(640, 480);
 
-    map2dLayer.centerX = 0;
-    map2dLayer.centerY = 0;
+    map2d.centerX = 0;
+    map2d.centerY = 0;
 
-    scene.add(map2dLayer);
+    scene.add(map2d);
 
-    (window as any).map2dLayer = map2dLayer;
-    console.log('map2dLayer', map2dLayer);
+    (window as any).map2dLayer = map2d;
+    console.log('map2dLayer', map2d);
 
     // create a tile data provider
     // ------------------------------------------------------
@@ -94,9 +94,9 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     const renderer = new Map2DTileSprites();
 
-    map2dLayer.add(renderer);
+    map2d.add(renderer);
 
-    map2dLayer.addTileRenderer(renderer);
+    map2d.addTileRenderer(renderer);
 
     renderer.tileData = tileData;
     renderer.tileSet = tileSet;
@@ -112,7 +112,7 @@ import {description, showSource, title} from './_map2d-layer3d.json';
     (window as any).tileRenderer = renderer;
     console.log('tileRenderer', renderer);
 
-    map2dLayer.update();
+    map2d.update();
 
     // prettier-ignore
     scene.add(makePoints([
@@ -147,9 +147,9 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     demo.onRenderFrame(({deltaTime}) => {
       panControl.update(deltaTime);
-      map2dLayer.centerX = panControl.panView.x;
-      map2dLayer.centerY = panControl.panView.y;
-      map2dLayer.update();
+      map2d.centerX = panControl.panView.x;
+      map2d.centerY = panControl.panView.y;
+      map2d.update();
     });
   });
 </script>

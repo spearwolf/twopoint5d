@@ -5,7 +5,7 @@ export * from './IMap2DTileDataProvider.js';
 export * from './IMap2DTileRenderer.js';
 export * from './IMap2DVisibilitor.js';
 export * from './Map2DLayer.js';
-export * from './Map2DLayer3D.js';
+export * from './Map2DLayerObject3D.js';
 export * from './Map2DSpatialHashGrid.js';
 export * from './Map2DTile.js';
 export * from './Map2DTileCoordsUtil.js';

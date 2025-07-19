@@ -1,9 +1,9 @@
 {
-  "title": "map2d layer3d",
-  "description": "This demo shows how easy it is to use a `Map2DLayer3D` mesh object. Use the W, A, S, and D keys to scroll the map.\n\nA `RectangularVisibilityArea` is used as the visibilitor, and `RepeatingTilesProvoder` is used as the tile ID provider.",
+  "title": "map2d layer object3d",
+  "description": "This demo shows how easy it is to use a `Map2DLayerObject3D` mesh object. Use the W, A, S, and D keys to scroll the map.\n\nA `RectangularVisibilityArea` is used as the visibilitor, and `RepeatingTilesProvoder` is used as the tile ID provider.",
   "url": "/demos/map2d-layer3d",
   "tags": [
-    "Map2DLayer3D",
+    "Map2DLayerObject3D",
     "Map2DTileSprites",
     "PanControl2D",
     "RectangularVisibilityArea",

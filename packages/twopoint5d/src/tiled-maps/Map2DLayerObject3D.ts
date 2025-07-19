@@ -8,7 +8,7 @@ import {Map2DLayer} from './Map2DLayer.js';
 /**
  * A facade that is an `THREE.Object3D` and represents a {@link Map2DLayer}
  */
-export class Map2DLayer3D extends Group implements IMap2DLayer {
+export class Map2DLayerObject3D extends Group implements IMap2DLayer {
   #renderers: Set<IMap2DTileRenderer> = new Set();
   #map2dLayer: Map2DLayer;
   #visibilitor?: IMap2DVisibilitor;
@@ -122,8 +122,7 @@ export class Map2DLayer3D extends Group implements IMap2DLayer {
       // }
 
       // eslint-disable-next-line no-console
-      console.log('Map2DLayer3D.addTileRenderer', {map2dLayer: this.#map2dLayer, renderer, Map2DLayer3D: this});
-      // console.log('Map2DLayer3D.addTileRenderer', {map2dLayer: this.#map2dLayer, renderer, rendererObject, Map2DLayer3D: this});
+      console.log('Map2DLayerObject3D.addTileRenderer', {map2dLayer: this.#map2dLayer, renderer, Map2DLayerObject3D: this});
     }
   }
 
@@ -140,11 +139,11 @@ export class Map2DLayer3D extends Group implements IMap2DLayer {
       // }
 
       // eslint-disable-next-line no-console
-      console.log('Map2DLayer3D.removeTileRenderer', {
+      console.log('Map2DLayerObject3D.removeTileRenderer', {
         map2dLayer: this.#map2dLayer,
         renderer,
         // rendererObject,
-        Map2DLayer3D: this,
+        Map2DLayerObject3D: this,
       });
     }
   }

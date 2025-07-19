@@ -102,11 +102,11 @@ The `Map2DLayer` is where you combine your data provider and visibility manager.
 
 **Example: Setting up a `Map2DLayer`**
 
-This example from the `lookbook` shows how to create a `Map2DLayer3D` and configure it:
+This example from the `lookbook` shows how to create a `Map2DLayerObject3D` and configure it:
 
 ```javascript
 import {
-  Map2DLayer3D,
+  Map2DLayerObject3D,
   RepeatingTilesProvider,
   RectangularVisibilityArea,
   Map2DTileSprites,
@@ -117,7 +117,7 @@ import { Scene } from 'three';
 const scene = new Scene();
 
 // 1. Create the layer
-const mapLayer = new Map2DLayer3D();
+const mapLayer = new Map2DLayerObject3D();
 mapLayer.tileWidth = 256;
 mapLayer.tileHeight = 256;
 
