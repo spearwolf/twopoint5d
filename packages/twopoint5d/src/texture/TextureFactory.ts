@@ -5,13 +5,11 @@ import {
   SRGBColorSpace,
   Texture,
   TextureLoader,
-  WebGLRenderer,
+  WebGPURenderer,
   type ColorSpace,
   type TextureFilter,
-} from 'three';
+} from 'three/webgpu';
 
-import type {WebGPURenderer} from 'three/webgpu';
-import type {DisplayRendererType} from '../display/types.js';
 import type {TextureSource} from './types.js';
 
 export interface TextureOptions {
@@ -101,15 +99,14 @@ export class TextureFactory {
   textureLoader: TextureLoader;
 
   constructor(
-    maxAnisotrophyOrRenderer: DisplayRendererType | number = 0,
+    maxAnisotrophyOrRenderer: WebGPURenderer | number = 0,
     defaultClassNames: Array<TextureOptionClasses> = ['nearest'],
     defaultOptions?: Partial<TextureOptions>,
   ) {
     this.#maxAnisotrophy =
       typeof maxAnisotrophyOrRenderer === 'number'
         ? maxAnisotrophyOrRenderer
-        : ((maxAnisotrophyOrRenderer as WebGLRenderer).capabilities?.getMaxAnisotropy?.() ??
-          (maxAnisotrophyOrRenderer as WebGPURenderer).getMaxAnisotropy?.());
+        : (maxAnisotrophyOrRenderer as WebGPURenderer).getMaxAnisotropy?.();
     this.#defaultOptions = defaultOptions ?? {
       anisotrophy: 0,
       flipY: false,

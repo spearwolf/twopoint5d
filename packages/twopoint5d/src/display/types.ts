@@ -1,12 +1,9 @@
-import type {WebGLRenderer, WebGLRendererParameters} from 'three';
 import type {WebGPURenderer} from 'three/webgpu';
 import type {Display} from './Display.js';
 
-export type DisplayRendererType = WebGLRenderer | WebGPURenderer;
-
 export interface DisplayEventProps {
   display: Display;
-  renderer: DisplayRendererType;
+  renderer: WebGPURenderer;
   width: number;
   height: number;
   pixelRatio: number;
@@ -17,10 +14,7 @@ export interface DisplayEventProps {
 
 export type ResizeDisplayToFn = (display: Display) => [width: number, height: number];
 
-export type DisplayRendererParameters =
-  | ({webgpu?: false} & Partial<Omit<WebGLRendererParameters, 'canvas'>>)
-  | ({webgpu: true} & Partial<Omit<ConstructorParameters<typeof WebGPURenderer>, 'canvas'>>);
-
+export type DisplayRendererParameters = Partial<Omit<ConstructorParameters<typeof WebGPURenderer>, 'canvas'>>;
 export type CreateRendererParameters = DisplayRendererParameters & {canvas: HTMLCanvasElement};
 
 export type DisplayParameters = DisplayRendererParameters & {
@@ -74,10 +68,10 @@ export type DisplayParameters = DisplayRendererParameters & {
   styleSheetRoot?: HTMLElement | ShadowRoot;
 
   /**
-   * Automatic creation of a `THREE.WebGPURenderer` instance is currently not supported.
-   * By default, a `THREE.WebGLRenderer` is created. As an alternative, you can create your own renderer instance using this callback.
+   * By default, a `THREE.WebGPURenderer` is created for you.
+   * But you can create your own renderer instance using this callback.
    *
-   * @returns The return value here is expected to be a `THREE.WebGLRenderer` or `THREE.WebGPURenderer` instance.
+   * @returns The return value here is expected to be a `THREE.WebGPURenderer` instance.
    */
-  createRenderer?: (params: CreateRendererParameters) => DisplayRendererType;
+  createRenderer?: (params: CreateRendererParameters) => WebGPURenderer;
 };

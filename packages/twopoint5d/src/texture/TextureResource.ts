@@ -1,7 +1,6 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, Signal, touch} from '@spearwolf/signalize';
-import {ImageLoader, type Texture} from 'three';
-import type {DisplayRendererType} from '../display/types.js';
+import {ImageLoader, WebGPURenderer, type Texture} from 'three/webgpu';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -111,7 +110,7 @@ export class TextureResource {
 
   #textureFactory = createSignal<TextureFactory | undefined>();
   #texture = createSignal<Texture | undefined>();
-  #renderer = createSignal<DisplayRendererType | undefined>();
+  #renderer = createSignal<WebGPURenderer | undefined>();
 
   readonly id: string;
   readonly type: TextureResourceType;
@@ -209,11 +208,11 @@ export class TextureResource {
     this.#texture.set(value);
   }
 
-  get renderer(): DisplayRendererType | undefined {
+  get renderer(): WebGPURenderer | undefined {
     return this.#renderer.value;
   }
 
-  set renderer(value: DisplayRendererType | undefined) {
+  set renderer(value: WebGPURenderer | undefined) {
     this.#renderer.set(value);
   }
 

@@ -5,7 +5,6 @@ import {description, showSource, title} from './_quadtree-playground.json';
 
 <Layout title={title} showSource={showSource}>
   <p slot="demo-description">{description}</p>
-
   <canvas id="twopoint5d" resize-to="window"></canvas>
 </Layout>
 
@@ -25,13 +24,7 @@ import {description, showSource, title} from './_quadtree-playground.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {
-    ChunkQuadTreeNode,
-    Display,
-    OnDisplayRenderFrame,
-    OnDisplayResize,
-    type OnDisplayResizeProps,
-  } from '@spearwolf/twopoint5d';
+  import {ChunkQuadTreeNode, Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~demos/quadtree-playground/QuadTreeVisualization';
 
@@ -44,7 +37,7 @@ import {description, showSource, title} from './_quadtree-playground.json';
   visual.makeRandomQuadTree();
 
   on(display, {
-    [OnDisplayResize]: ({width, height}: OnDisplayResizeProps) => {
+    [OnDisplayResize]: ({width, height}: DisplayEventProps) => {
       visual.canvasStage.setContainerSize(width, height);
     },
 
@@ -55,6 +48,11 @@ import {description, showSource, title} from './_quadtree-playground.json';
 
   display.start();
 
+  // -----------------------------
+  Object.assign(window, {
+    display,
+    visual,
+  });
   // -----------------------------
 
   const gui = new GUI({title: 'quadtree playground'});

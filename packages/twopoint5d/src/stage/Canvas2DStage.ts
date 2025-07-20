@@ -1,15 +1,14 @@
-import {emit, eventize} from '@spearwolf/eventize';
-import {Sprite, SpriteMaterial, Texture, type Scene} from 'three';
-import type {DisplayRendererType} from '../display/types.js';
-import {TextureFactory} from '../texture/TextureFactory.js';
-import {OrthographicProjection} from './OrthographicProjection.js';
-import {Stage2D} from './Stage2D.js';
-import {StageRenderer} from './StageRenderer.js';
+import { emit, eventize } from '@spearwolf/eventize';
+import { Sprite, SpriteMaterial, Texture, WebGPURenderer, type Scene } from 'three/webgpu';
+import { TextureFactory } from '../texture/TextureFactory.js';
+import { OrthographicProjection } from './OrthographicProjection.js';
+import { Stage2D } from './Stage2D.js';
+import { StageRenderer } from './StageRenderer.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
 
 export class Canvas2DStage {
-  readonly renderer: DisplayRendererType;
+  readonly renderer: WebGPURenderer;
   readonly stageRenderer: StageRenderer;
 
   #fit: Canvas2DStageFitType = 'contain';
@@ -56,7 +55,7 @@ export class Canvas2DStage {
   #lastHeight = 0;
 
   constructor(
-    renderer: DisplayRendererType,
+    renderer: WebGPURenderer,
     ...args:
       | [width: number, height: number]
       | [width: number, height: number, fit: Canvas2DStageFitType]

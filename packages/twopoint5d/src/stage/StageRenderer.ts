@@ -1,8 +1,7 @@
 import {emit, eventize, once} from '@spearwolf/eventize';
-import {Color, type WebGLRenderer} from 'three';
+import {Color, type WebGPURenderer} from 'three/webgpu';
 import {Display} from '../display/Display.js';
-import {isWebGPURenderer} from '../display/isWebGPURenderer.js';
-import type {DisplayRendererType} from '../display/types.js';
+import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {OnRemoveFromParent, OnStageAdded, OnStageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
 import type {IStage} from './IStage.js';
 
@@ -27,8 +26,24 @@ export class StageRenderer implements IStage {
   width: number = 0;
   height: number = 0;
 
+  /**
+   * The color used to clear the canvas before rendering.
+   * Default is `undefined`, which means the canvas will not be cleared before rendering.
+   */
   clearColor?: Color;
+
+  /**
+   * The alpha value of the clear color. Default is 1.
+   * But unless you don't set a clear color, the canvas will not be cleared before next render.
+   *
+   * If set to 0, the canvas be cleared and transparent, regardless of the clear color.
+   */
   clearAlpha: number = 1;
+
+  setClearColor(color: Color | null | undefined, alpha?: number): void {
+    this.clearColor = color ?? undefined;
+    this.clearAlpha = typeof alpha === 'number' ? alpha : color ? 1 : 0;
+  }
 
   clearColorBuffer = true;
   clearDepthBuffer = true;
@@ -168,19 +183,30 @@ export class StageRenderer implements IStage {
     }
   }
 
-  renderFrame(renderer: DisplayRendererType): void {
-    if (isWebGPURenderer(renderer)) {
-      throw new Error('WebGPU renderer is not supported yet');
+  renderFrame(renderer: WebGPURenderer): void {
+    if (isWebGLRenderer(renderer)) {
+      throw new TypeError('The WebGLRenderer renderer is not supported anymore');
     }
 
     const wasPreviouslyAutoClear = renderer.autoClear;
     const oldClearAlpha = renderer.getClearAlpha();
+
     const clearColor = this.clearColor;
 
+    let shouldClear = false;
+
     if (clearColor != null) {
-      renderer.getClearColor(this.#oldClearColor);
+      renderer.getClearColor(this.#oldClearColor as any);
       renderer.setClearColor(clearColor, this.clearAlpha);
+      shouldClear = true;
+    }
+
+    if (shouldClear || this.clearAlpha === 0) {
       renderer.setClearAlpha(this.clearAlpha);
+      shouldClear = true;
+    }
+
+    if (shouldClear) {
       renderer.clear(this.clearColorBuffer, this.clearDepthBuffer, this.clearStencilBuffer);
     }
 
@@ -194,11 +220,12 @@ export class StageRenderer implements IStage {
 
     if (clearColor != null) {
       renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
-      renderer.setClearAlpha(oldClearAlpha);
     }
+
+    renderer.setClearAlpha(oldClearAlpha);
   }
 
-  protected renderStage(stageItem: StageItem, renderer: WebGLRenderer): void {
+  protected renderStage(stageItem: StageItem, renderer: WebGPURenderer): void {
     const {stage} = stageItem;
     if (isStageRenderer(stage)) {
       stage.renderFrame(renderer);

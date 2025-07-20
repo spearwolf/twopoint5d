@@ -1,4 +1,5 @@
-import { Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D, type DisplayRendererType } from '@spearwolf/twopoint5d';
+import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@spearwolf/twopoint5d';
+import {type WebGPURenderer} from 'three/webgpu';
 
 export class QuadTreeVisualization {
   readonly canvasStage: Canvas2DStage;
@@ -13,8 +14,9 @@ export class QuadTreeVisualization {
     return this.canvasStage.height;
   }
 
-  constructor(renderer: DisplayRendererType, width: number, height: number) {
+  constructor(renderer: WebGPURenderer, width: number, height: number) {
     this.canvasStage = new Canvas2DStage(renderer, width, height);
+    this.canvasStage.stageRenderer.clearAlpha = 0;
 
     this.ctx = this.canvasStage.canvas.getContext('2d')!;
   }

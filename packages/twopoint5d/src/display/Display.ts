@@ -1,5 +1,5 @@
 import {emit, eventize, off, on, once, onceAsync, retain, retainClear} from '@spearwolf/eventize';
-import {WebGLRenderer} from 'three';
+import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,
   OnDisplayInit,
@@ -16,13 +16,7 @@ import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
 import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
-import type {
-  CreateRendererParameters,
-  DisplayEventProps,
-  DisplayParameters,
-  DisplayRendererType,
-  ResizeDisplayToFn,
-} from './types.js';
+import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -134,9 +128,11 @@ export class Display {
    */
   styleSheetRoot: HTMLElement | ShadowRoot;
 
-  renderer?: DisplayRendererType;
+  renderer?: WebGPURenderer;
 
-  constructor(domElementOrRenderer: HTMLElement | DisplayRendererType, options?: DisplayParameters) {
+  readonly #waitForRendererInit!: Promise<WebGPURenderer>;
+
+  constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
 
     retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
@@ -148,8 +144,17 @@ export class Display {
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
 
-    if (isWebGLRenderer(domElementOrRenderer) || isWebGPURenderer(domElementOrRenderer)) {
-      this.renderer = domElementOrRenderer as DisplayRendererType;
+    if (isWebGLRenderer(domElementOrRenderer)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'The Display constructor expects a WebGPURenderer or an HTML element as the first argument.',
+        'Since twopoint5d@0.13 a WebGLRenderer is not supported anymore.',
+      );
+      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument.');
+    }
+
+    if (isWebGPURenderer(domElementOrRenderer)) {
+      this.renderer = domElementOrRenderer;
       this.resizeToElement = this.renderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
       let canvas: HTMLCanvasElement;
@@ -175,17 +180,8 @@ export class Display {
       const createRenderer =
         options?.createRenderer ??
         ((params: CreateRendererParameters) => {
-          if (params.webgpu) {
-            // eslint-disable-next-line no-console
-            console.warn(
-              'Automatic creation of a WebGPURenderer instance is currently not supported. By default, a WebGLRenderer is created.',
-              'Alternatively, a custom renderer instance can be passed directly as the first Display(renderer) constructor argument,',
-              'or the Display(el, {createRenderer}) option callback can be used.',
-            );
-          }
-          return new WebGLRenderer({
-            precision: 'highp',
-            preserveDrawingBuffer: false,
+          return new WebGPURenderer({
+            // TODO check if this is still needed
             ...params,
           });
         });
@@ -198,6 +194,8 @@ export class Display {
         powerPreference: 'high-performance',
         ...options,
       } as CreateRendererParameters);
+
+      this.#waitForRendererInit = this.renderer.init();
     }
 
     const {domElement: canvas} = this.renderer!;
@@ -211,9 +209,7 @@ export class Display {
 
     on(this.#stateMachine, {
       [DisplayStateMachine.Init]: async () => {
-        if (isWebGPURenderer(this.renderer)) {
-          await this.renderer.init();
-        }
+        await this.#waitForRendererInit;
         this.#emit(OnDisplayInit);
       },
 
@@ -439,6 +435,8 @@ export class Display {
   }
 
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
+    await this.#waitForRendererInit;
+
     if (typeof beforeStartCallback === 'function') {
       await beforeStartCallback(this.getEventProps());
     }

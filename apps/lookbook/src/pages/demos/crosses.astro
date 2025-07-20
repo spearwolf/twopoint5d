@@ -22,7 +22,7 @@ import {description, showSource, title} from './_crosses.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {OnDisplayInit, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, MeshBasicMaterial} from 'three';
+  import {DoubleSide, MeshBasicMaterial} from 'three/webgpu';
   import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
@@ -30,7 +30,7 @@ import {description, showSource, title} from './_crosses.json';
     const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, capacity);
 
     for (let i = 0; i < capacity; i++) {
-      const cross = geometry.pool.createVO() as Cross;
+      const cross = geometry.pool.createVO();
       cross.make(size, size);
       cross.rotate(i * 45);
       cross.translate(i * size * offset - ((capacity - 1) * size * offset) / 2, 0);
