@@ -1,4 +1,4 @@
-import {MathUtils, Object3D} from 'three';
+import {MathUtils, Object3D} from 'three/webgpu';
 import {findRootNode} from '../utils/findRootNode.js';
 
 /**

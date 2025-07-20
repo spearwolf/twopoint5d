@@ -1,6 +1,5 @@
-import {Camera} from 'three';
-
-import {ProjectionPlane} from './ProjectionPlane.js';
+import type {Camera} from 'three/webgpu';
+import type {ProjectionPlane} from './ProjectionPlane.js';
 
 export interface IProjection {
   updateViewRect(width: number, height: number): void;

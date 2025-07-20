@@ -1,5 +1,4 @@
-import type {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsage, StreamDrawUsage} from 'three';
-
+import type {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsage, StreamDrawUsage} from 'three/webgpu';
 import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import type {voBuffer, voIndex} from './constants.js';
 

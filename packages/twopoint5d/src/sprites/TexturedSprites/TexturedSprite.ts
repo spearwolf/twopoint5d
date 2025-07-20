@@ -1,4 +1,4 @@
-import {Color} from 'three';
+import {Color} from 'three/webgpu';
 import {voInitialize} from '../../index.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';

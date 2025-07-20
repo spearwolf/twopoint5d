@@ -1,4 +1,4 @@
-import {OrthographicCamera} from 'three';
+import {OrthographicCamera} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {OrthographicProjection} from './OrthographicProjection.js';

@@ -1,5 +1,5 @@
 import {getDescriptorOf, type VO} from '@spearwolf/twopoint5d';
-import {Matrix4, Vector3} from 'three';
+import {Matrix4, Vector3} from 'three/webgpu';
 
 export interface Cross extends VO {
   x0: number;

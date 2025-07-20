@@ -1,4 +1,4 @@
-import {Material} from 'three';
+import type {Material} from 'three/webgpu';
 
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry.js';

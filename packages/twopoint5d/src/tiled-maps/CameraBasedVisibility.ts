@@ -15,7 +15,7 @@ import {
   PlaneHelper,
   Vector2,
   Vector3,
-} from 'three';
+} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {HelpersManager} from './HelpersManager.js';

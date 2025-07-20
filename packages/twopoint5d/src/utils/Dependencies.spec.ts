@@ -1,4 +1,4 @@
-import {Vector2} from 'three';
+import {Vector2} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {Dependencies} from './Dependencies.js';

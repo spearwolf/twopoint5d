@@ -1,4 +1,4 @@
-import {DataTexture, FloatType, RGBAFormat} from 'three';
+import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';

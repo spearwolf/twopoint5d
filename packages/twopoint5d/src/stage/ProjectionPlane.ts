@@ -1,4 +1,4 @@
-import {Matrix4, Object3D, Plane as THREE_Plane, Quaternion, Vector3} from 'three';
+import {Matrix4, Object3D, Quaternion, Plane as THREE_Plane, Vector3} from 'three/webgpu';
 
 export type ProjectionPlaneDescription = 'xy|bottom-left' | 'xy|top-left' | 'xz|bottom-left' | 'xz|top-left';
 

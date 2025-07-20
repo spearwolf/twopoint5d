@@ -1,4 +1,4 @@
-import type {Camera, Scene} from 'three';
+import type {Camera, Scene} from 'three/webgpu';
 
 export interface IStage {
   name: string;

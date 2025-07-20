@@ -1,4 +1,4 @@
-import {OrthographicCamera, Vector2} from 'three';
+import {OrthographicCamera, Vector2} from 'three/webgpu';
 
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';

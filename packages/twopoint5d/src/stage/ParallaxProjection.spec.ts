@@ -1,4 +1,4 @@
-import {PerspectiveCamera} from 'three';
+import {PerspectiveCamera} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {ParallaxProjection} from './ParallaxProjection.js';

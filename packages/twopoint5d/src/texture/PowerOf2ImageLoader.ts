@@ -1,4 +1,4 @@
-import {ImageLoader} from 'three';
+import {ImageLoader} from 'three/webgpu';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {isPowerOf2} from '../utils/isPowerOf2.js';
 import {TextureCoords} from './TextureCoords.js';

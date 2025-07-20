@@ -1,5 +1,4 @@
-import {BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute} from 'three';
-
+import {BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';

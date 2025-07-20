@@ -1,5 +1,4 @@
-import {DynamicDrawUsage, StaticDrawUsage, StreamDrawUsage} from 'three';
-
+import {DynamicDrawUsage, StaticDrawUsage, StreamDrawUsage} from 'three/webgpu';
 import type {DrawUsageType, VertexAttributeUsageType} from './types.js';
 
 export function toDrawUsage(usage: VertexAttributeUsageType): DrawUsageType {

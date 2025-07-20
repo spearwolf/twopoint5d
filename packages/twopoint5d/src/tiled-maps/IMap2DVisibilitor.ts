@@ -1,4 +1,4 @@
-import type {Object3D, Vector2, Vector3} from 'three';
+import type {Object3D, Vector2, Vector3} from 'three/webgpu';
 import type {Map2DTile} from './Map2DTile.js';
 import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 

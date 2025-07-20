@@ -1,4 +1,4 @@
-import type {Vector2, Vector3} from 'three';
+import type {Vector2, Vector3} from 'three/webgpu';
 import type {Map2DTile} from './Map2DTile.js';
 
 export interface IMap2DTileRenderer {

@@ -1,4 +1,4 @@
-import {Object3D, Vector2, Vector3} from 'three';
+import {Object3D, Vector2, Vector3} from 'three/webgpu';
 import type {IMap2DLayer} from './IMap2DLayer.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';

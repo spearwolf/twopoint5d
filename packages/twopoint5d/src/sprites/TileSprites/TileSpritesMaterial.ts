@@ -1,4 +1,4 @@
-import {FrontSide, ShaderMaterial, Texture, Vector4, type ShaderMaterialParameters} from 'three';
+import {FrontSide, ShaderMaterial, Texture, Vector4, type ShaderMaterialParameters} from 'three/webgpu';
 
 const vertexShader = `
   attribute vec2 quadSize;

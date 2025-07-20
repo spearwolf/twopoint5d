@@ -1,4 +1,4 @@
-import {FileLoader} from 'three';
+import {FileLoader} from 'three/webgpu';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';

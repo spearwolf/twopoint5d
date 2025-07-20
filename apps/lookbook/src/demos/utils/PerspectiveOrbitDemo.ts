@@ -1,7 +1,7 @@
 import {on, Priority} from '@spearwolf/eventize';
 import {Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
-import {Color, PerspectiveCamera, Scene} from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+import {Color, PerspectiveCamera, Scene} from 'three/webgpu';
 
 export interface PerspectiveOrbitDemoEventProps extends DisplayEventProps {
   scene: Scene;

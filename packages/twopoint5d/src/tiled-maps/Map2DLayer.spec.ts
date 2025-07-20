@@ -1,4 +1,4 @@
-import {Vector2, Vector3} from 'three';
+import {Vector2, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import {Map2DLayer} from './Map2DLayer.js';

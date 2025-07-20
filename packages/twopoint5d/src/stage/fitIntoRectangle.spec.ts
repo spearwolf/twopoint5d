@@ -1,4 +1,4 @@
-import {Vector2} from 'three';
+import {Vector2} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {fitIntoRectangle} from './fitIntoRectangle.js';

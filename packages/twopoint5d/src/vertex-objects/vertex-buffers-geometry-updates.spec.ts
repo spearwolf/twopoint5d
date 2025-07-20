@@ -1,6 +1,5 @@
+import type {BufferAttribute, InstancedBufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
-
-import type {BufferAttribute, InstancedBufferAttribute, InterleavedBufferAttribute} from 'three';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import type {VO} from './types.js';

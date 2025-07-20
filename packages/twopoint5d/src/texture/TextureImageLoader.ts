@@ -1,4 +1,4 @@
-import {Texture} from 'three';
+import {Texture} from 'three/webgpu';
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';

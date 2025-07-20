@@ -1,5 +1,4 @@
-import {Material, Mesh} from 'three';
-
+import {type Material, Mesh} from 'three/webgpu';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import type {VOBufferGeometry} from './VOBufferGeometry.js';
 

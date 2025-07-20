@@ -1,4 +1,4 @@
-import {DoubleSide, Texture} from 'three';
+import {DoubleSide, Texture} from 'three/webgpu';
 import {unpick} from '../../utils/unpick.js';
 import {CustomChunksShaderMaterial, type CustomChunksShaderMaterialParameters} from '../CustomChunksShaderMaterial.js';
 import ShaderLib from '../ShaderLib.js';
