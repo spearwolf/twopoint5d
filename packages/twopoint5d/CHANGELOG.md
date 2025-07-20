@@ -5,8 +5,21 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
 
+## [0.13.0] - Unreleased
+
+> [!CAUTION]
+> This version breaks with many things and clearly moves towards the use of WebGL2 and WebGPU!
+>
+> This follows the three.js library, which currently comes in two variants:
+> `import THREE from 'three'` _vs._ `import THREE from 'three/webgpu'`
+>
+> Starting with version `0.13`, `twopoint5d` is freeing itself from legacy issues and moving completely to the `three/webgpu` side!
+>
+> The new _node materials_ and the _three shader language_ are exactly what was envisioned when `twopoint5d` was created.
+> Instead of getting lost in custom workarounds that use the old materials and shaders, we have now switched exclusively and consistently to _tsl_.
+
+- only use the `three/webgpu` package as import
 - upgrade to three.js r178
 - refactor `Display` &rarr; `resize`, `renderFrame` events
   - add types, constants and interfaces for `OnDisplayResize` and `OnDisplayRenderFrame`
