@@ -4,9 +4,8 @@ import {description, showSource, title} from './_crosses.json';
 ---
 
 <Layout title={title} showSource={showSource}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
   <p slot="demo-description">{description}</p>
+  <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 
 <style>
@@ -15,42 +14,44 @@ import {description, showSource, title} from './_crosses.json';
     overflow-y: hidden;
   }
   body {
-    background: radial-gradient(circle, rgb(44 45 46) 0%, rgb(52 105 137) 100%);
+    background: radial-gradient(circle, rgb(182, 182, 182) 0%, rgb(51, 51, 51) 100%);
   }
 </style>
 
 <script>
-  import {on} from '@spearwolf/eventize';
-  import {OnDisplayInit, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, MeshBasicMaterial} from 'three/webgpu';
+  import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
+  import {vec4} from 'three/tsl';
+  import {DoubleSide, MeshBasicNodeMaterial} from 'three/webgpu';
   import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  function makeCrossMesh(capacity: number, size: number, offset = 1.2) {
-    const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, capacity);
+  const CAPACITY = 15;
+  const SIZE = 15;
+  const OFFSET = 1.2;
 
-    for (let i = 0; i < capacity; i++) {
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+
+  demo.onInit(() => {
+    const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, CAPACITY);
+
+    for (let i = 0; i < CAPACITY; i++) {
       const cross = geometry.pool.createVO();
-      cross.make(size, size);
+
+      cross.make(SIZE, SIZE);
       cross.rotate(i * 45);
-      cross.translate(i * size * offset - ((capacity - 1) * size * offset) / 2, 0);
+      cross.translate(i * SIZE * OFFSET - ((CAPACITY - 1) * SIZE * OFFSET) / 2, 0);
     }
 
-    const material = new MeshBasicMaterial({
-      color: 0xf01065,
+    const material = new MeshBasicNodeMaterial({
       side: DoubleSide,
     });
+
+    material.colorNode = vec4(0.9, 0, 0.3, 1);
 
     const mesh = new VertexObjects(geometry, material);
     mesh.name = 'CrossMesh';
 
-    return mesh;
-  }
-
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
-
-  on(demo, OnDisplayInit, ({scene}) => {
-    scene.add(makeCrossMesh(10, 10));
+    demo.scene.add(mesh);
   });
 
   demo.start();

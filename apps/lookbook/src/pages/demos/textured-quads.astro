@@ -16,20 +16,24 @@ import {description, showSource, title} from './_textured-quads.json';
     height: 100vh;
     overflow-y: hidden;
   }
+
   body {
     background-color: #391e39;
     background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
   }
+
   .texture-preview {
-    background-color: rgba(86, 101, 115, 80%);
-    border: 5px solid #324168;
+    background-color: rgba(100, 100, 100, 0.8);
+    border: 1px solid #000;
     border-radius: 5px;
-    width: 150px;
-    height: 150px;
+    width: 256px;
+    height: 256px;
     position: fixed;
     bottom: 20px;
     right: 20px;
-    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+    box-shadow:
+      0 0 0 2px #afafaf,
+      5px 5px 10px rgba(0 0 0 / 50%);
     overflow: hidden;
   }
   .texture-preview :global(img),
@@ -40,10 +44,10 @@ import {description, showSource, title} from './_textured-quads.json';
 
 <script>
   import {TextureCoords, TextureImageLoader, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, RawShaderMaterial, Texture} from 'three';
+  import {DoubleSide, RawShaderMaterial, Texture} from 'three/webgpu';
+  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
   import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import loadShaderSource from '~demos/utils/loadShaderSource';
@@ -97,7 +101,7 @@ import {description, showSource, title} from './_textured-quads.json';
     return mesh;
   }
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   const {imgEl, texture, texCoords} = await new TextureImageLoader().loadAsync(
     assetsUrl('ball-pattern-rot--not-power-of-2.png'),

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 >
 > Starting with version `0.13`, `twopoint5d` is freeing itself from legacy issues and moving completely to the `three/webgpu` side!
 >
-> The new _node materials_ and the _three shader language_ are exactly what was envisioned when `twopoint5d` was created.
+> The new _node materials_ and the _three shader language_ are exactly what was envisioned when `@spearwolf/twopoint5d` was created.
 > Instead of getting lost in custom workarounds that use the old materials and shaders, we have now switched exclusively and consistently to _tsl_.
 
 - only use the `three/webgpu` package as import
@@ -32,11 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `display.onPause(callback)`
     - `display.onRestart(callback)`
     - `display.onDispose(callback)`
-- the types and constants from `/events.js` are now also included in the main module
-  - _MIGRATION NOTE:_ the import of `@spearwolf/twopoint5d/events.js` is now deprecated and should no longer be used. Just use `@spearwolf/twopoint5d` instead.
+- the types and constants from `/events.js` are now included in the main module
+  - _MIGRATION NOTE:_ the import of `@spearwolf/twopoint5d/events.js` is no longer supported. just use `@spearwolf/twopoint5d` instead.
 - _MIGRATION NOTE:_ renamed `DisplayEventArgs` to `DisplayEventProps`
 - _MIGRATION NOTE:_ dropped `OnResizeProps` and `OnRenderFrameProps`. the only truth is `DisplayEventProps`
 - add new constants and types: `OnDisplayInit`, `OnDisplayStart`, `OntDisplayRestart`, `OnDisplayPause` and `OnDisplayDispose`
+- The `VertexObjects` mesh is calling `.update()` in the constructor now
+  - To avoid disappointment if the vertex object geometry was not manually updated initially.
 
 
 ## [0.12.0] - 2025-05-10

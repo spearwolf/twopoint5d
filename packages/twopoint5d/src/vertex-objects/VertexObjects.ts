@@ -11,6 +11,8 @@ export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObj
     this.name = 'VertexObjects';
 
     this.frustumCulled = false;
+
+    this.update();
   }
 
   /**
