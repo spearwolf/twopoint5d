@@ -21,8 +21,8 @@ import {description, showSource, title} from './_instanced-quads.json';
 </style>
 
 <script>
-  import {InstancedVertexObjectGeometry, VertexObjects, type VO} from '@spearwolf/twopoint5d';
-  import {add, attribute, mul, vec3, vec4} from 'three/tsl';
+  import {InstancedVertexObjectGeometry, positionByInstancePosition, VertexObjects, type VO} from '@spearwolf/twopoint5d';
+  import {attribute, vec3, vec4} from 'three/tsl';
   import {NodeMaterial} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
@@ -123,11 +123,7 @@ import {description, showSource, title} from './_instanced-quads.json';
   function createMaterial() {
     const material = new NodeMaterial();
 
-    const position = attribute('position');
-    const quadSize = attribute('quadSize');
-    const instancePosition = attribute('instancePosition');
-
-    material.positionNode = add(mul(position, vec3(quadSize, 1.0)), instancePosition);
+    material.positionNode = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
 
     material.colorNode = vec4(1.0, 0.3, 0.6, 0.9);
 

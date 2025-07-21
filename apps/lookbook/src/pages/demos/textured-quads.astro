@@ -43,16 +43,26 @@ import {description, showSource, title} from './_textured-quads.json';
 </style>
 
 <script>
-  import {TextureCoords, TextureImageLoader, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, RawShaderMaterial, Texture} from 'three/webgpu';
+  import {
+    colorFromTextureByTexCoords,
+    positionByInstancePosition,
+    TextureCoords,
+    TextureImageLoader,
+    VertexObjects,
+  } from '@spearwolf/twopoint5d';
+  import {attribute, vec3} from 'three/tsl';
+  import {NodeMaterial, Texture} from 'three/webgpu';
   import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
-  import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
-  import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
-  import loadShaderSource from '~demos/utils/loadShaderSource';
 
-  async function makeMesh(
+  // +================================================================================+
+  //
+  // create instanced geometry and mesh
+  //
+  // +================================================================================+
+
+  async function createMesh(
     rows: number,
     columns: number,
     size: number,
@@ -60,8 +70,7 @@ import {description, showSource, title} from './_textured-quads.json';
     texCoords: TextureCoords,
     texture: Texture,
   ) {
-    const capacity = rows * columns;
-    const geometry = new InstancedQuadsGeometry(capacity);
+    const geometry = new InstancedQuadsGeometry(rows * columns);
 
     geometry.basePool.createVO().make();
 
@@ -82,24 +91,34 @@ import {description, showSource, title} from './_textured-quads.json';
       }
     }
 
-    const material = new RawShaderMaterial({
-      vertexShader: await loadShaderSource(vertexShaderSource),
-      fragmentShader: await loadShaderSource(fragmentShaderSource),
-      uniforms: {
-        colorMap: {
-          value: texture,
-        },
-      },
-      transparent: true,
-      side: DoubleSide,
-    });
-
-    const mesh = new VertexObjects(geometry, material);
+    const mesh = new VertexObjects(geometry, await createMaterial(texture));
     mesh.name = 'InstancedQuadsMesh';
     mesh.frustumCulled = false;
 
     return mesh;
   }
+
+  // +================================================================================+
+  //
+  // create material
+  //
+  // +================================================================================+
+
+  async function createMaterial(texture: Texture) {
+    const material = new NodeMaterial();
+
+    material.positionNode = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
+
+    material.colorNode = colorFromTextureByTexCoords(texture);
+
+    return material;
+  }
+
+  // +================================================================================+
+  //
+  // start demo
+  //
+  // +================================================================================+
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
@@ -113,7 +132,7 @@ import {description, showSource, title} from './_textured-quads.json';
   document.getElementById('texture-preview').appendChild(imgEl);
 
   await demo.start(async () => {
-    demo.scene.add(await makeMesh(16, 32, 3.5, 1, texCoords, texture));
+    demo.scene.add(await createMesh(16, 32, 3.5, 1, texCoords, texture));
   });
 
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
