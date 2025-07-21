@@ -92,8 +92,8 @@ import {description, showSource, title} from './_textured-quads.json';
     }
 
     const mesh = new VertexObjects(geometry, await createMaterial(texture));
+
     mesh.name = 'InstancedQuadsMesh';
-    mesh.frustumCulled = false;
 
     return mesh;
   }

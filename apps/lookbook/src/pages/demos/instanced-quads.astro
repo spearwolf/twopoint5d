@@ -82,11 +82,9 @@ import {description, showSource, title} from './_instanced-quads.json';
   // +================================================================================+
 
   function createMesh(rows: number, columns: number, size: number, offset: number) {
-    const capacity = rows * columns;
-
     const geometry = new InstancedVertexObjectGeometry<InstancedQuad, BaseQuad>(
       InstancedQuadDescriptor,
-      capacity,
+      rows * columns,
       BaseQuadDescriptor,
     );
 
@@ -109,6 +107,7 @@ import {description, showSource, title} from './_instanced-quads.json';
     }
 
     const mesh = new VertexObjects(geometry, createMaterial());
+
     mesh.name = 'InstancedQuadsMesh';
 
     return mesh;
