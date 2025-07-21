@@ -21,7 +21,13 @@ import {description, showSource, title} from './_instanced-quads.json';
 </style>
 
 <script>
-  import {InstancedVertexObjectGeometry, positionByInstancePosition, VertexObjects, type VO} from '@spearwolf/twopoint5d';
+  import {
+    InstancedVertexObjectGeometry,
+    positionByInstancePosition,
+    VertexObjectPool,
+    VertexObjects,
+    type VO,
+  } from '@spearwolf/twopoint5d';
   import {attribute, vec3, vec4} from 'three/tsl';
   import {NodeMaterial} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -92,25 +98,41 @@ import {description, showSource, title} from './_instanced-quads.json';
     geometry.basePool.createVO().make();
 
     // Now, create the instanced quads ..
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < columns; x++) {
-        const cross = geometry.instancedPool.createVO();
-
-        cross.width = 1.0 + Math.random() * (size - 1.0);
-        cross.height = 1.0 + Math.random() * (size - 1.0);
-
-        cross.setInstancePosition([
-          x * size * offset - ((columns - 1) * size * offset) / 2,
-          y * size * offset - ((rows - 1) * size * offset) / 2,
-        ]);
-      }
-    }
+    createQuads(geometry.instancedPool, rows, columns, size, offset);
 
     const mesh = new VertexObjects(geometry, createMaterial());
 
     mesh.name = 'InstancedQuadsMesh';
 
     return mesh;
+  }
+
+  // +================================================================================+
+  //
+  // create quads
+  //
+  // +================================================================================+
+
+  function createQuads(
+    vertexObjectPool: VertexObjectPool<InstancedQuad>,
+    rows: number,
+    columns: number,
+    size: number,
+    offset: number,
+  ) {
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < columns; x++) {
+        const quad = vertexObjectPool.createVO();
+
+        quad.width = 1.0 + Math.random() * (size - 1.0);
+        quad.height = 1.0 + Math.random() * (size - 1.0);
+
+        quad.setInstancePosition([
+          x * size * offset - ((columns - 1) * size * offset) / 2,
+          y * size * offset - ((rows - 1) * size * offset) / 2,
+        ]);
+      }
+    }
   }
 
   // +================================================================================+
