@@ -60,60 +60,56 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
 </style>
 
 <script>
-  import {TileSet, TileSetLoader, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, RawShaderMaterial, Texture} from 'three';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
-  import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
-  import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
+  import {TileSet, TileSetLoader} from '@spearwolf/twopoint5d';
+  import {DoubleSide, MeshBasicNodeMaterial, Texture} from 'three/webgpu';
+  import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
-  import loadShaderSource from '~demos/utils/loadShaderSource';
+
+  // +================================================================================+
+  //
+  // create textured quads
+  //
+  // +================================================================================+
 
   async function makeMesh(rows: number, columns: number, size: number, offset: number, tileset: TileSet, texture: Texture) {
     const capacity = rows * columns;
-    const geometry = new InstancedQuadsGeometry(capacity);
 
-    geometry.basePool.createVO().make();
-
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < columns; x++) {
-        const quad = geometry.instancedPool.createVO();
-
-        quad.width = 1.0 + Math.random() * (size - 1.0);
-        quad.height = quad.width;
-
-        quad.setInstancePosition([
-          x * size * offset - ((columns - 1) * size * offset) / 2,
-          y * size * offset - ((rows - 1) * size * offset) / 2,
-          0,
-        ]);
-
-        const texCoords = tileset.atlas.randomFrame().coords;
-        console.log('texCoords', [texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
-        quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
-      }
-    }
-
-    const material = new RawShaderMaterial({
-      vertexShader: await loadShaderSource(vertexShaderSource),
-      fragmentShader: await loadShaderSource(fragmentShaderSource),
-      uniforms: {
-        colorMap: {
-          value: texture,
-        },
-      },
+    const material = new MeshBasicNodeMaterial({
       transparent: true,
       side: DoubleSide,
     });
 
-    const mesh = new VertexObjects(geometry, material);
-    mesh.name = 'InstancedQuadsMesh';
-    mesh.frustumCulled = false;
+    return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+          const quad = vertexObjectPool.createVO();
 
-    return mesh;
+          quad.width = 1.0 + Math.random() * (size - 1.0);
+          quad.height = quad.width;
+
+          quad.setInstancePosition([
+            x * size * offset - ((columns - 1) * size * offset) / 2,
+            y * size * offset - ((rows - 1) * size * offset) / 2,
+            0,
+          ]);
+
+          const texCoords = tileset.atlas.randomFrame().coords;
+          console.log('texCoords', [texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+
+          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+        }
+      }
+    });
   }
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // +================================================================================+
+  //
+  // start demo
+  //
+  // +================================================================================+
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   await demo.start(async () => {
     const {imgEl, texture, tileSet} = await new TileSetLoader().loadAsync(

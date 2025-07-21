@@ -38,75 +38,65 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
 </style>
 
 <script>
-  import {TextureAtlas, TextureAtlasLoader, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, RawShaderMaterial, Texture} from 'three';
-  import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
-  import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
+  import {TextureAtlas, TextureAtlasLoader} from '@spearwolf/twopoint5d';
+  import {Texture} from 'three';
+  import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
-  import loadShaderSource from '~demos/utils/loadShaderSource';
 
   const sample = (arr: any) => arr[Math.floor(Math.random() * arr.length)];
 
-  async function makeMesh(rows: number, columns: number, size: number, offset: number, atlas: TextureAtlas, texture: Texture) {
-    const capacity = rows * columns;
-    const geometry = new InstancedQuadsGeometry(capacity);
+  // +================================================================================+
+  //
+  // create textured quads
+  //
+  // +================================================================================+
 
+  function makeMesh(rows: number, columns: number, size: number, offset: number, atlas: TextureAtlas, texture: Texture) {
     const frames = atlas.frameNames(/numbers32/).map((name) => atlas.frame(name).coords);
 
-    geometry.basePool.createVO().make();
+    return createTexturedQuads({capacity: rows * columns, texture}, (vertexObjectPool) => {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+          const quad = vertexObjectPool.createVO();
 
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < columns; x++) {
-        const quad = geometry.instancedPool.createVO();
+          quad.width = 1.0 + Math.random() * (size - 1.0);
+          quad.height = quad.width;
 
-        quad.width = 1.0 + Math.random() * (size - 1.0);
-        quad.height = quad.width;
+          quad.setInstancePosition([
+            x * size * offset - ((columns - 1) * size * offset) / 2,
+            y * size * offset - ((rows - 1) * size * offset) / 2,
+            0,
+          ]);
 
-        quad.setInstancePosition([
-          x * size * offset - ((columns - 1) * size * offset) / 2,
-          y * size * offset - ((rows - 1) * size * offset) / 2,
-          0,
-        ]);
-
-        const texCoords = sample(frames);
-        quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+          const texCoords = sample(frames);
+          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+        }
       }
-    }
-
-    const material = new RawShaderMaterial({
-      vertexShader: await loadShaderSource(vertexShaderSource),
-      fragmentShader: await loadShaderSource(fragmentShaderSource),
-      uniforms: {
-        colorMap: {
-          value: texture,
-        },
-      },
-      transparent: true,
-      side: DoubleSide,
     });
-
-    const mesh = new VertexObjects(geometry, material);
-    mesh.name = 'InstancedQuadsMesh';
-    mesh.frustumCulled = false;
-
-    return mesh;
   }
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // +================================================================================+
+  //
+  // start demo
+  //
+  // +================================================================================+
 
-  const {imgEl, texture, atlas} = await new TextureAtlasLoader().loadAsync(assetsUrl('lab-walls-tiles.json'), ['nearest'], {
-    overrideImageUrl: assetsUrl('lab-walls-tiles.png'),
-  });
-
-  console.log('loaded texture-atlas', {imgEl, atlas, texture});
-
-  document.getElementById('texture-preview').appendChild(imgEl);
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   await demo.start(async () => {
-    demo.scene.add(await makeMesh(16, 32, 3.5, 1, atlas, texture));
-  });
+    const {imgEl, texture, atlas} = await new TextureAtlasLoader().loadAsync(assetsUrl('lab-walls-tiles.json'), ['nearest'], {
+      overrideImageUrl: assetsUrl('lab-walls-tiles.png'),
+    });
 
-  console.log('TexturedQuadsMesh', demo.scene.children[0]);
+    console.log('loaded texture-atlas', {imgEl, atlas, texture});
+
+    document.getElementById('texture-preview').appendChild(imgEl);
+
+    const mesh = makeMesh(16, 32, 3.5, 1, atlas, texture);
+
+    console.log('TexturedQuadsMesh', mesh);
+
+    demo.scene.add(mesh);
+  });
 </script>

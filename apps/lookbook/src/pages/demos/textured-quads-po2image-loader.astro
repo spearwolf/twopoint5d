@@ -39,65 +39,53 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
 </style>
 
 <script>
-  import {PowerOf2ImageLoader, TextureCoords, VertexObjects} from '@spearwolf/twopoint5d';
-  import {DoubleSide, NearestFilter, RawShaderMaterial, Texture} from 'three';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
-  import fragmentShaderSource from '~demos/shaders/textured-quads.frag?url';
-  import vertexShaderSource from '~demos/shaders/textured-quads.vert?url';
+  import {PowerOf2ImageLoader, TextureCoords} from '@spearwolf/twopoint5d';
+  import {DoubleSide, MeshBasicNodeMaterial, NearestFilter, Texture} from 'three/webgpu';
+  import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
-  import loadShaderSource from '~demos/utils/loadShaderSource';
 
-  async function makeMesh(
-    rows: number,
-    columns: number,
-    size: number,
-    offset: number,
-    texCoords: TextureCoords,
-    texture: Texture,
-  ) {
+  // +================================================================================+
+  //
+  // create textured quads
+  //
+  // +================================================================================+
+
+  function makeMesh(rows: number, columns: number, size: number, offset: number, texCoords: TextureCoords, texture: Texture) {
     const capacity = rows * columns;
-    const geometry = new InstancedQuadsGeometry(capacity);
 
-    geometry.basePool.createVO().make();
-
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < columns; x++) {
-        const quad = geometry.instancedPool.createVO();
-
-        quad.width = size * (0.6 + Math.random() * 0.45);
-        quad.height = (quad.width * texCoords.height) / texCoords.width;
-
-        quad.setInstancePosition([
-          x * size * offset - ((columns - 1) * size * offset) / 2,
-          y * size * offset - ((rows - 1) * size * offset) / 2,
-          0,
-        ]);
-
-        quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
-      }
-    }
-
-    const material = new RawShaderMaterial({
-      vertexShader: await loadShaderSource(vertexShaderSource),
-      fragmentShader: await loadShaderSource(fragmentShaderSource),
-      uniforms: {
-        colorMap: {
-          value: texture,
-        },
-      },
+    const material = new MeshBasicNodeMaterial({
       transparent: true,
       side: DoubleSide,
     });
 
-    const mesh = new VertexObjects(geometry, material);
-    mesh.name = 'InstancedQuadsMesh';
-    mesh.frustumCulled = false;
+    return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+          const quad = vertexObjectPool.createVO();
 
-    return mesh;
+          quad.width = size * (0.6 + Math.random() * 0.45);
+          quad.height = (quad.width * texCoords.height) / texCoords.width;
+
+          quad.setInstancePosition([
+            x * size * offset - ((columns - 1) * size * offset) / 2,
+            y * size * offset - ((rows - 1) * size * offset) / 2,
+            0,
+          ]);
+
+          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+        }
+      }
+    });
   }
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // +================================================================================+
+  //
+  // start demo
+  //
+  // +================================================================================+
+
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   const data = await new PowerOf2ImageLoader().loadAsync(assetsUrl('platform-blau.png'));
 
@@ -111,8 +99,8 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
 
   document.getElementById('texture-preview').appendChild(data.imgEl);
 
-  await demo.start(async () => {
-    demo.scene.add(await makeMesh(16, 32, 10, 1, data.texCoords, texture));
+  await demo.start(() => {
+    demo.scene.add(makeMesh(16, 32, 10, 1, data.texCoords, texture));
   });
 
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
