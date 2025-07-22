@@ -9,11 +9,12 @@ import {description, showSource, title} from './_display-multi.json';
   <div class="pt-[28px] h-full">
     <section class="gridContainer">
       <div class="gridCell">
-        <div class="canvasContainer border-box">
+        <div class="canvasContainer border-box" data-force-webgl>
           <canvas class="content-box create-canvas-here"></canvas>
         </div>
         <div class="gridInfo">
           div &gt; <b>canvas</b>.content-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
@@ -21,13 +22,15 @@ import {description, showSource, title} from './_display-multi.json';
         <div class="canvasContainer content-box create-canvas-here debug"></div>
         <div class="gridInfo">
           <b>div</b>.no-size.content-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
       <div class="gridCell">
-        <div class="canvasContainer content-box size-100 create-canvas-here"></div>
+        <div class="canvasContainer content-box size-100 create-canvas-here" data-force-webgl></div>
         <div class="gridInfo">
           <b>div</b>.size-100%.content-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
@@ -37,13 +40,15 @@ import {description, showSource, title} from './_display-multi.json';
         </div>
         <div class="gridInfo">
           div &gt; <b>canvas</b>.border-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
       <div class="gridCell">
-        <div class="canvasContainer border-box create-canvas-here"></div>
+        <div class="canvasContainer border-box create-canvas-here" data-force-webgl></div>
         <div class="gridInfo">
           <b>div</b>.no-size.border-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
@@ -51,6 +56,7 @@ import {description, showSource, title} from './_display-multi.json';
         <div class="canvasContainer size-100 border-box create-canvas-here"></div>
         <div class="gridInfo">
           <b>div</b>.size-100%.border-box
+          <span class="rendererBackendInfo"></span>
           <span class="canvasSizeInfo"></span>
         </div>
       </div>
@@ -83,8 +89,22 @@ import {description, showSource, title} from './_display-multi.json';
     };
   }
 
+  function setRendererBackendInfo(el: HTMLElement, display: Display) {
+    const rendererBackendInfo = el.parentElement!.querySelector('.rendererBackendInfo');
+    if (rendererBackendInfo) {
+      let backend = el.hasAttribute('data-force-webgl')
+        ? 'forceWebGL'
+        : display.isWebGPUBackend
+          ? 'WebGPU'
+          : display.isWebGLBackend
+            ? 'WebGL'
+            : 'unknown';
+      rendererBackendInfo.textContent = `[${backend}]`;
+    }
+  }
+
   for (const canvas of document.querySelectorAll('.create-canvas-here')) {
-    const display = new Display(canvas as HTMLElement);
+    const display = new Display(canvas as HTMLElement, {forceWebGL: canvas.hasAttribute('data-force-webgl')});
     // display.pixelZoom = 2;
 
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {pixelZoom: 2}));
@@ -107,11 +127,20 @@ import {description, showSource, title} from './_display-multi.json';
       stageRenderer.renderFrame(renderer);
     });
 
-    const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvas as HTMLElement);
+    let canvasContainer: HTMLElement = canvas as HTMLElement;
+    if (!canvasContainer.classList.contains('canvasContainer')) {
+      canvasContainer = canvasContainer.parentElement!;
+    }
 
-    on(display, OnDisplayResize, ({width, height, display}) => updateCanvasSizeInfo(width, height, display.pixelRatio));
+    const updateCanvasSizeInfo = createCanvasSizeInfoUpdater(canvasContainer);
 
-    display.start();
+    on(display, OnDisplayResize, ({width, height, display}) => {
+      updateCanvasSizeInfo(width, height, display.pixelRatio);
+    });
+
+    display.start(() => {
+      setRendererBackendInfo(canvasContainer, display);
+    });
   }
 </script>
 
