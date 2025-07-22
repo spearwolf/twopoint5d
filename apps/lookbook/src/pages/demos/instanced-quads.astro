@@ -157,7 +157,7 @@ import {description, showSource, title} from './_instanced-quads.json';
   //
   // +================================================================================+
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {forceWebGL: true});
 
   await demo.start(() => {
     demo.scene.add(createMesh(10, 20, 3.2, 1.2));

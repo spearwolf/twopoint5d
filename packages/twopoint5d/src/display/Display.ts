@@ -130,11 +130,18 @@ export class Display {
 
   renderer?: WebGPURenderer;
 
+  get isWebGPUBackend(): boolean {
+    return (this.renderer?.backend as any)?.['isWebGPUBackend'] ?? false;
+  }
+
+  get isWebGLBackend(): boolean {
+    return (this.renderer?.backend as any)?.['isWebGLBackend'] ?? false;
+  }
+
   readonly #waitForRendererInit!: Promise<WebGPURenderer>;
 
   constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
-
     retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
 
     this.#chronometer.stop();
@@ -150,7 +157,7 @@ export class Display {
         'The Display constructor expects a WebGPURenderer or an HTML element as the first argument.',
         'Since twopoint5d@0.13 a WebGLRenderer is not supported anymore.',
       );
-      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument.');
+      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument!');
     }
 
     if (isWebGPURenderer(domElementOrRenderer)) {
@@ -245,7 +252,7 @@ export class Display {
       onDocVisibilityChange();
     }
 
-    this.frameLoop.start(this);
+    this.#waitForRendererInit.then(() => this.frameLoop.start(this));
   }
 
   /**
@@ -270,6 +277,10 @@ export class Display {
 
   set pause(pause: boolean) {
     this.#stateMachine.pausedByUser = pause;
+  }
+
+  get isRunning(): boolean {
+    return this.#stateMachine.isRunning;
   }
 
   get pixelRatio(): number {
@@ -412,7 +423,7 @@ export class Display {
   }
 
   [FrameLoop.OnFrame](): void {
-    if (!this.pause) {
+    if (this.isRunning) {
       this.renderFrame();
     }
   }

@@ -14,6 +14,18 @@ export class DisplayStateMachine {
 
   state: DisplayStateName = DisplayStateMachine.NEW;
 
+  get isNew(): boolean {
+    return this.state === DisplayStateMachine.NEW;
+  }
+
+  get isRunning(): boolean {
+    return this.state === DisplayStateMachine.RUNNING;
+  }
+
+  get isPaused(): boolean {
+    return this.state === DisplayStateMachine.PAUSED;
+  }
+
   #pausedByUser = false;
   #documentIsVisible = true;
   #elementIsInsideViewport = true;

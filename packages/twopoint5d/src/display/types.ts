@@ -14,10 +14,13 @@ export interface DisplayEventProps {
 
 export type ResizeDisplayToFn = (display: Display) => [width: number, height: number];
 
-export type DisplayRendererParameters = Partial<Omit<ConstructorParameters<typeof WebGPURenderer>, 'canvas'>>;
-export type CreateRendererParameters = DisplayRendererParameters & {canvas: HTMLCanvasElement};
+export type DisplayRendererParameters = Partial<Omit<ConstructorParameters<typeof WebGPURenderer>[0], 'canvas'>>;
 
-export type DisplayParameters = DisplayRendererParameters & {
+export interface CreateRendererParameters extends DisplayRendererParameters {
+  canvas: HTMLCanvasElement;
+}
+
+export interface DisplayParameters extends DisplayRendererParameters {
   /**
    * Limit the maximum number of frames per second.
    *
@@ -74,4 +77,4 @@ export type DisplayParameters = DisplayRendererParameters & {
    * @returns The return value here is expected to be a `THREE.WebGPURenderer` instance.
    */
   createRenderer?: (params: CreateRendererParameters) => WebGPURenderer;
-};
+}
