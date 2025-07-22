@@ -121,7 +121,6 @@ import {description, showSource, title} from './_display-multi.json';
     height: 100%;
   }
   body {
-    height: 100%;
     margin: 0;
     color: #f0f0f0;
     background-color: #123;
@@ -133,10 +132,15 @@ import {description, showSource, title} from './_display-multi.json';
   .gridContainer {
     display: grid;
     height: 100%;
+    margin: 2px;
     grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     grid-template-areas: '. . .' '. . .';
     gap: 1px;
+  }
+  body,
+  .gridContainer {
+    background-color: #123;
   }
   .gridCell {
     outline: 1px dashed #4a4c50;
