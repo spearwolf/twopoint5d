@@ -106,7 +106,7 @@ export class Display {
     return this.#isFirstFrame;
   }
 
-  readonly frameLoop: FrameLoop;
+  frameLoop: FrameLoop;
 
   /**
    * see {@link DisplayParameters.maxFps}
@@ -130,6 +130,10 @@ export class Display {
 
   renderer?: WebGPURenderer;
 
+  get canvas(): HTMLCanvasElement {
+    return this.renderer!.domElement;
+  }
+
   get isWebGPUBackend(): boolean {
     return (this.renderer?.backend as any)?.['isWebGPUBackend'] ?? false;
   }
@@ -138,15 +142,13 @@ export class Display {
     return (this.renderer?.backend as any)?.['isWebGLBackend'] ?? false;
   }
 
-  readonly #waitForRendererInit!: Promise<WebGPURenderer>;
+  readonly #waitForRenderer!: Promise<WebGPURenderer>;
 
   constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
     retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
 
     this.#chronometer.stop();
-
-    this.frameLoop = new FrameLoop(options?.maxFps ?? 0);
 
     this.resizeToCallback = options?.resizeTo;
     this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
@@ -202,8 +204,10 @@ export class Display {
         ...options,
       } as CreateRendererParameters);
 
-      this.#waitForRendererInit = this.renderer.init();
+      this.#waitForRenderer = this.renderer.init();
     }
+
+    this.frameLoop = new FrameLoop(options?.maxFps ?? 0, this.renderer);
 
     const {domElement: canvas} = this.renderer!;
     Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;', this.styleSheetRoot);
@@ -216,7 +220,7 @@ export class Display {
 
     on(this.#stateMachine, {
       [DisplayStateMachine.Init]: async () => {
-        await this.#waitForRendererInit;
+        await this.#waitForRenderer;
         this.#emit(OnDisplayInit);
       },
 
@@ -252,7 +256,9 @@ export class Display {
       onDocVisibilityChange();
     }
 
-    this.#waitForRendererInit.then(() => this.frameLoop.start(this));
+    this.#waitForRenderer.then(() => {
+      this.frameLoop.start(this);
+    });
   }
 
   /**
@@ -298,7 +304,7 @@ export class Display {
     let wPx = 300;
     let hPx = 150;
 
-    const canvasElement = this.renderer!.domElement;
+    const canvasElement = this.canvas;
 
     let sizeRefElement = this.resizeToElement;
 
@@ -446,7 +452,7 @@ export class Display {
   }
 
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
-    await this.#waitForRendererInit;
+    await this.#waitForRenderer;
 
     if (typeof beforeStartCallback === 'function') {
       await beforeStartCallback(this.getEventProps());

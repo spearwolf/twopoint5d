@@ -1,15 +1,26 @@
 import {emit, eventize, off, on} from '@spearwolf/eventize';
 
+interface ISetAnimationLoop {
+  setAnimationLoop(callback: (now: number) => unknown): unknown;
+}
+
 const OnRAF = Symbol.for('onRAF');
 const OnFrame = Symbol.for('onFrame');
 
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 const MEASURE_COLLECTION_SIZE = 10;
 
+const rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
 let rafUniqueInstance: RAF = null;
 
 class RAF {
-  static get() {
+  static get(renderer?: ISetAnimationLoop): RAF {
+    if (renderer != null) {
+      if (!rafUniqueInstances.has(renderer)) {
+        rafUniqueInstances.set(renderer, new RAF(renderer));
+      }
+      return rafUniqueInstances.get(renderer);
+    }
     if (rafUniqueInstance == null) {
       rafUniqueInstance = new RAF();
     }
@@ -27,13 +38,15 @@ class RAF {
   measuredFps = 0;
   measuredFpsCollection: number[] = [];
 
-  constructor() {
+  constructor(private readonly renderer?: ISetAnimationLoop) {
     eventize(this);
     this.start();
   }
 
   #onAnimationFrame = (now: number) => {
-    this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
+    if (this.renderer == null) {
+      this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
+    }
 
     this.measureFps(now);
 
@@ -44,11 +57,20 @@ class RAF {
 
   start() {
     if (this.#rafID !== 0) return;
-    this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(this.#onAnimationFrame);
+      this.#rafID = 1; // Using 1 to indicate that the renderer is set
+    } else {
+      this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
+    }
   }
 
   stop() {
-    cancelAnimationFrame(this.#rafID);
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(null);
+    } else {
+      cancelAnimationFrame(this.#rafID);
+    }
     this.#rafID = 0;
   }
 
@@ -91,8 +113,11 @@ export class FrameLoop {
     return this.#subscribers.size;
   }
 
-  constructor(maxFps = 0) {
+  private readonly raf: RAF;
+
+  constructor(maxFps = 0, renderer?: ISetAnimationLoop) {
     eventize(this);
+    this.raf = RAF.get(renderer);
     this.setFps(maxFps);
   }
 
@@ -107,7 +132,7 @@ export class FrameLoop {
     this.#subscribers.add(target);
 
     if (this.subscriptionCount === 1) {
-      on(RAF.get(), OnRAF, this);
+      on(this.raf, OnRAF, this);
     }
 
     on(this, FrameLoop.OnFrame, target);
@@ -125,7 +150,7 @@ export class FrameLoop {
       off(this, FrameLoop.OnFrame, target);
 
       if (this.subscriptionCount === 0) {
-        off(RAF.get(), OnRAF, this);
+        off(this.raf, OnRAF, this);
       }
     }
   }
