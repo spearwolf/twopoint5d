@@ -11,6 +11,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
+    "playwright:install": "playwright install chromium firefox",
     "test": "pnpm web-test-runner"
   },
   "dependencies": {

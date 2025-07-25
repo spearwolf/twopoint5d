@@ -7,4 +7,7 @@ catalog:
   '@spearwolf/eventize': ^4.0.1
   '@spearwolf/signalize': ^0.20.1
 onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - nx
   - sharp
