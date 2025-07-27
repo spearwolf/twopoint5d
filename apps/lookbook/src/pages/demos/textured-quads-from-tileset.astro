@@ -61,7 +61,8 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
 
 <script>
   import {TileSet, TileSetLoader} from '@spearwolf/twopoint5d';
-  import {DoubleSide, MeshBasicNodeMaterial, Texture} from 'three/webgpu';
+  import {float} from 'three/tsl';
+  import {DoubleSide, MeshBasicNodeMaterial, NeutralToneMapping, Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -78,6 +79,7 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
     const material = new MeshBasicNodeMaterial({
       transparent: true,
       side: DoubleSide,
+      alphaTestNode: float(0.05),
     });
 
     return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
@@ -112,6 +114,9 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   await demo.start(async () => {
+    console.log('current toneMapping:', demo.renderer!.toneMapping);
+    demo.renderer!.toneMapping = NeutralToneMapping;
+
     const {imgEl, texture, tileSet} = await new TileSetLoader().loadAsync(
       assetsUrl('glaskugeln-2-256x.png'),
       {
@@ -126,6 +131,8 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
     document.getElementById('texture-preview').appendChild(imgEl.cloneNode());
 
     demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
+
+    Object.assign(globalThis, { demo });
   });
 
   console.log('TexturedQuadsMesh', demo.scene.children[0]);

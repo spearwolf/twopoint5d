@@ -28,7 +28,7 @@ import {description, showSource, title} from './_instanced-quads.json';
     VertexObjects,
     type VO,
   } from '@spearwolf/twopoint5d';
-  import {add, attribute, cameraPosition, cos, distance, length, modelPosition, mul, remapClamp, sin, sub, uniform, vec2, vec3, vec4} from 'three/tsl';
+  import {add, attribute, cos, length, mul, sin, sub, uniform, vec2, vec3, vec4} from 'three/tsl';
   import {NodeMaterial} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
@@ -188,5 +188,5 @@ import {description, showSource, title} from './_instanced-quads.json';
     demo.scene.add(createMesh(100, 200, 3, 1.2));
   });
 
-  console.log('InstancedQuadsMesh', demo.scene.children[0]);
+  console.log('InstancedQuadsMesh', {mesh: demo.scene.children[0], demo});
 </script>
