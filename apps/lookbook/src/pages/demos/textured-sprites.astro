@@ -30,13 +30,8 @@ import {description, showSource, title} from './_textured-sprites.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {
-    OnDisplayInit,
-    TexturedSprites,
-    TexturedSpritesGeometry,
-    TexturedSpritesMaterial,
-    TileSetLoader,
-  } from '@spearwolf/twopoint5d';
+  import {OnDisplayInit, TexturedSprites, TileSetLoader} from '@spearwolf/twopoint5d';
+  import {AlwaysDepth} from 'three';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -44,33 +39,37 @@ import {description, showSource, title} from './_textured-sprites.json';
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
   on(demo, OnDisplayInit, async ({scene}) => {
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(
+      assetsUrl('skinball-256.png'),
+      {
+        tileWidth: 256,
+        tileHeight: 256,
+        margin: 1,
+      },
+      ['srgb'],
+    );
+
     const CAPACITY = 256;
 
-    const geometry = new TexturedSpritesGeometry(CAPACITY);
+    const sprites = new TexturedSprites(CAPACITY, texture);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('skinball-256.png'), {
-      tileWidth: 256,
-      tileHeight: 256,
-      margin: 1,
-    });
+    sprites.material.depthFunc = AlwaysDepth;
 
-    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 100, 75, 4, CAPACITY);
+    // TODO render as billboards!!
+
+    const bouncingSprites = new BouncingSprites(sprites.spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
 
     bouncingSprites.createSprites();
 
-    const material = new TexturedSpritesMaterial({colorMap: texture, depthTest: false, depthWrite: false});
-
-    const mesh = new TexturedSprites(geometry, material);
-
-    scene.add(mesh);
+    scene.add(sprites);
 
     demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
-      mesh.update();
+      sprites.update();
     });
 
     console.log('bouncingSprites', bouncingSprites);
-    console.log('TexturedSpritesMesh', mesh);
+    console.log('TexturedSprites', sprites);
   });
 
   demo.start();

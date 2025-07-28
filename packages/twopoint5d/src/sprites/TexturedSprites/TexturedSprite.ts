@@ -26,7 +26,7 @@ export interface TexturedSprite extends VO {
   setQuadSize(quadSize: [width: number, height: number]): void;
   setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
   setInstancePosition(position: [x: number, y: number, z: number]): void;
-  setColorValues(color: [r: number, g: number, b: number, b: number]): void;
+  setColorValues(color: [r: number, g: number, b: number, a: number]): void;
 }
 
 export class TexturedSprite {

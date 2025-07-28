@@ -1,121 +1,49 @@
-import {DoubleSide, Texture} from 'three/webgpu';
-import {unpick} from '../../utils/unpick.js';
-import {CustomChunksShaderMaterial, type CustomChunksShaderMaterialParameters} from '../CustomChunksShaderMaterial.js';
-import ShaderLib from '../ShaderLib.js';
+import {attribute, float, vec3, vec4} from 'three/tsl';
+import {NodeMaterial, Texture} from 'three/webgpu';
+import {colorFromTextureByTexCoords, positionByInstancePosition} from '../node-utils.js';
 
-const vertexShader = `
-
-  attribute vec2 quadSize;
-  attribute vec3 instancePosition;
-  attribute vec4 texCoords;
-  attribute float rotation;
-  attribute vec4 color;
-
-  varying vec2 vTexCoords;
-  varying vec4 vBaseColor;
-
-  #include <extra_pars_vertex>
-
-  #include <rotateZ_vertex>
-
-  #ifdef RENDER_AS_BILLBOARDS
-  #include <makeBillboard_fn_vertex>
-  #endif
-
-  void main() {
-
-    #ifdef RENDER_AS_BILLBOARDS
-    #include <vertexPosition_makeBillboard_instanced_vertex>
-    #else
-    #include <vertexPosition_instanced_vertex>
-    #endif
-
-    #include <after_vertexPosition_vertex>
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(vertexPosition.xyz, 1.0);
-
-    vTexCoords = texCoords.xy + (uv * texCoords.zw);
-
-    vBaseColor = color;
-
-    #include <post_main_vertex>
-  }
-
-`;
-
-const fragmentShader = `
-
-  uniform sampler2D colorMap;
-
-  varying vec2 vTexCoords;
-  varying vec4 vBaseColor;
-
-  #include <extra_pars_fragment>
-
-  void main() {
-    vec4 col = texture2D(colorMap, vTexCoords);
-
-    gl_FragColor = vBaseColor * col;
-
-    #include <discard_by_alpha_fragment>
-    #include <post_main_fragment>
-  }
-
-`;
-
-export interface TexturedSpritesMaterialParameters extends CustomChunksShaderMaterialParameters {
+export interface TexturedSpritesMaterialParameters {
+  name?: string;
   colorMap?: Texture;
 }
 
-export class TexturedSpritesMaterial extends CustomChunksShaderMaterial {
+export class TexturedSpritesMaterial extends NodeMaterial {
   constructor(options?: TexturedSpritesMaterialParameters) {
-    super({
-      vertexShader,
-      fragmentShader,
-      uniforms: {
-        ...options?.uniforms,
-        colorMap: {
-          value: options?.colorMap,
-        },
-      },
-      transparent: true,
-      side: DoubleSide,
-      ...unpick(options, 'colorMap', 'uniforms'),
-    });
+    super();
 
     this.name = options?.name ?? 'twopoint5d.TexturedSpritesMaterial';
 
-    this.replaceVertexShaderChunks = [
-      'extra_pars_vertex',
-      'rotateZ_vertex',
-      'makeBillboard_fn_vertex',
-      'vertexPosition_makeBillboard_instanced_vertex',
-      'vertexPosition_instanced_vertex',
-      'after_vertexPosition_vertex',
-      'post_main_vertex',
-    ];
+    this.positionNode = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
 
-    this.replaceFragmentShaderChunks = ['extra_pars_fragment', 'discard_by_alpha_fragment', 'post_main_fragment'];
+    this.alphaTestNode = float(0.001);
 
-    this.addStaticChunks(ShaderLib);
+    this.colorMap = options?.colorMap;
   }
 
+  #colorMap: Texture | undefined;
+
   get colorMap(): Texture | undefined {
-    return this.uniforms['colorMap'].value;
+    return this.#colorMap;
   }
 
   set colorMap(colorMap: Texture | undefined) {
-    if (this.uniforms['colorMap'].value !== colorMap) {
-      this.uniforms['colorMap'].value = colorMap;
-      this.uniformsNeedUpdate = true;
+    if (this.#colorMap === colorMap) return;
+    this.#colorMap = colorMap;
+
+    if (!colorMap) {
+      this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
+      return;
     }
+
+    this.colorNode = colorFromTextureByTexCoords(colorMap);
   }
 
   get renderAsBillboards(): boolean {
-    return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
+    // TODO return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
+    return true;
   }
 
-  set renderAsBillboards(renderAsBillboards: boolean) {
-    this.updateBoolDefine('RENDER_AS_BILLBOARDS', renderAsBillboards);
+  set renderAsBillboards(_renderAsBillboards: boolean) {
+    // TODO this.updateBoolDefine('RENDER_AS_BILLBOARDS', renderAsBillboards);
   }
 }
