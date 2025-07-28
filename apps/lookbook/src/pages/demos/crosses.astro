@@ -14,39 +14,47 @@ import {description, showSource, title} from './_crosses.json';
     overflow-y: hidden;
   }
   body {
-    background: radial-gradient(circle, rgb(182, 182, 182) 0%, rgb(51, 51, 51) 100%);
+    background: radial-gradient(circle, rgb(77, 141, 81) 0%, rgb(113, 19, 114) 100%);
   }
 </style>
 
 <script>
   import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
-  import {vec4} from 'three/tsl';
+  import {abs, attribute, directionToColor, mul, sub, vec4} from 'three/tsl';
   import {DoubleSide, MeshBasicNodeMaterial} from 'three/webgpu';
   import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  const CAPACITY = 15;
+  const COLS = 15;
+  const ROWS = 20;
   const SIZE = 15;
   const OFFSET = 1.2;
+  const OFFSET_Z = -5;
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   demo.onInit(() => {
-    const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, CAPACITY);
+    const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, ROWS * COLS);
 
-    for (let i = 0; i < CAPACITY; i++) {
-      const cross = geometry.pool.createVO();
+    for (let i = 0; i < COLS; i++) {
+      for (let j = ROWS - 1; j >= 0; j--) {
+        const cross = geometry.pool.createVO();
 
-      cross.make(SIZE, SIZE);
-      cross.rotate(i * 45);
-      cross.translate(i * SIZE * OFFSET - ((CAPACITY - 1) * SIZE * OFFSET) / 2, 0);
+        cross.make(SIZE, SIZE, 1 / 8, 1 / 2, OFFSET_Z * j);
+        cross.rotate(i * 45 + j * 0.2);
+        cross.translate(i * SIZE * OFFSET - ((COLS - 1) * SIZE * OFFSET) / 2, 0);
+      }
     }
 
     const material = new MeshBasicNodeMaterial({
+      transparent: true,
       side: DoubleSide,
     });
 
-    material.colorNode = vec4(0.9, 0, 0.3, 1);
+    material.colorNode = vec4(
+      directionToColor(attribute('position')).xyz,
+      sub(1, mul(abs(attribute('position').z), 1 / Math.abs(ROWS * OFFSET_Z))),
+    );
 
     const mesh = new VertexObjects(geometry, material);
     mesh.name = 'CrossMesh';

@@ -56,21 +56,21 @@ export interface Cross extends VO {
 export type CrossVertexIndexType = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export class Cross {
-  make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2) {
+  make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2, z = 0) {
     // prettier-ignore
     this.setPosition([
-        - width * innerSize, + height * innerSize, 0,
-        - width * innerSize, + height * outerSize, 0,
-        + width * innerSize, + height * outerSize, 0,
-        + width * innerSize, + height * innerSize, 0,
-        + width * outerSize, + height * innerSize, 0,
-        + width * outerSize, - height * innerSize, 0,
-        + width * innerSize, - height * innerSize, 0,
-        + width * innerSize, - height * outerSize, 0,
-        - width * innerSize, - height * outerSize, 0,
-        - width * innerSize, - height * innerSize, 0,
-        - width * outerSize, - height * innerSize, 0,
-        - width * outerSize, + height * innerSize, 0,
+        - width * innerSize, + height * innerSize, z,
+        - width * innerSize, + height * outerSize, z,
+        + width * innerSize, + height * outerSize, z,
+        + width * innerSize, + height * innerSize, z,
+        + width * outerSize, + height * innerSize, z,
+        + width * outerSize, - height * innerSize, z,
+        + width * innerSize, - height * innerSize, z,
+        + width * innerSize, - height * outerSize, z,
+        - width * innerSize, - height * outerSize, z,
+        - width * innerSize, - height * innerSize, z,
+        - width * outerSize, - height * innerSize, z,
+        - width * outerSize, + height * innerSize, z,
       ]);
   }
 

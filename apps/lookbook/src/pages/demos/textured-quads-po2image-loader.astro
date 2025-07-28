@@ -40,7 +40,7 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
 
 <script>
   import {PowerOf2ImageLoader, TextureCoords} from '@spearwolf/twopoint5d';
-  import {DoubleSide, MeshBasicNodeMaterial, NearestFilter, Texture} from 'three/webgpu';
+  import {DoubleSide, MeshBasicNodeMaterial, NearestFilter, NeutralToneMapping, Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -57,6 +57,7 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
     const material = new MeshBasicNodeMaterial({
       transparent: true,
       side: DoubleSide,
+      // alphaTestNode: float(0.001),
     });
 
     return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
@@ -95,11 +96,15 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
   texture.magFilter = NearestFilter;
   texture.minFilter = NearestFilter;
   texture.flipY = false;
+  texture.colorSpace = 'srgb';
   texture.needsUpdate = true;
 
   document.getElementById('texture-preview').appendChild(data.imgEl);
 
   await demo.start(() => {
+    demo.renderer!.toneMapping = NeutralToneMapping;
+    demo.renderer!.toneMappingExposure = 1.1;
+
     demo.scene.add(makeMesh(16, 32, 10, 1, data.texCoords, texture));
   });
 

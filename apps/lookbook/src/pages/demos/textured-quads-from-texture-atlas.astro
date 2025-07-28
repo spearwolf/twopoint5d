@@ -85,9 +85,13 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
 
   await demo.start(async () => {
-    const {imgEl, texture, atlas} = await new TextureAtlasLoader().loadAsync(assetsUrl('lab-walls-tiles.json'), ['nearest'], {
-      overrideImageUrl: assetsUrl('lab-walls-tiles.png'),
-    });
+    const {imgEl, texture, atlas} = await new TextureAtlasLoader().loadAsync(
+      assetsUrl('lab-walls-tiles.json'),
+      ['nearest', 'srgb'],
+      {
+        overrideImageUrl: assetsUrl('lab-walls-tiles.png'),
+      },
+    );
 
     console.log('loaded texture-atlas', {imgEl, atlas, texture});
 

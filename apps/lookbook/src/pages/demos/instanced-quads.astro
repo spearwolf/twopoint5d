@@ -32,10 +32,7 @@ import {description, showSource, title} from './_instanced-quads.json';
   import {NodeMaterial} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  const demo = new PerspectiveOrbitDemo(
-    document.getElementById('canvas-container'),
-    {forceWebGL: true},
-  );
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {forceWebGL: true});
 
   demo.camera.position.z = 110;
   demo.camera.position.y = -100;
@@ -159,12 +156,7 @@ import {description, showSource, title} from './_instanced-quads.json';
 
     const instaPosLen = length(attribute('instancePosition').xy);
 
-    const z = sin(
-      add(
-        mul(time, -2.0),
-        mul(instaPosLen, 0.05),
-      )
-    );
+    const z = sin(add(mul(time, -2.0), mul(instaPosLen, 0.05)));
 
     material.positionNode = vec3(pos.xy, add(pos.z, mul(z, 11.0)));
 

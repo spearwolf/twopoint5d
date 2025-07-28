@@ -19,7 +19,7 @@ import {description, showSource, title} from './_textured-quads.json';
 
   body {
     background-color: #391e39;
-    background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
+    background: radial-gradient(circle, rgb(195, 130, 74) 0%, rgb(95, 26, 26) 100%);
   }
 
   .texture-preview {
@@ -32,8 +32,8 @@ import {description, showSource, title} from './_textured-quads.json';
     bottom: 20px;
     right: 20px;
     box-shadow:
-      0 0 0 2px #afafaf,
-      5px 5px 10px rgba(0 0 0 / 50%);
+      0 0 0 2px #b1b1a2,
+      5px 5px 10px rgba(31, 29, 18, 0.5);
     overflow: hidden;
   }
   .texture-preview :global(img),
@@ -51,7 +51,7 @@ import {description, showSource, title} from './_textured-quads.json';
     VertexObjects,
   } from '@spearwolf/twopoint5d';
   import {attribute, vec3} from 'three/tsl';
-  import {NodeMaterial, Texture} from 'three/webgpu';
+  import {AgXToneMapping, NodeMaterial, Texture} from 'three/webgpu';
   import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -124,7 +124,7 @@ import {description, showSource, title} from './_textured-quads.json';
 
   const {imgEl, texture, texCoords} = await new TextureImageLoader().loadAsync(
     assetsUrl('ball-pattern-rot--not-power-of-2.png'),
-    ['nearest'],
+    ['nearest', 'srgb'],
   );
 
   console.log('loaded texture-image', {imgEl, texCoords, texture});
@@ -132,7 +132,10 @@ import {description, showSource, title} from './_textured-quads.json';
   document.getElementById('texture-preview').appendChild(imgEl);
 
   await demo.start(async () => {
-    demo.scene.add(await createMesh(16, 32, 3.5, 1, texCoords, texture));
+    demo.renderer!.toneMapping = AgXToneMapping;
+    demo.renderer!.toneMappingExposure = 1.1;
+
+    demo.scene.add(await createMesh(16, 32, 3.7, 1, texCoords, texture));
   });
 
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
