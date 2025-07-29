@@ -15,9 +15,18 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     return this.geometry.instancedPool;
   }
 
+  get createSprite(): () => TexturedSprite {
+    return this.geometry.instancedPool.createVO;
+  }
+
+  get freeSprite(): (sprite: TexturedSprite) => void {
+    return this.geometry.instancedPool.freeVO;
+  }
+
   get texture(): Texture | undefined {
     return this.material.colorMap;
   }
+
   set texture(texture: Texture | undefined) {
     this.material.colorMap = texture;
   }
@@ -32,13 +41,5 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     );
 
     this.name = 'twopoint5d.TexturedSprites';
-  }
-
-  createSprite(): TexturedSprite {
-    return this.spritePool.createVO();
-  }
-
-  freeSprite(sprite: TexturedSprite): void {
-    this.spritePool.freeVO(sprite);
   }
 }
