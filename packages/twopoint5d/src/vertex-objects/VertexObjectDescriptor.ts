@@ -2,7 +2,7 @@ import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import type {VertexObjectDescription} from './types.js';
 
 export class VertexObjectDescriptor {
-  private readonly description: VertexObjectDescription;
+  readonly description: VertexObjectDescription;
 
   readonly attributes: Map<string, VertexAttributeDescriptor>;
   readonly bufferNames: Set<string>;

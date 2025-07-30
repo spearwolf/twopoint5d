@@ -15,6 +15,9 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
     this.positionNode = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
 
+    // TODO add support for rotation
+    // TODO add support for billboard
+
     this.alphaTestNode = float(0.001);
 
     this.colorMap = options?.colorMap;

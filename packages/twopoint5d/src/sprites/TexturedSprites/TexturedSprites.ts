@@ -1,7 +1,11 @@
 import type {Texture} from 'three/webgpu';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {TexturedSprite} from './TexturedSprite.js';
-import {TexturedSpritesGeometry, type TexturedSpritePool} from './TexturedSpritesGeometry.js';
+import {
+  TexturedSpritesGeometry,
+  type TexturedSpriteGeometryParameters,
+  type TexturedSpritePool,
+} from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
 
 const isTexture = (value: Texture | TexturedSpritesMaterial | undefined): value is Texture =>
@@ -32,11 +36,11 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   }
 
   constructor(
-    geometry?: number | TexturedSpritesGeometry,
+    geometry?: number | TexturedSpritesGeometry | TexturedSpriteGeometryParameters,
     material: Texture | TexturedSpritesMaterial = new TexturedSpritesMaterial(),
   ) {
     super(
-      typeof geometry === 'number' ? new TexturedSpritesGeometry(geometry) : geometry,
+      geometry instanceof TexturedSpritesGeometry ? geometry : new TexturedSpritesGeometry(geometry),
       isTexture(material) ? new TexturedSpritesMaterial({colorMap: material}) : material,
     );
 
