@@ -1,6 +1,6 @@
 import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
 import {NodeMaterial, Texture} from 'three/webgpu';
-import {colorFromTextureByTexCoords, positionByInstancePosition} from '../node-utils.js';
+import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 
 export interface TexturedSpritesMaterialParameters {
   name?: string;
@@ -28,8 +28,8 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
     // TODO add support for billboard
 
-    this.positionNode = positionByInstancePosition({
-      position: rotate(vertexPositionNode, rotationEulerNode),
+    this.positionNode = vertexByInstancePosition({
+      vertexPosition: rotate(vertexPositionNode, rotationEulerNode),
       scale: vec3(quadSizeNode, 1.0),
       instancePosition: instancePositionNode,
     });

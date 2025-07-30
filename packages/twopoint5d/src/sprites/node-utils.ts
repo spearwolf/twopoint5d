@@ -1,12 +1,12 @@
 import {add, attribute, mul, texture, varying, vec2, type ShaderNodeObject} from 'three/tsl';
 import {Texture, type Node} from 'three/webgpu';
 
-export const positionByInstancePosition = (params?: {
-  position?: ShaderNodeObject<Node>;
+export const vertexByInstancePosition = (params?: {
+  vertexPosition?: ShaderNodeObject<Node>;
   instancePosition?: ShaderNodeObject<Node>;
   scale?: ShaderNodeObject<Node>;
 }) => {
-  const position = params?.position ?? attribute('position');
+  const position = params?.vertexPosition ?? attribute('position');
   const instancePosition = params?.instancePosition ?? attribute('instancePosition');
   const scale = params?.scale;
 

@@ -23,7 +23,7 @@ import {description, showSource, title} from './_instanced-quads.json';
 <script>
   import {
     InstancedVertexObjectGeometry,
-    positionByInstancePosition,
+    vertexByInstancePosition,
     VertexObjectPool,
     VertexObjects,
     type VO,
@@ -152,7 +152,7 @@ import {description, showSource, title} from './_instanced-quads.json';
     const time = uniform(demo.now);
     time.onFrameUpdate(() => demo.now);
 
-    const pos = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
+    const pos = vertexByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
 
     const instaPosLen = length(attribute('instancePosition').xy);
 
