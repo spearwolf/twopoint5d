@@ -1,11 +1,15 @@
-import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
-import {NodeMaterial, Texture} from 'three/webgpu';
-import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
+import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
+import {attribute, float, rotate, vec3, vec4, type ShaderNodeObject} from 'three/tsl';
+import {Node, NodeMaterial, Texture} from 'three/webgpu';
+import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 
 export interface TexturedSpritesMaterialParameters {
   name?: string;
   colorMap?: Texture;
 }
+
+const createShaderAttributeNodeSignal = (name: string, attach: object) =>
+  createSignal<ShaderNodeObject<Node>>(attribute(name), {attach});
 
 export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
@@ -13,26 +17,75 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly RotationAttributeName = 'instancePosition';
   static readonly QuadSizeAttributeName = 'quadSize';
 
+  #vertexPositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.PositionAttributeName, this);
+  #rotationNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.RotationAttributeName, this);
+  #instancePositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.InstancePositionAttributeName, this);
+  #quadSizeNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.QuadSizeAttributeName, this);
+
+  #renderAsBillboards = createSignal(false, {attach: this});
+
+  get vertexPositionNode() {
+    return this.#vertexPositionNode.get();
+  }
+
+  set vertexPositionNode(node: ShaderNodeObject<Node>) {
+    this.#vertexPositionNode.set(node);
+  }
+
+  get rotationNode() {
+    return this.#rotationNode.get();
+  }
+
+  set rotationNode(node: ShaderNodeObject<Node>) {
+    this.#rotationNode.set(node);
+  }
+
+  get instancePositionNode() {
+    return this.#instancePositionNode.get();
+  }
+
+  set instancePositionNode(node: ShaderNodeObject<Node>) {
+    this.#instancePositionNode.set(node);
+  }
+
+  get quadSizeNode() {
+    return this.#quadSizeNode.get();
+  }
+
+  set quadSizeNode(node: ShaderNodeObject<Node>) {
+    this.#quadSizeNode.set(node);
+  }
+
+  get renderAsBillboards() {
+    return this.#renderAsBillboards.get();
+  }
+
+  set renderAsBillboards(value: boolean) {
+    this.#renderAsBillboards.set(value);
+  }
+
   constructor(options?: TexturedSpritesMaterialParameters) {
     super();
 
     this.name = options?.name ?? 'twopoint5d.TexturedSpritesMaterial';
 
-    const vertexPositionNode = attribute(TexturedSpritesMaterial.PositionAttributeName);
+    createEffect(
+      () => {
+        const rotationEulerNode = vec3(0, 0, this.rotationNode.toFloat());
+        const vertexPosition = rotate(this.vertexPositionNode, rotationEulerNode);
+        const instancePosition = this.instancePositionNode;
+        const scale = vec3(this.quadSizeNode.xy, 1.0);
 
-    const rotationNode = attribute(TexturedSpritesMaterial.RotationAttributeName);
-    const rotationEulerNode = vec3(0, 0, rotationNode);
+        this.positionNode = (this.renderAsBillboards ? billboardVertexByInstancePosition : vertexByInstancePosition)({
+          vertexPosition,
+          instancePosition,
+          scale,
+        });
 
-    const instancePositionNode = attribute(TexturedSpritesMaterial.InstancePositionAttributeName);
-    const quadSizeNode = attribute(TexturedSpritesMaterial.QuadSizeAttributeName);
-
-    // TODO add support for billboard
-
-    this.positionNode = vertexByInstancePosition({
-      vertexPosition: rotate(vertexPositionNode, rotationEulerNode),
-      scale: vec3(quadSizeNode, 1.0),
-      instancePosition: instancePositionNode,
-    });
+        this.needsUpdate = true;
+      },
+      {attach: this},
+    );
 
     this.alphaTestNode = float(0.001);
 
@@ -57,12 +110,8 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.colorNode = colorFromTextureByTexCoords(colorMap);
   }
 
-  get renderAsBillboards(): boolean {
-    // TODO return this.defines?.['RENDER_AS_BILLBOARDS'] === 1;
-    return true;
-  }
-
-  set renderAsBillboards(_renderAsBillboards: boolean) {
-    // TODO this.updateBoolDefine('RENDER_AS_BILLBOARDS', renderAsBillboards);
+  override dispose() {
+    SignalGroup.destroy(this);
+    super.dispose();
   }
 }

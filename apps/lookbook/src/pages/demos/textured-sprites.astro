@@ -7,6 +7,10 @@ import {description, showSource, title} from './_textured-sprites.json';
   <p slot="demo-description">{description}</p>
 
   <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
+    <div class="actionBtn render-as-billboards select-none" data-render-as-billboards="true">render as billboards</div>
+  </section>
 </Layout>
 
 <style>
@@ -25,6 +29,18 @@ import {description, showSource, title} from './_textured-sprites.json';
   em {
     font-size: 84.615384%;
     color: #ddd;
+  }
+  .actionBtn {
+    padding: 0.5em;
+    background-color: rgba(50 20 90 / 60%);
+    color: #eee;
+    border-radius: 4px;
+    border: 1px solid rgba(11, 15, 17);
+    box-shadow: 4px 4px 0 rgba(11, 15, 17);
+    font-size: 100%;
+    font-weight: bold;
+    cursor: pointer;
+    display: inline-fl;
   }
 </style>
 
@@ -55,7 +71,17 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     sprites.material.depthFunc = AlwaysDepth;
 
-    // TODO render as billboards!!
+    document.querySelector(`.${RENDER_AS_BILLBOARDS}`).addEventListener('pointerdown', (e) => {
+      const el = e.currentTarget as HTMLElement;
+      const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
+      sprites.material.renderAsBillboards = dataValue;
+      el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
+      if (dataValue) {
+        el.textContent = 'render as sprites';
+      } else {
+        el.textContent = 'render as billboards';
+      }
+    });
 
     const bouncingSprites = new BouncingSprites(sprites.spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
 
@@ -73,4 +99,6 @@ import {description, showSource, title} from './_textured-sprites.json';
   });
 
   demo.start();
+
+  const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 </script>
