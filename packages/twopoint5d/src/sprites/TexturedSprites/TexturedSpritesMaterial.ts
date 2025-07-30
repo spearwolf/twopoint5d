@@ -1,4 +1,4 @@
-import {attribute, float, vec3, vec4} from 'three/tsl';
+import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
 import {NodeMaterial, Texture} from 'three/webgpu';
 import {colorFromTextureByTexCoords, positionByInstancePosition} from '../node-utils.js';
 
@@ -8,15 +8,31 @@ export interface TexturedSpritesMaterialParameters {
 }
 
 export class TexturedSpritesMaterial extends NodeMaterial {
+  static readonly PositionAttributeName = 'position';
+  static readonly InstancePositionAttributeName = 'instancePosition';
+  static readonly RotationAttributeName = 'instancePosition';
+  static readonly QuadSizeAttributeName = 'quadSize';
+
   constructor(options?: TexturedSpritesMaterialParameters) {
     super();
 
     this.name = options?.name ?? 'twopoint5d.TexturedSpritesMaterial';
 
-    this.positionNode = positionByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
+    const vertexPositionNode = attribute(TexturedSpritesMaterial.PositionAttributeName);
 
-    // TODO add support for rotation
+    const rotationNode = attribute(TexturedSpritesMaterial.RotationAttributeName);
+    const rotationEulerNode = vec3(0, 0, rotationNode);
+
+    const instancePositionNode = attribute(TexturedSpritesMaterial.InstancePositionAttributeName);
+    const quadSizeNode = attribute(TexturedSpritesMaterial.QuadSizeAttributeName);
+
     // TODO add support for billboard
+
+    this.positionNode = positionByInstancePosition({
+      position: rotate(vertexPositionNode, rotationEulerNode),
+      scale: vec3(quadSizeNode, 1.0),
+      instancePosition: instancePositionNode,
+    });
 
     this.alphaTestNode = float(0.001);
 
