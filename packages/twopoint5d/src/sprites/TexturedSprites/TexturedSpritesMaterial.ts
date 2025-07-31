@@ -6,6 +6,7 @@ import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexBy
 export interface TexturedSpritesMaterialParameters {
   name?: string;
   colorMap?: Texture;
+  renderAsBillboards?: boolean;
 }
 
 const createShaderAttributeNodeSignal = (name: string, attach: object) =>
@@ -68,6 +69,8 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     super();
 
     this.name = options?.name ?? 'twopoint5d.TexturedSpritesMaterial';
+
+    this.renderAsBillboards = options?.renderAsBillboards ?? this.#renderAsBillboards.value;
 
     createEffect(
       () => {

@@ -6,10 +6,9 @@ import {
   type TexturedSpriteGeometryParameters,
   type TexturedSpritePool,
 } from './TexturedSpritesGeometry.js';
-import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
+import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from './TexturedSpritesMaterial.js';
 
-const isTexture = (value: Texture | TexturedSpritesMaterial | undefined): value is Texture =>
-  Boolean((value as Texture)?.isTexture);
+const isTexture = (value: Texture | object | undefined): value is Texture => Boolean((value as Texture)?.isTexture);
 
 export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   declare geometry: TexturedSpritesGeometry;
@@ -37,11 +36,15 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
 
   constructor(
     geometry?: number | TexturedSpritesGeometry | TexturedSpriteGeometryParameters,
-    material: Texture | TexturedSpritesMaterial = new TexturedSpritesMaterial(),
+    material: Texture | TexturedSpritesMaterial | TexturedSpritesMaterialParameters = new TexturedSpritesMaterial(),
   ) {
     super(
       geometry instanceof TexturedSpritesGeometry ? geometry : new TexturedSpritesGeometry(geometry),
-      isTexture(material) ? new TexturedSpritesMaterial({colorMap: material}) : material,
+      isTexture(material)
+        ? new TexturedSpritesMaterial({colorMap: material})
+        : material instanceof TexturedSpritesMaterial
+          ? material
+          : new TexturedSpritesMaterial(material),
     );
 
     this.name = 'twopoint5d.TexturedSprites';
