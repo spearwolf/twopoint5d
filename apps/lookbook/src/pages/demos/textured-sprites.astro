@@ -45,16 +45,17 @@ import {description, showSource, title} from './_textured-sprites.json';
 </style>
 
 <script>
-  import {on} from '@spearwolf/eventize';
-  import {OnDisplayInit, TexturedSprites, TileSetLoader} from '@spearwolf/twopoint5d';
+  import {TexturedSprites, TileSetLoader} from '@spearwolf/twopoint5d';
   import {AlwaysDepth} from 'three';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
+  const RENDER_AS_BILLBOARDS = 'render-as-billboards';
+
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
 
-  on(demo, OnDisplayInit, async ({scene}) => {
+  demo.onInit(async () => {
     const {tileSet, texture} = await new TileSetLoader().loadAsync(
       assetsUrl('skinball-256.png'),
       {
@@ -74,7 +75,9 @@ import {description, showSource, title} from './_textured-sprites.json';
     document.querySelector(`.${RENDER_AS_BILLBOARDS}`).addEventListener('pointerdown', (e) => {
       const el = e.currentTarget as HTMLElement;
       const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
+
       sprites.material.renderAsBillboards = dataValue;
+
       el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
       if (dataValue) {
         el.textContent = 'render as sprites';
@@ -87,7 +90,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     bouncingSprites.createSprites();
 
-    scene.add(sprites);
+    demo.scene.add(sprites);
 
     demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
@@ -99,6 +102,4 @@ import {description, showSource, title} from './_textured-sprites.json';
   });
 
   demo.start();
-
-  const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 </script>
