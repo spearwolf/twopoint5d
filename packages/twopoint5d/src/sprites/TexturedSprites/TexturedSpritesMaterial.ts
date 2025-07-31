@@ -25,6 +25,16 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   #renderAsBillboards = createSignal(false, {attach: this});
 
+  #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
+
+  get colorMap(): Texture | undefined {
+    return this.#colorMap.get();
+  }
+
+  set colorMap(value: Texture | undefined) {
+    this.#colorMap.set(value);
+  }
+
   get vertexPositionNode() {
     return this.#vertexPositionNode.get();
   }
@@ -90,27 +100,20 @@ export class TexturedSpritesMaterial extends NodeMaterial {
       {attach: this},
     );
 
+    createEffect(
+      () => {
+        if (this.colorMap) {
+          this.colorNode = colorFromTextureByTexCoords(this.colorMap);
+        } else {
+          this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
+        }
+      },
+      {attach: this},
+    );
+
     this.alphaTestNode = float(0.001);
 
     this.colorMap = options?.colorMap;
-  }
-
-  #colorMap: Texture | undefined;
-
-  get colorMap(): Texture | undefined {
-    return this.#colorMap;
-  }
-
-  set colorMap(colorMap: Texture | undefined) {
-    if (this.#colorMap === colorMap) return;
-    this.#colorMap = colorMap;
-
-    if (!colorMap) {
-      this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
-      return;
-    }
-
-    this.colorNode = colorFromTextureByTexCoords(colorMap);
   }
 
   override dispose() {
