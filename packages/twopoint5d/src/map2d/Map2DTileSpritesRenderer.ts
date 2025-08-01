@@ -1,14 +1,14 @@
 import {emit, eventize, on} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three/webgpu';
-import type {TileSprite} from './TileSprites/descriptors.js';
-import {TileSprites} from './TileSprites/TileSprites.js';
 import {TileSet} from '../texture/TileSet.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import {Map2DTile} from './Map2DTile.js';
+import type {TileSprite} from './TileSprites/descriptors.js';
+import {TileSprites} from './TileSprites/TileSprites.js';
 
-export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer {
+export class Map2DTileSpritesRenderer extends TileSprites implements IMap2DTileRenderer {
   #tileData?: IMap2DTileDataProvider;
 
   #tiles = new Map<string, TileSprite>();
@@ -27,7 +27,7 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
     super();
     eventize(this);
 
-    this.name = 'twopoint5d.Map2DTileSprites';
+    this.name = 'twopoint5d.Map2DTileSpritesRenderer';
 
     on(this, 'ready', () => this.#addDeferredTiles());
   }
@@ -192,6 +192,6 @@ export class Map2DTileSprites extends TileSprites implements IMap2DTileRenderer 
 
   dispose(): void {
     // eslint-disable-next-line no-console
-    console.warn('TODO Map2DTileSpritesRenderer3D.dispose() is not implemented');
+    console.warn('TODO Map2DTileSpritesRenderer.dispose() is not yet implemented');
   }
 }

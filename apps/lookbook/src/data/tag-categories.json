@@ -47,9 +47,9 @@
       "includeTags": [
         "AABB2",
         "ChunkQuadTreeNode",
-        "Map2DLayerObject3D",
+        "Map2D",
         "Map2DTile",
-        "Map2DTileSprites",
+        "Map2DTileSpritesRenderer",
         "RectangularVisibilityArea",
         "RepeatingTilesProvider",
         "TileSpritesGeometry",

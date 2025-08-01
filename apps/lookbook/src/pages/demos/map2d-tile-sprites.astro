@@ -25,7 +25,7 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
   import {
     AABB2,
     Map2DTile,
-    Map2DTileSprites,
+    Map2DTileSpritesRenderer,
     RepeatingTilesProvider,
     TileSetLoader,
     TileSpritesGeometry,
@@ -51,7 +51,7 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
 
     // ------------------------------------------------------
 
-    const tiles = new Map2DTileSprites();
+    const tiles = new Map2DTileSpritesRenderer();
 
     scene.add(tiles);
 

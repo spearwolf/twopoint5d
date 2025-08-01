@@ -14,7 +14,7 @@ export type Map2DVisibleTiles = {
 };
 
 /**
- * The Map2DVisibilitor decides which tiles are visible in a Map2DLayer.
+ * The Map2DVisibilitor decides which tiles are visible in a map2d.
  */
 export interface IMap2DVisibilitor {
   needsUpdate: boolean;

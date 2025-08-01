@@ -1,11 +1,11 @@
 {
   "title": "map2d tile sprites",
-  "description": "How to render tile-sprites with the Map2DTileSprites mesh",
+  "description": "How to render tile-sprites with the Map2DTileSpritesRenderer",
   "url": "/demos/map2d-tile-sprites",
   "tags": [
     "AABB2",
     "Map2DTile",
-    "Map2DTileSprites",
+    "Map2DTileSpritesRenderer",
     "RepeatingTilesProvider",
     "TileSetLoader",
     "TileSpritesGeometry",

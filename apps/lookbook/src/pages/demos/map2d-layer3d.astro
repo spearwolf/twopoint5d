@@ -26,8 +26,8 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
 <script>
   import {
-    Map2DLayerObject3D,
-    Map2DTileSprites,
+    Map2D,
+    Map2DTileSpritesRenderer,
     PanControl2D,
     RectangularVisibilityArea,
     RepeatingTilesProvider,
@@ -56,10 +56,10 @@ import {description, showSource, title} from './_map2d-layer3d.json';
     const line = new LineSegments(edges, new LineBasicMaterial({color: 0xf0f0f0}));
     scene.add(line);
 
-    // create a map2d layer and add to scene
-    // ------------------------------------------------------
+    // create a map2d
+    // -------------------------------------
 
-    const map2d = new Map2DLayerObject3D();
+    const map2d = new Map2D();
 
     map2d.tileWidth = 256;
     map2d.tileHeight = 256;
@@ -75,8 +75,8 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     scene.fog = new Fog(0x458497, 300, 1500);
 
-    (window as any).map2dLayer = map2d;
-    console.log('map2dLayer', map2d);
+    (window as any).map2d = map2d;
+    console.log('map2d', map2d);
 
     // create a tile data provider
     // ------------------------------------------------------
@@ -98,10 +98,10 @@ import {description, showSource, title} from './_map2d-layer3d.json';
       ['srgb'],
     );
 
-    // create the tile-renderer and add to map2d-layer
+    // create the tile renderer
     // ------------------------------------------------------
 
-    const renderer = new Map2DTileSprites();
+    const renderer = new Map2DTileSpritesRenderer();
 
     map2d.add(renderer);
 
