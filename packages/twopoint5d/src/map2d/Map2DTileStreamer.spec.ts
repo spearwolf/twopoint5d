@@ -1,13 +1,13 @@
 import {Vector2, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
-import {Map2DLayer} from './Map2DLayer.js';
 import {Map2DTile} from './Map2DTile.js';
+import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 
-describe('Map2DLayer', () => {
+describe('Map2DTileStreamer', () => {
   describe('new', () => {
     test('tileWidth, tileHeight', () => {
-      const layer = new Map2DLayer(8, 16);
+      const layer = new Map2DTileStreamer(8, 16);
       expect(layer.tileWidth).toEqual(8);
       expect(layer.tileHeight).toEqual(16);
       layer.tileWidth = 77;
@@ -16,10 +16,10 @@ describe('Map2DLayer', () => {
       expect(layer.tileHeight).toEqual(99);
     });
     test('xOffset, yOffset', () => {
-      let layer = new Map2DLayer(1, 1);
+      let layer = new Map2DTileStreamer(1, 1);
       expect(layer.xOffset).toEqual(0);
       expect(layer.yOffset).toEqual(0);
-      layer = new Map2DLayer(1, 1, 10, 20);
+      layer = new Map2DTileStreamer(1, 1, 10, 20);
       expect(layer.xOffset).toEqual(10);
       expect(layer.yOffset).toEqual(20);
       layer.xOffset = 77;
@@ -28,12 +28,12 @@ describe('Map2DLayer', () => {
       expect(layer.yOffset).toEqual(99);
     });
     test('tiles', () => {
-      const layer = new Map2DLayer(1, 1);
+      const layer = new Map2DTileStreamer(1, 1);
       expect(Array.isArray(layer.tiles)).toBeTruthy();
       expect(layer.tiles).toHaveLength(0);
     });
     test('tilesRenderer', () => {
-      const layer = new Map2DLayer(1, 1);
+      const layer = new Map2DTileStreamer(1, 1);
       expect(layer.renderers.size).toBe(0);
       const renderer: IMap2DTileRenderer = {
         beginUpdate(_offset: Vector2, _translate: Vector3) {},

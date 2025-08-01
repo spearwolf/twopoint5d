@@ -1,17 +1,38 @@
 import {Object3D, Vector2, Vector3} from 'three/webgpu';
-import type {IMap2DLayer} from './IMap2DLayer.js';
 import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
 import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';
 import {Map2DTile} from './Map2DTile.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 /**
- * A Map2DLayer divides a 2D map into a grid consisting of individual tiles of equal size.
- * The center-point specifies the center of the visible area.
- * The visibilitor interface is used to determine which tiles are visible.
- * The rendering of the visible tiles via update() method is delegated to the TileRenderer.
+ * A tile streaming manager for 2D maps that loads and unloads tiles based on visibility.
+ *
+ * The Map2DTileStreamer divides a large 2D world into a grid of equally-sized tiles and implements
+ * an streaming system that only loads tiles within the visible area. This enables performant
+ * rendering of large 2D worlds by managing memory usage and reducing rendering overhead.
+ *
+ * **Core Functionality:**
+ * - **Grid System**: Divides the world into tiles of configurable size (tileWidth × tileHeight)
+ * - **Viewport Management**: Tracks the center point of the currently visible area
+ * - **Dynamic Loading**: Automatically adds new tiles when they become visible
+ * - **Memory Management**: Removes tiles that are no longer visible to conserve memory
+ * - **Tile Reuse**: Reuses existing tiles when possible
+ *
+ * **Typical Usage:**
+ * ```typescript
+ * const streamer = new Map2DTileStreamer(64, 64); // 64x64 pixel tiles
+ * streamer.visibilitor = new RectangularVisibilityArea(640, 480); // Determines which tiles are visible
+ * streamer.addTileRenderer(renderer); // Handles actual tile rendering
+ *
+ * // Update center position (e.g., follow player movement)
+ * streamer.centerX = playerX;
+ * streamer.centerY = playerY;
+ *
+ * // Called in render loop
+ * streamer.update(sceneNode);
+ * ```
  */
-export class Map2DLayer implements IMap2DLayer {
+export class Map2DTileStreamer {
   #centerX = 0;
   #centerY = 0;
 
