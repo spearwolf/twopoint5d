@@ -31,7 +31,7 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
     TileSpritesGeometry,
     TileSpritesMaterial,
   } from '@spearwolf/twopoint5d';
-  import {BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments, Vector2, Vector3} from 'three';
+  import {BoxGeometry, EdgesGeometry, Fog, LineBasicMaterial, LineSegments, Vector2, Vector3} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -55,15 +55,21 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
 
     scene.add(tiles);
 
+    scene.fog = new Fog(0x458497, 300, 1500);
+
     tiles.tileData = new RepeatingTilesProvider([
       [1, 2],
       [3, 4],
     ]);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('map2d-debug-tiles_4x256x256.png'), {
-      tileWidth: 256,
-      tileHeight: 256,
-    });
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(
+      assetsUrl('map2d-debug-tiles_4x256x256.png'),
+      {
+        tileWidth: 256,
+        tileHeight: 256,
+      },
+      ['srgb'],
+    );
 
     tiles.tileSet = tileSet;
 

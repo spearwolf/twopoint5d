@@ -107,6 +107,8 @@ export class TexturedSpritesMaterial extends NodeMaterial {
         } else {
           this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
         }
+
+        this.needsUpdate = true;
       },
       {attach: this},
     );

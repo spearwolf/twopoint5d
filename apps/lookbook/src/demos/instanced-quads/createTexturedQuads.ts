@@ -19,7 +19,10 @@ export const createTexturedQuads = (
   initializeVertexObjects(geometry.instancedPool);
 
   const mesh = new VertexObjects(geometry, createMaterial(texture, material));
+
   mesh.name = 'TexturedQuadsMesh';
+
+  mesh.update();
 
   return mesh;
 };

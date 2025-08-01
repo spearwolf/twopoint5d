@@ -35,12 +35,15 @@ import {description, showSource, title} from './_map2d-layer3d.json';
     TileSpritesGeometry,
     TileSpritesMaterial,
   } from '@spearwolf/twopoint5d';
-  import {BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments} from 'three';
+  import {BoxGeometry, EdgesGeometry, Fog, LineBasicMaterial, LineSegments} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {makePoints} from '~demos/utils/makePoints';
 
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+
+  (window as any).demo = demo;
+  console.log('demo', demo);
 
   demo.start(async () => {
     const {scene, camera} = demo;
@@ -70,6 +73,8 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     scene.add(map2d);
 
+    scene.fog = new Fog(0x458497, 300, 1500);
+
     (window as any).map2dLayer = map2d;
     console.log('map2dLayer', map2d);
 
@@ -84,10 +89,14 @@ import {description, showSource, title} from './_map2d-layer3d.json';
     // load a tileset texture
     // ------------------------------------------------------
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('map2d-debug-tiles_4x256x256.png'), {
-      tileWidth: 256,
-      tileHeight: 256,
-    });
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(
+      assetsUrl('map2d-debug-tiles_4x256x256.png'),
+      {
+        tileWidth: 256,
+        tileHeight: 256,
+      },
+      ['srgb'],
+    );
 
     // create the tile-renderer and add to map2d-layer
     // ------------------------------------------------------
@@ -105,8 +114,6 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     renderer.material = new TileSpritesMaterial({
       colorMap: texture,
-      depthTest: true,
-      depthWrite: true,
     });
 
     (window as any).tileRenderer = renderer;
@@ -147,6 +154,7 @@ import {description, showSource, title} from './_map2d-layer3d.json';
 
     demo.onRenderFrame(({deltaTime}) => {
       panControl.update(deltaTime);
+
       map2d.centerX = panControl.panView.x;
       map2d.centerY = panControl.panView.y;
       map2d.update();
