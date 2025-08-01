@@ -1,7 +1,7 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {attribute, float, vec3, vec4, type ShaderNodeObject} from 'three/tsl';
 import {Node, NodeMaterial, Texture} from 'three/webgpu';
-import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
+import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../../sprites/node-utils.js';
 
 export interface TileSpritesMaterialParameters {
   name?: string;

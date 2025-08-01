@@ -10,7 +10,3 @@ export * from './TexturedSprites/TexturedSprite.js';
 export * from './TexturedSprites/TexturedSprites.js';
 export * from './TexturedSprites/TexturedSpritesGeometry.js';
 export * from './TexturedSprites/TexturedSpritesMaterial.js';
-export * from './TileSprites/descriptors.js';
-export * from './TileSprites/TileSprites.js';
-export * from './TileSprites/TileSpritesGeometry.js';
-export * from './TileSprites/TileSpritesMaterial.js';

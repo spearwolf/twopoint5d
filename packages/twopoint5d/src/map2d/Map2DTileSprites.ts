@@ -1,7 +1,7 @@
 import {emit, eventize, on} from '@spearwolf/eventize';
 import {Vector2, Vector3} from 'three/webgpu';
-import type {TileSprite} from '../sprites/TileSprites/descriptors.js';
-import {TileSprites} from '../sprites/TileSprites/TileSprites.js';
+import type {TileSprite} from './TileSprites/descriptors.js';
+import {TileSprites} from './TileSprites/TileSprites.js';
 import {TileSet} from '../texture/TileSet.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import type {IMap2DTileDataProvider} from './IMap2DTileDataProvider.js';

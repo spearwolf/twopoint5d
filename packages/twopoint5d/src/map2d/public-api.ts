@@ -1,5 +1,6 @@
 export * from './AABB2.js';
 export * from './CameraBasedVisibility.js';
+export * from './chunk-quad-tree/public-api.js';
 export * from './IMap2DLayer.js';
 export * from './IMap2DTileDataProvider.js';
 export * from './IMap2DTileRenderer.js';
@@ -12,4 +13,7 @@ export * from './Map2DTileCoordsUtil.js';
 export * from './Map2DTileSprites.js';
 export * from './RectangularVisibilityArea.js';
 export * from './RepeatingTilesProvider.js';
-export * from './chunk-quad-tree/public-api.js';
+export * from './TileSprites/descriptors.js';
+export * from './TileSprites/TileSprites.js';
+export * from './TileSprites/TileSpritesGeometry.js';
+export * from './TileSprites/TileSpritesMaterial.js';
