@@ -1,11 +1,15 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_map2d-tile-sprites.json';
+import {description, showSource, title} from './_map2d-rect-visi.json';
 ---
 
-<Layout title={title} showSource={showSource}>
-  <p slot="demo-description">{description}</p>
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <div class="info-controls text-sky-200 pt-4 pl-1">
+    <p>Use the W, A, S, and D keys to scroll the map.</p>
+    <p>Use the mouse to rotate the camera.</p>
+  </div>
 </Layout>
 
 <style>
@@ -21,7 +25,7 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
 </style>
 
 <script>
-  import {run} from '~demos/map2d-tile-sprites';
+  import {run} from '~demos/map2d-rect-visi';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
   run(new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false}));

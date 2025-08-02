@@ -1,6 +1,6 @@
 {
   "name": "twopoint5d",
-  "tags": ["ci"],
+  "tags": ["ci", "twopoint5d"],
   "root": "packages/twopoint5d",
   "targets": {
     "build": {

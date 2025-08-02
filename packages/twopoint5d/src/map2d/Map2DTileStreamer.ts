@@ -1,91 +1,33 @@
 import {Object3D, Vector2, Vector3} from 'three/webgpu';
-import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
-import type {IMap2DVisibilitor} from './IMap2DVisibilitor.js';
-import {Map2DTile} from './Map2DTile.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
 /**
- * A tile streaming manager for 2D maps that loads and unloads tiles based on visibility.
+ * `Map2DTileStreamer` is a tile streaming manager for 2D maps that loads and discards tiles based on their visibility.
  *
- * The Map2DTileStreamer divides a large 2D world into a grid of equally-sized tiles and implements
- * an streaming system that only loads tiles within the visible area. This enables performant
- * rendering of large 2D worlds by managing memory usage and reducing rendering overhead.
+ * `Map2DTileStreamer` divides a 2D world into an equal-sized grid of tiles (`tileWidth` + `tileHeight` and `xOffset` + `yOffset`)
+ * and only loads the visible tiles.
  *
- * **Core Functionality:**
- * - **Grid System**: Divides the world into tiles of configurable size (tileWidth × tileHeight)
- * - **Viewport Management**: Tracks the center point of the currently visible area
- * - **Dynamic Loading**: Automatically adds new tiles when they become visible
- * - **Memory Management**: Removes tiles that are no longer visible to conserve memory
- * - **Tile Reuse**: Reuses existing tiles when possible
+ * Visibility is checked based on the _view center position_ (`centerX` + `centerY`) and a _visibilitor_ (see `IMap2DVisibilitor`).
  *
- * **Typical Usage:**
- * ```typescript
- * const streamer = new Map2DTileStreamer(64, 64); // 64x64 pixel tiles
- * streamer.visibilitor = new RectangularVisibilityArea(640, 480); // Determines which tiles are visible
- * streamer.addTileRenderer(renderer); // Handles actual tile rendering
- *
- * // Update center position (e.g., follow player movement)
- * streamer.centerX = playerX;
- * streamer.centerY = playerY;
- *
- * // Called in render loop
- * streamer.update(sceneNode);
- * ```
+ * Tile rendering is delegated to a _renderer_ (see `IMap2DTileRenderer`).
  */
 export class Map2DTileStreamer {
-  #centerX = 0;
-  #centerY = 0;
-
-  #tileCoords: Map2DTileCoordsUtil;
-
-  #needsUpdate = true;
+  centerX = 0;
+  centerY = 0;
 
   visibilitor?: IMap2DVisibilitor;
 
-  #resetTilesOnNextUpdate = false;
+  #tileCoords: Map2DTileCoordsUtil;
 
-  get needsUpdate(): boolean {
-    return this.#needsUpdate || this.visibilitor?.needsUpdate;
-  }
-
-  set needsUpdate(update: boolean) {
-    this.#needsUpdate = update;
-    if (this.visibilitor) {
-      this.visibilitor.needsUpdate = update;
-    }
-  }
-
-  get centerX(): number {
-    return this.#centerX;
-  }
-
-  set centerX(x: number) {
-    if (this.#centerX !== x) {
-      this.#centerX = x;
-      this.#needsUpdate = true;
-    }
-  }
-
-  get centerY(): number {
-    return this.#centerY;
-  }
-
-  set centerY(y: number) {
-    if (this.#centerY !== y) {
-      this.#centerY = y;
-      this.#needsUpdate = true;
-    }
-  }
+  #clearTilesOnNextUpdate = false;
 
   get tileWidth(): number {
     return this.#tileCoords.tileWidth;
   }
 
   set tileWidth(width: number) {
-    if (this.#tileCoords.tileWidth !== width) {
-      this.#tileCoords.tileWidth = width;
-      this.#needsUpdate = true;
-    }
+    this.#tileCoords.tileWidth = width;
   }
 
   get tileHeight(): number {
@@ -93,10 +35,7 @@ export class Map2DTileStreamer {
   }
 
   set tileHeight(height: number) {
-    if (this.#tileCoords.tileHeight !== height) {
-      this.#tileCoords.tileHeight = height;
-      this.#needsUpdate = true;
-    }
+    this.#tileCoords.tileHeight = height;
   }
 
   get xOffset(): number {
@@ -104,10 +43,7 @@ export class Map2DTileStreamer {
   }
 
   set xOffset(offset: number) {
-    if (this.#tileCoords.xOffset !== offset) {
-      this.#tileCoords.xOffset = offset;
-      this.#needsUpdate = true;
-    }
+    this.#tileCoords.xOffset = offset;
   }
 
   get yOffset(): number {
@@ -115,13 +51,10 @@ export class Map2DTileStreamer {
   }
 
   set yOffset(offset: number) {
-    if (this.#tileCoords.yOffset !== offset) {
-      this.#tileCoords.yOffset = offset;
-      this.#needsUpdate = true;
-    }
+    this.#tileCoords.yOffset = offset;
   }
 
-  tiles: Map2DTile[] = [];
+  tiles: IMap2DTileCoords[] = [];
   renderers: Set<IMap2DTileRenderer> = new Set();
 
   constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
@@ -139,50 +72,51 @@ export class Map2DTileStreamer {
   update(node: Object3D): void {
     if (this.renderers.size === 0 || this.visibilitor == null) return;
 
-    if (this.#resetTilesOnNextUpdate) {
+    if (this.#clearTilesOnNextUpdate) {
       for (const tileRenderer of this.renderers) {
-        tileRenderer.resetTiles();
+        tileRenderer.clearTiles();
       }
       this.tiles.length = 0;
-      this.needsUpdate = true;
-      this.#resetTilesOnNextUpdate = false;
+      this.#clearTilesOnNextUpdate = false;
     }
 
-    if (this.needsUpdate) {
-      node.updateWorldMatrix(true, false);
+    node.updateWorldMatrix(true, false);
 
-      const visible = this.visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords, node);
+    const visible = this.visibilitor.computeVisibleTiles(
+      this.tiles,
+      [this.centerX, this.centerY],
+      this.#tileCoords,
+      node.matrixWorld,
+    );
 
-      if (visible) {
-        this.tiles = visible?.tiles;
-        this.needsUpdate = false;
+    if (visible) {
+      this.tiles = visible?.tiles;
 
-        const offset = visible.offset ?? new Vector2();
-        const translate = visible.translate ?? new Vector3();
+      const offset = visible.offset ?? new Vector2();
+      const translate = visible.translate ?? new Vector3();
+      const position = new Vector3(offset.x + translate.x, translate.y, offset.y + translate.z);
 
-        for (const tileRenderer of this.renderers) {
-          tileRenderer.beginUpdate(offset, translate);
+      for (const tileRenderer of this.renderers) {
+        tileRenderer.beginUpdatingTiles(position);
 
-          visible.removeTiles?.forEach((tile) => {
-            tileRenderer.removeTile(tile);
-          });
+        visible.removeTiles?.forEach((tile) => {
+          tileRenderer.removeTile(tile);
+        });
 
-          visible.createTiles?.forEach((tile) => {
-            tileRenderer.addTile(tile);
-          });
+        visible.createTiles?.forEach((tile) => {
+          tileRenderer.addTile(tile);
+        });
 
-          visible.reuseTiles?.forEach((tile) => {
-            tileRenderer.reuseTile(tile);
-          });
+        visible.reuseTiles?.forEach((tile) => {
+          tileRenderer.reuseTile(tile);
+        });
 
-          tileRenderer.endUpdate();
-        }
+        tileRenderer.endUpdatingTiles();
       }
     }
   }
 
-  resetTiles(): void {
-    this.#resetTilesOnNextUpdate = true;
-    this.needsUpdate = true;
+  clearTiles(): void {
+    this.#clearTilesOnNextUpdate = true;
   }
 }

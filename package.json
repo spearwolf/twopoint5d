@@ -12,8 +12,10 @@
   "packageManager": "pnpm@10.10.0",
   "scripts": {
     "build": "pnpm nx run-many -t build",
+    "build:twopoint5d": "NX_TUI=false pnpm nx run-many -t build --projects=tag:twopoint5d",
     "test": "pnpm nx run-many -t test",
     "test:ci": "NX_TUI=false pnpm nx run-many -t test --projects=tag:ci",
+    "test:twopoint5d": "NX_TUI=false pnpm nx run-many -t test --projects=tag:twopoint5d",
     "lint": "eslint .",
     "test:affected": "pnpm nx affected -t test",
     "clean": "NX_TUI=false pnpm nx run-many -t clean && rimraf dist",
@@ -21,6 +23,7 @@
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
     "cbt": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
+    "rebuild:twopoint5d": "NX_TUI=false pnpm run-s -sn build:twopoint5d test:twopoint5d",
     "test:all": "NX_TUI=false pnpm run-s -sn clean lint build checkPkgTypes test:ci",
     "lookbook": "NX_TUI=false pnpm nx dev lookbook",
     "handbook": "NX_TUI=false pnpm nx dev handbook",

@@ -1,10 +1,10 @@
 import {AABB2} from './AABB2.js';
-import type {IMap2DRenderable} from './IMap2DRenderable.js';
+import type {IMap2DRenderableArea} from './types.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 export type Map2DSpatialHashGridKeyType = string;
 
-export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderable> {
+export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   static getKey(x: number, y: number): Map2DSpatialHashGridKeyType {
     return `${x};${y}`;
   }

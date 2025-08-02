@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'vitest';
 import {AABB2} from './AABB2.js';
-import type {IMap2DRenderable} from './IMap2DRenderable.js';
+import type {IMap2DRenderableArea} from './types.js';
 import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 
 describe('Map2DSpatialHashGrid', () => {
@@ -11,8 +11,8 @@ describe('Map2DSpatialHashGrid', () => {
 
   test('add', () => {
     const grid = new Map2DSpatialHashGrid(100, 100);
-    const a: IMap2DRenderable = {aabb: new AABB2(10, 20, 150, 150)};
-    const b: IMap2DRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
+    const a: IMap2DRenderableArea = {aabb: new AABB2(10, 20, 150, 150)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(-50, -50, 50, 50)};
 
     expect(grid.add(a)).toBe(grid);
     expect(grid.add(b)).toBe(grid);
@@ -32,8 +32,8 @@ describe('Map2DSpatialHashGrid', () => {
 
   test('remove', () => {
     const grid = new Map2DSpatialHashGrid(100, 100);
-    const a: IMap2DRenderable = {aabb: new AABB2(10, 20, 150, 150)};
-    const b: IMap2DRenderable = {aabb: new AABB2(-50, -50, 50, 50)};
+    const a: IMap2DRenderableArea = {aabb: new AABB2(10, 20, 150, 150)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(-50, -50, 50, 50)};
     grid.add(a, b);
 
     let tileset = grid.getTiles(-1, -1, 2, 2);
@@ -55,9 +55,9 @@ describe('Map2DSpatialHashGrid', () => {
 
   test('findWithin', () => {
     const grid = new Map2DSpatialHashGrid(20, 20);
-    const a: IMap2DRenderable = {aabb: new AABB2(-60, -60, 100, 80)};
-    const b: IMap2DRenderable = {aabb: new AABB2(30, 10, 80, 70)};
-    const c: IMap2DRenderable = {aabb: new AABB2(-90, 50, 50, 50)};
+    const a: IMap2DRenderableArea = {aabb: new AABB2(-60, -60, 100, 80)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(30, 10, 80, 70)};
+    const c: IMap2DRenderableArea = {aabb: new AABB2(-90, 50, 50, 50)};
     grid.add(a, b, c);
 
     let tileset = grid.findWithin(new AABB2(-50, -50, 100, 110));

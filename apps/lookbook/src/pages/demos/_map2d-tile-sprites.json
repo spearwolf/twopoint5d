@@ -1,13 +1,14 @@
 {
   "title": "map2d tile sprites",
-  "description": "How to render tile-sprites with the Map2DTileSpritesRenderer",
+  "description": "How to create and use a `Map2DTileRenderer` with `TileSprites`",
   "url": "/demos/map2d-tile-sprites",
   "tags": [
     "AABB2",
-    "Map2DTile",
-    "Map2DTileSpritesRenderer",
+    "Map2DTileCoords",
+    "Map2DTileRenderer",
     "RepeatingTilesProvider",
     "TileSetLoader",
+    "TileSprites",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
     "tilesets",
@@ -17,6 +18,6 @@
   ],
   "previewImage": "map2d-tile-sprites.png",
   "showSource": {
-    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/map2d-tile-sprites.astro"
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/demos/map2d-tile-sprites.ts"
   }
 }

@@ -1,8 +1,7 @@
-import {Vector2, Vector3} from 'three/webgpu';
+import {Object3D, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
-import type {IMap2DTileRenderer} from './IMap2DTileRenderer.js';
-import {Map2DTile} from './Map2DTile.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer} from './types.js';
 
 describe('Map2DTileStreamer', () => {
   describe('new', () => {
@@ -36,12 +35,13 @@ describe('Map2DTileStreamer', () => {
       const layer = new Map2DTileStreamer(1, 1);
       expect(layer.renderers.size).toBe(0);
       const renderer: IMap2DTileRenderer = {
-        beginUpdate(_offset: Vector2, _translate: Vector3) {},
-        addTile(_tile: Map2DTile) {},
-        reuseTile(_tile: Map2DTile) {},
-        removeTile(_tile: Map2DTile) {},
-        resetTiles() {},
-        endUpdate() {},
+        node: new Object3D(),
+        beginUpdatingTiles(_pos: Vector3) {},
+        addTile(_coords: IMap2DTileCoords) {},
+        reuseTile(_coords: IMap2DTileCoords) {},
+        removeTile(_coords: IMap2DTileCoords) {},
+        clearTiles() {},
+        endUpdatingTiles() {},
         dispose() {},
       };
       layer.addTileRenderer(renderer);

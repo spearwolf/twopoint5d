@@ -48,11 +48,15 @@
         "AABB2",
         "ChunkQuadTreeNode",
         "Map2D",
-        "Map2DTile",
+        "Map2DTileCoords",
+        "Map2DTileRenderer",
         "Map2DTileSpritesRenderer",
         "RectangularVisibilityArea",
         "RepeatingTilesProvider",
+        "TileSprites",
         "TileSpritesGeometry",
+        "TileSpritesGeometry",
+        "TileSpritesMaterial",
         "TileSpritesMaterial",
         "map2d"
       ]

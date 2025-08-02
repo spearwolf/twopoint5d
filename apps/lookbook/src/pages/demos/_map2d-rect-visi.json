@@ -1,0 +1,24 @@
+{
+  "title": "map2d with rectangular view",
+  "shortDescription": "How to render a Map2D with a RectangularVisibilityArea",
+  "description": "This demo shows how to use a `Map2D`. Use the W, A, S, and D keys to scroll the map.\n\nA `RectangularVisibilityArea` is used as the visibilitor, and `RepeatingTilesProvoder` is used as the tile ID provider.",
+  "url": "/demos/map2d-rect-visi",
+  "tags": [
+    "Map2D",
+    "Map2DTileSpritesRenderer",
+    "PanControl2D",
+    "RectangularVisibilityArea",
+    "RepeatingTilesProvider",
+    "TileSetLoader",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "map2d",
+    "vanilla"
+  ],
+  "previewImage": "map2d-layer3d.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/demos/map2d-rect-visi.ts"
+  }
+}
