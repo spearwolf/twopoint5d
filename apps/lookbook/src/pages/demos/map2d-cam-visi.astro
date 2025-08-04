@@ -1,5 +1,6 @@
 ---
 import CrossHair from '~components/CrossHair.astro';
+import RadioButtons from '~components/RadioButtons.astro';
 import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_map2d-cam-visi.json';
 ---
@@ -10,6 +11,15 @@ import {description, showSource, title} from './_map2d-cam-visi.json';
   <CrossHair />
 
   <div class="info-controls text-neutral-200 text-sm pt-4 pl-1 text-center">
+    <div class="py-2">
+      <RadioButtons
+        name="camera"
+        buttons={[
+          {value: 'map2d-camera', label: 'View & Control Map2D Camera', isActive: true},
+          {value: 'pan-control', label: 'Map2D PanControl', isActive: false},
+        ]}
+      />
+    </div>
     <p>Use the W, A, S, and D keys to scroll the map.</p>
     <p>Use the mouse to control the camera.</p>
   </div>
@@ -31,8 +41,21 @@ import {description, showSource, title} from './_map2d-cam-visi.json';
 </style>
 
 <script>
+  import {emit} from '@spearwolf/eventize';
+  import {queryRadioButtons} from '~components/RadioButtonsApi';
   import {run} from '~demos/map2d-cam-visi';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  run(new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false}));
+  const app = await run(new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false}));
+
+  const cameraControl = queryRadioButtons('camera');
+
+  console.log('initial camera control set to:', cameraControl.get());
+
+  cameraControl.onChange((value) => {
+    console.log('Camera control changed to:', value);
+
+    emit(app, 'enableOrbitControls', value === 'map2d-camera');
+    emit(app, 'enablePanControl', value === 'pan-control');
+  });
 </script>

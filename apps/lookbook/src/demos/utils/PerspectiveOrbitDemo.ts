@@ -28,6 +28,10 @@ export class PerspectiveOrbitDemo extends Display {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
+    on(this, 'enableOrbitControls', (enabled) => {
+      this.controls.enabled = enabled;
+    })
+
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 
     on(this, OnDisplayResize, Priority.BB, ({camera, width, height}) => {

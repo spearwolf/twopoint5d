@@ -14,6 +14,7 @@ import {
 import {Fog} from 'three/webgpu';
 import assetsUrl from './utils/assetsUrl';
 import type {PerspectiveOrbitDemo} from './utils/PerspectiveOrbitDemo';
+import {on} from '@spearwolf/eventize';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
   demo.start(async () => {
@@ -89,6 +90,10 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     const panControl = new PanControl2D({
       disablePointer: true,
       speed: 200,
+    });
+
+    on(demo, 'enablePanControl', (enabled) => {
+      panControl.pointerDisabled = !enabled;
     });
 
     demo.onRenderFrame(({deltaTime}) => {
