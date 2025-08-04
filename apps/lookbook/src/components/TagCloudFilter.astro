@@ -2,7 +2,7 @@
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
 import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 
-const {uniqTagKeys, tags, tagCategories} = loadMetadataForDemos();
+const {tags, tagCategories} = loadMetadataForDemos();
 ---
 
 <section class="tags select-none">
@@ -113,7 +113,7 @@ const {uniqTagKeys, tags, tagCategories} = loadMetadataForDemos();
   const CSS_ACTIVE = 'active';
   const CSS_INACTIVE = 'inactive';
 
-  function readUniqValuesFromAttribute($el: HTMLElement, attrName: string, target: Set<string> = new Set()): Set<string> {
+  function readUniqValuesFromAttribute($el: Element, attrName: string, target: Set<string> = new Set()): Set<string> {
     $el
       .getAttribute(attrName)
       .split(',')
