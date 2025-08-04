@@ -1,10 +1,13 @@
 ---
+import CrossHair from '~components/CrossHair.astro';
 import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_map2d-cam-visi.json';
 ---
 
 <Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <CrossHair />
 
   <div class="info-controls text-neutral-200 text-sm pt-4 pl-1 text-center">
     <p>Use the W, A, S, and D keys to scroll the map.</p>

@@ -1,0 +1,62 @@
+---
+
+---
+
+<div class="crosshair-container">
+  <div class="crosshair-grid">
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --crosshair-size: 30px;
+    --crosshair-thickness: 2px;
+    --crosshair-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .crosshair-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 50%;
+    z-index: 1000000;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .crosshair-grid {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    transform: translate(50%, 50%);
+
+    display: grid;
+    grid-template-columns: var(--crosshair-size) var(--crosshair-size);
+    grid-auto-rows: var(--crosshair-size);
+  }
+
+  .crosshair-grid > div:nth-child(1),
+  .crosshair-grid > div:nth-child(3) {
+    border-right: var(--crosshair-thickness) solid var(--crosshair-color);
+  }
+
+  .crosshair-grid > div:nth-child(2),
+  .crosshair-grid > div:nth-child(4) {
+    border-left: var(--crosshair-thickness) solid var(--crosshair-color);
+  }
+
+  .crosshair-grid > div:nth-child(1),
+  .crosshair-grid > div:nth-child(2) {
+    border-bottom: var(--crosshair-thickness) solid var(--crosshair-color);
+  }
+
+  .crosshair-grid > div:nth-child(3),
+  .crosshair-grid > div:nth-child(4) {
+    border-top: var(--crosshair-thickness) solid var(--crosshair-color);
+  }
+</style>
