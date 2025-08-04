@@ -1,0 +1,24 @@
+{
+  "title": "map2d using camera based visibility",
+  "shortDescription": "How to render a Map2D with CameraBasedVisibility",
+  "description": "This demo shows how to create and display a `Map2D`.\n\nUse the `[W]`, `[A]`, `[S]`, and `[D]` keys to scroll the map.\n\nThe `CameraBasedVisibility` class is used as the visibilitor, and `RepeatingTilesProvoder` is used as the tile ID provider.",
+  "url": "/demos/map2d-cam-visi",
+  "tags": [
+    "Map2D",
+    "Map2DTileSpritesRenderer",
+    "PanControl2D",
+    "CameraBasedVisibility",
+    "RepeatingTilesProvider",
+    "TileSetLoader",
+    "TileSpritesGeometry",
+    "TileSpritesMaterial",
+    "tilesets",
+    "textures",
+    "map2d",
+    "vanilla"
+  ],
+  "previewImage": "map2d-layer3d.png",
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/demos/map2d-cam-visi.ts"
+  }
+}

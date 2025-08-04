@@ -1,5 +1,5 @@
 {
-  "title": "map2d with rectangular view",
+  "title": "map2d using rectangular view area",
   "shortDescription": "How to render a Map2D with a RectangularVisibilityArea",
   "description": "This demo shows how to use a `Map2D`. Use the W, A, S, and D keys to scroll the map.\n\nA `RectangularVisibilityArea` is used as the visibilitor, and `RepeatingTilesProvoder` is used as the tile ID provider.",
   "url": "/demos/map2d-rect-visi",

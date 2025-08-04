@@ -46,6 +46,7 @@
       "tagId": "map2d",
       "includeTags": [
         "AABB2",
+        "CameraBasedVisibility",
         "ChunkQuadTreeNode",
         "Map2D",
         "Map2DTileCoords",

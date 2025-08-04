@@ -1,0 +1,35 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, showSource, title} from './_map2d-cam-visi.json';
+---
+
+<Layout title={title} showSource={showSource} description={description}>
+  <canvas id="canvas-container" resize-to="window"></canvas>
+
+  <div class="info-controls text-neutral-200 text-sm pt-4 pl-1 text-center">
+    <p>Use the W, A, S, and D keys to scroll the map.</p>
+    <p>Use the mouse to control the camera.</p>
+  </div>
+</Layout>
+
+<style>
+  body {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  body {
+    background-color: #458497;
+    background-image: linear-gradient(to bottom, #001020 0, #001020 25%, #667686);
+    color: #fff;
+  }
+  .info-controls {
+    transform: translateZ(10px);
+  }
+</style>
+
+<script>
+  import {run} from '~demos/map2d-cam-visi';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+
+  run(new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false}));
+</script>
