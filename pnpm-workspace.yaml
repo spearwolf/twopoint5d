@@ -2,10 +2,10 @@ packages:
   - packages/*
   - apps/*
 catalog:
-  three: ~0.178.0
-  '@types/three': ~0.178.0
-  '@spearwolf/eventize': ^4.0.1
-  '@spearwolf/signalize': ^0.20.1
+  three: ~0.179.0
+  '@types/three': ~0.179.0
+  '@spearwolf/eventize': ^4.0.2
+  '@spearwolf/signalize': ^0.24.0
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - esbuild
