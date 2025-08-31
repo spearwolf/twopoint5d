@@ -43,19 +43,29 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 <script>
   import {
     EVENT_SHOW_DEMOS,
-    STORAGE_KEY_SHOW_ALL_DEMOS,
-    STORAGE_KEY_FILTER_DEMOS_BY_ID,
     STORAGE_KEY_ACTIVE_TAGS,
+    STORAGE_KEY_FILTER_DEMOS_BY_ID,
+    STORAGE_KEY_SHOW_ALL_DEMOS,
   } from './constants.js';
+  import type {LookBookShowDemosEvent} from './types.ts';
+
+  const localFilterById = localStorage.getItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
+  const localActiveTags = localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS);
 
   const localConfig = {
     showAllDemos: !(localStorage.getItem(STORAGE_KEY_SHOW_ALL_DEMOS) === 'false'),
-    filterById: localStorage.getItem(STORAGE_KEY_FILTER_DEMOS_BY_ID)?.split(',') ?? undefined,
-    activeTags: new Set(localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS)?.split(',')) ?? undefined,
+    filterById: localFilterById ? new Set(localFilterById.split(',')) : undefined,
+    activeTags: localActiveTags ? new Set(localActiveTags.split(',')) : undefined,
   };
 
-  function updateCardVisibility($el: Element, demoId: string, showAll: boolean, filterById?: string[], activeTags?: Set<string>) {
-    if (showAll || filterById?.includes?.(demoId)) {
+  function updateCardVisibility(
+    $el: Element,
+    demoId: string,
+    showAll: boolean,
+    filterById?: Set<string>,
+    activeTags?: Set<string>,
+  ) {
+    if (showAll || filterById?.has(demoId)) {
       $el.classList.remove('hidden');
     } else {
       $el.classList.add('hidden');
@@ -84,9 +94,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
     updateCardVisibility($el, demoId, localConfig.showAllDemos, localConfig.filterById, localConfig.activeTags);
 
-    document.addEventListener(EVENT_SHOW_DEMOS, (event: any) => {
-      const activeTags = event.detail.activeTags ? new Set<string>(event.detail.activeTags) : undefined;
-      updateCardVisibility($el, demoId, event.detail.showAll, event.detail.filterById, activeTags);
+    document.addEventListener(EVENT_SHOW_DEMOS, ({detail: {showAll, filterById, activeTags}}: LookBookShowDemosEvent) => {
+      updateCardVisibility($el, demoId, showAll, filterById, activeTags);
     });
 
     // Make the card visible after JS is loaded and visibility is set

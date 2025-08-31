@@ -111,6 +111,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
     STORAGE_KEY_SHOW_ALL_DEMOS,
     STORAGE_KEY_FILTER_DEMOS_BY_ID,
   } from './constants.js';
+  import type { LookBookShowDemosEventDetail } from './types.ts';
 
   const ATTR_TAG = 'data-tag';
   const ATTR_RELATED_DEMOS = 'data-related-demos';
@@ -134,37 +135,36 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
   const getClearTagsAction = () => document.querySelector('.tags .clear-tags-action') as HTMLButtonElement;
 
-  function dispatchShowDemosEvent(payload: {showAll: boolean; filterById?: string[]; activeTags?: string[], relatedTags?: string[]}): void {
+  function dispatchShowDemosEvent(payload: LookBookShowDemosEventDetail): void {
     getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
 
+    localStorage.setItem(STORAGE_KEY_SHOW_ALL_DEMOS, payload.showAll ? 'true' : 'false');
+
     if (payload.showAll) {
+      localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
       localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
       localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
     } else {
-      if (Array.isArray(payload.activeTags) && payload.activeTags.length) {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_TAGS, payload.activeTags.join(','));
+      if (payload.filterById?.size) {
+        localStorage.setItem(STORAGE_KEY_FILTER_DEMOS_BY_ID, Array.from(payload.filterById).join(','));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
+      }
+      if (payload.activeTags?.size) {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAGS, Array.from(payload.activeTags).join(','));
       } else {
         localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
       }
-      if (Array.isArray(payload.relatedTags) && payload.relatedTags.length) {
-        localStorage.setItem(STORAGE_KEY_RELATED_TAGS, payload.relatedTags.join(','));
+      if (payload.relatedTags?.size) {
+        localStorage.setItem(STORAGE_KEY_RELATED_TAGS, Array.from(payload.relatedTags).join(','));
       } else {
         localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
       }
     }
 
-    localStorage.setItem(STORAGE_KEY_SHOW_ALL_DEMOS, payload.showAll ? 'true' : 'false');
-    if (Array.isArray(payload.filterById) && payload.filterById.length) {
-      localStorage.setItem(STORAGE_KEY_FILTER_DEMOS_BY_ID, payload.filterById.join(','));
-    } else {
-      localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
-    }
-
     document.dispatchEvent(
       new CustomEvent(EVENT_SHOW_DEMOS, {
-        detail: {
-          ...payload,
-        },
+        detail: payload
       }),
     );
   }
@@ -249,12 +249,15 @@ const {tags, tagCategories} = loadMetadataForDemos();
             }
           }
 
-          const activeTags = (Array.from($activated) as HTMLElement[]).map((el) => el.getAttribute(ATTR_TAG));
-          activeTags.forEach((tag) => relatedTags.add(tag));
+          const activeTags = new Set((Array.from($activated) as HTMLElement[]).map((el) => el.getAttribute(ATTR_TAG)));
+          // activeTags.forEach((tag) => relatedTags.add(tag));
+          for (const tag of activeTags) {
+            relatedTags.add(tag);
+          }
 
           for (const el of $allTags) {
             const tagName = el.getAttribute(ATTR_TAG);
-            if (activeTags.includes(tagName)) {
+            if (activeTags.has(tagName)) {
               el.classList.remove(CSS_INACTIVE);
             }
             if (relatedTags.has(tagName)) {
@@ -266,9 +269,9 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
           dispatchShowDemosEvent({
             showAll: false,
-            filterById: Array.from(relatedDemos),
+            filterById: relatedDemos,
             activeTags,
-            relatedTags: Array.from(relatedTags),
+            relatedTags,
           });
         }
       },
