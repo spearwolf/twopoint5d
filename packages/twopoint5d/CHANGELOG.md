@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > Instead of getting lost in custom workarounds that use the old materials and shaders, we have now switched exclusively and consistently to _tsl_.
 
 - only use the `three/webgpu` package as import
-- upgrade to three.js r178
+- upgrade to three.js r179
 - refactor `Display` &rarr; `resize`, `renderFrame` events
   - add types, constants and interfaces for `OnDisplayResize` and `OnDisplayRenderFrame`
   - _MIGRATION NOTE:_ the `frame` event has been renamed to `renderFrame`
