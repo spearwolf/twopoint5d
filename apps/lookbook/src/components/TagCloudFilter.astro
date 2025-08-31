@@ -5,7 +5,7 @@ import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 const {tags, tagCategories} = loadMetadataForDemos();
 ---
 
-<section class="tags select-none">
+<section class="tags select-none invisible">
   {
     tagCategories.map((category) => (
       <h3 class="tag-category">{category.name}</h3>
@@ -104,6 +104,14 @@ const {tags, tagCategories} = loadMetadataForDemos();
 </style>
 
 <script>
+  import {
+    EVENT_SHOW_DEMOS,
+    STORAGE_KEY_ACTIVE_TAGS,
+    STORAGE_KEY_RELATED_TAGS,
+    STORAGE_KEY_SHOW_ALL_DEMOS,
+    STORAGE_KEY_FILTER_DEMOS_BY_ID,
+  } from './constants.js';
+
   const ATTR_TAG = 'data-tag';
   const ATTR_RELATED_DEMOS = 'data-related-demos';
   const ATTR_RELATED_TAGS = 'data-related-tags';
@@ -126,11 +134,34 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
   const getClearTagsAction = () => document.querySelector('.tags .clear-tags-action') as HTMLButtonElement;
 
-  function dispatchShowDemosEvent(payload: {showAll: boolean; filterById?: string[]}): void {
+  function dispatchShowDemosEvent(payload: {showAll: boolean; filterById?: string[]; activeTags?: string[], relatedTags?: string[]}): void {
     getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
 
+    if (payload.showAll) {
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
+      localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
+    } else {
+      if (Array.isArray(payload.activeTags) && payload.activeTags.length) {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAGS, payload.activeTags.join(','));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
+      }
+      if (Array.isArray(payload.relatedTags) && payload.relatedTags.length) {
+        localStorage.setItem(STORAGE_KEY_RELATED_TAGS, payload.relatedTags.join(','));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEY_SHOW_ALL_DEMOS, payload.showAll ? 'true' : 'false');
+    if (Array.isArray(payload.filterById) && payload.filterById.length) {
+      localStorage.setItem(STORAGE_KEY_FILTER_DEMOS_BY_ID, payload.filterById.join(','));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
+    }
+
     document.dispatchEvent(
-      new CustomEvent('lookbook.showDemos', {
+      new CustomEvent(EVENT_SHOW_DEMOS, {
         detail: {
           ...payload,
         },
@@ -150,7 +181,29 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
   getClearTagsAction().addEventListener('pointerdown', () => clearTags());
 
-  document.querySelectorAll(CSS_TAG_CLOUD_FILTER).forEach(($el) => {
+  const $tagCloud = document.querySelectorAll(CSS_TAG_CLOUD_FILTER);
+
+  const localConfig = {
+    activeTags: new Set(localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS)?.split(',') ?? []),
+    relatedTags: new Set(localStorage.getItem(STORAGE_KEY_RELATED_TAGS)?.split(',') ?? []),
+  };
+
+  if (localConfig.activeTags.size) {
+    $tagCloud.forEach(($el) => {
+      for (const el of $el.querySelectorAll(`[${ATTR_TAG}]`)) {
+        const tagName = el.getAttribute(ATTR_TAG);
+        if (localConfig.activeTags.has(tagName)) {
+          el.classList.add(CSS_ACTIVE);
+        } else if (!localConfig.relatedTags.has(tagName)) {
+          el.classList.add(CSS_INACTIVE);
+        }
+      }
+    });
+  }
+
+  document.querySelector('.tags').classList.remove('invisible');
+
+  $tagCloud.forEach(($el) => {
     $el.addEventListener(
       'pointerdown',
       (event: any) => {
@@ -212,8 +265,10 @@ const {tags, tagCategories} = loadMetadataForDemos();
           }
 
           dispatchShowDemosEvent({
-            filterById: Array.from(relatedDemos),
             showAll: false,
+            filterById: Array.from(relatedDemos),
+            activeTags,
+            relatedTags: Array.from(relatedTags),
           });
         }
       },

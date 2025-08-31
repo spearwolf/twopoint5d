@@ -17,7 +17,7 @@ const {id, href, title, body, image, tags} = Astro.props;
 const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
 
-<li class="link-card relative" data-demo-id={id}>
+<li class="link-card relative invisible" data-demo-id={id}>
   <a href={href} class="group aspect-h-7 aspect-w-10 block w-full overflow-hidden">
     <img src={previewImage} class="card-image pointer-events-none object-cover group-hover:opacity-75" />
   </a>
@@ -31,7 +31,9 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     tags && tags.length > 0 && (
       <ul class="tags">
         {tags.map((tag) => (
-          <li class="tag">{tag}</li>
+          <li class="tag" data-tag={tag}>
+            {tag}
+          </li>
         ))}
       </ul>
     )
@@ -39,15 +41,56 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 </li>
 
 <script>
+  import {
+    EVENT_SHOW_DEMOS,
+    STORAGE_KEY_SHOW_ALL_DEMOS,
+    STORAGE_KEY_FILTER_DEMOS_BY_ID,
+    STORAGE_KEY_ACTIVE_TAGS,
+  } from './constants.js';
+
+  const localConfig = {
+    showAllDemos: !(localStorage.getItem(STORAGE_KEY_SHOW_ALL_DEMOS) === 'false'),
+    filterById: localStorage.getItem(STORAGE_KEY_FILTER_DEMOS_BY_ID)?.split(',') ?? undefined,
+    activeTags: new Set(localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS)?.split(',')) ?? undefined,
+  };
+
+  function updateCardVisibility($el: Element, demoId: string, showAll: boolean, filterById?: string[], activeTags?: Set<string>) {
+    if (showAll || filterById?.includes?.(demoId)) {
+      $el.classList.remove('hidden');
+    } else {
+      $el.classList.add('hidden');
+    }
+
+    const $tagEls = $el.querySelectorAll('[data-tag]');
+
+    if (showAll) {
+      $tagEls.forEach((el) => {
+        el.classList.remove('active');
+      });
+    } else if (activeTags?.size) {
+      $tagEls.forEach((el) => {
+        const tag = el.getAttribute('data-tag');
+        if (activeTags.has(tag)) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      });
+    }
+  }
+
   document.querySelectorAll('.link-card').forEach(($el) => {
     const demoId = $el.getAttribute('data-demo-id');
-    document.addEventListener('lookbook.showDemos', (event: any) => {
-      if (event.detail.showAll || event.detail.filterById?.includes?.(demoId)) {
-        $el.classList.remove('hidden');
-      } else {
-        $el.classList.add('hidden');
-      }
+
+    updateCardVisibility($el, demoId, localConfig.showAllDemos, localConfig.filterById, localConfig.activeTags);
+
+    document.addEventListener(EVENT_SHOW_DEMOS, (event: any) => {
+      const activeTags = event.detail.activeTags ? new Set<string>(event.detail.activeTags) : undefined;
+      updateCardVisibility($el, demoId, event.detail.showAll, event.detail.filterById, activeTags);
     });
+
+    // Make the card visible after JS is loaded and visibility is set
+    $el.classList.remove('invisible');
   });
 </script>
 
@@ -106,5 +149,9 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
     padding: var(--tag-padding);
     border-radius: var(--tag-border-radius);
     /* box-shadow: 0 0 1px 1px var(--color-background-lighter); */
+  }
+  .tag.active {
+    color: var(--color-background-dark);
+    background-color: var(--color-primary);
   }
 </style>
