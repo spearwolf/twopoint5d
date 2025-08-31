@@ -1,7 +1,7 @@
 import tagCategoriesJson from '../../data/tag-categories.json' assert {type: 'json'};
 import {baseUrl, makeUrl} from './makeUrl.js';
 
-interface IDemo {
+export interface IDemo {
   id: string;
   title: string;
   shortDescription?: string;
@@ -10,6 +10,11 @@ interface IDemo {
   href: string;
   previewImage?: string;
   tags?: string[];
+}
+
+export interface ITag {
+  demoIds: Set<string>;
+  relatedTags: Set<string>;
 }
 
 interface ICategory {

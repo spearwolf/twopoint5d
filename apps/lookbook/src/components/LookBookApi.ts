@@ -1,3 +1,4 @@
+import type {IDemo, ITag} from '~demos/utils/loadMetadataForDemos';
 import {
   STORAGE_KEY_ACTIVE_TAGS,
   STORAGE_KEY_FILTER_DEMOS_BY_ID,
@@ -5,6 +6,11 @@ import {
   STORAGE_KEY_SHOW_ALL_DEMOS,
 } from './constants';
 import type {LookBookShowDemosEventDetail} from './types';
+
+export interface LookBookMetadata {
+  demos: IDemo[];
+  tags: Map<string, ITag>;
+}
 
 export function getShowDemosConfig(): LookBookShowDemosEventDetail {
   const localFilterById = localStorage.getItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
@@ -43,4 +49,30 @@ export function saveShowDemosConfig(config: LookBookShowDemosEventDetail) {
       localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
     }
   }
+}
+
+let metadata: LookBookMetadata = undefined;
+
+export function getMetadataForDemos(): LookBookMetadata | undefined {
+  if (metadata) return metadata;
+
+  const lookMetatdataEl = document.getElementById('lookbook-metadata');
+  if (lookMetatdataEl) {
+    const demos = JSON.parse(lookMetatdataEl.getAttribute('data-lookbook-demos'));
+    const tags = JSON.parse(lookMetatdataEl.getAttribute('data-lookbook-tags'));
+
+    metadata = {
+      demos,
+      tags: new Map(
+        Object.entries(tags).map(([k, v]: [string, any]) => [
+          k,
+          {demoIds: new Set(v.demoIds), relatedTags: new Set(v.relatedTags)},
+        ]),
+      ),
+    };
+  } else {
+    throw new Error('LookBook metadata element not found');
+  }
+
+  return metadata;
 }

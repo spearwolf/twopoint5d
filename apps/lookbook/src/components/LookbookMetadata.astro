@@ -1,0 +1,20 @@
+---
+import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
+
+const {demos, tags} = loadMetadataForDemos();
+---
+
+<div
+  id="lookbook-metadata"
+  class="hidden"
+  data-lookbook-demos={JSON.stringify(demos)}
+  data-lookbook-tags={JSON.stringify(
+    Object.fromEntries(
+      Array.from(tags.entries()).map(([tag, {demoIds, relatedTags}]) => [
+        tag,
+        {demoIds: Array.from(demoIds), relatedTags: Array.from(relatedTags)},
+      ]),
+    ),
+  )}
+>
+</div>
