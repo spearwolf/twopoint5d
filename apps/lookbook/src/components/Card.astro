@@ -41,22 +41,11 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 </li>
 
 <script>
-  import {
-    EVENT_SHOW_DEMOS,
-    STORAGE_KEY_ACTIVE_TAGS,
-    STORAGE_KEY_FILTER_DEMOS_BY_ID,
-    STORAGE_KEY_SHOW_ALL_DEMOS,
-  } from './constants.js';
+  import {EVENT_SHOW_DEMOS} from './constants.js';
+  import {getShowDemosConfig} from './LookBookApi';
   import type {LookBookShowDemosEvent} from './types.ts';
 
-  const localFilterById = localStorage.getItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
-  const localActiveTags = localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS);
-
-  const localConfig = {
-    showAllDemos: !(localStorage.getItem(STORAGE_KEY_SHOW_ALL_DEMOS) === 'false'),
-    filterById: localFilterById ? new Set(localFilterById.split(',')) : undefined,
-    activeTags: localActiveTags ? new Set(localActiveTags.split(',')) : undefined,
-  };
+  const localConfig = getShowDemosConfig();
 
   function updateCardVisibility(
     $el: Element,
@@ -92,7 +81,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   document.querySelectorAll('.link-card').forEach(($el) => {
     const demoId = $el.getAttribute('data-demo-id');
 
-    updateCardVisibility($el, demoId, localConfig.showAllDemos, localConfig.filterById, localConfig.activeTags);
+    updateCardVisibility($el, demoId, localConfig.showAll, localConfig.filterById, localConfig.activeTags);
 
     document.addEventListener(EVENT_SHOW_DEMOS, ({detail: {showAll, filterById, activeTags}}: LookBookShowDemosEvent) => {
       updateCardVisibility($el, demoId, showAll, filterById, activeTags);

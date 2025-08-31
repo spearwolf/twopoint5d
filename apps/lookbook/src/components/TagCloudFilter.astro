@@ -104,13 +104,8 @@ const {tags, tagCategories} = loadMetadataForDemos();
 </style>
 
 <script>
-  import {
-    EVENT_SHOW_DEMOS,
-    STORAGE_KEY_ACTIVE_TAGS,
-    STORAGE_KEY_RELATED_TAGS,
-    STORAGE_KEY_SHOW_ALL_DEMOS,
-    STORAGE_KEY_FILTER_DEMOS_BY_ID,
-  } from './constants.js';
+  import { EVENT_SHOW_DEMOS } from './constants.js';
+  import { getShowDemosConfig, saveShowDemosConfig } from './LookBookApi';
   import type { LookBookShowDemosEventDetail } from './types.ts';
 
   const ATTR_TAG = 'data-tag';
@@ -138,29 +133,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
   function dispatchShowDemosEvent(payload: LookBookShowDemosEventDetail): void {
     getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
 
-    localStorage.setItem(STORAGE_KEY_SHOW_ALL_DEMOS, payload.showAll ? 'true' : 'false');
-
-    if (payload.showAll) {
-      localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
-      localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
-      localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
-    } else {
-      if (payload.filterById?.size) {
-        localStorage.setItem(STORAGE_KEY_FILTER_DEMOS_BY_ID, Array.from(payload.filterById).join(','));
-      } else {
-        localStorage.removeItem(STORAGE_KEY_FILTER_DEMOS_BY_ID);
-      }
-      if (payload.activeTags?.size) {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_TAGS, Array.from(payload.activeTags).join(','));
-      } else {
-        localStorage.removeItem(STORAGE_KEY_ACTIVE_TAGS);
-      }
-      if (payload.relatedTags?.size) {
-        localStorage.setItem(STORAGE_KEY_RELATED_TAGS, Array.from(payload.relatedTags).join(','));
-      } else {
-        localStorage.removeItem(STORAGE_KEY_RELATED_TAGS);
-      }
-    }
+    saveShowDemosConfig(payload);
 
     document.dispatchEvent(
       new CustomEvent(EVENT_SHOW_DEMOS, {
@@ -183,18 +156,17 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
   const $tagCloud = document.querySelectorAll(CSS_TAG_CLOUD_FILTER);
 
-  const localConfig = {
-    activeTags: new Set(localStorage.getItem(STORAGE_KEY_ACTIVE_TAGS)?.split(',') ?? []),
-    relatedTags: new Set(localStorage.getItem(STORAGE_KEY_RELATED_TAGS)?.split(',') ?? []),
-  };
+  const localConfig = getShowDemosConfig();
 
-  if (localConfig.activeTags.size) {
+  getClearTagsAction().classList.toggle(CSS_INACTIVE, localConfig.showAll);
+
+  if (localConfig.activeTags?.size) {
     $tagCloud.forEach(($el) => {
       for (const el of $el.querySelectorAll(`[${ATTR_TAG}]`)) {
         const tagName = el.getAttribute(ATTR_TAG);
         if (localConfig.activeTags.has(tagName)) {
           el.classList.add(CSS_ACTIVE);
-        } else if (!localConfig.relatedTags.has(tagName)) {
+        } else if (!localConfig.relatedTags?.has(tagName)) {
           el.classList.add(CSS_INACTIVE);
         }
       }
@@ -250,7 +222,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
           }
 
           const activeTags = new Set((Array.from($activated) as HTMLElement[]).map((el) => el.getAttribute(ATTR_TAG)));
-          // activeTags.forEach((tag) => relatedTags.add(tag));
+
           for (const tag of activeTags) {
             relatedTags.add(tag);
           }
