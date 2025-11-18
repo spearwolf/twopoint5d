@@ -3,6 +3,9 @@ import {
   attribute,
   cameraPosition,
   cross,
+  div,
+  float,
+  mod,
   modelViewMatrix,
   mul,
   normalize,
@@ -51,4 +54,14 @@ export const colorFromTextureByTexCoords = (colorMap: Texture, params?: {texCoor
 
   // gl_FragColor = texture2D(colorMap, vTexCoords);
   return texture(colorMap, vTexCoords);
+};
+
+export const texCoordsFromIndex = (mapSize: Node, ndx: Node) => {
+  // vec2 texCoordsFromIndex(in vec2 mapSize, in int ndx) {
+  //   int column = int(mod(float(ndx), float(mapSize[0])));
+  const column = mod(ndx.toInt().toFloat(), mapSize[0].toFloat()).toInt();
+  //   int row = ndx / int(mapSize[0]);
+  const row = div(ndx, mapSize[0].toInt()).toInt();
+  //   return (vec2(column, row) + 0.5) / vec2(mapSize[0], mapSize[1]);
+  return div(add(vec2(column, row), float(0.5)), vec2(mapSize[0], mapSize[1]));
 };

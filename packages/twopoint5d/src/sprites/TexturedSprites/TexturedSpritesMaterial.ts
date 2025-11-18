@@ -1,13 +1,15 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
-import {type Node, NodeMaterial, type Texture} from 'three/webgpu';
+import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 
-export interface TexturedSpritesMaterialParameters {
+export interface TexturedSpritesMaterialParameters extends NodeMaterialParameters {
   name?: string;
   colorMap?: Texture;
   renderAsBillboards?: boolean;
 }
+
+const createShaderNodeSignal = (node: Node | undefined, attach: object) => createSignal<Node | undefined>(node, {attach});
 
 const createShaderAttributeNodeSignal = (name: string, attach: object) => createSignal<Node>(attribute(name), {attach});
 
@@ -18,6 +20,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly QuadSizeAttributeName = 'quadSize';
 
   #vertexPositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.PositionAttributeName, this);
+  #texCoordsNode = createShaderNodeSignal(undefined, this);
   #rotationNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.RotationAttributeName, this);
   #instancePositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.InstancePositionAttributeName, this);
   #quadSizeNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.QuadSizeAttributeName, this);
@@ -40,6 +43,14 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   set vertexPositionNode(node: Node) {
     this.#vertexPositionNode.set(node);
+  }
+
+  get texCoordsNode() {
+    return this.#texCoordsNode.get();
+  }
+
+  set texCoordsNode(node: Node) {
+    this.#texCoordsNode.set(node);
   }
 
   get rotationNode() {
@@ -81,6 +92,10 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
     this.renderAsBillboards = options?.renderAsBillboards ?? this.#renderAsBillboards.value;
 
+    this.alphaTestNode = float(0.001);
+
+    this.colorMap = options?.colorMap;
+
     createEffect(
       () => {
         const rotationEulerNode = vec3(0, 0, this.rotationNode.toFloat());
@@ -102,7 +117,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     createEffect(
       () => {
         if (this.colorMap) {
-          this.colorNode = colorFromTextureByTexCoords(this.colorMap);
+          this.colorNode = colorFromTextureByTexCoords(this.colorMap, {texCoords: this.texCoordsNode});
         } else {
           this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
         }
@@ -111,10 +126,6 @@ export class TexturedSpritesMaterial extends NodeMaterial {
       },
       {attach: this},
     );
-
-    this.alphaTestNode = float(0.001);
-
-    this.colorMap = options?.colorMap;
   }
 
   override dispose() {

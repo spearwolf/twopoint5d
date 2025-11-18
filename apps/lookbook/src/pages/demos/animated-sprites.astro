@@ -77,11 +77,15 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
-      tileWidth: 64,
-      tileHeight: 64,
-      margin: 1,
-    });
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(
+      assetsUrl('nobinger-anim-sheet.png'),
+      {
+        tileWidth: 64,
+        tileHeight: 64,
+        margin: 1,
+      },
+      ['srgb'],
+    );
 
     const anims = new FrameBasedAnimations();
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);

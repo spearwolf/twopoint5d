@@ -6,7 +6,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.13.0] - Unreleased
+## [0.13.0] - 2025-11-18
 
 > [!CAUTION]
 > This version breaks with many things and clearly moves towards the use of WebGL2 and WebGPU!
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > Instead of getting lost in custom workarounds that use the old materials and shaders, we have now switched exclusively and consistently to _tsl_.
 
 - only use the `three/webgpu` package as import
-- upgrade to three.js r179
+- upgrade to three.js r181
 - refactor `Display` &rarr; `resize`, `renderFrame` events
   - add types, constants and interfaces for `OnDisplayResize` and `OnDisplayRenderFrame`
   - _MIGRATION NOTE:_ the `frame` event has been renamed to `renderFrame`

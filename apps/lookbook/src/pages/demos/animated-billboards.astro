@@ -46,7 +46,7 @@ import {description, showSource, title} from './_animated-billboards.json';
     OnDisplayRenderFrame,
     TileSetLoader,
   } from '@spearwolf/twopoint5d';
-  import {LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PlaneGeometry, TextureLoader} from 'three';
+  import {Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader} from 'three';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -60,11 +60,15 @@ import {description, showSource, title} from './_animated-billboards.json';
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(assetsUrl('nobinger-anim-sheet.png'), {
-      tileWidth: 64,
-      tileHeight: 64,
-      margin: 1,
-    });
+    const {tileSet, texture} = await new TileSetLoader().loadAsync(
+      assetsUrl('nobinger-anim-sheet.png'),
+      {
+        tileWidth: 64,
+        tileHeight: 64,
+        margin: 1,
+      },
+      ['srgb'],
+    );
 
     const anims = new FrameBasedAnimations();
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
@@ -94,7 +98,7 @@ import {description, showSource, title} from './_animated-billboards.json';
     console.log('BouncingSprites', bouncingSprites);
 
     const blueGroundTexture = await new TextureLoader().loadAsync(assetsUrl('blue-ground-2048x.webp'));
-    blueGroundTexture.colorSpace = LinearSRGBColorSpace;
+    blueGroundTexture.colorSpace = SRGBColorSpace;
 
     const planeGeometry = new PlaneGeometry(400, 400);
     const planeMaterial = new MeshBasicMaterial({
