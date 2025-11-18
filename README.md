@@ -1,5 +1,8 @@
 <p align="center">
-  <img width="350" src="docs/images/twopoint5d-700x168.png">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/handbook/docs/images/twopoint5d-light.png">
+    <img width="350" src="apps/handbook/docs/images/twopoint5d-dark.png">
+  </picture>
   <br>
   <em>A javascript side project about rendering 2.5D realtime graphics on the web.</em>
 </p>
