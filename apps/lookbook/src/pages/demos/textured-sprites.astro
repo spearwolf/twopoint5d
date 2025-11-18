@@ -46,7 +46,7 @@ import {description, showSource, title} from './_textured-sprites.json';
 
 <script>
   import {TexturedSprites, TileSetLoader} from '@spearwolf/twopoint5d';
-  import {AlwaysDepth} from 'three';
+  import {LessEqualDepth} from 'three';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -70,7 +70,9 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     const sprites = new TexturedSprites(CAPACITY, texture);
 
-    sprites.material.depthFunc = AlwaysDepth;
+    sprites.material.depthFunc = LessEqualDepth; // AlwaysDepth;
+    sprites.material.depthWrite = true;
+    sprites.material.depthTest = true;
 
     document.querySelector(`.${RENDER_AS_BILLBOARDS}`).addEventListener('pointerdown', (e) => {
       const el = e.currentTarget as HTMLElement;
@@ -87,6 +89,7 @@ import {description, showSource, title} from './_textured-sprites.json';
     });
 
     const bouncingSprites = new BouncingSprites(sprites.spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
+    bouncingSprites.shouldRotate = false;
 
     bouncingSprites.createSprites();
 

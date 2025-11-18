@@ -1,6 +1,6 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
-import {attribute, float, rotate, vec3, vec4, type ShaderNodeObject} from 'three/tsl';
-import {Node, NodeMaterial, Texture} from 'three/webgpu';
+import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
+import {type Node, NodeMaterial, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 
 export interface TexturedSpritesMaterialParameters {
@@ -9,13 +9,12 @@ export interface TexturedSpritesMaterialParameters {
   renderAsBillboards?: boolean;
 }
 
-const createShaderAttributeNodeSignal = (name: string, attach: object) =>
-  createSignal<ShaderNodeObject<Node>>(attribute(name), {attach});
+const createShaderAttributeNodeSignal = (name: string, attach: object) => createSignal<Node>(attribute(name), {attach});
 
 export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
   static readonly InstancePositionAttributeName = 'instancePosition';
-  static readonly RotationAttributeName = 'instancePosition';
+  static readonly RotationAttributeName = 'rotation';
   static readonly QuadSizeAttributeName = 'quadSize';
 
   #vertexPositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.PositionAttributeName, this);
@@ -39,7 +38,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#vertexPositionNode.get();
   }
 
-  set vertexPositionNode(node: ShaderNodeObject<Node>) {
+  set vertexPositionNode(node: Node) {
     this.#vertexPositionNode.set(node);
   }
 
@@ -47,7 +46,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#rotationNode.get();
   }
 
-  set rotationNode(node: ShaderNodeObject<Node>) {
+  set rotationNode(node: Node) {
     this.#rotationNode.set(node);
   }
 
@@ -55,7 +54,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#instancePositionNode.get();
   }
 
-  set instancePositionNode(node: ShaderNodeObject<Node>) {
+  set instancePositionNode(node: Node) {
     this.#instancePositionNode.set(node);
   }
 
@@ -63,7 +62,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#quadSizeNode.get();
   }
 
-  set quadSizeNode(node: ShaderNodeObject<Node>) {
+  set quadSizeNode(node: Node) {
     this.#quadSizeNode.set(node);
   }
 

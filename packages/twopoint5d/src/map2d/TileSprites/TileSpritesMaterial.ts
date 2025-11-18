@@ -1,6 +1,6 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
-import {attribute, float, vec3, vec4, type ShaderNodeObject} from 'three/tsl';
-import {Node, NodeMaterial, Texture} from 'three/webgpu';
+import {attribute, float, vec3, vec4} from 'three/tsl';
+import {type Node, NodeMaterial, type Texture} from 'three/webgpu';
 import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../../sprites/node-utils.js';
 
 export interface TileSpritesMaterialParameters {
@@ -8,13 +8,14 @@ export interface TileSpritesMaterialParameters {
   colorMap?: Texture;
 }
 
-const createShaderAttributeNodeSignal = (name: string, attach: object) =>
-  createSignal<ShaderNodeObject<Node>>(attribute(name), {attach});
+const createShaderAttributeNodeSignal = (name: string, attach: object) => createSignal<Node>(attribute(name), {attach});
 
 export class TileSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
   static readonly InstancePositionAttributeName = 'instancePosition';
   static readonly QuadSizeAttributeName = 'quadSize';
+
+  static readonly DefaultColor = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
 
   #vertexPositionNode = createShaderAttributeNodeSignal(TileSpritesMaterial.PositionAttributeName, this);
   #instancePositionNode = createShaderAttributeNodeSignal(TileSpritesMaterial.InstancePositionAttributeName, this);
@@ -34,7 +35,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#vertexPositionNode.get();
   }
 
-  set vertexPositionNode(node: ShaderNodeObject<Node>) {
+  set vertexPositionNode(node: Node) {
     this.#vertexPositionNode.set(node);
   }
 
@@ -42,7 +43,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#instancePositionNode.get();
   }
 
-  set instancePositionNode(node: ShaderNodeObject<Node>) {
+  set instancePositionNode(node: Node) {
     this.#instancePositionNode.set(node);
   }
 
@@ -50,7 +51,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#quadSizeNode.get();
   }
 
-  set quadSizeNode(node: ShaderNodeObject<Node>) {
+  set quadSizeNode(node: Node) {
     this.#quadSizeNode.set(node);
   }
 
@@ -80,7 +81,7 @@ export class TileSpritesMaterial extends NodeMaterial {
       () => {
         const colorMap = this.colorMap;
 
-        this.colorNode = colorMap ? colorFromTextureByTexCoords(colorMap) : vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
+        this.colorNode = colorMap ? colorFromTextureByTexCoords(colorMap) : TileSpritesMaterial.DefaultColor;
 
         this.needsUpdate = true;
       },

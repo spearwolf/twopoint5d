@@ -25,5 +25,6 @@
         "Visibilitor",
         "visibles"
     ],
-    "nxConsole.generateAiAgentRules": true
+    "nxConsole.generateAiAgentRules": true,
+    "biome.enabled": false
 }

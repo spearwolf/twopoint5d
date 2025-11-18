@@ -11,15 +11,10 @@ import {
   varying,
   vec2,
   vec3,
-  type ShaderNodeObject,
 } from 'three/tsl';
-import {Texture, type Node} from 'three/webgpu';
+import type {Node, Texture} from 'three/webgpu';
 
-export const vertexByInstancePosition = (params?: {
-  vertexPosition?: ShaderNodeObject<Node>;
-  instancePosition?: ShaderNodeObject<Node>;
-  scale?: ShaderNodeObject<Node>;
-}) => {
+export const vertexByInstancePosition = (params?: {vertexPosition?: Node; instancePosition?: Node; scale?: Node}) => {
   const position = params?.vertexPosition ?? attribute('position');
   const instancePosition = params?.instancePosition ?? attribute('instancePosition');
   const scale = params?.scale;
@@ -31,11 +26,7 @@ export const vertexByInstancePosition = (params?: {
   }
 };
 
-export const billboardVertexByInstancePosition = (params?: {
-  vertexPosition?: ShaderNodeObject<Node>;
-  instancePosition?: ShaderNodeObject<Node>;
-  scale?: ShaderNodeObject<Node>;
-}) => {
+export const billboardVertexByInstancePosition = (params?: {vertexPosition?: Node; instancePosition?: Node; scale?: Node}) => {
   const billboardPosition = params?.instancePosition ?? attribute('instancePosition');
   const billboardSize = params?.scale ?? attribute('quadSize');
   const vertexPosition = params?.vertexPosition ?? attribute('position');
@@ -51,10 +42,7 @@ export const billboardVertexByInstancePosition = (params?: {
   );
 };
 
-export const colorFromTextureByTexCoords = (
-  colorMap: Texture,
-  params?: {texCoords?: ShaderNodeObject<Node>; uv?: ShaderNodeObject<Node>},
-) => {
+export const colorFromTextureByTexCoords = (colorMap: Texture, params?: {texCoords?: Node; uv?: Node}) => {
   const texCoords = params?.texCoords ?? attribute('texCoords');
   const uv = params?.uv ?? attribute('uv');
 

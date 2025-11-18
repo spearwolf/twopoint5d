@@ -9,6 +9,7 @@
     "_preview": "vitepress preview docs"
   },
   "devDependencies": {
-    "vitepress": "^1.6.3"
+    "caniuse-lite": "^1.0.30001755",
+    "vitepress": "^1.6.4"
   }
 }

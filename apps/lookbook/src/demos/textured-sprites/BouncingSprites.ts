@@ -7,6 +7,8 @@ interface BounceSprite extends TexturedSprite {
 }
 
 export class BouncingSprites {
+  name = 'textured-sprites.BouncingSprites';
+
   gravity = -45;
   startSpeedX = 20;
   startSpeedY = 40;
@@ -16,7 +18,9 @@ export class BouncingSprites {
   fallBaseSpeed = 15;
   upwindBaseSpeed = 0.5;
   upwindSpeed = 0.6;
+
   speedRotateFactor = 1;
+  shouldRotate = true;
 
   spritePool: TexturedSpritePool;
   textureAtlas: TextureAtlas;
@@ -60,8 +64,13 @@ export class BouncingSprites {
       sprite.speedX = Math.random() * this.startSpeedX + this.startSpeedBaseX;
       sprite.speedY = Math.random() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
 
-      sprite.rotation = Math.random() * Math.PI * 2;
-      sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
+      if (this.shouldRotate) {
+        sprite.rotation = Math.random() * Math.PI * 2;
+        sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
+      } else {
+        sprite.rotation = 0;
+        sprite.speedRotate = 0;
+      }
 
       this.sprites.push(sprite);
     }
@@ -75,7 +84,9 @@ export class BouncingSprites {
     const halfHeight = this.containerHeight / 2;
 
     this.sprites.forEach((sprite) => {
-      sprite.rotation += sprite.speedRotate * deltaFactor;
+      if (this.shouldRotate) {
+        sprite.rotation += sprite.speedRotate * deltaFactor;
+      }
 
       let {x, y, speedX, speedY} = sprite;
 
