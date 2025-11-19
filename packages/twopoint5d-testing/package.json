@@ -15,7 +15,7 @@
     "test": "pnpm web-test-runner"
   },
   "dependencies": {
-    "@playwright/test": "^1.53.1",
+    "@playwright/test": "^1.56.1",
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
@@ -26,6 +26,6 @@
     "@web/dev-server-esbuild": "^1.0.4",
     "@web/test-runner": "^0.20.2",
     "@web/test-runner-playwright": "^0.11.1",
-    "playwright": "^1.53.1"
+    "playwright": "^1.56.1"
   }
 }
