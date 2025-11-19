@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="apps/handbook/docs/images/twopoint5d-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="apps/lookbook/src/images/twopoint5d-logo-next.svg">
     <img width="350" src="apps/handbook/docs/images/twopoint5d-dark.png">
   </picture>
   <br>
