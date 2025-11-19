@@ -1,4 +1,4 @@
-import type {Object3D} from 'three';
+import type {Object3D} from 'three/webgpu';
 import {TileSet} from '../../texture/TileSet.js';
 import type {IMap2DTileCoords, IMap2DTileDataProvider, IMapTileFactory} from '../types.js';
 import type {TileSprite} from './descriptors.js';

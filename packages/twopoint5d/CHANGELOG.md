@@ -5,6 +5,13 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2025-11-19
+
+- refactor all 'three' imports: use only 'three/webgpu'
+- remove obsolete classes:
+  - `CustomChunksShaderMaterial`
+  - `ShaderLib`
+  - `ShaderTool`
 
 ## [0.13.0] - 2025-11-18
 
