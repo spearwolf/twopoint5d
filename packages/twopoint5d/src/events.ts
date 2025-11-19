@@ -1,4 +1,4 @@
-import type {Camera, WebGPURenderer} from 'three/webgpu';
+import type {Camera} from 'three/webgpu';
 import type {Display} from './display/Display.js';
 import type {DisplayEventProps} from './display/types.js';
 import type {IStage} from './stage/IStage.js';
@@ -90,11 +90,6 @@ export interface StageUpdateFrameProps {
   now: number;
   deltaTime: number;
   frameNo: number;
-}
-
-export interface StageRenderFrameProps {
-  stage: IStage;
-  renderer: WebGPURenderer;
 }
 
 export interface IStageFirstFrame {

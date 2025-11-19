@@ -5,6 +5,11 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - Unreleased
+
+- clean up _events.js_
+  - remove `StageRenderFrameProps` interface
+
 ## [0.14.0] - 2025-11-19
 
 - refactor all 'three' imports: use only 'three/webgpu'
