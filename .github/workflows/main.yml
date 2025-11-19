@@ -32,7 +32,7 @@ jobs:
         with:
           timeout_minutes: 2
           max_attempts: 3
-          run: xvfb-run pnpm run ci
+          command: xvfb-run pnpm run ci
         env:
           NPM_TOKEN: xxx
 
