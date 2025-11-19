@@ -17,7 +17,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.22
+          version: 10.22.0
           run_install: true
         env:
           NPM_TOKEN: xxx
@@ -53,7 +53,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.22
+          version: 10.22.0
           run_install: true
         env:
           NPM_TOKEN: xxx
