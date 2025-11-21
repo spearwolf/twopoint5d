@@ -76,18 +76,13 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const store = new TextureStore().load(assetsUrl('nobingers.json'));
-    store.renderer = renderer;
+    const store = new TextureStore(renderer).load(assetsUrl('nobingers.json'));
 
     console.log('loading textures...', store);
 
-    const [tileSet, texture, frameBasedAnimations] = await store.getOnce('nobingers', [
-      'tileSet',
-      'texture',
-      'frameBasedAnimations',
-    ]);
+    const [atlas, texture, frameBasedAnimations] = await store.get('nobingers', ['atlas', 'texture', 'frameBasedAnimations']);
 
-    const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 500, 75, 7);
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, atlas, 500, 75, 7);
 
     bouncingSprites.startSpeedBaseX = 10;
     bouncingSprites.startSpeedX = 50;

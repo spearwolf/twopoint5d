@@ -82,7 +82,7 @@ textureStore.whenReady().then(() => {
   display.scene.add(texturedSprites.mesh);
 
   // Get texture coordinates for a named frame from the atlas
-  const frameCoords = textureStore.get('my-atlas', 'atlas', (atlas) => {
+  const frameCoords = textureStore.on('my-atlas', 'atlas', (atlas) => {
     const frame = atlas.frame('my_sprite_frame');
     if (frame) {
       const sprite = texturedSprites.add();

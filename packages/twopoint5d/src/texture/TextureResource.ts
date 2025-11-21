@@ -315,6 +315,7 @@ export class TextureResource {
           createEffect(() => {
             if (this.imageCoords && this.tileSetOptions) {
               this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
+              this.atlas = this.tileSet.atlas;
             }
           }, [this.#imageCoords, this.#tileSetOptions]),
         );

@@ -152,8 +152,10 @@ The central asset vault for textures, managing loading, parsing, and caching of 
   - Registers a callback to be invoked when a specific texture resource is available. Returns an unsubscribe function.
 - `whenReady(): Promise<TextureStore>`
   - Returns a Promise that resolves when all initial resources in the store are loaded and ready.
-- `get(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void`
+- `on(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void`
   - Retrieves a texture resource by ID and type, invoking a callback when available. Returns an unsubscribe function.
+- `get(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void`
+  - Retrieves texture resources by ID and type when available. Returns a promise with the resource objects.
 
 ## `TextureFactory`
 Provides methods for creating and updating Three.js textures with various quality and processing options.

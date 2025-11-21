@@ -1,7 +1,7 @@
 {
   "name": "@spearwolf/twopoint5d",
   "description": "Create 2.5D realtime graphics and pixelart with WebGL and three.js",
-  "version": "0.15.0-dev",
+  "version": "0.15.0",
   "keywords": [
     "sprites",
     "particles",

@@ -8,12 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.15.0] - Unreleased
 
 - improve `TextureStore`
-  - load and create _frameBasedAnimations_
-  - add `.dispose()`
-  - add `.getOnce()`
-  - fix _textureFactory_ initialization issue
+  - load and create _frameBasedAnimations_ from _json_
+  - The _textureStore_ now also supports the _atlas_ type when creating a _tileSet_.
+  - The `textureStore.get()` method has been renamed to `.on()` and a new implementation of `.get()` (which replaces the old one) has been added. The new `.get()` method behaves exactly like `.on()` but returns a promise once.
+  - add `.dispose()` method
+  - fix an issue that prevented the _textureFactory_ from being created when the _renderer_ property was set very early on
 - clean up _events.js_
-  - remove `StageRenderFrameProps` interface
+  - remove obsolete `StageRenderFrameProps` interface
 
 ## [0.14.0] - 2025-11-19
 

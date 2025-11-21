@@ -145,7 +145,7 @@ export class TextureStore {
     });
   }
 
-  get(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void {
+  on(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void {
     const isMultipleTypes = Array.isArray(type);
     const values = isMultipleTypes ? new Map<TextureResourceSubType, any>() : undefined;
 
@@ -207,9 +207,9 @@ export class TextureStore {
     return unsubscribe;
   }
 
-  getOnce(id: string, type: TextureResourceSubType | TextureResourceSubType[]): Promise<any> {
+  get(id: string, type: TextureResourceSubType | TextureResourceSubType[]): Promise<any> {
     return new Promise((resolve) => {
-      const unsubscribe = this.get(id, type, (...args) => {
+      const unsubscribe = this.on(id, type, (...args) => {
         resolve(...args);
         unsubscribe();
       });
