@@ -3,47 +3,7 @@ import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
-import type {TileSetOptions} from './TileSet.js';
-
-interface FrameBasedAnimationsBaseData {
-  duration: number;
-}
-
-export interface FrameBasedAnimationsDataByTileIds extends FrameBasedAnimationsBaseData {
-  tileIds: number[];
-}
-
-export interface FrameBasedAnimationsDataByTileCount extends FrameBasedAnimationsBaseData {
-  firstTileId: number;
-  tileCount: number;
-}
-
-export interface FrameBasedAnimationsDataByAtlas extends FrameBasedAnimationsBaseData {
-  frameNameQuery: string;
-}
-
-// TODO create animation type with raw texture coords as input
-
-export type FrameBasedAnimationsData =
-  | FrameBasedAnimationsDataByTileIds
-  | FrameBasedAnimationsDataByTileCount
-  | FrameBasedAnimationsDataByAtlas;
-
-export type FrameBasedAnimationsDataMap = Record<string, FrameBasedAnimationsData>;
-
-export interface TextureStoreItem {
-  imageUrl?: string;
-  overrideImageUrl?: string;
-  atlasUrl?: string;
-  tileSet?: TileSetOptions;
-  texture?: TextureOptionClasses[];
-  frameBasedAnimations?: FrameBasedAnimationsDataMap;
-}
-
-export interface TextureStoreData {
-  defaultTextureClasses: TextureOptionClasses[];
-  items: Record<string, TextureStoreItem>;
-}
+import type {TextureStoreData} from './types.js';
 
 const OnReady = 'ready';
 const OnRendererChanged = 'rendererChanged';
@@ -174,7 +134,6 @@ export class TextureStore {
       if (resource) {
         this.#resources.set(id, resource);
         on(this, resource);
-        // TODO on delete resource: off(resource)
         updatedResources.push(resource);
       }
     }

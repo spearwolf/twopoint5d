@@ -6,8 +6,8 @@ import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
-import type {FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './TextureStore.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
+import type {FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './types.ts';
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
 export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture' | 'frameBasedAnimations';
@@ -305,12 +305,7 @@ export class TextureResource {
           }
 
           return () => {
-            // TODO test
-            if (texture) {
-              // eslint-disable-next-line no-console
-              console.debug('dispose texture', texture);
-              texture.dispose();
-            }
+            texture?.dispose();
           };
         }, [this.#textureFactory, this.#imageUrl]),
       );
