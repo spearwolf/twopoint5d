@@ -36,6 +36,7 @@
         "TextureCoords",
         "TextureFactory",
         "TextureImageLoader",
+        "TextureStore",
         "TileSet",
         "TileSetLoader",
         "PowerOf2ImageLoader"

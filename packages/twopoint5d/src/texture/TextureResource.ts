@@ -1,14 +1,16 @@
-import {emit, eventize, retain} from '@spearwolf/eventize';
-import {batch, createEffect, createSignal, Signal, touch} from '@spearwolf/signalize';
+import {emit, eventize, off, once, retain} from '@spearwolf/eventize';
+import {batch, createEffect, createSignal, Effect, Signal, SignalGroup, touch} from '@spearwolf/signalize';
 import {ImageLoader, WebGPURenderer, type Texture} from 'three/webgpu';
+import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
+import type {FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './TextureStore.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
-export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture';
+export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture' | 'frameBasedAnimations';
 
 const cmpTexClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
   if (a === b) {
@@ -47,6 +49,8 @@ const cmpTileSetOptions = (a: TileSetOptions | undefined, b: TileSetOptions | un
   return false;
 };
 
+const OnDispose = 'dispose';
+
 export class TextureResource {
   static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): TextureResource {
     const resource = new TextureResource(id, 'image');
@@ -64,15 +68,18 @@ export class TextureResource {
     imageUrl: string,
     tileSetOptions: TileSetOptions,
     textureClasses?: TextureOptionClasses[],
+    frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): TextureResource {
     const resource = new TextureResource(id, 'tileset');
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.#tileSetOptions = createSignal(tileSetOptions, {compare: cmpTileSetOptions});
-      resource.#tileSet = createSignal();
-      resource.#atlas = createSignal();
+      resource.#tileSetOptions = createSignal(tileSetOptions, {compare: cmpTileSetOptions, attach: resource});
+      resource.#tileSet = createSignal(undefined, {attach: resource});
+      resource.#atlas = createSignal(undefined, {attach: resource});
       resource.textureClasses = textureClasses?.splice(0);
+      resource.#frameBasedAnimations = createSignal(undefined, {attach: resource});
+      resource.#frameBasedAnimationsData = createSignal(frameBasedAnimations, {attach: resource});
     });
 
     return resource;
@@ -87,10 +94,10 @@ export class TextureResource {
     const resource = new TextureResource(id, 'atlas');
 
     batch(() => {
-      resource.#atlasUrl = createSignal(atlasUrl);
-      resource.#atlasJson = createSignal();
-      resource.#atlas = createSignal();
-      resource.#overrideImageUrl = createSignal(overrideImageUrl);
+      resource.#atlasUrl = createSignal(atlasUrl, {attach: resource});
+      resource.#atlasJson = createSignal(undefined, {attach: resource});
+      resource.#atlas = createSignal(undefined, {attach: resource});
+      resource.#overrideImageUrl = createSignal(overrideImageUrl, {attach: resource});
       resource.textureClasses = textureClasses?.splice(0);
     });
 
@@ -103,14 +110,16 @@ export class TextureResource {
   #atlas?: Signal<TextureAtlas | undefined>;
   #tileSetOptions?: Signal<TileSetOptions | undefined>;
   #tileSet?: Signal<TileSet | undefined>;
+  #frameBasedAnimations?: Signal<FrameBasedAnimations | undefined>;
+  #frameBasedAnimationsData?: Signal<FrameBasedAnimationsDataMap | undefined>;
 
-  #textureClasses: Signal<TextureOptionClasses[] | undefined> = createSignal(undefined, {compare: cmpTexClasses});
-  #imageUrl = createSignal<string | undefined>();
-  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpTexCoords});
+  #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
+  #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
+  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpTexCoords, attach: this});
 
-  #textureFactory = createSignal<TextureFactory | undefined>();
-  #texture = createSignal<Texture | undefined>();
-  #renderer = createSignal<WebGPURenderer | undefined>();
+  #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
+  #texture = createSignal<Texture | undefined>(undefined, {attach: this});
+  #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
 
   readonly id: string;
   readonly type: TextureResourceType;
@@ -181,6 +190,22 @@ export class TextureResource {
     this.#tileSet?.set(value);
   }
 
+  get frameBasedAnimations(): FrameBasedAnimations | undefined {
+    return this.#frameBasedAnimations?.value;
+  }
+
+  set frameBasedAnimations(value: FrameBasedAnimations | undefined) {
+    this.#frameBasedAnimations?.set(value);
+  }
+
+  get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
+    return this.#frameBasedAnimationsData?.value;
+  }
+
+  set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
+    this.#frameBasedAnimationsData?.set(value);
+  }
+
   get textureClasses(): TextureOptionClasses[] | undefined {
     return this.#textureClasses.value;
   }
@@ -224,7 +249,13 @@ export class TextureResource {
     this.id = id;
     this.type = type;
 
-    retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture']);
+    retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture', 'frameBasedAnimations']);
+  }
+
+  dispose() {
+    emit(this, OnDispose);
+    SignalGroup.get(this).destroy();
+    off(this);
   }
 
   load(): TextureResource {
@@ -243,78 +274,127 @@ export class TextureResource {
         emit(this, 'tileSet', value);
       });
 
+      this.#frameBasedAnimations?.onChange((value) => {
+        emit(this, 'frameBasedAnimations', value);
+      });
+
       this.#texture.onChange((value) => {
         emit(this, 'texture', value);
       });
 
-      createEffect(() => {
-        let texture: Texture | undefined;
+      const unsubscribeOnDispose = (effect: Effect) => {
+        once(this, OnDispose, () => {
+          effect.destroy();
+        });
+      };
 
-        if (this.textureFactory && this.imageUrl) {
-          new ImageLoader().loadAsync(this.imageUrl).then((image) => {
-            batch(() => {
-              this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
+      unsubscribeOnDispose(
+        createEffect(() => {
+          let texture: Texture | undefined;
 
-              texture = this.textureFactory.create(image);
-              texture.name = this.id;
-              this.texture = texture;
+          if (this.textureFactory && this.imageUrl) {
+            new ImageLoader().loadAsync(this.imageUrl).then((image) => {
+              batch(() => {
+                this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
+
+                texture = this.textureFactory.create(image);
+                texture.name = this.id;
+                this.texture = texture;
+              });
             });
-          });
-        }
-
-        return () => {
-          // TODO test
-          if (texture) {
-            // eslint-disable-next-line no-console
-            console.log('dispose texture', texture);
-            texture.dispose();
           }
-        };
-      }, [this.#textureFactory, this.#imageUrl]);
+
+          return () => {
+            // TODO test
+            if (texture) {
+              // eslint-disable-next-line no-console
+              console.debug('dispose texture', texture);
+              texture.dispose();
+            }
+          };
+        }, [this.#textureFactory, this.#imageUrl]),
+      );
 
       if (this.tileSetOptions) {
-        createEffect(() => {
-          if (this.imageCoords && this.tileSetOptions) {
-            this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
-          }
-        }, [this.#imageCoords, this.#tileSetOptions]);
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.imageCoords && this.tileSetOptions) {
+              this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
+            }
+          }, [this.#imageCoords, this.#tileSetOptions]),
+        );
+
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.tileSet && this.frameBasedAnimationsData) {
+              this.frameBasedAnimations = new FrameBasedAnimations();
+              for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
+                if ('tileIds' in data) {
+                  this.frameBasedAnimations.add(name, data.duration, this.tileSet, data.tileIds);
+                } else {
+                  const _data = data as FrameBasedAnimationsDataByTileCount;
+                  this.frameBasedAnimations.add(name, data.duration, this.tileSet, _data.firstTileId, _data.tileCount);
+                }
+              }
+            }
+          }, [this.#tileSet, this.#frameBasedAnimationsData]),
+        );
       }
 
       if (this.atlasUrl) {
-        createEffect(() => {
-          if (this.atlasUrl) {
-            fetch(this.atlasUrl)
-              .then((response) => response.json())
-              .then((atlasJson) => {
-                this.atlasJson = atlasJson;
-              });
-          }
-        }, [this.#atlasUrl]);
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.atlasUrl) {
+              fetch(this.atlasUrl)
+                .then((response) => response.json())
+                .then((atlasJson) => {
+                  this.atlasJson = atlasJson;
+                });
+            }
+          }, [this.#atlasUrl]),
+        );
 
-        createEffect(() => {
-          if (this.atlasJson) {
-            this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
-          }
-        }, [this.#atlasJson, this.#overrideImageUrl]);
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.atlasJson) {
+              this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
+            }
+          }, [this.#atlasJson, this.#overrideImageUrl]),
+        );
 
-        createEffect(() => {
-          if (this.atlasJson && this.imageCoords) {
-            const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
-            this.atlas = atlas;
-          }
-        }, [this.#atlasJson, this.#imageCoords]);
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.atlasJson && this.imageCoords) {
+              const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
+              this.atlas = atlas;
+            }
+          }, [this.#atlasJson, this.#imageCoords]),
+        );
+
+        unsubscribeOnDispose(
+          createEffect(() => {
+            if (this.atlas && this.frameBasedAnimationsData) {
+              this.frameBasedAnimations = new FrameBasedAnimations();
+              for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
+                if ('frameNameQuery' in data) {
+                  this.frameBasedAnimations.add(name, data.duration, this.atlas, data.frameNameQuery);
+                }
+              }
+            }
+          }, [this.#atlas, this.#frameBasedAnimationsData]),
+        );
 
         touch(this.#atlasUrl);
       }
 
-      // this effect is dynamic and comes last,
-      // because it can trigger the others and it is quite possible
-      // that the renderer has already been set
-      createEffect(() => {
-        if (this.renderer) {
-          this.textureFactory = new TextureFactory(this.#renderer.get(), this.#textureClasses.get());
-        }
-      });
+      unsubscribeOnDispose(
+        createEffect(() => {
+          const renderer = this.#renderer.get();
+          if (renderer) {
+            this.textureFactory = new TextureFactory(renderer, this.#textureClasses.get());
+          }
+        }),
+      );
     }
     return this;
   }

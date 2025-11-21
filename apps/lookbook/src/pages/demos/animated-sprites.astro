@@ -54,10 +54,9 @@ import {description, showSource, title} from './_animated-sprites.json';
     AnimatedSprites,
     AnimatedSpritesGeometry,
     AnimatedSpritesMaterial,
-    FrameBasedAnimations,
     OnDisplayInit,
     OnDisplayRenderFrame,
-    TileSetLoader,
+    TextureStore,
   } from '@spearwolf/twopoint5d';
   import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -69,7 +68,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     document.querySelector('.spriteCount').textContent = count.toString();
   };
 
-  on(demo, OnDisplayInit, async ({scene, camera}) => {
+  on(demo, OnDisplayInit, async ({scene, camera, renderer}) => {
     camera.position.z = 60;
 
     const CAPACITY = 3000;
@@ -77,23 +76,23 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(
-      assetsUrl('nobinger-anim-sheet.png'),
-      {
-        tileWidth: 64,
-        tileHeight: 64,
-        margin: 1,
-      },
-      ['srgb'],
-    );
+    const store = new TextureStore().load(assetsUrl('nobingers.json'));
+    store.renderer = renderer;
 
-    const anims = new FrameBasedAnimations();
-    const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
+    console.log('loading textures...', store);
+
+    const [tileSet, texture, frameBasedAnimations] = await store.getOnce('nobingers', [
+      'tileSet',
+      'texture',
+      'frameBasedAnimations',
+    ]);
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, tileSet.atlas, 500, 75, 7);
 
     bouncingSprites.startSpeedBaseX = 10;
     bouncingSprites.startSpeedX = 50;
+
+    const animId = frameBasedAnimations.animId('anim0');
 
     bouncingSprites.createSprites(INITIAL_SPRITE_COUNT, animId);
 
@@ -102,7 +101,7 @@ import {description, showSource, title} from './_animated-sprites.json';
     const material = new AnimatedSpritesMaterial();
 
     material.colorMap = texture;
-    material.animsMap = anims.bakeDataTexture();
+    material.animsMap = frameBasedAnimations.bakeDataTexture();
 
     material.renderAsBillboards = false;
     material.depthTest = false;

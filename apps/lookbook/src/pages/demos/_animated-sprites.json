@@ -7,7 +7,7 @@
     "AnimatedSpritesGeometry",
     "AnimatedSpritesMaterial",
     "FrameBasedAnimations",
-    "TileSetLoader",
+    "TextureStore",
     "tilesets",
     "textures",
     "vanilla"

@@ -1,9 +1,35 @@
-import {emit, on, once, onceAsync, retain} from '@spearwolf/eventize';
-import {batch, createSignal} from '@spearwolf/signalize';
+import {emit, off, on, once, onceAsync, retain} from '@spearwolf/eventize';
+import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSetOptions} from './TileSet.js';
+
+interface FrameBasedAnimationsBaseData {
+  duration: number;
+}
+
+export interface FrameBasedAnimationsDataByTileIds extends FrameBasedAnimationsBaseData {
+  tileIds: number[];
+}
+
+export interface FrameBasedAnimationsDataByTileCount extends FrameBasedAnimationsBaseData {
+  firstTileId: number;
+  tileCount: number;
+}
+
+export interface FrameBasedAnimationsDataByAtlas extends FrameBasedAnimationsBaseData {
+  frameNameQuery: string;
+}
+
+// TODO create animation type with raw texture coords as input
+
+export type FrameBasedAnimationsData =
+  | FrameBasedAnimationsDataByTileIds
+  | FrameBasedAnimationsDataByTileCount
+  | FrameBasedAnimationsDataByAtlas;
+
+export type FrameBasedAnimationsDataMap = Record<string, FrameBasedAnimationsData>;
 
 export interface TextureStoreItem {
   imageUrl?: string;
@@ -11,6 +37,7 @@ export interface TextureStoreItem {
   atlasUrl?: string;
   tileSet?: TileSetOptions;
   texture?: TextureOptionClasses[];
+  frameBasedAnimations?: FrameBasedAnimationsDataMap;
 }
 
 export interface TextureStoreData {
@@ -21,6 +48,7 @@ export interface TextureStoreData {
 const OnReady = 'ready';
 const OnRendererChanged = 'rendererChanged';
 const OnResource = 'resource';
+const OnDispose = 'dispose';
 
 const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): TextureOptionClasses[] | undefined => {
   const all = classes?.filter((c) => c != null);
@@ -37,7 +65,7 @@ export class TextureStore {
 
   defaultTextureClasses: TextureOptionClasses[] = [];
 
-  #renderer = createSignal<WebGPURenderer | undefined>();
+  #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
 
   get renderer(): WebGPURenderer | undefined {
     return this.#renderer.value;
@@ -49,12 +77,14 @@ export class TextureStore {
 
   #resources = new Map<string, TextureResource>();
 
-  constructor() {
+  constructor(renderer?: WebGPURenderer) {
     retain(this, [OnReady, OnRendererChanged]);
 
     this.#renderer.onChange((renderer) => {
       emit(this, OnRendererChanged, renderer);
     });
+
+    this.renderer = renderer;
   }
 
   onResource(id: string, callback: (resource: TextureResource) => void): () => void {
@@ -81,6 +111,12 @@ export class TextureStore {
     return this;
   }
 
+  /**
+   * Parse texture store data and update resources.
+   *
+   * This method can be called multiple times. Resources that were previously loaded
+   * and now receive new specifications will be updated accordingly.
+   */
   parse(data: TextureStoreData) {
     if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
       this.defaultTextureClasses = data.defaultTextureClasses.splice(0);
@@ -105,7 +141,7 @@ export class TextureStore {
             resource.textureClasses = textureClasses;
           });
         } else {
-          resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses);
+          resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
         }
       } else if (item.atlasUrl) {
         if (resource) {
@@ -171,6 +207,8 @@ export class TextureStore {
       clearSubTypeSubscriptions();
     };
 
+    once(this, OnDispose, unsubscribe);
+
     once(this, OnReady, () => {
       if (isActiveSubscription) {
         unsubscribeFromResource = this.onResource(id, (resource) => {
@@ -208,5 +246,28 @@ export class TextureStore {
     });
 
     return unsubscribe;
+  }
+
+  getOnce(id: string, type: TextureResourceSubType | TextureResourceSubType[]): Promise<any> {
+    return new Promise((resolve) => {
+      const unsubscribe = this.get(id, type, (...args) => {
+        resolve(...args);
+        unsubscribe();
+      });
+    });
+  }
+
+  dispose() {
+    emit(this, OnDispose);
+
+    this.renderer = undefined;
+    SignalGroup.get(this).destroy();
+
+    this.#resources.forEach((resource) => {
+      resource.dispose();
+    });
+    this.#resources.clear();
+
+    off(this);
   }
 }

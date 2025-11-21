@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - Unreleased
 
+- improve `TextureStore`
+  - load and create _frameBasedAnimations_
+  - add `.dispose()`
+  - add `.getOnce()`
+  - fix _textureFactory_ initialization issue
 - clean up _events.js_
   - remove `StageRenderFrameProps` interface
 
