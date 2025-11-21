@@ -7,6 +7,7 @@ export default defineConfig({
   base: '/lookbook',
   server: {
     host: true,
+    allowedHosts: true,
   },
   integrations: [react(), tailwind()],
 });
