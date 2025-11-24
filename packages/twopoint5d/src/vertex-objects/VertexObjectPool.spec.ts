@@ -295,4 +295,153 @@ describe('VertexObjectPool', () => {
       expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
     });
   });
+
+  describe('resize()', () => {
+    test('resize to larger capacity preserves existing data', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const vo0 = pool.createVO();
+      vo0.setBar([1, 2, 3, 4]);
+
+      const vo1 = pool.createVO();
+      vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      expect(pool.capacity).toBe(10);
+      expect(pool.usedCount).toBe(2);
+
+      pool.resize(50);
+
+      expect(pool.capacity).toBe(50);
+      expect(pool.usedCount).toBe(2);
+      expect(pool.availableCount).toBe(48);
+
+      // Verify data is preserved
+      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      // Verify we can create more VOs
+      const vo2 = pool.createVO();
+      vo2.setBar([5, 6, 7, 8]);
+      expect(pool.usedCount).toBe(3);
+      expect(Array.from(pool.getVO(2).getBar())).toEqual([5, 6, 7, 8]);
+    });
+
+    test('resize to smaller capacity preserves data within new capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
+
+      const vo0 = pool.createVO();
+      vo0.setBar([1, 2, 3, 4]);
+
+      const vo1 = pool.createVO();
+      vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      const vo2 = pool.createVO();
+      vo2.setBar([5, 6, 7, 8]);
+
+      expect(pool.capacity).toBe(100);
+      expect(pool.usedCount).toBe(3);
+
+      pool.resize(2);
+
+      expect(pool.capacity).toBe(2);
+      expect(pool.usedCount).toBe(2);
+      expect(pool.availableCount).toBe(0);
+
+      // Verify first two VOs are preserved
+      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      // Third VO should not be accessible
+      expect(pool.getVO(2)).toBeUndefined();
+
+      // Cannot create more VOs when at capacity
+      const vo3 = pool.createVO();
+      expect(vo3).toBeUndefined();
+    });
+
+    test('resize to same capacity is a no-op', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const vo0 = pool.createVO();
+      vo0.setBar([1, 2, 3, 4]);
+
+      const oldBuffer = pool.buffer;
+
+      pool.resize(10);
+
+      expect(pool.capacity).toBe(10);
+      expect(pool.usedCount).toBe(1);
+      expect(pool.buffer).toBe(oldBuffer); // Buffer should not change
+      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+    });
+
+    test('resize to 0 capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      pool.createVO().setBar([1, 2, 3, 4]);
+      pool.createVO().setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      pool.resize(0);
+
+      expect(pool.capacity).toBe(0);
+      expect(pool.usedCount).toBe(0);
+      expect(pool.availableCount).toBe(0);
+
+      const vo = pool.createVO();
+      expect(vo).toBeUndefined();
+    });
+
+    test('resize preserves VO references in voIndex', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const vo0 = pool.createVO();
+      vo0.setBar([1, 2, 3, 4]);
+
+      const vo1 = pool.createVO();
+      vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+
+      pool.resize(50);
+
+      // The same VO instances should still be accessible
+      expect(pool.getVO(0)).toBe(vo0);
+      expect(pool.getVO(1)).toBe(vo1);
+
+      // Their data should be intact
+      expect(Array.from(vo0.getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(vo1.getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+    });
+
+    test('resize updates buffer reference for existing VOs', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const vo0 = pool.createVO();
+      vo0.setBar([1, 2, 3, 4]);
+
+      const oldBuffer = pool.buffer;
+
+      pool.resize(50);
+
+      // Buffer should be new
+      expect(pool.buffer).not.toBe(oldBuffer);
+
+      // VO should be accessible and functional
+      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+
+      // Modifying the VO should work with the new buffer
+      vo0.setBar([10, 20, 30, 40]);
+      expect(Array.from(pool.getVO(0).getBar())).toEqual([10, 20, 30, 40]);
+    });
+
+    test('resize throws error for negative capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      expect(() => pool.resize(-1)).toThrow('Capacity must be a non-negative integer');
+    });
+
+    test('resize throws error for non-integer capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      expect(() => pool.resize(10.5)).toThrow('Capacity must be a non-negative integer');
+    });
+  });
 });
