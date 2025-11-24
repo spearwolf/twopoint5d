@@ -5,13 +5,18 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.16.0] - 2025-11-24
 
 - add `resize(capacity: number): void` method to `VertexObjectPool`
   - enables dynamic capacity adjustment while preserving existing vertex objects
   - validates input: rejects negative or non-integer capacities
   - updates internal buffer references in existing vertex objects
   - adjusts `usedCount` to not exceed the new capacity
+- improve `TextureSprites`and `AnimatedSprites`
+  - enhance typscript definitions for better type safety and developer experience
+  - add `.dispose()` method to free up resources when no longer needed
+- enhance `TextureStore` error handling
+  - improve error messages for better debugging and user feedback
 
 ## [0.15.0] - 2025-11-21
 

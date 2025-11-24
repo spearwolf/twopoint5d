@@ -293,15 +293,21 @@ export class TextureResource {
           let texture: Texture | undefined;
 
           if (this.textureFactory && this.imageUrl) {
-            new ImageLoader().loadAsync(this.imageUrl).then((image) => {
-              batch(() => {
-                this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
+            new ImageLoader()
+              .loadAsync(this.imageUrl)
+              .then((image) => {
+                batch(() => {
+                  this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
 
-                texture = this.textureFactory.create(image);
-                texture.name = this.id;
-                this.texture = texture;
+                  texture = this.textureFactory.create(image);
+                  texture.name = this.id;
+                  this.texture = texture;
+                });
+              })
+              .catch((error) => {
+                // eslint-disable-next-line no-console
+                console.error(`[TextureStore] Failed to load image from ${this.imageUrl}`, error);
               });
-            });
           }
 
           return () => {

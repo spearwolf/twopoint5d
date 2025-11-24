@@ -11,8 +11,8 @@ import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '.
 const isTexture = (value: Texture | object | undefined): value is Texture => Boolean((value as Texture)?.isTexture);
 
 export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
-  declare geometry: TexturedSpritesGeometry;
-  declare material: TexturedSpritesMaterial;
+  declare geometry: TexturedSpritesGeometry | undefined;
+  declare material: TexturedSpritesMaterial | undefined;
 
   get spritePool(): TexturedSpritePool {
     return this.geometry.instancedPool;
@@ -48,5 +48,12 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     );
 
     this.name = 'twopoint5d.TexturedSprites';
+  }
+
+  dispose(): void {
+    this.geometry?.dispose();
+    this.geometry = undefined;
+    this.material?.dispose();
+    this.material = undefined;
   }
 }

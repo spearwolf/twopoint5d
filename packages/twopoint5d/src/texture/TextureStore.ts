@@ -64,11 +64,20 @@ export class TextureStore {
   }
 
   load(url: string | URL) {
-    fetch(url).then(async (response) => {
-      const data: TextureStoreData = await response.json();
-      this.parse(data);
-    });
-    // TODO handle fetch errors
+    fetch(url)
+      .then(async (response) => {
+        const data: TextureStoreData = await response.json();
+        try {
+          this.parse(data);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(`[TextureStore] Failed to parse data from ${url}:`, error);
+        }
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error(`[TextureStore] Failed to load from ${url}:`, error);
+      });
     return this;
   }
 
