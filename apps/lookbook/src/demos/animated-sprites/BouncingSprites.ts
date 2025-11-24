@@ -1,4 +1,4 @@
-import type {AnimatedSprite, TextureAtlas, VertexObjectPool} from '@spearwolf/twopoint5d';
+import type {AnimatedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
 
 interface Sprite extends AnimatedSprite {
   speedX: number;
@@ -17,7 +17,6 @@ export class BouncingSprites {
   speedRotateFactor = -1.2;
 
   spritePool: VertexObjectPool<AnimatedSprite>;
-  textureAtlas: TextureAtlas;
 
   containerWidth: number;
   containerHeight: number;
@@ -27,15 +26,8 @@ export class BouncingSprites {
 
   sprites: Sprite[] = [];
 
-  constructor(
-    spritePool: VertexObjectPool<AnimatedSprite>,
-    textureAtlas: TextureAtlas,
-    width = 600,
-    height = 300,
-    spriteSize = 10,
-  ) {
+  constructor(spritePool: VertexObjectPool<AnimatedSprite>, width = 600, height = 300, spriteSize = 10) {
     this.spritePool = spritePool;
-    this.textureAtlas = textureAtlas;
     this.containerWidth = width;
     this.containerHeight = height;
     this.spriteSize = spriteSize;
