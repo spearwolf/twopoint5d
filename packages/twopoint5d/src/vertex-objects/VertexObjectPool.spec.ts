@@ -431,5 +431,17 @@ describe('VertexObjectPool', () => {
       vo0.setBar([10, 20, 30, 40]);
       expect(Array.from(pool.getVO(0).getBar())).toEqual([10, 20, 30, 40]);
     });
+
+    test('resize throws error for negative capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      expect(() => pool.resize(-1)).toThrow('Capacity must be a non-negative integer');
+    });
+
+    test('resize throws error for non-integer capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      expect(() => pool.resize(10.5)).toThrow('Capacity must be a non-negative integer');
+    });
   });
 });

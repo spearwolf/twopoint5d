@@ -3,6 +3,7 @@ import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {createVertexObject} from './createVertexObject.js';
+import {voBuffer} from './constants.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 export class VertexObjectPool<VOType> extends VOBufferPool {
@@ -23,6 +24,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * The usedCount will be adjusted to not exceed the new capacity.
    */
   resize(capacity: number): void {
+    if (capacity < 0 || !Number.isInteger(capacity)) {
+      throw new Error('Capacity must be a non-negative integer');
+    }
+
     if (capacity === this.capacity) return;
 
     // Create a new buffer with the new capacity
@@ -44,11 +49,13 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     // Update the buffer reference
     this.buffer = newBuffer;
 
-    // Resize the voIndex array
+    // Resize the voIndex array and update buffer references in existing VOs
     const newVoIndex: Array<VOType & VO> = new Array(capacity);
     for (let i = 0; i < copyCount; i++) {
       const vo = this.#voIndex[i];
       if (vo != null) {
+        // Update the VO's internal buffer reference to point to the new buffer
+        vo[voBuffer] = newBuffer;
         newVoIndex[i] = vo;
       }
     }
