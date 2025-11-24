@@ -68,6 +68,7 @@ export class TextureStore {
       const data: TextureStoreData = await response.json();
       this.parse(data);
     });
+    // TODO handle fetch errors
     return this;
   }
 

@@ -15,6 +15,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     this.#voIndex = new Array(this.capacity);
   }
 
+  // TODO add resize(capacity: number): void method
+
   createVO(): VOType & VO {
     if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;

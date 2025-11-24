@@ -9,4 +9,6 @@ export class AnimatedSprites extends VertexObjects<AnimatedSpritesGeometry> {
 
     this.name = 'twopoint5d.AnimatedSprites';
   }
+
+  // TODO add dispose method to clean up resources (eg. animsMap from material and buffers from geometry)
 }
