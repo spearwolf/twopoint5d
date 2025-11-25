@@ -5,6 +5,14 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- add `frameRate` (fps) option as alternative to `duration` in `FrameBasedAnimations`
+  - the `add()` method now accepts either a `duration` number or an `AnimationTimingOptions` object with `frameRate` or `duration`
+  - when using `frameRate`, the duration is automatically calculated as `frameCount / frameRate`
+  - added validation to ensure `frameRate` is greater than 0
+  - updated `TextureResource` to support `frameRate` in declarative animation configuration
+
 ## [0.16.0] - 2025-11-24
 
 - add `resize(capacity: number): void` method to `VertexObjectPool`
