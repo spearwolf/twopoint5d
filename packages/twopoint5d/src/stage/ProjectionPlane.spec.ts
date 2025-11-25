@@ -51,16 +51,18 @@ describe('ProjectionPlane', () => {
       expect(p.equals(new Vector3(0, 0, 0))).toBeTruthy();
     });
 
-    it('custom plane with offset (constant = 5)', () => {
-      // A plane with normal pointing along +z and offset 5 units from origin
+    it('custom plane with offset (constant = -5)', () => {
+      // A plane with normal pointing along +z and constant -5
+      // This means the plane is at z=5 (coplanarPoint returns normal * -constant)
       const customPlane = new THREE_Plane(new Vector3(0, 0, 1), -5);
       const pp = new ProjectionPlane(customPlane, new Vector3(0, 1, 0));
       const origin = pp.getOrigin();
       expect(origin.equals(new Vector3(0, 0, 5))).toBeTruthy();
     });
 
-    it('custom plane with negative offset', () => {
-      // A plane with normal pointing along +y and offset -3 units
+    it('custom plane with positive constant', () => {
+      // A plane with normal pointing along +y and constant 3
+      // This means the plane is at y=-3 (coplanarPoint returns normal * -constant)
       const customPlane = new THREE_Plane(new Vector3(0, 1, 0), 3);
       const pp = new ProjectionPlane(customPlane, new Vector3(0, 0, 1));
       const origin = pp.getOrigin();
