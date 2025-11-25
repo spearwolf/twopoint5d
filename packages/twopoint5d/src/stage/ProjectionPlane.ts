@@ -61,11 +61,8 @@ export class ProjectionPlane {
     return this.getOrigin(target).add(this.plane.normal.clone().multiplyScalar(distanceToPlane));
   }
 
-  // TODO use coplanarPoint()
   getOrigin(target?: Vector3): Vector3 {
-    const {normal, constant} = this.plane;
-    target = target ? target.copy(normal) : normal.clone();
-    return target.multiplyScalar(-constant);
+    return this.plane.coplanarPoint(target ?? new Vector3());
   }
 
   getForward(target?: Vector3): Vector3 {
