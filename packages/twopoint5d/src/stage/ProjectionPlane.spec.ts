@@ -1,4 +1,4 @@
-import {Vector3} from 'three/webgpu';
+import {Plane as THREE_Plane, Vector3} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {ProjectionPlane} from './ProjectionPlane.js';
@@ -37,6 +37,49 @@ describe('ProjectionPlane', () => {
       const xz = ProjectionPlane.get('xz|top-left');
       const p = xz.getOrigin();
       expect(p.equals(new Vector3(0, 0, 0))).toBeTruthy();
+    });
+
+    it('xy|top-left', () => {
+      const xy = ProjectionPlane.get('xy|top-left');
+      const p = xy.getOrigin();
+      expect(p.equals(new Vector3(0, 0, 0))).toBeTruthy();
+    });
+
+    it('xz|bottom-left', () => {
+      const xz = ProjectionPlane.get('xz|bottom-left');
+      const p = xz.getOrigin();
+      expect(p.equals(new Vector3(0, 0, 0))).toBeTruthy();
+    });
+
+    it('custom plane with offset (constant = 5)', () => {
+      // A plane with normal pointing along +z and offset 5 units from origin
+      const customPlane = new THREE_Plane(new Vector3(0, 0, 1), -5);
+      const pp = new ProjectionPlane(customPlane, new Vector3(0, 1, 0));
+      const origin = pp.getOrigin();
+      expect(origin.equals(new Vector3(0, 0, 5))).toBeTruthy();
+    });
+
+    it('custom plane with negative offset', () => {
+      // A plane with normal pointing along +y and offset -3 units
+      const customPlane = new THREE_Plane(new Vector3(0, 1, 0), 3);
+      const pp = new ProjectionPlane(customPlane, new Vector3(0, 0, 1));
+      const origin = pp.getOrigin();
+      expect(origin.equals(new Vector3(0, -3, 0))).toBeTruthy();
+    });
+
+    it('uses target vector when provided', () => {
+      const xy = ProjectionPlane.get('xy|bottom-left');
+      const target = new Vector3(1, 2, 3);
+      const result = xy.getOrigin(target);
+      expect(result).toBe(target);
+      expect(target.equals(new Vector3(0, 0, 0))).toBeTruthy();
+    });
+
+    it('creates new vector when target is not provided', () => {
+      const xy = ProjectionPlane.get('xy|bottom-left');
+      const p1 = xy.getOrigin();
+      const p2 = xy.getOrigin();
+      expect(p1).not.toBe(p2);
     });
   });
 
