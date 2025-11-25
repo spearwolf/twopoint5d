@@ -12,7 +12,7 @@
       },
       "frameBasedAnimations": {
         "anim0": {
-          "duration": 0.66,
+          "frameRate": 12,
           "tileIds": [
             1,
             2,
