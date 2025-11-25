@@ -9,6 +9,7 @@
     "build": "pnpm exec astro build",
     "preview": "pnpm exec astro preview",
     "update": "pnpm dlx npm-check --update",
+    "postinstall": "pnpm exec astro telemetry disable",
     "astro:check": "pnpm exec astro check",
     "astro": "pnpm exec astro"
   },
