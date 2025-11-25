@@ -1,4 +1,5 @@
 import { esbuildPlugin } from '@web/dev-server-esbuild';
+import { defaultReporter } from '@web/test-runner';
 import { playwrightLauncher } from '@web/test-runner-playwright';
 
 export default {
@@ -6,6 +7,9 @@ export default {
   // in a monorepo you need to set set the root dir to resolve modules
   rootDir: '../../',
   files: 'test/**/*.test.js',
+  reporters: [
+    defaultReporter({ reportTestResults: true, reportTestProgress: false }),
+  ],
   plugins: [
     esbuildPlugin({ target: 'auto' }),
   ],
