@@ -1,13 +1,28 @@
 import {emit, eventize, off, once, retain} from '@spearwolf/eventize';
 import {batch, createEffect, createSignal, Effect, Signal, SignalGroup, touch} from '@spearwolf/signalize';
 import {ImageLoader, WebGPURenderer, type Texture} from 'three/webgpu';
-import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
-import type {FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './types.ts';
+import type {FrameBasedAnimationsData, FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './types.ts';
+
+/**
+ * Extracts timing options from frame-based animation data.
+ * Returns AnimationTimingOptions object with either duration or frameRate.
+ * @throws Error if neither duration nor frameRate is provided
+ */
+const getTimingOptions = (data: FrameBasedAnimationsData): AnimationTimingOptions => {
+  if ('frameRate' in data && data.frameRate !== undefined) {
+    return {frameRate: data.frameRate};
+  }
+  if ('duration' in data && data.duration !== undefined) {
+    return {duration: data.duration};
+  }
+  throw new Error('Either duration or frameRate must be provided in animation data');
+};
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
 export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture' | 'frameBasedAnimations';
@@ -331,11 +346,12 @@ export class TextureResource {
             if (this.tileSet && this.frameBasedAnimationsData) {
               this.frameBasedAnimations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
+                const timing = getTimingOptions(data);
                 if ('tileIds' in data) {
-                  this.frameBasedAnimations.add(name, data.duration, this.tileSet, data.tileIds);
+                  this.frameBasedAnimations.add(name, timing, this.tileSet, data.tileIds);
                 } else {
                   const _data = data as FrameBasedAnimationsDataByTileCount;
-                  this.frameBasedAnimations.add(name, data.duration, this.tileSet, _data.firstTileId, _data.tileCount);
+                  this.frameBasedAnimations.add(name, timing, this.tileSet, _data.firstTileId, _data.tileCount);
                 }
               }
             }
@@ -379,7 +395,8 @@ export class TextureResource {
               this.frameBasedAnimations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
                 if ('frameNameQuery' in data) {
-                  this.frameBasedAnimations.add(name, data.duration, this.atlas, data.frameNameQuery);
+                  const timing = getTimingOptions(data);
+                  this.frameBasedAnimations.add(name, timing, this.atlas, data.frameNameQuery);
                 }
               }
             }

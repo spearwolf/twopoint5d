@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- add `frameRate` (fps) option as alternative to `duration` in `FrameBasedAnimations`
+  - the `add()` method now accepts either a `duration` number or an `AnimationTimingOptions` object with `frameRate` or `duration`
+  - when using `frameRate`, the duration is automatically calculated as `frameCount / frameRate`
+  - added validation to ensure `frameRate` is greater than 0
+  - updated `TextureResource` to support `frameRate` in declarative animation configuration
 - add `anchorPosition` support to `fitIntoRectangle`
   - new types: `AnchorPosition`, `AnchorPositionX`, `AnchorPositionY`
   - new function: `parseAnchorPosition()` - parses anchor position strings into [y, x] components
