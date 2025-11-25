@@ -5,6 +5,14 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- add `anchorPosition` support to `fitIntoRectangle`
+  - new types: `AnchorPosition`, `AnchorPositionX`, `AnchorPositionY`
+  - new function: `parseAnchorPosition()` - parses anchor position strings into [y, x] components
+  - new function: `calculateAnchorOffset()` - computes view offset based on container/view size difference and anchor position
+  - updated `FitIntoRectangleSpecs` type to include optional `anchorPosition` property
+
 ## [0.16.0] - 2025-11-24
 
 - add `resize(capacity: number): void` method to `VertexObjectPool`
