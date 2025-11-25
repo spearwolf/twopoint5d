@@ -155,6 +155,31 @@ export function calculateAnchorOffset(
   return target;
 }
 
+/**
+ * Calculates the view dimensions that fit into a container rectangle based on the given specifications.
+ *
+ * The function supports several fit modes:
+ * - `pixelZoom`: Scales the container by a fixed factor
+ * - `fill`: Uses the container dimensions as-is
+ * - `contain`: Fits the view inside the container, preserving aspect ratio
+ * - `cover`: Covers the container with the view, preserving aspect ratio
+ *
+ * To position the calculated view within the container using the `anchorPosition` property,
+ * use the `calculateAnchorOffset` function with the result:
+ *
+ * @example
+ * ```ts
+ * const rect = new Vector2(800, 600);
+ * const specs = { fit: 'contain', width: 640, height: 480, anchorPosition: 'top center' };
+ * const view = fitIntoRectangle(rect, specs);
+ * const offset = calculateAnchorOffset(rect, view, specs.anchorPosition);
+ * ```
+ *
+ * @param rect - The container dimensions as a Vector2
+ * @param specs - The fit specifications
+ * @param target - Optional target Vector2 to store the result
+ * @returns The calculated view dimensions as a Vector2
+ */
 export function fitIntoRectangle(rect: Vector2, specs: FitIntoRectangleSpecs, target: Vector2 = new Vector2()): Vector2 {
   if ('pixelZoom' in specs) {
     // ---------------------------------------------------------------
