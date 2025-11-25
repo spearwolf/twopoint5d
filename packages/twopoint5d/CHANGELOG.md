@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - when using `frameRate`, the duration is automatically calculated as `frameCount / frameRate`
   - added validation to ensure `frameRate` is greater than 0
   - updated `TextureResource` to support `frameRate` in declarative animation configuration
+- add `anchorPosition` support to `fitIntoRectangle`
+  - new types: `AnchorPosition`, `AnchorPositionX`, `AnchorPositionY`
+  - new function: `parseAnchorPosition()` - parses anchor position strings into [y, x] components
+  - new function: `calculateAnchorOffset()` - computes view offset based on container/view size difference and anchor position
+  - updated `FitIntoRectangleSpecs` type to include optional `anchorPosition` property
 
 ## [0.16.0] - 2025-11-24
 
