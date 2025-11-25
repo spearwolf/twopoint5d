@@ -1,8 +1,9 @@
-name: Build, test and deploy
+name: Build, Lint and Test
 
 on:
   push:
-    branches: ['main']
+    paths-ignore:
+      - '**.md'
 
 jobs:
   ci:
@@ -44,26 +45,3 @@ jobs:
           path: packages/twopoint5d-testing/test-results
           retention-days: 3
 
-  deploy:
-    name: Deploy packages
-    needs: ci
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.22.0
-          run_install: true
-        env:
-          NPM_TOKEN: xxx
-
-      - run: pnpm run publishNpmPkg
-        name: Publish npm packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
