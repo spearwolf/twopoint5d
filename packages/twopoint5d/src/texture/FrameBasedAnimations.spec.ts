@@ -345,4 +345,156 @@ describe('FrameBasedAnimations', () => {
       expect(dataTexture.image.data).toBeInstanceOf(Float32Array);
     });
   });
+
+  describe('frameRate support', () => {
+    test('add animation with frameRate option', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [
+        new TextureCoords(0, 0, 32, 32),
+        new TextureCoords(32, 0, 32, 32),
+        new TextureCoords(64, 0, 32, 32),
+        new TextureCoords(96, 0, 32, 32),
+      ];
+
+      // 4 frames at 4 fps = 1 second duration
+      const id = animations.add('walk', {frameRate: 4}, frames);
+
+      expect(id).toBe(0);
+      expect(animations.animId('walk')).toBe(0);
+    });
+
+    test('frameRate correctly calculates duration in baked texture', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [
+        new TextureCoords(0, 0, 32, 32),
+        new TextureCoords(32, 0, 32, 32),
+        new TextureCoords(64, 0, 32, 32),
+        new TextureCoords(96, 0, 32, 32),
+        new TextureCoords(128, 0, 32, 32),
+      ];
+
+      // 5 frames at 10 fps = 0.5 second duration
+      animations.add('run', {frameRate: 10}, frames);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      expect(buffer[0]).toBe(5); // frames.length
+      expect(buffer[1]).toBeCloseTo(0.5, 5); // duration = 5 / 10 = 0.5
+    });
+
+    test('add animation with duration option object', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [
+        new TextureCoords(0, 0, 32, 32),
+        new TextureCoords(32, 0, 32, 32),
+      ];
+
+      const id = animations.add('idle', {duration: 2.5}, frames);
+
+      expect(id).toBe(0);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      expect(buffer[1]).toBeCloseTo(2.5, 5); // duration
+    });
+
+    test('mix duration number and frameRate options', () => {
+      const animations = new FrameBasedAnimations();
+      const frames2 = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
+      const frames4 = [
+        new TextureCoords(0, 0, 32, 32),
+        new TextureCoords(32, 0, 32, 32),
+        new TextureCoords(64, 0, 32, 32),
+        new TextureCoords(96, 0, 32, 32),
+      ];
+
+      // Duration number (backward compatibility)
+      animations.add('idle', 1.0, frames2);
+
+      // frameRate option: 4 frames at 8 fps = 0.5 seconds
+      animations.add('walk', {frameRate: 8}, frames4);
+
+      // duration option object
+      animations.add('run', {duration: 0.25}, frames2);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      // idle: 2 frames, 1.0 duration
+      expect(buffer[0]).toBe(2);
+      expect(buffer[1]).toBeCloseTo(1.0, 5);
+
+      // walk: 4 frames, 0.5 duration (4 / 8)
+      expect(buffer[4]).toBe(4);
+      expect(buffer[5]).toBeCloseTo(0.5, 5);
+
+      // run: 2 frames, 0.25 duration
+      expect(buffer[8]).toBe(2);
+      expect(buffer[9]).toBeCloseTo(0.25, 5);
+    });
+
+    test('frameRate with TextureAtlas', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+
+      atlas.add('sprite_001', new TextureCoords(0, 0, 32, 32));
+      atlas.add('sprite_002', new TextureCoords(32, 0, 32, 32));
+      atlas.add('sprite_003', new TextureCoords(64, 0, 32, 32));
+
+      // 3 frames at 6 fps = 0.5 seconds
+      const id = animations.add('walk', {frameRate: 6}, atlas, 'sprite_.*');
+
+      expect(id).toBe(0);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      expect(buffer[0]).toBe(3);
+      expect(buffer[1]).toBeCloseTo(0.5, 5);
+    });
+
+    test('frameRate with TileSet', () => {
+      const animations = new FrameBasedAnimations();
+      const baseCoords = new TextureCoords(0, 0, 128, 64);
+      const tileSet = new TileSet(baseCoords, {
+        tileWidth: 32,
+        tileHeight: 32,
+        firstId: 1,
+      });
+
+      // 4 tiles at 12 fps = 1/3 seconds
+      const id = animations.add('walk', {frameRate: 12}, tileSet, 1, 4);
+
+      expect(id).toBe(0);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      expect(buffer[0]).toBe(4);
+      expect(buffer[1]).toBeCloseTo(1 / 3, 5);
+    });
+
+    test('frameRate with TileSet using tileIds array', () => {
+      const animations = new FrameBasedAnimations();
+      const baseCoords = new TextureCoords(0, 0, 128, 64);
+      const tileSet = new TileSet(baseCoords, {
+        tileWidth: 32,
+        tileHeight: 32,
+        firstId: 1,
+      });
+
+      // 4 tiles at 20 fps = 0.2 seconds
+      const id = animations.add('custom', {frameRate: 20}, tileSet, [1, 3, 2, 4]);
+
+      expect(id).toBe(0);
+
+      const dataTexture = animations.bakeDataTexture();
+      const buffer = dataTexture.image.data as Float32Array;
+
+      expect(buffer[0]).toBe(4);
+      expect(buffer[1]).toBeCloseTo(0.2, 5);
+    });
+  });
 });

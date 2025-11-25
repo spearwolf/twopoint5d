@@ -3,22 +3,24 @@ import type {TileSetOptions} from './TileSet.js';
 
 export type TextureSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 
-interface FrameBasedAnimationsBaseData {
-  duration: number;
-}
+/**
+ * Base timing data for frame-based animations.
+ * Use either `duration` (total animation time in seconds) or `frameRate` (frames per second), but not both.
+ */
+type FrameBasedAnimationsTimingData = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
 
-export interface FrameBasedAnimationsDataByTileIds extends FrameBasedAnimationsBaseData {
+export type FrameBasedAnimationsDataByTileIds = FrameBasedAnimationsTimingData & {
   tileIds: number[];
-}
+};
 
-export interface FrameBasedAnimationsDataByTileCount extends FrameBasedAnimationsBaseData {
+export type FrameBasedAnimationsDataByTileCount = FrameBasedAnimationsTimingData & {
   firstTileId: number;
   tileCount: number;
-}
+};
 
-export interface FrameBasedAnimationsDataByAtlas extends FrameBasedAnimationsBaseData {
+export type FrameBasedAnimationsDataByAtlas = FrameBasedAnimationsTimingData & {
   frameNameQuery: string;
-}
+};
 
 export type FrameBasedAnimationsData =
   | FrameBasedAnimationsDataByTileIds

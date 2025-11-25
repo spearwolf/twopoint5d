@@ -17,6 +17,38 @@ export interface BakeTextureOptions {
   includeTextureSize: boolean;
 }
 
+/**
+ * Options for specifying animation timing.
+ * Use either `duration` (total animation time in seconds) or `frameRate` (frames per second), but not both.
+ */
+export type AnimationTimingOptions = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
+
+/**
+ * Calculates the duration of an animation based on frame count and frame rate.
+ * @param frameCount Number of frames in the animation
+ * @param frameRate Frames per second
+ * @returns Duration in seconds
+ */
+const calculateDurationFromFrameRate = (frameCount: number, frameRate: number): number => {
+  return frameCount / frameRate;
+};
+
+/**
+ * Extracts the duration from timing options, calculating from frameRate if necessary.
+ * @param timing Either a duration number or AnimationTimingOptions object
+ * @param frameCount Number of frames (required when using frameRate)
+ * @returns Duration in seconds
+ */
+const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: number): number => {
+  if (typeof timing === 'number') {
+    return timing;
+  }
+  if ('frameRate' in timing && timing.frameRate !== undefined) {
+    return calculateDurationFromFrameRate(frameCount, timing.frameRate);
+  }
+  return timing.duration!;
+};
+
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
 
 const getBufferSize = (animationsMap: AnimationsMap, sizePerTexture = 1, maxTextureSize = 16384) => {
@@ -70,12 +102,17 @@ export class FrameBasedAnimations {
   #names: AnimName[] = [];
 
   add(
-    // TODO support frameRate (fps) option as an alternative to duration
     ...args:
-      | [name: AnimName | undefined, duration: number, texCoords: TextureCoords[]]
-      | [name: AnimName | undefined, duration: number, atlas: TextureAtlas, frameNameQuery?: string]
-      | [name: AnimName | undefined, duration: number, tileSet: TileSet, firstTileId?: number, tileCount?: number]
-      | [name: AnimName | undefined, duration: number, tileSet: TileSet, tileIds: number[]]
+      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, texCoords: TextureCoords[]]
+      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, atlas: TextureAtlas, frameNameQuery?: string]
+      | [
+          name: AnimName | undefined,
+          timing: number | AnimationTimingOptions,
+          tileSet: TileSet,
+          firstTileId?: number,
+          tileCount?: number,
+        ]
+      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, tileSet: TileSet, tileIds: number[]]
   ): number {
     let [name] = args;
 
@@ -111,7 +148,8 @@ export class FrameBasedAnimations {
     }
 
     const id = this.#names.length;
-    const [, duration] = args;
+    const timing = args[1];
+    const duration = resolveDuration(timing, frames.length);
 
     this.#names.push(name);
     this.#animations.set(name, {
