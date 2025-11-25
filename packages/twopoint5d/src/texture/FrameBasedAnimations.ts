@@ -66,18 +66,14 @@ export class FrameBasedAnimations {
 
   #animations: AnimationsMap = new Map();
 
-  // we can not just use animations.keys() here, because we need a consistent name <-> id mapping
+  // NOTE we can not just use animations.keys() here, because we need a consistent name <-> id mapping
   #names: AnimName[] = [];
 
   add(
     // TODO support args without first anim-frame parameter
+    // TODO support frameRate (fps) option as an alternative to duration
     ...args:
-      | [
-          name: AnimName | undefined,
-          // TODO support frameRate (fps) option as an alternative to duration
-          duration: number,
-          texCoords: TextureCoords[],
-        ]
+      | [name: AnimName | undefined, duration: number, texCoords: TextureCoords[]]
       | [name: AnimName | undefined, duration: number, atlas: TextureAtlas, frameNameQuery?: string]
       | [name: AnimName | undefined, duration: number, tileSet: TileSet, firstTileId?: number, tileCount?: number]
       | [name: AnimName | undefined, duration: number, tileSet: TileSet, tileIds: number[]]
