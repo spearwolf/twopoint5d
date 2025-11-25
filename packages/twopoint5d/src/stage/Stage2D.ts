@@ -125,8 +125,6 @@ export class Stage2D implements IStage {
       this.scene = new Scene();
       this.scene.name = 'Stage2D';
     }
-
-    // TODO set "up" vector of the scene??
   }
 
   resize(containerWidth: number, containerHeight: number): void {

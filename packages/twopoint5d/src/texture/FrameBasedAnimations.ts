@@ -70,7 +70,6 @@ export class FrameBasedAnimations {
   #names: AnimName[] = [];
 
   add(
-    // TODO support args without first anim-frame parameter
     // TODO support frameRate (fps) option as an alternative to duration
     ...args:
       | [name: AnimName | undefined, duration: number, texCoords: TextureCoords[]]
@@ -118,7 +117,6 @@ export class FrameBasedAnimations {
     this.#animations.set(name, {
       id,
       name,
-      // @ts-ignore
       frames,
       duration,
     });

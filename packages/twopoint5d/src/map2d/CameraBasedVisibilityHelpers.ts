@@ -69,6 +69,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     if (el) {
       el.textContent = this.cammeraBasedVisibility.planeCoords2D.toArray().map(Math.round).join(', ');
     }
+    // ---
   }
 
   private createPlaneHelpers() {

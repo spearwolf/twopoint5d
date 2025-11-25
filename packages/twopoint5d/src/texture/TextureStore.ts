@@ -102,7 +102,6 @@ export class TextureStore {
       if (item.tileSet) {
         if (resource) {
           if (resource.type !== 'tileset') {
-            // TODO maybe we can throw away the old resource and create a new one?
             throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "tileset"`);
           }
           batch(() => {
@@ -116,7 +115,6 @@ export class TextureStore {
       } else if (item.atlasUrl) {
         if (resource) {
           if (resource.type !== 'atlas') {
-            // TODO maybe we can throw away the old resource and create a new one?
             throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "atlas"`);
           }
           batch(() => {

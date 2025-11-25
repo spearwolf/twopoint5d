@@ -34,7 +34,7 @@ export interface VADescription {
   usage?: VertexAttributeUsageType;
   autoTouch?: boolean;
   bufferName?: string;
-  // TODO add attributeName? to VADescription
+  // TODO add optional attributeName? to VADescription
 }
 
 export interface VAComponentsDescription extends VADescription {

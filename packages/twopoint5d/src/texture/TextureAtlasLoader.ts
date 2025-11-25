@@ -55,7 +55,7 @@ export class TextureAtlasLoader {
         );
       },
       (_xhr) => {
-        // TODO progress callback?
+        // TODO add optional onProgressCallback parameter?
         // console.log(`${(xhr.loaded / xhr.total) * 100}% loaded`);
       },
       onErrorCallback,

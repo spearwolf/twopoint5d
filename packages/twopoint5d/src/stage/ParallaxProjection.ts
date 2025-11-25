@@ -71,7 +71,7 @@ export class ParallaxProjection implements IProjection {
     camera.updateProjectionMatrix();
   }
 
-  // TODO explanation
+  // TODO add jsdoc
   getZoom(distanceToProjectionPlane: number): number {
     if (distanceToProjectionPlane === 0) return 1;
 

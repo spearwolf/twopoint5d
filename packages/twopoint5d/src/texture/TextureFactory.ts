@@ -18,11 +18,9 @@ export interface TextureOptions {
   anisotrophy: number;
   flipY: boolean;
   colorSpace: ColorSpace;
-  // TODO encoding @see https://threejs.org/docs/#api/en/constants/Textures
 }
 
 const TextureClasses = {
-  // TODO encoding classes
   anisotrophy: {
     anisotrophy: Infinity,
   },
