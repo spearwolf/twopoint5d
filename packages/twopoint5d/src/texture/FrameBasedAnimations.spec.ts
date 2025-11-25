@@ -496,5 +496,23 @@ describe('FrameBasedAnimations', () => {
       expect(buffer[0]).toBe(4);
       expect(buffer[1]).toBeCloseTo(0.2, 5);
     });
+
+    test('throw error for zero frameRate', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
+
+      expect(() => {
+        animations.add('invalid', {frameRate: 0}, frames);
+      }).toThrow('frameRate must be greater than 0');
+    });
+
+    test('throw error for negative frameRate', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
+
+      expect(() => {
+        animations.add('invalid', {frameRate: -5}, frames);
+      }).toThrow('frameRate must be greater than 0');
+    });
   });
 });

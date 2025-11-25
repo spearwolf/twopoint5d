@@ -11,13 +11,17 @@ import type {FrameBasedAnimationsData, FrameBasedAnimationsDataByTileCount, Fram
 
 /**
  * Extracts timing options from frame-based animation data.
- * Returns either a duration number or AnimationTimingOptions object with frameRate.
+ * Returns AnimationTimingOptions object with either duration or frameRate.
+ * @throws Error if neither duration nor frameRate is provided
  */
 const getTimingOptions = (data: FrameBasedAnimationsData): AnimationTimingOptions => {
   if ('frameRate' in data && data.frameRate !== undefined) {
     return {frameRate: data.frameRate};
   }
-  return {duration: data.duration!};
+  if ('duration' in data && data.duration !== undefined) {
+    return {duration: data.duration};
+  }
+  throw new Error('Either duration or frameRate must be provided in animation data');
 };
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';

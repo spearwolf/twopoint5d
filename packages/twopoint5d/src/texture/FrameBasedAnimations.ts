@@ -26,10 +26,14 @@ export type AnimationTimingOptions = {duration: number; frameRate?: never} | {du
 /**
  * Calculates the duration of an animation based on frame count and frame rate.
  * @param frameCount Number of frames in the animation
- * @param frameRate Frames per second
+ * @param frameRate Frames per second (must be greater than 0)
  * @returns Duration in seconds
+ * @throws Error if frameRate is not greater than 0
  */
 const calculateDurationFromFrameRate = (frameCount: number, frameRate: number): number => {
+  if (frameRate <= 0) {
+    throw new Error('frameRate must be greater than 0');
+  }
   return frameCount / frameRate;
 };
 
@@ -38,6 +42,7 @@ const calculateDurationFromFrameRate = (frameCount: number, frameRate: number): 
  * @param timing Either a duration number or AnimationTimingOptions object
  * @param frameCount Number of frames (required when using frameRate)
  * @returns Duration in seconds
+ * @throws Error if neither duration nor frameRate is provided
  */
 const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: number): number => {
   if (typeof timing === 'number') {
@@ -46,7 +51,10 @@ const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: nu
   if ('frameRate' in timing && timing.frameRate !== undefined) {
     return calculateDurationFromFrameRate(frameCount, timing.frameRate);
   }
-  return timing.duration!;
+  if ('duration' in timing && timing.duration !== undefined) {
+    return timing.duration;
+  }
+  throw new Error('Either duration or frameRate must be provided');
 };
 
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
