@@ -76,7 +76,6 @@ export class FrameBasedAnimations {
           name: AnimName | undefined,
           // TODO support frameRate (fps) option as an alternative to duration
           duration: number,
-          // TODO add tests for this
           texCoords: TextureCoords[],
         ]
       | [name: AnimName | undefined, duration: number, atlas: TextureAtlas, frameNameQuery?: string]
