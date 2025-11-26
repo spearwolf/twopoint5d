@@ -1,9 +1,35 @@
 import {emit, off, on, once, onceAsync, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
-import type {WebGPURenderer} from 'three/webgpu';
+import type {Texture, WebGPURenderer} from 'three/webgpu';
+import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import type {TextureAtlas} from './TextureAtlas.js';
+import type {TextureCoords} from './TextureCoords.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
+import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
+
+/**
+ * Maps each TextureResourceSubType to its corresponding TypeScript type.
+ */
+type TextureResourceSubTypeMap = {
+  imageCoords: TextureCoords;
+  atlas: TextureAtlas;
+  tileSet: TileSet;
+  texture: Texture;
+  frameBasedAnimations: FrameBasedAnimations;
+};
+
+/**
+ * Maps an array of TextureResourceSubType to an array of their corresponding types.
+ * For single types, returns the mapped type directly.
+ */
+type MapSubTypes<T extends TextureResourceSubType | readonly TextureResourceSubType[]> =
+  T extends readonly TextureResourceSubType[]
+    ? {[K in keyof T]: T[K] extends TextureResourceSubType ? TextureResourceSubTypeMap[T[K]] : never}
+    : T extends TextureResourceSubType
+      ? TextureResourceSubTypeMap[T]
+      : never;
 
 const OnReady = 'ready';
 const OnRendererChanged = 'rendererChanged';
@@ -153,10 +179,13 @@ export class TextureStore {
     });
   }
 
-  // TODO fix any type: map to specific types based on TextureResourceSubType
-  on(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void {
+  on<T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    id: string,
+    type: T,
+    callback: (val: MapSubTypes<T>) => void,
+  ): () => void {
     const isMultipleTypes = Array.isArray(type);
-    const values = isMultipleTypes ? new Map<TextureResourceSubType, any>() : undefined;
+    const values = isMultipleTypes ? new Map<TextureResourceSubType, MapSubTypes<TextureResourceSubType>>() : undefined;
 
     const unsubscribeFromSubType: (() => void)[] = [];
     let unsubscribeFromResource: undefined | (() => void);
@@ -197,15 +226,15 @@ export class TextureStore {
                   values.set(t, val);
                   const valuesArg = (type as Array<TextureResourceSubType>).map((t) => values.get(t)).filter((v) => v != null);
                   if (valuesArg.length === type.length) {
-                    callback(valuesArg);
+                    callback(valuesArg as MapSubTypes<T>);
                   }
                 }),
               );
             });
           } else {
             unsubscribeFromSubType.push(
-              on(resource, type, (val) => {
-                callback(val);
+              on(resource, type as TextureResourceSubType, (val) => {
+                callback(val as MapSubTypes<T>);
               }),
             );
           }
@@ -216,10 +245,10 @@ export class TextureStore {
     return unsubscribe;
   }
 
-  get(id: string, type: TextureResourceSubType | TextureResourceSubType[]): Promise<any> {
+  get<T extends TextureResourceSubType | readonly TextureResourceSubType[]>(id: string, type: T): Promise<MapSubTypes<T>> {
     return new Promise((resolve) => {
-      const unsubscribe = this.on(id, type, (...args) => {
-        resolve(...args);
+      const unsubscribe = this.on(id, type, (value) => {
+        resolve(value);
         unsubscribe();
       });
     });
