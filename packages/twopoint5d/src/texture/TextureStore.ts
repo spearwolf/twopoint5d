@@ -153,6 +153,7 @@ export class TextureStore {
     });
   }
 
+  // TODO fix any type: map to specific types based on TextureResourceSubType
   on(id: string, type: TextureResourceSubType | TextureResourceSubType[], callback: (val: any) => void): () => void {
     const isMultipleTypes = Array.isArray(type);
     const values = isMultipleTypes ? new Map<TextureResourceSubType, any>() : undefined;
