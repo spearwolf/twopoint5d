@@ -185,7 +185,9 @@ export class TextureStore {
     callback: (val: MapSubTypes<T>) => void,
   ): () => void {
     const isMultipleTypes = Array.isArray(type);
-    const values = isMultipleTypes ? new Map<TextureResourceSubType, MapSubTypes<TextureResourceSubType>>() : undefined;
+    const values = isMultipleTypes
+      ? new Map<TextureResourceSubType, TextureResourceSubTypeMap[TextureResourceSubType]>()
+      : undefined;
 
     const unsubscribeFromSubType: (() => void)[] = [];
     let unsubscribeFromResource: undefined | (() => void);
@@ -199,7 +201,7 @@ export class TextureStore {
 
     const unsubscribe: () => void = () => {
       isActiveSubscription = false;
-      values.clear();
+      values?.clear();
       unsubscribeFromResource?.();
       clearSubTypeSubscriptions();
     };
