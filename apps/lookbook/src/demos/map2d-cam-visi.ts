@@ -103,6 +103,8 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       map2d.centerY = panControl.panView.y;
       map2d.update();
 
+      // tileSprites.update();
+
       // rectVisiAreaHelpers.update();
     });
 

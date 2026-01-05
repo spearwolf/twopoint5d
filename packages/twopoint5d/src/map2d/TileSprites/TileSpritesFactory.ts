@@ -13,6 +13,7 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
 
   constructor(tileSprites: TileSprites, tileSet?: TileSet, tileDataProvider?: IMap2DTileDataProvider) {
     this.tileSprites = tileSprites;
+    this.tileSprites.update();
     this.tileSet = tileSet;
     this.tileDataProvider = tileDataProvider;
   }

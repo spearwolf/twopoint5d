@@ -5,12 +5,16 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.0] - 2026-01-05
 
 - improve type safety in `TextureStore`
   - replace `any` type with mapped types in `.on()` and `.get()` methods
   - add `TextureResourceSubTypeMap` type mapping each `TextureResourceSubType` to its corresponding TypeScript type
   - callbacks now receive properly typed values based on the requested resource type
+- fix initial geometry update issue (`instanceCount` is _Infinity_ error) for `TileSprites` managed by a `TileSpritesFactory`
+- upgrade dependencies
+  - three@0.182.0
+  - @spearwolf/signalize@0.25.0
 
 ## [0.17.0] - 2025-11-25
 

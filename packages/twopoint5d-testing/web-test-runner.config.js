@@ -14,8 +14,20 @@ export default {
     esbuildPlugin({ target: 'auto' }),
   ],
   browsers: [
+    // https://modern-web.dev/docs/test-runner/browser-launchers/playwright/
     playwrightLauncher({ product: 'chromium', concurrency: 1 }),
-    playwrightLauncher({ product: 'firefox', concurrency: 1 }),
+    playwrightLauncher({
+      product: 'firefox',
+      concurrency: 1,
+      launchOptions: {
+        headless: true,
+        // devtools: true,
+        // args: ['--some-flag'],
+        firefoxUserPrefs: { 
+          "dom.webgpu.enabled": true
+        },
+      },
+    }),
   ],
   testFramework: {
     config: {
