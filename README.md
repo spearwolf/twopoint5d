@@ -16,7 +16,7 @@
 <div align="center">
 
 ![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/twopoint5d)
-![github actions main workflow status](https://github.com/spearwolf/twopoint5d/actions/workflows/main.yml/badge.svg)
+![github actions main workflow status](https://github.com/spearwolf/twopoint5d/actions/workflows/deploy.yml/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
 </div>
