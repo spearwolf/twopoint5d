@@ -1,5 +1,5 @@
 import {emit, eventize, retain} from '@spearwolf/eventize';
-import {Camera, Color, Scene} from 'three/webgpu';
+import {type Camera, Color, Scene} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
   OnStageFirstFrame,

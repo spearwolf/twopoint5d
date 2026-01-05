@@ -5,6 +5,10 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1] - 2026-01-05
+
+- fix import `Camera` as _type_ issue in `Stage2D`
+
 ## [0.18.0] - 2026-01-05
 
 - improve type safety in `TextureStore`
