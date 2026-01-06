@@ -24,10 +24,14 @@ type TextureResourceSubTypeMap = {
  * Maps an array of TextureResourceSubType to an array of their corresponding types.
  * For single types, returns the mapped type directly.
  */
-type MapSubTypes<T extends TextureResourceSubType | readonly TextureResourceSubType[]> =
-  T extends readonly TextureResourceSubType[]
-    ? {[K in keyof T]: T[K] extends TextureResourceSubType ? TextureResourceSubTypeMap[T[K]] : never}
-    : T extends TextureResourceSubType
+type MapSubTypes<
+    T extends
+      keyof TextureResourceSubTypeMap
+      | readonly (keyof TextureResourceSubTypeMap)[]
+  > =
+  T extends readonly (keyof TextureResourceSubTypeMap)[]
+    ? {[Index in keyof T]: T[Index] extends keyof TextureResourceSubTypeMap ? TextureResourceSubTypeMap[T[Index]] : never}
+    : T extends keyof TextureResourceSubTypeMap
       ? TextureResourceSubTypeMap[T]
       : never;
 
