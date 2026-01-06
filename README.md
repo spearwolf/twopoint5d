@@ -109,6 +109,6 @@ Everyone is welcome to contribute to this project, no matter if it's just bug-fi
 
 ## Copyright and License
 
-Copyright &copy; 2021-2025 by [Wolfger Schramm](mailto:wolfger@spearwolf.de?subject=[GitHub]%20twopoint5d).
+Copyright &copy; 2021-2026 by [Wolfger Schramm](mailto:wolfger@spearwolf.de?subject=[GitHub]%20twopoint5d).
 
 The source code is licensed under the [Apache-2.0 License](./LICENSE).
