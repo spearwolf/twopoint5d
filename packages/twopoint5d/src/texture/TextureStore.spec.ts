@@ -11,7 +11,7 @@ describe('TextureStore', () => {
     const store = new TextureStore();
 
     const wait = store.on('foo', ['atlas', 'imageCoords'], ([atlas, coords]) => {
-      atlas.randomFrame('bar');
+      atlas.randomFrame();
       coords.flipDiagonal();
     });
 

@@ -21,7 +21,15 @@ type TextureResourceSubTypeMap = {
 };
 
 /**
- * Maps an array of TextureResourceSubType to an array of their corresponding types.
+ * Helper type to recursively map a tuple of TextureResourceSubType to their corresponding types.
+ */
+type MapTuple<T extends readonly TextureResourceSubType[]> =
+  T extends readonly [infer First extends TextureResourceSubType, ...infer Rest extends TextureResourceSubType[]]
+    ? [TextureResourceSubTypeMap[First], ...MapTuple<Rest>]
+    : [];
+
+/**
+ * Maps an array of TextureResourceSubType to a tuple of their corresponding types.
  * For single types, returns the mapped type directly.
  */
 type MapSubTypes<
@@ -29,10 +37,10 @@ type MapSubTypes<
       keyof TextureResourceSubTypeMap
       | readonly (keyof TextureResourceSubTypeMap)[]
   > =
-  T extends readonly (keyof TextureResourceSubTypeMap)[]
-    ? {[Index in keyof T]: T[Index] extends keyof TextureResourceSubTypeMap ? TextureResourceSubTypeMap[T[Index]] : never}
-    : T extends keyof TextureResourceSubTypeMap
-      ? TextureResourceSubTypeMap[T]
+  T extends keyof TextureResourceSubTypeMap
+    ? TextureResourceSubTypeMap[T]
+    : T extends readonly TextureResourceSubType[]
+      ? MapTuple<T>
       : never;
 
 const OnReady = 'ready';
@@ -183,7 +191,7 @@ export class TextureStore {
     });
   }
 
-  on<T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+  on<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
     callback: (val: MapSubTypes<T>) => void,
@@ -251,7 +259,7 @@ export class TextureStore {
     return unsubscribe;
   }
 
-  get<T extends TextureResourceSubType | readonly TextureResourceSubType[]>(id: string, type: T): Promise<MapSubTypes<T>> {
+  get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(id: string, type: T): Promise<MapSubTypes<T>> {
     return new Promise((resolve) => {
       const unsubscribe = this.on(id, type, (value) => {
         resolve(value);

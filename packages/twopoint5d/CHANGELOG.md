@@ -5,6 +5,14 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.2] - 2026-01-06
+
+- fix `TextureStore` type mappings for tuple destructuring in `.on()` and `.get()` methods
+  - tuple types are now properly preserved instead of being flattened to union types
+  - callbacks with destructured parameters now receive correctly typed values
+  - added `MapTuple` helper type for recursive tuple mapping
+  - applied `const` type parameter modifier to prevent array literal widening
+
 ## [0.18.1] - 2026-01-05
 
 - fix import `Camera` as _type_ issue in `Stage2D`
