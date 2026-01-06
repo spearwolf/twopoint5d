@@ -50,5 +50,6 @@
         "externalDependencies": ["vitest", "happy-dom"]
       }
     ]
-  }
+  },
+  "nxCloudId": "695ce1be241868734dacdd56"
 }
