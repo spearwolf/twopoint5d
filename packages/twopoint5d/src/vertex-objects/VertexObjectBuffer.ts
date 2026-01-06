@@ -1,7 +1,7 @@
 import {createTypedArray} from './createTypedArray.js';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
 import type {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 interface BufferAttribute {
   bufferName: string;

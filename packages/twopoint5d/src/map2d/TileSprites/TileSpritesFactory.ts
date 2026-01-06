@@ -1,8 +1,8 @@
 import type {Object3D} from 'three/webgpu';
-import {TileSet} from '../../texture/TileSet.js';
+import type {TileSet} from '../../texture/TileSet.js';
 import type {IMap2DTileCoords, IMap2DTileDataProvider, IMapTileFactory} from '../types.js';
 import type {TileSprite} from './descriptors.js';
-import {TileSprites} from './TileSprites.js';
+import type {TileSprites} from './TileSprites.js';
 
 export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   readonly tileSprites: TileSprites;

@@ -1,4 +1,5 @@
-import {createSignal, Signal} from '@spearwolf/signalize';
+import type { Signal} from '@spearwolf/signalize';
+import {createSignal} from '@spearwolf/signalize';
 
 const signals = new Map<string, Signal<string | undefined>>();
 

@@ -1,7 +1,7 @@
 import type {Material} from 'three/webgpu';
 
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
-import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
+import type {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
 import type {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
 
 export class AnimatedSprites extends VertexObjects<AnimatedSpritesGeometry> {

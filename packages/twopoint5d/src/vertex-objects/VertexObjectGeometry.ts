@@ -1,6 +1,6 @@
 import type {VertexObjectDescription, VO} from './types.js';
 import {VOBufferGeometry} from './VOBufferGeometry.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 export class VertexObjectGeometry<VOType extends VO> extends VOBufferGeometry {

@@ -1,7 +1,7 @@
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {createVertexObject} from './createVertexObject.js';
 import {voBuffer} from './constants.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';

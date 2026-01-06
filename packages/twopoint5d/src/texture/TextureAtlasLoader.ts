@@ -1,5 +1,5 @@
 import {FileLoader} from 'three/webgpu';
-import {TextureAtlas} from './TextureAtlas.js';
+import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';
 import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaData} from './TexturePackerJson.js';

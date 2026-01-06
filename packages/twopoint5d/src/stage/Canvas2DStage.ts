@@ -1,5 +1,6 @@
 import { emit, eventize } from '@spearwolf/eventize';
-import { Sprite, SpriteMaterial, Texture, WebGPURenderer, type Scene } from 'three/webgpu';
+import type { WebGPURenderer} from 'three/webgpu';
+import { Sprite, SpriteMaterial, Texture, type Scene } from 'three/webgpu';
 import { TextureFactory } from '../texture/TextureFactory.js';
 import { OrthographicProjection } from './OrthographicProjection.js';
 import { Stage2D } from './Stage2D.js';

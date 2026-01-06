@@ -1,4 +1,5 @@
-import {BufferGeometry, InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
+import type {BufferGeometry} from 'three/webgpu';
+import { InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {toDrawUsage} from './toDrawUsage.js';
 import type {BufferLike} from './types.js';

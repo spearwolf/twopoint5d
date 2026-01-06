@@ -1,4 +1,5 @@
-import {colorFromTextureByTexCoords, vertexByInstancePosition, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
+import type { VertexObjectPool} from '@spearwolf/twopoint5d';
+import {colorFromTextureByTexCoords, vertexByInstancePosition, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute, vec3} from 'three/tsl';
 import {NodeMaterial, type Texture} from 'three/webgpu';
 import {InstancedQuadsGeometry, type InstancedQuad} from './InstancedQuadsGeometry';

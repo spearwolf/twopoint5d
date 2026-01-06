@@ -1,4 +1,5 @@
-import {Object3D, Vector3} from 'three/webgpu';
+import type { Vector3} from 'three/webgpu';
+import {Object3D} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer} from './types.js';

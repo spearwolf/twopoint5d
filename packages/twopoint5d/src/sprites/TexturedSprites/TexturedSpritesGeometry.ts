@@ -1,8 +1,10 @@
 import cloneVertexObjectDescription from '../../vertex-objects/cloneVertexObjectDescription.js';
 import {InstancedVertexObjectGeometry} from '../../vertex-objects/InstancedVertexObjectGeometry.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
-import {BaseSprite, BaseSpriteDescriptor} from '../BaseSprite.js';
-import {TexturedSprite, TexturedSpriteDescriptor} from './TexturedSprite.js';
+import type {BaseSprite} from '../BaseSprite.js';
+import { BaseSpriteDescriptor} from '../BaseSprite.js';
+import type {TexturedSprite} from './TexturedSprite.js';
+import { TexturedSpriteDescriptor} from './TexturedSprite.js';
 
 export type TexturedSpritesBasePool = VertexObjectPool<BaseSprite>;
 export type TexturedSpritePool = VertexObjectPool<TexturedSprite>;

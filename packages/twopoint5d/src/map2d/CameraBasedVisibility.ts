@@ -1,4 +1,5 @@
-import {Box3, Frustum, Line3, Matrix4, OrthographicCamera, PerspectiveCamera, Plane, Vector2, Vector3} from 'three/webgpu';
+import type { OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
+import {Box3, Frustum, Line3, Matrix4, Plane, Vector2, Vector3} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';

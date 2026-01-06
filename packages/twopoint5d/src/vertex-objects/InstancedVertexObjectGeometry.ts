@@ -1,7 +1,7 @@
 import {BufferGeometry} from 'three/webgpu';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import type {VertexObjectDescription, VO} from './types.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 const asPool = <T>(

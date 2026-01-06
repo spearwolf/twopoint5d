@@ -1,6 +1,6 @@
 import {Texture} from 'three/webgpu';
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
-import {TextureCoords} from './TextureCoords.js';
+import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
 import type {TextureSource} from './types.js';

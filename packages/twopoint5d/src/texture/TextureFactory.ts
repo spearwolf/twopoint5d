@@ -1,3 +1,5 @@
+import type {
+  WebGPURenderer} from 'three/webgpu';
 import {
   LinearFilter,
   LinearSRGBColorSpace,
@@ -5,7 +7,6 @@ import {
   SRGBColorSpace,
   Texture,
   TextureLoader,
-  WebGPURenderer,
   type ColorSpace,
   type TextureFilter,
 } from 'three/webgpu';

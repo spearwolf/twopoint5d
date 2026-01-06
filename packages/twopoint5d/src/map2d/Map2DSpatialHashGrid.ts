@@ -1,4 +1,4 @@
-import {AABB2} from './AABB2.js';
+import type {AABB2} from './AABB2.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 

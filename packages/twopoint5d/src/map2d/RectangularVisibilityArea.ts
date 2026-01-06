@@ -1,7 +1,8 @@
-import {Matrix4, Vector2, Vector3} from 'three/webgpu';
+import type {Matrix4} from 'three/webgpu';
+import { Vector2, Vector3} from 'three/webgpu';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {

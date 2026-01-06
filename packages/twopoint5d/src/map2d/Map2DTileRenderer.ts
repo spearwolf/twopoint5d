@@ -1,4 +1,5 @@
-import {Object3D, Vector3} from 'three/webgpu';
+import type { Vector3} from 'three/webgpu';
+import {Object3D} from 'three/webgpu';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './types.js';
 
 export class Map2DTileRenderer implements IMap2DTileRenderer {

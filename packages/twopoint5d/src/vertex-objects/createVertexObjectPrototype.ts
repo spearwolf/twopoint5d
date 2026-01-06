@@ -1,4 +1,4 @@
-import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {voBuffer, voIndex} from './constants.js';
 import {createTypedArray} from './createTypedArray.js';
 import type {VO} from './types.js';

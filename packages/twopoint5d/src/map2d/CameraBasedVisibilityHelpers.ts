@@ -1,11 +1,12 @@
-import {
+import type {
   Box3,
+  Object3D} from 'three/webgpu';
+import {
   Box3Helper,
   BoxGeometry,
   Color,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
   PlaneHelper,
   Vector2,
   Vector3,

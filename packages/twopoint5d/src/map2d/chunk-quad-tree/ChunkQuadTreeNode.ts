@@ -1,4 +1,4 @@
-import {AABB2} from '../AABB2.js';
+import type {AABB2} from '../AABB2.js';
 import type {IDataChunk2D} from './IDataChunk2D.js';
 
 enum Quadrant {

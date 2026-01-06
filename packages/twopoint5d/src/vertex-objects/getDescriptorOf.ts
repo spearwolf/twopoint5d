@@ -1,4 +1,4 @@
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {voBuffer} from './constants.js';
 import type {VO} from './types.js';
 

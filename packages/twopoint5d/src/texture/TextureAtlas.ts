@@ -1,4 +1,4 @@
-import {TextureCoords} from './TextureCoords.js';
+import type {TextureCoords} from './TextureCoords.js';
 
 export type TextureAtlasFrameData = Record<string, any>;
 

@@ -1,4 +1,5 @@
-import {BufferAttribute, BufferGeometry, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
+import type { BufferGeometry} from 'three/webgpu';
+import {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {createIndicesArray} from './createIndicesArray.js';
 import {toDrawUsage} from './toDrawUsage.js';

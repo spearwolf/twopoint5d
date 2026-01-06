@@ -1,6 +1,6 @@
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
-import {TileSpritesGeometry} from './TileSpritesGeometry.js';
-import {TileSpritesMaterial} from './TileSpritesMaterial.js';
+import type {TileSpritesGeometry} from './TileSpritesGeometry.js';
+import type {TileSpritesMaterial} from './TileSpritesMaterial.js';
 
 export class TileSprites extends VertexObjects<TileSpritesGeometry> {
   declare geometry: TileSpritesGeometry | undefined;
