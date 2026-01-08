@@ -5,8 +5,8 @@ packages:
 catalog:
   '@spearwolf/eventize': ^4.0.2
   '@spearwolf/signalize': ^0.25.0
-  '@types/three': ~0.182.0
-  three: ~0.182.0
+  '@types/three': ~0.181.0
+  three: ~0.181.2
 
 onlyBuiltDependencies:
   - '@parcel/watcher'
