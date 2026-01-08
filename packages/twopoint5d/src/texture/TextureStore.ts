@@ -23,20 +23,18 @@ type TextureResourceSubTypeMap = {
 /**
  * Helper type to recursively map a tuple of TextureResourceSubType to their corresponding types.
  */
-type MapTuple<T extends readonly TextureResourceSubType[]> =
-  T extends readonly [infer First extends TextureResourceSubType, ...infer Rest extends TextureResourceSubType[]]
-    ? [TextureResourceSubTypeMap[First], ...MapTuple<Rest>]
-    : [];
+type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
+  infer First extends TextureResourceSubType,
+  ...infer Rest extends TextureResourceSubType[],
+]
+  ? [TextureResourceSubTypeMap[First], ...MapTuple<Rest>]
+  : [];
 
 /**
  * Maps an array of TextureResourceSubType to a tuple of their corresponding types.
  * For single types, returns the mapped type directly.
  */
-type MapSubTypes<
-    T extends
-      keyof TextureResourceSubTypeMap
-      | readonly (keyof TextureResourceSubTypeMap)[]
-  > =
+type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
   T extends keyof TextureResourceSubTypeMap
     ? TextureResourceSubTypeMap[T]
     : T extends readonly TextureResourceSubType[]
@@ -269,14 +267,17 @@ export class TextureStore {
   }
 
   dispose() {
+    this.#renderer.set(undefined);
+
     emit(this, OnDispose);
 
     this.renderer = undefined;
-    SignalGroup.get(this).destroy();
+    SignalGroup.get(this).clear();
 
     this.#resources.forEach((resource) => {
       resource.dispose();
     });
+
     this.#resources.clear();
 
     off(this);

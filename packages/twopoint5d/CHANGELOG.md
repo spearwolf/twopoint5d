@@ -5,6 +5,10 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.4] - 2026-01-08
+
+- refactor TextureStore#dispose() to use SignalGroup#clear() and clear renderer reference
+
 ## [0.18.3] - 2026-01-08
 
 - revert back to `three@0.181.2` due to _undefined_ `GPUShaderStage` issues with `three/webgpu` in `0.182.0`
