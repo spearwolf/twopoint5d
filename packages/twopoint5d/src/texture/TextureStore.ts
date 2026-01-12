@@ -77,6 +77,9 @@ export class TextureStore {
     retain(this, [OnReady, OnRendererChanged]);
 
     this.#renderer.onChange((renderer) => {
+      for (const resource of this.#resources.values()) {
+        resource.renderer = renderer;
+      }
       emit(this, OnRendererChanged, renderer);
     });
 
@@ -260,8 +263,8 @@ export class TextureStore {
   get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(id: string, type: T): Promise<MapSubTypes<T>> {
     return new Promise((resolve) => {
       const unsubscribe = this.on(id, type, (value) => {
-        resolve(value);
         unsubscribe();
+        resolve(value);
       });
     });
   }
