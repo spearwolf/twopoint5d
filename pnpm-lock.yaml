@@ -10,8 +10,8 @@ catalogs:
       specifier: ^4.0.2
       version: 4.0.2
     '@spearwolf/signalize':
-      specifier: ^0.25.0
-      version: 0.25.0
+      specifier: ^0.27.2
+      version: 0.27.2
     '@types/three':
       specifier: ~0.181.0
       version: 0.181.0
@@ -133,7 +133,7 @@ importers:
         version: 4.0.2
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.25.0(@spearwolf/eventize@4.0.2)
+        version: 0.27.2(@spearwolf/eventize@4.0.2)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -185,7 +185,7 @@ importers:
         version: 4.0.2
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.25.0(@spearwolf/eventize@4.0.2)
+        version: 0.27.2(@spearwolf/eventize@4.0.2)
       three:
         specifier: 'catalog:'
         version: 0.181.2
@@ -200,7 +200,7 @@ importers:
         version: 4.0.2
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.25.0(@spearwolf/eventize@4.0.2)
+        version: 0.27.2(@spearwolf/eventize@4.0.2)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -1911,9 +1911,9 @@ packages:
     resolution: {integrity: sha512-CyyT2MXoRmp9yRVz2f7xyPhiSr3Gnn4m5Ofu9oN7VH4uS1Evlji5onP5UCdJW8H+ZMVn25DQn3OAJLGRi/ymLA==}
     engines: {node: '>=18.16'}
 
-  '@spearwolf/signalize@0.25.0':
-    resolution: {integrity: sha512-dfaqIrlZJst+ydg8buM5S/3RkHGSTNDEBAr69Np+H3RVvtkOSWfdclFJF8Vkac/ZKbJcSUxsTjvzuZ/QRsDF9Q==}
-    engines: {node: '>=20.12'}
+  '@spearwolf/signalize@0.27.2':
+    resolution: {integrity: sha512-r/owAixCfvZNNi6LtcKNMLNBbqMc7Ai7DFT2Zs4Yh03SLmR5L/p/uCOVzG3Ck3/LQjZCHSek57/1DQ/AHEfIvw==}
+    engines: {node: '>=24.13'}
     peerDependencies:
       '@spearwolf/eventize': ^4.0.2
 
@@ -7669,7 +7669,7 @@ snapshots:
 
   '@spearwolf/eventize@4.0.2': {}
 
-  '@spearwolf/signalize@0.25.0(@spearwolf/eventize@4.0.2)':
+  '@spearwolf/signalize@0.27.2(@spearwolf/eventize@4.0.2)':
     dependencies:
       '@spearwolf/eventize': 4.0.2
 
