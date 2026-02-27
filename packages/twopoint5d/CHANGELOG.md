@@ -5,6 +5,10 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-02-27
+
+- upgrade dependencies to `three@0.183.1`
+
 ## [0.18.5] - 2026-01-12
 
 - delegate renderer to texture ressources in `TextureStore` on change

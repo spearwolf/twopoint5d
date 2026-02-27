@@ -8,7 +8,8 @@ export interface TileSpritesMaterialParameters {
   colorMap?: Texture;
 }
 
-const createShaderAttributeNodeSignal = (name: string, attach: object) => createSignal<Node>(attribute(name), {attach});
+const createShaderAttributeNodeSignal = <T = unknown>(name: string, attach: object) =>
+  createSignal<Node<T>>(attribute(name), {attach});
 
 export class TileSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
@@ -17,9 +18,9 @@ export class TileSpritesMaterial extends NodeMaterial {
 
   static readonly DefaultColor = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
 
-  #vertexPositionNode = createShaderAttributeNodeSignal(TileSpritesMaterial.PositionAttributeName, this);
-  #instancePositionNode = createShaderAttributeNodeSignal(TileSpritesMaterial.InstancePositionAttributeName, this);
-  #quadSizeNode = createShaderAttributeNodeSignal(TileSpritesMaterial.QuadSizeAttributeName, this);
+  #vertexPositionNode = createShaderAttributeNodeSignal<'vec3'>(TileSpritesMaterial.PositionAttributeName, this);
+  #instancePositionNode = createShaderAttributeNodeSignal<'vec3'>(TileSpritesMaterial.InstancePositionAttributeName, this);
+  #quadSizeNode = createShaderAttributeNodeSignal<'vec2'>(TileSpritesMaterial.QuadSizeAttributeName, this);
 
   #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
@@ -35,7 +36,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#vertexPositionNode.get();
   }
 
-  set vertexPositionNode(node: Node) {
+  set vertexPositionNode(node: Node<'vec3'>) {
     this.#vertexPositionNode.set(node);
   }
 
@@ -43,7 +44,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#instancePositionNode.get();
   }
 
-  set instancePositionNode(node: Node) {
+  set instancePositionNode(node: Node<'vec3'>) {
     this.#instancePositionNode.set(node);
   }
 
@@ -51,7 +52,7 @@ export class TileSpritesMaterial extends NodeMaterial {
     return this.#quadSizeNode.get();
   }
 
-  set quadSizeNode(node: Node) {
+  set quadSizeNode(node: Node<'vec2'>) {
     this.#quadSizeNode.set(node);
   }
 

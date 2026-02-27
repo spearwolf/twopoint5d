@@ -1,4 +1,4 @@
-import {Color} from 'three/webgpu';
+import {Color, type Node} from 'three/webgpu';
 import {voInitialize} from '../../index.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
@@ -69,3 +69,9 @@ export const TexturedSpriteDescriptor: VertexObjectDescription = {
 
   basePrototype: TexturedSprite.prototype,
 };
+
+export type TAttributeNodeQuadSize = Node<'vec2'>;
+export type TAttributeNodeTexCoords = Node<'vec4'>;
+export type TAttributeNodeInstancePosition = Node<'vec3'>;
+export type TAttributeNodeRotation = Node<'float'>;
+export type TAttributeNodeColor = Node<'vec4'>;

@@ -1,7 +1,13 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
-import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
+import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
+import type {
+  TAttributeNodeInstancePosition,
+  TAttributeNodeQuadSize,
+  TAttributeNodeRotation,
+  TAttributeNodeTexCoords,
+} from './TexturedSprite.js';
 
 export interface TexturedSpritesMaterialParameters extends NodeMaterialParameters {
   name?: string;
@@ -9,21 +15,28 @@ export interface TexturedSpritesMaterialParameters extends NodeMaterialParameter
   renderAsBillboards?: boolean;
 }
 
-const createShaderNodeSignal = (node: Node | undefined, attach: object) => createSignal<Node | undefined>(node, {attach});
-
-const createShaderAttributeNodeSignal = (name: string, attach: object) => createSignal<Node>(attribute(name), {attach});
-
 export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
   static readonly InstancePositionAttributeName = 'instancePosition';
   static readonly RotationAttributeName = 'rotation';
   static readonly QuadSizeAttributeName = 'quadSize';
 
-  #vertexPositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.PositionAttributeName, this);
-  #texCoordsNode = createShaderNodeSignal(undefined, this);
-  #rotationNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.RotationAttributeName, this);
-  #instancePositionNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.InstancePositionAttributeName, this);
-  #quadSizeNode = createShaderAttributeNodeSignal(TexturedSpritesMaterial.QuadSizeAttributeName, this);
+  #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
+
+  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(attribute(TexturedSpritesMaterial.PositionAttributeName), {
+    attach: this,
+  });
+
+  #rotationNode = createSignal<TAttributeNodeRotation>(attribute(TexturedSpritesMaterial.RotationAttributeName), {attach: this});
+
+  #instancePositionNode = createSignal<TAttributeNodeInstancePosition>(
+    attribute(TexturedSpritesMaterial.InstancePositionAttributeName),
+    {
+      attach: this,
+    },
+  );
+
+  #quadSizeNode = createSignal<TAttributeNodeQuadSize>(attribute(TexturedSpritesMaterial.QuadSizeAttributeName), {attach: this});
 
   #renderAsBillboards = createSignal(false, {attach: this});
 
@@ -41,7 +54,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#vertexPositionNode.get();
   }
 
-  set vertexPositionNode(node: Node) {
+  set vertexPositionNode(node: TAttributeNodeInstancePosition) {
     this.#vertexPositionNode.set(node);
   }
 
@@ -49,7 +62,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#texCoordsNode.get();
   }
 
-  set texCoordsNode(node: Node) {
+  set texCoordsNode(node: TAttributeNodeTexCoords | undefined) {
     this.#texCoordsNode.set(node);
   }
 
@@ -57,7 +70,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#rotationNode.get();
   }
 
-  set rotationNode(node: Node) {
+  set rotationNode(node: TAttributeNodeRotation) {
     this.#rotationNode.set(node);
   }
 
@@ -65,7 +78,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#instancePositionNode.get();
   }
 
-  set instancePositionNode(node: Node) {
+  set instancePositionNode(node: TAttributeNodeInstancePosition) {
     this.#instancePositionNode.set(node);
   }
 
@@ -73,7 +86,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#quadSizeNode.get();
   }
 
-  set quadSizeNode(node: Node) {
+  set quadSizeNode(node: TAttributeNodeQuadSize) {
     this.#quadSizeNode.set(node);
   }
 

@@ -1,8 +1,8 @@
-import {createEffect, createSignal} from '@spearwolf/signalize';
-import {add, attribute, div, mod, mul, texture, uniform, vec2, vec4} from 'three/tsl';
-import type {Texture} from 'three/webgpu';
-import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '../TexturedSprites/TexturedSpritesMaterial.js';
-import {texCoordsFromIndex} from '../node-utils.js';
+import { createEffect, createSignal } from '@spearwolf/signalize';
+import { add, attribute, div, mod, mul, texture, uniform, vec2, vec4 } from 'three/tsl';
+import { type Texture } from 'three/webgpu';
+import { TexturedSpritesMaterial, type TexturedSpritesMaterialParameters } from '../TexturedSprites/TexturedSpritesMaterial.js';
+import { texCoordsFromIndex } from '../node-utils.js';
 
 interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
   animsMap?: Texture;
@@ -45,15 +45,18 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
           const time = this.#timeUniform;
 
-          const anim = attribute(AnimatedSpritesMaterial.AnimAttributeName);
-          const animId = anim[0];
-          const animOffset = anim[1];
+          const anim = attribute<'vec2'>(AnimatedSpritesMaterial.AnimAttributeName);
+          const animId = anim.x;
+          const animOffset = anim.y;
 
           const animMetaData = texture(this.animsMap, texCoordsFromIndex(animsMapSize, animId.toInt()));
           const frameIndex = mod(mul(div(add(time, animOffset), animMetaData.y), animMetaData.x), animMetaData.x)
             .floor()
             .toInt();
-          this.texCoordsNode = texture(this.animsMap, texCoordsFromIndex(animsMapSize, add(animMetaData.z.toInt(), frameIndex)));
+          this.texCoordsNode = texture(
+            this.animsMap,
+            texCoordsFromIndex(animsMapSize, add(animMetaData.z.toInt(), frameIndex).toInt()),
+          );
         } else {
           this.texCoordsNode = vec4(0, 0, 1, 1);
         }
