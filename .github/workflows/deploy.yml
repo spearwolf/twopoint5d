@@ -6,6 +6,10 @@ on:
     types: [completed]
     branches: [main]
 
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   deploy:
     name: Deploy NPM Packages
@@ -22,12 +26,6 @@ jobs:
         with:
           version: 10.27.0
           run_install: true
-        env:
-          NPM_TOKEN: xxx
 
       - run: pnpm run publishNpmPkg
         name: Publish npm packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
