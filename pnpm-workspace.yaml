@@ -1,3 +1,5 @@
+ignore-workspace-root-check: true
+
 packages:
   - packages/*
   - apps/*
@@ -13,3 +15,4 @@ onlyBuiltDependencies:
   - esbuild
   - nx
   - sharp
+
