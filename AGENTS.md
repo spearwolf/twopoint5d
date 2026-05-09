@@ -13,7 +13,6 @@ Structure: **Monorepo** with **NX** and **pnpm Workspaces**.
 **CRITICAL:**
 - Ignore all files excluded by `.gitignore`.
 - Focus ONLY on `packages/` and `apps/`.
-- **NEVER** read files from `apps/handbook/docs/.vitepress/cache`.
 
 ---
 
@@ -27,7 +26,6 @@ Run all commands from the project root.
 -   **Test:** `pnpm test` (Runs all: `vitest` unit tests & `@web/test-runner` browser tests).
 -   **Start Demos:**
     -   `pnpm lookbook` (Astro demo app @ `http://localhost:4321`)
-    -   `pnpm handbook` (VitePress docs @ `http://localhost:5173`)
 -   **CI Check:** `pnpm run ci` (Clean install, lint, build, test). **Run before committing.**
 
 ---
@@ -37,7 +35,6 @@ Run all commands from the project root.
 -   `packages/twopoint5d`: **Core Library.** Logic, classes, shaders. Main dev work here.
 -   `packages/twopoint5d-testing`: **Browser Integration Tests.** Ensures visual correctness.
 -   `apps/lookbook`: **Demo App (Astro).** Visual showcase for testing changes live.
--   `apps/handbook`: **Documentation (VitePress).** Docs are in `apps/handbook/docs/` (Markdown).
 
 ---
 
