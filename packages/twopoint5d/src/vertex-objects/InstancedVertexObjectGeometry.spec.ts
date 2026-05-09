@@ -106,6 +106,96 @@ describe('InstancedVertexObjectGeometry', () => {
     ]);
   });
 
+  describe('dispose()', () => {
+    test('clears basePool and instancedPool', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+
+      const baseClear = sandbox.spy(geometry.basePool, 'clear');
+      const instancedClear = sandbox.spy(geometry.instancedPool, 'clear');
+
+      geometry.dispose();
+
+      expect(baseClear.calledOnce).toBe(true);
+      expect(instancedClear.calledOnce).toBe(true);
+    });
+
+    test('clears extra instanced pools by default (autoDispose defaults to true)', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+      const extraClear = sandbox.spy(extraPool, 'clear');
+
+      geometry.dispose();
+
+      expect(extraClear.calledOnce).toBe(true);
+    });
+
+    test('clears extra instanced pools when autoDispose is explicitly true', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor, {autoDispose: true});
+
+      const extraClear = sandbox.spy(extraPool, 'clear');
+
+      geometry.dispose();
+
+      expect(extraClear.calledOnce).toBe(true);
+    });
+
+    test('does NOT clear extra instanced pools when autoDispose is false', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor, {autoDispose: false});
+
+      const extraClear = sandbox.spy(extraPool, 'clear');
+
+      geometry.dispose();
+
+      expect(extraClear.called).toBe(false);
+    });
+
+    test('respects per-pool autoDispose flags independently', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+
+      const ownedPool = geometry.attachInstancedPool('owned', extraInstancedDescriptor);
+      const sharedPool = geometry.attachInstancedPool('shared', extraInstancedDescriptor, {autoDispose: false});
+
+      const ownedClear = sandbox.spy(ownedPool, 'clear');
+      const sharedClear = sandbox.spy(sharedPool, 'clear');
+
+      geometry.dispose();
+
+      expect(ownedClear.calledOnce).toBe(true);
+      expect(sharedClear.called).toBe(false);
+    });
+
+    test('empties all extra-instanced bookkeeping maps', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      geometry.attachInstancedPool('a', extraInstancedDescriptor);
+      geometry.attachInstancedPool('b', extraInstancedDescriptor, {autoDispose: false});
+
+      expect(geometry.extraInstancedPools.size).toBe(2);
+      expect(geometry.extraInstancedBuffers.size).toBe(2);
+      expect(geometry.extraInstancedBufferSerials.size).toBe(2);
+
+      geometry.dispose();
+
+      expect(geometry.extraInstancedPools.size).toBe(0);
+      expect(geometry.extraInstancedBuffers.size).toBe(0);
+      expect(geometry.extraInstancedBufferSerials.size).toBe(0);
+    });
+
+    test('detachInstancedPool removes the autoDispose tracking entry', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+      const extraClear = sandbox.spy(extraPool, 'clear');
+
+      geometry.detachInstancedPool('extraPool');
+      geometry.dispose();
+
+      expect(extraClear.called).toBe(false);
+    });
+  });
+
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {
     const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor);
 

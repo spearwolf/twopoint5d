@@ -37,6 +37,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly extraInstancedBuffers: Map<string, Map<string, BufferLike>> = new Map();
   readonly extraInstancedBufferSerials: Map<string, Map<string, number>> = new Map();
 
+  readonly #extraInstancedPoolAutoDispose: Map<string, boolean> = new Map();
+
   constructor(
     ...args:
       | [VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
@@ -82,11 +84,20 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * _Pro-Hint:_ It is also possible to attach a vertex-buffer-pool to several instanced geometries at the same time.
    *
-   * NOTE: attached vertex-buffer-pools are not automatically cleared when the geometry is deleted!
+   * @param name - unique key for this attached pool, used by {@link detachInstancedPool} and the
+   *   `extraInstancedPools` / `extraInstancedBuffers` / `extraInstancedBufferSerials` maps.
+   * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be wrapped in a new pool.
+   * @param options.autoDispose - when `true` (the **default**), the attached pool is cleared together with this
+   *   geometry on {@link dispose}, which is the right choice for pools that are exclusively owned by this geometry
+   *   (e.g. created on the fly when an `InstancedMesh` is built and torn down again). Set to `false` when the same
+   *   pool is shared with other geometries or otherwise managed by the caller — in that case the pool will be
+   *   detached from the internal bookkeeping on `dispose`, but its buffers and typed arrays remain untouched and the
+   *   caller is responsible for releasing them.
    */
   attachInstancedPool(
     name: string,
     pool: VertexObjectPool<any> | VertexObjectDescriptor | VertexObjectDescription,
+    options?: {autoDispose?: boolean},
   ): VertexObjectPool<any> {
     if (!(pool instanceof VertexObjectPool)) {
       const descriptor = pool instanceof VertexObjectDescriptor ? pool : new VertexObjectDescriptor(pool);
@@ -100,6 +111,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     const bufferSerials = new Map<string, number>();
     this.extraInstancedBufferSerials.set(name, bufferSerials);
+
+    this.#extraInstancedPoolAutoDispose.set(name, options?.autoDispose ?? true);
 
     initializeInstancedAttributes(this, pool, buffers, bufferSerials);
 
@@ -115,14 +128,34 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.extraInstancedPools.delete(name);
     this.extraInstancedBuffers.delete(name);
     this.extraInstancedBufferSerials.delete(name);
+    this.#extraInstancedPoolAutoDispose.delete(name);
     this.#autoTouchAttrNames = undefined;
     return pool;
   }
 
+  /**
+   * Releases the resources owned by this geometry.
+   *
+   * The `basePool` and the default `instancedPool` are always cleared.
+   * Extra instanced pools that were attached with `autoDispose: true` (the default)
+   * are also cleared; pools attached with `autoDispose: false` are left intact
+   * — the caller keeps full ownership of those.
+   *
+   * After this call all internal bookkeeping maps for extra pools are emptied
+   * and `super.dispose()` (the `THREE.InstancedBufferGeometry` cleanup) is invoked.
+   */
   override dispose(): void {
     this.basePool?.clear();
     this.instancedPool.clear();
+    for (const [name, pool] of this.extraInstancedPools) {
+      if (this.#extraInstancedPoolAutoDispose.get(name) ?? true) {
+        pool.clear();
+      }
+    }
     this.extraInstancedPools.clear();
+    this.extraInstancedBuffers.clear();
+    this.extraInstancedBufferSerials.clear();
+    this.#extraInstancedPoolAutoDispose.clear();
     super.dispose();
   }
 

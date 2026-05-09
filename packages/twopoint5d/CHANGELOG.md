@@ -5,6 +5,13 @@ All notable changes to [@spearwolf/twopoint5d](https://github.com/spearwolf/twop
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix `InstancedVOBufferGeometry#dispose()`: extra instanced pools attached via `attachInstancedPool()` are now actually cleared, and the `extraInstancedBuffers` / `extraInstancedBufferSerials` bookkeeping maps are emptied
+- add `options.autoDispose` parameter to `InstancedVOBufferGeometry#attachInstancedPool(name, pool, options?)`
+  - defaults to `true` — the attached pool is cleared together with the geometry on `dispose()`
+  - set to `false` for pools that are shared with other geometries or otherwise managed by the caller
+
 ## [0.19.0] - 2026-02-27
 
 - upgrade dependencies to `three@0.183.1`

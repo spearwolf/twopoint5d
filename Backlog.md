@@ -25,32 +25,21 @@ Die Library ist **architektonisch solide und konzeptionell stark** (klare Schich
 
 ### 2.1 Bestätigte Bugs / Resource-Leaks
 
-#### 🔴 P1 — `InstancedVOBufferGeometry.dispose()` räumt extra-Pools nicht auf
-**Datei:** `packages/twopoint5d/src/vertex-objects/InstancedVOBufferGeometry.ts:122–127`
+#### ✅ ERLEDIGT — `InstancedVOBufferGeometry.dispose()` räumt extra-Pools nicht auf
+**Datei:** `packages/twopoint5d/src/vertex-objects/InstancedVOBufferGeometry.ts`
 
-```ts
-override dispose(): void {
-  this.basePool?.clear();
-  this.instancedPool.clear();
-  this.extraInstancedPools.clear();   // ← löscht nur die Map-Einträge,
-  super.dispose();                    //    ohne pool.clear() je Pool
-}
-```
+Ursprünglicher Befund: `Map.clear()` entfernte zwar die Map-Einträge der `extraInstancedPools`, rief aber kein `clear()` auf den jeweiligen `VOBufferPool`-Instanzen auf. Zusätzlich fehlten `extraInstancedBuffers.clear()` und `extraInstancedBufferSerials.clear()`.
 
-`Map.clear()` entfernt die Map-Einträge, ruft aber kein `clear()` auf den jeweiligen `VOBufferPool`-Instanzen auf. Bei mehrfach erzeugten Geometries mit `attachInstancedPool()` bleiben gehaltene TypedArrays über die three.js-Refs lebendig, bis der GC sie aufnimmt. Begleitend fehlt `extraInstancedBuffers.clear()` und `extraInstancedBufferSerials.clear()`.
+**Umgesetzte Lösung (über das ursprüngliche Fix-Snippet hinaus):**
 
-**Fix:**
-```ts
-override dispose(): void {
-  this.basePool?.clear();
-  this.instancedPool.clear();
-  for (const pool of this.extraInstancedPools.values()) pool.clear();
-  this.extraInstancedPools.clear();
-  this.extraInstancedBuffers.clear();
-  this.extraInstancedBufferSerials.clear();
-  super.dispose();
-}
-```
+`attachInstancedPool()` hat einen optionalen dritten Parameter `options?: {autoDispose?: boolean}` bekommen (Default: `true`). Damit kann der Aufrufer steuern, wem der Pool gehört:
+
+- `autoDispose: true` (oder weggelassen) → der Pool wird beim `dispose()` der Geometry mit-aufgeräumt. Sinnvoll, wenn der Pool exklusiv zu dieser Geometry gehört (z. B. ad-hoc für ein `InstancedMesh` erzeugt).
+- `autoDispose: false` → die Geometry lässt den Pool unangetastet und entfernt ihn nur aus den eigenen Bookkeeping-Maps. Sinnvoll, wenn derselbe Pool an mehrere Geometries gehängt ist (Pro-Hint des bestehenden TSDoc).
+
+`dispose()` räumt zusätzlich `extraInstancedBuffers` und `extraInstancedBufferSerials` auf und konsumiert die interne autoDispose-Map. `detachInstancedPool()` entfernt das passende autoDispose-Tracking-Eintrag mit.
+
+**Test-Coverage:** sieben neue Cases in `InstancedVertexObjectGeometry.spec.ts` (`describe('dispose()')`-Block) decken Default-Verhalten, explizites `true`/`false`, gemischte Flags pro Pool, Map-Cleanup und das Zusammenspiel mit `detachInstancedPool()` ab.
 
 #### 🔴 P1 — `AnimatedSpritesMaterial.dispose()` Reihenfolge unsauber
 **Datei:** `packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:70–75`
@@ -378,7 +367,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 ## 7. Priorisierte Roadmap
 
 ### Sprint 1 — Bug-Fixes & Test-Grundlage (≈ 1 Woche)
-1. 🔴 `InstancedVOBufferGeometry.dispose()` — extra-Pools korrekt aufräumen (§2.1).
+1. ✅ `InstancedVOBufferGeometry.dispose()` — extra-Pools korrekt aufräumen, inkl. neuer `autoDispose`-Option an `attachInstancedPool()` (§2.1).
 2. 🔴 `AnimatedSpritesMaterial.dispose()` — Reihenfolge korrigieren (§2.1).
 3. 🔴 Sprites-Test-Suite anlegen (BaseSprite, TexturedSprite, AnimatedSprite).
 4. 🔴 Controls-Test-Suite anlegen (InputControlBase, PanControl2D).
