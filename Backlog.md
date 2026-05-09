@@ -41,19 +41,12 @@ Ursprünglicher Befund: `Map.clear()` entfernte zwar die Map-Einträge der `extr
 
 **Test-Coverage:** sieben neue Cases in `InstancedVertexObjectGeometry.spec.ts` (`describe('dispose()')`-Block) decken Default-Verhalten, explizites `true`/`false`, gemischte Flags pro Pool, Map-Cleanup und das Zusammenspiel mit `detachInstancedPool()` ab.
 
-#### 🔴 P1 — `AnimatedSpritesMaterial.dispose()` Reihenfolge unsauber
-**Datei:** `packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:70–75`
+#### ✅ ERLEDIGT — `AnimatedSpritesMaterial.dispose()` Reihenfolge unsauber
+**Datei:** `packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts`
 
-```ts
-override dispose(): void {
-  super.dispose();              // ← Parent zerstört evtl. SignalGroup(this)
-  this.#animsMap.value?.dispose();
-  this.#animsMap.set(undefined);
-  this.#animsMap.destroy();     // ← könnte auf zerstörter Group laufen
-}
-```
+Ursprünglicher Befund: `super.dispose()` lief vor dem Aufräumen des `animsMap`-Signals. Da das Parent `TexturedSpritesMaterial.dispose()` zuerst `SignalGroup.destroy(this)` aufruft, war das `#animsMap`-Signal danach bereits zerstört — die anschließenden `value?.dispose()` / `set(undefined)` / `destroy()`-Aufrufe funktionierten nur durch signalize's Lenz, dass zerstörte Signals den letzten Wert noch zurückliefern.
 
-Die `super.dispose()`-Implementierung in `TexturedSpritesMaterial` ruft `SignalGroup.destroy(this)` auf — danach ist es Glück, dass `#animsMap` noch ein gültiges Signal-Handle hat. Reihenfolge umdrehen:
+**Umgesetzte Lösung:** Reihenfolge umgedreht — die Texture wird disposed, das Signal auf `undefined` gesetzt und das lokale Handle zerstört, _bevor_ `super.dispose()` die SignalGroup abräumt:
 
 ```ts
 override dispose(): void {
@@ -63,6 +56,8 @@ override dispose(): void {
   super.dispose();
 }
 ```
+
+**Test-Coverage:** neue `AnimatedSpritesMaterial.spec.ts` (8 Cases): Konstruktion mit/ohne `animsMap`-Option, Dispose-Verhalten (Texture-Release, No-Op ohne `animsMap`, `animsMap`-Reset auf `undefined`), explizite Order-Assertion gegen `NodeMaterial#dispose` via `sinon.calledBefore`, Signal/Effect-Leak-Check via `getSignalsCount`/`getEffectsCount`-Baseline, Idempotenz bei doppeltem Dispose.
 
 #### 🟠 P2 — `VOBufferPool` hat keine `dispose()`-Methode
 **Datei:** `packages/twopoint5d/src/vertex-objects/VOBufferPool.ts`
@@ -368,7 +363,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 
 ### Sprint 1 — Bug-Fixes & Test-Grundlage (≈ 1 Woche)
 1. ✅ `InstancedVOBufferGeometry.dispose()` — extra-Pools korrekt aufräumen, inkl. neuer `autoDispose`-Option an `attachInstancedPool()` (§2.1).
-2. 🔴 `AnimatedSpritesMaterial.dispose()` — Reihenfolge korrigieren (§2.1).
+2. ✅ `AnimatedSpritesMaterial.dispose()` — Reihenfolge korrigieren, plus 8 Unit-Tests in `AnimatedSpritesMaterial.spec.ts` (§2.1).
 3. 🔴 Sprites-Test-Suite anlegen (BaseSprite, TexturedSprite, AnimatedSprite).
 4. 🔴 Controls-Test-Suite anlegen (InputControlBase, PanControl2D).
 5. 🔴 `apps/lookbook/README.md` ersetzen.

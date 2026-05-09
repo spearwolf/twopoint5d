@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `options.autoDispose` parameter to `InstancedVOBufferGeometry#attachInstancedPool(name, pool, options?)`
   - defaults to `true` — the attached pool is cleared together with the geometry on `dispose()`
   - set to `false` for pools that are shared with other geometries or otherwise managed by the caller
+- fix `AnimatedSpritesMaterial#dispose()` order: the `animsMap` texture is now released, reset and its signal handle destroyed _before_ `super.dispose()` tears down the `SignalGroup` attached to the material — previously the cleanup relied on signalize's "destroyed signal still returns last value" lenience
+- add unit tests for `AnimatedSpritesMaterial` covering construction and the full `dispose()` contract (texture release, no-op on missing `animsMap`, ordering vs. `NodeMaterial#dispose`, signal/effect leak check, idempotent double-dispose)
 
 ## [0.19.0] - 2026-02-27
 

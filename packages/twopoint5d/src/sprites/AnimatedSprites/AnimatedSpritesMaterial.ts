@@ -68,9 +68,9 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
   }
 
   override dispose(): void {
-    super.dispose();
     this.#animsMap.value?.dispose();
     this.#animsMap.set(undefined);
     this.#animsMap.destroy();
+    super.dispose();
   }
 }
