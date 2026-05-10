@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- perf `CameraBasedVisibility#computeVisibleTiles()`: reduce per-frame GC pressure
+  - pool `TileBox` slots (and their `Box3` / `Vector3` / `Map2DTileCoords` shells) by tile id, mutate them in place across frames
+  - replace the per-frame `previousTiles.slice(0)` + linear `findIndex` / `splice` (O(n²)) with an id-keyed `Map` lookup (O(n))
+  - reuse the `visitedIds` `Set`, the BFS stack, and the `Vector3` / `Vector2` / `Line3` scratch instances instead of reallocating each frame
+  - hoist the 8-neighbour offsets to a module constant and walk them with a `for` loop (no per-tile `forEach` callbacks)
+  - sort `visibles` once with `Array.sort` instead of a quadratic sorted-insert loop
+- add unit-test suite `CameraBasedVisibility.spec.ts` covering visibility classification (create / reuse / remove), dependency-based caching, parallel-camera edge cases, distance-sorted `visibles`, helper contract (`frustumBox` / `box` / `centerWorld` / `map2dTile`), `offset` / `translate` outputs, and a low-GC regression check that the pooled `TileBox` instances are reused across non-cached calls
 - fix `Display`: `OnDisplayResize` now fires exactly once per frame (previously double-emitted on the first frame when the constructor measurement and the first-frame measurement differed)
 - add JSDoc for the `Display` resize model and the resize-related public API
 - add `Display` resize browser tests in `@spearwolf/twopoint5d-testing`

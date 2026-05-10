@@ -1,4 +1,4 @@
-import type { OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
+import type {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {Box3, Frustum, Line3, Matrix4, Plane, Vector2, Vector3} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
@@ -22,24 +22,26 @@ interface TileBox {
 const _v = new Vector3();
 const _m = new Matrix4();
 
+const NEIGHBOR_DX_DY: ReadonlyArray<readonly [number, number]> = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+];
+
 const toBoxId = (x: number, y: number) => `${x},${y}`;
 
-const toAABB2 = ({top, left, width, height}: TilesWithinCoords, xOffset: number, yOffset: number): AABB2 =>
-  new AABB2(left + xOffset, top + yOffset, width, height);
+const setAABB2 = (target: AABB2, {top, left, width, height}: TilesWithinCoords): AABB2 =>
+  target.set(left, top, width, height);
 
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, target = new Frustum()): Frustum =>
   target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
 
-const findTileIndex = (tiles: IMap2DTileCoords[], id: string): number => tiles.findIndex((tile) => tile.id === id);
-
-const insertAndSortByDistance = (arr: TileBox[], tile: TileBox): void => {
-  const index = arr.findIndex((t) => tile.distanceToCamera < t.distanceToCamera);
-  if (index === -1) {
-    arr.push(tile);
-  } else {
-    arr.splice(index, 0, tile);
-  }
-};
+const sortByDistance = (a: TileBox, b: TileBox): number => a.distanceToCamera! - b.distanceToCamera!;
 
 /**
  * This visibilitor assumes that the map2D layer is rendered in the 3D space on the XZ ground plane.
@@ -98,6 +100,27 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly visibles: TileBox[] = [];
   #visibleTiles?: IMap2DVisibleTiles;
 
+  // Per-frame scratch buffers — reused across calls to keep GC pressure low.
+  readonly #visitedIds = new Set<string>();
+  readonly #nextStack: TileBox[] = [];
+  readonly #previousTilesById = new Map<string, IMap2DTileCoords>();
+
+  // Pool of TileBox slots keyed by `${x},${y}`. Each slot owns its Box3/Vector3/Map2DTileCoords
+  // shells so subsequent frames can mutate them in place instead of allocating new ones.
+  readonly #tileBoxPool = new Map<string, TileBox>();
+
+  // Snapshot of the tile-grid parameters that drive `tile.coords`. When any of these change
+  // we invalidate the per-slot `coords` caches so the next frame recomputes them.
+  #cachedTileCoords: Map2DTileCoordsUtil | undefined;
+
+  // Hot-path scratch instances — kept on the class to share across frames.
+  readonly #scratchTranslate = new Vector3();
+  readonly #scratchOffset = new Vector2();
+  readonly #scratchCamDir = new Vector3();
+  readonly #scratchLineEnd = new Vector3();
+  readonly #scratchLineOfSight = new Line3();
+  readonly #scratchPlaneIntersection = new Vector3();
+
   constructor(camera?: PerspectiveCamera | OrthographicCamera) {
     this.camera = camera;
   }
@@ -112,6 +135,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       cameraMatrixWorld: this.camera.matrixWorld,
       cameraProjectionMatrix: this.camera.projectionMatrix,
     });
+  }
+
+  private invalidateTileCoordsCacheIfChanged(): void {
+    const current = this.map2dTileCoords;
+    if (this.#cachedTileCoords && this.#cachedTileCoords.equals(current)) return;
+
+    if (this.#cachedTileCoords) {
+      this.#cachedTileCoords.copy(current);
+    } else {
+      this.#cachedTileCoords = current.clone();
+    }
+
+    // Tile geometry parameters changed → cached `coords` on each pool slot is stale.
+    for (const tile of this.#tileBoxPool.values()) {
+      tile.coords = undefined;
+    }
   }
 
   computeVisibleTiles(
@@ -139,6 +178,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return this.#visibleTiles;
     }
 
+    this.invalidateTileCoordsCacheIfChanged();
+
     this.matrixWorld.copy(matrixWorld);
     this.#matrixWorldInverse.copy(matrixWorld).invert();
 
@@ -146,10 +187,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     if (pointOnPlane3D != null) {
       if (this.pointOnPlane == null) {
-        this.pointOnPlane = pointOnPlane3D;
-      } else {
-        this.pointOnPlane.copy(pointOnPlane3D);
+        this.pointOnPlane = new Vector3();
       }
+      this.pointOnPlane.copy(pointOnPlane3D);
     } else {
       this.pointOnPlane = null;
     }
@@ -175,11 +215,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | null | undefined {
-    const camWorldDir = this.camera.getWorldDirection(_v).setLength(this.camera.far);
+    const camWorldDir = this.camera.getWorldDirection(this.#scratchCamDir).setLength(this.camera.far);
     this.#cameraWorldPosition.setFromMatrixPosition(this.camera.matrixWorld);
 
-    const lineOfSightEnd = camWorldDir.clone().add(this.#cameraWorldPosition);
-    const lineOfSight = new Line3(this.#cameraWorldPosition, lineOfSightEnd);
+    this.#scratchLineEnd.copy(camWorldDir).add(this.#cameraWorldPosition);
+    this.#scratchLineOfSight.set(this.#cameraWorldPosition, this.#scratchLineEnd);
 
     // TODO check all frame corners of the view frustum instead of the view frustum center?
 
@@ -188,11 +228,32 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       .applyMatrix4(_m.makeTranslation(this.map2dTileCoords.xOffset, 0, this.map2dTileCoords.yOffset))
       .applyMatrix4(this.matrixWorld);
 
-    return this.planeWorld.intersectLine(lineOfSight, new Vector3());
+    return this.planeWorld.intersectLine(this.#scratchLineOfSight, this.#scratchPlaneIntersection);
+  }
+
+  private acquireTileBox(x: number, y: number, primary: boolean): TileBox {
+    const id = toBoxId(x, y);
+    let tile = this.#tileBoxPool.get(id);
+    if (tile === undefined) {
+      tile = {id, x, y, primary};
+      this.#tileBoxPool.set(id, tile);
+    } else {
+      tile.primary = primary;
+    }
+    return tile;
   }
 
   private findVisibleTiles(previousTiles: IMap2DTileCoords[]): IMap2DVisibleTiles | undefined {
-    previousTiles = previousTiles.slice(0);
+    // Reset reusable working buffers.
+    this.#visitedIds.clear();
+    this.#nextStack.length = 0;
+    this.visibles.length = 0;
+
+    // Index previousTiles by id for O(1) reuse lookups (replaces the original O(n²) splice loop).
+    this.#previousTilesById.clear();
+    for (let i = 0; i < previousTiles.length; ++i) {
+      this.#previousTilesById.set(previousTiles[i].id, previousTiles[i]);
+    }
 
     makeCameraFrustum(this.camera, this.#cameraFrustum);
 
@@ -203,7 +264,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.map2dTileCoords.tileHeight,
     );
 
-    const translate = new Vector3().setFromMatrixPosition(this.matrixWorld);
+    const translate = this.#scratchTranslate.setFromMatrixPosition(this.matrixWorld);
 
     this.#tileBoxMatrix.makeTranslation(
       this.map2dTileCoords.xOffset - this.#centerPoint2D.x + translate.x,
@@ -211,104 +272,90 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.map2dTileCoords.yOffset - this.#centerPoint2D.y + translate.z,
     );
 
-    const next: TileBox[] = [];
-
     for (let ty = 0; ty < primaryTiles.rows; ty++) {
       for (let tx = 0; tx < primaryTiles.columns; tx++) {
-        const x = primaryTiles.tileLeft + tx;
-        const y = primaryTiles.tileTop + ty;
-        next.push({
-          id: toBoxId(x, y),
-          x,
-          y,
-          primary: true,
-        });
+        this.#nextStack.push(this.acquireTileBox(primaryTiles.tileLeft + tx, primaryTiles.tileTop + ty, true));
       }
     }
 
     const reuseTiles: IMap2DTileCoords[] = [];
     const createTiles: IMap2DTileCoords[] = [];
 
-    const visitedIds = new Set<string>();
+    while (this.#nextStack.length > 0) {
+      const tile = this.#nextStack.pop()!;
+      if (this.#visitedIds.has(tile.id)) continue;
+      this.#visitedIds.add(tile.id);
 
-    this.visibles.length = 0;
+      tile.coords ??= this.map2dTileCoords.computeTilesWithinCoords(
+        tile.x * primaryTiles.tileWidth,
+        tile.y * primaryTiles.tileHeight,
+        1,
+        1,
+      );
 
-    while (next.length > 0) {
-      const tile = next.pop();
-      if (!visitedIds.has(tile.id)) {
-        visitedIds.add(tile.id);
+      if (tile.frustumBox === undefined) tile.frustumBox = new Box3();
+      this.setBox(tile.frustumBox, tile.coords, this.frustumBoxScale)
+        .applyMatrix4(this.#tileBoxMatrix)
+        .applyMatrix4(this.matrixWorld);
 
-        tile.coords ??= this.map2dTileCoords.computeTilesWithinCoords(
-          tile.x * primaryTiles.tileWidth,
-          tile.y * primaryTiles.tileHeight,
-          1,
-          1,
-        );
-
-        tile.frustumBox ??= this.makeBox(tile.coords, this.frustumBoxScale)
+      if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
+        if (tile.centerWorld === undefined) tile.centerWorld = new Vector3();
+        tile.centerWorld
+          .set(tile.coords.left + tile.coords.width / 2, 0, tile.coords.top + tile.coords.height / 2)
           .applyMatrix4(this.#tileBoxMatrix)
           .applyMatrix4(this.matrixWorld);
 
-        if (this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
-          tile.centerWorld = new Vector3(tile.coords.left + tile.coords.width / 2, 0, tile.coords.top + tile.coords.height / 2)
-            .applyMatrix4(this.#tileBoxMatrix)
-            .applyMatrix4(this.matrixWorld);
+        tile.distanceToCamera = tile.centerWorld.distanceTo(this.#cameraWorldPosition);
 
-          tile.distanceToCamera = tile.centerWorld.distanceTo(this.#cameraWorldPosition);
+        this.visibles.push(tile);
 
-          insertAndSortByDistance(this.visibles, tile);
+        if (tile.box === undefined) tile.box = new Box3();
+        this.setBox(tile.box, tile.coords).applyMatrix4(this.#tileBoxMatrix);
 
-          tile.box ??= this.makeBox(tile.coords).applyMatrix4(this.#tileBoxMatrix);
+        if (tile.map2dTile === undefined) {
+          tile.map2dTile = new Map2DTileCoords(tile.x, tile.y, new AABB2());
+        }
+        setAABB2(tile.map2dTile.view, tile.coords);
 
-          tile.map2dTile = new Map2DTileCoords(tile.x, tile.y, toAABB2(tile.coords, 0, 0));
+        const previous = this.#previousTilesById.get(tile.map2dTile.id);
+        if (previous !== undefined) {
+          this.#previousTilesById.delete(tile.map2dTile.id);
+          reuseTiles.push(tile.map2dTile);
+        } else {
+          createTiles.push(tile.map2dTile);
+        }
 
-          const previousTilesIndex = findTileIndex(previousTiles, Map2DTileCoords.createID(tile.x, tile.y));
-
-          if (previousTilesIndex >= 0) {
-            previousTiles.splice(previousTilesIndex, 1);
-            reuseTiles.push(tile.map2dTile);
-          } else {
-            createTiles.push(tile.map2dTile);
+        for (let i = 0; i < NEIGHBOR_DX_DY.length; ++i) {
+          const dx = NEIGHBOR_DX_DY[i][0];
+          const dy = NEIGHBOR_DX_DY[i][1];
+          const tx = tile.coords.tileLeft + dx;
+          const ty = tile.coords.tileTop + dy;
+          if (!this.#visitedIds.has(toBoxId(tx, ty))) {
+            this.#nextStack.push(this.acquireTileBox(tx, ty, false));
           }
-
-          [
-            [0, -1],
-            [1, 0],
-            [0, 1],
-            [-1, 0],
-            [-1, -1],
-            [1, -1],
-            [1, 1],
-            [-1, 1],
-          ].forEach(([dx, dy]) => {
-            const [tx, ty] = [tile.coords.tileLeft + dx, tile.coords.tileTop + dy];
-            const tileId = toBoxId(tx, ty);
-
-            if (!visitedIds.has(tileId)) {
-              next.push({
-                id: tileId,
-                x: tx,
-                y: ty,
-              });
-            }
-          });
         }
       }
     }
 
-    const offset = new Vector2(
+    this.visibles.sort(sortByDistance);
+
+    const tiles: IMap2DTileCoords[] = new Array(this.visibles.length);
+    for (let i = 0; i < this.visibles.length; ++i) tiles[i] = this.visibles[i].map2dTile!;
+
+    const removeTiles: IMap2DTileCoords[] = [];
+    for (const t of this.#previousTilesById.values()) removeTiles.push(t);
+
+    this.#scratchOffset.set(
       this.map2dTileCoords.xOffset - this.#centerPoint2D.x,
       this.map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
 
     return {
-      tiles: this.visibles.map((visible) => visible.map2dTile),
-
+      tiles,
       createTiles,
       reuseTiles,
-      removeTiles: previousTiles,
-
-      offset,
+      removeTiles,
+      offset: this.#scratchOffset,
       translate,
     };
   }
@@ -320,11 +367,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     target.set(_v.x, _v.z);
   }
 
-  private makeBox({top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
+  private setBox(target: Box3, {top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
     const sw = width * scale - width;
     const sh = height * scale - height;
     const ground = this.depth * -0.5 * scale;
     const ceiling = this.depth * 0.5 * scale;
-    return new Box3(new Vector3(left - sw, ground, top - sh), new Vector3(left + width + sw, ceiling, top + height + sh));
+    target.min.set(left - sw, ground, top - sh);
+    target.max.set(left + width + sw, ceiling, top + height + sh);
+    return target;
   }
 }

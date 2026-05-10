@@ -110,10 +110,22 @@ set refCount(value: number) {
 
 …wobei der TextureStore dann auf das `'disposable'`-Signal hört und den Eintrag aus `#resources` löscht.
 
-#### 🟡 P3 — `CameraBasedVisibility.computeVisibleTiles()` per-Frame-Allocations
-**Datei:** `packages/twopoint5d/src/map2d/...` (Agent-Verweis: Zeilen 195, 232, 299–302)
+#### ✅ ERLEDIGT — `CameraBasedVisibility.computeVisibleTiles()` per-Frame-Allocations
+**Datei:** `packages/twopoint5d/src/map2d/CameraBasedVisibility.ts`
 
-Pro Frame werden `previousTiles.slice(0)`, `new Set<string>()` und `new Vector2()` erzeugt. Bei großen Maps und 60 Hz erzeugt das messbaren GC-Druck. Ein wiederverwendbares Set + zwei vorallokierte `Vector2` reduziert Allokationen ohne Architekturänderung. **Vor dem Fix verifizieren mit einem Profiler-Snapshot** — der Schaden ist nur dann real, wenn die Seite tatsächlich tausende Tiles pro Frame iteriert.
+Ursprünglicher Befund: pro Frame entstanden `previousTiles.slice(0)`, ein neues `visitedIds`-Set, ein `next`-Stack, plus pro sichtbarem Tile ein `TileBox`, zwei `Box3` (jeweils mit zwei `Vector3` im Konstruktor), ein `Vector3` (`centerWorld`), eine `Map2DTileCoords` mit `AABB2` und ein 8-Element-Nachbar-Literal in der inneren Schleife. Zusätzlich war die Wiederverwendungs-Suche (`findIndex` + `splice`) O(n²) und die Distanz-Sortierung (`insertAndSortByDistance`) ebenfalls O(n²).
+
+**Umgesetzte Lösung:**
+- **TileBox-Pool** (`#tileBoxPool: Map<id, TileBox>`): pro Tile-Id (auch über Frames hinweg) genau ein `TileBox` mit eigenen `Box3`/`Vector3`/`Map2DTileCoords`/`AABB2`-Shells. Jeden Frame werden nur die _Inhalte_ über `Box3.min/max.set(…)`, `Vector3.set(…)`, `AABB2.set(…)` mutiert — keine Neuallokation der schweren Three.js-Objekte.
+- **Cache-Invalidierung**: ändert sich `tileWidth`/`tileHeight`/`xOffset`/`yOffset` (per `Map2DTileCoordsUtil.equals()`), wird der gecachte `tile.coords`-Slot pro Pool-Eintrag verworfen — `Box3`/`Vector3`-Shells bleiben.
+- **`previousTiles`-Lookup**: O(1)-`Map<id, IMap2DTileCoords>` statt O(n)-`findIndex` + O(n)-`splice` — Gesamtkosten der Klassifikation (reuse / create / remove) sinken von O(n²) auf O(n).
+- **Reusable Working-Buffers** als Klassen-Felder: `#visitedIds`, `#nextStack`, `#previousTilesById`, `#scratchTranslate`/`#scratchOffset`/`#scratchCamDir`/`#scratchLineEnd`/`#scratchLineOfSight`/`#scratchPlaneIntersection`. `Set.clear()` / `length = 0` statt `new`.
+- **Nachbarn-Iteration**: 8 Offsets als modul-globaler `NEIGHBOR_DX_DY`-Konstantenarray, `for`-Schleife statt `Array#forEach` — kein per-Tile-Callback-Allocation.
+- **Sortierung**: einmaliges `Array#sort` mit `(a,b) => a.distanceToCamera - b.distanceToCamera` ersetzt das O(n²)-`insertAndSortByDistance` während der Traversierung.
+
+Helper-Vertrag (`CameraBasedVisibilityHelpers` liest `tile.frustumBox`, `tile.box`, `tile.primary`) bleibt unverändert.
+
+**Test-Coverage:** neue `CameraBasedVisibility.spec.ts` (15 Cases): undefined-on-no-camera, Visible-Tiles-Tile-Center, parallel-zur-Ebene mit/ohne `previousTiles`, Cache-Pfad bei unveränderten Deps, Klassifikation create/reuse/remove über Frames, sortierte `visibles`, Helper-Kontrakt, `tile.view`-Aufbau, `offset`/`translate`-Werte, `matrixWorld`-Translation, sowie ein Low-GC-Regressionscheck, der die Identität der gepoolten `TileBox`-, `Box3`- und `Vector3`-Instanzen zwischen non-cached Frames mit identischer Tile-Sichtbarkeit asserted.
 
 ---
 
@@ -186,7 +198,7 @@ Damit der Backlog nicht nur wie eine Mängelliste wirkt, hier explizit das **Sol
 | Modul | Source-Dateien | Spec-Dateien | % | Bewertung |
 |---|---|---|---|---|
 | `vertex-objects/` | 26 | 10 | ~38 % | ✓ Gut, kritische Pfade abgedeckt |
-| `map2d/` | 28 | 7 | ~25 % | ⚠️ Streaming-Logik kaum geprüft |
+| `map2d/` | 28 | 8 | ~29 % | ⚠️ Streaming-Logik kaum geprüft; `CameraBasedVisibility.spec.ts` (15 Cases) seit der Performance-Optimierung neu hinzugekommen |
 | `texture/` | 14 | 5 | ~36 % | ✓ TextureAtlas exzellent (`TextureAtlas.spec.ts`, 230 Zeilen, randomisierte Permutationen) |
 | `stage/` | 10 | 5 | ~50 % | ✓ Projection-Tests gut, `Stage2D.spec.ts` aber nur 17 Zeilen |
 | `display/` | 10 | 2 | ~20 % | ⚠️ `Chronometer` + `DisplayStateMachine` als Vitest-Specs; das Resize-Verhalten der `Display`-Klasse wird seit `display-resize.test.js` (13 Cases, Browser) abgedeckt — übrige Lifecycle-Bereiche der Klasse weiterhin ungetestet |
@@ -417,7 +429,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 22. 🟢 `publint`/`arethetypeswrong` in CI (`arethetypeswrong` läuft bereits via `checkPkgTypes`, müsste nur als blocking gate definiert werden).
 23. 🟢 `Display.pixelZoom`-Renaming.
 24. 🟢 `ARCHITECTURE.md`.
-25. 🟢 `CameraBasedVisibility` Per-Frame-Allocs reduzieren (vorher Profiler-Snapshot!).
+25. ✅ `CameraBasedVisibility` Per-Frame-Allocs reduzieren — TileBox-Pool, O(n)-Map-Lookup, reused Set/Stack/Vectors, Single-Sort statt O(n²)-Insert (siehe §2.1).
 26. 🟢 `tsup`-Migration evaluieren (oder devDep entfernen).
 
 ---
