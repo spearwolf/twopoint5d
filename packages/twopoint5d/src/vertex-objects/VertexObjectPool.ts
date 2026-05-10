@@ -89,6 +89,28 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   }
 
   /**
+   * In addition to {@link VOBufferPool#dispose}, this also unlinks the buffer
+   * reference from every still-tracked vertex object and drops the internal
+   * VO index. Registered `onDestroyVO` callbacks are invoked for each VO that
+   * was alive at the time of the call so consumers can release scene-graph
+   * references.
+   */
+  override dispose(): void {
+    if (this.isDisposed) return;
+    for (let i = 0; i < this.#voIndex.length; i++) {
+      const vo = this.#voIndex[i];
+      if (vo != null) {
+        if (this.onDestroyVO != null) {
+          this.onDestroyVO(vo);
+        }
+        VOUtils.clearBuffer(vo);
+      }
+    }
+    this.#voIndex.length = 0;
+    super.dispose();
+  }
+
+  /**
    * The fastest variant is when the VO was the last one created,
    * otherwise the underlying buffer(s) have to be recopied internally.
    */

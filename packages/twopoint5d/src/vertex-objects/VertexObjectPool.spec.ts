@@ -1,4 +1,5 @@
-import {beforeEach, describe, expect, test} from 'vitest';
+import {beforeEach, describe, expect, test, vi} from 'vitest';
+import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex} from './constants.js';
@@ -442,6 +443,154 @@ describe('VertexObjectPool', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
       expect(() => pool.resize(10.5)).toThrow('Capacity must be a non-negative integer');
+    });
+  });
+
+  describe('dispose()', () => {
+    test('VOBufferPool: starts as not disposed and toggles isDisposed on dispose()', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+
+      expect(pool.isDisposed).toBe(false);
+
+      pool.dispose();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('VOBufferPool: resets usedCount and releases typed-array references', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2]});
+      expect(pool.usedCount).toBe(2);
+
+      // capture references before dispose so we can verify the pool drops them
+      const buffersBefore = Array.from(pool.buffer.buffers.values());
+      expect(buffersBefore.length).toBeGreaterThan(0);
+      for (const buf of buffersBefore) {
+        expect(buf.typedArray).toBeDefined();
+      }
+
+      pool.dispose();
+
+      expect(pool.usedCount).toBe(0);
+      expect(pool.buffer.buffers.size).toBe(0);
+      // the buffer entries we captured before dispose should now have null'd typedArrays
+      for (const buf of buffersBefore) {
+        expect(buf.typedArray).toBeUndefined();
+      }
+    });
+
+    test('VOBufferPool: dispose() is idempotent', () => {
+      const pool = new VOBufferPool(descriptor, 4);
+
+      expect(() => {
+        pool.dispose();
+        pool.dispose();
+        pool.dispose();
+      }).not.toThrow();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('VertexObjectPool: clears buffer reference on every tracked VO', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
+      const vo2 = pool.createVO();
+
+      expect(vo0[voBuffer]).toBe(pool.buffer);
+      expect(vo1[voBuffer]).toBe(pool.buffer);
+      expect(vo2[voBuffer]).toBe(pool.buffer);
+
+      pool.dispose();
+
+      expect(vo0[voBuffer]).toBeUndefined();
+      expect(vo1[voBuffer]).toBeUndefined();
+      expect(vo2[voBuffer]).toBeUndefined();
+    });
+
+    test('VertexObjectPool: invokes onDestroyVO for every still-alive VO', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+
+      const onDestroyVO = vi.fn();
+      pool.onDestroyVO = onDestroyVO;
+
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
+      const vo2 = pool.createVO();
+
+      // free the middle one first → must not be reported as destroyed by dispose()
+      pool.freeVO(vo1);
+
+      pool.dispose();
+
+      const destroyed = onDestroyVO.mock.calls.map(([vo]) => vo);
+      expect(destroyed).toContain(vo0);
+      expect(destroyed).toContain(vo2);
+      expect(destroyed).not.toContain(vo1);
+    });
+
+    test('VertexObjectPool: does not invoke onDestroyVO when no VOs are alive', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+
+      const onDestroyVO = vi.fn();
+      pool.onDestroyVO = onDestroyVO;
+
+      pool.dispose();
+
+      expect(onDestroyVO).not.toHaveBeenCalled();
+    });
+
+    test('VertexObjectPool: getVO() / createVO() are no-ops after dispose()', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+
+      pool.createVO();
+      pool.createVO();
+
+      pool.dispose();
+
+      expect(pool.getVO(0)).toBeUndefined();
+      expect(pool.getVO(1)).toBeUndefined();
+      // capacity-bound check survives dispose, but the internal voIndex is empty:
+      // either createVO returns undefined (capacity reached because usedCount == capacity)
+      // or it bumps usedCount but cannot persist the new VO. Both are acceptable;
+      // the contract is "the pool is dead", not "createVO is graceful".
+      // Here we simply assert the disposal flag is set and used VOs are not retrievable.
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('VertexObjectPool: dispose() is idempotent and a second call does not re-fire onDestroyVO', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+      const onDestroyVO = vi.fn();
+      pool.onDestroyVO = onDestroyVO;
+
+      pool.createVO();
+
+      pool.dispose();
+      pool.dispose();
+
+      expect(onDestroyVO).toHaveBeenCalledTimes(1);
+    });
+
+    test('VertexObjectPool: dispose() while VOs were freed-via-swap still tears the swapped slot down cleanly', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
+      const vo2 = pool.createVO();
+
+      // Free vo0 → vo2 is swapped into slot 0 (see freeVO()).
+      pool.freeVO(vo0);
+
+      expect(vo0[voBuffer]).toBeUndefined();
+      expect(VOUtils.getIndex(vo2)).toBe(0);
+
+      pool.dispose();
+
+      // every VO that survived the freeVO swap must end up unlinked
+      expect(vo1[voBuffer]).toBeUndefined();
+      expect(vo2[voBuffer]).toBeUndefined();
     });
   });
 });

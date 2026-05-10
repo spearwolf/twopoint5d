@@ -1,6 +1,6 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
-import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
+import type {TypedArray, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 export class VOBufferPool {
   readonly descriptor: VertexObjectDescriptor;
@@ -9,6 +9,7 @@ export class VOBufferPool {
   buffer: VertexObjectBuffer;
 
   #usedCount = 0;
+  #disposed = false;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
@@ -35,8 +36,38 @@ export class VOBufferPool {
     return this.capacity - this.#usedCount;
   }
 
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
   clear(): void {
     this.usedCount = 0;
+  }
+
+  /**
+   * Releases the underlying typed-array memory of this pool eagerly.
+   *
+   * In contrast to {@link clear} (which only resets `usedCount` to `0`), this
+   * method drops every reference to the typed-arrays held by `pool.buffer.buffers`
+   * so the underlying `ArrayBuffer`s can be reclaimed by the garbage collector
+   * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
+   * the array reference. After `dispose()` the pool is **dead**: any further
+   * read/write operation on its vertex objects will fail. The method is idempotent.
+   *
+   * NOTE: `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
+   * that were created on top of this pool — the geometry that owns those is
+   * responsible for calling its own `dispose()` (see `VOBufferGeometry`).
+   */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#usedCount = 0;
+    if (this.buffer != null) {
+      for (const buffer of this.buffer.buffers.values()) {
+        buffer.typedArray = undefined as unknown as TypedArray;
+      }
+      this.buffer.buffers.clear();
+    }
   }
 
   createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIndex: number] {

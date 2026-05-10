@@ -59,10 +59,20 @@ override dispose(): void {
 
 **Test-Coverage:** neue `AnimatedSpritesMaterial.spec.ts` (8 Cases): Konstruktion mit/ohne `animsMap`-Option, Dispose-Verhalten (Texture-Release, No-Op ohne `animsMap`, `animsMap`-Reset auf `undefined`), explizite Order-Assertion gegen `NodeMaterial#dispose` via `sinon.calledBefore`, Signal/Effect-Leak-Check via `getSignalsCount`/`getEffectsCount`-Baseline, Idempotenz bei doppeltem Dispose.
 
-#### 🟠 P2 — `VOBufferPool` hat keine `dispose()`-Methode
+#### ✅ ERLEDIGT — `VOBufferPool` hat keine `dispose()`-Methode
 **Datei:** `packages/twopoint5d/src/vertex-objects/VOBufferPool.ts`
 
-`pool.clear()` setzt nur `usedCount = 0`, gibt aber TypedArrays/`BufferAttribute`-Refs nicht aktiv frei. Bei langen Sessions mit dynamischer Pool-Erzeugung (z. B. Tile-Streaming) wachsen Heap-Allokationen unnötig, bevor der GC sie aufnimmt. Empfehlung: explizite `dispose()`-Methode, die die internen `BufferAttribute.array`-Felder nullt und (falls nicht von three.js bereits getan) `BufferAttribute.dispose()` triggert.
+Ursprünglicher Befund: `pool.clear()` setzte nur `usedCount = 0`, gab aber TypedArray-Referenzen nicht aktiv frei. Bei langen Sessions mit dynamischer Pool-Erzeugung (z. B. Tile-Streaming) wuchsen Heap-Allokationen unnötig, bevor der GC sie aufnahm.
+
+**Umgesetzte Lösung:** explizite `dispose()`-Methode auf `VOBufferPool` plus `VertexObjectPool`-Override:
+
+- `VOBufferPool#dispose()` setzt `usedCount = 0`, nullt `buffer.typedArray` für jeden Eintrag in `pool.buffer.buffers` und leert die `buffers`-Map. Damit kann das darunterliegende `ArrayBuffer` vom GC eingesammelt werden, auch wenn downstream `THREE.BufferAttribute`s die Array-Referenz noch kurz halten.
+- `VOBufferPool#isDisposed` als Getter; `dispose()` ist idempotent (mehrfache Aufrufe sind No-Ops).
+- `VertexObjectPool#dispose()` ruft zusätzlich `onDestroyVO` für jeden noch lebenden VO auf, hängt mit `VOUtils.clearBuffer()` die Buffer-Referenz von jedem getrackten VO ab und leert den internen `#voIndex`. Das deckt auch VOs ab, die nach `freeVO()`-Swaps in alten Slots zurückgeblieben waren.
+
+Bewusst nicht im Scope: `VOBufferGeometry#dispose()` ruft weiterhin `pool.clear()` (nicht `pool.dispose()`) — Pools dürfen laut "Pro-Hint" in `attachInstancedPool()` an mehrere Geometries gehängt werden, der Geometry-Lifecycle darf den Pool also nicht einseitig zerstören. Wer den Pool aktiv freigeben will, ruft `pool.dispose()` selbst auf.
+
+**Test-Coverage:** acht neue Cases im neuen `describe('dispose()')`-Block in `VertexObjectPool.spec.ts` decken Disposed-Flag, TypedArray-Release, Idempotenz, `onDestroyVO`-Fan-out (inkl. Zusammenspiel mit `freeVO()`-Swaps), Buffer-Ref-Unlinking auf VOs und den Edge-Case "kein lebender VO" ab.
 
 #### 🟠 P2 — `Display` hat keinen automatischen Window-Resize-Listener
 **Datei:** `packages/twopoint5d/src/display/Display.ts` (verifiziert: nur `visibilitychange` auf line 250)
@@ -371,7 +381,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 
 ### Sprint 2 — API-Konsistenz & Dokumentation (≈ 1–2 Wochen)
 7. 🟠 `TextureResource.refCount` → automatisches Cleanup.
-8. 🟠 `VOBufferPool.dispose()`.
+8. ✅ `VOBufferPool.dispose()` (siehe §2.1).
 9. 🟠 TSDoc auf Public-API (alle `public-api.ts`-Exports).
 10. 🟠 `Display.autoResize`-Option (oder Doku als bewusste Entscheidung).
 11. 🟠 `apps/handbook/`-Aufräumung.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- add `dispose()` method to `VOBufferPool` (and the `VertexObjectPool` subclass)
+  - releases the underlying typed-array memory eagerly by dropping every reference held in `pool.buffer.buffers` so the `ArrayBuffer`s can be reclaimed by the garbage collector even if downstream `THREE.BufferAttribute`s still hold a transient copy of the array reference — useful for long-running sessions with dynamic pool creation/teardown (e.g. tile streaming)
+  - `usedCount` is reset to `0` and `isDisposed` flips to `true`; subsequent `dispose()` calls are no-ops (idempotent)
+  - the `VertexObjectPool` override additionally invokes `onDestroyVO` for every still-alive vertex object, unlinks the buffer reference from each tracked VO and drops the internal VO index — VOs that survived earlier `freeVO()` swaps are unlinked too
+- add `isDisposed` getter on `VOBufferPool`
+- add unit tests covering `dispose()` for both `VOBufferPool` and `VertexObjectPool`: idempotency, typed-array release, used-count reset, `onDestroyVO` fan-out (incl. interaction with `freeVO()`), buffer-reference unlinking, and the no-VOs-alive case
 - fix `InstancedVOBufferGeometry#dispose()`: extra instanced pools attached via `attachInstancedPool()` are now actually cleared, and the `extraInstancedBuffers` / `extraInstancedBufferSerials` bookkeeping maps are emptied
 - add `options.autoDispose` parameter to `InstancedVOBufferGeometry#attachInstancedPool(name, pool, options?)`
   - defaults to `true` — the attached pool is cleared together with the geometry on `dispose()`
