@@ -1,4 +1,4 @@
-import {emit, eventize, off, on, once, onceAsync, retain, retainClear} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on, once, onceAsync, retain, retainClear} from '@spearwolf/eventize';
 import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,
@@ -100,6 +100,9 @@ type EventHandler = (handler: (props: DisplayEventProps) => any) => ReturnType<t
  * so subscribers attaching after the first frame still receive the latest
  * size on subscription.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Display extends EventizedObject {}
+
 export class Display {
   /**
    * Hard upper bound (per axis, in device pixels) for the canvas size
@@ -650,16 +653,16 @@ export class Display {
     }
   };
 
-  readonly onResize = on.bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
+  readonly onResize = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
 
-  readonly onRenderFrame = on.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
-  readonly onNextFrame = once.bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
-  readonly nextFrame = onceAsync.bind(undefined, this, OnDisplayRenderFrame) as unknown as Promise<DisplayEventProps>;
+  readonly onRenderFrame = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
+  readonly onNextFrame = (once as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
+  readonly nextFrame = (onceAsync as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as Promise<DisplayEventProps>;
 
-  readonly onInit = on.bind(undefined, this, OnDisplayInit) as unknown as EventHandler;
-  readonly onStart = on.bind(undefined, this, OnDisplayStart) as unknown as EventHandler;
-  readonly onRestart = on.bind(undefined, this, OnDisplayRestart) as unknown as EventHandler;
-  readonly onPause = on.bind(undefined, this, OnDisplayPause) as unknown as EventHandler;
+  readonly onInit = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayInit) as unknown as EventHandler;
+  readonly onStart = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayStart) as unknown as EventHandler;
+  readonly onRestart = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRestart) as unknown as EventHandler;
+  readonly onPause = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayPause) as unknown as EventHandler;
 
-  readonly onDispose = once.bind(undefined, this, OnDisplayDispose) as unknown as EventHandler;
+  readonly onDispose = (once as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayDispose) as unknown as EventHandler;
 }

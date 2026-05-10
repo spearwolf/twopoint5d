@@ -1,4 +1,4 @@
-import {emit, off, on, once, onceAsync, retain} from '@spearwolf/eventize';
+import {emit, type EventizedObject, off, on, once, onceAsync, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import type {Texture, WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -53,6 +53,9 @@ const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): T
   }
   return undefined;
 };
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TextureStore extends EventizedObject {}
 
 export class TextureStore {
   static async load(url: string | URL): Promise<TextureStore> {
@@ -180,7 +183,7 @@ export class TextureStore {
 
       if (resource) {
         this.#resources.set(id, resource);
-        on(this, resource);
+        on(this as TextureStore, resource);
         updatedResources.push(resource);
       }
     }

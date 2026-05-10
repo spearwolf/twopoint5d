@@ -1,4 +1,4 @@
-import {emit, eventize, off, once, retain} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, once, retain} from '@spearwolf/eventize';
 import type { Effect, Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type { WebGPURenderer} from 'three/webgpu';
@@ -67,6 +67,9 @@ const cmpTileSetOptions = (a: TileSetOptions | undefined, b: TileSetOptions | un
 };
 
 const OnDispose = 'dispose';
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TextureResource extends EventizedObject {}
 
 export class TextureResource {
   static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): TextureResource {

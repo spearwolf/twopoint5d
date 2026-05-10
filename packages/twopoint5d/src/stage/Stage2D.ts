@@ -1,4 +1,4 @@
-import {emit, eventize, retain} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, retain} from '@spearwolf/eventize';
 import {type Camera, Color, Scene} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
@@ -23,6 +23,9 @@ import type {IStage} from './IStage.js';
  * but this is not always the case.
  * The StageRenderer passes the container size to the stage by calling the resize() method.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Stage2D extends EventizedObject {}
+
 export class Stage2D implements IStage {
   isStage2D = true;
 

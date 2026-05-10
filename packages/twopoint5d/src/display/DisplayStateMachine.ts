@@ -1,6 +1,9 @@
-import {emit, eventize} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize} from '@spearwolf/eventize';
 
 export type DisplayStateName = 'new' | 'running' | 'paused';
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface DisplayStateMachine extends EventizedObject {}
 
 export class DisplayStateMachine {
   static NEW: DisplayStateName = 'new';

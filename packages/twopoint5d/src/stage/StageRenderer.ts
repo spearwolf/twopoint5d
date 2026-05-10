@@ -1,4 +1,4 @@
-import {emit, eventize, once} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, once} from '@spearwolf/eventize';
 import {Color, type WebGPURenderer} from 'three/webgpu';
 import {Display} from '../display/Display.js';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
@@ -15,6 +15,9 @@ interface StageItem {
 }
 
 const isStageRenderer = (obj: unknown): obj is StageRenderer => (obj as {isStageRenderer: boolean})?.isStageRenderer === true;
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface StageRenderer extends EventizedObject {}
 
 export class StageRenderer implements IStage {
   readonly isStageRenderer = true;

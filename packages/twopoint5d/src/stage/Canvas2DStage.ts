@@ -1,4 +1,4 @@
-import { emit, eventize } from '@spearwolf/eventize';
+import { emit, type EventizedObject, eventize } from '@spearwolf/eventize';
 import type { WebGPURenderer} from 'three/webgpu';
 import { Sprite, SpriteMaterial, Texture, type Scene } from 'three/webgpu';
 import { TextureFactory } from '../texture/TextureFactory.js';
@@ -7,6 +7,9 @@ import { Stage2D } from './Stage2D.js';
 import { StageRenderer } from './StageRenderer.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Canvas2DStage extends EventizedObject {}
 
 export class Canvas2DStage {
   readonly renderer: WebGPURenderer;

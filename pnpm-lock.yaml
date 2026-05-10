@@ -7,11 +7,11 @@ settings:
 catalogs:
   default:
     '@spearwolf/eventize':
-      specifier: ^4.0.2
-      version: 4.0.2
+      specifier: ^4.3.1
+      version: 4.3.1
     '@spearwolf/signalize':
-      specifier: ^0.27.2
-      version: 0.27.2
+      specifier: ^0.28.0
+      version: 0.28.0
     '@types/three':
       specifier: ~0.183.1
       version: 0.183.1
@@ -121,10 +121,10 @@ importers:
         version: 1.3.0
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.3.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.27.2(@spearwolf/eventize@4.0.2)
+        version: 0.28.0(@spearwolf/eventize@4.3.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -173,10 +173,10 @@ importers:
     dependencies:
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.3.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.27.2(@spearwolf/eventize@4.0.2)
+        version: 0.28.0(@spearwolf/eventize@4.3.1)
       three:
         specifier: 'catalog:'
         version: 0.183.1
@@ -188,10 +188,10 @@ importers:
         version: 1.57.0
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 4.0.2
+        version: 4.3.1
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.27.2(@spearwolf/eventize@4.0.2)
+        version: 0.28.0(@spearwolf/eventize@4.3.1)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -1567,15 +1567,15 @@ packages:
   '@spearwolf/astro-rainbow-line@1.3.0':
     resolution: {integrity: sha512-zX/JWrxWmBcEl0i3G/mL+CBP0FaE08F7lWYqbVGfjwVKYdtVATk16dcZsRD6IoEvGvlm0mQCELMd75OEpbqA3g==}
 
-  '@spearwolf/eventize@4.0.2':
-    resolution: {integrity: sha512-CyyT2MXoRmp9yRVz2f7xyPhiSr3Gnn4m5Ofu9oN7VH4uS1Evlji5onP5UCdJW8H+ZMVn25DQn3OAJLGRi/ymLA==}
+  '@spearwolf/eventize@4.3.1':
+    resolution: {integrity: sha512-QrHS2anine6WGfkHh/jg3WPsKa5StLyrh343XR9t68FkX1SOZ9R9S1cnk37YqmvukCZNz44FOe/mWHPR9xbP8A==}
     engines: {node: '>=18.16'}
 
-  '@spearwolf/signalize@0.27.2':
-    resolution: {integrity: sha512-r/owAixCfvZNNi6LtcKNMLNBbqMc7Ai7DFT2Zs4Yh03SLmR5L/p/uCOVzG3Ck3/LQjZCHSek57/1DQ/AHEfIvw==}
+  '@spearwolf/signalize@0.28.0':
+    resolution: {integrity: sha512-YoQP/S4teskV6ADycrvytn/1zEGsDEkNGmPtXXEmjwbSgnabppUnYmZpv+q1OAxEfY3zRQPJ3Ud3qwAdcQSHhQ==}
     engines: {node: '>=24.13'}
     peerDependencies:
-      '@spearwolf/eventize': ^4.0.2
+      '@spearwolf/eventize': ^4.3.1
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -6927,11 +6927,11 @@ snapshots:
 
   '@spearwolf/astro-rainbow-line@1.3.0': {}
 
-  '@spearwolf/eventize@4.0.2': {}
+  '@spearwolf/eventize@4.3.1': {}
 
-  '@spearwolf/signalize@0.27.2(@spearwolf/eventize@4.0.2)':
+  '@spearwolf/signalize@0.28.0(@spearwolf/eventize@4.3.1)':
     dependencies:
-      '@spearwolf/eventize': 4.0.2
+      '@spearwolf/eventize': 4.3.1
 
   '@standard-schema/spec@1.1.0': {}
 

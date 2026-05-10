@@ -1,4 +1,4 @@
-import {emit, eventize, off} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off} from '@spearwolf/eventize';
 
 import {Stylesheets} from '../display/Stylesheets.js';
 import {InputControlBase} from './InputControlBase.js';
@@ -90,6 +90,9 @@ export interface PanControl2DOptions {
   disablePointer?: boolean;
   disableKeyboard?: boolean;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface PanControl2D extends EventizedObject {}
 
 export class PanControl2D extends InputControlBase {
   pixelsPerSecond = 0;

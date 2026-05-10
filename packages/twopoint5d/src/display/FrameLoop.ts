@@ -1,4 +1,4 @@
-import {emit, eventize, off, on} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on} from '@spearwolf/eventize';
 
 interface ISetAnimationLoop {
   setAnimationLoop(callback: (now: number) => unknown): unknown;
@@ -12,6 +12,9 @@ const MEASURE_COLLECTION_SIZE = 10;
 
 const rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
 let rafUniqueInstance: RAF = null;
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface RAF extends EventizedObject {}
 
 class RAF {
   static get(renderer?: ISetAnimationLoop): RAF {
@@ -97,6 +100,9 @@ class RAF {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface FrameLoop extends EventizedObject {}
+
 export class FrameLoop {
   static OnFrame = OnFrame;
 
@@ -135,7 +141,7 @@ export class FrameLoop {
       on(this.raf, OnRAF, this);
     }
 
-    on(this, FrameLoop.OnFrame, target);
+    on(this as FrameLoop, FrameLoop.OnFrame, target);
 
     return () => {
       this.stop(target);
