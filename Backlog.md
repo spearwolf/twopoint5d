@@ -74,13 +74,27 @@ Bewusst nicht im Scope: `VOBufferGeometry#dispose()` ruft weiterhin `pool.clear(
 
 **Test-Coverage:** acht neue Cases im neuen `describe('dispose()')`-Block in `VertexObjectPool.spec.ts` decken Disposed-Flag, TypedArray-Release, Idempotenz, `onDestroyVO`-Fan-out (inkl. Zusammenspiel mit `freeVO()`-Swaps), Buffer-Ref-Unlinking auf VOs und den Edge-Case "kein lebender VO" ab.
 
-#### 🟠 P2 — `Display` hat keinen automatischen Window-Resize-Listener
-**Datei:** `packages/twopoint5d/src/display/Display.ts` (verifiziert: nur `visibilitychange` auf line 250)
+#### ✅ ERLEDIGT — `Display` braucht keinen automatischen Window-Resize-Listener
+**Datei:** `packages/twopoint5d/src/display/Display.ts`
 
-`Display.resize()` ist vorhanden, wird aber nie automatisch durch ein Window-Event getriggert. In Fullscreen-/`resize-to="fullscreen"`-Setups muss der User selbst auf `window.resize` lauschen, was in der Lookbook-Konfiguration via Astro-Page funktioniert, in 0815-Anwendungen aber nicht erwartet wird. Mehrere Optionen:
+Ursprünglicher Befund: `Display.resize()` werde nie automatisch durch ein Window-Event getriggert.
 
-- Optional-Flag `autoResize: 'window' | 'parent' | false` (default `'window'`) im Constructor, mit sauberem Cleanup in `dispose()`.
-- Oder dokumentieren als bewusste Design-Entscheidung mit Beispiel-Snippet im README.
+**Auflösung als bewusste Design-Entscheidung:** `Display.resize()` läuft am Anfang jedes Frames innerhalb von `renderFrame()` (Display.ts:447). Damit deckt der per-Frame-Aufruf nicht nur Window-Resizes, sondern auch Container-Reflows, `devicePixelRatio`-Änderungen, `resize-to`-Attribut-Mutationen und runtime-Swaps von `resizeToElement` einheitlich ab — ohne DOM-Listener, die in `dispose()` aufgeräumt werden müssten. Re-Computations sind günstig (Hash-Vergleich kürzt No-Ops ab). Ein zusätzlicher `window.resize`-Listener wäre redundant.
+
+**Umgesetzte Aktionen:**
+- Class-Level-JSDoc auf `Display` ergänzt mit explizitem "Resize model"-Abschnitt: Resolution-Order (resize-to-Attribut → resizeToCallback → resizeToElement), Fullscreen-CSS-Toggle-Verhalten, Emission-Kontrakt von `OnDisplayResize`.
+- Method-JSDoc auf `Display.resize()`, `Display.renderFrame()`, sowie auf `resizeToElement` / `resizeToCallback` / `resizeToAttributeEl` / `MaxResolution`.
+- Browser-Test-Suite `packages/twopoint5d-testing/test/display-resize.test.js` mit 13 Cases auf Chromium + Firefox: HTMLElement-Host als Size-Source, `resizeToElement`-Option und Runtime-Swap, `resizeToCallback`-Override, Reaktion auf Container-Resize ohne DOM-Listener, `OnDisplayResize`-Emit-Dedup bei unverändertem Hash, `resize-to="self"` / `"window"` / CSS-Selector, Fullscreen-CSS-Class-Toggle, `pixelZoom`-Skalierung mit `pixelRatio === 1`, `MaxResolution`-Clamp, sowie Initial-Frame-Emit-Garantie.
+- Dummy-Browsertest `number-or-the-beast.test.js` entfernt.
+
+#### ✅ ERLEDIGT — `OnDisplayResize` feuerte auf dem ersten Frame doppelt
+**Datei:** `packages/twopoint5d/src/display/Display.ts`
+
+Ursprünglicher Befund (festgestellt beim Schreiben der Resize-Tests): Wenn sich die im Konstruktor gemessene Größe und die im ersten `renderFrame()` gemessene Größe unterschieden (häufig, weil zum Konstruktor-Zeitpunkt noch keine CSS-Maße angewandt sind), feuerte auf Frame 1: (1) ein Emit aus `resize()` (Hash geändert), gefolgt von (2) einem Emit aus dem `if (isFirstFrame)`-Branch in `renderFrame()`. Subscriber sahen zwei Resize-Events mit identischen Maßen.
+
+**Umgesetzte Lösung:** Privates Flag `#didEmitResize` markiert, ob `resize()` in seinem letzten Aufruf bereits emittet hat; der First-Frame-Fallback in `renderFrame()` zündet jetzt nur noch dann, wenn `resize()` selbst nicht emittet hat. Damit gilt der Kontrakt: `OnDisplayResize` feuert auf Frame 1 garantiert genau einmal, und auf späteren Frames genau dann (genau einmal), wenn sich der Resize-Hash geändert hat. Class-JSDoc auf `Display` entsprechend präzisiert.
+
+**Test-Coverage:** `display-resize.test.js` enthält jetzt zwei dedizierte Cases: `"emits OnDisplayResize exactly once on the first frame"` (assertet exakt `1` Emission auf Frame 1) und `"does not double-emit OnDisplayResize on the first frame when the size differs from construction"` (Regression-Schutz für genau das Szenario, das den Doppel-Emit bisher provoziert hat — Host wird nach dem Konstruktor, vor `start()`, vergrößert).
 
 #### 🟠 P2 — `TextureResource.refCount` führt zu keinem automatischen Cleanup
 **Datei:** `packages/twopoint5d/src/texture/TextureStore.ts:74, 232–234`
@@ -175,7 +189,7 @@ Damit der Backlog nicht nur wie eine Mängelliste wirkt, hier explizit das **Sol
 | `map2d/` | 28 | 7 | ~25 % | ⚠️ Streaming-Logik kaum geprüft |
 | `texture/` | 14 | 5 | ~36 % | ✓ TextureAtlas exzellent (`TextureAtlas.spec.ts`, 230 Zeilen, randomisierte Permutationen) |
 | `stage/` | 10 | 5 | ~50 % | ✓ Projection-Tests gut, `Stage2D.spec.ts` aber nur 17 Zeilen |
-| `display/` | 10 | 2 | ~20 % | 🔴 Nur `Chronometer` und `DisplayStateMachine` — die Display-Klasse selbst ungetestet |
+| `display/` | 10 | 2 | ~20 % | ⚠️ `Chronometer` + `DisplayStateMachine` als Vitest-Specs; das Resize-Verhalten der `Display`-Klasse wird seit `display-resize.test.js` (13 Cases, Browser) abgedeckt — übrige Lifecycle-Bereiche der Klasse weiterhin ungetestet |
 | `utils/` | 7 | 5 | ~71 % | ✓ Sehr gut |
 | **`sprites/`** | **11** | **0** | **0 %** | 🔴 **Komplett ungetestet** |
 | **`controls/`** | **4** | **0** | **0 %** | 🔴 **Komplett ungetestet** |
@@ -216,7 +230,8 @@ it('dispose() releases shared resources', () => {
 
 #### 🟠 P2 — Browser-Tests aufwerten (Sprint 2)
 
-- `number-or-the-beast.test.js` löschen.
+- ✅ `number-or-the-beast.test.js` gelöscht.
+- ✅ `display-resize.test.js` ergänzt (13 Cases, Chromium + Firefox).
 - Test-Timeout auf 5–10 s erhöhen (`web-test-runner.config.js`).
 - Migration zu `@playwright/test` mit nativen Screenshot-Asserts (`expect(page).toHaveScreenshot()`) für Sprite-Rendering und Animation-Frame-Verifikation.
 - Memory-Smoke-Test: 100 Frames rendern, `performance.memory.usedJSHeapSize` darf nicht monoton wachsen.
@@ -383,7 +398,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 7. 🟠 `TextureResource.refCount` → automatisches Cleanup.
 8. ✅ `VOBufferPool.dispose()` (siehe §2.1).
 9. 🟠 TSDoc auf Public-API (alle `public-api.ts`-Exports).
-10. 🟠 `Display.autoResize`-Option (oder Doku als bewusste Entscheidung).
+10. ✅ `Display.autoResize` — als bewusste Design-Entscheidung dokumentiert (per-Frame-Resize-Modell), Test-Coverage in `twopoint5d-testing` (siehe §2.1).
 11. 🟠 `apps/handbook/`-Aufräumung.
 12. 🟠 Build-Scripts deduplizieren (`cbt`/`test:all`/`ci`), ungenutzte Deps raus.
 13. 🟠 Nx-Tags für `lookbook`, Targets für `twopoint5d-testing`.

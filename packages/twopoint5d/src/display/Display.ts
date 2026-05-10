@@ -33,10 +33,81 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
 
 type EventHandler = (handler: (props: DisplayEventProps) => any) => ReturnType<typeof on>;
 
+/**
+ * The `Display` is the entry point for rendering with twopoint5d. It owns the
+ * three.js `WebGPURenderer`, drives the per-frame loop via {@link FrameLoop},
+ * and keeps the canvas size in sync with its environment.
+ *
+ * ## Lifecycle
+ *
+ * 1. `new Display(target, options)` — creates (or adopts) the renderer and
+ *    canvas, installs the required CSS rules, performs an initial
+ *    {@link Display.resize} (no `OnDisplayResize` event yet — see below) and
+ *    wires up `document.visibilitychange` so the loop pauses while the tab is
+ *    hidden.
+ * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
+ *    (once), `OnDisplayStart` and begins emitting `OnDisplayRenderFrame`.
+ * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
+ *    releases the renderer.
+ *
+ * ## Resize model
+ *
+ * **There is no `window.resize` listener.** {@link Display.resize} is invoked
+ * at the beginning of every frame from {@link Display.renderFrame}, so the
+ * canvas size, the `THREE` renderer size and the `pixelRatio` are always
+ * re-evaluated against the current DOM/window state on the next frame. This
+ * is a deliberate design decision: it covers window resizes, container
+ * reflows, devicePixelRatio changes, `resize-to` attribute mutations and
+ * `resizeToElement` swaps uniformly, without registering DOM listeners that
+ * would have to be cleaned up. A `resize` is a no-op when nothing actually
+ * changed (size + pixelRatio + pixelZoom are hashed in
+ * `#lastResizeHash`).
+ *
+ * The size source is resolved in this priority order, evaluated each frame:
+ *
+ * 1. If {@link Display.resizeToAttributeEl} carries a `resize-to` attribute,
+ *    its value selects the source:
+ *    - `"window"` / `"fullscreen"` (with optional leading colon) →
+ *      `window.innerWidth × window.innerHeight`. Adds the
+ *      `twopoint5d-canvas--fullscreen` CSS class to the canvas
+ *      (`position:fixed; top:0; left:0`). The class is removed when the
+ *      attribute changes back to anything else.
+ *    - `"self"` → uses the canvas (or {@link Display.resizeToElement}) itself.
+ *    - any other non-empty string is treated as a `document.querySelector`
+ *      selector; falls back to {@link Display.resizeToElement} or the canvas
+ *      if the selector finds nothing.
+ * 2. If {@link Display.resizeToCallback} is set, it is called every frame and
+ *    its `[width, height]` return value wins over any element-based size
+ *    measurement (the `resize-to` attribute still controls the
+ *    fullscreen-CSS toggle, but its measured size is discarded).
+ * 3. Otherwise the content-area of {@link Display.resizeToElement} is
+ *    measured via `getBoundingClientRect()` minus padding/border.
+ *
+ * The resolved pixel size is then clamped to `[0, Display.MaxResolution]`
+ * (per axis), padded/unpadded depending on the canvas `box-sizing`, and
+ * passed to `renderer.setPixelRatio()` / `renderer.setSize()`. CSS
+ * `width`/`height` and `image-rendering` are written to the canvas inline
+ * style. {@link Display.pixelZoom} divides the device pixel size to produce
+ * the logical {@link Display.width} / {@link Display.height}, which is what
+ * `OnDisplayResize` consumers see.
+ *
+ * `OnDisplayResize` is emitted **exactly once** per frame. On the first
+ * rendered frame the event always fires (so listeners attached before
+ * `start()` receive a guaranteed initial-size event); on subsequent frames
+ * it fires only when the resize hash actually changed. The constructor's
+ * initial `resize()` does **not** emit, because `frameNo` is still `0` and
+ * listeners cannot be attached yet — `OnDisplayResize` is also `retain`ed
+ * so subscribers attaching after the first frame still receive the latest
+ * size on subscription.
+ */
 export class Display {
   /**
-   * If the width or height determined from the display is greater than this value, an exception is thrown.
-   * However, this value can also be adjusted if desired.
+   * Hard upper bound (per axis, in device pixels) for the canvas size
+   * computed by {@link Display.resize}. Sizes beyond this are clamped and a
+   * one-time `console.warn` is emitted.
+   *
+   * Adjust this _before_ constructing a `Display` if you genuinely need a
+   * larger canvas (and the GPU supports it).
    */
   static MaxResolution = 8192;
 
@@ -49,6 +120,15 @@ export class Display {
   #stateMachine = new DisplayStateMachine();
 
   #lastResizeHash = '';
+
+  /**
+   * Set by `resize()` to mark whether it emitted `OnDisplayResize` on its
+   * most recent invocation. Read by `renderFrame()` to decide whether the
+   * first-frame fallback emit is still needed — guarantees that
+   * `OnDisplayResize` fires exactly once on the first frame and exactly once
+   * per subsequent frame in which the resize hash actually changed.
+   */
+  #didEmitResize = false;
 
   #fullscreenCssRules?: string;
   #fullscreenCssRulesMustBeRemoved = false;
@@ -109,17 +189,47 @@ export class Display {
   frameLoop: FrameLoop;
 
   /**
-   * see {@link DisplayParameters.maxFps}
+   * The HTML element whose content-area size drives the canvas size each
+   * frame, when no `resize-to` attribute and no
+   * {@link Display.resizeToCallback} take precedence.
+   *
+   * Defaults to:
+   * - the renderer's `domElement`, if a `WebGPURenderer` was passed to the
+   *   constructor;
+   * - the canvas element itself, if a `<canvas>` was passed;
+   * - the host element, if any other `HTMLElement` was passed (a `<div>`
+   *   container is created inside it and the canvas is appended there).
+   *
+   * Can be overridden via {@link DisplayParameters.resizeToElement} in the
+   * constructor or reassigned at runtime — the next frame's `resize()` picks
+   * up the change.
+   *
+   * @see {@link DisplayParameters.resizeToElement}
    */
   resizeToElement?: HTMLElement;
 
   /**
-   * see {@link DisplayParameters.resizeTo}
+   * Optional per-frame size provider. If set, it is invoked at the start of
+   * each frame and its returned `[width, height]` (in CSS pixels) overrides
+   * any element-based measurement. Use this for app-specific sizing logic
+   * (e.g. fitting to a UI panel, applying min/max constraints, locking
+   * aspect ratio).
+   *
+   * The `resize-to` attribute is still honored for its fullscreen-CSS
+   * toggle, but the size it would compute is discarded in favor of the
+   * callback's return value.
+   *
+   * @see {@link DisplayParameters.resizeTo}
    */
   resizeToCallback?: ResizeDisplayToFn;
 
   /**
-   * see {@link DisplayParameters.resizeToElement}
+   * The HTML element that {@link Display.resize} consults each frame for the
+   * `resize-to` attribute. Defaults to the canvas element, but you can point
+   * it at a wrapper if you prefer to control sizing declaratively from the
+   * outside (see {@link DisplayParameters.resizeToAttributeEl}).
+   *
+   * @see {@link DisplayParameters.resizeToAttributeEl}
    */
   resizeToAttributeEl: HTMLElement;
 
@@ -300,7 +410,30 @@ export class Display {
     return window.devicePixelRatio ?? 1;
   }
 
+  /**
+   * Recomputes the canvas pixel size, CSS size and renderer pixel ratio from
+   * the current DOM/window state and applies them to the renderer and the
+   * canvas inline style.
+   *
+   * Called automatically at the start of every frame from
+   * {@link Display.renderFrame}, so user code rarely needs to invoke this.
+   * It is safe to call manually (e.g. immediately after a layout-affecting
+   * DOM mutation if you cannot wait for the next frame); the work is
+   * short-circuited via an internal hash when nothing actually changed.
+   *
+   * Resolution order for the size source: the `resize-to` attribute on
+   * {@link Display.resizeToAttributeEl} (if present), then
+   * {@link Display.resizeToCallback} (if set, wins over element measurement),
+   * then the content-area of {@link Display.resizeToElement}. The fallback
+   * size when nothing else applies is `300 × 150` (HTML's intrinsic canvas
+   * size). See the class-level docs for the full priority table.
+   *
+   * Emission of `OnDisplayResize` is deferred to
+   * {@link Display.renderFrame}; this method only mutates state and returns.
+   */
   resize(): void {
+    this.#didEmitResize = false;
+
     let wPx = 300;
     let hPx = 150;
 
@@ -424,7 +557,10 @@ export class Display {
       canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
 
       const isConstructing = this.frameNo === 0;
-      if (!isConstructing) this.#emit(OnDisplayResize);
+      if (!isConstructing) {
+        this.#emit(OnDisplayResize);
+        this.#didEmitResize = true;
+      }
     }
   }
 
@@ -435,8 +571,14 @@ export class Display {
   }
 
   /**
-   * You don't need to call this up yourself.
-   * It happens automatically after you call {@link start}.
+   * Renders one frame: advances the chronometer, runs {@link Display.resize}
+   * to keep the canvas in sync with its environment, emits
+   * `OnDisplayResize` (always on the first frame, otherwise only when the
+   * size or pixelRatio actually changed), and finally emits
+   * `OnDisplayRenderFrame` so listeners can draw.
+   *
+   * You normally do not call this yourself — the {@link FrameLoop} drives it
+   * automatically once {@link Display.start} has resolved.
    */
   renderFrame(now = window.performance.now()): void {
     this.#isFirstFrame = this.frameNo === 0;
@@ -446,7 +588,13 @@ export class Display {
 
     this.resize();
 
-    if (this.isFirstFrame) this.#emit(OnDisplayResize);
+    // Guarantee one OnDisplayResize event on the first rendered frame so
+    // listeners attached before `start()` always receive an initial size,
+    // even when nothing changed since the constructor's resize() call —
+    // but skip it if resize() above already emitted, to avoid the
+    // double-emit that previously happened on every first frame whose
+    // measured size differed from the constructor measurement.
+    if (this.isFirstFrame && !this.#didEmitResize) this.#emit(OnDisplayResize);
 
     this.#emit(OnDisplayRenderFrame);
   }
