@@ -113,13 +113,7 @@ export class AABB2 {
    * @returns `true` if _aabb_ is completely within
    */
   isInsideAABB(aabb: AABB2): boolean {
-    return (
-      this.isInside(aabb.top, aabb.left) &&
-      this.left <= aabb.right &&
-      aabb.right <= this.right &&
-      this.top <= aabb.bottom &&
-      aabb.bottom <= this.bottom
-    );
+    return this.left <= aabb.left && aabb.right <= this.right && this.top <= aabb.top && aabb.bottom <= this.bottom;
   }
 
   /**
@@ -130,18 +124,18 @@ export class AABB2 {
   }
 
   isNorthWest(x: number, y: number): boolean {
-    return (this.right <= x || this.left < x) && (this.top < y || this.bottom <= y);
+    return this.left < x && this.top < y;
   }
 
   isNorthEast(x: number, y: number): boolean {
-    return (this.right > x || this.left >= x) && (this.top < y || this.bottom <= y);
+    return this.right > x && this.top < y;
   }
 
   isSouthEast(x: number, y: number): boolean {
-    return (this.right > x || this.left >= x) && (this.top >= y || this.bottom > y);
+    return this.right > x && this.bottom > y;
   }
 
   isSouthWest(x: number, y: number): boolean {
-    return (this.right <= x || this.left < x) && (this.top >= y || this.bottom > y);
+    return this.left < x && this.bottom > y;
   }
 }

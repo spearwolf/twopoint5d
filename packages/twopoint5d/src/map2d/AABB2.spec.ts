@@ -192,6 +192,44 @@ describe('AABB2', () => {
     expect(new AABB2(-10, -10, 100, 100).isInsideAABB(new AABB2(0, 0, 10, 10))).toBeTruthy();
   });
 
+  describe('isInsideAABB — asymmetric containers (regression for x/y-swap bug)', () => {
+    it('detects an inner aabb that is contained but whose top exceeds the container width', () => {
+      // Container is wide (5) but tall (10). Inner aabb has top=7 — inside the
+      // container, but if the impl swaps (x,y) it would test x=7 against right=5
+      // and report "outside".
+      const container = new AABB2(0, 0, 5, 10);
+      const inner = new AABB2(2, 7, 1, 1);
+      expect(container.isInsideAABB(inner)).toBe(true);
+    });
+
+    it('detects an inner aabb that is contained but whose left exceeds the container height', () => {
+      // Mirror case: container tall (5) and wide (10), inner.left=7 > height(5).
+      const container = new AABB2(0, 0, 10, 5);
+      const inner = new AABB2(7, 2, 1, 1);
+      expect(container.isInsideAABB(inner)).toBe(true);
+    });
+
+    it('rejects an inner aabb that pokes out to the right', () => {
+      const container = new AABB2(0, 0, 5, 10);
+      expect(container.isInsideAABB(new AABB2(4, 1, 2, 1))).toBe(false);
+    });
+
+    it('rejects an inner aabb that pokes out to the bottom', () => {
+      const container = new AABB2(0, 0, 5, 10);
+      expect(container.isInsideAABB(new AABB2(1, 9, 1, 2))).toBe(false);
+    });
+
+    it('rejects an inner aabb above the container', () => {
+      const container = new AABB2(0, 0, 5, 10);
+      expect(container.isInsideAABB(new AABB2(1, -1, 1, 1))).toBe(false);
+    });
+
+    it('rejects an inner aabb left of the container', () => {
+      const container = new AABB2(0, 0, 5, 10);
+      expect(container.isInsideAABB(new AABB2(-1, 1, 1, 1))).toBe(false);
+    });
+  });
+
   describe('quadrant helpers', () => {
     const A = new AABB2(-20, -20, 10, 10);
     const B = new AABB2(-5, -20, 10, 10);

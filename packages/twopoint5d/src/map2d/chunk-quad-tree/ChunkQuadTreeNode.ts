@@ -9,69 +9,71 @@ enum Quadrant {
 }
 
 type IChunkQuadTreeChildNodes<ChunkType extends IDataChunk2D> = {
-  [index in Quadrant]: ChunkQuadTreeNode<ChunkType>;
+  [index in Quadrant]: ChunkQuadTreeNode<ChunkType> | null;
 };
 
 interface IChunkAxis {
   origin: number;
   distance: number;
-  noSubdivide: boolean;
 }
 
 type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
-const calcAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey, chunk: IDataChunk2D): IChunkAxis => {
+const scoreAxis = (
+  chunks: IDataChunk2D[],
+  beforeKey: AABBPropKey,
+  afterKey: AABBPropKey,
+  origin: number,
+): IChunkAxis | null => {
   const chunksCount = chunks.length;
-  const origin = chunk[beforeKey];
-  const beforeChunks: IDataChunk2D[] = [];
-  const intersectChunks: IDataChunk2D[] = [];
-  const afterChunks: IDataChunk2D[] = [];
+  let beforeCount = 0;
+  let intersectCount = 0;
+  let afterCount = 0;
 
   for (let i = 0; i < chunksCount; i++) {
-    const beforeValue = chunks[i][beforeKey];
-    if (beforeValue <= origin) {
-      beforeChunks.push(chunk);
+    const c = chunks[i];
+    if (c[beforeKey] <= origin) {
+      beforeCount++;
+    } else if (c[afterKey] >= origin) {
+      afterCount++;
     } else {
-      const afterValue = chunks[i][afterKey];
-      if (afterValue >= origin) {
-        afterChunks.push(chunk);
-      } else {
-        intersectChunks.push(chunk);
-      }
+      intersectCount++;
     }
   }
 
-  const beforeCount = beforeChunks.length;
-  const intersectCount = intersectChunks.length;
-  const afterCount = afterChunks.length;
-  const beforeDistance = Math.abs(0.5 - beforeCount / chunksCount);
-  const intersectDistance = Math.abs(intersectCount / chunksCount) * ChunkQuadTreeNode.IntersectDistanceFactor;
-  const afterDistance = Math.abs(0.5 - afterCount / chunksCount);
+  const noSubdivide =
+    (beforeCount === 0 && intersectCount === 0) ||
+    (beforeCount === 0 && afterCount === 0) ||
+    (intersectCount === 0 && afterCount === 0);
+  if (noSubdivide) return null;
 
-  return {
-    distance:
-      beforeDistance +
-      intersectDistance +
-      afterDistance +
-      Math.abs(afterDistance - beforeDistance) * ChunkQuadTreeNode.BeforeAfterDeltaFactor,
-    noSubdivide:
-      (beforeCount === 0 && intersectCount === 0) ||
-      (beforeCount === 0 && afterCount === 0) ||
-      (intersectCount === 0 && afterCount === 0),
-    origin,
-  };
+  const beforeDistance = Math.abs(0.5 - beforeCount / chunksCount);
+  const afterDistance = Math.abs(0.5 - afterCount / chunksCount);
+  const intersectDistance = (intersectCount / chunksCount) * ChunkQuadTreeNode.IntersectDistanceFactor;
+  const distance =
+    beforeDistance +
+    intersectDistance +
+    afterDistance +
+    Math.abs(afterDistance - beforeDistance) * ChunkQuadTreeNode.BeforeAfterDeltaFactor;
+
+  return {distance, origin};
 };
 
-const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis => {
-  chunks.sort((a: IDataChunk2D, b: IDataChunk2D) => a[beforeKey] - b[beforeKey]);
-  return (
-    chunks
-      .map(calcAxis.bind(null, chunks, beforeKey, afterKey))
-      // @ts-ignore
-      .filter((axis: IChunkAxis) => !axis.noSubdivide)
-      // @ts-ignore
-      .sort((a: IChunkAxis, b: IChunkAxis) => a.distance - b.distance)[0] as IChunkAxis
-  );
+const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis | undefined => {
+  // Sort once so duplicate origin candidates are adjacent and can be skipped.
+  chunks.sort((a, b) => a[beforeKey] - b[beforeKey]);
+  let best: IChunkAxis | undefined;
+  let lastOrigin = Number.NaN;
+  for (let i = 0; i < chunks.length; i++) {
+    const origin = chunks[i][beforeKey];
+    if (origin === lastOrigin) continue;
+    lastOrigin = origin;
+    const axis = scoreAxis(chunks, beforeKey, afterKey, origin);
+    if (axis !== null && (best === undefined || axis.distance < best.distance)) {
+      best = axis;
+    }
+  }
+  return best;
 };
 
 /**
@@ -104,66 +106,102 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //               +y
   //
 
-  // @ts-ignore
-  originX: number = null;
-  // @ts-ignore
-  originY: number = null;
+  originX: number | null = null;
+  originY: number | null = null;
 
   chunks: ChunkType[];
 
   isLeaf = true;
 
   readonly nodes: IChunkQuadTreeChildNodes<ChunkType> = {
-    // @ts-ignore
     northEast: null,
-    // @ts-ignore
     northWest: null,
-    // @ts-ignore
     southEast: null,
-    // @ts-ignore
     southWest: null,
   };
 
   constructor(chunks?: ChunkType | ChunkType[]) {
-    // @ts-ignore
-    this.chunks = chunks ? [].concat(chunks) : [];
+    if (chunks === undefined) {
+      this.chunks = [];
+    } else if (Array.isArray(chunks)) {
+      this.chunks = chunks.slice();
+    } else {
+      this.chunks = [chunks];
+    }
   }
 
   canSubdivide() {
     return this.isLeaf && this.chunks.length > 1;
   }
 
-  subdivide(maxChunkNodes = 2): void {
-    if (this.canSubdivide() && this.chunks.length > maxChunkNodes) {
-      const chunks = this.chunks.slice(0);
-
-      const xAxis = findAxis(chunks, 'right', 'left');
-      const yAxis = findAxis(chunks, 'bottom', 'top');
-
-      if (xAxis && yAxis) {
-        this.originX = xAxis.origin;
-        this.originY = yAxis.origin;
-        this.isLeaf = false;
-
-        this.chunks.length = 0;
-
-        chunks.forEach((chunk) => {
-          this.appendChunk(chunk);
-        });
-
-        this.subdivideQuadrant(Quadrant.NorthEast, maxChunkNodes);
-        this.subdivideQuadrant(Quadrant.NorthWest, maxChunkNodes);
-        this.subdivideQuadrant(Quadrant.SouthEast, maxChunkNodes);
-        this.subdivideQuadrant(Quadrant.SouthWest, maxChunkNodes);
-      }
-    }
+  /**
+   * Reset this node to a fresh empty leaf. Drops all child references and
+   * clears the chunk list so the subtree becomes GC-eligible. The node
+   * itself remains reusable — call `appendChunk()` / `subdivide()` again.
+   */
+  clear(): void {
+    this.chunks = [];
+    this.isLeaf = true;
+    this.originX = null;
+    this.originY = null;
+    this.nodes.northEast = null;
+    this.nodes.northWest = null;
+    this.nodes.southEast = null;
+    this.nodes.southWest = null;
   }
 
-  private subdivideQuadrant(quadrant: Quadrant, maxChunkNodes: number) {
-    const node = this.nodes[quadrant];
-    if (node) {
-      node.subdivide(maxChunkNodes);
+  subdivide(maxChunkNodes = 2): void {
+    if (!this.canSubdivide() || this.chunks.length <= maxChunkNodes) return;
+
+    const chunks = this.chunks.slice(0);
+    const xAxis = findAxis(chunks, 'right', 'left');
+    const yAxis = findAxis(chunks, 'bottom', 'top');
+    if (!xAxis || !yAxis) return;
+
+    const originX = xAxis.origin;
+    const originY = yAxis.origin;
+    this.originX = originX;
+    this.originY = originY;
+    this.isLeaf = false;
+
+    // Partition into the four quadrants in a single pass and keep straddlers
+    // (chunks that cross either axis) at this node.
+    const ne: ChunkType[] = [];
+    const nw: ChunkType[] = [];
+    const se: ChunkType[] = [];
+    const sw: ChunkType[] = [];
+    const straddlers: ChunkType[] = [];
+
+    for (let i = 0, n = chunks.length; i < n; i++) {
+      const chunk = chunks[i];
+      if (chunk.left >= originX) {
+        if (chunk.top >= originY) se.push(chunk);
+        else if (chunk.bottom <= originY) ne.push(chunk);
+        else straddlers.push(chunk);
+      } else if (chunk.right <= originX) {
+        if (chunk.top >= originY) sw.push(chunk);
+        else if (chunk.bottom <= originY) nw.push(chunk);
+        else straddlers.push(chunk);
+      } else {
+        straddlers.push(chunk);
+      }
     }
+
+    this.chunks = straddlers;
+
+    this.nodes.northEast = ChunkQuadTreeNode.makeChild(ne, maxChunkNodes);
+    this.nodes.northWest = ChunkQuadTreeNode.makeChild(nw, maxChunkNodes);
+    this.nodes.southEast = ChunkQuadTreeNode.makeChild(se, maxChunkNodes);
+    this.nodes.southWest = ChunkQuadTreeNode.makeChild(sw, maxChunkNodes);
+  }
+
+  private static makeChild<T extends IDataChunk2D>(bucket: T[], maxChunkNodes: number): ChunkQuadTreeNode<T> | null {
+    if (bucket.length === 0) return null;
+    const child = new ChunkQuadTreeNode<T>();
+    // Take ownership of the bucket array — it's freshly created in `subdivide()`.
+    child.chunks = bucket;
+    child.subdivide(maxChunkNodes);
+    return child;
   }
 
   appendChunk(chunk: ChunkType) {
@@ -204,23 +242,24 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     }
   }
 
-  findChunks(aabb: AABB2) {
-    let chunks = this.chunks.filter((chunk) => chunk.isIntersecting(aabb));
-
-    if (this.isNorthWest(aabb)) {
-      chunks = chunks.concat(this.nodes.northWest.findChunks(aabb));
+  /**
+   * Collects every chunk that intersects `aabb`.
+   *
+   * Pass an `out` array to reuse storage in hot paths (e.g. per-frame visibility
+   * queries) — entries are appended without resetting `out`. The same array is
+   * returned for chaining.
+   */
+  findChunks(aabb: AABB2, out: ChunkType[] = []): ChunkType[] {
+    const local = this.chunks;
+    for (let i = 0, n = local.length; i < n; i++) {
+      const c = local[i];
+      if (c.isIntersecting(aabb)) out.push(c);
     }
-    if (this.isNorthEast(aabb)) {
-      chunks = chunks.concat(this.nodes.northEast.findChunks(aabb));
-    }
-    if (this.isSouthEast(aabb)) {
-      chunks = chunks.concat(this.nodes.southEast.findChunks(aabb));
-    }
-    if (this.isSouthWest(aabb)) {
-      chunks = chunks.concat(this.nodes.southWest.findChunks(aabb));
-    }
-
-    return chunks;
+    if (this.isNorthWest(aabb)) this.nodes.northWest!.findChunks(aabb, out);
+    if (this.isNorthEast(aabb)) this.nodes.northEast!.findChunks(aabb, out);
+    if (this.isSouthEast(aabb)) this.nodes.southEast!.findChunks(aabb, out);
+    if (this.isSouthWest(aabb)) this.nodes.southWest!.findChunks(aabb, out);
+    return out;
   }
 
   isNorthWest(aabb: AABB2) {
@@ -241,22 +280,18 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
   findChunksAt(x: number, y: number): ChunkType[] {
     const chunks: ChunkType[] = this.chunks.filter((chunk: ChunkType) => chunk.containsDataAt(x, y));
+    if (this.isLeaf) return chunks;
 
-    let moreChunks: ChunkType[] | null = null;
+    const child =
+      x < this.originX!
+        ? y < this.originY!
+          ? this.nodes.northWest
+          : this.nodes.southWest
+        : y < this.originY!
+          ? this.nodes.northEast
+          : this.nodes.southEast;
 
-    if (x < this.originX) {
-      if (y < this.originY) {
-        moreChunks = this.nodes.northWest.findChunksAt(x, y);
-      } else {
-        moreChunks = this.nodes.southWest.findChunksAt(x, y);
-      }
-    } else if (y < this.originY) {
-      moreChunks = this.nodes.northEast.findChunksAt(x, y);
-    } else {
-      moreChunks = this.nodes.southEast.findChunksAt(x, y);
-    }
-
-    return chunks.concat(moreChunks);
+    return child === null ? chunks : chunks.concat(child.findChunksAt(x, y));
   }
 
   // toDebugJson(): object | string {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- fix `AABB2#isInsideAABB()`: corner-coordinate test no longer swaps x/y — previously an inner aabb whose `top` exceeded the container's width (or whose `left` exceeded the container's height) was reported as outside even when fully contained
+- simplify `AABB2#isNorthWest()` / `isNorthEast()` / `isSouthEast()` / `isSouthWest()` — drop redundant OR clauses, semantics unchanged (all 52 existing quadrant assertions still pass)
+- fix `ChunkQuadTreeNode#findChunksAt()`: leaf-guard added — previously every call against a subdivided tree (or a non-subdivided leaf) crashed with a null deref as soon as the recursion descended into a child leaf
+- fix `ChunkQuadTreeNode` axis heuristic (`scoreAxis`/`findAxis`): drop the bogus per-call `beforeChunks`/`intersectChunks`/`afterChunks` arrays (chunks were pushed but the entries were the outer chunk argument, not the iterated chunk — the lists were never read but were a latent bug); replace with three integer counters
+- perf `ChunkQuadTreeNode#subdivide()`: O(n²) → O(n × unique-origins) per level — single-pass min instead of `map`/`filter`/`sort`, dedup adjacent origin candidates, eliminate the per-call `Function.prototype.bind`, partition straight into four bucket arrays + straddler list (one pass over chunks, no transient `appendChunk()` round-trip), child nodes take ownership of their bucket arrays without a copy
+- perf `ChunkQuadTreeNode#findChunks(aabb, out?)`: optional caller-supplied output array — avoids the per-recursion `Array#concat` allocation chain in hot paths (per-frame visibility queries); chunks are pushed in place
+- typecheck `ChunkQuadTreeNode`: `originX`/`originY` and `nodes.{north,south}{East,West}` now correctly typed as `number | null` / `ChunkQuadTreeNode | null` (previously `@ts-ignore`'d to `number` / non-null) — V8 hidden-class stays stable from construction
+- add `ChunkQuadTreeNode#clear()`: reset a node back to a fresh empty leaf, dropping every child reference so the subtree becomes GC-eligible — useful for re-builds in tile-streaming scenarios
+- add ~40 unit tests for `ChunkQuadTreeNode` covering `clear()`, `findChunksAt()` happy paths + missing-quadrant tolerance, the `findChunks(aabb, out)` signature, axis-straddler routing, idempotency of `subdivide()`, the no-axis-splittable bail-out, and a 1k-chunk subdivide stress smoke
+- add `AABB2#isInsideAABB` regression tests for asymmetric containers (x/y-swap reproducer)
 - perf `CameraBasedVisibility#computeVisibleTiles()`: reduce per-frame GC pressure
   - pool `TileBox` slots (and their `Box3` / `Vector3` / `Map2DTileCoords` shells) by tile id, mutate them in place across frames
   - replace the per-frame `previousTiles.slice(0)` + linear `findIndex` / `splice` (O(n²)) with an id-keyed `Map` lookup (O(n))

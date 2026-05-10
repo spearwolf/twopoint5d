@@ -1,6 +1,6 @@
 # Backlog — Analyse von `twopoint5d`
 
-> Stand: 2026-05-09. Basis: vollständige Quell-Analyse von `packages/twopoint5d`, `packages/twopoint5d-testing`, `apps/lookbook`, sowie der Monorepo-Tooling-Schicht.
+> Stand: 2026-05-10. Basis: vollständige Quell-Analyse von `packages/twopoint5d`, `packages/twopoint5d-testing`, `apps/lookbook`, sowie der Monorepo-Tooling-Schicht.
 >
 > Methodik: Sechs unabhängige Explore-Agenten haben parallel die Domänen Architektur (vertex-objects), Rendering-Pipeline (sprites/display/stage), Support-Module (texture/map2d/controls/utils), Tests, Build-System und Dokumentation erforscht. Die kritischsten Bug-Behauptungen wurden anschließend manuell anhand der Quellen verifiziert. Befunde, die sich nicht halten ließen, sind aus dem Bericht entfernt (z. B. ein gemeldeter Bug in `InputControlBase.removeEventListener` — der DOM matcht Listener nicht über `passive`, das ist kein Fehler).
 
@@ -109,6 +109,28 @@ set refCount(value: number) {
 ```
 
 …wobei der TextureStore dann auf das `'disposable'`-Signal hört und den Eintrag aus `#resources` löscht.
+
+#### ✅ ERLEDIGT — `ChunkQuadTreeNode` Bug-Bündel + GC-Druck im Subdivide/Find-Hot-Path
+**Datei:** `packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts` und `packages/twopoint5d/src/map2d/AABB2.ts`
+
+Ursprünglicher Befund (über Analyse der bisher unproduktiv eingesetzten WIP-Klasse): mehrere latente Bugs (`findChunksAt` null-deref auf jedem subdivided Tree; `calcAxis` schoben das falsche `chunk`-Argument in drei Klassifikations-Listen, deren Inhalte deshalb Müll waren — die Counts blieben durch Glück korrekt; `AABB2#isInsideAABB` swappte (x,y) im Eckpunkt-Test; redundante OR-Klauseln in `AABB2#isNorthWest`/etc.; `originX`/`originY` per `@ts-ignore` als `number` typisiert obwohl initial `null`), plus signifikanter GC-Druck im `subdivide()` (O(n²) Achsenwahl mit `map`/`filter`/`sort` und drei Throwaway-Arrays pro `calcAxis`-Aufruf, plus per-Aufruf `Function.bind`) und im `findChunks` (per-Rekursionsebene `Array#concat`).
+
+**Umgesetzte Lösung:**
+
+- `AABB2#isInsideAABB` neu geschrieben (klare 4-Kanten-Bedingung statt verschränkter `isInside`-Aufruf).
+- `AABB2`-Quadrant-Helper (`isNorthWest`/`isNorthEast`/`isSouthEast`/`isSouthWest`) auf den effektiven Boolesken Ausdruck reduziert — alle 52 existierenden Quadrant-Tests bleiben grün.
+- `ChunkQuadTreeNode#findChunksAt()` bekommt einen Leaf-Guard plus `null`-Toleranz für fehlende Kindquadranten.
+- `calcAxis` durch `scoreAxis` ersetzt: drei Integer-Counter statt drei Arrays; gibt `null` für nicht-teilbare Achsen direkt zurück.
+- `findAxis` als Single-Pass-Min mit Dedup adjacent gleicher Origins (`chunks` ist bereits sortiert) — eliminiert `map`/`filter`/`sort` und `Function.bind`. O(n × unique-origins) statt O(n²).
+- `subdivide()` partitioniert in einem Durchlauf in vier Bucket-Arrays + einen Straddler-Bucket; Kindknoten übernehmen ihre Buckets per Referenz (privater `makeChild`-Helper) — kein `chunks.length=0`/`forEach(appendChunk)`-Re-Entry mehr.
+- `findChunks(aabb, out?)` bekommt einen optionalen Output-Parameter für allokationsfreie Hot-Path-Aufrufe (z. B. `CameraBasedVisibility`); rekursive Aufrufe pushen direkt in das geteilte Array.
+- `clear()`-Methode hinzugefügt: setzt den Knoten auf den Initialzustand zurück und löst alle Kindreferenzen — geeignet für Tile-Streaming-Re-Builds.
+- `originX`/`originY` und die `nodes.{north,south}{East,West}`-Slots tragen nun ehrliche `number | null` / `ChunkQuadTreeNode<…> | null`-Typen; das `@ts-ignore`-Trio im Klassen-Header entfällt.
+- Konstruktor-`[].concat(chunks)`-Hack durch `Array.isArray`-Branching ersetzt.
+
+**Test-Coverage:** neue `ChunkQuadTreeNode.extended.spec.ts` mit ~40 Cases (Konstruktor-Varianten, `canSubdivide`-Lebenszyklus, `subdivide`-Edge-Cases inkl. nicht-teilbare Eingabe und Idempotenz, gezielte Achsen-Heuristik-Assertion, Bucket-Erschöpfungsinvariante, `appendChunk` auf Blatt/Subtree/Straddler/lazy-Quadrant, `findChunks` Mehr-Quadrant-Coverage und Out-Param-Kontrakt, `findChunksAt` Happy-Path + `null`-Quadrant-Toleranz + Straddler, `clear()` inkl. Wiederverwendbarkeit, 1k-Chunk-Stress-Smoke, 400-Zellen-Korrektheits-Smoke). Plus 6 neue Cases in `AABB2.spec.ts` für asymmetrische Container, die den x/y-Swap-Bug reproduzieren.
+
+Hinweis: `ChunkQuadTreeNode` ist via `public-api.ts` exportiert, hat aber bisher keinen Produktions-Konsumenten — die Lookbook-`QuadTreeVisualization` ist der einzige Caller. Das Hardening ist vorausschauende Arbeit für die geplante Map2D/`CameraBasedVisibility`-Integration.
 
 #### ✅ ERLEDIGT — `CameraBasedVisibility.computeVisibleTiles()` per-Frame-Allocations
 **Datei:** `packages/twopoint5d/src/map2d/CameraBasedVisibility.ts`
@@ -430,7 +452,8 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 23. 🟢 `Display.pixelZoom`-Renaming.
 24. 🟢 `ARCHITECTURE.md`.
 25. ✅ `CameraBasedVisibility` Per-Frame-Allocs reduzieren — TileBox-Pool, O(n)-Map-Lookup, reused Set/Stack/Vectors, Single-Sort statt O(n²)-Insert (siehe §2.1).
-26. 🟢 `tsup`-Migration evaluieren (oder devDep entfernen).
+26. ✅ `ChunkQuadTreeNode` Bug-Bündel + GC-Druck — `findChunksAt`-Null-Guard, `calcAxis`/`findAxis`-Refactor (Counter + Single-Pass + Dedup, kein `Function.bind`), `subdivide` mit direkten Buckets, `findChunks(aabb, out)` Out-Param, `clear()`, ehrliche `number | null`-Typen, plus ~40 neue Tests inkl. `AABB2.isInsideAABB`-x/y-Swap-Reproducer (siehe §2.1).
+27. 🟢 `tsup`-Migration evaluieren (oder devDep entfernen).
 
 ---
 
