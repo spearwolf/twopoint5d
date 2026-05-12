@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add `FixedFrameLoop` — opt-in helper that wraps a `Display` and emits `OnTick` events at a fixed rate (default 60 fps) plus an `OnRender` event per render frame carrying an `alpha` interpolation factor in `[0, 1)`. Decouples simulation cadence from render cadence so per-frame JS-cost variance (physics, animation curves, IK) no longer produces visible micro-stutter even on high-refresh-rate displays. Spiral-of-death guard via `maxStepsPerFrame` (default 5). Auto-disposes when `Display` disposes
+- add `Display#maxDeltaTime` getter/setter — proxy for the internal `Chronometer#maxDeltaTime`; default is `1 / 30` (~33ms) so individual frame outliers are capped instead of producing spikes. Set to `0` to disable
+- add `Display#resizePollIntervalMs` — optional throttle (in milliseconds) for the per-frame DOM measurements inside `Display#resize()`. Default `0` keeps the legacy "measure every frame" behavior; on high-refresh-rate displays setting it to e.g. `1000 / 60` caps `getComputedStyle()` / `getBoundingClientRect()` calls and reclaims a significant slice of the frame budget
+- add `Chronometer#reset(time?)` — return the chronometer to its initial state without allocating a new instance; `maxDeltaTime` is preserved
+- add `Chronometer#maxDeltaTime` (also exposed as the second constructor argument) — optional upper bound for the per-`update()` delta; overflow is folded into `lostTime` so `time` stays continuous (covers rAF throttling in background tabs, long GC pauses, breakpoints). Default `0` means "disabled"
+- add optional `time?` argument to `Chronometer#stop()` and `Chronometer#start()` — lets callers pin pause/resume to an explicit wall-clock so `lostTime` is tracked correctly even when no `update()` runs during the pause
+- add `FixedFrameLoop.spec.ts` — 13 vitest cases covering tick cadence, accumulator drain, alpha monotonicity, multi-tick frames, spiral-of-death guard, prop forwarding, runtime `fps` updates, `reset()`, `dispose()` and `OnDisplayDispose` auto-cleanup
+- add `FrameLoop.spec.ts` — vitest coverage for the first-frame `deltaTime`, `lastNow` emission, `measuredFps` warm-up, `maxFps` throttling (including grid-stability over many frames, jitter tolerance, long-pause snap-forward and `setFps()` reset), and `subscriptionCount` idempotency
+- add `Chronometer.spec.ts` cases for: pause-without-update jump regression, hybrid pause (updates + idle wall-clock), `stop()`/`start()` idempotency, `maxDeltaTime` clamping, `reset()`
 - add `IRenderable` interface (`renderTo(renderer: WebGPURenderer): void`) — implemented by `Stage2D` and `StageRenderer`
 - add `IPassProvider` interface (`asPassNode(renderer): Node`) — TSL contribution of a stage; implemented by `Stage2D` (returns `pass(scene, camera)`) and `StageRenderer` (returns `texture(internalRT.texture)`)
 - add `IStageRendererHost` interface (`onResize`, `onRenderFrame`) — the parent type a `StageRenderer` needs from a frame-loop host; `Display` satisfies it structurally
@@ -39,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- change `Chronometer#stop()` now captures the wall-clock timestamp; `Chronometer#start()` closes the pause-gap in `lostTime` and resets `#currentTime` + `deltaTime` to `0`, so the next `update()` produces a normal small delta even when no `update()` ran during the pause
+- change `Chronometer#getCurrentTime` uses `Number.isNaN` instead of the global `isNaN`
+- change `Display` constructs its internal `Chronometer` without the `0` seed (`new Chronometer()`), so `timeStart` is anchored to the wall-clock and the new `stop()`/`start()` gap-tracking takes effect
+- change `DisplayStateMachine` Start/Pause handlers now pass an explicit `performance.now() / 1000` timestamp to `Chronometer#start()` / `stop()` / `update()` — guarantees a single coherent timestamp per transition
+- change `Display[FrameLoop.OnFrame]` forwards the rAF timestamp from `FrameLoop` to `renderFrame()` instead of reading `performance.now()` again
+- change `FrameLoop` `maxFps` throttle uses a rastered emit-schedule instead of the previous `now - lastNow >= 0.98 * interval` check — emissions stay on a fixed grid, vsync jitter is tolerated within 2% of the target interval, and long pauses (tab hidden, GC) snap the schedule forward instead of producing a catch-up burst on resume. Fixes the perceptible stutter on 120Hz/240Hz displays when a non-zero `maxFps` is configured
 - change `StageRenderer.renderTo()` in pipeline mode always clears the internal pass-target each frame (transparent black, or the user's `clear`-color/alpha when `clear=true`) to avoid frame-content accumulation
 - change `StageRenderer#renderFrame(renderer)` → `StageRenderer#renderTo(renderer)` (renamed for `IRenderable` consistency)
 - change `StageRenderer#add(stage)` parameter type from `IStage` to `IStage & IRenderable`
@@ -52,7 +67,156 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - remove `Stage2D#clearColor`, `Stage2D#clearAlpha`, `Stage2D#autoClear` — never honored by `StageRenderer`. Use `Scene#background` for per-scene backgrounds or `StageRenderer#setClearColor()` for the renderer-level clear
 
+### Fixed
+
+- fix `Chronometer`: a `stop()` → (no `update()`s during the pause) → `start()` cycle no longer attributes the pause duration to the next `update()` as a giant frame delta — the wall-clock gap is folded into `lostTime` instead, so `time` and `deltaTime` stay continuous across pauses. This was the root cause of "subjective jumps" after `Display.pause = false` and after every `document.visibilitychange` resume
+- fix `Display.now` starts at `0` and remains continuous after `start()` — previously it jumped to `performance.now() / 1000` (≈ seconds since page load) on the first `OnDisplayStart` because the internal `Chronometer` was seeded with `0` and the wall-clock gap between construction and start was not tracked
+- fix `Display#deltaTime` on `OnDisplayStart` after a `visibilitychange` resume is now `0` (was: the entire hidden-tab duration as a single frame delta)
+- fix `FrameLoop`: first emitted `OnFrame` has `deltaTime: 0` instead of `NaN` (the previous conditional `this.#lastNow != null && this.frameNo === 1` was inverted and always fell through to `now - undefined` on the first tick)
+- fix `FrameLoop`: `lastNow` in the emitted `OnFrame` props now reflects the previous frame's timestamp instead of being identical to `now` (the `#lastNow = now` assignment used to happen before the `emit()`)
+- fix `FrameLoop#measureFps`: the first measurement window is now anchored to the first rAF timestamp instead of using `0` as `measureTimeBegin`, eliminating the bogus ~6 FPS phantom sample that polluted `measuredFps` until the first real 30-frame window completed
+
 ### Migration Guide
+
+#### `Chronometer#stop()` / `start()` now track the wall-clock pause-gap
+
+If you were calling `chronometer.stop()` and `chronometer.start()` without `update()` calls during the pause, your `time` and `deltaTime` used to jump on the next `update()` after `start()` (the entire pause was attributed to a single frame). After the fix, the pause-gap is folded into `lostTime` and the next `update()` produces a normal small delta.
+
+For most callers this is purely a bugfix and no code change is needed. If you relied on the old jumping behavior (e.g. for an "elapsed-real-time" counter), use `performance.now()` directly instead.
+
+If you want pause/resume to be anchored to a specific timestamp (for tests, replay, or to stay in lockstep with another clock), pass an explicit `time` argument:
+
+**Before**
+
+```ts
+chronometer.stop();  // pausedAt was untracked
+chronometer.start(); // pause duration was silently lost
+```
+
+**After**
+
+```ts
+chronometer.stop(t);   // pausedAt = t
+chronometer.start(t2); // lostTime += (t2 - t)
+```
+
+#### `Chronometer#start()` resets `deltaTime` to `0`
+
+Previously `start()` left `deltaTime` at its pre-pause value. Now it is `0` until the next `update()` — semantically there has been no active phase since the resume. If you query `chronometer.deltaTime` between `start()` and the next `update()`, you'll now see `0` (was: the last pre-pause delta).
+
+#### `Display.now` no longer jumps on the first frame
+
+`Display.now` (and the `now` field in `OnDisplayRenderFrame` / `OnDisplayStart` event props) now starts at `0` and stays small. Previously it jumped to `performance.now() / 1000` (≈ seconds since page load) on the first frame after `display.start()`. Code that was working around this — e.g. by subtracting the first `now` value to "rebase" the clock — can drop that workaround.
+
+**Before (workaround)**
+
+```ts
+let t0: number | null = null;
+display.onRenderFrame(({now}) => {
+  if (t0 == null) t0 = now;
+  const elapsed = now - t0; // rebase against first-frame jump
+  // ...
+});
+```
+
+**After**
+
+```ts
+display.onRenderFrame(({now}) => {
+  const elapsed = now; // already starts at 0
+  // ...
+});
+```
+
+#### Optional `maxDeltaTime` to clamp frame-spike outliers
+
+New in `Chronometer`. The bare class still defaults to `0` (disabled) so existing direct uses of `Chronometer` are preserved. Set it (in the same unit as your time source — seconds by default) to cap individual `deltaTime` values and fold the overflow into `lostTime`. Useful as a defensive guard against rAF throttling, GC pauses, or debugger breakpoints.
+
+```ts
+const c = new Chronometer(undefined, 1 / 30); // cap frame-delta at ~33ms
+// or later:
+c.maxDeltaTime = 1 / 30;
+```
+
+#### `Display` now caps `deltaTime` at `1 / 30` by default
+
+`Display` seeds its internal `Chronometer` with `maxDeltaTime = 1 / 30` (~33ms). Subscribers will no longer see `deltaTime` values larger than that on a single frame — anything beyond is treated as lost time so `display.now` stays continuous. This is the right default for games / animations / physics and matches what most engines do, but it changes observable behavior for callers that consumed the raw "real wall-clock since last frame" value.
+
+**Before**
+
+```ts
+display.onRenderFrame(({deltaTime}) => {
+  // After a hidden-tab resume or a long GC pause, deltaTime could be
+  // several seconds — and your integrator had to deal with it.
+});
+```
+
+**After (default)**
+
+```ts
+display.onRenderFrame(({deltaTime}) => {
+  // deltaTime ≤ 1/30; outliers are absorbed by the lost-time accumulator.
+});
+```
+
+**Opt out (preserve old behavior)**
+
+```ts
+display.maxDeltaTime = 0;
+```
+
+#### `Display#resizePollIntervalMs` for high-refresh displays
+
+`Display#resize()` runs every frame and forces a layout via `getComputedStyle()` + `getBoundingClientRect()`. On 240Hz monitors that is 240 forced reflows per second and can dominate the frame budget. Default remains `0` (legacy "every frame" behavior); opt in to throttle:
+
+```ts
+const display = new Display(canvas);
+display.resizePollIntervalMs = 1000 / 60; // measure layout at most ~60Hz
+```
+
+The cheap hash-based no-op short-circuit inside `resize()` still applies on every poll, so this only affects the cost of the DOM reads — the renderer is still re-evaluated whenever the size actually changes.
+
+#### Adopting `FixedFrameLoop` for smooth motion on high-refresh displays
+
+Purely additive — existing `display.onRenderFrame(...)` code keeps working unchanged. The opt-in pattern decouples the simulation step (position/physics/animation update) from the render step (interpolation + draw), so the on-screen motion stays smooth even when frame timing varies.
+
+**Before (delta-driven, susceptible to per-frame JS jitter)**
+
+```ts
+let x = 0;
+display.onRenderFrame(({deltaTime, renderer}) => {
+  x += velocity * deltaTime;            // integrated against variable dt
+  mesh.position.x = x;
+  renderer.render(scene, camera);
+});
+```
+
+**After (fixed step + interpolation)**
+
+```ts
+import {FixedFrameLoop} from '@spearwolf/twopoint5d';
+
+const sim = new FixedFrameLoop(display, {fps: 60});
+
+let prevX = 0;
+let currX = 0;
+
+sim.onTick(({fixedDelta}) => {
+  prevX = currX;
+  currX += velocity * fixedDelta;       // deterministic, fixed step
+});
+
+sim.onRender(({alpha, renderer}) => {
+  mesh.position.x = prevX + (currX - prevX) * alpha;
+  renderer.render(scene, camera);
+});
+```
+
+The loop subscribes to `Display`'s `OnDisplayRenderFrame` automatically and disposes itself when `Display` disposes. To tear it down earlier (e.g. switching scenes), call `sim.dispose()`.
+
+#### `FrameLoop` `maxFps` cadence is now grid-stable
+
+If you were using `new Display(canvas, {maxFps: N})` with `N` set (e.g. for power-saving on a 60Hz monitor) the emit cadence used to drift slightly with vsync jitter and could miss frames on 120Hz/240Hz monitors. The new rastered schedule keeps emissions on a fixed grid with a 2% jitter tolerance. No code change is required — but if you'd previously dialed `maxFps` to a non-divisor of your refresh rate to dodge the drift, you can now use the natural divisor (e.g. `maxFps: 60` on a 240Hz monitor).
 
 #### `StageRenderer#renderFrame()` renamed to `renderTo()`
 

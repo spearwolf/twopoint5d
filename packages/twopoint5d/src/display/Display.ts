@@ -118,11 +118,35 @@ export class Display {
   static CssRulesPrefixDisplay = 'twopoint5d-canvas';
   static CssRulesPrefixFullscreen = 'twopoint5d-canvas--fullscreen';
 
-  #chronometer = new Chronometer(0);
+  /**
+   * The internal {@link Chronometer} is seeded with `maxDeltaTime = 1/30`
+   * (≈ 33ms) so individual frame outliers (background-tab rAF throttling,
+   * GC pauses, debugger breakpoints) are capped and the overflow is
+   * folded into the lost-time accumulator instead of producing a frame
+   * spike. Set {@link Display.maxDeltaTime} = 0 to disable the cap.
+   */
+  #chronometer = new Chronometer(undefined, 1 / 30);
 
   #stateMachine = new DisplayStateMachine();
 
   #lastResizeHash = '';
+
+  /**
+   * Minimum interval (in milliseconds) between the DOM measurements inside
+   * {@link Display.resize}. Defaults to `0` (no throttle — `resize()` runs
+   * every frame, matching the legacy behavior).
+   *
+   * On high-refresh-rate displays the per-frame `getComputedStyle()` and
+   * `getBoundingClientRect()` calls force a layout each frame and can
+   * dominate the per-frame budget (240Hz = up to 240 forced reflows per
+   * second). Set this to e.g. `1000 / 60` to cap the measurement rate at
+   * 60Hz while keeping the size up-to-date for any resize event the user
+   * can perceive. The cheap hash-based no-op short-circuit inside
+   * `resize()` still applies on every poll.
+   */
+  resizePollIntervalMs = 0;
+
+  #lastResizePollMs = Number.NEGATIVE_INFINITY;
 
   /**
    * Set by `resize()` to mark whether it emitted `OnDisplayResize` on its
@@ -340,14 +364,15 @@ export class Display {
       [DisplayStateMachine.Restart]: () => this.#emit(OnDisplayRestart),
 
       [DisplayStateMachine.Start]: () => {
-        this.#chronometer.start();
-        this.#chronometer.update();
+        const t = performance.now() / 1000;
+        this.#chronometer.start(t);
+        this.#chronometer.update(t);
 
         this.#emit(OnDisplayStart);
       },
 
       [DisplayStateMachine.Pause]: () => {
-        this.#chronometer.stop();
+        this.#chronometer.stop(performance.now() / 1000);
 
         retainClear(this, OnDisplayStart);
 
@@ -388,6 +413,24 @@ export class Display {
 
   get deltaTime(): number {
     return this.#chronometer.deltaTime;
+  }
+
+  /**
+   * Upper bound on the per-frame `deltaTime` (in seconds). When a frame
+   * delta exceeds this value the overflow is folded into the chronometer's
+   * lost-time accumulator, so `now` stays continuous and `deltaTime` never
+   * reports a spike. Useful against rAF throttling, GC pauses and
+   * debugger breakpoints — a single hiccup no longer cascades into
+   * physics jumps or animation glitches.
+   *
+   * Defaults to `1 / 30` (~33ms). Set to `0` to disable the cap entirely.
+   */
+  get maxDeltaTime(): number {
+    return this.#chronometer.maxDeltaTime;
+  }
+
+  set maxDeltaTime(value: number) {
+    this.#chronometer.maxDeltaTime = value;
   }
 
   get pause(): boolean {
@@ -436,6 +479,14 @@ export class Display {
    */
   resize(): void {
     this.#didEmitResize = false;
+
+    if (this.resizePollIntervalMs > 0) {
+      const nowMs = performance.now();
+      if (nowMs - this.#lastResizePollMs < this.resizePollIntervalMs) {
+        return;
+      }
+      this.#lastResizePollMs = nowMs;
+    }
 
     let wPx = 300;
     let hPx = 150;
@@ -567,9 +618,10 @@ export class Display {
     }
   }
 
-  [FrameLoop.OnFrame](): void {
+  [FrameLoop.OnFrame](props: {now: number}): void {
     if (this.isRunning) {
-      this.renderFrame();
+      // FrameLoop emits `now` in seconds; renderFrame expects ms.
+      this.renderFrame(props.now * 1000);
     }
   }
 

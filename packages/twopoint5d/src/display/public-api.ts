@@ -1,5 +1,6 @@
 export * from './Chronometer.js';
 export * from './Display.js';
+export * from './FixedFrameLoop.js';
 export * from './isWebGLRenderer.js';
 export * from './isWebGPURenderer.js';
 export * from './Stylesheets.js';
