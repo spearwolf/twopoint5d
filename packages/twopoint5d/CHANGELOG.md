@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- refactor `Display` `on*` event-helper properties (`onResize`, `onRenderFrame`, `onNextFrame`, `onInit`, `onStart`, `onRestart`, `onPause`, `onDispose`): replace the `bind`-with-`unknown`-cast pattern with typed arrow functions. Listener parameter is now `DisplayEventListener` (= `(props: DisplayEventProps) => unknown`), return type is the official `UnsubscribeFunc` from `@spearwolf/eventize`. No runtime change; purely a type-surface cleanup
+- change `Display` `EventHandler` type alias removed in favor of a parameterized `DisplayEventListener<T = DisplayEventProps>` so `onDispose` can correctly type its argument as `Display`
 - change `Chronometer#stop()` now captures the wall-clock timestamp; `Chronometer#start()` closes the pause-gap in `lostTime` and resets `#currentTime` + `deltaTime` to `0`, so the next `update()` produces a normal small delta even when no `update()` ran during the pause
 - change `Chronometer#getCurrentTime` uses `Number.isNaN` instead of the global `isNaN`
 - change `Display` constructs its internal `Chronometer` without the `0` seed (`new Chronometer()`), so `timeStart` is anchored to the wall-clock and the new `stop()`/`start()` gap-tracking takes effect
@@ -69,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `Display#nextFrame` type signature: was incorrectly declared as `Promise<DisplayEventProps>` while the runtime value is a function returning the promise. All call sites already used `await display.nextFrame()` — the new type `() => Promise<DisplayEventProps>` matches that. TS code that wrote `await display.nextFrame` (without parens) was a latent runtime bug and is now flagged at compile time
+- fix `Display#onDispose` listener type: was `(props: DisplayEventProps) => any`, but the `OnDisplayDispose` event is emitted with the `Display` instance (per `IOnDisplayDispose`). Handler is now typed as `(display: Display) => unknown`
 - fix `Chronometer`: a `stop()` → (no `update()`s during the pause) → `start()` cycle no longer attributes the pause duration to the next `update()` as a giant frame delta — the wall-clock gap is folded into `lostTime` instead, so `time` and `deltaTime` stay continuous across pauses. This was the root cause of "subjective jumps" after `Display.pause = false` and after every `document.visibilitychange` resume
 - fix `Display.now` starts at `0` and remains continuous after `start()` — previously it jumped to `performance.now() / 1000` (≈ seconds since page load) on the first `OnDisplayStart` because the internal `Chronometer` was seeded with `0` and the wall-clock gap between construction and start was not tracked
 - fix `Display#deltaTime` on `OnDisplayStart` after a `visibilitychange` resume is now `0` (was: the entire hidden-tab duration as a single frame delta)
@@ -77,6 +81,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `FrameLoop#measureFps`: the first measurement window is now anchored to the first rAF timestamp instead of using `0` as `measureTimeBegin`, eliminating the bogus ~6 FPS phantom sample that polluted `measuredFps` until the first real 30-frame window completed
 
 ### Migration Guide
+
+#### `Display#nextFrame` is a method, not a promise property
+
+Pure type fix — runtime was always a function. If your code was relying on the (incorrect) `Promise<DisplayEventProps>` declaration and `await`ing the property without calling it, you had a latent runtime bug.
+
+**Before (broken at runtime, allowed by TS)**
+
+```ts
+const props = await display.nextFrame; // resolves to the function itself, not a frame!
+```
+
+**After**
+
+```ts
+const props = await display.nextFrame(); // resolves on the next OnDisplayRenderFrame
+```
+
+#### `Display#onDispose` callback receives the `Display`, not `DisplayEventProps`
+
+The `OnDisplayDispose` event has always been emitted with the `Display` instance as its payload (see `IOnDisplayDispose`), but the `onDispose` helper was mistyped to claim it would call your listener with `DisplayEventProps`. If TS let you destructure `{renderer, frameNo, …}` from the argument, that code was relying on runtime-`undefined`s.
+
+**Before**
+
+```ts
+display.onDispose(({display, renderer}) => {
+  // renderer is undefined at runtime — the emitter passes the Display itself.
+});
+```
+
+**After**
+
+```ts
+display.onDispose((display) => {
+  // do cleanup against `display` directly; renderer is on display.renderer
+});
+```
 
 #### `Chronometer#stop()` / `start()` now track the wall-clock pause-gap
 

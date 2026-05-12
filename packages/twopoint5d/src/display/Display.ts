@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, on, once, onceAsync, retain, retainClear} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on, once, onceAsync, retain, retainClear, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,
@@ -31,7 +31,7 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   }
 }
 
-type EventHandler = (handler: (props: DisplayEventProps) => any) => ReturnType<typeof on>;
+type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
 /**
  * The `Display` is the entry point for rendering with twopoint5d. It owns the
@@ -705,16 +705,16 @@ export class Display {
     }
   };
 
-  readonly onResize = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayResize) as unknown as EventHandler;
+  readonly onResize = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayResize, listener);
 
-  readonly onRenderFrame = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
-  readonly onNextFrame = (once as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as EventHandler;
-  readonly nextFrame = (onceAsync as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRenderFrame) as unknown as Promise<DisplayEventProps>;
+  readonly onRenderFrame = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayRenderFrame, listener);
+  readonly onNextFrame = (listener: DisplayEventListener): UnsubscribeFunc => once(this, OnDisplayRenderFrame, listener);
+  readonly nextFrame = (): Promise<DisplayEventProps> => onceAsync<DisplayEventProps>(this, OnDisplayRenderFrame);
 
-  readonly onInit = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayInit) as unknown as EventHandler;
-  readonly onStart = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayStart) as unknown as EventHandler;
-  readonly onRestart = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayRestart) as unknown as EventHandler;
-  readonly onPause = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayPause) as unknown as EventHandler;
+  readonly onInit = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayInit, listener);
+  readonly onStart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayStart, listener);
+  readonly onRestart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayRestart, listener);
+  readonly onPause = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayPause, listener);
 
-  readonly onDispose = (once as (...args: unknown[]) => unknown).bind(undefined, this, OnDisplayDispose) as unknown as EventHandler;
+  readonly onDispose = (listener: DisplayEventListener<Display>): UnsubscribeFunc => once(this, OnDisplayDispose, listener);
 }
