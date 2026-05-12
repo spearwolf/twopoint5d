@@ -1,5 +1,6 @@
 import {emit, type EventizedObject, eventize, once} from '@spearwolf/eventize';
-import {Color, type WebGPURenderer} from 'three/webgpu';
+import {texture} from 'three/tsl';
+import {Color, type Node, RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {
   OnAddToParent,
@@ -9,9 +10,16 @@ import {
   type StageAddedProps,
   type StageRemovedProps,
 } from '../events.js';
+import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost} from './IStageRendererHost.js';
+import {RootRenderPipeline} from './RootRenderPipeline.js';
+
+export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
+
+const hasAsPassNode = (s: unknown): s is IPassProvider =>
+  typeof (s as IPassProvider)?.asPassNode === 'function';
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
@@ -54,7 +62,7 @@ export interface StageRenderer extends EventizedObject {}
  * (the renderer sets `autoClear = false` while iterating stages) — use this
  * to layer stages on top of each other in a single pass.
  */
-export class StageRenderer implements IStage, IRenderable {
+export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Sort key for `parent.renderOrder` and for diagnostics. Defaults to
    * `'StageRenderer'`; rename when you have multiple nested renderers and
@@ -144,6 +152,7 @@ export class StageRenderer implements IStage, IRenderable {
       this.#renderOrder = order;
       this.#renderOrderArray = undefined;
       this.#orderedStages = undefined;
+      this.#outputDirty = true;
       this.onRenderOrderChanged();
     }
   }
@@ -249,6 +258,9 @@ export class StageRenderer implements IStage, IRenderable {
     this.width = width;
     this.height = height;
 
+    if (this.#internalRT) this.#internalRT.setSize(Math.max(1, width), Math.max(1, height));
+    if (this.#asPassNodeRT) this.#asPassNodeRT.setSize(Math.max(1, width), Math.max(1, height));
+
     for (const stage of this.stages) {
       this.resizeStage(stage, width, height);
     }
@@ -268,46 +280,250 @@ export class StageRenderer implements IStage, IRenderable {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Pipeline / RenderTarget integration (§6 of Backlog-StageRenderer.md)
+  // ---------------------------------------------------------------------------
+
   /**
-   * Render all stages into `renderer` (applies the clear policy first).
-   * This is the {@link IRenderable} method — call it from your frame loop
-   * if you are running in manual mode (no `parent` set).
+   * Optional `THREE.RenderPipeline` running between the stages and the
+   * output. Without `buildOutputNode`, the stages render into an internal
+   * pass-target whose texture is sampled by the pipeline. With
+   * `buildOutputNode`, the pipeline runs a user-defined TSL graph composed
+   * from each stage's pass node.
+   */
+  pipeline?: RenderPipeline;
+
+  /**
+   * Optional `RenderTarget` to which this renderer's final output is written.
+   * Default `undefined` = writes to the renderer's current target (usually
+   * the canvas). Useful for picking, screenshots, or driving a downstream
+   * pass.
+   */
+  outputRenderTarget?: RenderTarget;
+
+  /**
+   * Optional TSL-composition hook. When set together with {@link pipeline},
+   * the renderer collects an `asPassNode()` from each stage and feeds the
+   * resulting node array into this function. Return the composed TSL graph
+   * to use as `pipeline.outputNode` (e.g. bloom, blur, mix).
+   *
+   * Without `buildOutputNode` but with `pipeline`, the renderer falls back
+   * to "render stages into an internal target, sample as `texture()`".
+   */
+  buildOutputNode?: StageRendererBuildOutputNode;
+
+  /** Internal RT used in Mode C (pipeline without buildOutputNode). */
+  #internalRT?: RenderTarget;
+  /** Internal RT used when a parent calls `asPassNode()` on this renderer. */
+  #asPassNodeRT?: RenderTarget;
+  /** Marks `pipeline.outputNode` as needing a rebuild (after stage list changes). */
+  #outputDirty = true;
+
+  /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it. */
+  invalidateOutputNode(): void {
+    this.#outputDirty = true;
+  }
+
+  /**
+   * Render all stages and optional post-pipeline into `renderer`. The
+   * destination is `outputRenderTarget` if set, otherwise the renderer's
+   * current target. This is the {@link IRenderable} method.
    */
   renderTo(renderer: WebGPURenderer): void {
     if (isWebGLRenderer(renderer)) {
       throw new TypeError('The WebGLRenderer renderer is not supported anymore');
     }
 
-    const wasPreviouslyAutoClear = renderer.autoClear;
-
-    if (this.clear) {
-      const oldClearAlpha = renderer.getClearAlpha();
-      let colorWasOverridden = false;
-
-      if (this.#clearColor != null) {
-        renderer.getClearColor(this.#oldClearColor as any);
-        renderer.setClearColor(this.#clearColor, this.clearAlpha);
-        colorWasOverridden = true;
-      } else {
-        renderer.setClearAlpha(this.clearAlpha);
+    if (this.outputRenderTarget) {
+      const prev = renderer.getRenderTarget();
+      renderer.setRenderTarget(this.outputRenderTarget);
+      try {
+        this.#renderToCurrentTarget(renderer);
+      } finally {
+        renderer.setRenderTarget(prev);
       }
-
-      renderer.clear(this.clearColorBuffer, this.clearDepthBuffer, this.clearStencilBuffer);
-
-      if (colorWasOverridden) {
-        renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
-      } else {
-        renderer.setClearAlpha(oldClearAlpha);
-      }
+    } else {
+      this.#renderToCurrentTarget(renderer);
     }
+  }
 
+  /**
+   * Render contribution into the renderer's CURRENT target, ignoring
+   * `outputRenderTarget`. Picks the right mode (plain / pipeline-only /
+   * pipeline+buildOutputNode). A `RootRenderPipeline` triggers the
+   * composed path automatically via its static `buildOutputNode`.
+   */
+  #renderToCurrentTarget(renderer: WebGPURenderer): void {
+    if (this.pipeline) {
+      if (this.buildOutputNode || this.pipeline instanceof RootRenderPipeline) {
+        this.#renderPipelineComposed(renderer);
+      } else {
+        this.#renderPipelineSimple(renderer);
+      }
+    } else {
+      this.#renderStagesInline(renderer);
+    }
+  }
+
+  /** Plain mode: clear (if requested), then render stages into the current target. */
+  #renderStagesInline(renderer: WebGPURenderer): void {
+    const wasPreviouslyAutoClear = renderer.autoClear;
+    if (this.clear) this.#applyClear(renderer);
     renderer.autoClear = false;
-
     for (const stageItem of this.orderedStages) {
       this.renderStage(stageItem, renderer);
     }
-
     renderer.autoClear = wasPreviouslyAutoClear;
+  }
+
+  /**
+   * Mode C (§6.4): render stages into the internal pass-target, then run
+   * the pipeline sampling that target as `texture()`. The internal RT is
+   * always cleared per frame (transparent black, or the user's
+   * `clear`-color/alpha if set); the user's `clear` additionally clears the
+   * final output target before the pipeline writes.
+   */
+  #renderPipelineSimple(renderer: WebGPURenderer): void {
+    const rt = this.#ensureInternalRT(renderer);
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    try {
+      this.#clearForInternalRT(renderer);
+      const wasPreviouslyAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
+      for (const stageItem of this.orderedStages) this.renderStage(stageItem, renderer);
+      renderer.autoClear = wasPreviouslyAutoClear;
+    } finally {
+      renderer.setRenderTarget(prev);
+    }
+
+    if (this.#outputDirty) {
+      this.pipeline!.outputNode = texture(rt.texture);
+      this.pipeline!.needsUpdate = true;
+      this.#outputDirty = false;
+    }
+
+    if (this.clear) this.#applyClear(renderer);
+    this.pipeline!.render();
+  }
+
+  /** Clears the currently bound internal RT each frame to avoid accumulation. */
+  #clearForInternalRT(renderer: WebGPURenderer): void {
+    if (this.clear) {
+      this.#applyClear(renderer);
+    } else {
+      const oldClearAlpha = renderer.getClearAlpha();
+      renderer.setClearAlpha(0);
+      renderer.clear(true, true, false);
+      renderer.setClearAlpha(oldClearAlpha);
+    }
+  }
+
+  /**
+   * Mode D (§6.2): for each stage, get its pass node; pre-render nested
+   * `StageRenderer` children into their asPassNode-RTs first. Then run the
+   * pipeline with `buildOutputNode(passes)` as `outputNode`.
+   */
+  #renderPipelineComposed(renderer: WebGPURenderer): void {
+    for (const stageItem of this.orderedStages) {
+      const stage = stageItem.stage;
+      if (stage instanceof StageRenderer) {
+        const childRT = stage.#ensureAsPassNodeRT(renderer);
+        const prev = renderer.getRenderTarget();
+        renderer.setRenderTarget(childRT);
+        try {
+          stage.#renderToCurrentTarget(renderer);
+        } finally {
+          renderer.setRenderTarget(prev);
+        }
+      }
+    }
+
+    if (this.#outputDirty) {
+      const passes = this.orderedStages.map((s) => this.#getStagePass(s, renderer));
+      const compose = this.buildOutputNode ?? RootRenderPipeline.buildOutputNode;
+      this.pipeline!.outputNode = compose(passes);
+      this.pipeline!.needsUpdate = true;
+      this.#outputDirty = false;
+    }
+
+    if (this.clear) this.#applyClear(renderer);
+    this.pipeline!.render();
+  }
+
+  #getStagePass(stageItem: StageItem, renderer: WebGPURenderer): Node {
+    const stage = stageItem.stage;
+    if (!hasAsPassNode(stage)) {
+      throw new TypeError(
+        `StageRenderer.buildOutputNode: stage ${JSON.stringify(stage.name)} does not implement asPassNode() — incompatible with the buildOutputNode composition path`,
+      );
+    }
+    return stage.asPassNode(renderer);
+  }
+
+  /**
+   * Return a TSL `texture()` node sampling this renderer's pass-target.
+   * Used by a parent `StageRenderer` with `buildOutputNode` to nest renderers.
+   *
+   * The parent is responsible for ensuring the texture is up-to-date before
+   * the pipeline runs (`StageRenderer` does that automatically for nested
+   * `StageRenderer` children).
+   */
+  asPassNode(renderer: WebGPURenderer): Node {
+    const rt = this.#ensureAsPassNodeRT(renderer);
+    return texture(rt.texture);
+  }
+
+  #ensureInternalRT(renderer: WebGPURenderer): RenderTarget {
+    return (this.#internalRT = this.#ensureRT(this.#internalRT, renderer));
+  }
+
+  #ensureAsPassNodeRT(renderer: WebGPURenderer): RenderTarget {
+    return (this.#asPassNodeRT = this.#ensureRT(this.#asPassNodeRT, renderer));
+  }
+
+  #ensureRT(rt: RenderTarget | undefined, renderer: WebGPURenderer): RenderTarget {
+    const pixelRatio = renderer.getPixelRatio?.() ?? 1;
+    const w = Math.max(1, Math.floor(this.width * pixelRatio));
+    const h = Math.max(1, Math.floor(this.height * pixelRatio));
+    if (!rt) {
+      return new RenderTarget(w, h);
+    }
+    if (rt.width !== w || rt.height !== h) {
+      rt.setSize(w, h);
+    }
+    return rt;
+  }
+
+  #applyClear(renderer: WebGPURenderer): void {
+    const oldClearAlpha = renderer.getClearAlpha();
+    let colorWasOverridden = false;
+    if (this.#clearColor != null) {
+      renderer.getClearColor(this.#oldClearColor as any);
+      renderer.setClearColor(this.#clearColor, this.clearAlpha);
+      colorWasOverridden = true;
+    } else {
+      renderer.setClearAlpha(this.clearAlpha);
+    }
+    renderer.clear(this.clearColorBuffer, this.clearDepthBuffer, this.clearStencilBuffer);
+    if (colorWasOverridden) {
+      renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
+    } else {
+      renderer.setClearAlpha(oldClearAlpha);
+    }
+  }
+
+  /**
+   * Release internal `RenderTarget`s and the pipeline (if any).
+   * Call when this renderer is no longer needed.
+   */
+  dispose(): void {
+    this.#internalRT?.dispose();
+    this.#internalRT = undefined;
+    this.#asPassNodeRT?.dispose();
+    this.#asPassNodeRT = undefined;
+    this.pipeline?.dispose();
+    this.pipeline = undefined;
   }
 
   protected renderStage(stageItem: StageItem, renderer: WebGPURenderer): void {
@@ -385,6 +601,7 @@ export class StageRenderer implements IStage, IRenderable {
       };
       this.stages.push(si);
       this.#orderedStages = undefined;
+      this.#outputDirty = true;
       this.resizeStage(si, this.width, this.height);
       emit(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
     }
@@ -399,6 +616,7 @@ export class StageRenderer implements IStage, IRenderable {
     if (index !== -1) {
       this.stages.splice(index, 1);
       this.#orderedStages = undefined;
+      this.#outputDirty = true;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
     return this;

@@ -11,12 +11,16 @@ interface RendererMock {
   autoClear: boolean;
   __clearColor: Color;
   __clearAlpha: number;
+  __renderTarget: unknown;
   setClearColor: Mock;
   getClearColor: Mock;
   setClearAlpha: Mock;
   getClearAlpha: Mock;
   clear: Mock;
   render: Mock;
+  setRenderTarget: Mock;
+  getRenderTarget: Mock;
+  getPixelRatio: Mock;
 }
 
 function createRendererMock(): RendererMock {
@@ -24,13 +28,21 @@ function createRendererMock(): RendererMock {
     autoClear: true,
     __clearColor: new Color(0x111111),
     __clearAlpha: 0.5,
+    __renderTarget: null,
     setClearColor: vi.fn(),
     getClearColor: vi.fn(),
     setClearAlpha: vi.fn(),
     getClearAlpha: vi.fn(),
     clear: vi.fn(),
     render: vi.fn(),
+    setRenderTarget: vi.fn(),
+    getRenderTarget: vi.fn(),
+    getPixelRatio: vi.fn(() => 1),
   };
+  m.setRenderTarget.mockImplementation((rt) => {
+    m.__renderTarget = rt;
+  });
+  m.getRenderTarget.mockImplementation(() => m.__renderTarget);
   m.setClearColor.mockImplementation((c: Color, a?: number) => {
     m.__clearColor.copy(c);
     if (typeof a === 'number') m.__clearAlpha = a;
@@ -301,6 +313,309 @@ describe('StageRenderer', () => {
       expect(added).toHaveBeenCalledTimes(1);
       sr.detach();
       expect(removed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pipeline integration (§6 of Backlog-StageRenderer.md)
+  // ---------------------------------------------------------------------------
+
+  describe('outputRenderTarget (§6.4 RT only, no pipeline)', () => {
+    it('redirects rendering into the given RT and restores the previous target', () => {
+      const sr = new StageRenderer();
+      const rt = {isRenderTarget: true} as any;
+      sr.outputRenderTarget = rt;
+      const stage = fakeStage('s');
+      stage.renderTo.mockImplementation(() => {
+        // While rendering, the current render target must be our RT
+        expect(renderer.__renderTarget).toBe(rt);
+      });
+      sr.add(stage);
+      const beforeRT = {tag: 'screen'};
+      renderer.__renderTarget = beforeRT;
+      sr.renderTo(renderer as any);
+      expect(stage.renderTo).toHaveBeenCalledTimes(1);
+      // Restored
+      expect(renderer.__renderTarget).toBe(beforeRT);
+    });
+  });
+
+  describe('pipeline without buildOutputNode (§6.4 Mode C)', () => {
+    function makePipelineMock() {
+      return {
+        outputNode: undefined as unknown,
+        needsUpdate: false,
+        render: vi.fn(),
+        dispose: vi.fn(),
+      };
+    }
+
+    it('renders stages into an internal RT, then runs the pipeline', () => {
+      const sr = new StageRenderer();
+      sr.resize(200, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+
+      let rtDuringStageRender: unknown;
+      stage.renderTo.mockImplementation(() => {
+        rtDuringStageRender = renderer.__renderTarget;
+      });
+
+      let rtDuringPipelineRender: unknown;
+      pipeline.render.mockImplementation(() => {
+        rtDuringPipelineRender = renderer.__renderTarget;
+      });
+
+      sr.renderTo(renderer as any);
+
+      // Stage rendered into an internal RT (non-null)
+      expect(rtDuringStageRender).not.toBeNull();
+      expect((rtDuringStageRender as any)?.isRenderTarget).toBe(true);
+      // Pipeline rendered to the original target (null = screen)
+      expect(rtDuringPipelineRender).toBeNull();
+      expect(pipeline.render).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(true);
+      expect(pipeline.outputNode).toBeDefined();
+    });
+
+    it('rebuilds outputNode only when stage list changes', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      const pipeline = {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      sr.pipeline = pipeline as any;
+
+      sr.renderTo(renderer as any);
+      const firstNode = pipeline.outputNode;
+      pipeline.needsUpdate = false;
+      sr.renderTo(renderer as any);
+      // outputNode kept (rebuild only when invalidated)
+      expect(pipeline.outputNode).toBe(firstNode);
+      expect(pipeline.needsUpdate).toBe(false);
+
+      // Add a stage → invalidate
+      sr.add(fakeStage('t'));
+      pipeline.needsUpdate = false;
+      sr.renderTo(renderer as any);
+      expect(pipeline.needsUpdate).toBe(true);
+    });
+
+    it('runs pipeline into outputRenderTarget when set', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('s'));
+      const outRT = {isRenderTarget: true, tag: 'out'} as any;
+      sr.outputRenderTarget = outRT;
+      let rtDuringPipeline: unknown;
+      const pipeline = {
+        outputNode: undefined as unknown,
+        needsUpdate: false,
+        render: vi.fn(() => {
+          rtDuringPipeline = renderer.__renderTarget;
+        }),
+        dispose: vi.fn(),
+      };
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+      expect(rtDuringPipeline).toBe(outRT);
+    });
+
+    it('dispose() releases internal RT and pipeline', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.add(fakeStage('s'));
+      const dispose = vi.fn();
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose} as any;
+      sr.renderTo(renderer as any);
+      sr.dispose();
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(sr.pipeline).toBeUndefined();
+    });
+  });
+
+  describe('asPassNode + buildOutputNode (§6.2 / §6.3)', () => {
+    function fakePassNode(label: string) {
+      return {isNode: true, label, type: 'pass'} as any;
+    }
+
+    it('Stage2D.asPassNode requires a camera (throws without projection)', async () => {
+      const {Stage2D} = await import('./Stage2D.js');
+      const {ParallaxProjection} = await import('./ParallaxProjection.js');
+      const stage = new Stage2D();
+      expect(() => stage.asPassNode(renderer as any)).toThrowError(/no scene or camera/);
+      stage.projection = new ParallaxProjection('xy|bottom-left');
+      expect(() => stage.asPassNode(renderer as any)).not.toThrow();
+    });
+
+    it('buildOutputNode receives a pass node per stage (default renderOrder = "*", insertion order)', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const passA = fakePassNode('a');
+      const passB = fakePassNode('b');
+      const stageA = {...fakeStage('a'), asPassNode: vi.fn(() => passA)};
+      const stageB = {...fakeStage('b'), asPassNode: vi.fn(() => passB)};
+      sr.add(stageA as any).add(stageB as any);
+      const buildOutputNode = vi.fn((nodes: unknown[]) => nodes[0]);
+      sr.buildOutputNode = buildOutputNode as any;
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(buildOutputNode.mock.calls[0][0]).toEqual([passA, passB]);
+    });
+
+    // -------------------------------------------------------------------------
+    // renderOrder × buildOutputNode — the order the user reads in their pipeline
+    // -------------------------------------------------------------------------
+    describe('renderOrder controls the order of pass nodes passed to buildOutputNode', () => {
+      function makeOrderedSetup(names: string[], renderOrder?: string) {
+        const sr = new StageRenderer();
+        sr.resize(100, 100);
+        const passByName: Record<string, unknown> = {};
+        for (const n of names) {
+          passByName[n] = fakePassNode(n);
+          const stage = {...fakeStage(n), asPassNode: vi.fn(() => passByName[n])};
+          sr.add(stage as any);
+        }
+        if (renderOrder !== undefined) sr.renderOrder = renderOrder;
+        const buildOutputNode = vi.fn((nodes: unknown[]) => nodes[0]);
+        sr.buildOutputNode = buildOutputNode as any;
+        sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+        return {sr, buildOutputNode, passByName};
+      }
+
+      it('explicit list reorders inserted stages: "ui,world,bg" → passes [ui, world, bg]', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,world,bg');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+      });
+
+      it('wildcard splices the rest in insertion order: "ui,*" → [ui, bg, world]', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,*');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['bg'], passByName['world']]);
+      });
+
+      it('wildcard between names: "bg,*,ui" → [bg, world, ui]', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'bg,*,ui');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
+      });
+
+      it('names missing from renderOrder are dropped from the pass list: "ui,bg" → [ui, bg] (world omitted)', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,bg');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['bg']]);
+      });
+
+      it('unknown names in renderOrder are ignored: "ui,nope,world,*" → [ui, world, bg]', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,nope,world,*');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+      });
+
+      it('whitespace in renderOrder is trimmed: " ui , world , bg " → [ui, world, bg]', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], ' ui , world , bg ');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+      });
+
+      it('changing renderOrder after the first render rebuilds outputNode with the new order', () => {
+        const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'bg,world,ui');
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode).toHaveBeenCalledTimes(1);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
+
+        // Reorder
+        sr.renderOrder = 'ui,world,bg';
+        sr.renderTo(renderer as any);
+        expect(buildOutputNode).toHaveBeenCalledTimes(2);
+        expect(buildOutputNode.mock.calls[1][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+      });
+
+      it('order matches the parallel call order of asPassNode() per stage', () => {
+        const sr = new StageRenderer();
+        sr.resize(100, 100);
+        const order: string[] = [];
+        const make = (name: string) => {
+          const node = fakePassNode(name);
+          const stage = {
+            ...fakeStage(name),
+            asPassNode: vi.fn(() => {
+              order.push(name);
+              return node;
+            }),
+          };
+          return {stage, node};
+        };
+        const a = make('a');
+        const b = make('b');
+        const c = make('c');
+        sr.add(a.stage as any).add(b.stage as any).add(c.stage as any);
+        sr.renderOrder = 'c,a,b';
+        const buildOutputNode = vi.fn((nodes: unknown[]) => nodes[0]);
+        sr.buildOutputNode = buildOutputNode as any;
+        sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+        sr.renderTo(renderer as any);
+        // asPassNode() called in the same order the nodes appear in buildOutputNode's argument
+        expect(order).toEqual(['c', 'a', 'b']);
+        expect(buildOutputNode.mock.calls[0][0]).toEqual([c.node, a.node, b.node]);
+      });
+    });
+
+    it('throws when a stage in the build path has no asPassNode()', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('bare'));
+      sr.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      expect(() => sr.renderTo(renderer as any)).toThrowError(/asPassNode/);
+    });
+
+    it('nested StageRenderer is pre-rendered into its asPassNode-RT before parent pipeline runs', () => {
+      const parent = new StageRenderer();
+      parent.resize(100, 100);
+      const child = new StageRenderer();
+      // attach child as stage of parent
+      parent.add(child as any);
+      child.resize(100, 100);
+      const inner = fakeStage('inner');
+      child.add(inner);
+
+      // Record the RT during child's inner rendering
+      let rtDuringInner: unknown;
+      inner.renderTo.mockImplementation(() => {
+        rtDuringInner = renderer.__renderTarget;
+      });
+
+      let pipelineOutputNode: unknown;
+      parent.buildOutputNode = ((nodes: unknown[]) => {
+        pipelineOutputNode = nodes[0];
+        return nodes[0];
+      }) as any;
+      parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+
+      parent.renderTo(renderer as any);
+
+      // Child's inner stage rendered into a non-null target (the child's asPassNodeRT)
+      expect(rtDuringInner).not.toBeNull();
+      expect((rtDuringInner as any)?.isRenderTarget).toBe(true);
+      // buildOutputNode received exactly one pass node (the child as a texture node)
+      expect(pipelineOutputNode).toBeDefined();
+    });
+
+    it('invalidateOutputNode() forces a rebuild on next render', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('a') as any);
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      sr.renderTo(renderer as any);
+      sr.pipeline!.needsUpdate = false;
+      sr.invalidateOutputNode();
+      sr.renderTo(renderer as any);
+      expect(sr.pipeline!.needsUpdate).toBe(true);
     });
   });
 });

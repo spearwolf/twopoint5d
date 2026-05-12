@@ -154,7 +154,7 @@ Helper-Vertrag (`CameraBasedVisibilityHelpers` liest `tile.frustumBox`, `tile.bo
 
 Detaillierte Analyse: siehe [`Backlog-StageRenderer.md`](./Backlog-StageRenderer.md).
 
-Iteration 1 (§3.1–§3.8, §4, §5) umgesetzt:
+Iteration 1 (§3.1–§3.8, §4, §5) + Iteration 2 (§6) vollständig umgesetzt:
 
 - `Stage2D` von toten Clear-Properties (`clearColor`/`clearAlpha`/`autoClear`) befreit — die wurden vom Renderer nie gelesen.
 - `StageRenderer` bekommt ein explizites `clear: boolean`-Flag; `setClearColor(color, alpha?)` aktiviert es als Convenience und ist fluent (`this`-Return). Ebenso `add`, `remove`, `attach`, `detach`.
@@ -165,14 +165,15 @@ Iteration 1 (§3.1–§3.8, §4, §5) umgesetzt:
 - `setClearColor`-Signatur gelockert (`Color | null`), `setClearAlpha`-Restore liegt jetzt im `if (shouldClear)`-Zweig (vorher Side-Effect pro Frame).
 - Class-JSDoc auf `StageRenderer` dokumentiert beide Frame-Loop-Modi (auto via `parent` / manuell), die Clear-Policy und die `name`/`renderOrder`-Eindeutigkeit.
 - Public `ClearStage` (Marker-Stage zum Buffer-Clearen zwischen Siblings, depth-only default) — Idiom aus §5.
-- `packages/twopoint5d/src/stage/README.md`: Cheat-Sheet mit Hello-World, Manual vs. Auto-Mode, Layering, Nesting, Clear-Policy-Tabelle, Custom-Host-Beispiel.
-- Lookbook-Demos: `display-multi.astro` aufgeräumt (doppeltes Frame-Driving entfernt), `display-minimal.astro` auf das fluent §4-Idiom umgestellt, `quadtree-playground` auf explizites `setClearColor(null, 0)` migriert.
+- `RenderPipeline`-Integration (§6): `StageRenderer.pipeline?`, `outputRenderTarget?`, `buildOutputNode?`, `IPassProvider#asPassNode`, `StageRenderer.dispose()` + `invalidateOutputNode()`. Drei Modes: C (internes RT), D (TSL-Komposition mit `bloom`/`fxaa`/etc), E (verschachtelte StageRenderer mit eigener Pipeline).
+- `packages/twopoint5d/src/stage/README.md`: Cheat-Sheet mit Architektur-Diagramm, Hello-World, Manual vs. Auto-Mode, Layering, Nesting, Clear-Policy-Tabelle, Off-Screen-Rendering, Pipeline-Modes C/D/E, Resource-Lifecycle, Custom-Host.
+- Lookbook-Demos: `display-multi.astro` aufgeräumt (doppeltes Frame-Driving entfernt), `display-minimal.astro` auf das fluent §4-Idiom umgestellt, `quadtree-playground` auf explizites `setClearColor(null, 0)` migriert, neue Demos `stage-postprocessing.astro` (Mode D mit `bloom`) und `stage-nested-pipelines.astro` (Mode E: World-Renderer mit eigener Bloom-Pipeline + UI plain on top).
 
-**Test-Coverage:** neue `StageRenderer.spec.ts` (21 Cases) — Clear-Policy, Render-Order, Fluent-API, Namens-Kollisions-Warnung, Host-Wiring, Nesting, `OnAddToParent`/`OnRemoveFromParent`-Symmetrie; erweiterte `Stage2D.spec.ts` (5 Cases) — `renderTo` mit/ohne Camera + Removal-Assertion; neue `ClearStage.spec.ts` (5 Cases) — Default-Flags, explizite Options, Naming, No-Op-Lifecycle, Runtime-Flag-Changes; neuer Browser-Test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` (Display-Integration, Multi-Stage, Nesting, `detach()`-Unhook).
+**Test-Coverage:** `StageRenderer.spec.ts` jetzt 31 Cases (zusätzlich für §6: outputRenderTarget redirect, Mode C internal-RT-Sampling, outputNode-Rebuild-Caching, Mode D buildOutputNode-Vertrag, Throw-on-missing-asPassNode, Mode E pre-Render-into-asPassNodeRT, dispose lifecycle, invalidateOutputNode). Erweiterte `Stage2D.spec.ts` (5 Cases) — `renderTo` mit/ohne Camera + Removal-Assertion; neue `ClearStage.spec.ts` (5 Cases); neuer Browser-Test `stage-renderer.test.js` (Display-Integration, Multi-Stage, Nesting, `detach()`-Unhook) und `stage-pipeline.test.js` (Mode C / Mode D / dispose).
 
-Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (`renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus, `clearAlpha === 0` ist kein Clear-Trigger mehr, empfohlenes fluent-Idiom, `ClearStage` für Zwischen-Clears).
+Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (Iteration 1 + Iteration 2: `renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus, `clearAlpha === 0` ist kein Clear-Trigger mehr, empfohlenes fluent-Idiom, `ClearStage` für Zwischen-Clears, Adoption der `pipeline`-Integration aus Mode D, Komposition verschachtelter Renderer aus Mode E).
 
-Noch offen (Iteration 2): `RenderPipeline` / Post-Pass-Integration, Verschachtelung mit eigenem RenderTarget — siehe §6 in `Backlog-StageRenderer.md`.
+Nice-to-have für die Zukunft (kein Blocker): RenderTarget-Pool zur Mehrfachverwendung, gemeinsame Effekt-Builder als `buildOutputNode`-Factories — siehe `Backlog-StageRenderer.md` §9.
 
 ---
 
@@ -247,7 +248,7 @@ Damit der Backlog nicht nur wie eine Mängelliste wirkt, hier explizit das **Sol
 | `vertex-objects/` | 26 | 10 | ~38 % | ✓ Gut, kritische Pfade abgedeckt |
 | `map2d/` | 28 | 8 | ~29 % | ⚠️ Streaming-Logik kaum geprüft; `CameraBasedVisibility.spec.ts` (15 Cases) seit der Performance-Optimierung neu hinzugekommen |
 | `texture/` | 14 | 5 | ~36 % | ✓ TextureAtlas exzellent (`TextureAtlas.spec.ts`, 230 Zeilen, randomisierte Permutationen) |
-| `stage/` | 14 | 7 | ~50 % | ✓ Projection-Tests gut; `Stage2D.spec.ts`, `StageRenderer.spec.ts` (21 Cases) und `ClearStage.spec.ts` (5 Cases) seit der `IStage`/`IRenderable`-Aufräumung |
+| `stage/` | 15 | 7 | ~47 % | ✓ Projection-Tests gut; `Stage2D.spec.ts`, `StageRenderer.spec.ts` (31 Cases) und `ClearStage.spec.ts` (5 Cases) seit den Iterationen 1+2 (inkl. Pipeline-Mode C/D/E) |
 | `display/` | 10 | 2 | ~20 % | ⚠️ `Chronometer` + `DisplayStateMachine` als Vitest-Specs; das Resize-Verhalten der `Display`-Klasse wird seit `display-resize.test.js` (13 Cases, Browser) abgedeckt — übrige Lifecycle-Bereiche der Klasse weiterhin ungetestet |
 | `utils/` | 7 | 5 | ~71 % | ✓ Sehr gut |
 | **`sprites/`** | **11** | **0** | **0 %** | 🔴 **Komplett ungetestet** |

@@ -1,0 +1,70 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, showSource, title} from './_stage-postprocessing.json';
+---
+
+<Layout title={title} showSource={showSource}>
+  <canvas id="twopoint5d" resize-to="window"></canvas>
+
+  <p slot="demo-description">{description}</p>
+</Layout>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    Display,
+    OnStageUpdateFrame,
+    ParallaxProjection,
+    Stage2D,
+    StageRenderer,
+    TextureFactory,
+    type StageUpdateFrameProps,
+  } from '@spearwolf/twopoint5d';
+  import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
+  import {Color, RenderPipeline, Sprite, SpriteMaterial} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+
+  const canvas = document.getElementById('twopoint5d')!;
+  const display = new Display(canvas);
+
+  const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {width: 800, height: 600, fit: 'cover'}));
+
+  const stageRenderer = new StageRenderer(display).setClearColor(new Color('#0a0a1f'), 1).add(stage);
+
+  // Build a tiny post-pass: bloom on top of the rendered scene
+  stageRenderer.pipeline = new RenderPipeline(display.renderer);
+  // stageRenderer.buildOutputNode = ([scenePass]) => bloom(scenePass, 1.2, 0.6, 0.0);
+  stageRenderer.buildOutputNode = ([scenePass]) => scenePass.add(bloom(scenePass, 1.2, 0.6, 0.0));
+
+  const textureFactory = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']);
+
+  // A few bright sprites — bloom will smear them across the screen
+  const sprites: Sprite[] = [];
+  const colors = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffe0b3'];
+
+  for (let i = 0; i < 80; i++) {
+    const sprite = new Sprite(
+      new SpriteMaterial({map: textureFactory.load(assetsUrl('skinball-256.png')), color: new Color(colors[i % colors.length])}),
+    );
+    sprite.scale.set(40, 40, 1);
+    sprite.position.set(Math.random() * 800, Math.random() * 600, 0);
+    stage.scene.add(sprite);
+    sprites.push(sprite);
+  }
+
+  stage.scene.position.set(-400, -300, 0); // Center the stage so sprites can go around the edges
+
+  // Animate them on a circle so the bloom moves
+  const phases = sprites.map((_, i) => i * (1.5 * (Math.PI * 2) / sprites.length));
+  on(stage, OnStageUpdateFrame, ({now}: StageUpdateFrameProps) => {
+    for (let i = 0; i < sprites.length; i++) {
+      const a = phases[i] + now * 0.6;
+      sprites[i].position.set(400 + Math.cos(a) * 220, 300 + Math.sin(a * 1.3) * 160, 0);
+    }
+  });
+
+  display.start();
+
+  (window as any).display = display;
+  (window as any).stageRenderer = stageRenderer;
+</script>

@@ -10,9 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - add `IRenderable` interface (`renderTo(renderer: WebGPURenderer): void`) — implemented by `Stage2D` and `StageRenderer`
+- add `IPassProvider` interface (`asPassNode(renderer): Node`) — TSL contribution of a stage; implemented by `Stage2D` (returns `pass(scene, camera)`) and `StageRenderer` (returns `texture(internalRT.texture)`)
 - add `IStageRendererHost` interface (`onResize`, `onRenderFrame`) — the parent type a `StageRenderer` needs from a frame-loop host; `Display` satisfies it structurally
 - add `ClearStage` — marker stage that emits `renderer.clear(...)` between siblings; depth-only by default, configurable via `{color, depth, stencil}` (use case: drop the depth buffer before drawing UI on top of the world)
+- add `RootRenderPipeline` — `RenderPipeline` subclass with a built-in additive `buildOutputNode` (`p0.add(p1).add(p2)…`); assign as `StageRenderer.pipeline` to skip the `buildOutputNode` boilerplate for the common "compose every stage" case. User-set `buildOutputNode` still overrides the default
 - add `StageRenderer#clear: boolean` flag — explicit opt-in for clearing the render target before drawing the stages (default `false`)
+- add `StageRenderer#pipeline?: RenderPipeline` — optional `three.RenderPipeline` integration; without `buildOutputNode` (Mode C / §6.4) the stages render into an internal `RenderTarget` whose texture is sampled as `pipeline.outputNode`; with `buildOutputNode` (Mode D / §6.2) the user composes a TSL graph from per-stage pass nodes
+- add `StageRenderer#outputRenderTarget?: RenderTarget` — redirect the renderer's final output into a `RenderTarget` instead of the canvas; useful for picking, screenshots or downstream passes; combines with `pipeline`
+- add `StageRenderer#buildOutputNode?: (passes: Node[]) => Node` — TSL-composition hook used together with `pipeline`; called when the stage list changes; returns the node used as `pipeline.outputNode`
+- add `StageRenderer#invalidateOutputNode()` — explicit "rebuild on next render" for the pipeline's `outputNode`
+- add `StageRenderer#dispose()` — releases internal `RenderTarget`s and `this.pipeline`
+- add `StageRenderer#asPassNode(renderer)` — returns a `texture()` node sampling this renderer's pass-target, for use inside a parent's `buildOutputNode`; the parent automatically pre-renders nested `StageRenderer` children into their pass-target before its own pipeline runs (§6.3)
+- add `Stage2D#asPassNode(renderer)` — returns `pass(scene, camera)`; throws when camera is not ready (assign `projection` or call `resize()` first)
 - add `OnAddToParent` event on `StageRenderer` (symmetric to `OnRemoveFromParent`)
 - add `Stage2D#renderTo(renderer)` — renders `scene` with `camera`; no-op until both exist
 - add fluent return (`this`) on `StageRenderer#add()`, `#remove()`, `#setClearColor()`, `#attach()`, `#detach()` — enables the three-line "Display + Stage2D + StageRenderer" idiom
@@ -22,9 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `ClearStage.spec.ts` (5 cases) covering default flags, explicit options, naming, no-op lifecycle methods and runtime flag changes
 - add Stage2D `renderTo()` unit tests and an assertion that the removed clear-properties are no longer exposed
 - add browser test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` covering Display-driven rendering, additive multi-stage rendering, nested renderers, and `detach()`-unhook
+- add browser test `stage-pipeline.test.js` in `@spearwolf/twopoint5d-testing` covering Mode C internal-RT sampling, Mode D `buildOutputNode` invocation, and `dispose()` lifecycle
+- add `RootRenderPipeline.spec.ts` (9 cases) covering the static additive composer (single / multi / empty), user-`buildOutputNode` precedence, `renderOrder` integration and outputNode rebuild on stage-list change — explicit verification that the composer receives ALL pass nodes
+- add lookbook demo `stage-postprocessing.astro` — `Stage2D` with `bloom()` via `buildOutputNode`
+- add lookbook demo `stage-nested-pipelines.astro` — outer `RootRenderPipeline` automatically composes a bloom-post-processed world layer (nested `StageRenderer` with its own pipeline) and a plain UI pass without an explicit `buildOutputNode`
+- document the "one canvas writer per frame" constraint in `packages/twopoint5d/src/stage/README.md` (Mode E section + Common pitfalls): a `RenderPipeline.render()` and a plain `renderer.render(scene, camera)` cannot share the canvas within one frame — compose mixed stages via an outer pipeline instead
 
 ### Changed
 
+- change `StageRenderer.renderTo()` in pipeline mode always clears the internal pass-target each frame (transparent black, or the user's `clear`-color/alpha when `clear=true`) to avoid frame-content accumulation
 - change `StageRenderer#renderFrame(renderer)` → `StageRenderer#renderTo(renderer)` (renamed for `IRenderable` consistency)
 - change `StageRenderer#add(stage)` parameter type from `IStage` to `IStage & IRenderable`
 - change `StageRenderer.parent` type from `Display | StageRenderer` to `IStageRendererHost | StageRenderer` — any frame-loop host is now accepted
@@ -182,6 +197,37 @@ sr.add(stage);
 new StageRenderer(display).setClearColor(new Color('#90b0d0')).add(stage);
 ```
 
+#### Adopting the new `pipeline` integration
+
+The new `pipeline` integration is purely additive; existing code paths continue to work unchanged. If you were running your own post-pass against the renderer manually, you can fold it into the `StageRenderer`:
+
+**Before (manual pass + render)**
+
+```ts
+const sr = new StageRenderer(display).add(stage);
+const renderTarget = new RenderTarget(width, height);
+const scenePass = pass(stage.scene, stage.camera!);
+const pipeline = new RenderPipeline(display.renderer);
+pipeline.outputNode = bloom(scenePass);
+
+on(display, OnDisplayRenderFrame, ({renderer}) => {
+  renderer.setRenderTarget(renderTarget);
+  sr.renderTo(renderer);
+  renderer.setRenderTarget(null);
+  pipeline.render();
+});
+```
+
+**After (Mode D via `buildOutputNode`)**
+
+```ts
+const sr = new StageRenderer(display).add(stage);
+sr.pipeline = new RenderPipeline(display.renderer);
+sr.buildOutputNode = ([scenePass]) => bloom(scenePass); // pass is pulled from stage.asPassNode()
+```
+
+The renderer manages its own internal `RenderTarget`, sizes it on `resize()` and disposes it with `dispose()`.
+
 #### Intermediate clears between layered stages
 
 If you previously inserted custom rendering steps to clear the depth buffer between world and UI, use `ClearStage` instead.
@@ -201,6 +247,57 @@ root.add(world).add(new ClearStage({depth: true})).add(ui); // depth-only is the
 ```
 
 See `packages/twopoint5d/src/stage/README.md` for the full layering cheat-sheet.
+
+#### `RootRenderPipeline` shortcut for additive composition
+
+For the most common case — "compose every stage's pass additively as the pipeline output" — use `RootRenderPipeline` instead of `RenderPipeline` and skip `buildOutputNode` entirely.
+
+**Before**
+
+```ts
+import {RenderPipeline} from 'three/webgpu';
+root.pipeline = new RenderPipeline(display.renderer);
+root.buildOutputNode = ([a, b, c]) => a.add(b).add(c); // boilerplate
+```
+
+**After**
+
+```ts
+import {RootRenderPipeline} from '@spearwolf/twopoint5d';
+root.pipeline = new RootRenderPipeline(display.renderer); // additive composition built-in
+```
+
+Setting `stageRenderer.buildOutputNode` still overrides the default — use the explicit form when you need a non-additive composition (e.g. `bloom(scenePass)` wrapping a single pass).
+
+#### Composing nested renderers with their own pipeline
+
+Each `StageRenderer` can carry its own pipeline. The outer composition picks them up automatically.
+
+**Before (separate, manually composed)**
+
+```ts
+const worldRT = new RenderTarget(w, h);
+const worldPipeline = new RenderPipeline(renderer);
+worldPipeline.outputNode = bloom(pass(worldScene, worldCamera));
+on(display, OnDisplayRenderFrame, ({renderer}) => {
+  renderer.setRenderTarget(worldRT);
+  worldPipeline.render();
+  renderer.setRenderTarget(null);
+  // … now blit worldRT.texture as a quad, then render UI on top …
+});
+```
+
+**After (nested renderers)**
+
+```ts
+const root = new StageRenderer(display).setClearColor(new Color('#000'));
+
+const worldRenderer = new StageRenderer(root).add(worldStage);
+worldRenderer.pipeline = new RenderPipeline(display.renderer);
+worldRenderer.buildOutputNode = ([scene]) => bloom(scene);
+
+root.add(uiStage); // plain on top
+```
 
 ## [0.20.0] - 2026-05-10
 

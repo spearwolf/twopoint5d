@@ -1,0 +1,18 @@
+{
+  "title": "stage nested pipelines",
+  "description": "Outer composite of two stage layers: world layer post-processed via its own `RenderPipeline`, UI layer rendered plainly on top",
+  "url": "/demos/stage-nested-pipelines",
+  "tags": [
+    "Display",
+    "ParallaxProjection",
+    "Stage2D",
+    "StageRenderer",
+    "RenderPipeline",
+    "post-processing",
+    "nested-renderers",
+    "vanilla"
+  ],
+  "showSource": {
+    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/stage-nested-pipelines.astro"
+  }
+}

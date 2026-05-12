@@ -5,10 +5,11 @@
 > Audience: Entwickler:innen, die mit `twopoint5d` arbeiten. Ziel ist ein
 > einfacher, konsistenter Renderer-Stack mit optionalem Post-Pass.
 >
-> **Status:** §3.1–§3.8, §4 und §5 sind umgesetzt (siehe `[Unreleased]` im
-> `packages/twopoint5d/CHANGELOG.md` und `packages/twopoint5d/src/stage/README.md`).
-> §6 (RenderPipeline / Post-Pass) steht noch offen — siehe §9 für den
-> verbleibenden Backlog.
+> **Status:** §3–§6 sind vollständig umgesetzt. Siehe `[Unreleased]` im
+> `packages/twopoint5d/CHANGELOG.md` und das Cheat-Sheet in
+> `packages/twopoint5d/src/stage/README.md` (inkl. Architektur-Diagramm,
+> Pipeline-Modes C/D/E, RenderTarget-Lifecycle, Lookbook-Demos
+> `stage-postprocessing` und `stage-nested-pipelines`).
 
 ---
 
@@ -444,7 +445,34 @@ Pattern für User von ganz alleine an.
 
 ---
 
-## 6. Neues Feature: `RenderPipeline` / Post-Pass pro `StageRenderer`
+## 6. Neues Feature: `RenderPipeline` / Post-Pass pro `StageRenderer` ✅ ERLEDIGT
+
+> **Iteration 2 vollständig umgesetzt:**
+>
+> - Mode C (§6.4): `pipeline?: RenderPipeline` ohne `buildOutputNode` →
+>   internes `RenderTarget` wird per Frame gefüllt, `pipeline.outputNode =
+>   texture(rt.texture)`. Anwender brauchen kein TSL-Wissen.
+> - Mode D (§6.2): `pipeline + buildOutputNode((passes) => Node)` →
+>   `Stage2D.asPassNode()` liefert `pass(scene, camera)`, der User komponiert
+>   bloom/blur/etc. als TSL-Graph.
+> - Mode E (§6.3): Verschachtelte `StageRenderer` mit eigener Pipeline →
+>   `asPassNode()` liefert `texture(internal-pass-RT.texture)`, der Parent
+>   pre-rendert die Child-Renderer per Frame.
+> - Zusätzlich: `outputRenderTarget?: RenderTarget` (Mode B), `dispose()`
+>   für interne RTs + Pipeline, `invalidateOutputNode()`-Hook.
+> - **Convenience-Klasse `RootRenderPipeline`** (Iteration 2.1): subclass
+>   von `RenderPipeline` mit eingebauter additiver Komposition
+>   `p0.add(p1).add(p2)…`. Wird vom `StageRenderer` automatisch als
+>   Default-Composer benutzt, wenn `pipeline instanceof RootRenderPipeline`
+>   und `buildOutputNode` nicht gesetzt ist. Reduziert den Outer-Pipeline-
+>   Boilerplate auf eine Zeile: `root.pipeline = new RootRenderPipeline(display.renderer)`.
+> - Tests: 39 Vitest-Cases in `StageRenderer.spec.ts` + 9 Cases in
+>   `RootRenderPipeline.spec.ts` (statische Composer-Tests + Integration
+>   verifizieren dass ALLE Passes verwendet werden) + 3 Browser-Cases in
+>   `stage-pipeline.test.js`.
+> - Demos: `stage-postprocessing.astro` (Mode D mit Bloom),
+>   `stage-nested-pipelines.astro` (Mode E mit verschachteltem Bloom + UI,
+>   `RootRenderPipeline` am Root).
 
 ### 6.1 Hintergrund (three.js r183+)
 
@@ -547,6 +575,17 @@ Dadurch wird das Verschachtelungs-Verhalten konsistent:
 - **Kein Renderer hat eine Pipeline** → es bleibt beim heutigen Pfad
   (`renderer.render(scene, camera)`-pro-Stage). `asPassNode` wäre dann nicht
   nötig; nur Renderer mit Pipeline rufen es auf.
+
+> **Constraint (Iteration 2, durch Lookbook-Demo verifiziert):** WebGPURenderer
+> (und der WebGL2-Fallback) erlaubt **genau einen Canvas-Writer pro Frame**.
+> Mischt man im selben Frame `RenderPipeline.render()` und ein direktes
+> `renderer.render(scene, camera)` auf der Canvas, wird einer der beiden
+> verworfen (der Swap-Chain-Backbuffer in WebGPU ist pro Draw frisch). Für
+> "Bloom auf der Welt-Stage aber UI plain darüber" muss ein **Outer-Pipeline**
+> beide Layer per `buildOutputNode` komponieren. Im Lookbook-Demo
+> `stage-nested-pipelines.astro` ist das so umgesetzt: `root` hat eine
+> Pipeline, die `worldRenderer.asPassNode()` (Texture aus innerer Bloom-RT)
+> und `uiStage.asPassNode()` (Pass-Node) addiert.
 
 Skizze des Datenflusses:
 
@@ -711,15 +750,33 @@ interface IPassProvider {
 - [x] §5 (Stages "übereinander"): `ClearStage` als public Marker-Stage
       ausgeliefert; Idiom + Cheat-Sheet in `src/stage/README.md`.
 
-### Noch offen (Iteration 2: RenderPipeline / Post-Pass — siehe §6)
+### Erledigt (Iteration 2 + 2.1: RenderPipeline / Post-Pass, §6 + Convenience-Layer)
 
-- [ ] `StageRenderer.outputRenderTarget?: WebGPURenderTarget` (Minimal-RT-Variante,
-      §6.4).
-- [ ] `StageRenderer.pipeline?: RenderPipeline` + Default-Render-Strategie
-      (Pipeline läuft, sampelt internes RT).
-- [ ] TSL-Komposition: `asPassNode()`, `buildOutputNode()`, verschachtelte
-      Pipelines (§6.2 / §6.3).
-- [ ] Browser-Tests für die Pipeline-Variante in `packages/twopoint5d-testing/`.
+- [x] `StageRenderer.outputRenderTarget?: RenderTarget` (Mode B / §6.4) inklusive
+      Restore-Behavior für den vorherigen Render-Target-Slot.
+- [x] `StageRenderer.pipeline?: RenderPipeline` + Default-Render-Strategie
+      (Mode C / §6.4): Pipeline läuft, sampelt internes RT.
+- [x] TSL-Komposition (Mode D / §6.2): `buildOutputNode(passes)` als Hook,
+      `asPassNode()` für jede `IPassProvider`-Stage.
+- [x] Verschachtelte Pipelines (Mode E / §6.3): Parent rendert
+      `StageRenderer`-Kinder automatisch in deren pass-RT.
+- [x] `StageRenderer.dispose()` für RTs + Pipeline; `invalidateOutputNode()`
+      für gezielten Rebuild.
+- [x] Browser-Tests `stage-pipeline.test.js` (Mode C / Mode D / dispose).
+- [x] Lookbook-Demos `stage-postprocessing.astro` + `stage-nested-pipelines.astro`
+      (letztere nutzt `RootRenderPipeline` am Root).
+- [x] `RootRenderPipeline` (Iteration 2.1): `RenderPipeline`-Subclass mit
+      statischem additivem Composer. `StageRenderer` erkennt die Subclass
+      und nutzt deren `buildOutputNode` als Default; user-set
+      `buildOutputNode` hat weiterhin Vorrang. Tests in
+      `RootRenderPipeline.spec.ts` (9 Cases).
+
+### Nice-to-have (zukünftig)
+
+- [ ] `RenderTarget`-Pool (multi-renderer dedup), wenn mehrere Renderer mit
+      gleicher Auflösung dasselbe Target zwischenspeichern könnten.
+- [ ] Helper-Builder für gängige Effekt-Stacks (`bloom`, `chromatic`,
+      `film grain`) als `buildOutputNode`-Factories.
 
 ---
 
@@ -727,16 +784,22 @@ interface IPassProvider {
 
 - `packages/twopoint5d/src/stage/IStage.ts`
 - `packages/twopoint5d/src/stage/IRenderable.ts` (neu)
+- `packages/twopoint5d/src/stage/IPassProvider.ts` (neu, Iteration 2)
 - `packages/twopoint5d/src/stage/IStageRendererHost.ts` (neu)
 - `packages/twopoint5d/src/stage/Stage2D.ts`
 - `packages/twopoint5d/src/stage/StageRenderer.ts`
 - `packages/twopoint5d/src/stage/Canvas2DStage.ts`
 - `packages/twopoint5d/src/stage/ClearStage.ts` (neu)
+- `packages/twopoint5d/src/stage/RootRenderPipeline.ts` (neu, Iteration 2.1)
 - `packages/twopoint5d/src/stage/public-api.ts`
 - `packages/twopoint5d/src/stage/README.md` (neu, Cheat-Sheet)
 - `packages/twopoint5d/src/events.ts`
 - `apps/lookbook/src/pages/demos/display-multi.astro`
 - `apps/lookbook/src/pages/demos/display-minimal.astro`
+- `apps/lookbook/src/pages/demos/stage-postprocessing.astro` (neu, Iteration 2)
+- `apps/lookbook/src/pages/demos/stage-nested-pipelines.astro` (neu, Iteration 2)
 - `apps/lookbook/src/demos/quadtree-playground/QuadTreeVisualization.ts`
-- Unit-Tests: `StageRenderer.spec.ts`, `Stage2D.spec.ts`, `ClearStage.spec.ts`
-- Browser-Test in `packages/twopoint5d-testing/test/stage-renderer.test.js`
+- Unit-Tests: `StageRenderer.spec.ts`, `Stage2D.spec.ts`, `ClearStage.spec.ts`,
+  `RootRenderPipeline.spec.ts` (neu, Iteration 2.1)
+- Browser-Tests: `packages/twopoint5d-testing/test/stage-renderer.test.js`,
+  `packages/twopoint5d-testing/test/stage-pipeline.test.js` (neu, Iteration 2)

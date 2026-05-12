@@ -1,5 +1,6 @@
 import {emit, type EventizedObject, eventize, retain} from '@spearwolf/eventize';
-import {type Camera, Scene, type WebGPURenderer} from 'three/webgpu';
+import {pass} from 'three/tsl';
+import {type Camera, type Node, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
   OnStageFirstFrame,
@@ -9,6 +10,7 @@ import {
   type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
+import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
@@ -27,7 +29,7 @@ import type {IStage} from './IStage.js';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Stage2D extends EventizedObject {}
 
-export class Stage2D implements IStage, IRenderable {
+export class Stage2D implements IStage, IRenderable, IPassProvider {
   isStage2D = true;
 
   scene: Scene;
@@ -214,5 +216,16 @@ export class Stage2D implements IStage, IRenderable {
     if (this.scene && this.camera) {
       renderer.render(this.scene, this.camera);
     }
+  }
+
+  /**
+   * Return a TSL `pass(scene, camera)` node for use inside a parent
+   * `RenderPipeline`. Requires `camera` (i.e. at least one `resize()`).
+   */
+  asPassNode(_renderer: WebGPURenderer): Node {
+    if (!this.scene || !this.camera) {
+      throw new Error('Stage2D.asPassNode(): no scene or camera yet — call resize() first');
+    }
+    return pass(this.scene, this.camera);
   }
 }
