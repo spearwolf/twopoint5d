@@ -1,4 +1,5 @@
 export * from './Canvas2DStage.js';
+export * from './ClearStage.js';
 export * from './fitIntoRectangle.js';
 export type * from './IProjection.js';
 export type * from './IRenderable.js';

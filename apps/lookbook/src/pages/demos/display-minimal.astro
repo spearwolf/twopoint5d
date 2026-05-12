@@ -20,19 +20,9 @@ import {description, showSource, title} from './_display-minimal.json';
   const width = 2288;
   const height = 3264;
 
-  const stage = new Stage2D(
-    new ParallaxProjection('xy|bottom-left', {
-      width: width,
-      height: height,
-      fit: 'contain',
-    }),
-  );
+  const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {width, height, fit: 'contain'}));
 
-  const stageRenderer = new StageRenderer(display);
-  stageRenderer.clearColor = new Color('#90b0d0');
-  stageRenderer.add(stage);
-
-  // stage.scene.background = new Color('#272727');
+  const stageRenderer = new StageRenderer(display).setClearColor(new Color('#90b0d0')).add(stage);
 
   (window as any).display = display;
   (window as any).stage = stage;

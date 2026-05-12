@@ -5,9 +5,10 @@
 > Audience: Entwickler:innen, die mit `twopoint5d` arbeiten. Ziel ist ein
 > einfacher, konsistenter Renderer-Stack mit optionalem Post-Pass.
 >
-> **Status:** §3.1–§3.8 sind umgesetzt (siehe `[Unreleased]` im
-> `packages/twopoint5d/CHANGELOG.md`). §4 (RenderPipeline / Post-Pass) und §6
-> stehen noch offen — siehe §9 für den verbleibenden Backlog.
+> **Status:** §3.1–§3.8, §4 und §5 sind umgesetzt (siehe `[Unreleased]` im
+> `packages/twopoint5d/CHANGELOG.md` und `packages/twopoint5d/src/stage/README.md`).
+> §6 (RenderPipeline / Post-Pass) steht noch offen — siehe §9 für den
+> verbleibenden Backlog.
 
 ---
 
@@ -373,7 +374,7 @@ Host-Interface ist es zumindest dokumentiert.
 
 ---
 
-## 4. Vorschlag: vereinfachte Standard-Verwendung
+## 4. Vorschlag: vereinfachte Standard-Verwendung ✅ ERLEDIGT
 
 Ziel: "Stage + StageRenderer + Display" in **drei** Zeilen.
 
@@ -396,7 +397,12 @@ display.start();
 
 ---
 
-## 5. Vorschlag: Mehrere Stages "übereinander" in dasselbe Target
+## 5. Vorschlag: Mehrere Stages "übereinander" in dasselbe Target ✅ ERLEDIGT
+
+> Fluent-Idiom + Layering nutzt heute jeder `StageRenderer`; `ClearStage`
+> ist als public `class ClearStage implements IStage, IRenderable` ausgeliefert
+> (`packages/twopoint5d/src/stage/ClearStage.ts`), `renderOrder` wie gewohnt.
+> Cheat-Sheet in `packages/twopoint5d/src/stage/README.md`.
 
 Das funktioniert heute schon — wir machen es nur explizit:
 
@@ -671,7 +677,7 @@ interface IPassProvider {
 
 ## 9. Checkliste / Backlog
 
-### Erledigt (Iteration 1: Konsistenz & API-Aufräumung)
+### Erledigt (Iteration 1: Konsistenz & API-Aufräumung, §3.1–§3.8 + §4 + §5)
 
 - [x] `display-multi.astro`: doppeltes Frame-Driving entfernt (auto-driven mit
       fluent setClearColor + add).
@@ -697,9 +703,15 @@ interface IPassProvider {
       `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing`
       (Display-Integration, Multi-Stage, Nesting, `detach()`).
 - [x] CHANGELOG `[Unreleased]` inkl. Migration Guides.
-- [x] Lookbook-Demo `display-multi.astro` aktualisiert.
+- [x] Lookbook-Demo `display-multi.astro` aktualisiert; `display-minimal.astro`
+      auf das §4-Fluent-Idiom umgestellt; `quadtree-playground` auf
+      explizites `setClearColor(null, 0)` migriert.
+- [x] §4 (vereinfachte Standard-Verwendung): fluent `setClearColor`/`add`-Kette
+      funktioniert, durch JSDoc + README dokumentiert.
+- [x] §5 (Stages "übereinander"): `ClearStage` als public Marker-Stage
+      ausgeliefert; Idiom + Cheat-Sheet in `src/stage/README.md`.
 
-### Noch offen (Iteration 2: RenderPipeline / Post-Pass — siehe §4 und §6)
+### Noch offen (Iteration 2: RenderPipeline / Post-Pass — siehe §6)
 
 - [ ] `StageRenderer.outputRenderTarget?: WebGPURenderTarget` (Minimal-RT-Variante,
       §6.4).
@@ -714,11 +726,17 @@ interface IPassProvider {
 ## 10. Anhang: betroffene Dateien
 
 - `packages/twopoint5d/src/stage/IStage.ts`
+- `packages/twopoint5d/src/stage/IRenderable.ts` (neu)
+- `packages/twopoint5d/src/stage/IStageRendererHost.ts` (neu)
 - `packages/twopoint5d/src/stage/Stage2D.ts`
 - `packages/twopoint5d/src/stage/StageRenderer.ts`
 - `packages/twopoint5d/src/stage/Canvas2DStage.ts`
+- `packages/twopoint5d/src/stage/ClearStage.ts` (neu)
 - `packages/twopoint5d/src/stage/public-api.ts`
+- `packages/twopoint5d/src/stage/README.md` (neu, Cheat-Sheet)
 - `packages/twopoint5d/src/events.ts`
 - `apps/lookbook/src/pages/demos/display-multi.astro`
 - `apps/lookbook/src/pages/demos/display-minimal.astro`
-- (neu) Browser-Test in `packages/twopoint5d-testing/test/`
+- `apps/lookbook/src/demos/quadtree-playground/QuadTreeVisualization.ts`
+- Unit-Tests: `StageRenderer.spec.ts`, `Stage2D.spec.ts`, `ClearStage.spec.ts`
+- Browser-Test in `packages/twopoint5d-testing/test/stage-renderer.test.js`

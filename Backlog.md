@@ -154,7 +154,7 @@ Helper-Vertrag (`CameraBasedVisibilityHelpers` liest `tile.frustumBox`, `tile.bo
 
 Detaillierte Analyse: siehe [`Backlog-StageRenderer.md`](./Backlog-StageRenderer.md).
 
-Iteration 1 (§3.1–§3.8) umgesetzt:
+Iteration 1 (§3.1–§3.8, §4, §5) umgesetzt:
 
 - `Stage2D` von toten Clear-Properties (`clearColor`/`clearAlpha`/`autoClear`) befreit — die wurden vom Renderer nie gelesen.
 - `StageRenderer` bekommt ein explizites `clear: boolean`-Flag; `setClearColor(color, alpha?)` aktiviert es als Convenience und ist fluent (`this`-Return). Ebenso `add`, `remove`, `attach`, `detach`.
@@ -164,13 +164,15 @@ Iteration 1 (§3.1–§3.8) umgesetzt:
 - Warnung in `add()` bei doppeltem Namen + nicht-default `renderOrder` (vorher stiller Sort-Fail).
 - `setClearColor`-Signatur gelockert (`Color | null`), `setClearAlpha`-Restore liegt jetzt im `if (shouldClear)`-Zweig (vorher Side-Effect pro Frame).
 - Class-JSDoc auf `StageRenderer` dokumentiert beide Frame-Loop-Modi (auto via `parent` / manuell), die Clear-Policy und die `name`/`renderOrder`-Eindeutigkeit.
-- Lookbook-Demo `display-multi.astro` aufgeräumt (doppeltes Frame-Driving entfernt).
+- Public `ClearStage` (Marker-Stage zum Buffer-Clearen zwischen Siblings, depth-only default) — Idiom aus §5.
+- `packages/twopoint5d/src/stage/README.md`: Cheat-Sheet mit Hello-World, Manual vs. Auto-Mode, Layering, Nesting, Clear-Policy-Tabelle, Custom-Host-Beispiel.
+- Lookbook-Demos: `display-multi.astro` aufgeräumt (doppeltes Frame-Driving entfernt), `display-minimal.astro` auf das fluent §4-Idiom umgestellt, `quadtree-playground` auf explizites `setClearColor(null, 0)` migriert.
 
-**Test-Coverage:** neue `StageRenderer.spec.ts` (21 Cases) — Clear-Policy, Render-Order, Fluent-API, Namens-Kollisions-Warnung, Host-Wiring, Nesting, `OnAddToParent`/`OnRemoveFromParent`-Symmetrie; erweiterte `Stage2D.spec.ts` (5 Cases) — `renderTo` mit/ohne Camera + Removal-Assertion; neuer Browser-Test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` (Display-Integration, Multi-Stage, Nesting, `detach()`-Unhook).
+**Test-Coverage:** neue `StageRenderer.spec.ts` (21 Cases) — Clear-Policy, Render-Order, Fluent-API, Namens-Kollisions-Warnung, Host-Wiring, Nesting, `OnAddToParent`/`OnRemoveFromParent`-Symmetrie; erweiterte `Stage2D.spec.ts` (5 Cases) — `renderTo` mit/ohne Camera + Removal-Assertion; neue `ClearStage.spec.ts` (5 Cases) — Default-Flags, explizite Options, Naming, No-Op-Lifecycle, Runtime-Flag-Changes; neuer Browser-Test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` (Display-Integration, Multi-Stage, Nesting, `detach()`-Unhook).
 
-Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (`renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus).
+Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (`renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus, `clearAlpha === 0` ist kein Clear-Trigger mehr, empfohlenes fluent-Idiom, `ClearStage` für Zwischen-Clears).
 
-Noch offen (Iteration 2): `RenderPipeline` / Post-Pass-Integration, Verschachtelung mit eigenem RenderTarget — siehe §4 + §6 in `Backlog-StageRenderer.md`.
+Noch offen (Iteration 2): `RenderPipeline` / Post-Pass-Integration, Verschachtelung mit eigenem RenderTarget — siehe §6 in `Backlog-StageRenderer.md`.
 
 ---
 
@@ -245,7 +247,7 @@ Damit der Backlog nicht nur wie eine Mängelliste wirkt, hier explizit das **Sol
 | `vertex-objects/` | 26 | 10 | ~38 % | ✓ Gut, kritische Pfade abgedeckt |
 | `map2d/` | 28 | 8 | ~29 % | ⚠️ Streaming-Logik kaum geprüft; `CameraBasedVisibility.spec.ts` (15 Cases) seit der Performance-Optimierung neu hinzugekommen |
 | `texture/` | 14 | 5 | ~36 % | ✓ TextureAtlas exzellent (`TextureAtlas.spec.ts`, 230 Zeilen, randomisierte Permutationen) |
-| `stage/` | 13 | 6 | ~46 % | ✓ Projection-Tests gut; `Stage2D.spec.ts` und neue `StageRenderer.spec.ts` (21 Cases) seit der `IStage`/`IRenderable`-Aufräumung |
+| `stage/` | 14 | 7 | ~50 % | ✓ Projection-Tests gut; `Stage2D.spec.ts`, `StageRenderer.spec.ts` (21 Cases) und `ClearStage.spec.ts` (5 Cases) seit der `IStage`/`IRenderable`-Aufräumung |
 | `display/` | 10 | 2 | ~20 % | ⚠️ `Chronometer` + `DisplayStateMachine` als Vitest-Specs; das Resize-Verhalten der `Display`-Klasse wird seit `display-resize.test.js` (13 Cases, Browser) abgedeckt — übrige Lifecycle-Bereiche der Klasse weiterhin ungetestet |
 | `utils/` | 7 | 5 | ~71 % | ✓ Sehr gut |
 | **`sprites/`** | **11** | **0** | **0 %** | 🔴 **Komplett ungetestet** |

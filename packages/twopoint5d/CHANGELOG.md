@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - add `IRenderable` interface (`renderTo(renderer: WebGPURenderer): void`) — implemented by `Stage2D` and `StageRenderer`
 - add `IStageRendererHost` interface (`onResize`, `onRenderFrame`) — the parent type a `StageRenderer` needs from a frame-loop host; `Display` satisfies it structurally
+- add `ClearStage` — marker stage that emits `renderer.clear(...)` between siblings; depth-only by default, configurable via `{color, depth, stencil}` (use case: drop the depth buffer before drawing UI on top of the world)
 - add `StageRenderer#clear: boolean` flag — explicit opt-in for clearing the render target before drawing the stages (default `false`)
 - add `OnAddToParent` event on `StageRenderer` (symmetric to `OnRemoveFromParent`)
 - add `Stage2D#renderTo(renderer)` — renders `scene` with `camera`; no-op until both exist
-- add fluent return (`this`) on `StageRenderer#add()`, `#remove()`, `#setClearColor()`, `#attach()`, `#detach()`
+- add fluent return (`this`) on `StageRenderer#add()`, `#remove()`, `#setClearColor()`, `#attach()`, `#detach()` — enables the three-line "Display + Stage2D + StageRenderer" idiom
 - add JSDoc on `StageRenderer` covering the two frame-loop modes (auto via `parent`, manual via direct `updateFrame()` + `renderTo()`), the clear policy, and the `name` / `renderOrder` uniqueness requirement
+- add `packages/twopoint5d/src/stage/README.md` cheat-sheet documenting roles, hello-world, manual vs. auto-driven mode, layering, `ClearStage`, nesting, clear policy table, custom stages, events, custom hosts and common pitfalls
 - add `StageRenderer.spec.ts` (21 cases) covering clear policy, rendering order, fluent API, name-collision warning, host wiring, parent/child nesting and `OnAddToParent`/`OnRemoveFromParent` symmetry
+- add `ClearStage.spec.ts` (5 cases) covering default flags, explicit options, naming, no-op lifecycle methods and runtime flag changes
 - add Stage2D `renderTo()` unit tests and an assertion that the removed clear-properties are no longer exposed
 - add browser test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` covering Display-driven rendering, additive multi-stage rendering, nested renderers, and `detach()`-unhook
 
@@ -160,6 +163,44 @@ on(display, OnDisplayRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
   sr.renderTo(renderer);
 });
 ```
+
+#### Recommended idiom: fluent setup
+
+Not a breaking change (the property-write style still works), but the fluent API documents intent more clearly and reads as one statement.
+
+**Before**
+
+```ts
+const sr = new StageRenderer(display);
+sr.clearColor = new Color('#90b0d0');
+sr.add(stage);
+```
+
+**After**
+
+```ts
+new StageRenderer(display).setClearColor(new Color('#90b0d0')).add(stage);
+```
+
+#### Intermediate clears between layered stages
+
+If you previously inserted custom rendering steps to clear the depth buffer between world and UI, use `ClearStage` instead.
+
+**Before**
+
+```ts
+class _ClearDepth { name = 'cd'; resize(){} updateFrame(){} renderTo(r){ r.clear(false, true, false); } }
+root.add(world).add(new _ClearDepth()).add(ui);
+```
+
+**After**
+
+```ts
+import {ClearStage} from '@spearwolf/twopoint5d';
+root.add(world).add(new ClearStage({depth: true})).add(ui); // depth-only is the default
+```
+
+See `packages/twopoint5d/src/stage/README.md` for the full layering cheat-sheet.
 
 ## [0.20.0] - 2026-05-10
 
