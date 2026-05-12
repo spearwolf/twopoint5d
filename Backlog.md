@@ -149,6 +149,29 @@ Helper-Vertrag (`CameraBasedVisibilityHelpers` liest `tile.frustumBox`, `tile.bo
 
 **Test-Coverage:** neue `CameraBasedVisibility.spec.ts` (15 Cases): undefined-on-no-camera, Visible-Tiles-Tile-Center, parallel-zur-Ebene mit/ohne `previousTiles`, Cache-Pfad bei unveränderten Deps, Klassifikation create/reuse/remove über Frames, sortierte `visibles`, Helper-Kontrakt, `tile.view`-Aufbau, `offset`/`translate`-Werte, `matrixWorld`-Translation, sowie ein Low-GC-Regressionscheck, der die Identität der gepoolten `TileBox`-, `Box3`- und `Vector3`-Instanzen zwischen non-cached Frames mit identischer Tile-Sichtbarkeit asserted.
 
+#### ✅ ERLEDIGT — `StageRenderer` / `IStage` Konsistenz & Aufräumung
+**Dateien:** `packages/twopoint5d/src/stage/{IStage,IRenderable,IStageRendererHost,Stage2D,StageRenderer,Canvas2DStage,public-api}.ts`, `packages/twopoint5d/src/events.ts`
+
+Detaillierte Analyse: siehe [`Backlog-StageRenderer.md`](./Backlog-StageRenderer.md).
+
+Iteration 1 (§3.1–§3.8) umgesetzt:
+
+- `Stage2D` von toten Clear-Properties (`clearColor`/`clearAlpha`/`autoClear`) befreit — die wurden vom Renderer nie gelesen.
+- `StageRenderer` bekommt ein explizites `clear: boolean`-Flag; `setClearColor(color, alpha?)` aktiviert es als Convenience und ist fluent (`this`-Return). Ebenso `add`, `remove`, `attach`, `detach`.
+- `IStage` (Lifecycle: `name` + `resize` + `updateFrame`) und neuer `IRenderable` (`renderTo(renderer)`) sind sauber getrennt. Damit fällt der `isStageRenderer`-Discriminator weg, `Stage2D` und `StageRenderer` implementieren beide Interfaces.
+- `IStageRendererHost` extrahiert; `StageRenderer.parent` akzeptiert nun jeden Host mit `onResize`/`onRenderFrame` (Display ist strukturell kompatibel) sowie verschachtelte `StageRenderer`.
+- `OnAddToParent`-Event ergänzt (symmetrisch zu `OnRemoveFromParent`).
+- Warnung in `add()` bei doppeltem Namen + nicht-default `renderOrder` (vorher stiller Sort-Fail).
+- `setClearColor`-Signatur gelockert (`Color | null`), `setClearAlpha`-Restore liegt jetzt im `if (shouldClear)`-Zweig (vorher Side-Effect pro Frame).
+- Class-JSDoc auf `StageRenderer` dokumentiert beide Frame-Loop-Modi (auto via `parent` / manuell), die Clear-Policy und die `name`/`renderOrder`-Eindeutigkeit.
+- Lookbook-Demo `display-multi.astro` aufgeräumt (doppeltes Frame-Driving entfernt).
+
+**Test-Coverage:** neue `StageRenderer.spec.ts` (21 Cases) — Clear-Policy, Render-Order, Fluent-API, Namens-Kollisions-Warnung, Host-Wiring, Nesting, `OnAddToParent`/`OnRemoveFromParent`-Symmetrie; erweiterte `Stage2D.spec.ts` (5 Cases) — `renderTo` mit/ohne Camera + Removal-Assertion; neuer Browser-Test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` (Display-Integration, Multi-Stage, Nesting, `detach()`-Unhook).
+
+Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (`renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus).
+
+Noch offen (Iteration 2): `RenderPipeline` / Post-Pass-Integration, Verschachtelung mit eigenem RenderTarget — siehe §4 + §6 in `Backlog-StageRenderer.md`.
+
 ---
 
 ### 2.2 API-Konsistenz & Wartbarkeit
@@ -222,7 +245,7 @@ Damit der Backlog nicht nur wie eine Mängelliste wirkt, hier explizit das **Sol
 | `vertex-objects/` | 26 | 10 | ~38 % | ✓ Gut, kritische Pfade abgedeckt |
 | `map2d/` | 28 | 8 | ~29 % | ⚠️ Streaming-Logik kaum geprüft; `CameraBasedVisibility.spec.ts` (15 Cases) seit der Performance-Optimierung neu hinzugekommen |
 | `texture/` | 14 | 5 | ~36 % | ✓ TextureAtlas exzellent (`TextureAtlas.spec.ts`, 230 Zeilen, randomisierte Permutationen) |
-| `stage/` | 10 | 5 | ~50 % | ✓ Projection-Tests gut, `Stage2D.spec.ts` aber nur 17 Zeilen |
+| `stage/` | 13 | 6 | ~46 % | ✓ Projection-Tests gut; `Stage2D.spec.ts` und neue `StageRenderer.spec.ts` (21 Cases) seit der `IStage`/`IRenderable`-Aufräumung |
 | `display/` | 10 | 2 | ~20 % | ⚠️ `Chronometer` + `DisplayStateMachine` als Vitest-Specs; das Resize-Verhalten der `Display`-Klasse wird seit `display-resize.test.js` (13 Cases, Browser) abgedeckt — übrige Lifecycle-Bereiche der Klasse weiterhin ungetestet |
 | `utils/` | 7 | 5 | ~71 % | ✓ Sehr gut |
 | **`sprites/`** | **11** | **0** | **0 %** | 🔴 **Komplett ungetestet** |

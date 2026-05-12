@@ -155,7 +155,7 @@ export class Canvas2DStage {
 
     this.updateTexture();
 
-    this.stageRenderer.renderFrame(this.renderer);
+    this.stageRenderer.renderTo(this.renderer);
   }
 
   private dispatchEvent(eventName: string) {

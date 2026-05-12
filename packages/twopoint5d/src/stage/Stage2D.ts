@@ -1,5 +1,5 @@
 import {emit, type EventizedObject, eventize, retain} from '@spearwolf/eventize';
-import {type Camera, Color, Scene} from 'three/webgpu';
+import {type Camera, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
   OnStageFirstFrame,
@@ -10,6 +10,7 @@ import {
   type StageUpdateFrameProps,
 } from '../events.js';
 import type {IProjection} from './IProjection.js';
+import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 
 /**
@@ -26,15 +27,10 @@ import type {IStage} from './IStage.js';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Stage2D extends EventizedObject {}
 
-export class Stage2D implements IStage {
+export class Stage2D implements IStage, IRenderable {
   isStage2D = true;
 
   scene: Scene;
-
-  autoClear = true;
-
-  clearColor = new Color(0x000000);
-  clearAlpha = 0;
 
   /**
    * with this flag you can tell the updateProjection() method that the projection calculation needs an update
@@ -208,5 +204,15 @@ export class Stage2D implements IStage {
     }
 
     emit(this, OnStageUpdateFrame, updateFrameProps);
+  }
+
+  /**
+   * Render this stage's scene with its camera. No-op until both are present
+   * (i.e. until the first `resize()` has created the camera from the projection).
+   */
+  renderTo(renderer: WebGPURenderer): void {
+    if (this.scene && this.camera) {
+      renderer.render(this.scene, this.camera);
+    }
   }
 }

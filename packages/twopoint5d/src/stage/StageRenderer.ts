@@ -1,27 +1,65 @@
 import {emit, type EventizedObject, eventize, once} from '@spearwolf/eventize';
 import {Color, type WebGPURenderer} from 'three/webgpu';
-import {Display} from '../display/Display.js';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
-import {OnRemoveFromParent, OnStageAdded, OnStageRemoved, type StageAddedProps, type StageRemovedProps} from '../events.js';
+import {
+  OnAddToParent,
+  OnRemoveFromParent,
+  OnStageAdded,
+  OnStageRemoved,
+  type StageAddedProps,
+  type StageRemovedProps,
+} from '../events.js';
+import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
+import type {IStageRendererHost} from './IStageRendererHost.js';
 
-export type StageRendererParentType = Display | StageRenderer;
+export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
 interface StageItem {
-  stage: IStage;
+  stage: IStage & IRenderable;
 
   width: number;
   height: number;
 }
 
-const isStageRenderer = (obj: unknown): obj is StageRenderer => (obj as {isStageRenderer: boolean})?.isStageRenderer === true;
-
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface StageRenderer extends EventizedObject {}
 
-export class StageRenderer implements IStage {
-  readonly isStageRenderer = true;
-
+/**
+ * Renders a list of {@link IStage}s into a renderer, in order. Implements
+ * {@link IStage} + {@link IRenderable} itself, so renderers can be nested.
+ *
+ * ## Frame-loop modes
+ *
+ * - **Auto-driven (recommended).** Pass a host (`Display` or parent
+ *   `StageRenderer`) to the constructor (or call `attach(host)`): the renderer
+ *   wires itself into the host's `onResize` / `onRenderFrame` and calls
+ *   `updateFrame()` + `renderTo()` on every frame.
+ * - **Manual.** Construct without a host and drive `updateFrame()` +
+ *   `renderTo(renderer)` yourself from your own frame loop.
+ *
+ * **Do not mix the two.** If a `parent` is set, the renderer already ticks
+ * itself — calling `updateFrame()` / `renderTo()` from your own
+ * `OnDisplayRenderFrame` handler will render every frame twice.
+ *
+ * ## Clearing
+ *
+ * Clearing is opt-in via {@link clear} (default `false`). When `clear` is
+ * `true`, the renderer clears the active render target before drawing its
+ * stages, using {@link clearColor} / {@link clearAlpha} and the
+ * `clearColorBuffer` / `clearDepthBuffer` / `clearStencilBuffer` flags.
+ *
+ * Setting `clearColor` to a non-null value also sets `clear = true` as a
+ * convenience. Multiple stages are drawn additively into the same target
+ * (the renderer sets `autoClear = false` while iterating stages) — use this
+ * to layer stages on top of each other in a single pass.
+ */
+export class StageRenderer implements IStage, IRenderable {
+  /**
+   * Sort key for `parent.renderOrder` and for diagnostics. Defaults to
+   * `'StageRenderer'`; rename when you have multiple nested renderers and
+   * want to address them by name in a parent's `renderOrder`.
+   */
   name = 'StageRenderer';
 
   #parent?: StageRendererParentType;
@@ -30,27 +68,57 @@ export class StageRenderer implements IStage {
   height: number = 0;
 
   /**
-   * The color used to clear the canvas before rendering.
-   * Default is `undefined`, which means the canvas will not be cleared before rendering.
+   * When `true`, the active render target is cleared before drawing the
+   * stages. Defaults to `false`. Setting {@link clearColor} to a non-null
+   * value flips this to `true` automatically.
    */
-  clearColor?: Color;
+  clear: boolean = false;
+
+  #clearColor: Color | null = null;
 
   /**
-   * The alpha value of the clear color. Default is 1.
-   * But unless you don't set a clear color, the canvas will not be cleared before next render.
+   * Color used when {@link clear} is `true`. `null` means "leave the
+   * renderer's current clear color in place" — only `clearAlpha` is applied.
    *
-   * If set to 0, the canvas be cleared and transparent, regardless of the clear color.
+   * Assigning a non-null `Color` activates {@link clear} as a convenience;
+   * assigning `null` leaves `clear` untouched (set it explicitly to disable).
+   */
+  get clearColor(): Color | null {
+    return this.#clearColor;
+  }
+
+  set clearColor(color: Color | null | undefined) {
+    if (color == null) {
+      this.#clearColor = null;
+    } else {
+      this.#clearColor = color;
+      this.clear = true;
+    }
+  }
+
+  /**
+   * Alpha used when {@link clear} is `true`. Default `1`.
+   * Set to `0` for a transparent clear.
    */
   clearAlpha: number = 1;
-
-  setClearColor(color: Color | null | undefined, alpha?: number): void {
-    this.clearColor = color ?? undefined;
-    this.clearAlpha = typeof alpha === 'number' ? alpha : color ? 1 : 0;
-  }
 
   clearColorBuffer = true;
   clearDepthBuffer = true;
   clearStencilBuffer = true;
+
+  /**
+   * Activate clearing with the given color/alpha. Sets `clear = true`.
+   * Returns `this` for chaining.
+   *
+   * Pass `null` to clear without overriding the renderer's current color
+   * (alpha still applies); `clear` is enabled in that case as well.
+   */
+  setClearColor(color: Color | null, alpha = 1): this {
+    this.#clearColor = color;
+    this.clearAlpha = alpha;
+    this.clear = true;
+    return this;
+  }
 
   #oldClearColor = new Color(0x000000);
 
@@ -64,7 +132,11 @@ export class StageRenderer implements IStage {
   #orderedStages?: StageItem[];
 
   /**
-   * A comma separated list of stage names (see `IStage#name`) or '*' for all other stages which are not listed explicitly
+   * A comma separated list of stage names (see `IStage#name`) or `'*'` for
+   * all other stages which are not listed explicitly.
+   *
+   * Stage `name`s must be unique within this renderer for the sort to be
+   * deterministic — otherwise the warning emitted by {@link add} kicks in.
    */
   set renderOrder(order: string | undefined) {
     order = order || '*';
@@ -115,37 +187,43 @@ export class StageRenderer implements IStage {
 
     emit(this, OnRemoveFromParent);
 
-    if (!(this.#parent instanceof Display)) {
-      this.#parent!.remove(this);
+    if (this.#parent instanceof StageRenderer) {
+      this.#parent.remove(this);
     }
   }
 
   #addToParent(): void {
-    if (this.#parent instanceof Display) {
-      this.#addToDisplay(this.#parent);
+    if (this.#parent instanceof StageRenderer) {
+      this.#parent.add(this);
     } else {
-      this.#parent!.add(this);
+      this.#addToHost(this.#parent as IStageRendererHost);
     }
+    emit(this, OnAddToParent);
   }
 
-  #addToDisplay(display: Display): void {
+  #addToHost(host: IStageRendererHost): void {
     once(
       this,
       OnRemoveFromParent,
-      display.onResize(({width, height}) => {
+      host.onResize(({width, height}) => {
         this.resize(width, height);
       }),
     );
     once(
       this,
       OnRemoveFromParent,
-      display.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
+      host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
         this.updateFrame(now, deltaTime, frameNo);
-        this.renderFrame(renderer);
+        this.renderTo(renderer);
       }),
     );
   }
 
+  /**
+   * @param parent Optional host (e.g. a `Display`) or parent `StageRenderer`.
+   * Passing a parent enables the auto-driven frame loop — do not also drive
+   * `updateFrame()`/`renderTo()` from your own handler (see class docs).
+   */
   constructor(parent?: StageRendererParentType) {
     eventize(this);
     if (parent) {
@@ -153,12 +231,16 @@ export class StageRenderer implements IStage {
     }
   }
 
-  attach(parent: StageRendererParentType): void {
+  /** Equivalent to assigning `this.parent = parent`. */
+  attach(parent: StageRendererParentType): this {
     this.parent = parent;
+    return this;
   }
 
-  detach(): void {
+  /** Equivalent to assigning `this.parent = undefined`. */
+  detach(): this {
     this.parent = undefined;
+    return this;
   }
 
   resize(width: number, height: number): void {
@@ -186,31 +268,37 @@ export class StageRenderer implements IStage {
     }
   }
 
-  renderFrame(renderer: WebGPURenderer): void {
+  /**
+   * Render all stages into `renderer` (applies the clear policy first).
+   * This is the {@link IRenderable} method — call it from your frame loop
+   * if you are running in manual mode (no `parent` set).
+   */
+  renderTo(renderer: WebGPURenderer): void {
     if (isWebGLRenderer(renderer)) {
       throw new TypeError('The WebGLRenderer renderer is not supported anymore');
     }
 
     const wasPreviouslyAutoClear = renderer.autoClear;
-    const oldClearAlpha = renderer.getClearAlpha();
 
-    const clearColor = this.clearColor;
+    if (this.clear) {
+      const oldClearAlpha = renderer.getClearAlpha();
+      let colorWasOverridden = false;
 
-    let shouldClear = false;
+      if (this.#clearColor != null) {
+        renderer.getClearColor(this.#oldClearColor as any);
+        renderer.setClearColor(this.#clearColor, this.clearAlpha);
+        colorWasOverridden = true;
+      } else {
+        renderer.setClearAlpha(this.clearAlpha);
+      }
 
-    if (clearColor != null) {
-      renderer.getClearColor(this.#oldClearColor as any);
-      renderer.setClearColor(clearColor, this.clearAlpha);
-      shouldClear = true;
-    }
-
-    if (shouldClear || this.clearAlpha === 0) {
-      renderer.setClearAlpha(this.clearAlpha);
-      shouldClear = true;
-    }
-
-    if (shouldClear) {
       renderer.clear(this.clearColorBuffer, this.clearDepthBuffer, this.clearStencilBuffer);
+
+      if (colorWasOverridden) {
+        renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
+      } else {
+        renderer.setClearAlpha(oldClearAlpha);
+      }
     }
 
     renderer.autoClear = false;
@@ -220,26 +308,10 @@ export class StageRenderer implements IStage {
     }
 
     renderer.autoClear = wasPreviouslyAutoClear;
-
-    if (clearColor != null) {
-      renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
-    }
-
-    renderer.setClearAlpha(oldClearAlpha);
   }
 
   protected renderStage(stageItem: StageItem, renderer: WebGPURenderer): void {
-    const {stage} = stageItem;
-    if (isStageRenderer(stage)) {
-      stage.renderFrame(renderer);
-    } else {
-      if (stage.scene != null && stage.camera == null && stageItem.width > 0 && stageItem.height > 0) {
-        stage.resize(stageItem.width, stageItem.height);
-      }
-      if (stage.scene && stage.camera) {
-        renderer.render(stage.scene, stage.camera);
-      }
-    }
+    stageItem.stage.renderTo(renderer);
   }
 
   get orderedStages(): StageItem[] {
@@ -289,8 +361,23 @@ export class StageRenderer implements IStage {
     return this.#getIndex(stage) !== -1;
   }
 
-  add(stage: IStage): void {
+  /**
+   * Add a stage. The stage must implement both {@link IStage} and
+   * {@link IRenderable}. Returns `this` for chaining.
+   *
+   * Emits `OnStageAdded`. Warns when `renderOrder` is set and another stage
+   * already uses the same `name` — sort order is ambiguous in that case.
+   */
+  add(stage: IStage & IRenderable): this {
     if (!this.hasStage(stage)) {
+      if (this.#renderOrder !== '*' && this.stages.some((item) => item.stage.name === stage.name)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `StageRenderer: a stage named ${JSON.stringify(stage.name)} is already present and renderOrder=${JSON.stringify(
+            this.#renderOrder,
+          )} cannot disambiguate. Set unique names on your stages.`,
+        );
+      }
       const si: StageItem = {
         stage,
         width: 0,
@@ -301,14 +388,19 @@ export class StageRenderer implements IStage {
       this.resizeStage(si, this.width, this.height);
       emit(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
     }
+    return this;
   }
 
-  remove(stage: IStage): void {
+  /**
+   * Remove a stage. Returns `this` for chaining. Emits `OnStageRemoved`.
+   */
+  remove(stage: IStage): this {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);
       this.#orderedStages = undefined;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
     }
+    return this;
   }
 }

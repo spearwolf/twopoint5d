@@ -66,15 +66,7 @@ import {description, showSource, title} from './_display-multi.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {
-    Display,
-    OnDisplayRenderFrame,
-    OnDisplayResize,
-    ParallaxProjection,
-    Stage2D,
-    StageRenderer,
-    TextureFactory,
-  } from '@spearwolf/twopoint5d';
+  import {Display, OnDisplayResize, ParallaxProjection, Stage2D, StageRenderer, TextureFactory} from '@spearwolf/twopoint5d';
   import {Color, Sprite, SpriteMaterial} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -109,9 +101,7 @@ import {description, showSource, title} from './_display-multi.json';
 
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {pixelZoom: 2}));
 
-    const stageRenderer = new StageRenderer(display);
-    stageRenderer.clearColor = new Color('#304050');
-    stageRenderer.add(stage);
+    new StageRenderer(display).setClearColor(new Color('#304050')).add(stage);
 
     const textureFactory = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']);
 
@@ -121,11 +111,6 @@ import {description, showSource, title} from './_display-multi.json';
 
     sprite.scale.set(100, 100, 0); // => should result in a 200x200 (css pixels) pixelart/crisp image
     stage.scene.add(sprite);
-
-    on(display, OnDisplayRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
-      stageRenderer.updateFrame(now, deltaTime, frameNo);
-      stageRenderer.renderFrame(renderer);
-    });
 
     let canvasContainer: HTMLElement = canvas as HTMLElement;
     if (!canvasContainer.classList.contains('canvasContainer')) {

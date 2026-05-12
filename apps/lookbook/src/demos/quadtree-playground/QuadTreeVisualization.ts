@@ -16,7 +16,7 @@ export class QuadTreeVisualization {
 
   constructor(renderer: WebGPURenderer, width: number, height: number) {
     this.canvasStage = new Canvas2DStage(renderer, width, height);
-    this.canvasStage.stageRenderer.clearAlpha = 0;
+    this.canvasStage.stageRenderer.setClearColor(null, 0);
 
     this.ctx = this.canvasStage.canvas.getContext('2d')!;
   }

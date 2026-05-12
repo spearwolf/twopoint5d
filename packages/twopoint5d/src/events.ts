@@ -112,7 +112,12 @@ export interface IStageAfterCameraChanged {
 
 // ------------------------------------------------------------
 
+export const OnAddToParent = 'addToParent';
 export const OnRemoveFromParent = 'removeFromParent';
+
+export interface IAddToParent {
+  [OnAddToParent](): void;
+}
 
 export interface IRemoveFromParent {
   [OnRemoveFromParent](): void;

@@ -7,6 +7,160 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add `IRenderable` interface (`renderTo(renderer: WebGPURenderer): void`) — implemented by `Stage2D` and `StageRenderer`
+- add `IStageRendererHost` interface (`onResize`, `onRenderFrame`) — the parent type a `StageRenderer` needs from a frame-loop host; `Display` satisfies it structurally
+- add `StageRenderer#clear: boolean` flag — explicit opt-in for clearing the render target before drawing the stages (default `false`)
+- add `OnAddToParent` event on `StageRenderer` (symmetric to `OnRemoveFromParent`)
+- add `Stage2D#renderTo(renderer)` — renders `scene` with `camera`; no-op until both exist
+- add fluent return (`this`) on `StageRenderer#add()`, `#remove()`, `#setClearColor()`, `#attach()`, `#detach()`
+- add JSDoc on `StageRenderer` covering the two frame-loop modes (auto via `parent`, manual via direct `updateFrame()` + `renderTo()`), the clear policy, and the `name` / `renderOrder` uniqueness requirement
+- add `StageRenderer.spec.ts` (21 cases) covering clear policy, rendering order, fluent API, name-collision warning, host wiring, parent/child nesting and `OnAddToParent`/`OnRemoveFromParent` symmetry
+- add Stage2D `renderTo()` unit tests and an assertion that the removed clear-properties are no longer exposed
+- add browser test `stage-renderer.test.js` in `@spearwolf/twopoint5d-testing` covering Display-driven rendering, additive multi-stage rendering, nested renderers, and `detach()`-unhook
+
+### Changed
+
+- change `StageRenderer#renderFrame(renderer)` → `StageRenderer#renderTo(renderer)` (renamed for `IRenderable` consistency)
+- change `StageRenderer#add(stage)` parameter type from `IStage` to `IStage & IRenderable`
+- change `StageRenderer.parent` type from `Display | StageRenderer` to `IStageRendererHost | StageRenderer` — any frame-loop host is now accepted
+- change `StageRenderer#setClearColor(color, alpha?)` signature: `color: Color | null` (was `Color | null | undefined`); now sets `clear = true` and returns `this`
+- change `StageRenderer.renderTo()` clear-state restore: `setClearAlpha` is only called when a clear actually happened — previously the renderer's alpha was overwritten on every frame
+- change `StageRenderer` warns via `console.warn` when a stage is added whose `name` is already in use **and** `renderOrder` is non-default (otherwise the sort is ambiguous)
+- change `IStage`: drop optional `scene?` / `camera?` (they were unused by the renderer pipeline); `Stage2D` still exposes them as its own properties
+
+### Removed
+
+- remove `Stage2D#clearColor`, `Stage2D#clearAlpha`, `Stage2D#autoClear` — never honored by `StageRenderer`. Use `Scene#background` for per-scene backgrounds or `StageRenderer#setClearColor()` for the renderer-level clear
+
+### Migration Guide
+
+#### `StageRenderer#renderFrame()` renamed to `renderTo()`
+
+`StageRenderer` now implements `IRenderable` along with `IStage`. The render method follows the `IRenderable` contract.
+
+**Before**
+
+```ts
+stageRenderer.renderFrame(renderer);
+```
+
+**After**
+
+```ts
+stageRenderer.renderTo(renderer);
+```
+
+#### `StageRenderer` no longer clears when only `clearAlpha = 0` is set
+
+Previously, assigning `clearAlpha = 0` without a `clearColor` implicitly enabled clearing (with the renderer's current color, transparent). With the new explicit `clear` flag this no longer happens — you must opt in.
+
+**Before**
+
+```ts
+stageRenderer.clearAlpha = 0; // implicitly cleared with alpha=0
+```
+
+**After**
+
+```ts
+stageRenderer.setClearColor(null, 0); // explicit transparent clear
+// or:
+stageRenderer.clear = true;
+stageRenderer.clearAlpha = 0;
+```
+
+#### `Stage2D` clear properties removed
+
+`Stage2D#clearColor`, `Stage2D#clearAlpha`, and `Stage2D#autoClear` were never read by the renderer pipeline.
+
+**Before**
+
+```ts
+const stage = new Stage2D(projection);
+stage.clearColor = new Color('#222');
+stage.clearAlpha = 1;
+stage.autoClear = true;
+```
+
+**After (per-stage background)**
+
+```ts
+import {Color} from 'three/webgpu';
+const stage = new Stage2D(projection);
+stage.scene.background = new Color('#222');
+```
+
+**After (renderer-level clear, e.g. for the root renderer of a stack)**
+
+```ts
+new StageRenderer(display).setClearColor(new Color('#222'), 1).add(stage);
+```
+
+#### `StageRenderer#add()` requires `IRenderable`
+
+Any custom stage must now also implement `renderTo(renderer)`. Stages that previously relied on the implicit `scene && camera` path inside `renderStage()` need to expose a `renderTo()` instead:
+
+**Before**
+
+```ts
+class MyStage implements IStage {
+  name = 'my';
+  scene = new Scene();
+  camera = new PerspectiveCamera();
+  resize() {/* … */}
+  updateFrame() {/* … */}
+}
+```
+
+**After**
+
+```ts
+class MyStage implements IStage, IRenderable {
+  name = 'my';
+  scene = new Scene();
+  camera = new PerspectiveCamera();
+  resize() {/* … */}
+  updateFrame() {/* … */}
+  renderTo(renderer: WebGPURenderer) {
+    renderer.render(this.scene, this.camera);
+  }
+}
+```
+
+`Stage2D` users do not need to change anything — `Stage2D` ships with `renderTo()`.
+
+#### Driving a `StageRenderer` from `Display`
+
+If you constructed `StageRenderer(display)` **and** subscribed to `OnDisplayRenderFrame` yourself to call `stageRenderer.renderFrame(...)`, you were rendering every frame twice. Pick **one** of the two modes:
+
+**Before (double-driving)**
+
+```ts
+const sr = new StageRenderer(display);
+on(display, OnDisplayRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
+  sr.updateFrame(now, deltaTime, frameNo);
+  sr.renderFrame(renderer);
+});
+```
+
+**After (auto-driven — recommended)**
+
+```ts
+const sr = new StageRenderer(display); // updateFrame + renderTo run automatically
+```
+
+**After (manual — no `parent`)**
+
+```ts
+const sr = new StageRenderer();
+on(display, OnDisplayRenderFrame, ({renderer, now, deltaTime, frameNo}) => {
+  sr.updateFrame(now, deltaTime, frameNo);
+  sr.renderTo(renderer);
+});
+```
+
 ## [0.20.0] - 2026-05-10
 
 ### Added

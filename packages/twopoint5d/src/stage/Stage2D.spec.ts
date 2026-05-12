@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
 
@@ -13,5 +13,30 @@ describe('Stage2D', () => {
     stage.resize(320, 240);
 
     expect(stage.camera).toBeDefined();
+  });
+
+  describe('renderTo (IRenderable)', () => {
+    it('is a no-op when there is no camera yet', () => {
+      const stage = new Stage2D();
+      const renderer = {render: vi.fn()};
+      stage.renderTo(renderer as any);
+      expect(renderer.render).not.toHaveBeenCalled();
+    });
+
+    it('calls renderer.render(scene, camera) once camera exists', () => {
+      const stage = new Stage2D(new ParallaxProjection('xz|top-left', {pixelZoom: 1}));
+      stage.resize(100, 100);
+      const renderer = {render: vi.fn()};
+      stage.renderTo(renderer as any);
+      expect(renderer.render).toHaveBeenCalledTimes(1);
+      expect(renderer.render).toHaveBeenCalledWith(stage.scene, stage.camera);
+    });
+  });
+
+  it('does not expose the removed clearColor / clearAlpha / autoClear properties', () => {
+    const stage = new Stage2D() as any;
+    expect(stage.clearColor).toBeUndefined();
+    expect(stage.clearAlpha).toBeUndefined();
+    expect(stage.autoClear).toBeUndefined();
   });
 });
