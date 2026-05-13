@@ -151,7 +151,7 @@ export class TileSet {
     let y = margin;
     let tileCount = 0;
 
-    while (tileCountLimit === Infinity || tileCount < tileCountLimit) {
+    while (tileCount < tileCountLimit) {
       const coords = new TextureCoords(this.baseCoords, x + padding, y + padding, this.tileWidth, this.tileHeight);
 
       const frameId = this.atlas.add(coords);
@@ -162,7 +162,7 @@ export class TileSet {
 
       ++tileCount;
 
-      if (tileCountLimit !== Infinity && tileCount === tileCountLimit) {
+      if (tileCount === tileCountLimit) {
         break;
       }
 

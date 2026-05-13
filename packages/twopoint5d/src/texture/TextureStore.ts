@@ -4,7 +4,7 @@ import type {Texture, WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
-import type {TextureOptionClasses} from './TextureFactory.js';
+import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
@@ -41,10 +41,31 @@ type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof Tex
       ? MapTuple<T>
       : never;
 
-const OnReady = 'ready';
-const OnRendererChanged = 'rendererChanged';
-const OnResource = 'resource';
-const OnDispose = 'dispose';
+/**
+ * Public event-name constants emitted by `TextureStore`.
+ *
+ * - `Ready` (retained): fires once per `parse()` call after all signals have settled.
+ *   Payload: the `TextureStore` instance.
+ * - `RendererChanged` (retained): fires whenever `renderer` is reassigned (incl. `undefined`).
+ *   Payload: the new `WebGPURenderer | undefined`.
+ * - `Resource`: prefix for per-id events emitted as `resource:<id>` after `parse()` —
+ *   subscribe via the `onResource(id, cb)` helper.
+ * - `Dispose`: fires once when `dispose()` is called.
+ * - `Error`: fires with `{source: 'fetch'|'parse'|'atlas'|'image', url, error}` payload.
+ */
+export const TextureStoreEvents = {
+  Ready: 'ready',
+  RendererChanged: 'rendererChanged',
+  Resource: 'resource',
+  Dispose: 'dispose',
+  Error: 'error',
+} as const;
+
+const OnReady = TextureStoreEvents.Ready;
+const OnRendererChanged = TextureStoreEvents.RendererChanged;
+const OnResource = TextureStoreEvents.Resource;
+const OnDispose = TextureStoreEvents.Dispose;
+const OnError = TextureStoreEvents.Error;
 
 const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): TextureOptionClasses[] | undefined => {
   const all = classes?.filter((c) => c != null);
@@ -54,17 +75,36 @@ const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): T
   return undefined;
 };
 
+const cmpDefaultClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureStore extends EventizedObject {}
 
 export class TextureStore {
   static async load(url: string | URL): Promise<TextureStore> {
-    return new TextureStore().load(url);
+    const store = new TextureStore();
+    store.load(url);
+    return store.whenReady();
   }
 
-  defaultTextureClasses: TextureOptionClasses[] = [];
+  #defaultTextureClasses = createSignal<TextureOptionClasses[]>([], {compare: cmpDefaultClasses, attach: this});
+
+  get defaultTextureClasses(): TextureOptionClasses[] {
+    return this.#defaultTextureClasses.value;
+  }
+
+  set defaultTextureClasses(value: TextureOptionClasses[]) {
+    this.#defaultTextureClasses.set(value);
+  }
 
   #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
+  #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
 
   get renderer(): WebGPURenderer | undefined {
     return this.#renderer.value;
@@ -74,16 +114,29 @@ export class TextureStore {
     this.#renderer.set(value);
   }
 
+  /**
+   * The shared `TextureFactory` used to materialize textures for every resource
+   * managed by this store. Re-created automatically whenever `renderer` changes;
+   * consumers should not assign it directly.
+   */
+  get textureFactory(): TextureFactory | undefined {
+    return this.#textureFactory.value;
+  }
+
   #resources = new Map<string, TextureResource>();
 
   constructor(renderer?: WebGPURenderer) {
     retain(this, [OnReady, OnRendererChanged]);
 
     this.#renderer.onChange((renderer) => {
-      for (const resource of this.#resources.values()) {
-        resource.renderer = renderer;
-      }
+      this.#textureFactory.set(renderer ? new TextureFactory(renderer, []) : undefined);
       emit(this, OnRendererChanged, renderer);
+    });
+
+    this.#textureFactory.onChange((factory) => {
+      for (const resource of this.#resources.values()) {
+        resource.textureFactory = factory;
+      }
     });
 
     this.renderer = renderer;
@@ -105,21 +158,45 @@ export class TextureStore {
     return this;
   }
 
+  /**
+   * Resolve once the resource with the given `id` is available (typically after
+   * the first `parse()` call). Rejects if the store has fired `OnReady` and the
+   * id is still not present — useful to surface configuration mistakes instead
+   * of hanging promises.
+   */
+  async whenResource(id: string): Promise<TextureResource> {
+    const existing = this.#resources.get(id);
+    if (existing) return existing;
+    await onceAsync(this, OnReady);
+    const resource = this.#resources.get(id);
+    if (!resource) {
+      throw new Error(`[TextureStore] No resource with id "${id}" — check your TextureStoreData.items keys.`);
+    }
+    return resource;
+  }
+
   load(url: string | URL) {
-    fetch(url)
-      .then(async (response) => {
-        const data: TextureStoreData = await response.json();
-        try {
-          this.parse(data);
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error(`[TextureStore] Failed to parse data from ${url}:`, error);
-        }
-      })
-      .catch((error) => {
-        // eslint-disable-next-line no-console
-        console.error(`[TextureStore] Failed to load from ${url}:`, error);
-      });
+    void (async () => {
+      let response: Response;
+      try {
+        response = await fetch(url);
+      } catch (error) {
+        emit(this, OnError, {source: 'fetch', url, error});
+        return;
+      }
+      let data: TextureStoreData;
+      try {
+        data = await response.json();
+      } catch (error) {
+        emit(this, OnError, {source: 'parse', url, error});
+        return;
+      }
+      try {
+        this.parse(data);
+      } catch (error) {
+        emit(this, OnError, {source: 'parse', url, error});
+      }
+    })();
     return this;
   }
 
@@ -131,11 +208,12 @@ export class TextureStore {
    */
   parse(data: TextureStoreData) {
     if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
-      this.defaultTextureClasses = data.defaultTextureClasses.splice(0);
+      this.defaultTextureClasses = data.defaultTextureClasses.slice();
     }
 
     const updatedResources: TextureResource[] = [];
 
+    batch(() => {
     for (const [id, item] of Object.entries(data.items)) {
       let resource: TextureResource | undefined = this.#resources.get(id);
 
@@ -150,6 +228,7 @@ export class TextureStore {
             resource.imageUrl = item.imageUrl;
             resource.tileSetOptions = item.tileSet;
             resource.textureClasses = textureClasses;
+            resource.frameBasedAnimationsData = item.frameBasedAnimations;
           });
         } else {
           resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
@@ -163,9 +242,10 @@ export class TextureStore {
             resource.atlasUrl = item.atlasUrl;
             resource.overrideImageUrl = item.overrideImageUrl;
             resource.textureClasses = textureClasses;
+            resource.frameBasedAnimationsData = item.frameBasedAnimations;
           });
         } else {
-          resource = TextureResource.fromAtlas(id, item.atlasUrl, item.overrideImageUrl, textureClasses);
+          resource = TextureResource.fromAtlas(id, item.atlasUrl, item.overrideImageUrl, textureClasses, item.frameBasedAnimations);
         }
       } else if (item.imageUrl) {
         if (resource) {
@@ -182,11 +262,14 @@ export class TextureStore {
       }
 
       if (resource) {
+        if (!this.#resources.has(id)) {
+          resource.textureFactory = this.#textureFactory.value;
+        }
         this.#resources.set(id, resource);
-        on(this as TextureStore, resource);
         updatedResources.push(resource);
       }
     }
+    });
 
     emit(this, OnReady, this);
 
@@ -220,17 +303,19 @@ export class TextureStore {
       values?.clear();
       unsubscribeFromResource?.();
       clearSubTypeSubscriptions();
+      off(this, OnDispose, unsubscribe);
+      off(this, OnReady, onReadyHandler);
     };
 
-    once(this, OnDispose, unsubscribe);
-
-    once(this, OnReady, () => {
+    const onReadyHandler = () => {
       if (isActiveSubscription) {
         unsubscribeFromResource = this.onResource(id, (resource) => {
           clearSubTypeSubscriptions();
 
           resource.load();
-          resource.renderer = this.renderer;
+          if (this.#textureFactory.value && !resource.textureFactory) {
+            resource.textureFactory = this.#textureFactory.value;
+          }
 
           resource.refCount++;
           unsubscribeFromSubType.push(() => {
@@ -258,33 +343,64 @@ export class TextureStore {
           }
         });
       }
-    });
+    };
+
+    once(this, OnDispose, unsubscribe);
+    once(this, OnReady, onReadyHandler);
 
     return unsubscribe;
   }
 
-  get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(id: string, type: T): Promise<MapSubTypes<T>> {
-    return new Promise((resolve) => {
+  get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    id: string,
+    type: T,
+    options?: {signal?: AbortSignal},
+  ): Promise<MapSubTypes<T>> {
+    const signal = options?.signal;
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException('get() aborted before subscription', 'AbortError'));
+        return;
+      }
       const unsubscribe = this.on(id, type, (value) => {
+        if (signal) signal.removeEventListener('abort', onAbort);
         unsubscribe();
         resolve(value);
       });
+      const onAbort = () => {
+        unsubscribe();
+        reject(new DOMException(`get(${id}, ${String(type)}) aborted`, 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, {once: true});
     });
   }
 
-  dispose() {
-    this.#renderer.set(undefined);
+  /**
+   * Dispose all resources whose `refCount` is 0 and remove them from the store.
+   * Returns the number of resources that were cleared.
+   */
+  clearUnused(): number {
+    let removed = 0;
+    for (const [id, resource] of this.#resources) {
+      if (resource.refCount <= 0) {
+        resource.dispose();
+        this.#resources.delete(id);
+        removed++;
+      }
+    }
+    return removed;
+  }
 
+  dispose() {
     emit(this, OnDispose);
 
-    this.renderer = undefined;
-    SignalGroup.get(this).clear();
-
-    this.#resources.forEach((resource) => {
+    for (const resource of this.#resources.values()) {
       resource.dispose();
-    });
-
+    }
     this.#resources.clear();
+
+    this.#renderer.set(undefined);
+    SignalGroup.delete(this);
 
     off(this);
   }

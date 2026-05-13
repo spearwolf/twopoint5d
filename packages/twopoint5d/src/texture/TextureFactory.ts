@@ -110,6 +110,8 @@ export class TextureFactory {
       anisotrophy: 0,
       flipY: false,
     };
+    // resolve defaults against the supplied class names; the seed assignment
+    // above acts as the "no classes" fallback inside getOptions().
     this.#defaultOptions = this.getOptions(defaultClassNames);
     this.textureLoader = new TextureLoader();
   }

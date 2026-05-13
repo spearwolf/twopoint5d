@@ -76,7 +76,14 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const store = new TextureStore(renderer).load(assetsUrl('nobingers.json'));
+    const store = new TextureStore(renderer);
+
+    on(store, 'error', ({source, url, error}) => {
+      // eslint-disable-next-line no-console
+      console.error(`[animated-sprites] TextureStore ${source} failed for ${url}`, error);
+    });
+
+    store.load(assetsUrl('nobingers.json'));
 
     console.log('loading textures...', store);
 

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add `TextureStore#whenResource(id)` — resolves once the resource is present (typically after `parse()`), rejects with a descriptive error after the first `OnReady` if the id is still missing. Replaces the previous "promise hangs forever on typo" failure mode of `get()` for missing ids
+- add `options.signal` (`AbortSignal`) to `TextureStore#get(id, type, options?)` — allows callers to abort a pending `get()` (rejects with a `DOMException` named `AbortError`)
+- add `TextureStore#clearUnused()` — disposes and removes every resource with `refCount === 0`; returns the number of resources cleared. Pairs with the existing refCount bookkeeping that subscriptions maintain via `store.on(id, type, ...)` / `store.get(...)`
+- add `TextureStore#textureFactory` getter — exposes the single shared `TextureFactory` the store uses for all of its resources. Re-created automatically whenever `renderer` changes; the store now injects this factory into every managed resource so every `TextureStore` has exactly one factory per renderer (previously each resource spun up its own)
+- add `TextureStoreEvents` constants — public string constants for the events emitted by `TextureStore` (`Ready`, `RendererChanged`, `Resource`, `Dispose`, `Error`). `Error` is new and carries `{source: 'fetch' | 'parse', url, error}`
+- add `TextureResourceEvents` constants — public string constants for the events emitted by `TextureResource` (per-subtype events, plus `Dispose` and a new `Error` event carrying `{source: 'image' | 'atlas', url, error}`)
+- add `TextureResourceSubtypes` constants — typed string constants for the five resource subtypes (`ImageCoords`, `Atlas`, `TileSet`, `Texture`, `FrameBasedAnimations`); fully interchangeable with the raw string literals (`'imageCoords'`, `'atlas'`, …) in `TextureStore#on(id, type, …)` and `TextureStore#get(id, type, …)` — both forms type-check identically. Pick whichever reads more clearly at the call site (the literals stay the recommended default in tests/demos for brevity; the constants are useful inside larger config objects or when grep-finding usage)
+- add optional `frameBasedAnimations` argument to `TextureResource.fromAtlas(id, atlasUrl, overrideImageUrl?, textureClasses?, frameBasedAnimations?)` — parity with `fromTileSet`; atlas resources can now be constructed with their animation map up front. The `frameBasedAnimationsData` setter is now also honored for atlas resources (previously a silent no-op because the signal only existed on tile-set resources)
+
 - add `FixedFrameLoop` — opt-in helper that wraps a `Display` and emits `OnTick` events at a fixed rate (default 60 fps) plus an `OnRender` event per render frame carrying an `alpha` interpolation factor in `[0, 1)`. Decouples simulation cadence from render cadence so per-frame JS-cost variance (physics, animation curves, IK) no longer produces visible micro-stutter even on high-refresh-rate displays. Spiral-of-death guard via `maxStepsPerFrame` (default 5). Auto-disposes when `Display` disposes
 - add `Display#maxDeltaTime` getter/setter — proxy for the internal `Chronometer#maxDeltaTime`; default is `1 / 30` (~33ms) so individual frame outliers are capped instead of producing spikes. Set to `0` to disable
 - add `Display#resizePollIntervalMs` — optional throttle (in milliseconds) for the per-frame DOM measurements inside `Display#resize()`. Default `0` keeps the legacy "measure every frame" behavior; on high-refresh-rate displays setting it to e.g. `1000 / 60` caps `getComputedStyle()` / `getBoundingClientRect()` calls and reclaims a significant slice of the frame budget
@@ -48,6 +57,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- change `TextureStore#dispose()` no longer double-disposes its resources. The implicit `on(this, resource)` forwarding that ran `resource.dispose()` from the store's own `OnDispose` was removed; the explicit `for (resource of #resources) resource.dispose()` loop is now the single source of truth
+- change `TextureStore#dispose()` and `TextureResource#dispose()` use `SignalGroup.delete(this)` instead of the deprecated `SignalGroup.get(this).destroy()` (also avoids the `TypeError` that happened if the group had already been removed)
+- change `TextureResource#dispose()` is now idempotent (guards via an internal `#disposed` flag) — repeated `dispose()` calls are silent no-ops instead of throwing on the already-removed `SignalGroup`
+- change `TextureStore#on(id, type, callback)` unsubscribe handler now removes its own `OnDispose` and `OnReady` listeners from the store. Previously each `on()` left a `once(OnDispose, …)` listener and a `once(OnReady, …)` listener that survived unsubscription as inert no-ops, leaking listener slots on stores with many short-lived subscriptions
+- change `TextureStore` `defaultTextureClasses` is now backed by a signal with structural compare — mutating the field still works (setter assigns a new array), and identical re-assignments are deduplicated. Public reads/writes have the same shape as before, but the field is now observable internally and stays consistent with the rest of the reactive pipeline
+- change `TextureStore#parse()` body is now wrapped in `batch()` so every signal write across all `items[*]` settles before `OnReady` and the per-resource `resource:<id>` events fire — subscribers see a consistent snapshot instead of partial updates
+- change `TextureStore#parse()` propagates `item.frameBasedAnimations` into existing tile-set AND atlas resources (previously the existing-resource update path ignored animations; only the first `parse()` honored them via the constructor). Re-parsing with different `frameBasedAnimations` now actually rebuilds the animations
+- change `TextureStore#load()` (instance) no longer mutates `data.defaultTextureClasses` (was `splice(0)`, now `slice()`). Re-passing the same `TextureStoreData` to a second `parse()` call now preserves the original defaults
+- change `TextureResource.fromImage()` / `fromTileSet()` / `fromAtlas()` no longer mutate the supplied `textureClasses` array (was `splice(0)`, now `slice()`)
+- change static `TextureStore.load(url)` now actually awaits `whenReady()` before resolving — previously it returned an already-resolved promise wrapping the un-parsed store, so `const store = await TextureStore.load(url)` did not actually have data when control returned
+- change `TextureResource.load()` image-load effect is now an auto-tracking effect (no static deps) so it runs on registration and on every dep change. Previously it had static deps `[#textureFactory, #imageUrl]` which required the factory/URL to change *after* `load()` to ever fire — combined with the new "shared factory injected at parse() time" behavior, the static-dep variant would have left store-managed resources permanently un-loaded
+- change `TextureResource.load()` image-load effect protects against stale results: if `imageUrl` (or `textureFactory`) changes while a previous `loadAsync` is still pending, the stale result is discarded and the texture is never assigned. Eliminates a race that would otherwise let an old image overwrite a fresh one and silently leak the new texture
+- change `TextureResource.load()` atlas-fetch effect uses `AbortController` — cancelling the effect (dispose or `atlasUrl` change) aborts the in-flight `fetch()` instead of letting it land after teardown
+- change `TextureResource.load()` passes `textureClasses` directly to `factory.create(image, ...classes)` so changes to `textureClasses` trigger a texture rebuild via the shared factory. Previously each resource owned its own factory whose constructor baked in the classes; now the store's factory is class-agnostic and resources hand their classes in at create-time
+- change `TextureResource` central signal layout: `#frameBasedAnimationsData` and `#frameBasedAnimations` are now created in the field initializer instead of being conditionally instantiated inside `fromTileSet()` / `fromAtlas()`. The `frameBasedAnimationsData` setter is therefore active on every resource type (was a silent no-op for image / atlas resources)
+- perf `TextureStore` creates one shared `TextureFactory` per renderer instead of one factory per resource — for `N` resources and a renderer swap, allocations drop from `N` factories to `1`. The store's factory is constructed without `defaultClassNames` (the per-resource `textureClasses` carry the merge already, via `joinTextureClasses(item.texture, store.defaultTextureClasses)`)
+- change `TileSet#createTextureCoords()` drops the redundant `tileCountLimit === Infinity` branches in the while-loop guard — `tileCount < Infinity` is always true and the explicit early-out was unreachable when the limit was `Infinity`
 - refactor `Display` `on*` event-helper properties (`onResize`, `onRenderFrame`, `onNextFrame`, `onInit`, `onStart`, `onRestart`, `onPause`, `onDispose`): replace the `bind`-with-`unknown`-cast pattern with typed arrow functions. Listener parameter is now `DisplayEventListener` (= `(props: DisplayEventProps) => unknown`), return type is the official `UnsubscribeFunc` from `@spearwolf/eventize`. No runtime change; purely a type-surface cleanup
 - change `Display` `EventHandler` type alias removed in favor of a parameterized `DisplayEventListener<T = DisplayEventProps>` so `onDispose` can correctly type its argument as `Display`
 - change `Chronometer#stop()` now captures the wall-clock timestamp; `Chronometer#start()` closes the pause-gap in `lostTime` and resets `#currentTime` + `deltaTime` to `0`, so the next `update()` produces a normal small delta even when no `update()` ran during the pause
@@ -71,6 +97,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `TextureStore#parse()` — passing the same `TextureStoreData` object to multiple `parse()` calls now keeps `data.defaultTextureClasses` and every `item.texture` array intact. The previous `.splice(0)` calls consumed the source arrays and the second `parse()` would behave as if `defaultTextureClasses` were empty
+- fix `TextureStore.load()` (static) — the promise now resolves after the store has parsed the data, matching what `await TextureStore.load(url)` consumers expect
+- fix `TextureStore#dispose()` race + double-dispose — resources are disposed exactly once, signal groups are cleared exactly once, and `dispose()` no longer throws `TypeError: Cannot read properties of undefined (reading 'destroy')` when called more than once on the store or its resources
+- fix `TextureResource.load()` no longer leaves store-managed resources stuck without an image. The image-load effect is now an auto-tracking effect that runs on registration; under the previous static-dep + shared-factory combination, the effect's deps were already set at `load()` time so the effect would register but never fire. Symptom in user code: `await store.get(id, 'texture')` hung forever
+- fix `TextureResource.load()` image race — a `loadAsync` resolve that lands after the resource was disposed or `imageUrl` changed no longer creates an orphan `Texture`. The created texture is disposed on cleanup; stale resolves are discarded before any signal write
+- fix `TextureResource.fromAtlas()` — atlas resources can finally consume `frameBasedAnimations` data. Previously the `#frameBasedAnimationsData` signal was only created for tile-set resources, so the relevant effect in `load()` never had data to consume even though the code path existed
+- fix `TextureStore#parse()` — the existing-resource update path for both `tileSet` and `atlasUrl` items now writes `item.frameBasedAnimations` into the resource (was ignored: a second `parse()` could not replace or add animations to an existing resource)
+- replace silent `console.error` calls in `TextureStore#load()` and `TextureResource.load()` with structured `'error'` event emissions. Library users can now observe load failures programmatically (`on(store, 'error', listener)` / `on(resource, 'error', listener)`) instead of having a hardcoded `console.error` write into their app's log
 - fix `Display#nextFrame` type signature: was incorrectly declared as `Promise<DisplayEventProps>` while the runtime value is a function returning the promise. All call sites already used `await display.nextFrame()` — the new type `() => Promise<DisplayEventProps>` matches that. TS code that wrote `await display.nextFrame` (without parens) was a latent runtime bug and is now flagged at compile time
 - fix `Display#onDispose` listener type: was `(props: DisplayEventProps) => any`, but the `OnDisplayDispose` event is emitted with the `Display` instance (per `IOnDisplayDispose`). Handler is now typed as `(display: Display) => unknown`
 - fix `Chronometer`: a `stop()` → (no `update()`s during the pause) → `start()` cycle no longer attributes the pause duration to the next `update()` as a giant frame delta — the wall-clock gap is folded into `lostTime` instead, so `time` and `deltaTime` stay continuous across pauses. This was the root cause of "subjective jumps" after `Display.pause = false` and after every `document.visibilitychange` resume
@@ -81,6 +115,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `FrameLoop#measureFps`: the first measurement window is now anchored to the first rAF timestamp instead of using `0` as `measureTimeBegin`, eliminating the bogus ~6 FPS phantom sample that polluted `measuredFps` until the first real 30-frame window completed
 
 ### Migration Guide
+
+#### `TextureStore` and `TextureResource` load failures no longer write to `console.error`
+
+If you relied on `console.error` to surface `TextureStore` / `TextureResource` load failures (e.g. by watching the dev-tools console), subscribe to the new `'error'` event instead:
+
+**Before**
+
+```ts
+const store = new TextureStore();
+store.load('missing.json'); // failures appeared via console.error
+```
+
+**After**
+
+```ts
+import {on} from '@spearwolf/eventize';
+import {TextureStore, TextureStoreEvents} from '@spearwolf/twopoint5d';
+
+const store = new TextureStore();
+
+on(store, 'error', ({source, url, error}) => {
+  // source: 'fetch' | 'parse'
+  myLogger.warn(`[TextureStore] ${source} failed for ${url}`, error);
+});
+
+store.load('missing.json');
+```
+
+`TextureResource` emits a similar `'error'` event with `source: 'image' | 'atlas'`.
+
+#### `TextureStore.load(url)` (static) now waits for the data
+
+The static factory used to return a synchronously-wrapped instance — `await TextureStore.load(url)` resolved before the JSON had been fetched and parsed. Now it returns only after the first `OnReady`:
+
+**Before (latent bug)**
+
+```ts
+const store = await TextureStore.load('store.json');
+// resources were NOT yet present here; you had to also `await store.whenReady()`
+```
+
+**After**
+
+```ts
+const store = await TextureStore.load('store.json');
+// resources are present — equivalent to:
+// const store = new TextureStore(); store.load('store.json'); await store.whenReady();
+```
+
+If your code did `await store.whenReady()` immediately after `await TextureStore.load(url)`, the second await is now a no-op (still safe, just redundant).
+
+#### `TextureStore#get(id, type)` for unknown ids — opt into `AbortSignal` or `whenResource`
+
+Previously `store.get('does-not-exist', 'texture')` returned a promise that never resolved or rejected. There are now two recommended options to avoid hanging promises:
+
+```ts
+// 1) Reject when ready but the id is missing:
+const resource = await store.whenResource('hero'); // throws if 'hero' was not declared
+
+// 2) Bound the wait with an AbortController:
+const ac = new AbortController();
+setTimeout(() => ac.abort(), 5000);
+const tex = await store.get('hero', 'texture', {signal: ac.signal});
+```
+
+#### `TextureStore` shared `TextureFactory` (and the hard-coded `'nearest'` default is gone)
+
+Each `TextureResource` no longer owns its own `TextureFactory`. The store now creates one `TextureFactory` per renderer and injects it into every managed resource. There is one knock-on behavior change: the per-resource factory used to be constructed as `new TextureFactory(renderer, resourceTextureClasses)` — when `resourceTextureClasses` was `undefined`, the `TextureFactory` constructor's hard-coded `defaultClassNames = ['nearest']` kicked in. The store's shared factory is now built as `new TextureFactory(renderer, [])` (no defaults), and per-resource classes are passed at `factory.create(image, ...classes)` time. Consequence: if a `TextureStore` `item` has no `texture: [...]` AND the store has no `defaultTextureClasses`, the texture is no longer implicitly `nearest`-filtered.
+
+If you relied on the implicit `'nearest'` default, opt back in:
+
+**Option A — set it at the store level once:**
+
+```ts
+const store = new TextureStore(renderer);
+store.defaultTextureClasses = ['nearest'];
+store.load('store.json');
+```
+
+**Option B — declare it in the JSON either per-store or per-item:**
+
+```json
+{
+  "defaultTextureClasses": ["nearest"],
+  "items": { "tex": { "imageUrl": "tex.png" } }
+}
+```
+
+Demos that already specified `"texture": ["srgb"]` (etc.) on the item are unaffected — the explicit per-resource classes are honored exactly as before.
+
+#### `TextureResource.load()` image-load effect now autoruns on registration
+
+Internal change — no API surface affected. The image-load effect inside `TextureResource.load()` is now an auto-tracking effect (no static dep array) so it runs once on registration and re-runs on `textureFactory` / `imageUrl` / `textureClasses` changes. This is necessary because the `TextureStore` now injects the factory at `parse()` time (before `load()` is called), and a static-dep effect would never have fired in that flow. Standalone `TextureResource` usage (`resource.renderer = X`) keeps working because the renderer→factory fallback effect also runs on registration.
 
 #### `Display#nextFrame` is a method, not a promise property
 

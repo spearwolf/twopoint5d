@@ -96,19 +96,9 @@ Ursprünglicher Befund (festgestellt beim Schreiben der Resize-Tests): Wenn sich
 
 **Test-Coverage:** `display-resize.test.js` enthält jetzt zwei dedizierte Cases: `"emits OnDisplayResize exactly once on the first frame"` (assertet exakt `1` Emission auf Frame 1) und `"does not double-emit OnDisplayResize on the first frame when the size differs from construction"` (Regression-Schutz für genau das Szenario, das den Doppel-Emit bisher provoziert hat — Host wird nach dem Konstruktor, vor `start()`, vergrößert).
 
-#### 🟠 P2 — `TextureResource.refCount` führt zu keinem automatischen Cleanup
-**Datei:** `packages/twopoint5d/src/texture/TextureStore.ts:74, 232–234`
+#### ✅ ERLEDIGT — `TextureStore#clearUnused()` für RefCount-Aufräumung
 
-`refCount` wird inkrementiert/dekrementiert, aber bei `refCount === 0` wird die Resource **nicht** automatisch aus `#resources` entfernt oder disposed. Über die Laufzeit einer Single-Page-App wachsen so Texture-Caches monoton. Empfohlen:
-
-```ts
-set refCount(value: number) {
-  this.#refCount = value;
-  if (value === 0) this.dispose();   // oder: emit('disposable', this)
-}
-```
-
-…wobei der TextureStore dann auf das `'disposable'`-Signal hört und den Eintrag aus `#resources` löscht.
+Detaillierte Analyse + Test-Coverage: siehe [`Backlog-TextureStore.md`](./Backlog-TextureStore.md) §2 (BUG-9). Statt automatischer Disposition beim `refCount === 0` gibt es jetzt eine explizite Aufräum-Methode `store.clearUnused()`, die alle Resources mit `refCount <= 0` disposed und entfernt.
 
 #### ✅ ERLEDIGT — `ChunkQuadTreeNode` Bug-Bündel + GC-Druck im Subdivide/Find-Hot-Path
 **Datei:** `packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts` und `packages/twopoint5d/src/map2d/AABB2.ts`
@@ -174,6 +164,23 @@ Iteration 1 (§3.1–§3.8, §4, §5) + Iteration 2 (§6) vollständig umgesetzt
 Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md` (Iteration 1 + Iteration 2: `renderFrame` → `renderTo`, entfernte Stage2D-Properties, `IRenderable`-Pflicht für eigene Stages, Auto- vs. Manual-Modus, `clearAlpha === 0` ist kein Clear-Trigger mehr, empfohlenes fluent-Idiom, `ClearStage` für Zwischen-Clears, Adoption der `pipeline`-Integration aus Mode D, Komposition verschachtelter Renderer aus Mode E).
 
 Nice-to-have für die Zukunft (kein Blocker): RenderTarget-Pool zur Mehrfachverwendung, gemeinsame Effekt-Builder als `buildOutputNode`-Factories — siehe `Backlog-StageRenderer.md` §9.
+
+#### ✅ ERLEDIGT — `TextureStore` / `TextureResource` Hardening & API-Erweiterung
+**Dateien:** `packages/twopoint5d/src/texture/{TextureStore,TextureResource,TextureFactory,TileSet}.ts`
+
+Detaillierte Analyse: siehe [`Backlog-TextureStore.md`](./Backlog-TextureStore.md). Alle dort priorisierten Welle-1/2/3/4/5-Items sowie die §5-Cleanups sind umgesetzt:
+
+- **Korrektheit:** Daten-Mutation (`splice(0)` → `slice()`), Double-Dispose entfernt, Image-Race + Texture-Leak gefixt (Abort-Flag + Cleanup-Disposal), statisches `TextureStore.load(url)` wartet jetzt tatsächlich auf `whenReady()`, `TextureResource#dispose()` ist idempotent, `SignalGroup.delete(this)` statt deprecated `destroy()`.
+- **Reaktivität:** `#frameBasedAnimationsData`/`#frameBasedAnimations` zentral im Konstruktor (statt verteilt in `fromTileSet`/`fromAtlas`), Atlas-Resources akzeptieren jetzt initiale Animationen, `parse()`-Update-Pfad propagiert Animationen in existierende Resources, gesamter `parse()`-Body in `batch()`.
+- **Performance:** zentrale `TextureFactory` am Store (eine pro Renderer statt eine pro Resource), abortable `fetch()` für Atlas-JSON.
+- **DX:** neue API-Methoden `clearUnused()`, `whenResource(id)`, `get(id, type, {signal})`; exported Event-Konstanten `TextureStoreEvents` / `TextureResourceEvents` / `TextureResourceSubtypes`; `console.error`-Aufrufe durch strukturierte `'error'`-Events ersetzt (Payload: `{source, url, error}`); `defaultTextureClasses` als Signal mit Struktur-Compare; Self-Cleanup der `OnDispose`/`OnReady`-Listener in `store.on()`-Unsubscribe-Funktion.
+- **Cleanups:** `TileSet.tileCountLimit === Infinity`-Redundanz entfernt.
+
+**Test-Coverage:** `TextureStore.spec.ts` von 2 auf 32 Cases erweitert (siehe Backlog-TextureStore §10 Tabelle). Volle CI-Suite weiterhin grün (1214 Tests).
+
+Migration: siehe `### Migration Guide` in `[Unreleased]` von `packages/twopoint5d/CHANGELOG.md`.
+
+Offen (P4-Kategorie, kein Blocker): API-Renamings `load()`-Trio (§4.1) und `get()` → `getAsync()` (§4.2) sind breaking changes und in den nächsten Major-Sprint verschoben; Image-Dedup-Cache (§6.2); `cmpTexCoords`/`cmpTileSetOptions` per `Object.keys` (§6.5); Auto-Counter für anonyme FrameBasedAnimations-Namen (§6.6).
 
 ---
 
@@ -455,7 +462,7 @@ Astro + React + Tailwind + lil-gui — moderne, etablierte Stacks. Index-Page mi
 6. 🔴 `number-or-the-beast.test.js` löschen.
 
 ### Sprint 2 — API-Konsistenz & Dokumentation (≈ 1–2 Wochen)
-7. 🟠 `TextureResource.refCount` → automatisches Cleanup.
+7. ✅ `TextureResource.refCount` → explizite `TextureStore#clearUnused()`-Methode (siehe `Backlog-TextureStore.md` BUG-9).
 8. ✅ `VOBufferPool.dispose()` (siehe §2.1).
 9. 🟠 TSDoc auf Public-API (alle `public-api.ts`-Exports).
 10. ✅ `Display.autoResize` — als bewusste Design-Entscheidung dokumentiert (per-Frame-Resize-Modell), Test-Coverage in `twopoint5d-testing` (siehe §2.1).

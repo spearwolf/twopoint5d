@@ -2,7 +2,7 @@
 
 Analysebericht zu `packages/twopoint5d/src/texture/TextureStore.ts` und `TextureResource.ts` sowie der angrenzenden Klassen (`TextureFactory`, `TextureCoords`, `TileSet`, `TextureAtlas`, `FrameBasedAnimations`, `types.ts`).
 
-Stand: 2026-05-12.
+Stand: 2026-05-13. **Alle in §7 priorisierten Items (Welle 1–5) sind umgesetzt** — siehe Status-Marker (✅ ERLEDIGT) pro Punkt sowie Iteration-Notes am Ende. Eine kurze, aktualisierte Gesamtübersicht steht in §10.
 
 ---
 
@@ -52,34 +52,27 @@ Stand: 2026-05-12.
 
 ## 2. Bugs (nach Priorität)
 
-### 🟥 BUG-1 — `parse()` mutiert die Eingabedaten
+### ✅ ERLEDIGT — BUG-1 `parse()` mutiert die Eingabedaten
 
-`TextureStore.parse()` (Z. 134):
-```ts
-this.defaultTextureClasses = data.defaultTextureClasses.splice(0);
-```
-`Array.prototype.splice(0)` **leert** `data.defaultTextureClasses`. Wenn ein Aufrufer die Daten weiterverwendet (z. B. erneutes `parse()`), sind die Defaults weg. Analog dazu mutiert `TextureResource.fromImage/fromTileSet/fromAtlas` mit `textureClasses?.splice(0)` jede übergebene Klassenliste.
+Ursprünglicher Befund: `data.defaultTextureClasses.splice(0)` (TextureStore) und `textureClasses?.splice(0)` (TextureResource.fromX) leerten die übergebenen Arrays in-place.
 
-**Fix:** `.slice()` (kopiert) statt `.splice(0)` (mutiert + kopiert).
+**Umgesetzte Lösung:** `.slice()` ersetzt `.splice(0)` an allen vier Stellen. `TextureStore.spec.ts` enthält jetzt fünf `parse() input safety`/`fromX input safety`-Cases die das Verhalten gegen Regression schützen (inkl. eines Re-Parse-Tests, der dieselbe `TextureStoreData` zweimal hineingibt).
 
-### 🟥 BUG-2 — Double-Dispose von TextureResources
+### ✅ ERLEDIGT — BUG-2 Double-Dispose von TextureResources
 
-In `parse()` wird pro Resource registriert:
-```ts
-on(this as TextureStore, resource);   // listener-object form
-```
-Diese „listener-object“-Form ruft `resource.dispose()` auf, sobald der Store das `dispose`-Event emittiert (Methode `dispose` matcht Eventname `'dispose'`). Anschließend macht `TextureStore.dispose()` aber **zusätzlich** noch:
-```ts
-this.#resources.forEach((resource) => { resource.dispose(); });
-```
-Ergebnis: `TextureResource.dispose()` läuft zweimal. Der zweite Aufruf macht `SignalGroup.get(this).destroy()` auf einer bereits abgebauten Gruppe und `emit(this, OnDispose)` auf einem bereits per `off(this)` entkoppelten Objekt — derzeit defensiv genug, um nicht zu werfen, aber semantisch falsch (Listener wurden bereits einmal informiert, Konsumenten bekommen keinen zweiten dispose, was wiederum unauffällig ist — aber es wird Arbeit doppelt gemacht).
+Ursprünglicher Befund: `parse()` registrierte pro Resource `on(this as TextureStore, resource)` (listener-object Form). Diese forwarded das `dispose`-Event vom Store an die Resource, weil `resource.dispose` als Methode den Eventnamen matched. Zusätzlich rief `TextureStore.dispose()` aber selbst `resource.dispose()` über die `#resources`-Schleife auf. Resultat: `TextureResource.dispose()` lief zweimal, zweiter Aufruf warf `TypeError: Cannot read properties of undefined (reading 'destroy')`.
 
-**Fix-Optionen:**
-- Entweder die explizite `forEach`-Schleife entfernen und sich auf das Event verlassen,
-- oder das `on(this, resource)` entfernen und nur die explizite Schleife behalten (klarer und einfacher zu debuggen).
-- Empfehlung: explizite Schleife behalten, `on(this, resource)` streichen — Event-Forwarding zwischen Objekten ist hier intransparent und stiftet mehr Verwirrung als Nutzen. Außerdem gilt: `eventize(this)` installiert kein `.emit`-Catch-All — sollte sich später ein zusätzliches Resource-Event ergeben, dessen Methodenname am Store nicht matcht, wäre es stillschweigend „verloren“.
+**Umgesetzte Lösung:** Empfehlung aus dem Backlog umgesetzt — `on(this, resource)` aus `parse()` entfernt; die explizite Dispose-Schleife in `TextureStore.dispose()` ist jetzt die einzige Quelle der Resource-Disposition. `TextureResource#dispose()` ist zusätzlich idempotent geworden (private `#disposed`-Flag → No-Op bei mehrfachem Aufruf).
 
-### 🟥 BUG-3 — `parse()` aktualisiert `frameBasedAnimations` bei bestehenden TileSet-Resources nicht
+**Test-Coverage:** `dispose() emits OnDispose on store and on each resource exactly once` und `TextureResource.dispose() is idempotent and does not throw` in `TextureStore.spec.ts`.
+
+### ✅ ERLEDIGT — BUG-3 + BUG-3a `parse()` aktualisiert `frameBasedAnimations` nicht / `fromAtlas` lädt sie nicht
+
+**Umgesetzte Lösung:** `#frameBasedAnimationsData` (und das abgeleitete `#frameBasedAnimations`) werden jetzt zentral im Field-Initializer von `TextureResource` erzeugt — kein Stitching mehr in `fromTileSet()` / `fromAtlas()`, der Setter funktioniert auf jeder Resource-Variante. `TextureResource.fromAtlas()` bekommt einen optionalen `frameBasedAnimations`-Parameter (Parität zu `fromTileSet`). `TextureStore#parse()` propagiert `item.frameBasedAnimations` in den Existing-Resource-Pfaden für TileSet UND Atlas via `batch()`-Block. 
+
+**Test-Coverage:** vier Cases in `TextureStore.spec.ts > parse() update path (BUG-3)`: updates auf TileSet-Resources, updates auf Atlas-Resources, `fromAtlas` mit initialen Animationen, sowie Setter-Verhalten auf einer Image-Resource.
+
+### 🟥 BUG-3 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 if (item.tileSet) {
@@ -102,7 +95,13 @@ Beim **ersten** `parse()` werden die Animationen übergeben, beim **erneuten** `
 
 **Fix:** `#frameBasedAnimationsData` zentral im Konstruktor anlegen (statt verteilt in `fromX`) und in `parse()` für alle Branches auch im „resource exists“-Pfad mit-batchen.
 
-### 🟧 BUG-4 — Race in `TextureResource.load()` bei wechselndem `imageUrl`
+### ✅ ERLEDIGT — BUG-4 Race in `TextureResource.load()` bei wechselndem `imageUrl`
+
+**Umgesetzte Lösung:** der Image-Effect zieht jetzt `factory`/`url`/`classes` aus den Signalen, früher Early-Return wenn etwas fehlt, lokales `aborted`-Flag in der Closure. Resolved das `loadAsync`, schaut der `then`-Handler zuerst auf `aborted` und gibt im stale-Fall sofort zurück — `factory.create()` wird nicht mehr aufgerufen. Die Cleanup-Funktion setzt `aborted = true` und disposed eine evtl. bereits erzeugte Texture. Die Cleanup-Funktion sieht durch die Closure-Variable `texture` jetzt auch eine Texture, die NACH dem ursprünglichen `texture?.dispose()`-Aufruf zugewiesen wurde — der vorherige Leak (Texture entsteht nach Cleanup, wird never disposed) ist damit nicht mehr möglich.
+
+**Test-Coverage:** zwei Cases in `TextureStore.spec.ts > TextureResource.load() image race (BUG-4)`: (1) stale `imageUrl`-Change überschreibt das frische Bild nicht (mocked `ImageLoader.prototype.loadAsync` mit kontrollierten Promises), (2) wenn der Load nach `dispose()` resolved, wird die ggf. entstandene Texture disposed und `resource.texture` bleibt `undefined`.
+
+### 🟧 BUG-4 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 createEffect(() => {
@@ -156,7 +155,13 @@ createEffect(() => {
 ```
 (`three.js` `ImageLoader` unterstützt kein nativer Abort — daher idiomatisch über das Flag.)
 
-### 🟧 BUG-5 — `TextureStore.load()` (statisch) wartet nicht auf `whenReady`
+### ✅ ERLEDIGT — BUG-5 `TextureStore.load()` (statisch) wartet nicht auf `whenReady`
+
+**Umgesetzte Lösung:** das vom Backlog vorgeschlagene Snippet — `new TextureStore()`, `store.load(url)`, `return store.whenReady()` — ist jetzt der Body des statischen `load`. Konsumenten von `await TextureStore.load(url)` sehen ein bereits geparstes Store-Objekt.
+
+**Test-Coverage:** `awaits whenReady() before resolving — resource is present after await` in `TextureStore.spec.ts` (mockt `fetch` und prüft, dass `onResource` im Subscribe-Moment synchron mit dem Resource-Objekt feuert).
+
+### 🟧 BUG-5 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 static async load(url): Promise<TextureStore> {
@@ -174,7 +179,11 @@ static async load(url): Promise<TextureStore> {
 }
 ```
 
-### 🟧 BUG-6 — `TextureResource.dispose()` setzt Renderer doppelt
+### ✅ ERLEDIGT — BUG-6 `TextureStore.dispose()` setzte Renderer doppelt
+
+Im Zuge des `dispose()`-Rewrites entfernt (die explizite `this.renderer = undefined`-Zeile gibt es nicht mehr — die einzige Renderer-Resetzeile ist jetzt `this.#renderer.set(undefined)` nach der Resource-Schleife). Code-Hygiene-Cleanup; keine separate Test-Coverage nötig.
+
+### 🟧 BUG-6 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 dispose() {
@@ -189,7 +198,11 @@ dispose() {
 ```
 Reine Code-Hygiene, kein Funktionsfehler. Eine der beiden Zuweisungen entfernen.
 
-### 🟧 BUG-7 — `TextureResource.dispose()` ruft deprecated `.destroy()`
+### ✅ ERLEDIGT — BUG-7 `TextureResource.dispose()` ruft deprecated `.destroy()`
+
+**Umgesetzte Lösung:** sowohl `TextureStore.dispose()` als auch `TextureResource.dispose()` nutzen jetzt `SignalGroup.delete(this)`. Damit verschwindet die deprecation-Warnung und der `TypeError` (BUG-2-Folgeschaden) auf bereits abgebauten Gruppen.
+
+### 🟧 BUG-7 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 SignalGroup.get(this).destroy();
@@ -199,7 +212,13 @@ Per `signalize`-API ist `destroy()` deprecated, `clear()` ist der empfohlene Weg
 SignalGroup.delete(this);   // löst die Gruppe vollständig auf und entfernt sie aus der Registry
 ```
 
-### 🟨 BUG-8 — Listener-Leak auf `OnDispose` durch wiederholtes `store.on(...)`
+### ✅ ERLEDIGT — BUG-8 Listener-Leak auf `OnDispose`/`OnReady` durch wiederholtes `store.on(...)`
+
+**Umgesetzte Lösung:** der `unsubscribe`-Cleanup entfernt jetzt explizit den `OnDispose`-`once`-Listener UND den `OnReady`-`once`-Listener (beide hängen pro `on()`-Call am Store). Damit räumt sich jede Subscription vollständig nach `unsubscribe()` ab.
+
+**Test-Coverage:** `unsubscribe() removes the OnDispose listener` in `TextureStore.spec.ts > on()/get() listener bookkeeping (BUG-8)` (prüft via `getSubscriptionCount` dass die Listener-Anzahl nach `on() + unsubscribe()` wieder auf der Baseline ist).
+
+### 🟨 BUG-8 (Original-Analyse, zur Nachverfolgung)
 
 In `TextureStore.on()`:
 ```ts
@@ -218,7 +237,13 @@ const unsubscribe = () => {
 };
 ```
 
-### 🟨 BUG-9 — `refCount` ist tote Buchhaltung
+### ✅ ERLEDIGT — BUG-9 `refCount` + `clearUnused()`
+
+**Umgesetzte Lösung:** das `refCount`-Feld bleibt erhalten (die Inkrement-/Dekrement-Logik in `TextureStore#on()` ist unverändert). Neu: `TextureStore#clearUnused(): number` iteriert über `#resources`, ruft `resource.dispose()` für jeden Eintrag mit `refCount <= 0` und entfernt ihn aus der Map. Rückgabewert = Anzahl der disposed Resources.
+
+**Test-Coverage:** `removes and disposes resources with refCount === 0; keeps subscribed ones` in `TextureStore.spec.ts > clearUnused() (BUG-9)`: legt drei Resources an, subscribed auf eine davon, asserted refCounts, ruft `clearUnused()` und prüft Dispose-Events + Map-Inhalt.
+
+### 🟨 BUG-9 (Original-Analyse, zur Nachverfolgung)
 
 ```ts
 resource.refCount++;
@@ -226,15 +251,32 @@ unsubscribeFromSubType.push(() => { resource.refCount--; });
 ```
 `refCount` wird nirgendwo gelesen, kein automatisches Ressourcen-Freigeben. Entweder Logik implementieren (z. B. bei `refCount === 0` Texture freigeben / Effects pausieren) oder Feld + Inkrementierung entfernen.
 
-### 🟨 BUG-10 — `whenReady()` und `get(...)` lösen nie aus, wenn die ID falsch ist
+**Bevorzugte Lösung:** das Feld bleibt! und der TextureStore bekommt eine clearUnused() methode die alle resourcen mit refCount === 0 aufräumt.
+
+### ✅ ERLEDIGT — BUG-10 `whenResource()` + abortable `get(...)`
+
+**Umgesetzte Lösung:**
+- Neue Methode `whenResource(id): Promise<TextureResource>`: resolved sofort wenn die Resource schon existiert, sonst `await onceAsync(this, OnReady)` und Re-Check — rejected mit beschreibender Fehlermeldung wenn die ID nach `OnReady` immer noch nicht vorhanden ist.
+- `get(id, type, options?)` akzeptiert `options.signal: AbortSignal` und bricht die Subscription bei Abort mit `DOMException('… aborted', 'AbortError')` ab.
+
+**Test-Coverage:** vier Cases in `TextureStore.spec.ts > whenResource() / abortable get() (BUG-10)`: positive Resolution wenn Resource da ist, Rejection bei fehlender ID nach Ready, Resolution wenn `parse()` erst nach dem `whenResource()`-Call passiert, AbortSignal-Rejection.
+
+### 🟨 BUG-10 (Original-Analyse, zur Nachverfolgung)
 
 `whenReady` löst nach dem ersten `parse` aus, völlig unabhängig davon, ob die gewünschte ID existiert. `get(id, type)` registriert intern `on()`, das im Fehlerfall niemals zurückmeldet (siehe BUG-2 in BUG-9 zusammen). Das ist ein häufiger Quell-für „Promise hängt für immer“-Bugs.
 
 **Fix-Idee:**
-- `onResource(id, …)` darf erkennen, dass nach dem nächsten OnReady eine ID immer noch nicht im Map ist → `emit('resource:<id>:missing', id)` oder Reject der Promise.
-- Mindestens eine optionale Timeout-/Abort-Variante: `get(id, type, {signal})`.
+- Eine optionale Abort-Variante: `get(id, type, {signal})`.
 
-### 🟨 BUG-11 — `console.error` umgeht das `no-console`-Lint per `eslint-disable`
+### ✅ ERLEDIGT — BUG-11 `console.error` → Eventize-Errors
+
+**Umgesetzte Lösung:** alle drei `console.error`-Stellen (im `TextureStore#load()` für Fetch/Parse, im `TextureResource.load()` für Image-Load) durch `emit(this, 'error', {source, url, error})` ersetzt. `TextureStore#load()` ist auf einen sauberen async-Block umgeschrieben (separate try/catch für `fetch` vs. `response.json()` vs. `parse()` → präzise `source: 'fetch' | 'parse'`). Der Atlas-Fetch im `TextureResource` (vorher ohne Error-Handling) hat jetzt einen analogen Error-Pfad mit `source: 'atlas'`. Die `eslint-disable-next-line no-console`-Kommentare sind weg.
+
+Begleitend: `TextureStoreEvents.Error` und `TextureResourceEvents.Error` Konstanten sind als public API exportiert.
+
+**Test-Coverage:** zwei Cases in `TextureStore.spec.ts > error events instead of console.error (BUG-11)` für Fetch-Fehler und Parse-Fehler. Plus der Migrations-Guide-Eintrag im CHANGELOG.
+
+### 🟨 BUG-11 (Original-Analyse, zur Nachverfolgung)
 
 CLAUDE.md sagt: `no-console` ist Error. Hier werden die Verstöße per `eslint-disable-next-line no-console` umgangen. Für Bibliothekscode ist ein eigener `console`-Ersatz (Logger-Hook, oder das library-übliche „silent fail + Event“) sauberer:
 ```ts
@@ -242,7 +284,9 @@ emit(this, 'error', {url, error});
 ```
 So können Konsumenten das Fehlverhalten erkennen, ohne dass die Lib unkontrolliert ins Konsolen-Log schreibt.
 
-### 🟨 BUG-12 — `data.defaultTextureClasses` wird nie überschrieben mit leerer Liste
+### 🟨 BUG-12 — `data.defaultTextureClasses` wird nie überschrieben mit leerer Liste (BELASSEN)
+
+Beim erneuten Parse mit `defaultTextureClasses: []` (oder undefined) bleiben die alten Defaults aktiv — weiterhin so, dokumentiert in der Klassen-JSDoc indirekt via §4.6: das `defaultTextureClasses`-Feld ist jetzt ein Signal mit Struktur-Compare; explizites Leeren via `store.defaultTextureClasses = []` ist möglich. Bewusst kein Sentinel-Pfad in `parse()` (Backlog-Eintrag „klar im JSON-Schema festhalten" wäre eine eigene API-Diskussion).
 
 ```ts
 if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
@@ -264,7 +308,15 @@ this.#imageCoords.onChange((value) => emit(this, 'imageCoords', value));
 ```
 Diese Subscriptions werden beim Signal-Destroy implizit beendet (signalize emittiert intern `destroy` und entkoppelt). Trotzdem doppelt verkettete Lifecycle-Kette: einmal über SignalGroup → Signal-Destroy → Subscriptions entfernt; einmal über `off(this)`. Sollte zusammenpassen, aber ein Diagramm im Kopf zu behalten ist mühsam — siehe Refactor-Vorschlag in §4.4.
 
-### 3.3 `TextureFactory` wird bei jedem Renderer- bzw. `textureClasses`-Wechsel neu erzeugt
+### ✅ ERLEDIGT — 3.3 / 6.1 `TextureFactory` zentral am Store
+
+**Umgesetzte Lösung:** `TextureStore` hat jetzt ein internes `#textureFactory`-Signal. Renderer-Wechsel triggert `new TextureFactory(renderer, [])` (klassen-agnostisch); das Factory-Signal hat eine `onChange`, die die neue Factory in alle Resources injiziert. `TextureResource.load()` reicht die per-Resource `textureClasses` direkt an `factory.create(image, ...classes)` weiter. Der lokale `renderer → new TextureFactory`-Effect in `TextureResource` ist als Standalone-Fallback erhalten geblieben (kommt nur zum Zug, wenn keine externe Factory injiziert wurde).
+
+`store.textureFactory`-Getter ist öffentlich.
+
+**Test-Coverage:** `TextureStore.spec.ts > central TextureFactory (§3.3, §6.1)` — assertet dass nach `parse()` alle Resources dieselbe Factory teilen, und dass ein Renderer-Wechsel eine neue Factory durch die Resources propagiert.
+
+### 3.3 (Original-Analyse, zur Nachverfolgung)
 ```ts
 createEffect(() => {
   const renderer = this.#renderer.get();
@@ -296,47 +348,64 @@ Soweit korrekt. Aber: `atlasJson`/`atlas`-Effects laufen unabhängig vom Texture
 - `TextureResource.load()` → returnt `this`, schaltet aber nur intern den Effekt-Pfad scharf („load“ klingt nach Fetch, ist aber „enable pipeline“).
 
 Empfehlung: umbenennen oder vereinheitlichen:
-- `TextureResource.load()` → `start()`/`activate()`/`enable()`.
+- `TextureResource.load()` → `activate()`.
 - Statisches `TextureStore.load()` → `TextureStore.loadAndAwait(url)` oder so umbauen, dass es tatsächlich auf Ready wartet (BUG-5).
 - Instanz-`load(url)` ggf. + `loadAsync(url): Promise<this>` für die awaitable Variante.
 
 ### 4.2 `TextureStore.get(id, type)` heißt wie `Map.get`, ist aber ein einmaliger Promise
-Wer eine `Map`-ähnliche API erwartet, wird überrascht. Vorschlag: `getAsync` oder `whenAvailable` als Name.
+Wer eine `Map`-ähnliche API erwartet, wird überrascht. Fix: `getAsync` als Name.
 
-### 4.3 Asymmetrie: `on(id, type, cb)` vs. die globalen `OnReady`/`OnDispose`-Events
+### ✅ ERLEDIGT — 4.3 + 4.7 Event-/Subtype-Konstanten exportieren
+
+**Umgesetzte Lösung:**
+- `TextureStoreEvents = {Ready, RendererChanged, Resource, Dispose, Error}` als public-API export auf `TextureStore.ts`.
+- `TextureResourceEvents = {ImageCoords, Atlas, TileSet, Texture, FrameBasedAnimations, Dispose, Error}` als public-API export auf `TextureResource.ts`.
+- `TextureResourceSubtypes` (entkoppelt von Events) — typed gegen `TextureResourceSubType`, geeignet für `store.on(id, TextureResourceSubtypes.Atlas, …)`.
+- Class-JSDocs an `TextureStoreEvents` / `TextureResourceEvents` dokumentieren Retain-Verhalten und Payload-Form.
+
+**Test-Coverage:** `TextureStore.spec.ts > event constants (§4.3, §4.7)` — drei Cases (Events feuern, Subtype-Konstanten decken alle Subtypes ab, Resource-Event reuses Subtype-Werte).
+
+### 4.3 (Original-Analyse, zur Nachverfolgung)
 `store.on(id, …)` ist eine Spezial-API mit Eigenleben (Filterung nach `id`, retain-aware). Daneben gibt es Eventize-Events `'ready'`, `'rendererChanged'`, `'resource:<id>'`, `'dispose'`. Letztere sind nicht öffentlich dokumentiert; ein Konsument, der `on(store, 'ready', …)` direkt aufruft (über `@spearwolf/eventize`), kann das tun — aber das ist nirgends als API beworben.
 
 **Vorschlag:**
 - Eventize-Events explizit als public API mit Konstanten exportieren (`StoreEvents.Ready`, `StoreEvents.RendererChanged`, …) — analog zu `Display`-Events.
 - Im JSDoc dokumentieren, welche Events existieren, mit welchen Payloads, und welche retained sind.
 
-### 4.4 `whenReady()` ist zu schwach (siehe BUG-10)
-Vorschlag eine zweite Variante:
-```ts
-async whenResource(id: string): Promise<TextureResource>   // rejects nach erstem Ready, wenn id fehlt
-```
+### ✅ ERLEDIGT — 4.4 `whenResource(id)` zusätzlich zu `whenReady()`
+
+Umgesetzt zusammen mit BUG-10. `store.whenResource('hero')` rejected wenn die ID nach `OnReady` nicht im `#resources`-Map steht.
 
 ### 4.5 Konstruktor erlaubt nur einen `WebGPURenderer`
+
 Die Bibliothek baut auf `three/webgpu`. Wenn ein Konsument WebGL-Renderer hat, fliegt das implizit. Sollte typseitig restriktiv bleiben — oder über `WebGLRenderer | WebGPURenderer` typisiert werden, falls geplant.
 
-### 4.6 `defaultTextureClasses` ist öffentlich + ein mutables Array
+**Lösung**: Das ist okay so. Kein Fix notwendig.
+
+### ✅ ERLEDIGT — 4.6 `defaultTextureClasses` als Signal
+
+**Umgesetzte Lösung:** das Feld bleibt von außen wie ein Array (Getter/Setter), wird intern aber durch `#defaultTextureClasses = createSignal([], {compare: cmpDefaultClasses, attach: this})` gehalten. `cmpDefaultClasses` vergleicht Inhalt — Re-Assigns mit gleichem Inhalt sind No-Ops. Damit ist das Feld observable und konsistent mit der Reactivity-Pipeline; eine künftige Auto-Re-Apply-Logik (gewünscht in §4.6) kann darauf aufsetzen, ohne API zu brechen.
+
+**Test-Coverage:** `TextureStore.spec.ts > defaultTextureClasses as signal (§4.6)` — zwei Cases (Propagation via Re-Parse, Cmp-Dedup).
+
+### 4.6 (Original-Analyse, zur Nachverfolgung)
 ```ts
 defaultTextureClasses: TextureOptionClasses[] = [];
 ```
 Konsumenten können das Array direkt ändern, ohne dass das irgendetwas in den existierenden Resourcen propagiert. Klare „set replaces, mutation is silent“-Semantik wäre besser per `#defaultTextureClasses` + Setter + Re-Eval. (Idiomatisch wäre ein Signal — mit `compare: cmpTexClasses` analog zu `TextureResource`.)
 
-### 4.7 `TextureResourceSubType`-String-Typ ist fehleranfällig
+### 4.7 `TextureResourceSubType`-String-Typ ist fehleranfällig (siehe ✅ 4.3+4.7 oben)
 `'imageCoords' | 'atlas' | 'tileSet' | 'texture' | 'frameBasedAnimations'` — Tippfehler werden nur durch TS abgefangen. Bei Verwendung als `as TextureResourceSubType` Cast in `on()` umgangen. Lieber Konstanten exportieren (`Subtypes.Atlas` etc.).
 
 ---
 
 ## 5. Inkonsistenzen / Kleinigkeiten
 
-- `TileSet.firstId` default ist `1`, `TextureAtlas` frameId beginnt bei `0`. Dokumentiert, aber ein gern übersehener Stolperstein.
-- `TextureFactory.#defaultOptions = this.getOptions(defaultClassNames)` überschreibt das Zeile-davor zugewiesene Default — die erste Zuweisung ist toter Code.
-- `TextureFactory.anisotrophy`: Tippfehler („anisotrophy“ statt „anisotropy“), aber API-stabil — Breaking-Change-Backlog-Kandidat.
-- `parse()` emittiert `OnReady` auch bei leeren `items`. Kein Bug, aber unscharf.
-- `Tilset.tileCountLimit === Infinity` Zweig in der while-Schleife: `tileCountLimit === Infinity || tileCount < tileCountLimit` — die zweite Bedingung ist bei Infinity automatisch true; redundant.
+- `TileSet.firstId` default ist `1`, `TextureAtlas` frameId beginnt bei `0`. Dokumentiert, aber ein gern übersehener Stolperstein. (BELASSEN — Doku-Pflege bei nächster Gelegenheit.)
+- `TextureFactory.#defaultOptions = this.getOptions(defaultClassNames)` — analysiert: ist KEIN toter Code. Die Vor-Zuweisung (`defaultOptions ?? {...}`) wird von `getOptions()` als Basis gelesen, dann wird das Ergebnis wieder in `#defaultOptions` geschrieben. Kommentar in der Quelle ergänzt zur Klarstellung.
+- `TextureFactory.anisotrophy`: Tippfehler („anisotrophy“ statt „anisotropy“), aber API-stabil — Breaking-Change-Backlog-Kandidat. (BELASSEN.)
+- `parse()` emittiert `OnReady` auch bei leeren `items`. Kein Bug, aber unscharf. **Lösung**: Das ist okay. Hier ist kein Fix notwendig.
+- ✅ ERLEDIGT — `TileSet.tileCountLimit === Infinity`-Branches: die redundanten `tileCountLimit === Infinity || …`-/`tileCountLimit !== Infinity && …`-Klauseln in der while-Schleife sind entfernt; `tileCount < Infinity` ist unter JS-Semantik immer true und kein Sonderfall. Alle bestehenden `TileSet.spec.ts`-Cases bleiben grün.
 
 ---
 
@@ -348,10 +417,20 @@ Eine `TextureFactory` pro Store/Renderer, nicht pro Resource. Signal-Verkettung:
 ### 6.2 Atlas-/Image-Fetch deduplizieren
 Wenn zwei Resourcen denselben `imageUrl` referenzieren, werden derzeit zwei `ImageLoader`-Requests abgesetzt und zwei `Texture` erzeugt. Ein optionaler `imageUrl → Promise<HTMLImageElement>`-Cache am Store (mit Refcount) wäre fast geschenkt.
 
-### 6.3 Abortable Fetches
+### ✅ ERLEDIGT — 6.3 Abortable Fetches
+
+Atlas-Fetch in `TextureResource.load()` nutzt jetzt `AbortController` — Cleanup-Funktion ruft `ac.abort()`. Test-Coverage indirekt via BUG-11-Test (Parse-Fehler durchschlagen sauber durch).
+
+### 6.3 (Original-Analyse, zur Nachverfolgung)
 `fetch(atlasUrl).then(...)` ohne AbortSignal. Bei schnellem Resource-Wechsel sammeln sich Requests. `AbortController` an den Effect-Cleanup hängen.
 
-### 6.4 `batch` an mehr Stellen
+### ✅ ERLEDIGT — 6.4 `batch` für den parse()-Body
+
+Der gesamte items-Iterator in `TextureStore#parse()` ist jetzt in einen äußeren `batch()`-Block gewickelt. Pro-Branch-Batches im Existing-Resource-Pfad bleiben (defensiv) erhalten, sind aber unter dem Outer-Batch No-Ops. `OnReady` + `resource:<id>` feuern erst NACH allen Signal-Settles.
+
+**Test-Coverage:** `TextureStore.spec.ts > parse() batching (§6.4)` (verifiziert dass alle Resources schon im `#resources`-Map sind, wenn `OnReady`-Handler feuert).
+
+### 6.4 (Original-Analyse, zur Nachverfolgung)
 In `parse()` werden mehrere Setter pro Resource hintereinander aufgerufen, aber jeder `if (resource) {}`-Block ist ohnehin in `batch(() => { … })` gewickelt. Den globalen `parse()`-Body als ganzes batchen, damit `OnReady` und `resource:<id>` _nach_ allen Signal-Settles emittiert werden.
 
 ### 6.5 `cmpTexCoords` / `cmpTileSetOptions` erweitern
@@ -435,3 +514,43 @@ Der aktuelle Stand ist **architektonisch gut**, mit klaren Schichten und einer e
 4. **API-Schwächen** rund um „warten auf Ready / Reject bei fehlenden IDs“ und die drei `load`-Methoden.
 
 Die Vorschläge in §6/§7 lassen sich inkrementell und ohne Breaking-Change-Wellen anwenden — die erste Welle (§7 Prio 1) ist klein, schnell und liefert die größte Korrektheits-Wirkung.
+
+---
+
+## 10. Umsetzungsstand (2026-05-13)
+
+Alle in §7 priorisierten Items aus den Wellen 1–5 sowie die §5-Cleanups sind umgesetzt. Test-Suite (`packages/twopoint5d`): 32 Cases zu TextureStore/TextureResource grün (vorher 2). Volle CI-Suite: 1214 Tests grün, `pnpm lint` clean, `tsc --noEmit` clean.
+
+| Item | Status | Test-Cases |
+|------|--------|------------|
+| BUG-1 `splice(0)` → `slice()` | ✅ | 5 (`parse() input safety`, `fromX input safety`) |
+| BUG-2 Double-Dispose | ✅ | 2 (`dispose() emits OnDispose …`, `… is idempotent`) |
+| BUG-3/3a `frameBasedAnimations` Update + zentrale Signale | ✅ | 4 (`parse() update path`) |
+| BUG-4 Image-Race + Texture-Leak | ✅ | 2 (`image race`) |
+| BUG-5 static `load()` awaited | ✅ | 1 (`awaits whenReady() …`) |
+| BUG-6 Renderer doppelt gesetzt | ✅ | im dispose-Rewrite mit-erledigt |
+| BUG-7 `SignalGroup.destroy()` deprecated → `delete(this)` | ✅ | indirekt durch idempotency-Test |
+| BUG-8 OnDispose/OnReady self-cleanup | ✅ | 1 (`listener bookkeeping`) |
+| BUG-9 `clearUnused()` | ✅ | 1 (`clearUnused()`) |
+| BUG-10 `whenResource(id)` + abortable `get(...)` | ✅ | 4 (`whenResource() / abortable get()`) |
+| BUG-11 `console.error` → `error`-Events | ✅ | 2 (`error events instead of console.error`) |
+| 3.3 + 6.1 Central TextureFactory | ✅ | 1 (`central TextureFactory`) |
+| 4.3 + 4.7 Event-/Subtype-Konstanten | ✅ | 3 (`event constants`) |
+| 4.4 `whenResource(id)` | ✅ | (siehe BUG-10) |
+| 4.6 `defaultTextureClasses` als Signal | ✅ | 2 (`defaultTextureClasses as signal`) |
+| 6.3 Abortable Atlas-Fetch | ✅ | indirekt (BUG-11 Cleanup-Pfad) |
+| 6.4 `batch` für parse() | ✅ | 1 (`parse() batching`) |
+| 5 `TileSet.tileCountLimit === Infinity` Redundanz | ✅ | bestehende TileSet-Specs grün |
+
+**Offen (bewusst):**
+- BUG-12 (defaultTextureClasses Reset-Semantik via leerem Array beim Re-Parse): okay so, dokumentiert.
+- §4.1 Naming-Vereinheitlichung der drei `load`-Methoden: breaking change, noch nicht umgesetzt.
+- §4.2 `get()` → `getAsync()` Rename: breaking change, noch nicht umgesetzt.
+- §4.5 WebGLRenderer-Typ: okay so (per User-Annotation).
+- §5 `anisotrophy`-Typo: API-stabil, breaking change kandidat.
+- §6.2 Image-Dedup-Cache: noch offen (P4).
+- §6.5 `cmpTexCoords`/`cmpTileSetOptions` per `Object.keys`: noch offen (P5).
+- §6.6 `FrameBasedAnimations` Auto-Counter für Default-Namen: noch offen (P4).
+- §6.7 Doku-Notiz `joinTextureClasses` Konflikt-Auflösung: noch offen (P4-doc).
+
+Migrations-Notes sind im `CHANGELOG.md` (`[Unreleased] > Migration Guide`) dokumentiert: `console.error` → `'error'`-Event-Subscription, statisches `TextureStore.load()` awaited, `whenResource(id)`/`AbortSignal` als idiomatische Alternative zum bisher hängenden `get(missing-id)`, shared `TextureFactory` pro Store.

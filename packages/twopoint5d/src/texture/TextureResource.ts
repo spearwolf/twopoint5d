@@ -29,6 +29,40 @@ const getTimingOptions = (data: FrameBasedAnimationsData): AnimationTimingOption
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
 export type TextureResourceSubType = 'imageCoords' | 'atlas' | 'tileSet' | 'texture' | 'frameBasedAnimations';
 
+/**
+ * Constants for the subtypes emitted by `TextureResource` (and accepted by `TextureStore.on(id, type, ...)`).
+ *
+ * Prefer these over raw string literals when subscribing — the values are
+ * declared as a `const`-typed record so they remain assignable to
+ * `TextureResourceSubType`.
+ */
+export const TextureResourceSubtypes = {
+  ImageCoords: 'imageCoords',
+  Atlas: 'atlas',
+  TileSet: 'tileSet',
+  Texture: 'texture',
+  FrameBasedAnimations: 'frameBasedAnimations',
+} as const satisfies Record<string, TextureResourceSubType>;
+
+/**
+ * Public event-name constants emitted by `TextureResource`.
+ *
+ * The per-subtype events (`imageCoords`, `atlas`, `tileSet`, `texture`,
+ * `frameBasedAnimations`) are retained — late subscribers see the latest value.
+ *
+ * `error` carries `{source: 'image'|'atlas', url, error}`.
+ * `dispose` fires once at the start of `dispose()`.
+ */
+export const TextureResourceEvents = {
+  ImageCoords: TextureResourceSubtypes.ImageCoords,
+  Atlas: TextureResourceSubtypes.Atlas,
+  TileSet: TextureResourceSubtypes.TileSet,
+  Texture: TextureResourceSubtypes.Texture,
+  FrameBasedAnimations: TextureResourceSubtypes.FrameBasedAnimations,
+  Dispose: 'dispose',
+  Error: 'error',
+} as const;
+
 const cmpTexClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
   if (a === b) {
     return true;
@@ -66,7 +100,8 @@ const cmpTileSetOptions = (a: TileSetOptions | undefined, b: TileSetOptions | un
   return false;
 };
 
-const OnDispose = 'dispose';
+const OnDispose = TextureResourceEvents.Dispose;
+const OnError = TextureResourceEvents.Error;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureResource extends EventizedObject {}
@@ -77,7 +112,7 @@ export class TextureResource {
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.textureClasses = textureClasses?.splice(0);
+      resource.textureClasses = textureClasses?.slice();
     });
 
     return resource;
@@ -97,9 +132,8 @@ export class TextureResource {
       resource.#tileSetOptions = createSignal(tileSetOptions, {compare: cmpTileSetOptions, attach: resource});
       resource.#tileSet = createSignal(undefined, {attach: resource});
       resource.#atlas = createSignal(undefined, {attach: resource});
-      resource.textureClasses = textureClasses?.splice(0);
-      resource.#frameBasedAnimations = createSignal(undefined, {attach: resource});
-      resource.#frameBasedAnimationsData = createSignal(frameBasedAnimations, {attach: resource});
+      resource.textureClasses = textureClasses?.slice();
+      resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
     return resource;
@@ -110,6 +144,7 @@ export class TextureResource {
     atlasUrl: string,
     overrideImageUrl?: string,
     textureClasses?: TextureOptionClasses[],
+    frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): TextureResource {
     const resource = new TextureResource(id, 'atlas');
 
@@ -118,7 +153,8 @@ export class TextureResource {
       resource.#atlasJson = createSignal(undefined, {attach: resource});
       resource.#atlas = createSignal(undefined, {attach: resource});
       resource.#overrideImageUrl = createSignal(overrideImageUrl, {attach: resource});
-      resource.textureClasses = textureClasses?.splice(0);
+      resource.textureClasses = textureClasses?.slice();
+      resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
     return resource;
@@ -130,8 +166,9 @@ export class TextureResource {
   #atlas?: Signal<TextureAtlas | undefined>;
   #tileSetOptions?: Signal<TileSetOptions | undefined>;
   #tileSet?: Signal<TileSet | undefined>;
-  #frameBasedAnimations?: Signal<FrameBasedAnimations | undefined>;
-  #frameBasedAnimationsData?: Signal<FrameBasedAnimationsDataMap | undefined>;
+
+  #frameBasedAnimations = createSignal<FrameBasedAnimations | undefined>(undefined, {attach: this});
+  #frameBasedAnimationsData = createSignal<FrameBasedAnimationsDataMap | undefined>(undefined, {attach: this});
 
   #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
   #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
@@ -211,19 +248,19 @@ export class TextureResource {
   }
 
   get frameBasedAnimations(): FrameBasedAnimations | undefined {
-    return this.#frameBasedAnimations?.value;
+    return this.#frameBasedAnimations.value;
   }
 
   set frameBasedAnimations(value: FrameBasedAnimations | undefined) {
-    this.#frameBasedAnimations?.set(value);
+    this.#frameBasedAnimations.set(value);
   }
 
   get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
-    return this.#frameBasedAnimationsData?.value;
+    return this.#frameBasedAnimationsData.value;
   }
 
   set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
-    this.#frameBasedAnimationsData?.set(value);
+    this.#frameBasedAnimationsData.set(value);
   }
 
   get textureClasses(): TextureOptionClasses[] | undefined {
@@ -262,6 +299,7 @@ export class TextureResource {
   }
 
   #load = false;
+  #disposed = false;
 
   constructor(id: string, type: TextureResourceType) {
     eventize(this);
@@ -273,8 +311,10 @@ export class TextureResource {
   }
 
   dispose() {
+    if (this.#disposed) return;
+    this.#disposed = true;
     emit(this, OnDispose);
-    SignalGroup.get(this).destroy();
+    SignalGroup.delete(this);
     off(this);
   }
 
@@ -294,7 +334,7 @@ export class TextureResource {
         emit(this, 'tileSet', value);
       });
 
-      this.#frameBasedAnimations?.onChange((value) => {
+      this.#frameBasedAnimations.onChange((value) => {
         emit(this, 'frameBasedAnimations', value);
       });
 
@@ -308,32 +348,42 @@ export class TextureResource {
         });
       };
 
+      // auto-tracking effect (no static deps) so it autoruns at registration
+      // — load() is typically called AFTER `textureFactory` and `imageUrl` are
+      // already set on the resource (by the store's parse-time injection), and
+      // a static-dep effect would otherwise never fire because no dep changes
+      // post-registration.
       unsubscribeOnDispose(
         createEffect(() => {
+          const factory = this.#textureFactory.get();
+          const url = this.#imageUrl.get();
+          const classes = this.#textureClasses.get();
+          if (!factory || !url) return;
+
+          let aborted = false;
           let texture: Texture | undefined;
 
-          if (this.textureFactory && this.imageUrl) {
-            new ImageLoader()
-              .loadAsync(this.imageUrl)
-              .then((image) => {
-                batch(() => {
-                  this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
-
-                  texture = this.textureFactory.create(image);
-                  texture.name = this.id;
-                  this.texture = texture;
-                });
-              })
-              .catch((error) => {
-                // eslint-disable-next-line no-console
-                console.error(`[TextureStore] Failed to load image from ${this.imageUrl}`, error);
+          new ImageLoader()
+            .loadAsync(url)
+            .then((image) => {
+              if (aborted) return;
+              texture = factory.create(image, ...(classes ?? []));
+              texture.name = this.id;
+              batch(() => {
+                this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
+                this.texture = texture;
               });
-          }
+            })
+            .catch((error) => {
+              if (aborted) return;
+              emit(this, OnError, {source: 'image', url, error});
+            });
 
           return () => {
+            aborted = true;
             texture?.dispose();
           };
-        }, [this.#textureFactory, this.#imageUrl]),
+        }),
       );
 
       if (this.tileSetOptions) {
@@ -367,13 +417,25 @@ export class TextureResource {
       if (this.atlasUrl) {
         unsubscribeOnDispose(
           createEffect(() => {
-            if (this.atlasUrl) {
-              fetch(this.atlasUrl)
-                .then((response) => response.json())
-                .then((atlasJson) => {
-                  this.atlasJson = atlasJson;
-                });
-            }
+            const atlasUrl = this.atlasUrl;
+            if (!atlasUrl) return;
+            const ac = new AbortController();
+            let aborted = false;
+            (async () => {
+              try {
+                const response = await fetch(atlasUrl, {signal: ac.signal});
+                const atlasJson = await response.json();
+                if (aborted) return;
+                this.atlasJson = atlasJson;
+              } catch (error) {
+                if (aborted) return;
+                emit(this, OnError, {source: 'atlas', url: atlasUrl, error});
+              }
+            })();
+            return () => {
+              aborted = true;
+              ac.abort();
+            };
           }, [this.#atlasUrl]),
         );
 
@@ -411,11 +473,15 @@ export class TextureResource {
         touch(this.#atlasUrl);
       }
 
+      // Standalone fallback: if a user assigns `renderer` directly on this resource
+      // (i.e. without going through a `TextureStore`), spin up a per-resource
+      // `TextureFactory`. When the resource is managed by a store, the store
+      // injects its shared factory and this branch never fires.
       unsubscribeOnDispose(
         createEffect(() => {
           const renderer = this.#renderer.get();
-          if (renderer) {
-            this.textureFactory = new TextureFactory(renderer, this.#textureClasses.get());
+          if (renderer && !this.#textureFactory.value) {
+            this.textureFactory = new TextureFactory(renderer);
           }
         }),
       );
