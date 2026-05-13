@@ -5,8 +5,8 @@ packages:
   - apps/*
 
 catalog:
-  '@spearwolf/eventize': ^4.3.1
-  '@spearwolf/signalize': ^0.28.0
+  '@spearwolf/eventize': ^5.0.0
+  '@spearwolf/signalize': ^0.29.0
   '@types/three': ~0.183.1
   three: ~0.183.1
 
