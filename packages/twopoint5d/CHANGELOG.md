@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-05-13
+
 ### Added
 
 - add `TextureStore#whenResource(id)` — resolves once the resource is present (typically after `parse()`), rejects with a descriptive error after the first `OnReady` if the id is still missing. Replaces the previous "promise hangs forever on typo" failure mode of `get()` for missing ids
