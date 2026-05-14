@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Audit — @spearwolf/twopoint5d</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --surface-2: #f5f5f4;
+    --border: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --text: #1c1917;
+    --text-muted: #57534e;
+    --text-soft: #78716c;
+    --accent: #1f5980;
+    --accent-soft: #e6eef4;
+    --sev-critical: #b91c1c;
+    --sev-critical-bg: #fef2f2;
+    --sev-high: #c2410c;
+    --sev-high-bg: #fff7ed;
+    --sev-medium: #a16207;
+    --sev-medium-bg: #fefce8;
+    --sev-low: #1d4ed8;
+    --sev-low-bg: #eff6ff;
+    --sev-info: #44403c;
+    --sev-info-bg: #f5f5f4;
+    --good: #166534;
+    --good-bg: #f0fdf4;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+  }
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0;
+  }
+  h1 { font-size: 2rem; line-height: 1.2; }
+  h2 {
+    font-size: 1.25rem;
+    margin-top: 56px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin-top: 24px; margin-bottom: 8px; }
+  p { margin: 0 0 12px; color: var(--text-muted); }
+  code, pre, .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+  }
+  code {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Header */
+  header.report-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: end;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .head-title { color: var(--text-soft); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .head-meta { color: var(--text-muted); font-size: 0.92rem; margin-top: 12px; }
+  .head-meta span + span::before { content: " · "; color: var(--text-soft); }
+  .badges { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 99px;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-family: ui-monospace, monospace;
+  }
+  .score-card {
+    text-align: right;
+  }
+  .score {
+    font-family: ui-monospace, monospace;
+    font-size: 3rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .score-label { font-size: 0.78rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+  /* Portrait + domains */
+  .portrait p { color: var(--text); }
+  .domains {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .domain {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .domain-name { font-weight: 600; color: var(--text); margin-bottom: 4px; font-size: 0.96rem; }
+  .domain-desc { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px; }
+  .domain-paths { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pathchip {
+    font-family: ui-monospace, monospace;
+    font-size: 0.74rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* ASCII diagram */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 18px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow-x: auto;
+    line-height: 1.4;
+  }
+  .arch-caption { font-size: 0.82rem; color: var(--text-soft); margin-top: 8px; }
+
+  /* Severity overview */
+  .sev-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .sev-cell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid currentColor;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .sev-cell .count { font-family: ui-monospace, monospace; font-size: 1.6rem; font-weight: 600; color: var(--text); line-height: 1; }
+  .sev-cell .label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: currentColor; margin-top: 4px; }
+  .sev-critical { color: var(--sev-critical); }
+  .sev-high { color: var(--sev-high); }
+  .sev-medium { color: var(--sev-medium); }
+  .sev-low { color: var(--sev-low); }
+  .sev-info { color: var(--sev-info); }
+
+  /* Category bars */
+  .cat-list { list-style: none; padding: 0; margin: 0; }
+  .cat-list li {
+    display: grid;
+    grid-template-columns: 220px 1fr 40px;
+    gap: 12px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 0.9rem;
+  }
+  .cat-name { color: var(--text); }
+  .cat-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .cat-bar-fill { height: 100%; background: var(--accent); opacity: 0.7; }
+  .cat-count { font-family: ui-monospace, monospace; color: var(--text-soft); text-align: right; font-size: 0.85rem; }
+
+  /* Filter + Backlog */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 16px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    align-items: center;
+  }
+  .filter-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .filter-group + .filter-group { border-left: 1px solid var(--border); padding-left: 10px; margin-left: 6px; }
+  .filter-label { font-size: 0.74rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; }
+  .fbtn {
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    padding: 3px 9px;
+    border-radius: 99px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .fbtn:hover { background: var(--surface-2); }
+  .fbtn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .fbtn[data-sev="critical"].active { background: var(--sev-critical); border-color: var(--sev-critical); }
+  .fbtn[data-sev="high"].active { background: var(--sev-high); border-color: var(--sev-high); }
+  .fbtn[data-sev="medium"].active { background: var(--sev-medium); border-color: var(--sev-medium); }
+  .fbtn[data-sev="low"].active { background: var(--sev-low); border-color: var(--sev-low); }
+  .fbtn[data-sev="info"].active { background: var(--sev-info); border-color: var(--sev-info); }
+
+  .backlog { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .row {
+    border-top: 1px solid var(--border);
+    padding: 0;
+  }
+  .row:first-child { border-top: 0; }
+  .row-head {
+    display: grid;
+    grid-template-columns: 70px 70px 1fr 90px;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    align-items: center;
+    user-select: none;
+  }
+  .row-head:hover { background: var(--surface-2); }
+  .row-id { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--text-soft); }
+  .sev-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+  }
+  .sev-tag.critical { background: var(--sev-critical-bg); color: var(--sev-critical); }
+  .sev-tag.high     { background: var(--sev-high-bg);     color: var(--sev-high); }
+  .sev-tag.medium   { background: var(--sev-medium-bg);   color: var(--sev-medium); }
+  .sev-tag.low      { background: var(--sev-low-bg);      color: var(--sev-low); }
+  .sev-tag.info     { background: var(--sev-info-bg);     color: var(--sev-info); }
+
+  .row-title { color: var(--text); font-size: 0.95rem; }
+  .row-cat { font-size: 0.76rem; color: var(--text-soft); margin-top: 2px; font-family: ui-monospace, monospace; }
+  .row-effort {
+    font-family: ui-monospace, monospace;
+    font-size: 0.74rem;
+    color: var(--text-soft);
+    text-align: right;
+  }
+  .row-body {
+    display: none;
+    padding: 4px 14px 18px 14px;
+    background: var(--surface-2);
+    border-top: 1px dashed var(--border);
+  }
+  .row.open .row-body { display: block; }
+  .row-body h4 {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-soft);
+    margin: 14px 0 4px;
+  }
+  .row-body p { color: var(--text); font-size: 0.92rem; margin: 0 0 6px; }
+  .row-loc {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    display: inline-block;
+    margin-top: 4px;
+  }
+
+  ul.lean { margin: 6px 0 12px 18px; padding: 0; }
+  ul.lean li { margin: 4px 0; color: var(--text-muted); }
+  ul.lean li b { color: var(--text); font-weight: 600; }
+
+  .meta-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .meta-block h3 { margin-top: 0; }
+
+  .footnote { color: var(--text-soft); font-size: 0.82rem; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 720px) {
+    main { padding: 28px 18px 64px; }
+    header.report-head { grid-template-columns: 1fr; }
+    .score-card { text-align: left; }
+    .domains { grid-template-columns: 1fr; }
+    .sev-grid { grid-template-columns: repeat(2, 1fr); }
+    .row-head { grid-template-columns: 60px 60px 1fr; }
+    .row-effort { display: none; }
+    .cat-list li { grid-template-columns: 140px 1fr 40px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="report-head">
+  <div>
+    <div class="head-title">Project Audit</div>
+    <h1>@spearwolf/twopoint5d</h1>
+    <div class="head-meta">
+      <span>Monorepo · Nx + pnpm</span>
+      <span>v0.21.1 (core lib)</span>
+      <span>Audit-Datum: 2026-05-14</span>
+    </div>
+    <div class="badges">
+      <span class="badge">TypeScript 5.9</span>
+      <span class="badge">three.js 0.183 / WebGPU</span>
+      <span class="badge">Node ≥ 22.13</span>
+      <span class="badge">pnpm 10.27</span>
+      <span class="badge">Vitest 4</span>
+      <span class="badge">@web/test-runner + Playwright</span>
+      <span class="badge">Astro (Lookbook)</span>
+      <span class="badge">ESLint 9 flat + Prettier</span>
+      <span class="badge">Apache-2.0</span>
+    </div>
+  </div>
+  <div class="score-card">
+    <div class="score">68</div>
+    <div class="score-label">Health-Score / 100</div>
+  </div>
+</header>
+
+<!-- ====== Portrait ====== -->
+<h2>Projektportrait</h2>
+<div class="portrait">
+<p>
+  <b>@spearwolf/twopoint5d</b> ist eine TypeScript-Bibliothek, die batch-basiertes 2D-Sprite-Rendering — Billboards, Tilesets, Frame-Animationen, Parallax-Projektionen, Tiled-Maps — in eine three.js / WebGPU-Szene bringt. Das Herzstück ist eine deklarative <i>Vertex-Object-Description</i>: ein Layout-Schema, das je-Instance-Properties auf ein gemeinsames, typisiertes <code>BufferGeometry</code> abbildet, sodass tausende „Sprites“ in einem Draw-Call landen. Die Lib versteht sich bewusst <i>nicht</i> als Sprite-Engine, sondern als Toolkit, das die WebGPU-Zustandshandhabung verbirgt, ohne three.js wegzukapseln.
+</p>
+<p>
+  Das Repo ist ein Nx + pnpm-Workspace mit drei Projekten: der publizierten Kernbibliothek <code>packages/twopoint5d</code>, einem separaten Browser-Integrationstestpaket <code>packages/twopoint5d-testing</code> (<code>@web/test-runner</code> + Playwright) und einer Astro-basierten Showcase-App <code>apps/lookbook</code>, die de-facto-Doku und Demo-Sammlung ist. Ein zusätzlich vorhandenes <code>apps/handbook</code> ist eine Überbleibsel-Verzeichnisstruktur (VitePress wurde entfernt, nur Bilder sind übrig).
+</p>
+
+<div class="domains">
+  <div class="domain">
+    <div class="domain-name">Vertex Objects (Core)</div>
+    <div class="domain-desc">Perf-Kern: deklarative Attribut-Layouts, die zu JS-Proxies über geteilte TypedArrays kompiliert werden — die Grundlage für jeden Sprite-Typ.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/vertex-objects/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Display &amp; Frame Loop</div>
+    <div class="domain-desc">WebGPURenderer-Wrapper mit Resize-Auto-Sync, Chronometer mit clamping <code>maxDeltaTime</code>, requestAnimationFrame und Fixed-Timestep-Loop für deterministische Simulation.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/display/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Stage &amp; Render Pipeline</div>
+    <div class="domain-desc">Stage2D (Scene + Projection + automatische Kamera), StageRenderer mit verschachtelten Render-Targets und TSL-basiertem Post-Processing-Pipeline-Modus.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/stage/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Texture Management</div>
+    <div class="domain-desc">TextureAtlas, TileSet, signalize-basierter TextureStore-Cache mit reaktiver Pipeline für Bild-Loader, Atlas-Parsing und FrameBasedAnimations.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/texture/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">2D Tiled Maps</div>
+    <div class="domain-desc">Tiled-Integration: Map2DLayer, CameraBasedVisibility (View-Frustum-Culling auf XZ-Plane) mit Tile-Pool, Spatial Hash Grid und ChunkQuadTree.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/map2d/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Sprite Materials</div>
+    <div class="domain-desc">Fertige ShaderMaterials auf Vertex-Object-Basis: TexturedSprites (Quads/Billboards), AnimatedSprites, TileSprites.</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/sprites/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Input Controls</div>
+    <div class="domain-desc">PanControl2D (WASD + Pointer mit Multi-Touch-Merging und Cursor-Hide-Strategie).</div>
+    <div class="domain-paths">
+      <span class="pathchip">packages/twopoint5d/src/controls/</span>
+    </div>
+  </div>
+  <div class="domain">
+    <div class="domain-name">Lookbook (Demo-App)</div>
+    <div class="domain-desc">Astro-App mit kuratierten Demos (animated-billboards, animated-sprites, instanced-quads, quadtree-playground, textured-sprites, passes, crosses) — primäre Doku-Quelle.</div>
+    <div class="domain-paths">
+      <span class="pathchip">apps/lookbook/</span>
+    </div>
+  </div>
+</div>
+
+<div class="arch-diagram">
+<pre style="margin:0">
+                       ┌────────────────────────────────┐
+   apps/lookbook  ───▶ │   @spearwolf/twopoint5d (lib)  │
+   (Astro demos)       └────────────────────────────────┘
+                                       │
+                                       │ uses
+                                       ▼
+       ┌──────────────────────────────────────────────────────────┐
+       │  Public API (re-exports via *.public-api.ts → index.ts)  │
+       └──────────────────────────────────────────────────────────┘
+            ▲           ▲           ▲           ▲          ▲
+            │           │           │           │          │
+       ┌────┴────┐ ┌────┴────┐ ┌────┴─────┐ ┌───┴──┐ ┌─────┴─────┐
+       │ display │ │  stage  │ │ texture  │ │map2d │ │ controls  │
+       │ Display │ │ Stage2D │ │ Store/   │ │ Cam- │ │ PanCtrl2D │
+       │ Frame-  │ │ Stage-  │ │ Resource │ │ Based│ └───────────┘
+       │ Loop /  │ │ Renderer│ │ TileSet  │ │ Vis. │
+       │ Fixed   │ │ (TSL)   │ │ Atlas    │ │      │
+       └─────────┘ └─────────┘ └────┬─────┘ └──┬───┘
+              │           │        │           │
+              └───────────┴────────┴───────────┘
+                                │
+                                ▼
+                  ┌──────────────────────────┐
+                  │      vertex-objects      │ ◀── sprites/ (materials)
+                  │  VOPool / VOBufferGeo /  │
+                  │  InstancedVOBufferGeo    │
+                  └──────────────────────────┘
+                                │
+                                ▼
+                ┌─────────────────────────────────┐
+                │  three/webgpu (WebGPURenderer)  │
+                └─────────────────────────────────┘
+
+       packages/twopoint5d-testing ──▶  blackbox-Tests gegen die Lib
+       (@web/test-runner + Playwright Chromium/Firefox)
+</pre>
+</div>
+<div class="arch-caption">Schichtenmodell: Pfeile zeigen „nutzt“. Alle Top-Module sind über das <code>public-api.ts</code>-Re-Export-Schema öffentlich; <code>vertex-objects</code> ist die geteilte Performance-Grundlage. Externe Pakete sind <code>three/webgpu</code> sowie <code>@spearwolf/eventize</code> + <code>@spearwolf/signalize</code> (peer-deps).</div>
+</div>
+
+<!-- ====== Executive Summary ====== -->
+<h2>Executive Summary</h2>
+<p>
+  Der Code ist <b>überdurchschnittlich gepflegt</b> für ein Solo-Open-Source-Projekt: klare Modulgrenzen via <code>public-api.ts</code>, sehr ausführliche TSDoc auf den zentralen Klassen (<code>Display</code>, <code>StageRenderer</code>, <code>FixedFrameLoop</code> dokumentieren Lifecycles und Trade-Offs sauber), strikt geführte ESM-/NodeNext-Imports, konsequente <code>.js</code>-Suffixe und ein realistischer CI-Pfad (Build → Lint → checkPkgTypes → Test inkl. headless Playwright via <code>xvfb-run</code>).
+</p>
+<p>
+  Die nennenswerten Schwachstellen liegen <b>im Type-System</b> und in <b>Lifecycle-Robustheit</b>: <code>strict: true</code>, aber <code>strictNullChecks: false</code> ist ein bewusst offen gehaltenes Sicherheitsfenster, das in mehreren <code>// @ts-ignore</code>-Stellen und Methoden mit Rückgabewert-Lügen (<code>VertexObjectPool.createVO()</code>, <code>FrameLoop.start()</code>) konkret spürbar wird. <code>Display</code> hat zwei Lifecycle-Klippen (Konstruktor-Pfad mit externem <code>WebGPURenderer</code> setzt <code>#waitForRenderer</code> nie; <code>canvas</code>-Getter wirft nach <code>dispose()</code>). <code>PanControl2D</code> verwendet das deprecated <code>event.keyCode</code> für WASD — bricht auf nicht-lateinischen Keyboard-Layouts.
+</p>
+<p>
+  <b>Tooling-Lücken</b>: keine Coverage-Konfiguration trotz Performance-/Buffer-Code, CI nutzt <code>nick-fields/retry@v3</code> (3× Wiederholung) — das maskiert Flakes; nur 5 Browser-Integrationstests im <code>twopoint5d-testing</code>-Paket gegenüber 42 Unit-Specs. Aufräum-Backlog: drei <code>Backlog-*.md</code>-Dateien (~110 KB) und das verwaiste <code>apps/handbook/</code>-Verzeichnis liegen weiterhin im Repo-Root. <code>AGENTS.md</code> erwähnt das längst entfernte VitePress, <code>README.md</code> nennt Node 18+ während <code>engines</code> auf 22.13 besteht.
+</p>
+
+<!-- ====== Severity Overview ====== -->
+<h2>Severity-Übersicht</h2>
+<div class="sev-grid">
+  <div class="sev-cell sev-critical"><div class="count">0</div><div class="label">Critical</div></div>
+  <div class="sev-cell sev-high"><div class="count">2</div><div class="label">High</div></div>
+  <div class="sev-cell sev-medium"><div class="count">8</div><div class="label">Medium</div></div>
+  <div class="sev-cell sev-low"><div class="count">13</div><div class="label">Low</div></div>
+  <div class="sev-cell sev-info"><div class="count">3</div><div class="label">Info</div></div>
+</div>
+
+<!-- ====== Category Overview ====== -->
+<h2>Kategorie-Verteilung</h2>
+<ul class="cat-list" id="catList"></ul>
+
+<!-- ====== Backlog ====== -->
+<h2>Backlog</h2>
+<div class="filters">
+  <div class="filter-group">
+    <span class="filter-label">Severity</span>
+    <button class="fbtn active" data-fsev="all">Alle</button>
+    <button class="fbtn" data-fsev="critical" data-sev="critical">Critical</button>
+    <button class="fbtn" data-fsev="high" data-sev="high">High</button>
+    <button class="fbtn" data-fsev="medium" data-sev="medium">Medium</button>
+    <button class="fbtn" data-fsev="low" data-sev="low">Low</button>
+    <button class="fbtn" data-fsev="info" data-sev="info">Info</button>
+  </div>
+  <div class="filter-group" id="catFilters">
+    <span class="filter-label">Kategorie</span>
+    <button class="fbtn active" data-fcat="all">Alle</button>
+  </div>
+</div>
+<div class="backlog" id="backlog"></div>
+
+<!-- ====== Open Questions ====== -->
+<h2>Offene Fragen / Unklarheiten</h2>
+<ul class="lean">
+  <li><b>DEPS-001 (siehe Backlog)</b> — <code>use-asset@^1.0.4</code> liegt in den root-<code>devDependencies</code>, aber kein Vorkommen in <code>src/</code> wurde gefunden. Wird das in Lookbook-Demos importiert oder ist es schlicht obsolet?</li>
+  <li>Catalog-Pin <code>three@~0.183.1</code> — bewusst gewählte minor-Range oder Convenience? Three.js bricht zwischen Minor-Versionen WebGPU-API; ein Plan für regelmäßige Bumps existiert nicht sichtbar.</li>
+  <li>Soll <code>apps/handbook/</code> tatsächlich für eine zukünftige Doku-App reserviert bleiben (Markenname „Handbook“), oder kann das Verzeichnis komplett wegfallen, sobald die Bilder zur Lookbook gewandert sind?</li>
+  <li>Die drei <code>Backlog-*.md</code>-Dateien im Root: aktuelle Roadmap oder bereits größtenteils abgearbeitete TODO-Sammlungen, die mit den letzten Refactoring-Commits (<code>7475b47</code> „TextureStore refactor“, etc.) erledigt sind?</li>
+  <li><code>Display.resizePollIntervalMs</code> hat als Default <code>0</code> (per-Frame DOM-Measurement). Ist das auf 120/240Hz-Setups bereits ein bekannter Hotspot, oder rein „funktioniert, also nicht angefasst“?</li>
+</ul>
+
+<!-- ====== Optimierungspotenzial ====== -->
+<h2>Optimierungspotenzial</h2>
+<p>Bewusst von Findings getrennt: das hier sind Verbesserungen, die <i>kein Defekt</i> sind, aber das Projekt resilienter oder lesbarer machen würden.</p>
+<ul class="lean">
+  <li><b>Coverage in CI</b> — <code>vitest --coverage</code> aktivieren, einen Mindest-Threshold für <code>vertex-objects/</code> einziehen. Bei einem Buffer-Manipulations-Kern kostet ungetesteter Edge-Case bares Geld in Production-Bugs.</li>
+  <li><b>ESLint-Regel-Override</b> — <code>'@typescript-eslint/no-empty-object-type': 0</code> ins TS-Block der <code>eslint.config.mjs</code>, dann fallen die ~10 verstreuten <code>// eslint-disable-next-line</code>-Kommentare weg, die alle exakt dem gleichen Pattern (Declaration-Merging mit <code>EventizedObject</code>) dienen.</li>
+  <li><b>Pre-Commit-Hook</b> — minimal lint-staged + Husky einziehen; spart CI-Loops bei Tippfehlern. Für ein Solo-Projekt nicht zwingend, aber günstig.</li>
+  <li><b>.nvmrc / .node-version</b> — eine Zeile, sofortiges Onboarding-Win für Nutzer mit <code>fnm</code>/<code>nvm</code>/<code>volta</code>.</li>
+  <li><b>Extraktion in Display.resize()</b> — die Resolution-Order der Size-Sources (<code>resize-to</code>-Attribut, Callback, Element) ist in einer einzigen 140-Zeilen-Methode. Drei kleine Helper (<code>resolveSizeFromAttribute</code>, <code>applyBoxModelCorrection</code>, <code>clampToMaxResolution</code>) würden die Lesbarkeit sichtbar heben, ohne das Verhalten zu ändern.</li>
+  <li><b>README ↔ AGENTS.md ↔ CLAUDE.md synchronisieren</b> — drei Quellen, die teilweise dasselbe sagen (Setup, Stack), teilweise widersprüchlich (Node-Version, VitePress-Erwähnung). Ein generierter Snippet aus <code>package.json</code> + <code>pnpm-workspace.yaml</code> wäre wartungsfreundlicher.</li>
+  <li><b><code>noImplicitReturns: true</code> aktivieren</b> — geringer Migrationsaufwand (nur Switch-Statements mit fehlendem Default), enger Sicherheitsgewinn bei Refactorings.</li>
+  <li><b>Auto-Eviction in TextureStore.parse()</b> — Resources, deren ID im neuen Datenset fehlt und deren <code>refCount === 0</code>, gleich entsorgen statt erst bei <code>clearUnused()</code>. Spart Live-Editing-Speicher in Lookbook-Demos.</li>
+</ul>
+
+<!-- ====== Methodik ====== -->
+<h2>Methodik</h2>
+<div class="meta-block">
+<h3>Vorgehen</h3>
+<p>
+  Gelesen wurden: alle relevanten Workspace-Configs (<code>package.json</code> root + <code>packages/twopoint5d</code> + <code>twopoint5d-testing</code>, <code>tsconfig.json</code>, <code>nx.json</code>, <code>pnpm-workspace.yaml</code>, <code>eslint.config.mjs</code>), beide GitHub-Workflows (<code>ci.yml</code>, <code>deploy.yml</code>), das Top-Level <code>index.ts</code> + alle <code>public-api.ts</code>-Dateien (vollständiger Public-Surface-Scan), die größten Source-Module nach LoC (<code>Display.ts</code>, <code>StageRenderer.ts</code>, <code>TextureResource.ts</code>, <code>TextureStore.ts</code>, <code>InstancedVOBufferGeometry.ts</code>, <code>CameraBasedVisibility.ts</code>, <code>PanControl2D.ts</code>, <code>Stage2D.ts</code>, <code>FrameLoop.ts</code>, <code>FixedFrameLoop.ts</code>, <code>VertexObjectPool.ts</code>, <code>Dependencies.ts</code>), Stichproben aus Tests und Verzeichnisstruktur. Vollständig per <code>grep</code> abgesucht: <code>TODO/FIXME/HACK/XXX</code>, <code>@ts-ignore / @ts-expect-error / eslint-disable</code>, <code>any</code>-Verteilung.
+</p>
+<p>
+  <b>Nicht gelesen</b> (bewusst Sampling): die jeweiligen <code>*.spec.ts</code>-Dateien im Detail, einzelne Shader-Materials in <code>sprites/AnimatedSprites/</code> bzw. <code>sprites/TexturedSprites/</code> (nur Inventar), Astro-/Lookbook-Demos (nur Verzeichnislisting), die ~110 KB <code>Backlog-*.md</code>-Dateien (per Skill-Regel: separate Planning-Artefakte zählen nicht als Code).
+</p>
+<h3>Health-Score-Berechnung</h3>
+<p>
+  Start 100 Punkte. Abzüge: critical -10, high -5, medium -2, low -0.5, info 0. Untergrenze 0. <br>
+  Hier: 100 − (0 × 10) − (2 × 5) − (8 × 2) − (13 × 0.5) − (3 × 0) = 100 − 0 − 10 − 16 − 6.5 = <b>67.5 → 68</b>.
+</p>
+<h3>Vorheriges Audit</h3>
+<p>Kein bestehendes <code>audit.html</code> im Repo-Root — dies ist ein Initial-Audit, kein Diff-Lauf.</p>
+</div>
+
+<div class="footnote">
+  Generiert von <code>js-ts-project-audit</code> · Audit-Datum 2026-05-14 · Standalone, kein externes CSS/JS.
+</div>
+
+</main>
+
+<script>
+const FINDINGS = [
+  // -- HIGH --
+  {
+    id: "CFG-001", category: "Build & Config", severity: "high",
+    title: "strictNullChecks deaktiviert trotz strict: true",
+    location: "tsconfig.json:40",
+    description: "Die Compiler-Option setzt zwar global <code>strict: true</code>, schaltet aber gezielt <code>strictNullChecks: false</code>. Dadurch sind alle <code>null</code>/<code>undefined</code>-Checks für den Compiler unsichtbar. Konkret spürbar: <code>VertexObjectPool.createVO()</code> behauptet, einen <code>VOType &amp; VO</code> zurückzugeben, liefert aber <code>undefined</code> bei voller Capacity. Mehrere Signals haben <code>Signal&lt;T | undefined&gt;</code>-Typen, deren Konsumenten ungeprüft auf <code>.value</code> zugreifen.",
+    recommendation: "<code>strictNullChecks: true</code> setzen. Erwartungsgemäß fallen viele Fehler — diese inkrementell beheben, bei Bedarf modulweise via separater <code>tsconfig</code>-Erweiterung migrieren. Das macht echte Null-Defekte sichtbar, statt sie im Code-Review zu suchen.",
+    effort: "L"
+  },
+  {
+    id: "IMPL-002", category: "Implementierungsstand", severity: "high",
+    title: "TODO als Runtime-Error in FrameBasedAnimations",
+    location: "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:69",
+    description: "Die Stelle wirft <code>throw new Error('TODO too many animation frames - we need better way here to calculate a corresponding buffer size!')</code>. Ein TODO als Runtime-Exception in publishter Library-Code ist eine latente Bombe: produktive Konsumenten bekommen eine kryptische Meldung mit Wortlaut „TODO“, sobald genug Frames addiert werden.",
+    recommendation: "Echte Größenberechnung umsetzen — entweder die obere Grenze dokumentieren (mit besserer Fehlermeldung), oder die Buffer-Größe dynamisch wachsen lassen (typisch: Verdopplung wie bei <code>resize()</code> in <code>VertexObjectPool</code>). Bis dahin Fehlermeldung ohne „TODO“ formulieren.",
+    effort: "M"
+  },
+
+  // -- MEDIUM --
+  {
+    id: "CFG-002", category: "Build & Config", severity: "medium",
+    title: "noUncheckedIndexedAccess nicht aktiviert",
+    location: "tsconfig.json",
+    description: "Array- und Index-Zugriffe werden als immer definiert getypt, auch wenn der Index außerhalb der Grenzen liegen kann. Im Buffer-Kern (<code>vertex-objects/</code>) und in <code>map2d/</code> mit viel manueller Index-Arithmetik ist das in Kombination mit dem deaktivierten <code>strictNullChecks</code> ein doppeltes Sicherheitsleck.",
+    recommendation: "<code>\"noUncheckedIndexedAccess\": true</code> aktivieren. Migration parallel zu CFG-001 sinnvoll, da viele Stellen ohnehin von beiden Schaltern profitieren.",
+    effort: "M"
+  },
+  {
+    id: "TEST-001", category: "Tests", severity: "medium",
+    title: "CI nutzt nick-fields/retry — Flakes werden maskiert",
+    location: ".github/workflows/ci.yml:24-30",
+    description: "Der Test-Step ist in <code>nick-fields/retry@v3</code> verpackt: <code>timeout_minutes: 2, max_attempts: 3</code>. Wiederholungslogik glättet Flakes statt sie zu beheben — über Zeit gewöhnt sich das Team an einen schwankenden CI-Status, und echte Regressionen verbergen sich hinter „lief beim zweiten Versuch durch“.",
+    recommendation: "Retry-Wrapper entfernen. Falls dadurch Tests rot werden: konkreten Flake identifizieren (typischerweise einer der WebGPU-Browser-Tests unter <code>xvfb</code>). Notfalls den flaky-Test isolieren in einen separaten Nx-Target, der explizit als „best-effort“ markiert ist — damit bleibt der Main-Run deterministisch.",
+    effort: "S"
+  },
+  {
+    id: "TEST-002", category: "Tests", severity: "medium",
+    title: "Keine Coverage-Konfiguration",
+    location: "packages/twopoint5d/package.json",
+    description: "Kein <code>vitest --coverage</code>-Script, keine <code>vitest.config</code>-Coverage-Section, keine Provider-Wahl (v8/istanbul). Für eine Library mit Buffer-Manipulation und Cache-Logik ist Coverage kein Selbstzweck, sondern Frühwarnsystem für ungetestete Edge-Cases (Pool-Resize, TextureStore-Re-Parse, CameraBasedVisibility-Neighbor-Walk).",
+    recommendation: "Vitest-Coverage aktivieren (<code>@vitest/coverage-v8</code>), Thresholds für <code>vertex-objects/</code> und <code>texture/</code> setzen (z.B. 80% statements). CI-Artefakt hochladen für historische Trends.",
+    effort: "S"
+  },
+  {
+    id: "API-001", category: "Öffentliche API", severity: "medium",
+    title: "VertexObjectPool.createVO() lügt im Rückgabetyp",
+    location: "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:76-85",
+    description: "Signatur: <code>createVO(): VOType &amp; VO</code>. Tatsächlich gibt es <code>undefined</code> zurück, wenn <code>usedCount &gt;= capacity</code>, abgesichert durch ein <code>// @ts-ignore</code>. Konsumenten bekommen vom Typ-System die Garantie, dass das Ergebnis kein <code>undefined</code> ist — die Realität sieht anders aus.",
+    recommendation: "Rückgabetyp auf <code>(VOType &amp; VO) | undefined</code> ändern, oder bei Capacity-Overflow eine echte <code>RangeError</code> werfen. Beides ist ehrlicher als das aktuelle Ts-Ignore.",
+    effort: "S"
+  },
+  {
+    id: "BUG-001", category: "Bugs &amp; Korrektheit", severity: "medium",
+    title: "Display.canvas wirft nach dispose()",
+    location: "packages/twopoint5d/src/display/Display.ts:270-272, 674-681",
+    description: "<code>dispose()</code> macht <code>delete this.renderer</code>. Der <code>canvas</code>-Getter dereferenziert weiterhin <code>this.renderer!.domElement</code> mit Non-Null-Assertion. Aufruf nach <code>dispose()</code> wirft eine generische TypeError statt einer aussagekräftigen Lifecycle-Meldung — und es gibt keinerlei Doku, dass die Instanz nach <code>dispose()</code> unbenutzbar ist.",
+    recommendation: "Entweder Getter mit <code>if (!this.renderer) throw new Error('Display has been disposed')</code> absichern, oder ein <code>#disposed</code>-Flag setzen und alle öffentlichen Accessor entsprechend guardieren. Lifecycle-Doku in der Klasse ergänzen.",
+    effort: "S"
+  },
+  {
+    id: "BUG-002", category: "Bugs &amp; Korrektheit", severity: "medium",
+    title: "#waitForRenderer ist undefined wenn externer WebGPURenderer übergeben wird",
+    location: "packages/twopoint5d/src/display/Display.ts:282, 302-304, 344, 397",
+    description: "<code>#waitForRenderer</code> wird nur im <code>HTMLElement</code>-Pfad zugewiesen (Zeile 344). Im <code>isWebGPURenderer</code>-Zweig (Zeile 302+) bleibt das Feld undefined. Zeile 397 macht <code>this.#waitForRenderer.then(...)</code> — ruft <code>.then</code> auf <code>undefined</code> und wirft einen TypeError. Wer einen schon initialisierten Renderer übergibt, bekommt diesen Crash schon im Konstruktor.",
+    recommendation: "Im WebGPURenderer-Pfad eine resolved Promise zuweisen: <code>this.#waitForRenderer = Promise.resolve(this.renderer)</code>. Tests für beide Konstruktor-Eintrittspfade ergänzen.",
+    effort: "S"
+  },
+  {
+    id: "BUG-003", category: "Bugs &amp; Korrektheit", severity: "medium",
+    title: "PanControl2D verwendet deprecated event.keyCode",
+    location: "packages/twopoint5d/src/controls/PanControl2D.ts:327-361",
+    description: "Die WASD-Erkennung nutzt <code>KeyboardEvent.keyCode</code>. Diese Property ist seit langem deprecated und nicht layout-unabhängig: auf AZERTY-Tastaturen liefert die Taste an Position W einen anderen Keycode, auf kyrillischen Layouts wieder einen anderen. Auch die Default-Codes <code>[87, 83, 65, 68]</code> sind Magic Numbers ohne Bezeichnerkommentar — der existiert nur als inline-Kommentar im Switch.",
+    recommendation: "Auf <code>event.code</code> umstellen (Werte: <code>'KeyW' | 'KeyS' | 'KeyA' | 'KeyD'</code>), das ist layout-unabhängig. <code>PanControl2DOptions.keyCodes</code> entsprechend auf <code>[string, string, string, string]</code> oder eine benannte Struktur umstellen — Breaking Change wert.",
+    effort: "M"
+  },
+  {
+    id: "TYPE-001", category: "Typsicherheit", severity: "medium",
+    title: "Mehrere @ts-ignore in vertex-objects/ verstecken Typ-Lügen",
+    location: "VertexObjectPool.ts:83, VertexAttributeDescriptor.ts:32/37/42, VertexObjectBuffer.ts:82",
+    description: "Vier @ts-ignore-Stellen in der Performance-Kern-Schicht. Jede einzelne wäre für sich kein Drama, in Summe sind sie das stille Symptom davon, dass die VO-Description-Types über die Lebenszeit erodiert sind — typische Stelle: Buffer-Slot wird via <code>[voBuffer]</code>-Symbol gesetzt, aber der Type-Index erlaubt das eigentlich nicht.",
+    recommendation: "Pro Stelle einen Cast mit benanntem Helper (z.B. <code>asVoSlot()</code>) statt @ts-ignore. Wenn die Symbol-basierten Slots häufig Casts brauchen, eine zentrale Type-Augmentation aufsetzen.",
+    effort: "M"
+  },
+
+  // -- LOW --
+  {
+    id: "ARCH-001", category: "Architektur", severity: "low",
+    title: "Drei große Backlog-*.md-Dateien im Repo-Root",
+    location: "Backlog.md, Backlog-StageRenderer.md, Backlog-TextureStore.md",
+    description: "Zusammen ~110 KB Planungs-Markdown direkt im Root. Vermischt Implementations-Code-Verzeichnis mit WIP-Notizen, jeder neue Mitleser muss erst sortieren, was Roadmap und was abgearbeitet ist.",
+    recommendation: "Nach <code>docs/backlog/</code> oder <code>.backlog/</code> verschieben, oder erledigte Punkte in Commits/Issues überführen und die Dateien löschen. Wenn dauerhafter Roadmap-Charakter: in eine zentrale <code>ROADMAP.md</code> konsolidieren.",
+    effort: "S"
+  },
+  {
+    id: "ARCH-002", category: "Architektur", severity: "low",
+    title: "apps/handbook/ ist ein VitePress-Überbleibsel",
+    location: "apps/handbook/docs/images/",
+    description: "<code>CLAUDE.md</code> dokumentiert es bereits: das VitePress-Handbook wurde in Commit <code>bc361c9</code> entfernt, übrig sind nur Bilder. <code>AGENTS.md</code> erwähnt VitePress aber noch im Tech-Stack — zwei Quellen widersprechen sich.",
+    recommendation: "<code>apps/handbook/</code> löschen (Bilder ggf. nach <code>apps/lookbook/public/images/</code> migrieren) und <code>AGENTS.md</code> §5 Tech Stack auf den aktuellen Stand bringen.",
+    effort: "S"
+  },
+  {
+    id: "CFG-003", category: "Build & Config", severity: "low",
+    title: "README-Node-Version widerspricht engines",
+    location: "README.md:75, package.json:9",
+    description: "README sagt „<i>a current node v18+</i>“, <code>engines.node</code> verlangt <code>&gt;=22.13</code>, <code>AGENTS.md</code> wiederum „Node ≥ 22.13“. Mitleser landet je nach gelesener Datei in einer anderen Realität. Es existiert weder <code>.nvmrc</code> noch <code>.node-version</code>.",
+    recommendation: "README an <code>engines</code>-Wert anpassen. <code>.nvmrc</code> mit Inhalt <code>22</code> anlegen — der Onboarding-Aufwand sinkt für Nutzer mit fnm/nvm/volta auf null.",
+    effort: "S"
+  },
+  {
+    id: "TEST-003", category: "Tests", severity: "low",
+    title: "Wenig Browser-Integrationstests gegenüber Unit-Tests",
+    location: "packages/twopoint5d-testing/test/",
+    description: "42 <code>*.spec.ts</code> in der Core-Lib stehen 5 <code>*.test.js</code> im Browser-Test-Paket gegenüber. Gerade die GPU-/Rendering-relevanten Bereiche (Stage-Pipeline, CameraBasedVisibility, Buffer-Updates über Frames hinweg) profitieren von echten Browser-Runs.",
+    recommendation: "Schrittweise ergänzen: ein Test pro Sprite-Material (TexturedSprites, AnimatedSprites, TileSprites), einer für <code>Map2DLayer + CameraBasedVisibility</code>, einer für <code>StageRenderer</code> mit Pipeline-Mode.",
+    effort: "L"
+  },
+  {
+    id: "API-002", category: "Öffentliche API", severity: "low",
+    title: "FrameLoop.start() liefert inkonsistenten Rückgabewert",
+    location: "packages/twopoint5d/src/display/FrameLoop.ts:150-165",
+    description: "Bei erstmaliger Subscription wird eine Unsubscribe-Funktion zurückgegeben. Bei bereits vorhandener Subscription (<code>this.#subscribers.has(target)</code>) wird stillschweigend <code>undefined</code> zurückgegeben. Konsumenten, die das Ergebnis cachen, bekommen einmal eine Funktion, beim zweiten Aufruf <code>undefined</code> — Crash beim späteren Aufruf.",
+    recommendation: "Auch im Already-Subscribed-Pfad eine (no-op oder echte) Unsubscribe-Funktion zurückgeben. Optional die Signatur explizit als <code>() =&gt; void</code> typisieren, damit der TS-Compiler die Inkonsistenz fängt.",
+    effort: "S"
+  },
+  {
+    id: "IMPL-001", category: "Implementierungsstand", severity: "low",
+    title: "Viele verstreute TODOs in der Kern-Lib",
+    location: "diverse: ParallaxProjection:74, TextureAtlasLoader:58, VertexObjectDescriptor:42, TexturePackerJson:19, Display:330, CameraBasedVisibility:224, VOBufferGeometry:79, InstancedVOBufferGeometry:254, DataIdsChunk2D:39",
+    description: "Neun unterschiedliche TODO-Marker, davon mehrere mit klarer Intent („add tests“, „support compression“, „check if still needed“). In Summe ergeben sie kein Bild davon, wo das Projekt steht — manche Punkte sind möglicherweise mit jüngsten Refactorings längst obsolet, ohne dass die TODO-Zeile gelöscht wurde.",
+    recommendation: "TODOs einmalig durchgehen: bestätigte Aufgaben in GitHub-Issues überführen (Backlog.md ist dafür eigentlich da), erledigte Punkte löschen. Idealerweise einen ESLint-Regel-Threshold setzen, damit neue TODOs nicht akkumulieren.",
+    effort: "M"
+  },
+  {
+    id: "READ-001", category: "Lesbarkeit", severity: "low",
+    title: "Display.ts (720 LOC) und StageRenderer.ts (624 LOC) sind groß",
+    location: "packages/twopoint5d/src/display/Display.ts, packages/twopoint5d/src/stage/StageRenderer.ts",
+    description: "Beide Klassen sind dank exzellenter TSDoc gut navigierbar, aber Display.resize() mit der Resolution-Order (resize-to-Attribut → Callback → Element + Box-Model-Korrektur + Clamping) ist eine ~140-Zeilen-Methode mit fünf Branches. StageRenderer hat vier verschachtelte Render-Modi in privaten Methoden — die Trennung ist konzeptuell richtig, aber die Datei wird schwer zu „greifen“.",
+    recommendation: "Display.resize: Pure Helper für <code>resolveSizeFromAttribute()</code>, <code>applyBoxModelCorrection()</code>, <code>clampToMaxResolution()</code> extrahieren. Keine Verhaltensänderung, nur Lesbarkeit.",
+    effort: "M"
+  },
+  {
+    id: "BUG-004", category: "Bugs &amp; Korrektheit", severity: "low",
+    title: "as any in Display.isWebGPUBackend / isWebGLBackend",
+    location: "packages/twopoint5d/src/display/Display.ts:274-280",
+    description: "<code>(this.renderer?.backend as any)?.['isWebGPUBackend']</code> — Cast über <code>any</code> mit String-Index. Wenn die three.js-Typings das Backend nicht korrekt typen, gibt es bessere Wege; wenn doch, ist der <code>as any</code> ein versteckter Bug-Vektor sobald three.js Property-Namen ändert.",
+    recommendation: "Eigene Interface-Augmentation für <code>WebGPURenderer['backend']</code> einziehen, oder pragmatisch via <code>instanceof</code> auf die konkreten Backend-Klassen prüfen. So wird ein Typ-Bruch beim three.js-Update zur Compile-Time-Fehlermeldung.",
+    effort: "S"
+  },
+  {
+    id: "MEM-001", category: "Memory &amp; Ressourcen", severity: "low",
+    title: "Module-Level RAF-Singleton im FrameLoop",
+    location: "packages/twopoint5d/src/display/FrameLoop.ts:13-14",
+    description: "<code>let rafUniqueInstance: RAF = null</code> und <code>rafUniqueInstances: WeakMap&lt;object, RAF&gt;</code> sind Modul-globale States. Pro-Renderer-Instanzen sind via <code>WeakMap</code> sauber GC-fähig, aber der Headless-Singleton lebt für die gesamte Modul-Lebensdauer. In Test-Runs mit vielen sequentiellen Displays bleibt der Singleton bestehen.",
+    recommendation: "Kein dringender Leak, aber: statisches <code>RAF.dispose()</code> ergänzen, das Singleton + WeakMap-Einträge clearen kann — vor allem für Unit-Tests, die mehrere Displays in einer Worker-Run erzeugen.",
+    effort: "S"
+  },
+  {
+    id: "MEM-002", category: "Memory &amp; Ressourcen", severity: "low",
+    title: "TextureStore.clearUnused() ist nur opt-in",
+    location: "packages/twopoint5d/src/texture/TextureStore.ts:382-392",
+    description: "Wenn <code>parse()</code> mehrfach mit unterschiedlichen Resource-IDs aufgerufen wird (Live-Editing, Hot-Reload), bleiben verwaiste Resources im internen Map liegen, bis jemand <code>clearUnused()</code> ruft. Bei long-running Apps mit dynamischem Content ist das eine Speicher-Linie, die nur nach oben geht.",
+    recommendation: "Auto-Eviction-Option: nach <code>parse()</code> jene Resources, die nicht im neuen Daten-Set vorkommen UND <code>refCount === 0</code> haben, sofort entsorgen. Default kann bleiben wie er ist (Backwards-Compat), via <code>parse(data, {evictMissing: true})</code> opt-in.",
+    effort: "S"
+  },
+  {
+    id: "ASYNC-001", category: "Async &amp; Concurrency", severity: "low",
+    title: "TextureStore.load() nicht awaitable",
+    location: "packages/twopoint5d/src/texture/TextureStore.ts:178-201",
+    description: "<code>load(url)</code> startet einen <code>void (async () =&gt; ...)()</code>-Fire-and-Forget. Caller muss separat <code>whenReady()</code> nutzen, um den Erfolg/Misserfolg zu beobachten. Die statische <code>TextureStore.load()</code> hingegen tut beides — inkonsistente API innerhalb derselben Klasse.",
+    recommendation: "Entweder die Instance-Methode auch eine Promise zurückgeben lassen (die ist intern bereits da) oder die asynchrone Semantik klar dokumentieren („feuert Events, nutzt <code>whenReady()</code> zum Awaiten“).",
+    effort: "S"
+  },
+  {
+    id: "TYPE-002", category: "Typsicherheit", severity: "low",
+    title: "Dependencies-Klasse verwendet any breit",
+    location: "packages/twopoint5d/src/utils/Dependencies.ts",
+    description: "<code>EqualityCallback&lt;T = any&gt;</code>, <code>Map&lt;DependencyKey, any&gt;</code>, <code>value(key): any</code>. Funktional einwandfrei und in der performance-kritischen CameraBasedVisibility-Schleife eingesetzt, aber Konsumenten verlieren beim Lesen jeden Typhinweis darauf, was eigentlich abgelegt ist.",
+    recommendation: "Generic auf einem Key-Value-Record-Typ einführen: <code>class Dependencies&lt;Shape extends Record&lt;string, unknown&gt;&gt;</code>. <code>value&lt;K extends keyof Shape&gt;(key: K): Shape[K]</code>. Migrationsaufwand klein, weil die wenigen Konsumenten den Shape ohnehin lokal kennen.",
+    effort: "M"
+  },
+  {
+    id: "SEC-001", category: "Sicherheit", severity: "low",
+    title: "Keine Doku zur Trust-Boundary von Texture-URLs",
+    location: "TextureStore.load(url), TextureResource fetch(atlasUrl)",
+    description: "Beide Eintrittspunkte akzeptieren beliebige URLs, parsen Atlas-Metadaten via <code>response.json()</code> und vertrauen den Inhalten (Tile-Definitions, Frame-Animationen). Für eine Library ist das die richtige Default-Haltung — aber es gibt keinen Hinweis darauf, dass die Lib davon ausgeht, dass die Aufrufer den URL-Origin kontrollieren.",
+    recommendation: "In README/TSDoc kurz vermerken: TextureStore lädt URLs ohne Origin-Validierung. Aufrufer sind für vertrauenswürdige Quellen verantwortlich.",
+    effort: "S"
+  },
+
+  // -- INFO --
+  {
+    id: "CONS-002", category: "Konsistenz", severity: "info",
+    title: "AGENTS.md erwähnt entferntes VitePress",
+    location: "AGENTS.md §5",
+    description: "Tech-Stack-Sektion listet „VitePress (Handbook)“ — der Handbook-App wurde entfernt. <code>CLAUDE.md</code> stellt das explizit klar; AGENTS.md ist nicht synchronisiert.",
+    recommendation: "AGENTS.md §5 anpassen (Astro Lookbook bleibt; VitePress streichen).",
+    effort: "S"
+  },
+  {
+    id: "DEPS-001", category: "Dependencies", severity: "info",
+    title: "use-asset evtl. ungenutzt",
+    location: "package.json:57",
+    description: "<code>use-asset@^1.0.4</code> in den root devDependencies; kein Grep-Treffer in <code>packages/**/src/</code>. Möglich dass das in Lookbook-Demos verwendet wird, aber nicht offensichtlich.",
+    recommendation: "Verifizieren (z.B. <code>pnpm why use-asset</code>); falls ungenutzt: entfernen.",
+    effort: "S"
+  },
+  {
+    id: "PERF-001", category: "Performance", severity: "info",
+    title: "Default-Resize-Polling per Frame",
+    location: "packages/twopoint5d/src/display/Display.ts:147",
+    description: "<code>resizePollIntervalMs = 0</code> bedeutet pro Frame <code>getComputedStyle()</code> + <code>getBoundingClientRect()</code> — beides forciert Layout. Bei 240Hz sind das bis zu 240 Layout-Forces pro Sekunde. Der Hash-basierte No-Op-Pfad federt das gut ab, aber der initiale Style-Read ist nicht vermeidbar.",
+    recommendation: "Default in zukünftiger Major-Version auf <code>1000 / 60</code> setzen (≈16.7ms — capping bei 60Hz) und in den TSDoc-Kommentaren erwähnen, dass Apps das selbst tunen können. Bewusst kein Breaking Change in 0.x ohne Vorankündigung.",
+    effort: "S"
+  }
+];
+
+// Render category overview
+const catCounts = {};
+for (const f of FINDINGS) {
+  catCounts[f.category] = (catCounts[f.category] || 0) + 1;
+}
+const maxCat = Math.max(...Object.values(catCounts));
+const catListEl = document.getElementById('catList');
+const sortedCats = Object.entries(catCounts).sort((a,b) => b[1]-a[1]);
+for (const [cat, count] of sortedCats) {
+  const li = document.createElement('li');
+  const pct = (count / maxCat * 100).toFixed(0);
+  li.innerHTML = `
+    <span class="cat-name">${cat}</span>
+    <span class="cat-bar"><span class="cat-bar-fill" style="width:${pct}%"></span></span>
+    <span class="cat-count">${count}</span>
+  `;
+  catListEl.appendChild(li);
+}
+
+// Build category filters
+const catFiltersEl = document.getElementById('catFilters');
+for (const [cat] of sortedCats) {
+  const btn = document.createElement('button');
+  btn.className = 'fbtn';
+  btn.dataset.fcat = cat;
+  btn.textContent = cat;
+  catFiltersEl.appendChild(btn);
+}
+
+// Severity sort weight
+const sevOrder = {critical: 0, high: 1, medium: 2, low: 3, info: 4};
+FINDINGS.sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity] || a.id.localeCompare(b.id));
+
+// Render backlog
+const backlogEl = document.getElementById('backlog');
+for (const f of FINDINGS) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.dataset.sev = f.severity;
+  row.dataset.cat = f.category;
+  row.innerHTML = `
+    <div class="row-head">
+      <span class="row-id">${f.id}</span>
+      <span><span class="sev-tag ${f.severity}">${f.severity}</span></span>
+      <div>
+        <div class="row-title">${f.title}</div>
+        <div class="row-cat">${f.category}</div>
+      </div>
+      <span class="row-effort">Aufwand · ${f.effort}</span>
+    </div>
+    <div class="row-body">
+      <h4>Ort</h4>
+      <span class="row-loc">${f.location}</span>
+      <h4>Problem</h4>
+      <p>${f.description}</p>
+      <h4>Empfehlung</h4>
+      <p>${f.recommendation}</p>
+    </div>
+  `;
+  row.querySelector('.row-head').addEventListener('click', () => row.classList.toggle('open'));
+  backlogEl.appendChild(row);
+}
+
+// Filter logic
+let activeSev = 'all';
+let activeCat = 'all';
+function applyFilter() {
+  for (const row of backlogEl.children) {
+    const sevOk = (activeSev === 'all' || row.dataset.sev === activeSev);
+    const catOk = (activeCat === 'all' || row.dataset.cat === activeCat);
+    row.style.display = (sevOk && catOk) ? '' : 'none';
+  }
+}
+document.querySelectorAll('[data-fsev]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('[data-fsev]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeSev = b.dataset.fsev;
+    applyFilter();
+  });
+});
+document.querySelectorAll('[data-fcat]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('[data-fcat]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    activeCat = b.dataset.fcat;
+    applyFilter();
+  });
+});
+</script>
+</body>
+</html>
