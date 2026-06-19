@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-06-19
+
+- upgrade `@spearwolf/signalize` dependencies to latest versions
+
 ## [0.21.1] - 2026-05-13
 
 - upgrade `@spearwolf/eventize` and `@spearwolf/signalize` dependencies to latest versions

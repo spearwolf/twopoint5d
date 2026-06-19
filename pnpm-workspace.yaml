@@ -6,7 +6,7 @@ packages:
 
 catalog:
   '@spearwolf/eventize': ^5.0.0
-  '@spearwolf/signalize': ^0.29.0
+  '@spearwolf/signalize': ^0.30.0
   '@types/three': ~0.183.1
   three: ~0.183.1
 

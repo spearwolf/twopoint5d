@@ -10,8 +10,8 @@ catalogs:
       specifier: ^5.0.0
       version: 5.0.0
     '@spearwolf/signalize':
-      specifier: ^0.29.0
-      version: 0.29.0
+      specifier: ^0.30.0
+      version: 0.30.0
     '@types/three':
       specifier: ~0.183.1
       version: 0.183.1
@@ -124,7 +124,7 @@ importers:
         version: 5.0.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.29.0(@spearwolf/eventize@5.0.0)
+        version: 0.30.0(@spearwolf/eventize@5.0.0)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -176,7 +176,7 @@ importers:
         version: 5.0.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.29.0(@spearwolf/eventize@5.0.0)
+        version: 0.30.0(@spearwolf/eventize@5.0.0)
       three:
         specifier: 'catalog:'
         version: 0.183.1
@@ -191,7 +191,7 @@ importers:
         version: 5.0.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 0.29.0(@spearwolf/eventize@5.0.0)
+        version: 0.30.0(@spearwolf/eventize@5.0.0)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -1571,8 +1571,8 @@ packages:
     resolution: {integrity: sha512-tFItU8RwEozY2HJkYBY/T/TgIx+ZJbWE1NEoxk8Hlx6iwqUcQGqhOJZIEbo//GktRwdtgU2TPZyyc7JZOMC34w==}
     engines: {node: '>=18.16'}
 
-  '@spearwolf/signalize@0.29.0':
-    resolution: {integrity: sha512-/WzTvRrgrF+T1VVw7CTPMUeRBUKece55PO7faIujXIjoXakr6mNVKfug8icgVHLflr/7aicxm/+CL+2qIneNIQ==}
+  '@spearwolf/signalize@0.30.0':
+    resolution: {integrity: sha512-MgqQLmmrnUjGJewLaBwFgu6QFZLPPi6x8NqpmrqYImWSzomfrwFNcFMEdZZzjewzei/EfpzPjFKpW99Mr3svYg==}
     engines: {node: '>=24.13'}
     peerDependencies:
       '@spearwolf/eventize': ^5.0.0
@@ -6930,7 +6930,7 @@ snapshots:
 
   '@spearwolf/eventize@5.0.0': {}
 
-  '@spearwolf/signalize@0.29.0(@spearwolf/eventize@5.0.0)':
+  '@spearwolf/signalize@0.30.0(@spearwolf/eventize@5.0.0)':
     dependencies:
       '@spearwolf/eventize': 5.0.0
 
