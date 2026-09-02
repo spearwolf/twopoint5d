@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- upgrade the `@spearwolf/eventize` peer dependency to `^6.2.0` (was `^5.0.0`) and `@spearwolf/signalize` to `^1.0.0` (was `^0.30.0`) — both are major releases, and `signalize@1.0.0` requires `eventize@^6.0.0`, so the two only move together
+- `TexturedSpritesMaterial` and `TileSpritesMaterial` now pass the TSL node type to `attribute()` explicitly (`attribute<'vec3'>(…)` instead of `attribute(…)`); the stricter `createSignal()` overloads no longer accept the untyped `AttributeNode<unknown>` these calls returned. No runtime change — the shader attributes were already used at these types
+- `TexturedSpritesMaterial#dispose()` and `TileSpritesMaterial#dispose()` call `SignalGroup.delete()` instead of the deprecated `SignalGroup.destroy()`, which now prints a deprecation notice once per process
+
+### Migration Guide
+
+#### `@spearwolf/eventize` and `@spearwolf/signalize` peer dependency ranges
+
+Both peer dependencies moved to a new major. Consumers have to bump them together:
+
+**Before**
+
+```json
+{
+  "dependencies": {
+    "@spearwolf/eventize": "^5.0.0",
+    "@spearwolf/signalize": "^0.30.0"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "dependencies": {
+    "@spearwolf/eventize": "^6.2.0",
+    "@spearwolf/signalize": "^1.0.0"
+  }
+}
+```
+
+Two things are worth checking after the bump, because neither is visible to the type checker:
+
+- **Deduplicate `@spearwolf/eventize`.** Its marker is keyed by `Symbol.for('eventize')` and therefore realm-wide, so a `^5` and a `^6` resolved side by side share one slot per object. Where v5 dispatched across the boundary for a while and then failed obscurely, v6 versions the marker payload and throws a `TypeError` naming both protocols. Check with `npm ls @spearwolf/eventize` and pin `^6` via `overrides` / `resolutions` if a transitive dependent still asks for the old range. The same applies to `@spearwolf/signalize`, whose internal `Symbol.for` keys moved into a `@spearwolf/signalize/` namespace: a pre-`1.0` and a `1.0` copy share nothing at all.
+- **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')` and any name array containing `'*'` or a nullish element wipe the retained values and retain policies along with the listeners. Targeted forms — `off(ε, eventName)`, `off(ε, [names])` — are unchanged.
+
+Code that only consumes this library's public API needs no further changes. Code that calls `eventize` or `signalize` directly should read the upstream migration notes; the breaking changes that bite without a compile error are the `off()` semantics above and, on the signalize side, `batch()` / `beQuiet()` / `hibernate()` refusing an `async` callback.
+
 ## [0.21.2] - 2026-06-19
 
 - upgrade `@spearwolf/signalize` dependencies to latest versions

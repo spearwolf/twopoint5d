@@ -154,7 +154,7 @@ export class FrameLoop {
     this.#subscribers.add(target);
 
     if (this.subscriptionCount === 1) {
-      on(this.raf, OnRAF, this);
+      on(this.raf, OnRAF, this as FrameLoop);
     }
 
     on(this as FrameLoop, FrameLoop.OnFrame, target);

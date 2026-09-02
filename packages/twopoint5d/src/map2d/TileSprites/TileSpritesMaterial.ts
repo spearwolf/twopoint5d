@@ -9,7 +9,7 @@ export interface TileSpritesMaterialParameters {
 }
 
 const createShaderAttributeNodeSignal = <T = unknown>(name: string, attach: object) =>
-  createSignal<Node<T>>(attribute(name), {attach});
+  createSignal<Node<T>>(attribute<T>(name), {attach});
 
 export class TileSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
@@ -95,7 +95,7 @@ export class TileSpritesMaterial extends NodeMaterial {
   }
 
   override dispose() {
-    SignalGroup.destroy(this);
+    SignalGroup.delete(this);
     super.dispose();
   }
 }

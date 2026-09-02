@@ -23,20 +23,20 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
 
-  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(attribute(TexturedSpritesMaterial.PositionAttributeName), {
+  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName), {
     attach: this,
   });
 
-  #rotationNode = createSignal<TAttributeNodeRotation>(attribute(TexturedSpritesMaterial.RotationAttributeName), {attach: this});
+  #rotationNode = createSignal<TAttributeNodeRotation>(attribute<'float'>(TexturedSpritesMaterial.RotationAttributeName), {attach: this});
 
   #instancePositionNode = createSignal<TAttributeNodeInstancePosition>(
-    attribute(TexturedSpritesMaterial.InstancePositionAttributeName),
+    attribute<'vec3'>(TexturedSpritesMaterial.InstancePositionAttributeName),
     {
       attach: this,
     },
   );
 
-  #quadSizeNode = createSignal<TAttributeNodeQuadSize>(attribute(TexturedSpritesMaterial.QuadSizeAttributeName), {attach: this});
+  #quadSizeNode = createSignal<TAttributeNodeQuadSize>(attribute<'vec2'>(TexturedSpritesMaterial.QuadSizeAttributeName), {attach: this});
 
   #renderAsBillboards = createSignal(false, {attach: this});
 
@@ -142,7 +142,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   }
 
   override dispose() {
-    SignalGroup.destroy(this);
+    SignalGroup.delete(this);
     super.dispose();
   }
 }

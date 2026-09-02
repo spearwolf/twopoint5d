@@ -146,7 +146,7 @@ export class FixedFrameLoop {
     this.#fixedDelta = 1 / this.#fps;
     this.maxStepsPerFrame = options?.maxStepsPerFrame ?? FixedFrameLoop.DefaultMaxStepsPerFrame;
 
-    on(display, OnDisplayRenderFrame, this);
+    on(display, OnDisplayRenderFrame, this as FixedFrameLoop);
     once(display, OnDisplayDispose, () => this.dispose());
   }
 
