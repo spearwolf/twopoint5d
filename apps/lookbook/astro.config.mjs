@@ -1,6 +1,6 @@
-import {defineConfig} from 'astro/config';
 import react from '@astrojs/react';
-import tailwind from '@astrojs/tailwind';
+import tailwindcss from '@tailwindcss/vite';
+import {defineConfig} from 'astro/config';
 
 process.env.ASTRO_TELEMETRY_DISABLED = '1';
 
@@ -11,5 +11,8 @@ export default defineConfig({
     host: true,
     allowedHosts: true,
   },
-  integrations: [react(), tailwind()],
+  integrations: [react()],
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });

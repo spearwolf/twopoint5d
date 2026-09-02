@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+@theme {
+  --grid-template-columns-sidebar-content: 25rem auto;
+  --grid-template-columns-only-content: auto;
+  --grid-template-columns-demo-cards: repeat(auto-fill, minmax(30ch, 1fr));
+}
+
+/* Tailwind v4 preflight resets buttons to `cursor: default`; the lookbook's
+   buttons have always shown a pointer, so keep that. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}

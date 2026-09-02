@@ -18,8 +18,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
 
 <li class="link-card relative invisible" data-demo-id={id}>
-  <a href={href} class="group aspect-h-7 aspect-w-10 block w-full overflow-hidden">
-    <img src={previewImage} class="card-image pointer-events-none object-cover group-hover:opacity-75" />
+  <a href={href} class="group aspect-10/7 block w-full overflow-hidden">
+    <img src={previewImage} class="card-image pointer-events-none h-full w-full object-cover group-hover:opacity-75" />
   </a>
   <h2 class="absolute inline-block top-0">
     {title}
