@@ -79,7 +79,7 @@ export class VOBufferGeometry extends BufferGeometry {
 
   /** Give up every attribute slot of `route` and let go of what the geometry knew about them. */
   #releaseSlots(route: AttributeRoute): void {
-    for (const attrName of this.#slots.releaseRoute(this, route)) {
+    for (const {attrName} of this.#slots.releaseRoute(this, route)) {
       // the slot has changed hands; the version #syncAttributeArrays compares against
       // belongs to the attribute that left
       this.#serials.delete(attrName);

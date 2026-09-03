@@ -38,6 +38,11 @@ const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
+const extraInstancedDescription = {
+  meshCount: 1,
+  attributes: {extraOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
+};
+
 describe('vertex-objects — dispose', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
@@ -116,6 +121,57 @@ describe('vertex-objects — dispose', function () {
 
     expect(() => geometry.dispose()).to.not.throw();
 
+    expect(Object.keys(geometry.attributes)).to.deep.equal([]);
+    expect(geometry.index).to.be.null;
+  });
+
+  /** A geometry with a third route, and a material whose shader reads all three attributes. */
+  function makeGeometryWithExtraRoute() {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
+    const extraPool = geometry.attachInstancedPool('extra', extraInstancedDescription);
+    const material = new MeshBasicNodeMaterial();
+    material.positionNode = attribute('position', 'vec3')
+      .add(attribute('instanceOffset', 'vec3'))
+      .add(attribute('extraOffset', 'vec3'));
+    geometry.basePool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+    geometry.instancedPool.createVO().setInstanceOffset([1, 1, 1]);
+    extraPool.createVO().setExtraOffset([0, 0, 0]);
+    return {geometry, material};
+  }
+
+  it('a rendered geometry disposes after one of its routes was detached', async function () {
+    const {geometry, material} = makeGeometryWithExtraRoute();
+    await renderOnce(new VertexObjects(geometry, material));
+
+    geometry.detachInstancedPool('extra');
+    expect(geometry.getAttribute('extraOffset'), 'the detached route gives up its slot').to.be.undefined;
+
+    const geometriesBefore = display.renderer.info.memory.geometries;
+    expect(() => geometry.dispose()).to.not.throw();
+
+    // the dispose event reached the renderer's handler, so this is the real path and not a
+    // geometry it never saw
+    expect(display.renderer.info.memory.geometries).to.equal(geometriesBefore - 1);
+    expect(Object.keys(geometry.attributes)).to.deep.equal([]);
+    expect(geometry.index).to.be.null;
+  });
+
+  it('a rendered geometry disposes after a route was replaced by one with other attributes', async function () {
+    const {geometry, material} = makeGeometryWithExtraRoute();
+    await renderOnce(new VertexObjects(geometry, material));
+
+    geometry.attachInstancedPool('extra', {
+      meshCount: 1,
+      attributes: {someOtherOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
+    });
+    expect(geometry.getAttribute('extraOffset'), 'the replaced route gives up its slot').to.be.undefined;
+
+    const geometriesBefore = display.renderer.info.memory.geometries;
+    expect(() => geometry.dispose()).to.not.throw();
+
+    // the dispose event reached the renderer's handler, so this is the real path and not a
+    // geometry it never saw
+    expect(display.renderer.info.memory.geometries).to.equal(geometriesBefore - 1);
     expect(Object.keys(geometry.attributes)).to.deep.equal([]);
     expect(geometry.index).to.be.null;
   });

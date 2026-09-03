@@ -1,6 +1,6 @@
 import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {BufferGeometry, InstancedBufferGeometry} from 'three/webgpu';
-import type {AttributeRoute} from './GeometryAttributeSlots.js';
+import type {AttributeRoute, ReleasedSlot} from './GeometryAttributeSlots.js';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
@@ -37,6 +37,18 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly extraInstancedBufferSerials: Map<string, Map<string, number>> = new Map();
 
   readonly #extraInstancedPoolAutoDispose: Map<string, boolean> = new Map();
+
+  /**
+   * The attributes that a detached route left behind in slots nothing else fills. The renderer
+   * keeps naming them for as long as it holds a pipeline built for this geometry, so `dispose()`
+   * lends them back to their slots for the length of the dispose event.
+   *
+   * Only slots that stay empty are collected — one that falls back to the claim underneath is
+   * filled and belongs to the route it fell back to. An entry lives until `dispose()` unless the
+   * same attribute name is filled again, so a geometry that gives up many routes with different
+   * attribute names holds one attribute, and its typed array, per name until then.
+   */
+  readonly #vacatedSlots: Map<string, BufferAttribute | InterleavedBufferAttribute> = new Map();
 
   readonly #attachments = new GeometryPoolAttachments();
   readonly #slots = new GeometryAttributeSlots();
@@ -162,6 +174,14 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
 
+    // a name that is filled again needs no stand-in, and the entry would keep the typed arrays
+    // of a pool this geometry has let go of alive until dispose()
+    for (const attrName of this.#vacatedSlots.keys()) {
+      if (this.getAttribute(attrName) !== undefined) {
+        this.#vacatedSlots.delete(attrName);
+      }
+    }
+
     // the buffer selection is already gone with the detach above; what is still owed is the
     // first auto-touch, which uploads every attribute of the new route once
     this.#firstAutoTouch = true;
@@ -185,6 +205,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * still returned, so a caller who wants to look at it can, but it is dead. A pool that is
    * shared with another geometry is the caller's to keep alive: attach it with
    * `autoDispose: false`.
+   *
+   * The attributes this route put on the geometry are gone afterwards. A material whose shader
+   * still reads one of them cannot render this geometry any more — give the geometry a material
+   * that matches the routes it has left, or take it out of the scene. Disposing the geometry goes
+   * through either way.
    *
    * @returns the pool that was attached under `name`, or `undefined` if the name was free.
    */
@@ -211,7 +236,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#extraInstancedPoolAutoDispose.delete(name);
 
     if (buffers != null) {
-      this.#releaseSlots(buffers);
+      for (const {attrName, vacated} of this.#releaseSlots(buffers)) {
+        if (vacated != null) {
+          this.#vacatedSlots.set(attrName, vacated);
+        }
+      }
     }
 
     this.#attachments.detach(pool);
@@ -241,12 +270,14 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   }
 
   /** Give up every attribute slot of `route` and let go of what the geometry knew about them. */
-  #releaseSlots(route: AttributeRoute): void {
-    for (const attrName of this.#slots.releaseRoute(this, route)) {
+  #releaseSlots(route: AttributeRoute): ReleasedSlot[] {
+    const released = this.#slots.releaseRoute(this, route);
+    for (const {attrName} of released) {
       // the slot has changed hands; the version #syncAttributeArrays compares against
       // belongs to the attribute that left
       this.#serials.delete(attrName);
     }
+    return released;
   }
 
   /**
@@ -255,6 +286,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * The attributes built on the pool buffers leave the geometry and the index is dropped, so
    * nothing keeps the typed arrays alive through this geometry any more. Attributes copied from
    * a `BufferGeometry` handed to the constructor stay where they are — they belong to the caller.
+   * A slot that an earlier `detachInstancedPool()` left empty is empty again when this returns.
    *
    * A `basePool` or `instancedPool` this geometry created itself is disposed with it; a pool
    * that was handed in is left exactly as it is. For extra pools the `autoDispose` option of
@@ -267,8 +299,25 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   override dispose(): void {
     // the renderer reads the attributes of this geometry once more while it handles the
     // dispose event, and reaches for the id of a slot before it checks that the slot is
-    // filled — so the event goes out while every slot is still there
-    super.dispose();
+    // filled — so the event goes out while every slot is there. A slot that a detached route
+    // vacated is empty, and the attribute that left it goes back in for that one moment: the
+    // renderer then finds what it names, frees its gpu buffer and finishes its bookkeeping.
+    const lent: string[] = [];
+    for (const [attrName, attr] of this.#vacatedSlots) {
+      if (this.getAttribute(attrName) === undefined) {
+        this.setAttribute(attrName, attr);
+        lent.push(attrName);
+      }
+    }
+
+    try {
+      super.dispose();
+    } finally {
+      for (const attrName of lent) {
+        this.deleteAttribute(attrName);
+      }
+      this.#vacatedSlots.clear();
+    }
 
     // the geometry is gone either way, so every pool it held gives up its attachment
     this.#attachments.detachAll();

@@ -9,6 +9,16 @@ import type {BufferLike} from './types.js';
  */
 export type AttributeRoute = Map<string, BufferLike>;
 
+/** What a released route left behind in one attribute slot. */
+export type ReleasedSlot = {
+  attrName: string;
+  /**
+   * The attribute that left the slot, and only set when no claim was left underneath: the
+   * slot is empty now. A slot that fell back to another route is filled and names nothing.
+   */
+  vacated?: BufferAttribute | InterleavedBufferAttribute;
+};
+
 type SlotClaim = {
   route: AttributeRoute | undefined;
   pool: VOBufferPool | undefined;
@@ -60,27 +70,28 @@ export class GeometryAttributeSlots {
    * back onto the geometry, a slot without a remaining claim is deleted. A claim that was not
    * the topmost one changes nothing on the geometry — a later route owns that slot.
    *
-   * @returns the names whose occupancy changed
+   * @returns the names whose occupancy changed; a name whose slot is empty now also carries
+   *   the attribute that left it
    */
-  releaseRoute(geometry: BufferGeometry, route: AttributeRoute): string[] {
-    const changed: string[] = [];
+  releaseRoute(geometry: BufferGeometry, route: AttributeRoute): ReleasedSlot[] {
+    const changed: ReleasedSlot[] = [];
 
     for (const [attrName, claims] of this.#slots) {
       const held = claims.findIndex((claim) => claim.route === route);
       if (held < 0) continue;
 
       const wasOnTop = held === claims.length - 1;
-      claims.splice(held, 1);
+      const [released] = claims.splice(held, 1);
       if (!wasOnTop) continue;
-
-      changed.push(attrName);
 
       if (claims.length === 0) {
         geometry.deleteAttribute(attrName);
         // deleting the entry the Map iteration is currently on is allowed
         this.#slots.delete(attrName);
+        changed.push({attrName, vacated: released.attr});
       } else {
         geometry.setAttribute(attrName, claims[claims.length - 1].attr);
+        changed.push({attrName});
       }
     }
 
