@@ -1,9 +1,12 @@
-import {beforeEach, describe, expect, test, vi} from 'vitest';
+import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
+import {beforeEach, describe, expect, test} from 'vitest';
+import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex} from './constants.js';
-import type {VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
+import type {VO, VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
 
 interface MyVertexObject {
   setFoo: VOAttrSetter;
@@ -295,6 +298,29 @@ describe('VertexObjectPool', () => {
       expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
       expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
     });
+
+    test('the swap path leaves no stale vertex object behind in the vacated slot', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+
+      const vo0 = pool.createVO();
+      pool.createVO();
+      const vo2 = pool.createVO();
+
+      pool.freeVO(vo0);
+
+      expect(VOUtils.getIndex(vo2)).toBe(0);
+      expect(pool.getVO(2)).toBeUndefined();
+    });
+
+    test('the swap path survives a slot that createFromAttributes() never materialized', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      // each vertex object consumes `vertexCount` values per attribute, so this fills three of them
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]});
+
+      expect(() => pool.freeVO(pool.getVO(0))).not.toThrow();
+      expect(pool.usedCount).toBe(2);
+    });
   });
 
   describe('resize()', () => {
@@ -444,6 +470,228 @@ describe('VertexObjectPool', () => {
 
       expect(() => pool.resize(10.5)).toThrow('Capacity must be a non-negative integer');
     });
+
+    test('shrinking unlinks every vertex object beyond the new capacity', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 6);
+
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
+      const vo2 = pool.createVO();
+      pool.createVO();
+      const vo4 = pool.createVO();
+      const vo5 = pool.createVO();
+
+      pool.resize(3);
+
+      expect(vo4[voBuffer]).toBeUndefined();
+      expect(vo5[voBuffer]).toBeUndefined();
+
+      expect(vo0[voBuffer]).toBe(pool.buffer);
+      expect(vo1[voBuffer]).toBe(pool.buffer);
+      expect(vo2[voBuffer]).toBe(pool.buffer);
+    });
+
+    test('is rejected while a geometry is attached and allowed again after the geometry is disposed', () => {
+      const pool = new VertexObjectPool<MyVertexObject & VO>(descriptor, 10);
+      const geometry = new VertexObjectGeometry(pool, 10);
+
+      expect(() => pool.resize(20)).toThrow();
+
+      geometry.dispose();
+
+      expect(() => pool.resize(20)).not.toThrow();
+    });
+  });
+
+  describe('usedCount', () => {
+    test('is clamped to zero', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      pool.usedCount = -5;
+
+      expect(pool.usedCount).toBe(0);
+      expect(pool.availableCount).toBe(pool.capacity);
+    });
+  });
+
+  describe('geometry attachments', () => {
+    const makePool = () => new VertexObjectPool<VO>(descriptor, 10);
+
+    // reads the geometry side of the attachment: which attributes still point into the
+    // typed arrays of this pool, regardless of how the geometry books its attachments
+    const attributesBackedBy = (geometry: BufferGeometry, pool: VOBufferPool): string[] => {
+      const typedArrays = new Set(Array.from(pool.buffer.buffers.values()).map((buffer) => buffer.typedArray));
+      return Object.entries(geometry.attributes)
+        .filter(([, attr]) => {
+          const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+            ? (attr as InterleavedBufferAttribute).data
+            : (attr as BufferAttribute);
+          return typedArrays.has(bufAttr.array as any);
+        })
+        .map(([attrName]) => attrName)
+        .sort();
+    };
+
+    test('an instanced geometry holds both its base and its instanced pool', () => {
+      const basePool = makePool();
+      const instancedPool = makePool();
+
+      const geometry = new InstancedVOBufferGeometry(instancedPool, 10, basePool, 10);
+
+      expect(basePool.isAttachedToGeometry).toBe(true);
+      expect(instancedPool.isAttachedToGeometry).toBe(true);
+
+      geometry.dispose();
+
+      expect(basePool.isAttachedToGeometry).toBe(false);
+      expect(instancedPool.isAttachedToGeometry).toBe(false);
+    });
+
+    test('a repeated dispose() does not release a pool a second time', () => {
+      const pool = makePool();
+
+      const first = new VertexObjectGeometry(pool, 10);
+      const second = new VertexObjectGeometry(pool, 10);
+
+      first.dispose();
+      first.dispose();
+
+      // the second geometry still has its attributes on this pool
+      expect(pool.isAttachedToGeometry).toBe(true);
+      expect(() => pool.resize(20)).toThrow();
+
+      second.dispose();
+
+      expect(pool.isAttachedToGeometry).toBe(false);
+      expect(() => pool.resize(20)).not.toThrow();
+    });
+
+    test('attachInstancedPool() holds the pool until detachInstancedPool() gives it back', () => {
+      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
+      const extraPool = makePool();
+
+      geometry.attachInstancedPool('extra', extraPool);
+
+      expect(extraPool.isAttachedToGeometry).toBe(true);
+      expect(() => extraPool.resize(20)).toThrow();
+
+      expect(attributesBackedBy(geometry, extraPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
+
+      geometry.detachInstancedPool('extra');
+
+      // giving the attachment back means giving up the attributes too: a resize() swaps the
+      // pool's typed arrays, and an attribute left behind would keep reading the old ones
+      expect(attributesBackedBy(geometry, extraPool)).toEqual([]);
+      expect(extraPool.isAttachedToGeometry).toBe(false);
+      expect(() => extraPool.resize(20)).not.toThrow();
+    });
+
+    test('detachInstancedPool() leaves the attributes of the other pools alone', () => {
+      const basePool = makePool();
+      const instancedPool = makePool();
+      const geometry = new InstancedVOBufferGeometry(instancedPool, 10, basePool, 10);
+
+      const extraPool = new VertexObjectPool<VO>({vertexCount: 1, attributes: {somethingElse: {size: 1, type: 'float32'}}}, 10);
+
+      geometry.attachInstancedPool('extra', extraPool);
+      geometry.detachInstancedPool('extra');
+
+      expect(attributesBackedBy(geometry, extraPool)).toEqual([]);
+      expect(attributesBackedBy(geometry, instancedPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
+    });
+
+    test('attaching under a name that is already taken releases the pool it replaces', () => {
+      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
+      const replaced = makePool();
+      const replacement = new VertexObjectPool<VO>({vertexCount: 1, attributes: {somethingElse: {size: 1, type: 'float32'}}}, 10);
+
+      geometry.attachInstancedPool('extra', replaced);
+      geometry.attachInstancedPool('extra', replacement);
+
+      expect(replaced.isAttachedToGeometry).toBe(false);
+      expect(replacement.isAttachedToGeometry).toBe(true);
+
+      // the replacement covers none of the attribute names of the pool it displaced, so
+      // nothing overwrites them and they have to go with the pool they belong to
+      expect(attributesBackedBy(geometry, replaced)).toEqual([]);
+      expect(attributesBackedBy(geometry, replacement)).toEqual(['somethingElse']);
+    });
+
+    test('one pool serving as base and instanced pool at once stays held until the geometry is gone', () => {
+      const pool = makePool();
+
+      const geometry = new InstancedVOBufferGeometry(pool, 10, pool, 10);
+
+      expect(pool.isAttachedToGeometry).toBe(true);
+
+      geometry.dispose();
+
+      expect(pool.isAttachedToGeometry).toBe(false);
+      expect(() => pool.resize(20)).not.toThrow();
+    });
+
+    test('one pool attached under two names stays held until both names are gone', () => {
+      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
+      const shared = makePool();
+
+      geometry.attachInstancedPool('one', shared);
+      geometry.attachInstancedPool('two', shared);
+
+      geometry.detachInstancedPool('one');
+
+      expect(shared.isAttachedToGeometry).toBe(true);
+      expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
+
+      geometry.detachInstancedPool('two');
+
+      expect(shared.isAttachedToGeometry).toBe(false);
+      expect(attributesBackedBy(geometry, shared)).toEqual([]);
+    });
+
+    test('one pool attached under two names keeps its attributes while either name still holds it', () => {
+      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
+      const shared = makePool();
+
+      geometry.attachInstancedPool('one', shared);
+      geometry.attachInstancedPool('two', shared);
+
+      geometry.detachInstancedPool('two');
+
+      // 'one' still reads the very same typed arrays, so the attributes have to stay —
+      // the attachment the pool reports and the attributes on the geometry say the same thing
+      expect(shared.isAttachedToGeometry).toBe(true);
+      expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
+
+      geometry.detachInstancedPool('one');
+
+      expect(shared.isAttachedToGeometry).toBe(false);
+      expect(attributesBackedBy(geometry, shared)).toEqual([]);
+    });
+
+    test('the default instanced pool keeps its attributes when it is detached as an extra pool', () => {
+      const instancedPool = makePool();
+      const geometry = new InstancedVOBufferGeometry(instancedPool, 10, makePool(), 10);
+
+      geometry.attachInstancedPool('again', instancedPool);
+      geometry.detachInstancedPool('again');
+
+      expect(instancedPool.isAttachedToGeometry).toBe(true);
+      expect(attributesBackedBy(geometry, instancedPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
+    });
+
+    test('dispose() releases an extra pool that it leaves untouched otherwise', () => {
+      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
+      const extraPool = makePool();
+
+      geometry.attachInstancedPool('extra', extraPool, {autoDispose: false});
+      extraPool.createVO();
+
+      geometry.dispose();
+
+      expect(extraPool.isAttachedToGeometry).toBe(false);
+      // autoDispose: false means the caller keeps the buffers, so the pool is still populated
+      expect(extraPool.usedCount).toBe(1);
+    });
   });
 
   describe('dispose()', () => {
@@ -510,38 +758,6 @@ describe('VertexObjectPool', () => {
       expect(vo2[voBuffer]).toBeUndefined();
     });
 
-    test('VertexObjectPool: invokes onDestroyVO for every still-alive VO', () => {
-      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
-
-      const onDestroyVO = vi.fn();
-      pool.onDestroyVO = onDestroyVO;
-
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
-      const vo2 = pool.createVO();
-
-      // free the middle one first → must not be reported as destroyed by dispose()
-      pool.freeVO(vo1);
-
-      pool.dispose();
-
-      const destroyed = onDestroyVO.mock.calls.map(([vo]) => vo);
-      expect(destroyed).toContain(vo0);
-      expect(destroyed).toContain(vo2);
-      expect(destroyed).not.toContain(vo1);
-    });
-
-    test('VertexObjectPool: does not invoke onDestroyVO when no VOs are alive', () => {
-      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
-
-      const onDestroyVO = vi.fn();
-      pool.onDestroyVO = onDestroyVO;
-
-      pool.dispose();
-
-      expect(onDestroyVO).not.toHaveBeenCalled();
-    });
-
     test('VertexObjectPool: getVO() / createVO() are no-ops after dispose()', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
 
@@ -560,17 +776,20 @@ describe('VertexObjectPool', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
-    test('VertexObjectPool: dispose() is idempotent and a second call does not re-fire onDestroyVO', () => {
+    test('VertexObjectPool: dispose() is idempotent', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
-      const onDestroyVO = vi.fn();
-      pool.onDestroyVO = onDestroyVO;
 
-      pool.createVO();
+      const vo0 = pool.createVO();
+      const vo1 = pool.createVO();
 
-      pool.dispose();
-      pool.dispose();
+      expect(() => {
+        pool.dispose();
+        pool.dispose();
+      }).not.toThrow();
 
-      expect(onDestroyVO).toHaveBeenCalledTimes(1);
+      expect(pool.isDisposed).toBe(true);
+      expect(vo0[voBuffer]).toBeUndefined();
+      expect(vo1[voBuffer]).toBeUndefined();
     });
 
     test('VertexObjectPool: dispose() while VOs were freed-via-swap still tears the swapped slot down cleanly', () => {

@@ -6,11 +6,13 @@ import {
   BufferGeometry,
   InstancedBufferGeometry
 } from 'three/webgpu';
+import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
+import {removeAttributes} from './removeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
@@ -39,6 +41,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   readonly #extraInstancedPoolAutoDispose: Map<string, boolean> = new Map();
 
+  readonly #attachments = new GeometryPoolAttachments();
+
   constructor(
     ...args:
       | [VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
@@ -64,9 +68,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       const baseCapacity = args[3] ?? 1;
       this.basePool = baseSource instanceof VOBufferPool ? baseSource : new VOBufferPool(baseSource, baseCapacity);
       this.baseBuffers = new Map();
+      this.#attachments.attach(this.basePool);
       initializeAttributes(this, this.basePool, this.baseBuffers, this.baseBufferSerials);
     }
 
+    this.#attachments.attach(this.instancedPool);
     initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
   }
 
@@ -104,7 +110,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       pool = new VertexObjectPool(descriptor, 1);
     }
 
+    // taking over a name that is already in use releases whatever was attached under it
+    this.detachInstancedPool(name);
+
     this.extraInstancedPools.set(name, pool);
+    this.#attachments.attach(pool);
 
     const buffers = new Map<string, BufferLike>();
     this.extraInstancedBuffers.set(name, buffers);
@@ -123,14 +133,45 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     return pool;
   }
 
+  /**
+   * Release the pool attached under `name` and take the attributes that were built on its
+   * buffers off this geometry.
+   *
+   * Both halves belong together: as long as an attribute reads from the pool's typed arrays,
+   * the pool has to keep reporting itself as attached, or a `resize()` would swap those arrays
+   * out from under the geometry. Attributes that another pool has claimed under the same name
+   * in the meantime stay where they are, and so do the attributes of a pool that this geometry
+   * reads through a second route — as the base pool, as the default instanced pool, or under
+   * another name.
+   *
+   * @returns the pool that was attached under `name`, or `undefined` if the name was free.
+   */
   detachInstancedPool(name: string): VOBufferPool | undefined {
     const pool = this.extraInstancedPools.get(name);
+    const buffers = this.extraInstancedBuffers.get(name);
+
+    // drop the route first, so that what is left is exactly what the geometry still reads through
     this.extraInstancedPools.delete(name);
     this.extraInstancedBuffers.delete(name);
     this.extraInstancedBufferSerials.delete(name);
     this.#extraInstancedPoolAutoDispose.delete(name);
+
+    if (buffers != null) {
+      removeAttributes(this, buffers, this.#liveBuffers());
+    }
+
+    this.#attachments.detach(pool);
     this.#autoTouchAttrNames = undefined;
     return pool;
+  }
+
+  /** The buffers of every route this geometry currently reads through. */
+  #liveBuffers(): Map<string, BufferLike>[] {
+    const live = [this.instancedBuffers, ...this.extraInstancedBuffers.values()];
+    if (this.baseBuffers != null) {
+      live.push(this.baseBuffers);
+    }
+    return live;
   }
 
   /**
@@ -145,6 +186,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * and `super.dispose()` (the `THREE.InstancedBufferGeometry` cleanup) is invoked.
    */
   override dispose(): void {
+    // the geometry is gone either way, so every pool it held gives up its attachment
+    this.#attachments.detachAll();
     this.basePool?.clear();
     this.instancedPool.clear();
     for (const [name, pool] of this.extraInstancedPools) {

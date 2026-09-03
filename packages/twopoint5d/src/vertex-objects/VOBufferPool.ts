@@ -10,6 +10,7 @@ export class VOBufferPool {
 
   #usedCount = 0;
   #disposed = false;
+  #geometryAttachments = 0;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
@@ -29,7 +30,7 @@ export class VOBufferPool {
   }
 
   set usedCount(value: number) {
-    this.#usedCount = value < this.capacity ? value : this.capacity;
+    this.#usedCount = Math.max(0, Math.min(value, this.capacity));
   }
 
   get availableCount(): number {
@@ -38,6 +39,28 @@ export class VOBufferPool {
 
   get isDisposed(): boolean {
     return this.#disposed;
+  }
+
+  /**
+   * True while at least one geometry has built `THREE.BufferAttribute`s on top of
+   * this pool's buffers. While this holds, {@link VertexObjectPool#resize} refuses
+   * every change of capacity; only a `resize()` to the capacity the pool already
+   * has still goes through, because it leaves the buffers alone.
+   */
+  get isAttachedToGeometry(): boolean {
+    return this.#geometryAttachments > 0;
+  }
+
+  /** @internal */
+  attachGeometry(): void {
+    this.#geometryAttachments++;
+  }
+
+  /** @internal */
+  detachGeometry(): void {
+    if (this.#geometryAttachments > 0) {
+      this.#geometryAttachments--;
+    }
   }
 
   clear(): void {

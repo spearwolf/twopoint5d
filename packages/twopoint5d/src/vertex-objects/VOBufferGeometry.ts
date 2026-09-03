@@ -1,5 +1,6 @@
 import type {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import { BufferGeometry} from 'three/webgpu';
+import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
@@ -16,14 +17,18 @@ export class VOBufferGeometry extends BufferGeometry {
   readonly buffers: Map<string, BufferLike> = new Map();
   readonly bufferSerials: Map<string, number> = new Map();
 
+  readonly #attachments = new GeometryPoolAttachments();
+
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super();
     this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
     this.name = 'VOBufferGeometry';
+    this.#attachments.attach(this.pool);
     initializeAttributes(this, this.pool, this.buffers, this.bufferSerials);
   }
 
   override dispose(): void {
+    this.#attachments.detachAll();
     this.pool.clear();
     super.dispose();
   }

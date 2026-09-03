@@ -7,11 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through
+
 ### Changed
 
 - upgrade the `@spearwolf/eventize` peer dependency to `^6.2.0` (was `^5.0.0`) and `@spearwolf/signalize` to `^1.0.0` (was `^0.30.0`) — both are major releases, and `signalize@1.0.0` requires `eventize@^6.0.0`, so the two only move together
 - `TexturedSpritesMaterial` and `TileSpritesMaterial` now pass the TSL node type to `attribute()` explicitly (`attribute<'vec3'>(…)` instead of `attribute(…)`); the stricter `createSignal()` overloads no longer accept the untyped `AttributeNode<unknown>` these calls returned. No runtime change — the shader attributes were already used at these types
 - `TexturedSpritesMaterial#dispose()` and `TileSpritesMaterial#dispose()` call `SignalGroup.delete()` instead of the deprecated `SignalGroup.destroy()`, which now prints a deprecation notice once per process
+- change the return type of `VertexObjectPool#createVO()` to `(VOType & VO) | undefined` — the method returns `undefined` once `usedCount` has reached `capacity`
+- `VertexObjectPool#resize()` throws for every change of capacity while the pool backs a geometry — resizing to the capacity the pool already has stays a no-op and is allowed. The `THREE.BufferAttribute`s and their GPU buffers take their size from the pool capacity exactly once, so a live geometry cannot follow a capacity change
+
+### Removed
+
+- remove `VertexObjectPool#onDestroyVO`: `freeVO()` and `dispose()` release a vertex object without firing a callback. `onCreateVO` is unchanged
+
+### Fixed
+
+- fix `VertexObjectPool#freeVO()`: the vacated slot is cleared on both the last-index and the swap path, so a freed index holds no vertex object — `getVO()` on it returns `undefined` and the internal index keeps nothing alive
+- fix `VertexObjectPool#freeVO()`: the swap path tolerates an index slot that `createFromAttributes()` raised `usedCount` past without materializing a vertex object
+- fix `VertexObjectPool#resize()`: shrinking unlinks every vertex object from the new capacity onwards, so a later read or write on one of them fails loudly
+- fix `InstancedVOBufferGeometry#detachInstancedPool()`: the attributes built on the buffers of the detached pool are taken off the geometry together with the pool, unless the geometry still reads the same buffers through another route — as its base pool, as its default instanced pool, or under a second name. A pool is therefore safe to `resize()` once its last route to the geometry is gone, and attaching a pool under a name that is already taken no longer leaves the attributes of its predecessor on the geometry when the two do not cover the same attribute names
+- fix the `VOBufferPool#usedCount` setter: the value is clamped to `[0, capacity]`, which keeps `availableCount` within `[0, capacity]` and every index handed out by `createVO()` inside the buffer
 
 ### Migration Guide
 
@@ -47,6 +65,56 @@ Two things are worth checking after the bump, because neither is visible to the 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')` and any name array containing `'*'` or a nullish element wipe the retained values and retain policies along with the listeners. Targeted forms — `off(ε, eventName)`, `off(ε, [names])` — are unchanged.
 
 Code that only consumes this library's public API needs no further changes. Code that calls `eventize` or `signalize` directly should read the upstream migration notes; the breaking changes that bite without a compile error are the `off()` semantics above and, on the signalize side, `batch()` / `beQuiet()` / `hibernate()` refusing an `async` callback.
+
+#### `VertexObjectPool#onDestroyVO` is gone
+
+Per-object cleanup belongs at the call site that releases the vertex object.
+
+**Before**
+
+```ts
+pool.onDestroyVO = (vo) => {
+  scene.remove(meshOf(vo));
+};
+
+pool.freeVO(vo);
+pool.dispose();
+```
+
+**After**
+
+```ts
+scene.remove(meshOf(vo));
+pool.freeVO(vo);
+
+for (const vo of myLiveVOs) {
+  scene.remove(meshOf(vo));
+}
+pool.dispose();
+```
+
+Note that `dispose()` does not walk the pool on your behalf: keep your own list of the vertex objects whose resources you have to release.
+
+#### `VertexObjectPool#createVO()` can return `undefined`
+
+Under `strictNullChecks` the honest return type turns an unguarded call into a compile error.
+
+**Before**
+
+```ts
+const vo = pool.createVO();
+vo.setFoo(1, 2);
+```
+
+**After**
+
+```ts
+const vo = pool.createVO();
+if (vo == null) return; // the pool is full
+vo.setFoo(1, 2);
+```
+
+Where the capacity is known to suffice, `pool.createVO()!` is the shorter way out.
 
 ## [0.21.2] - 2026-06-19
 

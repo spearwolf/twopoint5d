@@ -10,7 +10,6 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   #voIndex: Array<VOType & VO>;
 
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
-  onDestroyVO?: (vo: VOType & VO) => void;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     super(descriptor, capacityOrData);
@@ -19,9 +18,17 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   /**
    * Resizes the pool to a new capacity.
+   *
+   * Only allowed as long as the pool does not back a geometry: the `THREE.BufferAttribute`s
+   * and their GPU buffers take their size from the pool capacity exactly once, so a live
+   * geometry cannot follow along. While {@link VOBufferPool#isAttachedToGeometry} holds, the
+   * method throws for every capacity but the one the pool already has — resizing to the
+   * current capacity leaves the buffers alone and is therefore allowed.
+   *
    * If the new capacity is larger, the pool will be able to hold more vertex objects.
-   * If the new capacity is smaller, existing vertex objects beyond the new capacity will be lost.
-   * The usedCount will be adjusted to not exceed the new capacity.
+   * If it is smaller, every vertex object from the new capacity onwards is unlinked from its
+   * buffer — any further read or write on such a vertex object fails. The `usedCount` is
+   * capped at the new capacity.
    */
   resize(capacity: number): void {
     if (capacity < 0 || !Number.isInteger(capacity)) {
@@ -29,6 +36,12 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     }
 
     if (capacity === this.capacity) return;
+
+    if (this.isAttachedToGeometry) {
+      throw new Error(
+        'resize() is only allowed before the pool is attached to a geometry: the three.js attributes and their GPU buffers are sized once from the pool capacity and cannot be grown or shrunk afterwards',
+      );
+    }
 
     // Create a new buffer with the new capacity
     const newBuffer = new VertexObjectBuffer(this.descriptor, capacity);
@@ -59,6 +72,16 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
         newVoIndex[i] = vo;
       }
     }
+
+    // vertex objects beyond the new capacity have no slot any more; unlinking
+    // them makes a later write fail loudly instead of landing in the detached buffer
+    for (let i = copyCount; i < this.#voIndex.length; i++) {
+      const vo = this.#voIndex[i];
+      if (vo != null) {
+        VOUtils.clearBuffer(vo);
+      }
+    }
+
     this.#voIndex = newVoIndex;
 
     // Update capacity (readonly field needs to be redefined)
@@ -73,14 +96,13 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     this.usedCount = Math.min(this.usedCount, capacity);
   }
 
-  createVO(): VOType & VO {
+  createVO(): (VOType & VO) | undefined {
     if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;
       const vo = this.#createVO(idx);
       this.#voIndex[idx] = vo;
       return vo;
     }
-    // @ts-ignore
     return undefined;
   }
 
@@ -91,18 +113,13 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   /**
    * In addition to {@link VOBufferPool#dispose}, this also unlinks the buffer
    * reference from every still-tracked vertex object and drops the internal
-   * VO index. Registered `onDestroyVO` callbacks are invoked for each VO that
-   * was alive at the time of the call so consumers can release scene-graph
-   * references.
+   * VO index.
    */
   override dispose(): void {
     if (this.isDisposed) return;
     for (let i = 0; i < this.#voIndex.length; i++) {
       const vo = this.#voIndex[i];
       if (vo != null) {
-        if (this.onDestroyVO != null) {
-          this.onDestroyVO(vo);
-        }
         VOUtils.clearBuffer(vo);
       }
     }
@@ -121,12 +138,17 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     const lastUsedIdx = this.usedCount - 1;
 
     if (idx === lastUsedIdx) {
-      this.#destroyVO(idx);
+      this.#voIndex[idx] = undefined;
     } else {
       this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
       const lastUsedVO = this.#voIndex[lastUsedIdx];
-      VOUtils.setIndex(lastUsedVO, idx);
+      // createFromAttributes() raises usedCount without materializing a VO,
+      // so the slot that is swapped down can legitimately be empty
+      if (lastUsedVO != null) {
+        VOUtils.setIndex(lastUsedVO, idx);
+      }
       this.#voIndex[idx] = lastUsedVO;
+      this.#voIndex[lastUsedIdx] = undefined;
     }
 
     this.usedCount--;
@@ -141,14 +163,6 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       this.#voIndex[idx] = vo;
     }
     return vo;
-  }
-
-  #destroyVO(idx: number) {
-    const vo = this.#voIndex[idx];
-    if (vo != null && this.onDestroyVO != null) {
-      this.onDestroyVO(vo);
-    }
-    this.#voIndex[idx] = undefined;
   }
 
   #createVO(idx: number) {
