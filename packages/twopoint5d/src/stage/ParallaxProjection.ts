@@ -13,7 +13,7 @@ export type ParallaxProjectionSpecs = FitIntoRectangleSpecs & {
 
 export class ParallaxProjection implements IProjection {
   viewSpecs: Partial<ParallaxProjectionSpecs>;
-  projectionPlane: ProjectionPlane;
+  projectionPlane: ProjectionPlane | undefined;
 
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();

@@ -20,6 +20,12 @@ describe('OrthographicProjection', () => {
       expect(projection.viewSpecs).toBeDefined();
       expect(projection.projectionPlane).toBeDefined();
     });
+
+    it('starts from an empty spec when built without one', () => {
+      const projection = new OrthographicProjection();
+      expect(projection.viewSpecs).toEqual({});
+      expect(() => projection.updateViewRect(800, 600)).not.toThrow();
+    });
   });
 
   it('updateViewRect + getViewRect', () => {

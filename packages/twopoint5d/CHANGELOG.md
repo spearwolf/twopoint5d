@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and no longer allocate an array per vertex
 - `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `unknown` instead of `any`
 - a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool with the capacity of the `.instancedPool`, instead of a fixed capacity of `1`
+- `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
 
 ### Removed
 
@@ -48,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it now falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
+- fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds an empty object from construction on, the shape `ParallaxProjection` starts from as well
 
 ### Migration Guide
 
@@ -293,6 +295,34 @@ pool.createVO()?.setFoo(1); // typed as MyExtraVO
 ```
 
 Without a type argument, `pool` is typed `VertexObjectPool<unknown>`.
+
+#### Projection fields name the values their constructors write
+
+`OrthographicProjection#projectionPlane`, `ParallaxProjection#projectionPlane` and the
+`IProjection#projectionPlane` getter are typed `ProjectionPlane | undefined`, and
+`OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`: both fields
+hold exactly what a projection was built with, and a projection built without a plane or without
+specs is not exempt. Under `strictNullChecks`, code that reads either field without a guard turns
+into a compile error. A projection built with both a plane and specs — the normal case — needs no
+change.
+
+**Before**
+
+```ts
+const projection = new OrthographicProjection();
+projection.projectionPlane.getPointByDistance(100);
+
+const specs: OrthographicProjectionSpecs = projection.viewSpecs;
+```
+
+**After**
+
+```ts
+const projection = new OrthographicProjection();
+projection.projectionPlane?.getPointByDistance(100);
+
+const specs: Partial<OrthographicProjectionSpecs> = projection.viewSpecs;
+```
 
 ## [0.21.2] - 2026-06-19
 

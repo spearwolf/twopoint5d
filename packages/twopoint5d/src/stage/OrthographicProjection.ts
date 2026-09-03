@@ -2,6 +2,7 @@ import {OrthographicCamera, Vector2} from 'three/webgpu';
 
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
+import {asFitIntoRectangleSpecs} from './asFitIntoRectangleSpecs.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
@@ -11,8 +12,8 @@ export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
 };
 
 export class OrthographicProjection implements IProjection {
-  viewSpecs: OrthographicProjectionSpecs;
-  projectionPlane: ProjectionPlane;
+  viewSpecs: Partial<OrthographicProjectionSpecs>;
+  projectionPlane: ProjectionPlane | undefined;
 
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();
@@ -27,11 +28,11 @@ export class OrthographicProjection implements IProjection {
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: OrthographicProjectionSpecs) {
     this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
-    this.viewSpecs = specs;
+    this.viewSpecs = specs ?? {};
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
+    fitIntoRectangle(new Vector2(width, height), asFitIntoRectangleSpecs(this.viewSpecs), this.#viewRect);
 
     this.#halfWidth = this.#viewRect.width / 2;
     this.#halfHeight = this.#viewRect.height / 2;

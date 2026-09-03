@@ -83,8 +83,8 @@ export class TextureAtlas {
       }
       ++idx;
     }
-    // an atlas with no named frames has no name to answer: the loop above finds
-    // nothing, because rand(0) is null and #frameNames is empty
+    // reachable only for an atlas without named frames: the loop body never runs,
+    // and there is no name to hand back
     return undefined;
   }
 
