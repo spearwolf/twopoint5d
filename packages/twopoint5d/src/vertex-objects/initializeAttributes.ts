@@ -1,15 +1,16 @@
 import type { BufferGeometry} from 'three/webgpu';
 import {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
+import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {createIndicesArray} from './createIndicesArray.js';
 import {toDrawUsage} from './toDrawUsage.js';
-import type {BufferLike} from './types.js';
 
 export function initializeAttributes(
   geometry: BufferGeometry,
   pool: VOBufferPool,
-  buffers: Map<string, BufferLike>,
+  buffers: AttributeRoute,
   bufferSerials: Map<string, number>,
+  slots: GeometryAttributeSlots,
 ): void {
   const {descriptor, capacity} = pool;
   if (descriptor.hasIndices) {
@@ -29,6 +30,7 @@ export function initializeAttributes(
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
         attr.name = bufAttr.attributeName;
         geometry.setAttribute(attrDesc.name, attr);
+        slots.claim(attrDesc.name, buffers, pool, attr);
       }
     } else {
       const bufAttr = attributes[0];
@@ -39,6 +41,7 @@ export function initializeAttributes(
       buffers.set(buffer.bufferName, attr);
       bufferSerials.set(buffer.bufferName, buffer.serial);
       geometry.setAttribute(attrDesc.name, attr);
+      slots.claim(attrDesc.name, buffers, pool, attr);
     }
   }
 }

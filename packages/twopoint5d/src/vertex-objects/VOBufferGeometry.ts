@@ -1,10 +1,11 @@
 import type {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import { BufferGeometry} from 'three/webgpu';
+import type {AttributeRoute} from './GeometryAttributeSlots.js';
+import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
-import {removeAttributes} from './removeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
@@ -19,6 +20,7 @@ export class VOBufferGeometry extends BufferGeometry {
   readonly bufferSerials: Map<string, number> = new Map();
 
   readonly #attachments = new GeometryPoolAttachments();
+  readonly #slots = new GeometryAttributeSlots();
   readonly #ownedPools = new Set<VOBufferPool>();
 
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
@@ -29,7 +31,7 @@ export class VOBufferGeometry extends BufferGeometry {
       this.declareOwnedPool(this.pool);
     }
     this.#attachments.attach(this.pool);
-    initializeAttributes(this, this.pool, this.buffers, this.bufferSerials);
+    initializeAttributes(this, this.pool, this.buffers, this.bufferSerials, this.#slots);
   }
 
   /**
@@ -55,7 +57,7 @@ export class VOBufferGeometry extends BufferGeometry {
 
     // an attribute left behind would still read from the pool arrays, and a geometry put back
     // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-    removeAttributes(this, this.buffers, []);
+    this.#releaseSlots(this.buffers);
     this.setIndex(null);
 
     if (this.#ownedPools.has(this.pool)) {
@@ -70,6 +72,15 @@ export class VOBufferGeometry extends BufferGeometry {
     this.#updateAttributes.clear();
 
     super.dispose();
+  }
+
+  /** Give up every attribute slot of `route` and let go of what the geometry knew about them. */
+  #releaseSlots(route: AttributeRoute): void {
+    for (const attrName of this.#slots.releaseRoute(this, route)) {
+      // the slot has changed hands; the version #syncAttributeArrays compares against
+      // belongs to the attribute that left
+      this.#serials.delete(attrName);
+    }
   }
 
   touchAttributes(...attrNames: string[]): void {

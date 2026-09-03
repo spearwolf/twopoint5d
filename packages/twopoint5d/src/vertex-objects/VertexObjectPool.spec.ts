@@ -6,7 +6,7 @@ import {VOUtils} from './VOUtils.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex} from './constants.js';
-import type {VO, VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
+import type {BufferLike, VO, VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
 
 interface MyVertexObject {
   setFoo: VOAttrSetter;
@@ -518,7 +518,9 @@ describe('VertexObjectPool', () => {
     const makePool = () => new VertexObjectPool<VO>(descriptor, 10);
 
     // reads the geometry side of the attachment: which attributes still point into the
-    // typed arrays of this pool, regardless of how the geometry books its attachments
+    // typed arrays of this pool, regardless of how the geometry books its attachments.
+    // Two pools that share their typed arrays are indistinguishable here, and so are two
+    // routes to the same pool — for the question which route owns a slot, use bufferInSlot()
     const attributesBackedBy = (geometry: BufferGeometry, pool: VOBufferPool): string[] => {
       const typedArrays = new Set(Array.from(pool.buffer.buffers.values()).map((buffer) => buffer.typedArray));
       return Object.entries(geometry.attributes)
@@ -530,6 +532,21 @@ describe('VertexObjectPool', () => {
         })
         .map(([attrName]) => attrName)
         .sort();
+    };
+
+    /** The buffer behind the attribute that currently sits in the slot `attrName`. */
+    const bufferInSlot = (geometry: BufferGeometry, attrName: string): BufferLike | undefined => {
+      const attr = geometry.getAttribute(attrName);
+      if (attr == null) return undefined;
+      return (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+        ? (attr as InterleavedBufferAttribute).data
+        : (attr as BufferAttribute);
+    };
+
+    /** The buffer the route `name` built for the attribute `attrName`. */
+    const bufferOfRoute = (geometry: InstancedVOBufferGeometry, name: string, attrName: string): BufferLike => {
+      const {bufferName} = geometry.extraInstancedPools.get(name).buffer.bufferAttributes.get(attrName);
+      return geometry.extraInstancedBuffers.get(name).get(bufferName);
     };
 
     test('an instanced geometry holds both its base and its instanced pool', () => {
@@ -641,6 +658,8 @@ describe('VertexObjectPool', () => {
 
       expect(shared.isAttachedToGeometry).toBe(true);
       expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
+      // 'two' claimed the slots after 'one' did, so they stay with 'two'
+      expect(bufferInSlot(geometry, 'foo')).toBe(bufferOfRoute(geometry, 'two', 'foo'));
 
       geometry.detachInstancedPool('two');
 
@@ -661,6 +680,8 @@ describe('VertexObjectPool', () => {
       // the attachment the pool reports and the attributes on the geometry say the same thing
       expect(shared.isAttachedToGeometry).toBe(true);
       expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
+      // and they are the ones 'one' built: a touch has to reach the buffer that sits in the slot
+      expect(bufferInSlot(geometry, 'foo')).toBe(bufferOfRoute(geometry, 'one', 'foo'));
 
       geometry.detachInstancedPool('one');
 

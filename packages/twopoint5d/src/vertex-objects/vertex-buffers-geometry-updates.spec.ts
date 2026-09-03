@@ -5,17 +5,20 @@ import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js'
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
-import type {VO} from './types.js';
+import type {BufferLike, VO} from './types.js';
 
 describe('vertex-buffers-geometry-updates', () => {
-  /** The update ranges the gpu upload of `attrName` will use, read from the buffer behind the attribute. */
-  const updateRangesOf = (geometry: BufferGeometry, attrName: string) => {
+  /** The buffer behind the attribute that currently sits in the slot `attrName`, or `undefined` if the slot is empty. */
+  const bufferInSlot = (geometry: BufferGeometry, attrName: string): BufferLike | undefined => {
     const attr = geometry.getAttribute(attrName);
-    return ((attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+    if (attr == null) return undefined;
+    return (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
       ? (attr as InterleavedBufferAttribute).data
-      : (attr as BufferAttribute)
-    ).updateRanges;
+      : (attr as BufferAttribute);
   };
+
+  /** The update ranges the gpu upload of `attrName` will use, read from the buffer behind the attribute. */
+  const updateRangesOf = (geometry: BufferGeometry, attrName: string) => bufferInSlot(geometry, attrName)?.updateRanges;
 
   const baseDesc = new VertexObjectDescriptor({
     vertexCount: 4,
@@ -974,6 +977,115 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(Object.keys(withOwnPool.attributes)).toEqual([]);
       expect(withOwnPool.index).toBeNull();
       expect(pool.isDisposed).toBe(true);
+    });
+  });
+
+  describe('attribute slots', () => {
+    // declares the attribute name of `extraDesc` a second time, with its own typed arrays
+    const otherQuuxDesc = new VertexObjectDescriptor({
+      meshCount: 1,
+
+      attributes: {
+        quux: {
+          size: 2,
+          type: 'float32',
+        },
+      },
+    });
+
+    // declares an attribute name of `instancedDesc`
+    const fooDesc = new VertexObjectDescriptor({
+      meshCount: 1,
+
+      attributes: {
+        foo: {
+          size: 1,
+          type: 'float32',
+        },
+      },
+    });
+
+    const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) =>
+      pool.buffer.bufferAttributes.get(attrName).bufferName;
+
+    test('a route that gives up a shared pool hands the slot back to the route that keeps it', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const shared = new VertexObjectPool<VO>(extraDesc, 10);
+
+      geometry.attachInstancedPool('one', shared);
+      geometry.attachInstancedPool('two', shared);
+      geometry.detachInstancedPool('two');
+
+      // the slot belongs to the route that is still there, so touching the attribute reaches it
+      const buffer = bufferInSlot(geometry, 'quux');
+      expect(buffer).toBe(geometry.extraInstancedBuffers.get('one').get(bufferNameOf(shared, 'quux')));
+
+      const version = buffer.version;
+      geometry.touchAttributes('quux');
+
+      expect(bufferInSlot(geometry, 'quux').version).toBeGreaterThan(version);
+    });
+
+    test('a route that shares its typed arrays with another pool gives up only its own slots', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const a = new VertexObjectPool<VO>(extraDesc, 10);
+      // by default the typed arrays are shared instead of copied, so both pools read the same memory
+      const b = new VertexObjectPool<VO>(extraDesc, a.toBuffersData());
+
+      geometry.attachInstancedPool('a', a);
+      geometry.attachInstancedPool('b', b);
+      geometry.detachInstancedPool('b');
+
+      // detached, so it may resize — and that gives it typed arrays of its own
+      b.resize(20);
+      geometry.update();
+
+      const bufferName = bufferNameOf(a, 'quux');
+      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a').get(bufferName));
+      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName).typedArray);
+    });
+
+    test('two pools declaring the same attribute name keep the slot with the surviving route', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const a = new VertexObjectPool<VO>(extraDesc, 10);
+      const b = new VertexObjectPool<VO>(otherQuuxDesc, 10);
+
+      geometry.attachInstancedPool('a', a);
+      geometry.attachInstancedPool('b', b);
+      geometry.detachInstancedPool('b');
+
+      const bufferName = bufferNameOf(a, 'quux');
+      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a').get(bufferName));
+      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName).typedArray);
+    });
+
+    test('dispose() gives a slot back to the attribute of the geometry handed in', () => {
+      const base = new BufferGeometry();
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+      // the same attribute name the instanced pool declares
+      base.setAttribute('foo', new BufferAttribute(new Float32Array([1, 2, 3, 4]), 1));
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, base);
+
+      geometry.dispose();
+
+      expect(Object.keys(geometry.attributes).sort()).toEqual(['foo', 'position']);
+      expect(Array.from((geometry.getAttribute('foo') as BufferAttribute).array)).toEqual([1, 2, 3, 4]);
+    });
+
+    test('an extra pool that declares an attribute name of the instanced pool feeds the slot it took', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const extraPool = new VertexObjectPool<VO>(fooDesc, 10);
+
+      geometry.attachInstancedPool('extra', extraPool);
+      geometry.update();
+
+      const bufferName = bufferNameOf(extraPool, 'foo');
+      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(
+        extraPool.buffer.buffers.get(bufferName).typedArray,
+      );
     });
   });
 });
