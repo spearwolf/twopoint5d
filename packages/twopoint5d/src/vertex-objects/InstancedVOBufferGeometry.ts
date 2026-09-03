@@ -262,10 +262,14 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * After this call the geometry holds no route, no buffer and no pool of its own any more.
    * What stays behind belongs to the attributes that are still there: their serials from the
-   * last `update()`, plus `#firstAutoTouch`. Then `super.dispose()` (the
-   * `THREE.InstancedBufferGeometry` cleanup) is invoked.
+   * last `update()`, plus `#firstAutoTouch`.
    */
   override dispose(): void {
+    // the renderer reads the attributes of this geometry once more while it handles the
+    // dispose event, and reaches for the id of a slot before it checks that the slot is
+    // filled — so the event goes out while every slot is still there
+    super.dispose();
+
     // the geometry is gone either way, so every pool it held gives up its attachment
     this.#attachments.detachAll();
 
@@ -303,7 +307,6 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#ownedPools.clear();
     // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
     this.#autoTouchBuffers = undefined;
-    super.dispose();
   }
 
   /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. */

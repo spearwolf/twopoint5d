@@ -54,6 +54,11 @@ export class VOBufferGeometry extends BufferGeometry {
    * caller and is left exactly as it is.
    */
   override dispose(): void {
+    // the renderer reads the attributes of this geometry once more while it handles the
+    // dispose event, and reaches for the id of a slot before it checks that the slot is
+    // filled — so the event goes out while every slot is still there
+    super.dispose();
+
     this.#attachments.detachAll();
 
     // an attribute left behind would still read from the pool arrays, and a geometry put back
@@ -70,8 +75,6 @@ export class VOBufferGeometry extends BufferGeometry {
     this.#ownedPools.clear();
     // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
     this.#autoTouchBuffers = undefined;
-
-    super.dispose();
   }
 
   /** Give up every attribute slot of `route` and let go of what the geometry knew about them. */
