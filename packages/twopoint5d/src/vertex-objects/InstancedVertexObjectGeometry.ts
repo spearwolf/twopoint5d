@@ -30,5 +30,13 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
     );
 
     this.name = 'InstancedVertexObjectGeometry';
+
+    // the pools built above belong to this geometry; super() only ever sees pools and cannot tell
+    if (!(args[0] instanceof VertexObjectPool)) {
+      this.declareOwnedPool(this.instancedPool);
+    }
+    if (!(args[2] instanceof BufferGeometry) && !(args[2] instanceof VertexObjectPool)) {
+      this.declareOwnedPool(this.basePool);
+    }
   }
 }

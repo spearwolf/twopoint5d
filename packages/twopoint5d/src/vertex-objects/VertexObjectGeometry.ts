@@ -9,5 +9,10 @@ export class VertexObjectGeometry<VOType extends VO> extends VOBufferGeometry {
   constructor(source: VertexObjectPool<VOType> | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super(source instanceof VertexObjectPool ? source : new VertexObjectPool(source, capacity), capacity);
     this.name = 'VertexObjectGeometry';
+
+    // the pool built above belongs to this geometry; super() only ever sees a pool and cannot tell
+    if (!(source instanceof VertexObjectPool)) {
+      this.declareOwnedPool(this.pool);
+    }
   }
 }

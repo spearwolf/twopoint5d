@@ -20,6 +20,11 @@ export class GeometryPoolAttachments {
     this.#holds.set(pool, holds + 1);
   }
 
+  /** Whether this geometry still reaches `pool` through at least one route. */
+  holds(pool: VOBufferPool | undefined): boolean {
+    return pool != null && this.#holds.has(pool);
+  }
+
   detach(pool: VOBufferPool | undefined): void {
     if (pool == null) return;
 

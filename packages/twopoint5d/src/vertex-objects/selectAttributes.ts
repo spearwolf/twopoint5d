@@ -9,5 +9,13 @@ export function selectAttributes(pool: VOBufferPool, buffers: Map<string, Buffer
       attrs.add(bufAttr.bufferName);
     }
   }
-  return Array.from(attrs.values()).map((bufferName) => buffers.get(bufferName));
+  const selected: BufferLike[] = [];
+  for (const bufferName of attrs) {
+    const buffer = buffers.get(bufferName);
+    // a geometry that has given up its route to this pool carries no buffer for the name any more
+    if (buffer != null) {
+      selected.push(buffer);
+    }
+  }
+  return selected;
 }

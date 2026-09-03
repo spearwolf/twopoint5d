@@ -107,49 +107,49 @@ describe('InstancedVertexObjectGeometry', () => {
   });
 
   describe('dispose()', () => {
-    test('clears basePool and instancedPool', () => {
+    test('disposes basePool and instancedPool it built itself', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
 
-      const baseClear = sandbox.spy(geometry.basePool, 'clear');
-      const instancedClear = sandbox.spy(geometry.instancedPool, 'clear');
+      const baseDispose = sandbox.spy(geometry.basePool, 'dispose');
+      const instancedDispose = sandbox.spy(geometry.instancedPool, 'dispose');
 
       geometry.dispose();
 
-      expect(baseClear.calledOnce).toBe(true);
-      expect(instancedClear.calledOnce).toBe(true);
+      expect(baseDispose.calledOnce).toBe(true);
+      expect(instancedDispose.calledOnce).toBe(true);
     });
 
-    test('clears extra instanced pools by default (autoDispose defaults to true)', () => {
+    test('disposes extra instanced pools it built itself', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
 
-      const extraClear = sandbox.spy(extraPool, 'clear');
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
 
       geometry.dispose();
 
-      expect(extraClear.calledOnce).toBe(true);
+      expect(extraDispose.calledOnce).toBe(true);
     });
 
-    test('clears extra instanced pools when autoDispose is explicitly true', () => {
+    test('disposes extra instanced pools when autoDispose is explicitly true', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor, {autoDispose: true});
 
-      const extraClear = sandbox.spy(extraPool, 'clear');
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
 
       geometry.dispose();
 
-      expect(extraClear.calledOnce).toBe(true);
+      expect(extraDispose.calledOnce).toBe(true);
     });
 
-    test('does NOT clear extra instanced pools when autoDispose is false', () => {
+    test('does NOT dispose extra instanced pools when autoDispose is false', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor, {autoDispose: false});
 
-      const extraClear = sandbox.spy(extraPool, 'clear');
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
 
       geometry.dispose();
 
-      expect(extraClear.called).toBe(false);
+      expect(extraDispose.called).toBe(false);
     });
 
     test('respects per-pool autoDispose flags independently', () => {
@@ -158,13 +158,13 @@ describe('InstancedVertexObjectGeometry', () => {
       const ownedPool = geometry.attachInstancedPool('owned', extraInstancedDescriptor);
       const sharedPool = geometry.attachInstancedPool('shared', extraInstancedDescriptor, {autoDispose: false});
 
-      const ownedClear = sandbox.spy(ownedPool, 'clear');
-      const sharedClear = sandbox.spy(sharedPool, 'clear');
+      const ownedDispose = sandbox.spy(ownedPool, 'dispose');
+      const sharedDispose = sandbox.spy(sharedPool, 'dispose');
 
       geometry.dispose();
 
-      expect(ownedClear.calledOnce).toBe(true);
-      expect(sharedClear.called).toBe(false);
+      expect(ownedDispose.calledOnce).toBe(true);
+      expect(sharedDispose.called).toBe(false);
     });
 
     test('empties all extra-instanced bookkeeping maps', () => {
@@ -187,12 +187,16 @@ describe('InstancedVertexObjectGeometry', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
 
-      const extraClear = sandbox.spy(extraPool, 'clear');
-
       geometry.detachInstancedPool('extraPool');
+
+      // the detach released it already — the geometry built this pool
+      expect(extraPool.isDisposed).toBe(true);
+
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
+
       geometry.dispose();
 
-      expect(extraClear.called).toBe(false);
+      expect(extraDispose.called).toBe(false);
     });
   });
 

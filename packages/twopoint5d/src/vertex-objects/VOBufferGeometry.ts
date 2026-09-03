@@ -4,6 +4,7 @@ import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
+import {removeAttributes} from './removeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
@@ -18,18 +19,56 @@ export class VOBufferGeometry extends BufferGeometry {
   readonly bufferSerials: Map<string, number> = new Map();
 
   readonly #attachments = new GeometryPoolAttachments();
+  readonly #ownedPools = new Set<VOBufferPool>();
 
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     super();
     this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
     this.name = 'VOBufferGeometry';
+    if (!(source instanceof VOBufferPool)) {
+      this.declareOwnedPool(this.pool);
+    }
     this.#attachments.attach(this.pool);
     initializeAttributes(this, this.pool, this.buffers, this.bufferSerials);
   }
 
+  /**
+   * Mark a pool as created for this geometry, which is what makes the geometry
+   * release it on dispose. Pools that were handed in stay untouched.
+   *
+   * @internal
+   */
+  declareOwnedPool(pool: VOBufferPool): void {
+    this.#ownedPools.add(pool);
+  }
+
+  /**
+   * Releases the resources this geometry owns.
+   *
+   * The attributes built on the pool buffers leave the geometry and the index is dropped,
+   * so nothing keeps the typed arrays alive through this geometry any more. A pool this
+   * geometry created itself is disposed with it; a pool that was handed in belongs to the
+   * caller and is left exactly as it is.
+   */
   override dispose(): void {
     this.#attachments.detachAll();
-    this.pool.clear();
+
+    // an attribute left behind would still read from the pool arrays, and a geometry put back
+    // into a scene after dispose() would have the renderer build fresh gpu buffers from them
+    removeAttributes(this, this.buffers, []);
+    this.setIndex(null);
+
+    if (this.#ownedPools.has(this.pool)) {
+      this.pool.dispose();
+    }
+
+    this.buffers.clear();
+    this.bufferSerials.clear();
+    this.#ownedPools.clear();
+    // the scratch map of the last update() still holds every attribute it synced, and with it
+    // the very typed arrays this method is here to let go of
+    this.#updateAttributes.clear();
+
     super.dispose();
   }
 
@@ -119,11 +158,15 @@ export class VOBufferGeometry extends BufferGeometry {
 
   #checkBufferSerials(): void {
     for (const [bufferName, buffer] of this.buffers) {
+      const poolBuffer = this.pool.buffer.buffers.get(bufferName);
+      // a pool that has been disposed elsewhere carries no buffer to compare against; the rest
+      // of the update path already treats that as a regular state and leaves the attribute alone
+      if (poolBuffer == null) continue;
+
       const serial = this.bufferSerials.get(bufferName);
-      const bufSerial = this.pool.buffer.buffers.get(bufferName)!.serial;
-      if (serial !== bufSerial) {
+      if (serial !== poolBuffer.serial) {
         buffer.needsUpdate = true;
-        this.bufferSerials.set(bufferName, bufSerial);
+        this.bufferSerials.set(bufferName, poolBuffer.serial);
       }
     }
   }

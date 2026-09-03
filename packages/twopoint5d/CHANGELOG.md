@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSpritesMaterial#dispose()` and `TileSpritesMaterial#dispose()` call `SignalGroup.delete()` instead of the deprecated `SignalGroup.destroy()`, which now prints a deprecation notice once per process
 - change the return type of `VertexObjectPool#createVO()` to `(VOType & VO) | undefined` — the method returns `undefined` once `usedCount` has reached `capacity`
 - `VertexObjectPool#resize()` throws for every change of capacity while the pool backs a geometry — resizing to the capacity the pool already has stays a no-op and is allowed. The `THREE.BufferAttribute`s and their GPU buffers take their size from the pool capacity exactly once, so a live geometry cannot follow a capacity change
+- `VOBufferGeometry#dispose()` and `InstancedVOBufferGeometry#dispose()` release exactly the pools the geometry created itself, and leave every pool that was handed to the constructor untouched. Both also take the attributes built on the pool buffers off the geometry and drop the index, so nothing keeps the typed arrays alive through the geometry; attributes copied from a `BufferGeometry` passed to `InstancedVOBufferGeometry` stay where they are, because they belong to the caller. A further `update()` on a disposed geometry finds no attributes left to write to — it still sets the draw range and, on `InstancedVOBufferGeometry`, `instanceCount`
+- `InstancedVOBufferGeometry#detachInstancedPool()` disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, and one that a second route of the same geometry still reads stays alive. Attaching over a name that is already taken runs the same path, while a pool that takes its own name over again keeps everything it has
+- the `autoDispose` option of `InstancedVOBufferGeometry#attachInstancedPool()` defaults to whether the geometry built the pool itself: a descriptor or description handed in becomes a pool the geometry releases with itself, an existing `VertexObjectPool` stays the caller's. An explicit `autoDispose` still decides
 
 ### Removed
 
@@ -30,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VertexObjectPool#resize()`: shrinking unlinks every vertex object from the new capacity onwards, so a later read or write on one of them fails loudly
 - fix `InstancedVOBufferGeometry#detachInstancedPool()`: the attributes built on the buffers of the detached pool are taken off the geometry together with the pool, unless the geometry still reads the same buffers through another route — as its base pool, as its default instanced pool, or under a second name. A pool is therefore safe to `resize()` once its last route to the geometry is gone, and attaching a pool under a name that is already taken no longer leaves the attributes of its predecessor on the geometry when the two do not cover the same attribute names
 - fix the `VOBufferPool#usedCount` setter: the value is clamped to `[0, capacity]`, which keeps `availableCount` within `[0, capacity]` and every index handed out by `createVO()` inside the buffer
+- fix the upload range of every geometry attribute: it spans `itemSize * vertexCount * usedCount` elements, so a pool with a `vertexCount` above `1` — quads built through `VertexObjectGeometry`, for instance — uploads every vertex of every object it has in use, not just the first one
+- fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` for a pool that was disposed while the geometry still reads it: the buffers of such a pool are gone, and the geometry leaves the attributes built on them alone instead of raising a `TypeError`
+- fix `InstancedVOBufferGeometry#update()` for the `[pool, capacity, BufferGeometry]` constructor variant: an attribute that none of the geometry's pools declares stays as it is. That is what the attributes copied from the given `BufferGeometry` need — they belong to the caller, and this constructor path has no base pool to resolve them against
 
 ### Migration Guide
 
@@ -115,6 +121,98 @@ vo.setFoo(1, 2);
 ```
 
 Where the capacity is known to suffice, `pool.createVO()!` is the shorter way out.
+
+#### A geometry releases only the pools it built itself
+
+`VOBufferGeometry#dispose()`, `InstancedVOBufferGeometry#dispose()` and the `autoDispose` default of
+`attachInstancedPool()` all follow one rule now: a pool the geometry created belongs to the geometry
+and is disposed with it, a pool handed in belongs to the caller and is left alone. Three call
+patterns change because of it.
+
+**Before**
+
+```ts
+const shared = new VertexObjectPool(descriptor, 1000);
+
+const geometry = new InstancedVertexObjectGeometry(shared, 1000, baseDescriptor, 1);
+geometry.attachInstancedPool('extra', otherSharedPool);
+
+geometry.dispose();
+// shared.usedCount === 0     — the geometry cleared a pool it did not own
+// otherSharedPool.usedCount === 0
+// geometry.basePool was only cleared, its typed arrays stayed referenced
+```
+
+**After**
+
+```ts
+const shared = new VertexObjectPool(descriptor, 1000);
+
+const geometry = new InstancedVertexObjectGeometry(shared, 1000, baseDescriptor, 1);
+geometry.attachInstancedPool('extra', otherSharedPool);
+
+geometry.dispose();
+// shared and otherSharedPool are untouched — both were handed in
+// basePool, built from baseDescriptor, is disposed with the geometry
+
+shared.clear(); // opt back into the old behaviour, per pool
+```
+
+To have a pool that was handed in released with the geometry, say so:
+
+```ts
+geometry.attachInstancedPool('extra', otherSharedPool, {autoDispose: true});
+```
+
+`detachInstancedPool()` follows the same rule and therefore also changed: it releases a pool that
+belongs to the geometry instead of only unhooking it. The pool it returns is dead in that case.
+
+```ts
+const pool = geometry.attachInstancedPool('extra', descriptor); // built here, so owned here
+geometry.detachInstancedPool('extra');
+// pool.isDisposed === true
+
+const mine = geometry.attachInstancedPool('extra', new VertexObjectPool(descriptor, 100));
+geometry.detachInstancedPool('extra');
+// mine.isDisposed === false — it was handed in
+```
+
+Note that `dispose()` is more than the old `clear()`: it drops the typed arrays of the pool, and any
+vertex object still held by the caller is unlinked from its buffer. Keep pools you want to reuse out
+of a geometry's constructor, or hand them in as pools rather than as descriptors.
+
+Sharing a pool between geometries is the caller's job for the same reason: the geometry that built a
+pool releases it on `dispose()`, whoever else reads it by then. Passing on a pool a geometry built
+for itself is therefore the one pattern to drop.
+
+**Don't**
+
+```ts
+const one = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+const two = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+
+const shared = one.attachInstancedPool('extra', descriptor); // one built it, so one owns it
+two.attachInstancedPool('borrowed', shared);
+
+one.dispose();
+// shared.isDisposed === true, and its typed arrays are gone
+// two keeps the attributes it built on them: they read nothing, and two.update() leaves them be
+```
+
+**Do**
+
+```ts
+const shared = new VertexObjectPool(descriptor, 1000); // built by the caller, owned by the caller
+
+const one = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+const two = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+
+one.attachInstancedPool('extra', shared);
+two.attachInstancedPool('borrowed', shared);
+
+one.dispose();  // shared is untouched — neither geometry built it
+shared.dispose(); // when both geometries are gone
+```
 
 ## [0.21.2] - 2026-06-19
 

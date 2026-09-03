@@ -1,86 +1,109 @@
-import type {BufferAttribute, InstancedBufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
+import type {InstancedBufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
+import {BufferAttribute, BufferGeometry} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
 import type {VO} from './types.js';
 
 describe('vertex-buffers-geometry-updates', () => {
+  /** The update ranges the gpu upload of `attrName` will use, read from the buffer behind the attribute. */
+  const updateRangesOf = (geometry: BufferGeometry, attrName: string) => {
+    const attr = geometry.getAttribute(attrName);
+    return ((attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+      ? (attr as InterleavedBufferAttribute).data
+      : (attr as BufferAttribute)
+    ).updateRanges;
+  };
+
+  const baseDesc = new VertexObjectDescriptor({
+    vertexCount: 4,
+    indices: [0, 1, 2, 0, 2, 3],
+
+    attributes: {
+      position: {
+        components: ['x', 'y', 'z'],
+        type: 'float32',
+        bufferName: 'positions',
+      },
+    },
+  });
+
+  const instancedDesc = new VertexObjectDescriptor({
+    meshCount: 1,
+
+    attributes: {
+      color: {
+        components: ['r', 'g', 'b', 'a'],
+        type: 'uint8',
+      },
+      foo: {
+        size: 1,
+        type: 'float32',
+      },
+      bar: {
+        size: 2,
+        type: 'float32',
+      },
+      impact: {
+        size: 1,
+        type: 'uint32',
+        usage: 'dynamic',
+      },
+    },
+  });
+
+  interface MyBaseVO extends VO {
+    x0: number;
+    y0: number;
+    z0: number;
+    x1: number;
+    y1: number;
+    z1: number;
+    x2: number;
+    y2: number;
+    z2: number;
+    x3: number;
+    y3: number;
+    z3: number;
+
+    // prettier-ignore
+    setPosition(values: [
+      number, number, number,
+      number, number, number,
+      number, number, number,
+      number, number, number,
+    ]): void;
+  }
+
+  const extraDesc = new VertexObjectDescriptor({
+    meshCount: 1,
+
+    attributes: {
+      quux: {
+        size: 1,
+        type: 'float32',
+      },
+    },
+  });
+
+  interface MyInstancedVO extends VO {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+
+    setColor(color: [number, number, number, number]): void;
+
+    foo: number;
+
+    setBar(bar: [number, number]): void;
+
+    impact: number;
+  }
+
   describe('InstancedVertexObjectGeometry', () => {
-    const baseDesc = new VertexObjectDescriptor({
-      vertexCount: 4,
-      indices: [0, 1, 2, 0, 2, 3],
-
-      attributes: {
-        position: {
-          components: ['x', 'y', 'z'],
-          type: 'float32',
-          bufferName: 'positions',
-        },
-      },
-    });
-
-    const instancedDesc = new VertexObjectDescriptor({
-      meshCount: 1,
-
-      attributes: {
-        color: {
-          components: ['r', 'g', 'b', 'a'],
-          type: 'uint8',
-        },
-        foo: {
-          size: 1,
-          type: 'float32',
-        },
-        bar: {
-          size: 2,
-          type: 'float32',
-        },
-        impact: {
-          size: 1,
-          type: 'uint32',
-          usage: 'dynamic',
-        },
-      },
-    });
-
-    interface MyBaseVO extends VO {
-      x0: number;
-      y0: number;
-      z0: number;
-      x1: number;
-      y1: number;
-      z1: number;
-      x2: number;
-      y2: number;
-      z2: number;
-      x3: number;
-      y3: number;
-      z3: number;
-
-      // prettier-ignore
-      setPosition(values: [
-        number, number, number,
-        number, number, number,
-        number, number, number,
-        number, number, number,
-      ]): void;
-    }
-
-    interface MyInstancedVO extends VO {
-      r: number;
-      g: number;
-      b: number;
-      a: number;
-
-      setColor(color: [number, number, number, number]): void;
-
-      foo: number;
-
-      setBar(bar: [number, number]): void;
-
-      impact: number;
-    }
-
     const makeInstancedGeometry = () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const pool = geometry.instancedPool;
@@ -552,6 +575,405 @@ describe('vertex-buffers-geometry-updates', () => {
       });
 
       expect(geometry.instanceCount).toEqual(2);
+    });
+  });
+
+  describe('update ranges', () => {
+    test('the base pool of an instanced geometry uploads every vertex of a used object', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      geometry.basePool.createVO();
+      geometry.update();
+
+      // 3 components per vertex, 4 vertices per object, 1 object in use
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 0, count: 12}]);
+    });
+
+    test('a non-instanced geometry uploads every vertex of every used object', () => {
+      const quadDesc = new VertexObjectDescriptor({
+        vertexCount: 4,
+
+        attributes: {
+          position: {
+            components: ['x', 'y', 'z'],
+            type: 'float32',
+            bufferName: 'positions',
+          },
+        },
+      });
+
+      const geometry = new VertexObjectGeometry<MyBaseVO>(quadDesc, 10);
+
+      for (let i = 0; i < 5; i++) {
+        geometry.pool.createVO();
+      }
+
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 0, count: 3 * 4 * 5}]);
+    });
+  });
+
+  describe('constructed with a BufferGeometry', () => {
+    test('update() leaves the attributes copied from that geometry alone', () => {
+      const base = new BufferGeometry();
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, base);
+      geometry.instancedPool.createVO();
+
+      const copiedArray = (geometry.getAttribute('position') as BufferAttribute).array;
+
+      geometry.update();
+
+      expect((geometry.getAttribute('position') as BufferAttribute).array).toBe(copiedArray);
+    });
+
+    test('dispose() leaves the attributes copied from that geometry alone', () => {
+      const base = new BufferGeometry();
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, base);
+      const copiedArray = (geometry.getAttribute('position') as BufferAttribute).array;
+
+      geometry.dispose();
+
+      expect(Object.keys(geometry.attributes)).toEqual(['position']);
+      expect((geometry.getAttribute('position') as BufferAttribute).array).toBe(copiedArray);
+    });
+  });
+
+  describe('dispose', () => {
+    test('a pool handed in from outside stays untouched', () => {
+      const instancedPool = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
+      instancedPool.createVO();
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedPool, 10, baseDesc, 1);
+      geometry.dispose();
+
+      expect(instancedPool.usedCount).toBe(1);
+      expect(instancedPool.isDisposed).toBe(false);
+    });
+
+    test('a pool the geometry built itself is released', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const {instancedPool, basePool} = geometry;
+
+      geometry.dispose();
+
+      expect(instancedPool.isDisposed).toBe(true);
+      expect(basePool.isDisposed).toBe(true);
+    });
+
+    test('the attributes of every released route leave the geometry', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      expect(Object.keys(geometry.attributes).sort()).toEqual(['bar', 'color', 'foo', 'impact', 'position']);
+      expect(geometry.index).not.toBeNull();
+
+      geometry.dispose();
+
+      expect(Object.keys(geometry.attributes)).toEqual([]);
+      expect(geometry.index).toBeNull();
+    });
+
+    test('an attached pool is released only when the geometry owns it', () => {
+      const keptPool = new VertexObjectPool<VO>(extraDesc, 10);
+      keptPool.createVO();
+
+      const withKeptPool = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      withKeptPool.attachInstancedPool('extra', keptPool);
+      withKeptPool.dispose();
+
+      expect(keptPool.isDisposed).toBe(false);
+      expect(keptPool.usedCount).toBe(1);
+
+      const releasedPool = new VertexObjectPool<VO>(extraDesc, 10);
+
+      const withReleasedPool = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      withReleasedPool.attachInstancedPool('extra', releasedPool, {autoDispose: true});
+      withReleasedPool.dispose();
+
+      expect(releasedPool.isDisposed).toBe(true);
+
+      const withOwnPool = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const ownPool = withOwnPool.attachInstancedPool('extra', extraDesc);
+      withOwnPool.dispose();
+
+      expect(ownPool.isDisposed).toBe(true);
+    });
+
+    test('a pool handed in from outside stays untouched on a non-instanced geometry', () => {
+      const pool = new VertexObjectPool<MyBaseVO>(baseDesc, 10);
+      pool.createVO();
+
+      const geometry = new VertexObjectGeometry<MyBaseVO>(pool, 10);
+      geometry.dispose();
+
+      expect(pool.usedCount).toBe(1);
+      expect(pool.isDisposed).toBe(false);
+    });
+
+    test('a pool a non-instanced geometry built itself is released', () => {
+      const geometry = new VertexObjectGeometry<MyBaseVO>(baseDesc, 10);
+      const {pool} = geometry;
+
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('the attributes of a non-instanced geometry leave it', () => {
+      const geometry = new VertexObjectGeometry<MyBaseVO>(baseDesc, 10);
+
+      expect(Object.keys(geometry.attributes)).toEqual(['position']);
+      expect(geometry.index).not.toBeNull();
+
+      geometry.dispose();
+
+      expect(Object.keys(geometry.attributes)).toEqual([]);
+      expect(geometry.index).toBeNull();
+    });
+
+    test('detachInstancedPool() releases a pool the geometry built itself', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const ownPool = geometry.attachInstancedPool('extra', extraDesc);
+
+      expect(geometry.detachInstancedPool('extra')).toBe(ownPool);
+      expect(ownPool.isDisposed).toBe(true);
+    });
+
+    test('detachInstancedPool() leaves a pool handed in from outside alone', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const keptPool = new VertexObjectPool<VO>(extraDesc, 10);
+      geometry.attachInstancedPool('extra', keptPool);
+
+      geometry.detachInstancedPool('extra');
+
+      expect(keptPool.isDisposed).toBe(false);
+    });
+
+    test('attaching over a name that is already taken releases the pool it displaces', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const first = geometry.attachInstancedPool('extra', extraDesc);
+      const second = geometry.attachInstancedPool('extra', extraDesc);
+
+      expect(first.isDisposed).toBe(true);
+      expect(second.isDisposed).toBe(false);
+    });
+
+    test('attaching the same pool again under its own name keeps it alive', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      geometry.attachInstancedPool('extra', pool);
+
+      expect(pool.isDisposed).toBe(false);
+      expect(geometry.extraInstancedPools.get('extra')).toBe(pool);
+      expect(geometry.getAttribute('quux')).toBeDefined();
+    });
+
+    test('a pool the geometry built stays its own when it is attached again under the same name', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      geometry.attachInstancedPool('extra', pool);
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('a pool the geometry built stays its own when it is attached under a second name', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      geometry.attachInstancedPool('sameAgain', pool);
+      geometry.detachInstancedPool('extra');
+
+      expect(pool.isDisposed).toBe(false);
+
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    test('a pool that outlives its detach stops belonging to the geometry', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc, {autoDispose: false});
+
+      geometry.detachInstancedPool('extra');
+
+      expect(pool.isDisposed).toBe(false);
+
+      // no route of this geometry reaches the pool any more, so attaching it again is attaching
+      // a pool from outside
+      geometry.attachInstancedPool('extra', pool);
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(false);
+    });
+
+    test('every pool of an attach/detach cycle under one name is released', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const pools = [];
+      for (let i = 0; i < 3; i++) {
+        pools.push(geometry.attachInstancedPool('extra', extraDesc));
+        geometry.detachInstancedPool('extra');
+      }
+
+      geometry.dispose();
+
+      expect(pools.map((pool) => pool.isDisposed)).toEqual([true, true, true]);
+    });
+
+    test('an explicit autoDispose decides over a pool the geometry built', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc, {autoDispose: false});
+
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(false);
+    });
+
+    test('the geometry that built a pool releases it even while a second geometry reads it', () => {
+      const owner = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const borrower = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const shared = owner.attachInstancedPool('extra', extraDesc);
+      borrower.attachInstancedPool('borrowed', shared);
+
+      expect(borrower.extraInstancedPools.get('borrowed')).toBe(shared);
+
+      owner.dispose();
+
+      // passing a pool on to a second geometry does not move its lifetime there
+      expect(shared.isDisposed).toBe(true);
+    });
+
+    test('the non-instanced geometry that built a pool releases it even while a second geometry reads it', () => {
+      const owner = new VertexObjectGeometry<MyBaseVO>(baseDesc, 1);
+      const borrower = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, owner.pool);
+
+      expect(borrower.basePool).toBe(owner.pool);
+
+      owner.dispose();
+
+      expect(owner.pool.isDisposed).toBe(true);
+    });
+
+    test('detachInstancedPool() keeps a pool that another route still reads', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+      geometry.attachInstancedPool('sameAgain', pool);
+
+      geometry.detachInstancedPool('extra');
+
+      expect(pool.isDisposed).toBe(false);
+    });
+  });
+
+  describe('update() on a released pool', () => {
+    test('an instanced geometry reading a pool that its builder released does not throw', () => {
+      const owner = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const reader = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const shared = owner.attachInstancedPool('extra', extraDesc);
+      reader.attachInstancedPool('borrowed', shared);
+
+      owner.dispose();
+
+      expect(shared.isDisposed).toBe(true);
+      expect(() => reader.update()).not.toThrow();
+    });
+
+    test('a non-instanced geometry reading a pool that its builder released does not throw', () => {
+      const owner = new VertexObjectGeometry<MyBaseVO>(baseDesc, 1);
+      const reader = new VertexObjectGeometry<MyBaseVO>(owner.pool, 1);
+
+      owner.dispose();
+
+      expect(owner.pool.isDisposed).toBe(true);
+      expect(() => reader.update()).not.toThrow();
+    });
+  });
+
+  describe('update() after dispose()', () => {
+    test('stays a no-op on an instanced geometry, whoever owns the pools', () => {
+      const handedIn = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
+      handedIn.createVO();
+
+      const withHandedInPool = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(handedIn, 10, baseDesc, 1);
+      withHandedInPool.update();
+      withHandedInPool.dispose();
+
+      expect(() => withHandedInPool.update()).not.toThrow();
+
+      // no attribute comes back, so there is nothing left to upload, and the pool of the caller
+      // is as untouched by the second update() as it was by dispose()
+      expect(Object.keys(withHandedInPool.attributes)).toEqual([]);
+      expect(withHandedInPool.index).toBeNull();
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.usedCount).toBe(1);
+
+      const withOwnPools = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const {instancedPool, basePool} = withOwnPools;
+      withOwnPools.instancedPool.createVO();
+      withOwnPools.update();
+      withOwnPools.dispose();
+
+      expect(() => withOwnPools.update()).not.toThrow();
+
+      expect(Object.keys(withOwnPools.attributes)).toEqual([]);
+      expect(withOwnPools.index).toBeNull();
+      expect(instancedPool.isDisposed).toBe(true);
+      expect(basePool.isDisposed).toBe(true);
+    });
+
+    test('stays a no-op on a non-instanced geometry, whoever owns the pool', () => {
+      // a dynamic attribute, so that the auto-touch path is walked as well
+      const dynamicQuadDesc = new VertexObjectDescriptor({
+        vertexCount: 4,
+        indices: [0, 1, 2, 0, 2, 3],
+
+        attributes: {
+          position: {
+            components: ['x', 'y', 'z'],
+            type: 'float32',
+            usage: 'dynamic',
+          },
+        },
+      });
+
+      const handedIn = new VertexObjectPool<MyBaseVO>(dynamicQuadDesc, 10);
+      handedIn.createVO();
+
+      const withHandedInPool = new VertexObjectGeometry<MyBaseVO>(handedIn, 10);
+      withHandedInPool.update();
+      withHandedInPool.dispose();
+
+      expect(() => withHandedInPool.update()).not.toThrow();
+
+      // no attribute comes back, so there is nothing left to upload, and the pool of the caller
+      // is as untouched by the second update() as it was by dispose()
+      expect(Object.keys(withHandedInPool.attributes)).toEqual([]);
+      expect(withHandedInPool.index).toBeNull();
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.usedCount).toBe(1);
+
+      const withOwnPool = new VertexObjectGeometry<MyBaseVO>(dynamicQuadDesc, 10);
+      const {pool} = withOwnPool;
+      withOwnPool.pool.createVO();
+      withOwnPool.update();
+      withOwnPool.dispose();
+
+      expect(() => withOwnPool.update()).not.toThrow();
+
+      expect(Object.keys(withOwnPool.attributes)).toEqual([]);
+      expect(withOwnPool.index).toBeNull();
+      expect(pool.isDisposed).toBe(true);
     });
   });
 });
