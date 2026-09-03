@@ -15,6 +15,10 @@ export class AnimatedSpritesGeometry extends InstancedVertexObjectGeometry<Anima
 
     this.name = 'twopoint5d.AnimatedSpritesGeometry';
 
-    this.basePool.createVO().make(...makeBaseSpriteArgs);
+    const baseSprite = this.basePool?.createVO();
+    if (baseSprite == null) {
+      throw new Error('AnimatedSpritesGeometry: the base pool has no room for the base sprite');
+    }
+    baseSprite.make(...makeBaseSpriteArgs);
   }
 }

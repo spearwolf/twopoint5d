@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
+- export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
 
 ### Changed
 
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and allocate nothing per vertex
 - `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `VertexObjectPool<unknown>`
 - a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool that has the capacity of the geometry's `instancedPool`
+- `TexturedSprites#spritePool` is typed `TexturedSpritePool | undefined` and `#texture` is typed `Texture | undefined`: after `dispose()` the mesh holds neither geometry nor material, `spritePool` and `texture` answer `undefined`, `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
 
 ### Removed
@@ -38,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VertexObjectPool#freeVO()`: the vacated slot is cleared on both the last-index and the swap path, so a freed index holds no vertex object — `getVO()` on it returns `undefined` and the internal index keeps nothing alive
 - fix `VertexObjectPool#freeVO()`: the swap path tolerates an index slot that `createFromAttributes()` raised `usedCount` past without materializing a vertex object
 - fix `VertexObjectPool#resize()`: shrinking unlinks every vertex object from the new capacity onwards, so a later read or write on one of them fails loudly
-- fix the `VOBufferPool#usedCount` setter: the value is clamped to `[0, capacity]`, which keeps `availableCount` within `[0, capacity]` and every index handed out by `createVO()` inside the buffer
+- fix the `VOBufferPool#usedCount` setter: the value is clamped to `[0, capacity]`, which keeps `availableCount` within `[0, capacity]` and every index handed out by `createVO()` inside the buffer. Every writing path — `clear()`, `dispose()`, `createFromAttributes()` and `fromBuffersData()` — goes through the setter, so the clamp is an invariant of the class
 - fix the upload range of every geometry attribute: it spans `itemSize * vertexCount * usedCount` elements, so a pool with a `vertexCount` above `1` — quads built through `VertexObjectGeometry`, for instance — uploads every vertex of every object it has in use
 - fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` for a pool that was disposed while the geometry still reads it: the buffers of such a pool are gone, and the geometry leaves the attributes built on them alone
 - fix `InstancedVOBufferGeometry#update()` for the `[pool, capacity, BufferGeometry]` constructor variant: an attribute that none of the geometry's pools declares stays as it is. That is what the attributes copied from the given `BufferGeometry` need — they belong to the caller, and this constructor path has no base pool to resolve them against
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 - fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds an empty object from construction on, the shape `ParallaxProjection` starts from as well
+- fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 
 ### Migration Guide
 
@@ -351,6 +354,30 @@ const projection = new OrthographicProjection();
 projection.projectionPlane?.getPointByDistance(100);
 
 const specs: Partial<OrthographicProjectionSpecs> = projection.viewSpecs;
+```
+
+#### `TexturedSprites#spritePool` and `#texture` can be `undefined`
+
+`TexturedSprites#dispose()` releases the geometry and the material and leaves the mesh
+holding neither. `spritePool` and `texture` name that: both are typed `| undefined`,
+`createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
+once the sprites are disposed. Under `strictNullChecks`, code that reads either field
+without a guard turns into a compile error. Sprites that have not been disposed — the normal
+case — need no change.
+
+**Before**
+
+```ts
+const sprites = new TexturedSprites(1000);
+const pool: TexturedSpritePool = sprites.spritePool;
+```
+
+**After**
+
+```ts
+const sprites = new TexturedSprites(1000);
+const pool = sprites.spritePool;
+if (pool == null) return; // the sprites were disposed
 ```
 
 ## [0.21.2] - 2026-06-19

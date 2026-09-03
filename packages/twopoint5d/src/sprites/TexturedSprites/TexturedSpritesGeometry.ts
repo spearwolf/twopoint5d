@@ -50,6 +50,10 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
 
     this.name = 'twopoint5d.TexturedSpritesGeometry';
 
-    this.basePool.createVO().make(...makeBaseSpriteArgs);
+    const baseSprite = this.basePool?.createVO();
+    if (baseSprite == null) {
+      throw new Error('TexturedSpritesGeometry: the base pool has no room for the base sprite');
+    }
+    baseSprite.make(...makeBaseSpriteArgs);
   }
 }

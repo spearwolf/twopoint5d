@@ -512,6 +512,16 @@ describe('VertexObjectPool', () => {
       expect(pool.usedCount).toBe(0);
       expect(pool.availableCount).toBe(pool.capacity);
     });
+
+    test('fromBuffersData() writes through the clamp', () => {
+      const pool = new VOBufferPool(descriptor, 4);
+      const buffersData = pool.toBuffersData();
+
+      pool.fromBuffersData({...buffersData, usedCount: 99});
+
+      expect(pool.usedCount).toBe(4);
+      expect(pool.availableCount).toBe(0);
+    });
   });
 
   describe('geometry attachments', () => {
@@ -528,7 +538,7 @@ describe('VertexObjectPool', () => {
           const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
             ? (attr as InterleavedBufferAttribute).data
             : (attr as BufferAttribute);
-          return typedArrays.has(bufAttr.array as any);
+          return typedArrays.has(bufAttr.array);
         })
         .map(([attrName]) => attrName)
         .sort();
@@ -617,7 +627,7 @@ describe('VertexObjectPool', () => {
       expect(attributesBackedBy(geometry, instancedPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
     });
 
-    test('attaching under a name that is already taken releases the pool it replaces', () => {
+    test('attaching under a name that is already taken releases the attachment of the pool it replaces', () => {
       const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
       const replaced = makePool();
       const replacement = new VertexObjectPool<VO>({vertexCount: 1, attributes: {somethingElse: {size: 1, type: 'float32'}}}, 10);
@@ -779,7 +789,7 @@ describe('VertexObjectPool', () => {
       expect(vo2[voBuffer]).toBeUndefined();
     });
 
-    test('VertexObjectPool: getVO() / createVO() are no-ops after dispose()', () => {
+    test('VertexObjectPool: getVO() answers nothing after dispose()', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
 
       pool.createVO();
@@ -789,11 +799,7 @@ describe('VertexObjectPool', () => {
 
       expect(pool.getVO(0)).toBeUndefined();
       expect(pool.getVO(1)).toBeUndefined();
-      // capacity-bound check survives dispose, but the internal voIndex is empty:
-      // either createVO returns undefined (capacity reached because usedCount == capacity)
-      // or it bumps usedCount but cannot persist the new VO. Both are acceptable;
-      // the contract is "the pool is dead", not "createVO is graceful".
-      // Here we simply assert the disposal flag is set and used VOs are not retrievable.
+      // a disposed pool is dead — nothing it handed out can be read or written again
       expect(pool.isDisposed).toBe(true);
     });
 

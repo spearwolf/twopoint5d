@@ -47,4 +47,19 @@ describe('TexturedSprites', () => {
 
     sprites.dispose();
   });
+
+  test('the convenience API answers nothing once the sprites are disposed', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+
+    sprites.dispose();
+
+    expect(sprites.spritePool).toBeUndefined();
+    expect(sprites.texture).toBeUndefined();
+    expect(sprites.createSprite()).toBeUndefined();
+    expect(() => sprites.freeSprite(sprite)).not.toThrow();
+    expect(() => {
+      sprites.texture = undefined;
+    }).not.toThrow();
+  });
 });

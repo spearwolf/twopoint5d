@@ -26,7 +26,7 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
     super(
       ...(args[2] instanceof BufferGeometry
         ? [asPool<VOInstancedType>(args[0], args[1]), args[1], args[2]]
-        : [asPool<VOInstancedType>(args[0], args[1]), args[1], asPool<VOBaseType>(args[2], args[3] || 1), args[3]]),
+        : [asPool<VOInstancedType>(args[0], args[1]), args[1], asPool<VOBaseType>(args[2], args[3] ?? 1), args[3]]),
     );
 
     this.name = 'InstancedVertexObjectGeometry';

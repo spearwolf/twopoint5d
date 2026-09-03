@@ -14,16 +14,19 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   declare geometry: TexturedSpritesGeometry | undefined;
   declare material: TexturedSpritesMaterial | undefined;
 
-  get spritePool(): TexturedSpritePool {
-    return this.geometry.instancedPool;
+  /** The sprite pool of the geometry this mesh was built with — `undefined` once disposed. */
+  get spritePool(): TexturedSpritePool | undefined {
+    return this.geometry?.instancedPool;
   }
 
   get texture(): Texture | undefined {
-    return this.material.colorMap;
+    return this.material?.colorMap;
   }
 
   set texture(texture: Texture | undefined) {
-    this.material.colorMap = texture;
+    if (this.material != null) {
+      this.material.colorMap = texture;
+    }
   }
 
   constructor(
@@ -43,17 +46,18 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   }
 
   /**
-   * Takes a sprite from the sprite pool. Answers `undefined` once the pool has reached its capacity.
+   * Takes a sprite from the sprite pool. Answers `undefined` once the pool has reached its
+   * capacity or the sprites have been disposed.
    */
   createSprite(): TexturedSprite | undefined {
-    return this.geometry.instancedPool.createVO();
+    return this.geometry?.instancedPool.createVO();
   }
 
   /**
-   * Gives a sprite back to the sprite pool.
+   * Gives a sprite back to the sprite pool. Does nothing once the sprites have been disposed.
    */
   freeSprite(sprite: TexturedSprite): void {
-    this.geometry.instancedPool.freeVO(sprite);
+    this.geometry?.instancedPool.freeVO(sprite);
   }
 
   dispose(): void {

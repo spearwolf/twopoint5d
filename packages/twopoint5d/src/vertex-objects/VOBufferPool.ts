@@ -84,7 +84,7 @@ export class VOBufferPool {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#usedCount = 0;
+    this.usedCount = 0;
     if (this.buffer != null) {
       for (const buffer of this.buffer.buffers.values()) {
         buffer.typedArray = undefined as unknown as TypedArray;
@@ -96,7 +96,7 @@ export class VOBufferPool {
   createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIndex: number] {
     const firstObjectIndex = this.#usedCount;
     const objectCount = this.buffer.copyAttributes(attributes, firstObjectIndex);
-    this.#usedCount += objectCount;
+    this.usedCount += objectCount;
     return [objectCount, firstObjectIndex];
   }
 
@@ -121,12 +121,12 @@ export class VOBufferPool {
     if (buffersData.capacity !== this.capacity) {
       throw new Error('Invalid buffersData capacity');
     }
-    this.#usedCount = buffersData.usedCount;
+    this.usedCount = buffersData.usedCount;
     if (this.buffer == null) {
       this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
     } else {
       for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {
-        const buffer = this.buffer.buffers.get(bufferName)!;
+        const buffer = this.buffer.buffers.get(bufferName);
         if (buffer) {
           if (copyTypedArrays || typedArray.length < buffer.typedArray.length) {
             buffer.typedArray.set(typedArray);

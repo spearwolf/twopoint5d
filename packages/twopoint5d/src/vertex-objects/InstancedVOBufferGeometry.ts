@@ -162,8 +162,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
 
-    // reset auto-touch
-    this.#autoTouchBuffers = undefined;
+    // the buffer selection is already gone with the detach above; what is still owed is the
+    // first auto-touch, which uploads every attribute of the new route once
     this.#firstAutoTouch = true;
 
     return extraPool;
@@ -371,7 +371,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    */
   touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void {
     const attrNames: string[] = [];
-    let buffers: TouchBuffersType | TouchInstancedBuffersType;
+    let buffers: TouchBuffersType | TouchInstancedBuffersType | undefined = undefined;
     args.forEach((arg) => {
       if (typeof arg === 'string') {
         attrNames.push(arg);
@@ -454,9 +454,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       checkBufferSerials(this.basePool, this.baseBuffers, this.baseBufferSerials);
     }
 
-    if (this.instancedPool) {
-      checkBufferSerials(this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
-    }
+    checkBufferSerials(this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
 
     for (const [name, pool] of this.extraInstancedPools) {
       const buffers = this.extraInstancedBuffers.get(name);

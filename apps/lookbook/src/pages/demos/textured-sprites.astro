@@ -88,7 +88,10 @@ import {description, showSource, title} from './_textured-sprites.json';
       }
     });
 
-    const bouncingSprites = new BouncingSprites(sprites.spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
+    const spritePool = sprites.spritePool;
+    if (spritePool == null) return; // the sprites were disposed
+
+    const bouncingSprites = new BouncingSprites(spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
     bouncingSprites.shouldRotate = false;
 
     bouncingSprites.createSprites();

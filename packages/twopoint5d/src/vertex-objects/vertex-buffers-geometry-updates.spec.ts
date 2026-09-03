@@ -751,7 +751,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(keptPool.isDisposed).toBe(false);
     });
 
-    test('attaching over a name that is already taken releases the pool it displaces', () => {
+    test('attaching over a name that is already taken disposes the geometry-built pool it replaces', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
       const first = geometry.attachInstancedPool('extra', extraDesc);

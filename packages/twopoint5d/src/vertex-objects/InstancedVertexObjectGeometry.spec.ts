@@ -106,6 +106,12 @@ describe('InstancedVertexObjectGeometry', () => {
     ]);
   });
 
+  test('an explicit base capacity of 0 reaches the base pool', () => {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 0);
+
+    expect(geometry.basePool.capacity).toBe(0);
+  });
+
   describe('dispose()', () => {
     test('disposes basePool and instancedPool it built itself', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);

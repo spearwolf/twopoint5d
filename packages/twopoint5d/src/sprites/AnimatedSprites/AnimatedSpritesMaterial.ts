@@ -4,7 +4,7 @@ import { type Texture } from 'three/webgpu';
 import { TexturedSpritesMaterial, type TexturedSpritesMaterialParameters } from '../TexturedSprites/TexturedSpritesMaterial.js';
 import { texCoordsFromIndex } from '../node-utils.js';
 
-interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
+export interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
   animsMap?: Texture;
   time?: number;
 }
