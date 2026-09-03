@@ -26,9 +26,7 @@ export class OrthographicProjection implements IProjection {
   #distanceToProjectionPlane: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: OrthographicProjectionSpecs) {
-    // @ts-ignore
-    this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
-    // @ts-ignore
+    this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
     this.viewSpecs = specs;
   }
 

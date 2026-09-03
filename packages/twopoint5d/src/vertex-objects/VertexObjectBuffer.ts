@@ -79,7 +79,7 @@ export class VertexObjectBuffer {
             itemSize: attribute.size,
             dataType: attribute.dataType,
             usageType: attribute.usageType,
-            // @ts-ignore
+            // the typed array is filled below, once every attribute has contributed its share to itemSize
             typedArray: undefined,
             serial: 0,
           });

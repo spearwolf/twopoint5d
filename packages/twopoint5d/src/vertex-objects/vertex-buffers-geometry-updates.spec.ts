@@ -148,7 +148,6 @@ describe('vertex-buffers-geometry-updates', () => {
         const static_float32 = geometry.baseBuffers.get('positions').array;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
-        // @ts-ignore
         expect(positionAttribute.isBufferAttribute).toBe(true);
         expect(positionAttribute.array).toBe(static_float32);
         expect(static_float32).toBe(geometry.basePool.buffer.buffers.get('positions').typedArray);
@@ -162,7 +161,6 @@ describe('vertex-buffers-geometry-updates', () => {
         );
 
         const colorAttribute = geometry.getAttribute('color')! as InstancedBufferAttribute;
-        // @ts-ignore
         expect(colorAttribute.isInstancedBufferAttribute).toBe(true);
         expect(colorAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_uint8').typedArray);
       });
@@ -175,12 +173,10 @@ describe('vertex-buffers-geometry-updates', () => {
         );
 
         const fooAttribute = geometry.getAttribute('foo')! as InterleavedBufferAttribute;
-        // @ts-ignore
         expect(fooAttribute.isInterleavedBufferAttribute).toBe(true);
         expect(fooAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32').typedArray);
 
         const barAttribute = geometry.getAttribute('bar')! as InterleavedBufferAttribute;
-        // @ts-ignore
         expect(barAttribute.isInterleavedBufferAttribute).toBe(true);
         expect(barAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32').typedArray);
       });
@@ -192,7 +188,6 @@ describe('vertex-buffers-geometry-updates', () => {
         );
 
         const impactAttribute = geometry.getAttribute('impact')! as InstancedBufferAttribute;
-        // @ts-ignore
         expect(impactAttribute.isInstancedBufferAttribute).toBe(true);
         expect(impactAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray);
       });

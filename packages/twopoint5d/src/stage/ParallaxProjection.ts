@@ -2,6 +2,7 @@ import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
+import {asFitIntoRectangleSpecs} from './asFitIntoRectangleSpecs.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
 export type ParallaxProjectionSpecs = FitIntoRectangleSpecs & {
@@ -28,13 +29,12 @@ export class ParallaxProjection implements IProjection {
   #fovy: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
-    // @ts-ignore
-    this.projectionPlane = typeof projectionPlane === 'string' ? ProjectionPlane.get(projectionPlane) : projectionPlane;
+    this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
     this.viewSpecs = specs ?? {};
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(new Vector2(width, height), this.viewSpecs as any, this.#viewRect);
+    fitIntoRectangle(new Vector2(width, height), asFitIntoRectangleSpecs(this.viewSpecs), this.#viewRect);
 
     this.#halfHeight = this.#viewRect.height / 2;
 

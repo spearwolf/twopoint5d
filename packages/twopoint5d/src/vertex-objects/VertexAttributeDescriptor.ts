@@ -1,9 +1,23 @@
-import type {VertexAttributeDataType, VertexAttributeDescription, VertexAttributeUsageType} from './types.js';
+import type {
+  VAComponentsDescription,
+  VASizeDescription,
+  VertexAttributeDataType,
+  VertexAttributeDescription,
+  VertexAttributeMethods,
+  VertexAttributeUsageType,
+} from './types.js';
 
 const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) => m1.toUpperCase());
 
+type VADescriptionFields = Partial<VASizeDescription> & Partial<VAComponentsDescription> & VertexAttributeMethods;
+
 export class VertexAttributeDescriptor {
-  private readonly description: VertexAttributeDescription;
+  /**
+   * A description declares either `components` or `size`, and the getters below
+   * answer both forms in a single expression — a union of the two halves can't
+   * express that, so the stored field is the partial intersection of both.
+   */
+  private readonly description: VADescriptionFields;
 
   readonly name: string;
 
@@ -33,17 +47,14 @@ export class VertexAttributeDescriptor {
   }
 
   get size(): number {
-    // @ts-ignore
     return this.description.size ?? this.description.components?.length ?? 1;
   }
 
   get hasComponents(): boolean {
-    // @ts-ignore
     return this.description.components?.length > 0;
   }
 
   get components(): string[] {
-    // @ts-ignore
     return this.description.components ?? [];
   }
 

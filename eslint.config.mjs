@@ -37,7 +37,7 @@ export default [
   {
     files: ['**/*.ts'],
     rules: {
-      '@typescript-eslint/ban-ts-comment': 0,
+      '@typescript-eslint/ban-ts-comment': 'error',
       '@typescript-eslint/ban-ts-ignore': 0,
       '@typescript-eslint/ban-types': 0,
       '@typescript-eslint/consistent-type-imports': 'error',

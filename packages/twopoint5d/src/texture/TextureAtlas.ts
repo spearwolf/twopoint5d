@@ -83,8 +83,9 @@ export class TextureAtlas {
       }
       ++idx;
     }
-    // @ts-ignore
-    return;
+    // an atlas with no named frames has no name to answer: the loop above finds
+    // nothing, because rand(0) is null and #frameNames is empty
+    return undefined;
   }
 
   randomFrameIds(count: number): number[] {

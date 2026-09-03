@@ -17,6 +17,8 @@ import {
 } from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
+import {matrixColumn} from './matrixColumn.js';
+
 export const vertexByInstancePosition = (params?: {
   vertexPosition?: Node<'vec3'>;
   instancePosition?: Node<'vec3'>;
@@ -44,9 +46,11 @@ export const billboardVertexByInstancePosition = (params?: {
 
   const look = normalize(sub(cameraPosition, billboardPosition));
 
-  // const cameraUp = vec3(modelViewMatrix[0].y, modelViewMatrix[1].y, modelViewMatrix[2].y);
-  // XXX fix me - this is a hack but it seems to be that the types for modelViewMatrix are wrong
-  const cameraUp = vec3((modelViewMatrix as any)[0].y, (modelViewMatrix as any)[1].y, (modelViewMatrix as any)[2].y);
+  const cameraUp = vec3(
+    matrixColumn(modelViewMatrix, 0).y,
+    matrixColumn(modelViewMatrix, 1).y,
+    matrixColumn(modelViewMatrix, 2).y,
+  );
 
   const billboardRight = normalize(cross(cameraUp, look));
   const billboardUp = normalize(cross(look, billboardRight));
