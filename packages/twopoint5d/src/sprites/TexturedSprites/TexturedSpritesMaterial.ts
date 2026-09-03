@@ -23,11 +23,16 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
 
-  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName), {
+  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(
+    attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName),
+    {
+      attach: this,
+    },
+  );
+
+  #rotationNode = createSignal<TAttributeNodeRotation>(attribute<'float'>(TexturedSpritesMaterial.RotationAttributeName), {
     attach: this,
   });
-
-  #rotationNode = createSignal<TAttributeNodeRotation>(attribute<'float'>(TexturedSpritesMaterial.RotationAttributeName), {attach: this});
 
   #instancePositionNode = createSignal<TAttributeNodeInstancePosition>(
     attribute<'vec3'>(TexturedSpritesMaterial.InstancePositionAttributeName),
@@ -36,7 +41,9 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     },
   );
 
-  #quadSizeNode = createSignal<TAttributeNodeQuadSize>(attribute<'vec2'>(TexturedSpritesMaterial.QuadSizeAttributeName), {attach: this});
+  #quadSizeNode = createSignal<TAttributeNodeQuadSize>(attribute<'vec2'>(TexturedSpritesMaterial.QuadSizeAttributeName), {
+    attach: this,
+  });
 
   #renderAsBillboards = createSignal(false, {attach: this});
 

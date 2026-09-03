@@ -1,9 +1,5 @@
 {
-  "hiddenTags": [
-    "react",
-    "vanilla",
-    "demo"
-  ],
+  "hiddenTags": ["react", "vanilla", "demo"],
   "defaultCategory": {
     "name": "Other",
     "order": 9999,
@@ -66,14 +62,7 @@
     {
       "name": "Display, Stage and Projections",
       "tagId": "display-stage-projections",
-      "includeTags": [
-        "Display",
-        "Stage",
-        "OrthographicProjection",
-        "ParallaxProjection",
-        "Stage2D",
-        "StageRenderer"
-      ]
+      "includeTags": ["Display", "Stage", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer"]
     },
     {
       "name": "Vertex Objects",

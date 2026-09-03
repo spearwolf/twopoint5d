@@ -1,5 +1,5 @@
 import type {BufferGeometry} from 'three/webgpu';
-import { InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
+import {InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
@@ -19,7 +19,11 @@ export function initializeInstancedAttributes(
     // buffer name that has a buffer has its attributes, and an attribute name has its descriptor
     const attributes = pool.buffer.bufferNameAttributes.get(buffer.bufferName);
     if (attributes.length > 1) {
-      const interleavedBuffer = new InstancedInterleavedBuffer(asThreeTypedArray(buffer.typedArray), buffer.itemSize, meshPerAttribute);
+      const interleavedBuffer = new InstancedInterleavedBuffer(
+        asThreeTypedArray(buffer.typedArray),
+        buffer.itemSize,
+        meshPerAttribute,
+      );
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
       bufferSerials.set(buffer.bufferName, buffer.serial);

@@ -8,13 +8,11 @@ const {tags, tagCategories} = loadMetadataForDemos();
 <section class="tags select-none invisible">
   {
     tagCategories.map((category) => (
-      <h3 class="tag-category">{category.name}</h3>
-      <p class="tag-catgeory-description">
-        {category.description}
-      </p>
-      <ul class="tag-cloud-filter">
-        {
-          category.tags.sort().map((tag) => (
+      <>
+        <h3 class="tag-category">{category.name}</h3>
+        <p class="tag-catgeory-description">{category.description}</p>
+        <ul class="tag-cloud-filter">
+          {category.tags.sort().map((tag) => (
             <li
               class="tag"
               data-tag={tag}
@@ -23,9 +21,9 @@ const {tags, tagCategories} = loadMetadataForDemos();
             >
               {tag}
             </li>
-          ))
-        }
-      </ul>
+          ))}
+        </ul>
+      </>
     ))
   }
   <div class="flex flex-row justify-end lg:justify-start mt-8 pt-2 border-t border-dashed border-[var(--color-primary-inactive)]">
@@ -55,7 +53,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
     box-shadow: none;
   }
   .clear-tags-action .label {
-    line-height: 2.0;
+    line-height: 2;
   }
 
   .tags {
@@ -104,9 +102,9 @@ const {tags, tagCategories} = loadMetadataForDemos();
 </style>
 
 <script>
-  import { EVENT_SHOW_DEMOS } from './constants.js';
-  import { getShowDemosConfig, saveShowDemosConfig } from './LookBookApi';
-  import type { LookBookShowDemosEventDetail } from './types.ts';
+  import {EVENT_SHOW_DEMOS} from './constants.js';
+  import {getShowDemosConfig, saveShowDemosConfig} from './LookBookApi';
+  import type {LookBookShowDemosEventDetail} from './types.ts';
 
   const ATTR_TAG = 'data-tag';
   const ATTR_RELATED_DEMOS = 'data-related-demos';
@@ -137,7 +135,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
     document.dispatchEvent(
       new CustomEvent(EVENT_SHOW_DEMOS, {
-        detail: payload
+        detail: payload,
       }),
     );
   }

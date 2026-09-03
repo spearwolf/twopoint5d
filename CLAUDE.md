@@ -10,6 +10,7 @@ All commands run from the repo root. Node ≥24 and pnpm ≥10.22 are required (
 
 - Install: `pnpm install`
 - Lint: `pnpm lint` (flat-config ESLint + Prettier; `no-console` is an error in `.ts`/`.js`)
+- Format: `pnpm format` (Prettier over the whole repo; `pnpm lint` reports what it would change)
 - Build everything: `pnpm build` (nx orchestrates `^build` deps and caches outputs)
 - Build core lib only: `pnpm build:twopoint5d` (uses Nx tag `twopoint5d`)
 - Test everything: `pnpm test`

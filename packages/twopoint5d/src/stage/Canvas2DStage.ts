@@ -1,10 +1,10 @@
-import { emit, type EventizedObject, eventize } from '@spearwolf/eventize';
-import type { WebGPURenderer} from 'three/webgpu';
-import { Sprite, SpriteMaterial, Texture, type Scene } from 'three/webgpu';
-import { TextureFactory } from '../texture/TextureFactory.js';
-import { OrthographicProjection } from './OrthographicProjection.js';
-import { Stage2D } from './Stage2D.js';
-import { StageRenderer } from './StageRenderer.js';
+import {emit, type EventizedObject, eventize} from '@spearwolf/eventize';
+import type {WebGPURenderer} from 'three/webgpu';
+import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
+import {TextureFactory} from '../texture/TextureFactory.js';
+import {OrthographicProjection} from './OrthographicProjection.js';
+import {Stage2D} from './Stage2D.js';
+import {StageRenderer} from './StageRenderer.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
 

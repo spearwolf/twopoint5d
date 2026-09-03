@@ -1,7 +1,7 @@
 import {emit, type EventizedObject, eventize, off, once, retain} from '@spearwolf/eventize';
-import type { Effect, Signal} from '@spearwolf/signalize';
+import type {Effect, Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
-import type { WebGPURenderer} from 'three/webgpu';
+import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
 import type {TextureAtlas} from './TextureAtlas.js';

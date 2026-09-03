@@ -2,9 +2,7 @@ import type {DisplayEventProps} from '../display/types.js';
 
 export type StageRendererHostUnsubscribe = () => void;
 
-export type StageRendererHostEventHandler = (
-  handler: (props: DisplayEventProps) => unknown,
-) => StageRendererHostUnsubscribe;
+export type StageRendererHostEventHandler = (handler: (props: DisplayEventProps) => unknown) => StageRendererHostUnsubscribe;
 
 /**
  * What a `StageRenderer` needs from its frame-loop host (typically a

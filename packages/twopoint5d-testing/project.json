@@ -2,6 +2,5 @@
   "name": "twopoint5d-testing",
   "tags": ["ci", "twopoint5d"],
   "root": "packages/twopoint5d-testing",
-  "targets": {
-  }
+  "targets": {}
 }

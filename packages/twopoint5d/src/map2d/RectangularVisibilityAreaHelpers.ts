@@ -1,4 +1,4 @@
-import type { Object3D} from 'three/webgpu';
+import type {Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, Color, Vector3} from 'three/webgpu';
 import {HelpersManager} from './HelpersManager.js';
 import type {RectangularVisibilityArea} from './RectangularVisibilityArea.js';

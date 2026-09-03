@@ -245,9 +245,7 @@ describe('Display — resize behavior', () => {
     expect(display.width).to.equal(window.innerWidth);
     expect(display.height).to.equal(window.innerHeight);
 
-    const fullscreenClass = Array.from(canvas.classList).find((c) =>
-      c.startsWith(Display.CssRulesPrefixFullscreen),
-    );
+    const fullscreenClass = Array.from(canvas.classList).find((c) => c.startsWith(Display.CssRulesPrefixFullscreen));
     expect(fullscreenClass, 'fullscreen CSS class is added').to.exist;
 
     // Switch back to "self" — the fullscreen class must be removed.
@@ -257,9 +255,7 @@ describe('Display — resize behavior', () => {
     await nextFrame(display);
     await nextFrame(display);
 
-    const stillHasFullscreen = Array.from(canvas.classList).some((c) =>
-      c.startsWith(Display.CssRulesPrefixFullscreen),
-    );
+    const stillHasFullscreen = Array.from(canvas.classList).some((c) => c.startsWith(Display.CssRulesPrefixFullscreen));
     expect(stillHasFullscreen, 'fullscreen CSS class is removed').to.equal(false);
     expect(display.width).to.equal(100);
     expect(display.height).to.equal(50);

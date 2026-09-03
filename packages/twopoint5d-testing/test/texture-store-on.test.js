@@ -300,12 +300,7 @@ describe('TextureStore.on() — black-box workflow', function () {
       const a = await waitUntil(() => atlas);
       expect(a).to.be.instanceOf(TextureAtlas);
       const names = a.frameNames();
-      expect(names).to.include.members([
-        'ball-pattern-blau',
-        'ball-pattern-dunkelrot',
-        'ball-pattern-pink',
-        'ball-pattern-rot',
-      ]);
+      expect(names).to.include.members(['ball-pattern-blau', 'ball-pattern-dunkelrot', 'ball-pattern-pink', 'ball-pattern-rot']);
 
       unsub();
     });

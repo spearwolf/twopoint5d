@@ -214,61 +214,67 @@ export class TextureStore {
     const updatedResources: TextureResource[] = [];
 
     batch(() => {
-    for (const [id, item] of Object.entries(data.items)) {
-      let resource: TextureResource | undefined = this.#resources.get(id);
+      for (const [id, item] of Object.entries(data.items)) {
+        let resource: TextureResource | undefined = this.#resources.get(id);
 
-      const textureClasses = joinTextureClasses(item.texture, this.defaultTextureClasses);
+        const textureClasses = joinTextureClasses(item.texture, this.defaultTextureClasses);
 
-      if (item.tileSet) {
-        if (resource) {
-          if (resource.type !== 'tileset') {
-            throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "tileset"`);
+        if (item.tileSet) {
+          if (resource) {
+            if (resource.type !== 'tileset') {
+              throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "tileset"`);
+            }
+            batch(() => {
+              resource.imageUrl = item.imageUrl;
+              resource.tileSetOptions = item.tileSet;
+              resource.textureClasses = textureClasses;
+              resource.frameBasedAnimationsData = item.frameBasedAnimations;
+            });
+          } else {
+            resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
           }
-          batch(() => {
-            resource.imageUrl = item.imageUrl;
-            resource.tileSetOptions = item.tileSet;
-            resource.textureClasses = textureClasses;
-            resource.frameBasedAnimationsData = item.frameBasedAnimations;
-          });
-        } else {
-          resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
+        } else if (item.atlasUrl) {
+          if (resource) {
+            if (resource.type !== 'atlas') {
+              throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "atlas"`);
+            }
+            batch(() => {
+              resource.atlasUrl = item.atlasUrl;
+              resource.overrideImageUrl = item.overrideImageUrl;
+              resource.textureClasses = textureClasses;
+              resource.frameBasedAnimationsData = item.frameBasedAnimations;
+            });
+          } else {
+            resource = TextureResource.fromAtlas(
+              id,
+              item.atlasUrl,
+              item.overrideImageUrl,
+              textureClasses,
+              item.frameBasedAnimations,
+            );
+          }
+        } else if (item.imageUrl) {
+          if (resource) {
+            if (resource.type !== 'image') {
+              throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "image"`);
+            }
+            batch(() => {
+              resource.imageUrl = item.imageUrl;
+              resource.textureClasses = textureClasses;
+            });
+          } else {
+            resource = TextureResource.fromImage(id, item.imageUrl, textureClasses);
+          }
         }
-      } else if (item.atlasUrl) {
+
         if (resource) {
-          if (resource.type !== 'atlas') {
-            throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "atlas"`);
+          if (!this.#resources.has(id)) {
+            resource.textureFactory = this.#textureFactory.value;
           }
-          batch(() => {
-            resource.atlasUrl = item.atlasUrl;
-            resource.overrideImageUrl = item.overrideImageUrl;
-            resource.textureClasses = textureClasses;
-            resource.frameBasedAnimationsData = item.frameBasedAnimations;
-          });
-        } else {
-          resource = TextureResource.fromAtlas(id, item.atlasUrl, item.overrideImageUrl, textureClasses, item.frameBasedAnimations);
-        }
-      } else if (item.imageUrl) {
-        if (resource) {
-          if (resource.type !== 'image') {
-            throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "image"`);
-          }
-          batch(() => {
-            resource.imageUrl = item.imageUrl;
-            resource.textureClasses = textureClasses;
-          });
-        } else {
-          resource = TextureResource.fromImage(id, item.imageUrl, textureClasses);
+          this.#resources.set(id, resource);
+          updatedResources.push(resource);
         }
       }
-
-      if (resource) {
-        if (!this.#resources.has(id)) {
-          resource.textureFactory = this.#textureFactory.value;
-        }
-        this.#resources.set(id, resource);
-        updatedResources.push(resource);
-      }
-    }
     });
 
     emit(this, OnReady, this);

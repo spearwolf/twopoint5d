@@ -18,11 +18,7 @@ describe('FrameBasedAnimations', () => {
   describe('add with TextureCoords array', () => {
     test('add animation with name and TextureCoords array', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [
-        new TextureCoords(0, 0, 32, 32),
-        new TextureCoords(32, 0, 32, 32),
-        new TextureCoords(64, 0, 32, 32),
-      ];
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)];
 
       const id = animations.add('walk', 1.0, frames);
 
@@ -54,10 +50,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       const id0 = animations.add('idle', 1.0, [new TextureCoords(0, 0, 32, 32)]);
-      const id1 = animations.add('walk', 0.5, [
-        new TextureCoords(32, 0, 32, 32),
-        new TextureCoords(64, 0, 32, 32),
-      ]);
+      const id1 = animations.add('walk', 0.5, [new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)]);
       const id2 = animations.add('run', 0.3, [
         new TextureCoords(0, 32, 32, 32),
         new TextureCoords(32, 32, 32, 32),
@@ -187,11 +180,7 @@ describe('FrameBasedAnimations', () => {
   describe('bakeDataTexture', () => {
     test('bake DataTexture without includeTextureSize option', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [
-        new TextureCoords(0, 0, 32, 32),
-        new TextureCoords(32, 0, 32, 32),
-        new TextureCoords(64, 0, 32, 32),
-      ];
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)];
 
       animations.add('walk', 1.0, frames);
 
@@ -204,10 +193,7 @@ describe('FrameBasedAnimations', () => {
 
     test('bake DataTexture with includeTextureSize option', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [
-        new TextureCoords(0, 0, 32, 32),
-        new TextureCoords(32, 0, 32, 32),
-      ];
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
 
       animations.add('walk', 1.0, frames);
 
@@ -222,10 +208,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       animations.add('idle', 1.0, [new TextureCoords(0, 0, 32, 32)]);
-      animations.add('walk', 0.5, [
-        new TextureCoords(32, 0, 32, 32),
-        new TextureCoords(64, 0, 32, 32),
-      ]);
+      animations.add('walk', 0.5, [new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)]);
       animations.add('run', 0.3, [
         new TextureCoords(0, 32, 32, 32),
         new TextureCoords(32, 32, 32, 32),
@@ -385,10 +368,7 @@ describe('FrameBasedAnimations', () => {
 
     test('add animation with duration option object', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [
-        new TextureCoords(0, 0, 32, 32),
-        new TextureCoords(32, 0, 32, 32),
-      ];
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
 
       const id = animations.add('idle', {duration: 2.5}, frames);
 

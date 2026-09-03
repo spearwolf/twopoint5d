@@ -18,8 +18,7 @@ import {RootRenderPipeline} from './RootRenderPipeline.js';
 
 export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
 
-const hasAsPassNode = (s: unknown): s is IPassProvider =>
-  typeof (s as IPassProvider)?.asPassNode === 'function';
+const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProvider)?.asPassNode === 'function';
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 

@@ -35,8 +35,7 @@ const NEIGHBOR_DX_DY: ReadonlyArray<readonly [number, number]> = [
 
 const toBoxId = (x: number, y: number) => `${x},${y}`;
 
-const setAABB2 = (target: AABB2, {top, left, width, height}: TilesWithinCoords): AABB2 =>
-  target.set(left, top, width, height);
+const setAABB2 = (target: AABB2, {top, left, width, height}: TilesWithinCoords): AABB2 => target.set(left, top, width, height);
 
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, target = new Frustum()): Frustum =>
   target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));

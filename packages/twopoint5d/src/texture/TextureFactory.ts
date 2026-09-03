@@ -1,5 +1,4 @@
-import type {
-  WebGPURenderer} from 'three/webgpu';
+import type {WebGPURenderer} from 'three/webgpu';
 import {
   LinearFilter,
   LinearSRGBColorSpace,

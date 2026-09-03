@@ -553,7 +553,9 @@ describe('StageRenderer', () => {
         const a = make('a');
         const b = make('b');
         const c = make('c');
-        sr.add(a.stage as any).add(b.stage as any).add(c.stage as any);
+        sr.add(a.stage as any)
+          .add(b.stage as any)
+          .add(c.stage as any);
         sr.renderOrder = 'c,a,b';
         const buildOutputNode = vi.fn((nodes: unknown[]) => nodes[0]);
         sr.buildOutputNode = buildOutputNode as any;

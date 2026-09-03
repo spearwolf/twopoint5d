@@ -1,16 +1,5 @@
-import type {
-  Box3,
-  Object3D} from 'three/webgpu';
-import {
-  Box3Helper,
-  BoxGeometry,
-  Color,
-  Mesh,
-  MeshBasicMaterial,
-  PlaneHelper,
-  Vector2,
-  Vector3,
-} from 'three/webgpu';
+import type {Box3, Object3D} from 'three/webgpu';
+import {Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
 import type {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
 import {type TilesWithinCoords} from './Map2DTileCoordsUtil.js';

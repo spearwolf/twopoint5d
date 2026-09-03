@@ -19,12 +19,7 @@ interface IChunkAxis {
 
 type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
-const scoreAxis = (
-  chunks: IDataChunk2D[],
-  beforeKey: AABBPropKey,
-  afterKey: AABBPropKey,
-  origin: number,
-): IChunkAxis | null => {
+const scoreAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey, origin: number): IChunkAxis | null => {
   const chunksCount = chunks.length;
   let beforeCount = 0;
   let intersectCount = 0;

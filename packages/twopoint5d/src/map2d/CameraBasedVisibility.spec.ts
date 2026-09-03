@@ -238,9 +238,8 @@ describe('CameraBasedVisibility', () => {
   describe('IMap2DVisibilitor interface', () => {
     test('is implemented (computeVisibleTiles function exposed)', () => {
       const visibility = new CameraBasedVisibility();
-      const fn: (
-        ...args: Parameters<CameraBasedVisibility['computeVisibleTiles']>
-      ) => IMap2DVisibleTiles | undefined = visibility.computeVisibleTiles.bind(visibility);
+      const fn: (...args: Parameters<CameraBasedVisibility['computeVisibleTiles']>) => IMap2DVisibleTiles | undefined =
+        visibility.computeVisibleTiles.bind(visibility);
       expect(typeof fn).toBe('function');
     });
   });

@@ -1114,8 +1114,7 @@ describe('vertex-buffers-geometry-updates', () => {
       },
     });
 
-    const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) =>
-      pool.buffer.bufferAttributes.get(attrName).bufferName;
+    const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) => pool.buffer.bufferAttributes.get(attrName).bufferName;
 
     test('a route that gives up a shared pool hands the slot back to the route that keeps it', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
@@ -1192,9 +1191,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const bufferName = bufferNameOf(extraPool, 'foo');
-      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(
-        extraPool.buffer.buffers.get(bufferName).typedArray,
-      );
+      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(extraPool.buffer.buffers.get(bufferName).typedArray);
     });
   });
 });

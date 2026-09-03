@@ -1,5 +1,5 @@
 import type {Object3D} from 'three/webgpu';
-import { Vector2, Vector3} from 'three/webgpu';
+import {Vector2, Vector3} from 'three/webgpu';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 

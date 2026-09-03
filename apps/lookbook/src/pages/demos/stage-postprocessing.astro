@@ -55,7 +55,7 @@ import {description, showSource, title} from './_stage-postprocessing.json';
   stage.scene.position.set(-400, -300, 0); // Center the stage so sprites can go around the edges
 
   // Animate them on a circle so the bloom moves
-  const phases = sprites.map((_, i) => i * (1.5 * (Math.PI * 2) / sprites.length));
+  const phases = sprites.map((_, i) => i * ((1.5 * (Math.PI * 2)) / sprites.length));
   on(stage, OnStageUpdateFrame, ({now}: StageUpdateFrameProps) => {
     for (let i = 0; i < sprites.length; i++) {
       const a = phases[i] + now * 0.6;

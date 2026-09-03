@@ -30,7 +30,7 @@ export class PerspectiveOrbitDemo extends Display {
 
     on(this, 'enableOrbitControls', (enabled) => {
       this.controls.enabled = enabled;
-    })
+    });
 
     this.renderer.setClearColor(new Color(0x000000), 0.0);
 

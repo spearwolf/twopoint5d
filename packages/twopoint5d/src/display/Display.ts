@@ -1,4 +1,15 @@
-import {emit, type EventizedObject, eventize, off, on, once, onceAsync, retain, retainClear, type UnsubscribeFunc} from '@spearwolf/eventize';
+import {
+  emit,
+  type EventizedObject,
+  eventize,
+  off,
+  on,
+  once,
+  onceAsync,
+  retain,
+  retainClear,
+  type UnsubscribeFunc,
+} from '@spearwolf/eventize';
 import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,

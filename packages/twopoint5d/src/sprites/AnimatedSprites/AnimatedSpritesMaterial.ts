@@ -1,8 +1,8 @@
-import { createEffect, createSignal } from '@spearwolf/signalize';
-import { add, attribute, div, mod, mul, texture, uniform, vec2, vec4 } from 'three/tsl';
-import { type Texture } from 'three/webgpu';
-import { TexturedSpritesMaterial, type TexturedSpritesMaterialParameters } from '../TexturedSprites/TexturedSpritesMaterial.js';
-import { texCoordsFromIndex } from '../node-utils.js';
+import {createEffect, createSignal} from '@spearwolf/signalize';
+import {add, attribute, div, mod, mul, texture, uniform, vec2, vec4} from 'three/tsl';
+import {type Texture} from 'three/webgpu';
+import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '../TexturedSprites/TexturedSpritesMaterial.js';
+import {texCoordsFromIndex} from '../node-utils.js';
 
 export interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
   animsMap?: Texture;

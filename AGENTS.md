@@ -21,7 +21,7 @@ Structure: **Monorepo** with **NX** and **pnpm Workspaces**.
 Run all commands from the project root.
 
 -   **Install:** `pnpm install`
--   **Lint:** `pnpm lint` (ESLint for workspace)
+-   **Lint:** `pnpm lint` (ESLint and Prettier for workspace; `pnpm format` writes the Prettier changes)
 -   **Build:** `pnpm build` (All packages/apps). Single: `nx build <project>` (e.g., `twopoint5d`).
 -   **Test:** `pnpm test` (Runs all: `vitest` unit tests & `@web/test-runner` browser tests).
 -   **Start Demos:**

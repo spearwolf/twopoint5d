@@ -1,4 +1,4 @@
-import type { BufferGeometry} from 'three/webgpu';
+import type {BufferGeometry} from 'three/webgpu';
 import {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';

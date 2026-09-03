@@ -11,7 +11,7 @@ export interface Props {
   description?: string;
 }
 
-const {title, showSource = {}, description = ""} = Astro.props;
+const {title, showSource = {}, description = ''} = Astro.props;
 
 const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoint5d/tree/main';
 

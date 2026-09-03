@@ -2,9 +2,7 @@
   "items": {
     "nobingers": {
       "imageUrl": "/lookbook/assets/nobinger-anim-sheet.png",
-      "texture": [
-        "srgb"
-      ],
+      "texture": ["srgb"],
       "tileSet": {
         "tileWidth": 64,
         "tileHeight": 64,
@@ -13,16 +11,7 @@
       "frameBasedAnimations": {
         "anim0": {
           "frameRate": 12,
-          "tileIds": [
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2
-          ]
+          "tileIds": [1, 2, 3, 4, 5, 4, 3, 2]
         }
       }
     }

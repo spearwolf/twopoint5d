@@ -1,21 +1,17 @@
-import { esbuildPlugin } from '@web/dev-server-esbuild';
-import { defaultReporter } from '@web/test-runner';
-import { playwrightLauncher } from '@web/test-runner-playwright';
+import {esbuildPlugin} from '@web/dev-server-esbuild';
+import {defaultReporter} from '@web/test-runner';
+import {playwrightLauncher} from '@web/test-runner-playwright';
 
 export default {
   nodeResolve: true,
   // in a monorepo you need to set set the root dir to resolve modules
   rootDir: '../../',
   files: 'test/**/*.test.js',
-  reporters: [
-    defaultReporter({ reportTestResults: true, reportTestProgress: false }),
-  ],
-  plugins: [
-    esbuildPlugin({ target: 'auto' }),
-  ],
+  reporters: [defaultReporter({reportTestResults: true, reportTestProgress: false})],
+  plugins: [esbuildPlugin({target: 'auto'})],
   browsers: [
     // https://modern-web.dev/docs/test-runner/browser-launchers/playwright/
-    playwrightLauncher({ product: 'chromium', concurrency: 1 }),
+    playwrightLauncher({product: 'chromium', concurrency: 1}),
     playwrightLauncher({
       product: 'firefox',
       concurrency: 1,
@@ -23,8 +19,8 @@ export default {
         headless: true,
         // devtools: true,
         // args: ['--some-flag'],
-        firefoxUserPrefs: { 
-          "dom.webgpu.enabled": true
+        firefoxUserPrefs: {
+          'dom.webgpu.enabled': true,
         },
       },
     }),
@@ -35,7 +31,7 @@ export default {
       timeout: '2000',
     },
   },
-  testRunnerHtml: testFramework =>
+  testRunnerHtml: (testFramework) =>
     `<!DOCTYPE html>
     <html>
       <body>

@@ -405,15 +405,10 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const c = new StringDataChunk2D({x: 5, y: 5, width: 5, height: 5, data: 'C'});
       const n = new ChunkQuadTreeNode<StringDataChunk2D>([a, b, c]);
       n.subdivide(1);
-      const missing = (['northEast', 'northWest', 'southEast', 'southWest'] as const).find(
-        (q) => n.nodes[q] == null,
-      );
+      const missing = (['northEast', 'northWest', 'southEast', 'southWest'] as const).find((q) => n.nodes[q] == null);
       if (missing != null) {
         const pt =
-          missing === 'northEast' ? [5, -5]
-          : missing === 'northWest' ? [-5, -5]
-          : missing === 'southEast' ? [5, 5]
-          : [-5, 5];
+          missing === 'northEast' ? [5, -5] : missing === 'northWest' ? [-5, -5] : missing === 'southEast' ? [5, 5] : [-5, 5];
         expect(() => n.findChunksAt(pt[0], pt[1])).not.toThrow();
         expect(n.findChunksAt(pt[0], pt[1])).toEqual([]);
       }
@@ -485,8 +480,8 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const chunks = [];
       // Deterministic-ish layout
       for (let i = 0; i < 1000; i++) {
-        const x = ((i * 9301 + 49297) % 233280) / 233280 * 1000 - 500;
-        const y = ((i * 49297 + 9301) % 233280) / 233280 * 1000 - 500;
+        const x = (((i * 9301 + 49297) % 233280) / 233280) * 1000 - 500;
+        const y = (((i * 49297 + 9301) % 233280) / 233280) * 1000 - 500;
         chunks.push(new StringDataChunk2D({x, y, width: 10, height: 10, data: `c${i}`}));
       }
       const n = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);

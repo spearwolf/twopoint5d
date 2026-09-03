@@ -106,11 +106,7 @@ describe('FixedFrameLoop', () => {
   });
 
   it('forwards the original Display event props on OnRender', () => {
-    emit(
-      display,
-      OnDisplayRenderFrame,
-      makeFrame(1 / 60, {width: 1920, height: 1080, pixelRatio: 2, frameNo: 42, now: 123.45}),
-    );
+    emit(display, OnDisplayRenderFrame, makeFrame(1 / 60, {width: 1920, height: 1080, pixelRatio: 2, frameNo: 42, now: 123.45}));
 
     expect(renders[0].width).toBe(1920);
     expect(renders[0].height).toBe(1080);
