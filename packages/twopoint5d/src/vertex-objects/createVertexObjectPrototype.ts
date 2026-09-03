@@ -50,14 +50,15 @@ const makeAttributeValueSetter = (
   attrSize: number,
 ) => {
   return function setAttributeValues(this: VO, ...values: number[] | [ArrayLike<number>]) {
-    const source = values.length === 1 && Array.isArray(values[0]) ? values[0] : values;
+    const first = values[0];
+    const source: ArrayLike<number> = values.length === 1 && typeof first !== 'number' ? first : (values as number[]);
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
     const target = this[voBuffer].buffers.get(bufferName)!.typedArray;
-    for (let i = 0; i < vertexCount; i++) {
-      if (attrSize === 1) {
-        target[idx + i * bufferItemSize] = source[i];
-      } else {
-        target.set(Array.prototype.slice.call(source, i * attrSize, i * attrSize + attrSize), idx + i * bufferItemSize);
+    const {length} = source;
+    for (let i = 0, from = 0; i < vertexCount; i++, from += attrSize) {
+      const to = idx + i * bufferItemSize;
+      for (let j = 0; j < attrSize && from + j < length; j++) {
+        target[to + j] = source[from + j];
       }
     }
   };

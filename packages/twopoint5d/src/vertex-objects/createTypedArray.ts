@@ -7,7 +7,7 @@ export function createTypedArray(dataType: VertexAttributeDataType, size: number
     case 'float32':
       return new Float32Array(size);
     case 'float16':
-      return new Uint16Array(size);
+      return new Float16Array(size);
     case 'uint32':
       return new Uint32Array(size);
     case 'int32':

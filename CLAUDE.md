@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-All commands run from the repo root. Node ≥22.13 and pnpm ≥10.22 are required (`engines` in `package.json`).
+All commands run from the repo root. Node ≥24 and pnpm ≥10.22 are required (`engines` in `package.json`).
 
 - Install: `pnpm install`
 - Lint: `pnpm lint` (flat-config ESLint + Prettier; `no-console` is an error in `.ts`/`.js`)

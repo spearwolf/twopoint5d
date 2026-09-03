@@ -386,6 +386,32 @@ describe('VertexObjectBuffer', () => {
     ]);
   });
 
+  test('copyAttributes() stops at the end of the source data', () => {
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+        },
+      },
+    });
+    const vob = new VertexObjectBuffer(descriptor, 2);
+
+    expect(
+      vob.copyAttributes({
+        // one component short of the last vertex of the first object
+        foo: [1, 2, 3, 4, 5, 6, 7],
+      }),
+    ).toEqual(1);
+
+    // prettier-ignore
+    expect(Array.from(vob.buffers.get('static_float32').typedArray)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 0,
+      0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+  });
+
   test('toAttributeArrays', () => {
     const vob = new VertexObjectBuffer(
       new VertexObjectDescriptor({

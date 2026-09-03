@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InstancedVOBufferGeometry#detachInstancedPool()` disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, and one that a second route of the same geometry still reads stays alive. Attaching over a name that is already taken runs the same path, while a pool that takes its own name over again keeps everything it has
 - the `autoDispose` option of `InstancedVOBufferGeometry#attachInstancedPool()` defaults to whether the geometry built the pool itself: a descriptor or description handed in becomes a pool the geometry releases with itself, an existing `VertexObjectPool` stays the caller's. An explicit `autoDispose` still decides
 - `TexturedSprites#createSprite()` and `#freeSprite()` are methods on the mesh and operate on its geometry's sprite pool; `createSprite()` returns `TexturedSprite | undefined` and answers `undefined` once the pool has reached its capacity
+- `float16` attributes are backed by a `Float16Array`; a value written through the generated accessors is stored and read back as a half float. The `TypedArray` union lists `Float16Array` and every other type exactly once. A runtime without `Float16Array` throws on the first `float16` attribute; every other data type is unaffected
+- the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and no longer allocate an array per vertex
 
 ### Removed
 
@@ -42,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the pool an attribute name resolves to in `InstancedVOBufferGeometry#update()`: it is the pool that feeds the attribute currently sitting in that slot. Attribute names of extra pools may therefore collide with those of the instanced and base pool
 - fix `TexturedSprites#createSprite()` and `TexturedSprites#freeSprite()` losing the bind to their mesh when called as `sprites.createSprite()` and `sprites.freeSprite(sprite)`; both reach the sprite pool of the mesh they are called on
 - fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it now falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
+- fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
+- fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 
 ### Migration Guide
 
@@ -207,6 +211,33 @@ geometry.detachInstancedPool('extra');
 Note that `dispose()` is more than the old `clear()`: it drops the typed arrays of the pool, and any
 vertex object still held by the caller is unlinked from its buffer. Keep pools you want to reuse out
 of a geometry's constructor, or hand them in as pools rather than as descriptors.
+
+#### `float16` attributes are half floats
+
+A `float16` attribute's buffer is a `Float16Array`. Values written through the generated accessors
+round to half-float precision instead of being truncated to an integer.
+
+**Before**
+
+```ts
+vo.v = 0.1;
+vo.v; // 0
+```
+
+**After**
+
+```ts
+vo.v = 0.1;
+vo.v; // 0.0999755859375
+```
+
+Two things follow from the switch:
+
+- The runtime needs `Float16Array`. It shipped in Node 22.13 and has been available in every major
+  browser engine since 2025; a runtime without it throws on the first `float16` attribute.
+- A consumer that names the `TypedArray` type from this package directly needs a `tsconfig.json`
+  `lib` that includes `ESNext.Float16` (TypeScript 5.9.3: the declaration lives in
+  `lib.esnext.float16.d.ts`, in no year-numbered `lib`).
 
 Sharing a pool between geometries is the caller's job for the same reason: the geometry that built a
 pool releases it on `dispose()`, whoever else reads it by then. Passing on a pool a geometry built

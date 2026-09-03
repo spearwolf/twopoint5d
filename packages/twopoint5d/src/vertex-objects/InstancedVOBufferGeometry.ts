@@ -12,6 +12,7 @@ import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
@@ -437,7 +438,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       // the pool has been disposed, there is no array left to point at
       if (poolBuf === undefined) continue;
 
-      bufAttr.array = poolBuf.typedArray;
+      bufAttr.array = asThreeTypedArray(poolBuf.typedArray);
     }
   }
 

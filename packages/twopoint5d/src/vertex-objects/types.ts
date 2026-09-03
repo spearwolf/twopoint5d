@@ -5,13 +5,13 @@ import type {voBuffer, voIndex} from './constants.js';
 export type TypedArray =
   | Float64Array
   | Float32Array
-  | Uint16Array
+  | Float16Array
   | Uint32Array
   | Int32Array
   | Uint16Array
   | Int16Array
-  | Uint8Array
   | Uint8ClampedArray
+  | Uint8Array
   | Int8Array;
 
 export type VertexAttributeDataType =

@@ -5,6 +5,7 @@ import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
@@ -161,7 +162,7 @@ export class VOBufferGeometry extends BufferGeometry {
       if (poolBufInfo) {
         const poolBuf = this.pool.buffer.buffers.get(poolBufInfo.bufferName);
         if (poolBuf) {
-          bufAttr.array = poolBuf.typedArray;
+          bufAttr.array = asThreeTypedArray(poolBuf.typedArray);
         }
       }
     }

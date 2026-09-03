@@ -2,6 +2,7 @@ import type { BufferGeometry} from 'three/webgpu';
 import {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
+import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {createIndicesArray} from './createIndicesArray.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
@@ -21,7 +22,7 @@ export function initializeAttributes(
   for (const buffer of pool.buffer.buffers.values()) {
     const attributes = pool.buffer.bufferNameAttributes.get(buffer.bufferName);
     if (attributes.length > 1) {
-      const interleavedBuffer = new InterleavedBuffer(buffer.typedArray, buffer.itemSize);
+      const interleavedBuffer = new InterleavedBuffer(asThreeTypedArray(buffer.typedArray), buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
       bufferSerials.set(buffer.bufferName, buffer.serial);
@@ -35,7 +36,7 @@ export function initializeAttributes(
     } else {
       const bufAttr = attributes[0];
       const attrDesc = descriptor.attributes.get(bufAttr.attributeName);
-      const attr = new BufferAttribute(buffer.typedArray, buffer.itemSize, attrDesc.normalizedData);
+      const attr = new BufferAttribute(asThreeTypedArray(buffer.typedArray), buffer.itemSize, attrDesc.normalizedData);
       attr.setUsage(toDrawUsage(buffer.usageType));
       attr.name = bufAttr.attributeName;
       buffers.set(buffer.bufferName, attr);

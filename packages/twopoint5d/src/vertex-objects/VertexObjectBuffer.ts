@@ -163,7 +163,10 @@ export class VertexObjectBuffer {
         let bufIdx = targetObjectOffset * vertexCount * buffer.itemSize;
         while (idx < data.length && attrObjCount + targetObjectOffset < this.capacity) {
           for (let i = 0; i < vertexCount; i++) {
-            buffer.typedArray.set(Array.prototype.slice.call(data, idx, idx + attrSize), bufIdx + attr.offset);
+            const to = bufIdx + attr.offset;
+            for (let k = 0; k < attrSize && idx + k < data.length; k++) {
+              buffer.typedArray[to + k] = data[idx + k];
+            }
             idx += attrSize;
             bufIdx += buffer.itemSize;
           }
