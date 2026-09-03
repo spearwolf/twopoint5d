@@ -1,5 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
+import type {TextureNode} from 'three/webgpu';
 import {NodeMaterial, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
@@ -7,8 +8,7 @@ import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
 
 const makeAnimsMap = (): Texture => {
   const tex = new Texture();
-  // The reactive effect in AnimatedSpritesMaterial reads `animsMap.image.width/height`,
-  // so a stub image is required as soon as the signal carries a value.
+  // A stub image lets the tests below exercise the animation lookup path.
   tex.image = {width: 4, height: 4} as unknown as HTMLImageElement;
   return tex;
 };
@@ -111,6 +111,57 @@ describe('AnimatedSpritesMaterial', () => {
 
       // The texture should only be disposed once — the second call has nothing left to release.
       expect(animsMapDispose.calledOnce).toBe(true);
+    });
+  });
+
+  describe('an animsMap without an image', () => {
+    test('constructs with a texture whose image has not arrived yet', () => {
+      const tex = new Texture();
+      const material = new AnimatedSpritesMaterial({animsMap: tex});
+
+      expect(material.animsMap).toBe(tex);
+
+      material.dispose();
+    });
+
+    test('uses the neutral texture coordinates while the image is missing', () => {
+      const material = new AnimatedSpritesMaterial({animsMap: new Texture()});
+
+      expect((material.texCoordsNode as TextureNode | undefined)?.isTextureNode).toBeFalsy();
+
+      material.dispose();
+    });
+
+    test('touchAnimsMap() picks up the image once the texture has one', () => {
+      const tex = new Texture();
+      const material = new AnimatedSpritesMaterial({animsMap: tex});
+      const versionBefore = material.version;
+
+      tex.image = {width: 4, height: 4} as unknown as HTMLImageElement;
+      material.touchAnimsMap();
+
+      const texCoordsNode = material.texCoordsNode as TextureNode;
+      expect(texCoordsNode.isTextureNode).toBe(true);
+      expect(texCoordsNode.value).toBe(tex);
+      expect(material.version).toBeGreaterThan(versionBefore);
+
+      material.dispose();
+    });
+
+    test('touchAnimsMap() without an animsMap does not throw', () => {
+      const material = new AnimatedSpritesMaterial();
+
+      expect(() => material.touchAnimsMap()).not.toThrow();
+
+      material.dispose();
+    });
+
+    test('touchAnimsMap() after dispose() does not throw', () => {
+      const material = new AnimatedSpritesMaterial({animsMap: makeAnimsMap()});
+
+      material.dispose();
+
+      expect(() => material.touchAnimsMap()).not.toThrow();
     });
   });
 });

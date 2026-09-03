@@ -18,6 +18,11 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
     return this.#animsMap.get();
   }
 
+  /**
+   * Sets the animsMap texture. Plain assignment does not re-read the texture's image — an
+   * assignment of the same texture instance is a no-op to the underlying signal. Call
+   * {@link touchAnimsMap} once a texture assigned here has finished loading.
+   */
   set animsMap(value: Texture | undefined) {
     this.#animsMap.set(value);
   }
@@ -39,9 +44,10 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
     createEffect(
       () => {
-        if (this.animsMap) {
-          const animsTexture = this.animsMap.image as Texture;
-          const animsMapSize = vec2(animsTexture.width, animsTexture.height);
+        const animsImage = this.animsMap?.image as {width?: number; height?: number} | null | undefined;
+
+        if (animsImage != null && animsImage.width > 0 && animsImage.height > 0) {
+          const animsMapSize = vec2(animsImage.width, animsImage.height);
 
           const time = this.#timeUniform;
 
@@ -65,6 +71,15 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
       },
       {attach: this},
     );
+  }
+
+  /**
+   * Re-reads the animsMap texture and rebuilds the animation lookup from its current image.
+   * `TextureLoader` writes the loaded image into the same texture instance without emitting
+   * an event, so a texture assigned before it finished loading needs this call once it has.
+   */
+  touchAnimsMap(): void {
+    this.#animsMap.touch();
   }
 
   override dispose(): void {

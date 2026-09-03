@@ -18,14 +18,6 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     return this.geometry.instancedPool;
   }
 
-  get createSprite(): () => TexturedSprite {
-    return this.geometry.instancedPool.createVO;
-  }
-
-  get freeSprite(): (sprite: TexturedSprite) => void {
-    return this.geometry.instancedPool.freeVO;
-  }
-
   get texture(): Texture | undefined {
     return this.material.colorMap;
   }
@@ -48,6 +40,20 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     );
 
     this.name = 'twopoint5d.TexturedSprites';
+  }
+
+  /**
+   * Takes a sprite from the sprite pool. Answers `undefined` once the pool has reached its capacity.
+   */
+  createSprite(): TexturedSprite | undefined {
+    return this.geometry.instancedPool.createVO();
+  }
+
+  /**
+   * Gives a sprite back to the sprite pool.
+   */
+  freeSprite(sprite: TexturedSprite): void {
+    this.geometry.instancedPool.freeVO(sprite);
   }
 
   dispose(): void {
