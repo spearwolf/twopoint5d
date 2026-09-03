@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSprites#createSprite()` and `#freeSprite()` are methods on the mesh and operate on its geometry's sprite pool; `createSprite()` returns `TexturedSprite | undefined` and answers `undefined` once the pool has reached its capacity
 - `float16` attributes are backed by a `Float16Array`; a value written through the generated accessors is stored and read back as a half float. The `TypedArray` union lists `Float16Array` and every other type exactly once. A runtime without `Float16Array` throws on the first `float16` attribute; every other data type is unaffected
 - the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and no longer allocate an array per vertex
+- `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `unknown` instead of `any`
+- a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool with the capacity of the `.instancedPool`, instead of a fixed capacity of `1`
 
 ### Removed
 
@@ -271,6 +273,26 @@ two.attachInstancedPool('borrowed', shared);
 one.dispose();  // shared is untouched — neither geometry built it
 shared.dispose(); // when both geometries are gone
 ```
+
+#### `InstancedVOBufferGeometry#attachInstancedPool()` returns a typed pool
+
+The return type carries the vertex object type of the attached pool instead of `any`.
+
+**Before**
+
+```ts
+const pool = geometry.attachInstancedPool('extra', descriptor);
+pool.createVO().setFoo(1); // any, no compile-time check
+```
+
+**After**
+
+```ts
+const pool = geometry.attachInstancedPool<MyExtraVO>('extra', descriptor);
+pool.createVO()?.setFoo(1); // typed as MyExtraVO
+```
+
+Without a type argument, `pool` is typed `VertexObjectPool<unknown>`.
 
 ## [0.21.2] - 2026-06-19
 

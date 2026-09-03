@@ -1,5 +1,5 @@
-import type {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
-import { BufferGeometry} from 'three/webgpu';
+import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
+import {BufferGeometry} from 'three/webgpu';
 import type {AttributeRoute} from './GeometryAttributeSlots.js';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
@@ -68,9 +68,8 @@ export class VOBufferGeometry extends BufferGeometry {
     this.buffers.clear();
     this.bufferSerials.clear();
     this.#ownedPools.clear();
-    // the scratch map of the last update() still holds every attribute it synced, and with it
-    // the very typed arrays this method is here to let go of
-    this.#updateAttributes.clear();
+    // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
+    this.#autoTouchBuffers = undefined;
 
     super.dispose();
   }
@@ -84,18 +83,26 @@ export class VOBufferGeometry extends BufferGeometry {
     }
   }
 
+  /** Marks the buffers behind the given attribute names for GPU upload on the next `update()`. */
   touchAttributes(...attrNames: string[]): void {
     selectAttributes(this.pool, this.buffers, attrNames).forEach((buffer) => {
       buffer.needsUpdate = true;
     });
   }
 
+  /** Marks every buffer of the given usage types for GPU upload on the next `update()`. */
   touchBuffers(bufferTypes: TouchBuffersType): void {
     selectBuffers(this.buffers, bufferTypes).forEach((buffer) => {
       buffer.needsUpdate = true;
     });
   }
 
+  /**
+   * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
+   * mix of both. This is the counterpart to `autoTouch: false` (see {@link VADescription#autoTouch}):
+   * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
+   * were written.
+   */
   touch(...args: Array<string | TouchBuffersType>): void {
     const attrNames: string[] = [];
     let buffers: TouchBuffersType | undefined = undefined;
@@ -125,39 +132,25 @@ export class VOBufferGeometry extends BufferGeometry {
   }
 
   #serials: Map<string, number> = new Map();
-  #updateAttributes = new Map<string, BufferAttribute | InterleavedBuffer>();
 
   /**
    * If the references to the attribute arrays in a {@link VOBufferPool} are swapped,
    * e.g. via a {@link VOBufferPool#fromBuffersData()} call, then of course the references
    * to the typed arrays within the `THREE.BufferAttribute` structure must also be changed.
-   *
-   * TODO add tests
    */
   #syncAttributeArrays() {
-    this.#updateAttributes.clear();
-
-    // 1. find all attributes that need to be updated
-    //
-    for (const [attrName, attr] of Object.entries(this.attributes)) {
+    for (const attrName in this.attributes) {
+      const attr = this.attributes[attrName];
       const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
         ? (attr as InterleavedBufferAttribute).data
         : (attr as BufferAttribute);
-      const version = bufAttr.version;
-      if (this.#serials.has(attrName)) {
-        if (this.#serials.get(attrName) !== version) {
-          this.#updateAttributes.set(attrName, bufAttr);
-          this.#serials.set(attrName, version);
-        }
-      } else {
-        this.#updateAttributes.set(attrName, bufAttr);
-        this.#serials.set(attrName, version);
-      }
-    }
 
-    // 2. sync buffer attribute arrays
-    //
-    for (const [attrName, bufAttr] of this.#updateAttributes) {
+      // an attribute this geometry has not synced yet carries no serial, and undefined never
+      // equals a version
+      const version = bufAttr.version;
+      if (this.#serials.get(attrName) === version) continue;
+      this.#serials.set(attrName, version);
+
       const poolBufInfo = this.pool.buffer.bufferAttributes.get(attrName);
       if (poolBufInfo) {
         const poolBuf = this.pool.buffer.buffers.get(poolBufInfo.bufferName);
@@ -206,20 +199,28 @@ export class VOBufferGeometry extends BufferGeometry {
       this.#firstAutoTouch = false;
     }
 
-    const autoTouchAttrs = this.#getAutoTouchAttributeNames();
-    if (autoTouchAttrs.length) {
-      this.touchAttributes(...autoTouchAttrs);
+    for (const buffer of this.#getAutoTouchBuffers()) {
+      buffer.needsUpdate = true;
     }
   }
 
-  #autoTouchAttrNames?: string[];
+  #autoTouchBuffers?: BufferLike[];
 
-  #getAutoTouchAttributeNames(): string[] {
-    if (!this.#autoTouchAttrNames) {
-      this.#autoTouchAttrNames = Array.from(this.pool.descriptor.attributes.values())
-        .filter((attr) => attr.autoTouch)
-        .map((attr) => attr.name);
+  /**
+   * The buffers behind the attributes that carry `autoTouch`, resolved once. The selection
+   * changes only when a route is added or given up, and this geometry holds exactly one
+   * route for its whole life.
+   */
+  #getAutoTouchBuffers(): BufferLike[] {
+    if (this.#autoTouchBuffers == null) {
+      const attrNames: string[] = [];
+      for (const attr of this.pool.descriptor.attributes.values()) {
+        if (attr.autoTouch) {
+          attrNames.push(attr.name);
+        }
+      }
+      this.#autoTouchBuffers = selectAttributes(this.pool, this.buffers, attrNames);
     }
-    return this.#autoTouchAttrNames;
+    return this.#autoTouchBuffers;
   }
 }

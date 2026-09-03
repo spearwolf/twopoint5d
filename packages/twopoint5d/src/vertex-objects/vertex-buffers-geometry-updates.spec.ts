@@ -878,6 +878,69 @@ describe('vertex-buffers-geometry-updates', () => {
     });
   });
 
+  describe('attachInstancedPool()', () => {
+    const dynamicExtraDesc = new VertexObjectDescriptor({
+      meshCount: 1,
+      attributes: {
+        quux: {
+          size: 1,
+          type: 'float32',
+          usage: 'dynamic',
+        },
+      },
+    });
+
+    test('a descriptor is wrapped in a pool with the capacity of the instancedPool', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      expect(pool.capacity).toBe(geometry.instancedPool.capacity);
+    });
+
+    // guards the auto-touch buffer cache: it is resolved once and must be invalidated whenever a
+    // route is added, or a route attached after the cache was first primed would never get touched
+    test('a route attached after the auto-touch cache was primed is still touched on later updates', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.instancedPool.createVO();
+      geometry.update(); // primes the cache while the extra route does not exist yet
+
+      const pool = geometry.attachInstancedPool('extra', dynamicExtraDesc);
+      pool.createVO();
+
+      // this first post-attach update() also sees the buffer's serial for the first time, which
+      // touches it regardless of the auto-touch cache - it is not yet the measurement
+      geometry.update();
+      const buffer = bufferInSlot(geometry, 'quux');
+      const versionAfterFirstUpdate = buffer.version;
+
+      // the serial is stable by now, so only a correctly invalidated auto-touch cache touches
+      // the buffer again
+      geometry.update();
+
+      expect(buffer.version).toBeGreaterThan(versionAfterFirstUpdate);
+    });
+
+    // guards the same cache on the way out: a route that gave up its pool must not keep getting
+    // touched through a stale entry in the resolved buffer list
+    test('a released route is no longer touched, and update() does not throw', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.instancedPool.createVO();
+
+      const pool = geometry.attachInstancedPool('extra', dynamicExtraDesc);
+      pool.createVO();
+      geometry.update(); // primes the cache with the extra route included
+
+      const buffer = bufferInSlot(geometry, 'quux');
+      const versionBeforeDetach = buffer.version;
+
+      geometry.detachInstancedPool('extra');
+
+      expect(() => geometry.update()).not.toThrow();
+      expect(buffer.version).toBe(versionBeforeDetach);
+    });
+  });
+
   describe('update() on a released pool', () => {
     test('an instanced geometry reading a pool that its builder released does not throw', () => {
       const owner = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
@@ -977,6 +1040,57 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(Object.keys(withOwnPool.attributes)).toEqual([]);
       expect(withOwnPool.index).toBeNull();
       expect(pool.isDisposed).toBe(true);
+    });
+
+    // guards the auto-touch buffer cache: a pool handed in from outside survives dispose() with
+    // `usedCount > 0`, and a stale cache entry would keep touching its buffer through a geometry
+    // that no longer holds any route to it
+    test('does not touch an autoTouch buffer of a handed-in pool on an instanced geometry', () => {
+      const handedIn = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
+      handedIn.createVO();
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(handedIn, 10, baseDesc, 1);
+      geometry.update(); // primes the cache with the handed-in pool's autoTouch buffer (`impact`)
+
+      const buffer = bufferInSlot(geometry, 'impact');
+      geometry.dispose();
+      const versionAfterDispose = buffer.version;
+
+      geometry.update();
+
+      expect(buffer.version).toBe(versionAfterDispose);
+      expect(handedIn.isDisposed).toBe(false);
+    });
+
+    // same guard, for the non-instanced geometry
+    test('does not touch an autoTouch buffer of a handed-in pool on a non-instanced geometry', () => {
+      const dynamicQuadDesc = new VertexObjectDescriptor({
+        vertexCount: 4,
+        indices: [0, 1, 2, 0, 2, 3],
+
+        attributes: {
+          position: {
+            components: ['x', 'y', 'z'],
+            type: 'float32',
+            usage: 'dynamic',
+          },
+        },
+      });
+
+      const handedIn = new VertexObjectPool<MyBaseVO>(dynamicQuadDesc, 10);
+      handedIn.createVO();
+
+      const geometry = new VertexObjectGeometry<MyBaseVO>(handedIn, 10);
+      geometry.update(); // primes the cache with the handed-in pool's autoTouch buffer (`position`)
+
+      const buffer = bufferInSlot(geometry, 'position');
+      geometry.dispose();
+      const versionAfterDispose = buffer.version;
+
+      geometry.update();
+
+      expect(buffer.version).toBe(versionAfterDispose);
+      expect(handedIn.isDisposed).toBe(false);
     });
   });
 

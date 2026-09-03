@@ -24,6 +24,10 @@ export class VertexAttributeDescriptor {
     return this.description.usage ?? 'static';
   }
 
+  /**
+   * Defaults to `false` for `usageType: 'static'` and `true` otherwise.
+   * See {@link VADescription#autoTouch} for what this controls.
+   */
   get autoTouch(): boolean {
     return this.description.autoTouch ?? this.usageType !== 'static';
   }

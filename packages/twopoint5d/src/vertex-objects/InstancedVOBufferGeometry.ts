@@ -1,17 +1,12 @@
-import type {
-  BufferAttribute,
-  InterleavedBuffer,
-  InterleavedBufferAttribute} from 'three/webgpu';
-import {
-  BufferGeometry,
-  InstancedBufferGeometry
-} from 'three/webgpu';
+import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
+import {BufferGeometry, InstancedBufferGeometry} from 'three/webgpu';
 import type {AttributeRoute} from './GeometryAttributeSlots.js';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import {asInstancedCopySource} from './asInstancedCopySource.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
@@ -69,7 +64,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     }
 
     if (args[2] instanceof BufferGeometry) {
-      this.copy(args[2] as any);
+      this.copy(asInstancedCopySource(args[2]));
       // the attributes that came in with it belong to the caller and are claimed before any
       // route initializes, so a route that takes such a slot gives it back when it is released
       this.#slots.claimExisting(this);
@@ -108,14 +103,18 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * This can be very useful if you have instanced attributes that have a different _meshCount_ than that of the default `.instancedPool`.
    * Or you have grouped different attributes with the help of different vertex-object-descriptors and now want to combine them here.
    *
-   * However, you should make sure that the capacities match each other in each case.
-   * **The reference instance count is derived from the default `.instancedPool`.**
+   * A descriptor or description handed in here becomes a pool with the capacity of the
+   * `.instancedPool` — **the reference instance count is derived from it.** An existing pool with
+   * a different capacity can still be attached; matching it to the `.instancedPool` is then the
+   * caller's responsibility.
    *
    * _Pro-Hint:_ It is also possible to attach a vertex-buffer-pool to several instanced geometries at the same time.
    *
+   * @typeParam VOType - the vertex object type of the attached pool; `unknown` if not given.
    * @param name - unique key for this attached pool, used by {@link detachInstancedPool} and the
    *   `extraInstancedPools` / `extraInstancedBuffers` / `extraInstancedBufferSerials` maps.
-   * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be wrapped in a new pool.
+   * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be wrapped in a new pool
+   *   with the capacity of the `.instancedPool`.
    * @param options.autoDispose - when `true`, the attached pool is disposed together with this
    *   geometry on {@link dispose}. The **default** is whether this geometry built the pool itself: a descriptor or
    *   description handed in here becomes a pool that belongs to this geometry (e.g. created on the fly when an
@@ -126,18 +125,18 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *   detached from the internal bookkeeping on `dispose`, but its buffers and typed arrays remain untouched and the
    *   caller is responsible for releasing them.
    */
-  attachInstancedPool(
+  attachInstancedPool<VOType = unknown>(
     name: string,
-    pool: VertexObjectPool<any> | VertexObjectDescriptor | VertexObjectDescription,
+    pool: VertexObjectPool<VOType> | VertexObjectDescriptor | VertexObjectDescription,
     options?: {autoDispose?: boolean},
-  ): VertexObjectPool<any> {
+  ): VertexObjectPool<VOType> {
     // asked before the descriptor is wrapped below, or every pool would look self-made afterwards
     const ownsPool = !(pool instanceof VertexObjectPool);
 
-    let extraPool: VertexObjectPool<any>;
+    let extraPool: VertexObjectPool<VOType>;
     if (ownsPool) {
       const descriptor = pool instanceof VertexObjectDescriptor ? pool : new VertexObjectDescriptor(pool);
-      extraPool = new VertexObjectPool(descriptor, 1);
+      extraPool = new VertexObjectPool(descriptor, this.instancedPool.capacity) as VertexObjectPool<VOType>;
       this.declareOwnedPool(extraPool);
     } else {
       extraPool = pool;
@@ -164,7 +163,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
 
     // reset auto-touch
-    this.#autoTouchAttrNames = undefined;
+    this.#autoTouchBuffers = undefined;
     this.#firstAutoTouch = true;
 
     return extraPool;
@@ -216,7 +215,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     }
 
     this.#attachments.detach(pool);
-    this.#autoTouchAttrNames = undefined;
+    this.#autoTouchBuffers = undefined;
 
     // another route of this geometry reading the same pool keeps it alive: its attributes stay
     // on the geometry, and they would be left reading arrays that are no longer there
@@ -263,8 +262,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * After this call the geometry holds no route, no buffer and no pool of its own any more.
    * What stays behind belongs to the attributes that are still there: their serials from the
-   * last `update()`, plus the auto-touch bookkeeping (`#autoTouchAttrNames`, `#firstAutoTouch`).
-   * Then `super.dispose()` (the `THREE.InstancedBufferGeometry` cleanup) is invoked.
+   * last `update()`, plus `#firstAutoTouch`. Then `super.dispose()` (the
+   * `THREE.InstancedBufferGeometry` cleanup) is invoked.
    */
   override dispose(): void {
     // the geometry is gone either way, so every pool it held gives up its attachment
@@ -302,12 +301,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.extraInstancedBufferSerials.clear();
     this.#extraInstancedPoolAutoDispose.clear();
     this.#ownedPools.clear();
-    // the scratch map of the last update() still holds every attribute it synced, and with it
-    // the very typed arrays this method is here to let go of
-    this.#updateAttributes.clear();
+    // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
+    this.#autoTouchBuffers = undefined;
     super.dispose();
   }
 
+  /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. */
   touchAttributes(...attrNames: string[]): void {
     if (this.basePool) {
       selectAttributes(this.basePool, this.baseBuffers, attrNames).forEach((buffer) => {
@@ -329,6 +328,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     }
   }
 
+  /** Marks every buffer of the given usage types, across every route, for GPU upload on the next `update()`. */
   touchBuffers(bufferTypes: TouchInstancedBuffersType | TouchBuffersType): void {
     if ('base' in bufferTypes || 'instanced' in bufferTypes) {
       if (bufferTypes.base && this.baseBuffers) {
@@ -363,6 +363,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     }
   }
 
+  /**
+   * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
+   * mix of both. This is the counterpart to `autoTouch: false` (see {@link VADescription#autoTouch}):
+   * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
+   * were written.
+   */
   touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void {
     const attrNames: string[] = [];
     let buffers: TouchBuffersType | TouchInstancedBuffersType;
@@ -386,46 +392,32 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#updateDrawRange();
 
     this.#checkBufferSerials();
-    this.#updateBuffersUpdateRange();
     this.#autoTouchAttributes();
+    this.#updateBuffersUpdateRange();
 
     this.#syncAttributeArrays();
   }
 
   #serials: Map<string, number> = new Map();
-  #updateAttributes = new Map<string, BufferAttribute | InterleavedBuffer>();
 
   /**
    * If the references to the attribute arrays in a {@link VOBufferPool} are swapped,
    * e.g. via a {@link VOBufferPool#fromBuffersData()} call, then of course the references
    * to the typed arrays within the `THREE.BufferAttribute` structure must also be changed.
-   *
-   * TODO add tests
    */
   #syncAttributeArrays() {
-    this.#updateAttributes.clear();
-
-    // 1. find all attributes that need to be updated
-    //
-    for (const [attrName, attr] of Object.entries(this.attributes)) {
+    for (const attrName in this.attributes) {
+      const attr = this.attributes[attrName];
       const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
         ? (attr as InterleavedBufferAttribute).data
         : (attr as BufferAttribute);
-      const version = bufAttr.version;
-      if (this.#serials.has(attrName)) {
-        if (this.#serials.get(attrName) !== version) {
-          this.#updateAttributes.set(attrName, bufAttr);
-          this.#serials.set(attrName, version);
-        }
-      } else {
-        this.#updateAttributes.set(attrName, bufAttr);
-        this.#serials.set(attrName, version);
-      }
-    }
 
-    // 2. sync buffer attribute arrays
-    //
-    for (const [attrName, bufAttr] of this.#updateAttributes) {
+      // an attribute this geometry has not synced yet carries no serial, and undefined never
+      // equals a version
+      const version = bufAttr.version;
+      if (this.#serials.get(attrName) === version) continue;
+      this.#serials.set(attrName, version);
+
       // a slot without a pool holds an attribute copied from a `BufferGeometry` the caller
       // handed to the constructor: it belongs to the caller and is left exactly as it is
       const pool = this.#slots.poolOf(attrName);
@@ -498,7 +490,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   #firstAutoTouch = true;
 
-  #autoTouchAttributes = (): void => {
+  #autoTouchAttributes(): void {
     if (this.instanceCount === 0) return;
 
     if (this.#firstAutoTouch) {
@@ -506,27 +498,50 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       this.#firstAutoTouch = false;
     }
 
-    const autoTouchAttrs = this.#getAutoTouchAttributeNames();
-    if (autoTouchAttrs.length) {
-      this.touchAttributes(...autoTouchAttrs);
+    for (const buffer of this.#getAutoTouchBuffers()) {
+      buffer.needsUpdate = true;
     }
-  };
+  }
 
-  #autoTouchAttrNames?: string[];
+  #autoTouchBuffers?: BufferLike[];
 
-  #getAutoTouchAttributeNames = (): string[] => {
-    if (!this.#autoTouchAttrNames) {
-      const attrNames = [...Array.from(this.instancedPool.descriptor.attributes.values())];
+  /**
+   * The buffers behind the attributes that carry `autoTouch`, resolved once across every route
+   * of this geometry. The selection changes only when a route is added or given up.
+   */
+  #getAutoTouchBuffers(): BufferLike[] {
+    if (this.#autoTouchBuffers == null) {
+      const attrNames: string[] = [];
+      const collectNames = (pool: VOBufferPool) => {
+        for (const attr of pool.descriptor.attributes.values()) {
+          if (attr.autoTouch) {
+            attrNames.push(attr.name);
+          }
+        }
+      };
+      collectNames(this.instancedPool);
       if (this.basePool) {
-        attrNames.push(...Array.from(this.basePool.descriptor.attributes.values()));
+        collectNames(this.basePool);
       }
-      if (this.extraInstancedPools.size) {
-        for (const [, pool] of this.extraInstancedPools) {
-          attrNames.push(...Array.from(pool.descriptor.attributes.values()));
+      for (const pool of this.extraInstancedPools.values()) {
+        collectNames(pool);
+      }
+
+      // every route answers with the buffers it holds for these names, and a name a route does
+      // not carry selects nothing there
+      const buffers: BufferLike[] = [];
+      if (this.basePool) {
+        buffers.push(...selectAttributes(this.basePool, this.baseBuffers, attrNames));
+      }
+      buffers.push(...selectAttributes(this.instancedPool, this.instancedBuffers, attrNames));
+      for (const [name, pool] of this.extraInstancedPools) {
+        const routeBuffers = this.extraInstancedBuffers.get(name);
+        if (routeBuffers) {
+          buffers.push(...selectAttributes(pool, routeBuffers, attrNames));
         }
       }
-      this.#autoTouchAttrNames = attrNames.filter((attr) => attr.autoTouch).map((attr) => attr.name);
+      this.#autoTouchBuffers = buffers;
     }
-    return this.#autoTouchAttrNames;
-  };
+    return this.#autoTouchBuffers;
+  }
 }

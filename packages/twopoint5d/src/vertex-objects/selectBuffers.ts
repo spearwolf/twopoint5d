@@ -7,11 +7,14 @@ export function selectBuffers(
     [Type in VertexAttributeUsageType]?: boolean;
   },
 ): BufferLike[] {
-  const results = [];
-  for (const [usageType, needsUpdate] of Object.entries(bufferTypes)) {
-    if (needsUpdate === true) {
-      const drawUsage = toDrawUsage(usageType as VertexAttributeUsageType);
-      results.push(...Array.from(buffers.values()).filter((buffer) => buffer.usage === drawUsage));
+  const results: BufferLike[] = [];
+  for (const usageType in bufferTypes) {
+    if (bufferTypes[usageType as VertexAttributeUsageType] !== true) continue;
+    const drawUsage = toDrawUsage(usageType as VertexAttributeUsageType);
+    for (const buffer of buffers.values()) {
+      if (buffer.usage === drawUsage) {
+        results.push(buffer);
+      }
     }
   }
   return results;
