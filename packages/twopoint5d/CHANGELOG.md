@@ -20,13 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `VertexObjectPool#createVO()` to `(VOType & VO) | undefined` — the method returns `undefined` once `usedCount` has reached `capacity`
 - `VertexObjectPool#resize()` throws for every change of capacity while the pool backs a geometry — resizing to the capacity the pool already has stays a no-op and is allowed. The `THREE.BufferAttribute`s and their GPU buffers take their size from the pool capacity exactly once, so a live geometry cannot follow a capacity change
 - `VOBufferGeometry#dispose()` and `InstancedVOBufferGeometry#dispose()` release exactly the pools the geometry created itself, and leave every pool that was handed to the constructor untouched. Both also take the attributes built on the pool buffers off the geometry and drop the index, so nothing keeps the typed arrays alive through the geometry; attributes copied from a `BufferGeometry` passed to `InstancedVOBufferGeometry` stay where they are, because they belong to the caller. A further `update()` on a disposed geometry finds no attributes left to write to — it still sets the draw range and, on `InstancedVOBufferGeometry`, `instanceCount`
-- `InstancedVOBufferGeometry#detachInstancedPool()` disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, and one that a second route of the same geometry still reads stays alive. Attaching over a name that is already taken runs the same path, while a pool that takes its own name over again keeps everything it has
+- `InstancedVOBufferGeometry#detachInstancedPool()` takes the attributes that route built off the geometry, and disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, and one that a second route of the same geometry still reads stays alive. Attaching over a name that is already taken runs the same path — the attributes of the route it replaces come off with it — while a pool that takes its own name over again keeps everything it has
 - the `autoDispose` option of `InstancedVOBufferGeometry#attachInstancedPool()` defaults to whether the geometry built the pool itself: a descriptor or description handed in becomes a pool the geometry releases with itself, an existing `VertexObjectPool` stays the caller's. An explicit `autoDispose` still decides
 - `TexturedSprites#createSprite()` and `#freeSprite()` are methods on the mesh and operate on its geometry's sprite pool; `createSprite()` returns `TexturedSprite | undefined` and answers `undefined` once the pool has reached its capacity
 - `float16` attributes are backed by a `Float16Array`; a value written through the generated accessors is stored and read back as a half float. The `TypedArray` union lists `Float16Array` and every other type exactly once. A runtime without `Float16Array` throws on the first `float16` attribute; every other data type is unaffected
-- the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and no longer allocate an array per vertex
-- `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `unknown` instead of `any`
-- a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool with the capacity of the `.instancedPool`, instead of a fixed capacity of `1`
+- the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and allocate nothing per vertex
+- `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `VertexObjectPool<unknown>`
+- a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool that has the capacity of the geometry's `instancedPool`
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
 
 ### Removed
@@ -39,14 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VertexObjectPool#freeVO()`: the swap path tolerates an index slot that `createFromAttributes()` raised `usedCount` past without materializing a vertex object
 - fix `VertexObjectPool#resize()`: shrinking unlinks every vertex object from the new capacity onwards, so a later read or write on one of them fails loudly
 - fix the `VOBufferPool#usedCount` setter: the value is clamped to `[0, capacity]`, which keeps `availableCount` within `[0, capacity]` and every index handed out by `createVO()` inside the buffer
-- fix the upload range of every geometry attribute: it spans `itemSize * vertexCount * usedCount` elements, so a pool with a `vertexCount` above `1` — quads built through `VertexObjectGeometry`, for instance — uploads every vertex of every object it has in use, not just the first one
-- fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` for a pool that was disposed while the geometry still reads it: the buffers of such a pool are gone, and the geometry leaves the attributes built on them alone instead of raising a `TypeError`
+- fix the upload range of every geometry attribute: it spans `itemSize * vertexCount * usedCount` elements, so a pool with a `vertexCount` above `1` — quads built through `VertexObjectGeometry`, for instance — uploads every vertex of every object it has in use
+- fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` for a pool that was disposed while the geometry still reads it: the buffers of such a pool are gone, and the geometry leaves the attributes built on them alone
 - fix `InstancedVOBufferGeometry#update()` for the `[pool, capacity, BufferGeometry]` constructor variant: an attribute that none of the geometry's pools declares stays as it is. That is what the attributes copied from the given `BufferGeometry` need — they belong to the caller, and this constructor path has no base pool to resolve them against
-- fix `InstancedVOBufferGeometry#detachInstancedPool()` and both `dispose()` methods: giving up a route removes exactly the attributes that route put on the geometry, even when two pools share their typed arrays or declare the same attribute name. A pool is therefore safe to `resize()` once its last route to the geometry is gone
+- fix `InstancedVOBufferGeometry#detachInstancedPool()` and both `dispose()` methods: giving up a route removes exactly the attributes that route put on the geometry, even when two pools share their typed arrays or declare the same attribute name. A pool is therefore safe to `resize()` once its last route to any geometry is gone
 - fix the attribute slot a route took over: giving up that route hands the slot back to the route it took it from — an earlier pool route, or an attribute copied from a `BufferGeometry` passed to the `InstancedVOBufferGeometry` constructor
 - fix the pool an attribute name resolves to in `InstancedVOBufferGeometry#update()`: it is the pool that feeds the attribute currently sitting in that slot. Attribute names of extra pools may therefore collide with those of the instanced and base pool
-- fix `TexturedSprites#createSprite()` and `TexturedSprites#freeSprite()` losing the bind to their mesh when called as `sprites.createSprite()` and `sprites.freeSprite(sprite)`; both reach the sprite pool of the mesh they are called on
-- fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it now falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
+- fix `TexturedSprites#createSprite()` and `TexturedSprites#freeSprite()` losing their bind to the sprite pool when called as `sprites.createSprite()` and `sprites.freeSprite(sprite)`; both run on the sprite pool of the mesh they are called on
+- fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 - fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds an empty object from construction on, the shape `ParallaxProjection` starts from as well
@@ -212,36 +212,9 @@ geometry.detachInstancedPool('extra');
 // mine.isDisposed === false — it was handed in
 ```
 
-Note that `dispose()` is more than the old `clear()`: it drops the typed arrays of the pool, and any
+Note that `dispose()` is more than `clear()`: it drops the typed arrays of the pool, and any
 vertex object still held by the caller is unlinked from its buffer. Keep pools you want to reuse out
 of a geometry's constructor, or hand them in as pools rather than as descriptors.
-
-#### `float16` attributes are half floats
-
-A `float16` attribute's buffer is a `Float16Array`. Values written through the generated accessors
-round to half-float precision instead of being truncated to an integer.
-
-**Before**
-
-```ts
-vo.v = 0.1;
-vo.v; // 0
-```
-
-**After**
-
-```ts
-vo.v = 0.1;
-vo.v; // 0.0999755859375
-```
-
-Two things follow from the switch:
-
-- The runtime needs `Float16Array`. It shipped in Node 22.13 and has been available in every major
-  browser engine since 2025; a runtime without it throws on the first `float16` attribute.
-- A consumer that names the `TypedArray` type from this package directly needs a `tsconfig.json`
-  `lib` that includes `ESNext.Float16` (TypeScript 5.9.3: the declaration lives in
-  `lib.esnext.float16.d.ts`, in no year-numbered `lib`).
 
 Sharing a pool between geometries is the caller's job for the same reason: the geometry that built a
 pool releases it on `dispose()`, whoever else reads it by then. Passing on a pool a geometry built
@@ -276,6 +249,33 @@ one.dispose();  // shared is untouched — neither geometry built it
 shared.dispose(); // when both geometries are gone
 ```
 
+#### `float16` attributes are half floats
+
+A `float16` attribute's buffer is a `Float16Array`. Values written through the generated accessors
+round to half-float precision instead of being truncated to an integer.
+
+**Before**
+
+```ts
+vo.v = 0.1;
+vo.v; // 0
+```
+
+**After**
+
+```ts
+vo.v = 0.1;
+vo.v; // 0.0999755859375
+```
+
+Two things follow from the switch:
+
+- The runtime needs `Float16Array`. It shipped in Node 22.13 and has been available in every major
+  browser engine since 2025; a runtime without it throws on the first `float16` attribute.
+- A consumer that names the `TypedArray` type from this package directly needs a `tsconfig.json`
+  `lib` that includes `ESNext.Float16` (TypeScript 5.9.3: the declaration lives in
+  `lib.esnext.float16.d.ts`, in no year-numbered `lib`).
+
 #### `InstancedVOBufferGeometry#attachInstancedPool()` returns a typed pool
 
 The return type carries the vertex object type of the attached pool instead of `any`.
@@ -295,6 +295,35 @@ pool.createVO()?.setFoo(1); // typed as MyExtraVO
 ```
 
 Without a type argument, `pool` is typed `VertexObjectPool<unknown>`.
+
+#### A descriptor handed to `attachInstancedPool()` gets the instanced pool's capacity
+
+`attachInstancedPool()` wraps a descriptor or description in a pool sized like the geometry's
+`instancedPool`, so the extra pool holds one vertex object per instance.
+
+**Before**
+
+```ts
+const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+const extra = geometry.attachInstancedPool('extra', descriptor);
+extra.capacity; // 1
+```
+
+**After**
+
+```ts
+const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1000, baseDescriptor, 1);
+const extra = geometry.attachInstancedPool('extra', descriptor);
+extra.capacity; // 1000
+```
+
+Hand in a pool rather than a descriptor to pick the capacity yourself:
+
+```ts
+geometry.attachInstancedPool('extra', new VertexObjectPool(descriptor, 100));
+```
+
+A pool handed in that way belongs to the caller, and the geometry leaves it alone on `dispose()`.
 
 #### Projection fields name the values their constructors write
 
