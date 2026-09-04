@@ -27,8 +27,8 @@ Node and pnpm versions come from `engines` in `package.json`; `.nvmrc` and `mise
 -   **Build:** `pnpm build` (All packages/apps). Single: `nx build <project>` (e.g., `twopoint5d`).
 -   **Test:** `pnpm test` (Runs all: `vitest` unit tests & `@web/test-runner` browser tests).
 -   **Start Demos:**
-    -   `pnpm lookbook` (Astro demo app @ `http://localhost:4321`)
--   **CI Check:** `pnpm run ci` (clean, lint, build, typecheck, checkPkgTypes, lintPkg, then the vitest and browser suites). **Run before committing.**
+    -   `pnpm lookbook` (Astro demo app @ `http://localhost:4321/lookbook`)
+-   **CI Check:** `pnpm run ci` (clean, lint, build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, then the vitest and browser suites). **Run before committing.**
 
 ---
 

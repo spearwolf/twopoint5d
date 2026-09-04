@@ -1,55 +1,54 @@
-# Astro Starter Kit: Basics
+# twopoint5d lookbook
 
-```
-npm create astro@latest -- --template basics
-```
+The living documentation of `@spearwolf/twopoint5d`: 17 runnable demos, each linked to its
+own source, searchable by tags.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/basics)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/basics)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/basics/devcontainer.json)
+## Running it
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+From the repo root, `pnpm lookbook` (an alias for `pnpm nx dev lookbook`, which depends on
+`^build` and therefore builds the library first). From `apps/lookbook/` itself, `pnpm dev`.
+Both serve at `http://localhost:4321/lookbook` — the path comes from `base` in
+`astro.config.mjs`; without it the root URL 404s. For installing dependencies, see the
+repo-root `README.md`.
 
-![basics](https://user-images.githubusercontent.com/4677417/186188965-73453154-fdec-4d6b-9c34-cb35c248ae5b.png)
+## What's in `src/`
 
+- `pages/index.astro` — the overview page, the only page using `Layout.astro`
+- `pages/demos/<name>.astro` — 17 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 17 metadata files, one per demo page
+- `demos/` — the demo code itself, TypeScript, grouped by demo
+- `components/` — the lookbook UI: the card grid, the tag cloud, search
+- `layouts/`
+- `data/tag-categories.json` — the ordering of the tag cloud
+- `images/`
+- `styles/`
 
-## 🚀 Project Structure
+Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`, declared
+in `tsconfig.json`. All 17 demo pages import through them.
 
-Inside of your Astro project, you'll see the following folders and files:
+## Adding a demo
 
-```
-/
-├── public/
-│   └── favicon.svg
-├── src/
-│   ├── components/
-│   │   └── Card.astro
-│   ├── layouts/
-│   │   └── Layout.astro
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+1. Put the reusable classes under `src/demos/<name>/`. The wiring lives in the page's
+   `<script>` block instead — every demo page has one, and all of them import from
+   `~demos/…` there.
+2. Add `src/pages/demos/<name>.astro`, using the `VanillaDemo.astro` layout. Existing pages
+   import it under the local name `Layout`, e.g. `crosses.astro`.
+3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
+   turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
+   `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are
+   required — `url` must match the page's route, since the card links to it.
+   `description`, `tags` and `previewImage` are optional, per the `IDemo` interface in the
+   same file; without `previewImage`, `Card.astro` falls back to a default image, as in
+   `_stage-nested-pipelines.json` and `_stage-postprocessing.json`. `showSource` isn't read
+   by the overview at all — the demo page imports it from its own JSON file and passes it to
+   the layout, which builds the source link in `DemoNavBar.astro`. `_textured-sprites.json`
+   shows the full pattern.
+4. Drop the preview image into `public/images/demo-preview/`, referenced by its bare file
+   name — `src/demos/utils/demoPreviewImageUrl.ts` prepends the path.
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## Checks
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:3000`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+`pnpm nx typecheck lookbook` runs `astro check` over the 36 `.astro` and 22 `.ts` files and
+is part of the repo-wide `pnpm typecheck`. `pnpm nx build lookbook` builds the static site.
+The library is pulled in as `workspace:*`, so a change in `packages/twopoint5d` shows up here
+as soon as it's built.

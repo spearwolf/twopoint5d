@@ -32,6 +32,13 @@
         "script": "checkPkgTypes"
       }
     },
+    "checkNameableTypes": {
+      "executor": "nx:run-script",
+      "dependsOn": ["build"],
+      "options": {
+        "script": "checkNameableTypes"
+      }
+    },
     "lintPkg": {
       "executor": "nx:run-script",
       "dependsOn": ["build"],
