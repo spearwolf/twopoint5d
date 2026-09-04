@@ -278,7 +278,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('error events instead of console.error (BUG-11)', () => {
+  describe('error events instead of console.error', () => {
     test("TextureStore.load() emits 'error' on fetch failure", async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
       try {
@@ -313,7 +313,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('whenResource() / abortable get() (BUG-10)', () => {
+  describe('whenResource() / abortable get()', () => {
     test('whenResource() resolves when the resource is present at call time', async () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
@@ -346,7 +346,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('clearUnused() (BUG-9)', () => {
+  describe('clearUnused()', () => {
     test('removes and disposes resources with refCount === 0; keeps subscribed ones', () => {
       const store = new TextureStore();
       const data: TextureStoreData = {
@@ -406,7 +406,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('on()/get() listener bookkeeping (BUG-8)', () => {
+  describe('on()/get() listener bookkeeping', () => {
     test('unsubscribe() removes the OnDispose listener', () => {
       const store = new TextureStore();
       const base = getSubscriptionCount(store);
@@ -422,7 +422,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('parse() update path (BUG-3)', () => {
+  describe('parse() update path', () => {
     test('frameBasedAnimationsData is updated on existing TileSet resources', () => {
       const store = new TextureStore();
       const initialData: TextureStoreData = {
@@ -536,7 +536,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('TextureResource.load() image race (BUG-4)', () => {
+  describe('TextureResource.load() image race', () => {
     test('stale image result after imageUrl change does not overwrite fresh texture', async () => {
       let resolveFirst!: (img: unknown) => void;
       let resolveSecond!: (img: unknown) => void;

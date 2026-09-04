@@ -346,30 +346,27 @@ describe('ChunkQuadTreeNode (extended)', () => {
       return n;
     };
 
-    it('returns falsy when the corresponding child node is missing', () => {
+    it('returns false for a quadrant whose child node is missing', () => {
       const a = new StringDataChunk2D({x: -10, y: -10, width: 5, height: 5, data: 'A'});
       const b = new StringDataChunk2D({x: 10, y: 10, width: 5, height: 5, data: 'B'});
       const n = new ChunkQuadTreeNode<StringDataChunk2D>([a, b]);
       n.subdivide(1);
-      // We don't know which two of the four quadrants will be filled, but at least
-      // some must be missing — and isXxx() should be falsy for those
-      const aabb = new AABB2(0, 0, 1, 1);
-      const flags = [
-        n.isNorthEast(aabb) || false,
-        n.isNorthWest(aabb) || false,
-        n.isSouthEast(aabb) || false,
-        n.isSouthWest(aabb) || false,
-      ];
-      // at least one of the four must be falsy
-      expect(flags.some((f) => f === false)).toBe(true);
+      // origin is (-5, -5); northWest holds a, southEast holds b, northEast and
+      // southWest are both null.
+      expect(n.isNorthEast(new AABB2(0, -10, 1, 1))).toBe(false);
+      expect(n.isSouthWest(new AABB2(-10, 0, 1, 1))).toBe(false);
+      // counter-check: the populated quadrants still report true, so the false above is
+      // caused by the missing child, not by the AABB's location.
+      expect(n.isNorthWest(new AABB2(-10, -10, 1, 1))).toBe(true);
+      expect(n.isSouthEast(new AABB2(0, 0, 1, 1))).toBe(true);
     });
 
     it('returns true for an AABB clearly inside the quadrant', () => {
       const n = build();
-      expect(!!n.isNorthWest(new AABB2(-9, -9, 1, 1))).toBe(true);
-      expect(!!n.isNorthEast(new AABB2(8, -9, 1, 1))).toBe(true);
-      expect(!!n.isSouthWest(new AABB2(-9, 8, 1, 1))).toBe(true);
-      expect(!!n.isSouthEast(new AABB2(8, 8, 1, 1))).toBe(true);
+      expect(n.isNorthWest(new AABB2(-9, -9, 1, 1))).toBe(true);
+      expect(n.isNorthEast(new AABB2(8, -9, 1, 1))).toBe(true);
+      expect(n.isSouthWest(new AABB2(-9, 8, 1, 1))).toBe(true);
+      expect(n.isSouthEast(new AABB2(8, 8, 1, 1))).toBe(true);
     });
   });
 
@@ -405,13 +402,12 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const c = new StringDataChunk2D({x: 5, y: 5, width: 5, height: 5, data: 'C'});
       const n = new ChunkQuadTreeNode<StringDataChunk2D>([a, b, c]);
       n.subdivide(1);
-      const missing = (['northEast', 'northWest', 'southEast', 'southWest'] as const).find((q) => n.nodes[q] == null);
-      if (missing != null) {
-        const pt =
-          missing === 'northEast' ? [5, -5] : missing === 'northWest' ? [-5, -5] : missing === 'southEast' ? [5, 5] : [-5, 5];
-        expect(() => n.findChunksAt(pt[0]!, pt[1]!)).not.toThrow();
-        expect(n.findChunksAt(pt[0]!, pt[1]!)).toEqual([]);
-      }
+      // origin is (-5, -5); northWest holds a, southWest holds b, southEast holds c,
+      // northEast is null. (5, -6) sits north of the origin, so findChunksAt() descends
+      // into the empty northEast slot and must come back with [] instead of throwing.
+      expect(n.nodes.northEast).toBeNull();
+      expect(() => n.findChunksAt(5, -6)).not.toThrow();
+      expect(n.findChunksAt(5, -6)).toEqual([]);
     });
 
     it('returns straddling chunks stored at non-leaf nodes', () => {

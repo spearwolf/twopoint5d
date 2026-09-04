@@ -17,11 +17,11 @@ export default defineConfig({
       // the gap has grown too wide.
       thresholds: {
         statements: 65,
-        branches: 58,
-        functions: 58,
+        branches: 59,
+        functions: 59,
         lines: 65,
-        'src/vertex-objects/**': {statements: 90, branches: 82, functions: 88, lines: 90},
-        'src/texture/**': {statements: 70, branches: 60, functions: 60, lines: 70},
+        'src/vertex-objects/**': {statements: 92, branches: 84, functions: 90, lines: 92},
+        'src/texture/**': {statements: 70, branches: 61, functions: 62, lines: 70},
       },
     },
   },

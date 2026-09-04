@@ -226,4 +226,37 @@ describe('TextureAtlas', () => {
     expect(names).toHaveLength(20);
     expect(typeof names[0] === 'string').toBeTruthy();
   });
+
+  describe('index boundaries', () => {
+    test('get(), frame() and frameId() at and past the edges', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('first', new TextureCoords());
+      atlas.add(new TextureCoords());
+      const lastFrameId = atlas.add('last', new TextureCoords());
+
+      expect(atlas.size).toBe(3);
+
+      expect(atlas.get(-1)).toBeUndefined();
+      expect(atlas.get(0)!.coords).toBeInstanceOf(TextureCoords);
+      expect(atlas.get(lastFrameId)!.coords).toBeInstanceOf(TextureCoords);
+      expect(atlas.get(3)).toBeUndefined();
+
+      expect(atlas.frameId('first')).toBe(0);
+      expect(atlas.frameId('not-assigned')).toBeUndefined();
+      expect(atlas.frame('not-assigned')).toBeUndefined();
+    });
+  });
+
+  describe('empty atlas', () => {
+    test('has no frames and no random frame', () => {
+      const atlas = new TextureAtlas();
+
+      expect(atlas.size).toBe(0);
+      expect(atlas.get(0)).toBeUndefined();
+      expect(atlas.randomFrame()).toBeUndefined();
+      expect(atlas.randomFrameName()).toBeUndefined();
+      expect(atlas.randomFrames(2)).toEqual([undefined, undefined]);
+      expect(atlas.randomFrameNames(2)).toEqual([undefined, undefined]);
+    });
+  });
 });

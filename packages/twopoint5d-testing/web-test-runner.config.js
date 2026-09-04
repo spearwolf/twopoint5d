@@ -11,7 +11,14 @@ export default {
   plugins: [esbuildPlugin({target: 'auto'})],
   browsers: [
     // https://modern-web.dev/docs/test-runner/browser-launchers/playwright/
-    playwrightLauncher({product: 'chromium', concurrency: 1}),
+    playwrightLauncher({
+      product: 'chromium',
+      concurrency: 1,
+      // --enable-precise-memory-info: without it, performance.memory.usedJSHeapSize is
+      // quantized to a fixed bucket and never moves. --js-flags=--expose-gc: without it,
+      // there is no way to force a GC before a heap sample, so samples aren't comparable.
+      launchOptions: {args: ['--enable-precise-memory-info', '--js-flags=--expose-gc']},
+    }),
     playwrightLauncher({
       product: 'firefox',
       concurrency: 1,
