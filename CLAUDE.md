@@ -20,8 +20,9 @@ All commands run from the repo root. Node ≥24 and pnpm ≥10.22 are required (
 - Single Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts` (or `cd packages/twopoint5d && pnpm vitest --run src/path/to/file.spec.ts`)
 - Watch one package: `cd packages/twopoint5d && pnpm watch`
 - Lookbook dev server: `pnpm lookbook` (Astro at `http://localhost:4321`)
-- Full pre-commit gate: `pnpm run ci` (clean → lint → build → checkPkgTypes → test:ci → test:browser); `pnpm cbt` is an alias for it
+- Full pre-commit gate: `pnpm run ci` (clean → lint → build → checkPkgTypes → lintPkg → test:ci → test:browser); `pnpm cbt` is an alias for it
 - Type-check published `.d.ts` shape: `pnpm checkPkgTypes` (Are The Types Wrong, runs against built `dist/`)
+- Lint the publish manifest: `pnpm lintPkg` (publint, runs against built `dist/`)
 
 Do **not** run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without explicit instruction.
 

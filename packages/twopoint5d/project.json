@@ -13,7 +13,8 @@
       ]
     },
     "test": {
-      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
+      "outputs": ["{projectRoot}/coverage"]
     }
   }
 }

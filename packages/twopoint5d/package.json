@@ -46,11 +46,12 @@
     "compile": "pnpm tsc -p tsconfig.build.json",
     "build": "pnpm run compile && pnpm run makePackageJson",
     "clean": "pnpm rimraf build types dist",
-    "test": "pnpm vitest --run",
+    "test": "pnpm vitest --run --coverage",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm no-resolution",
-    "publishNpmPkg": "pnpm run checkPkgTypes && node ../../scripts/publishNpmPkg.mjs dist"
+    "lintPkg": "cd dist && pnpm exec publint",
+    "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "catalog:",

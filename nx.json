@@ -25,6 +25,13 @@
         "script": "checkPkgTypes"
       }
     },
+    "lintPkg": {
+      "executor": "nx:run-script",
+      "dependsOn": ["build"],
+      "options": {
+        "script": "lintPkg"
+      }
+    },
     "publishNpmPkg": {
       "executor": "nx:run-script",
       "dependsOn": ["build"],
@@ -49,7 +56,7 @@
       "{projectRoot}/package.json",
       "sharedTsconfigs",
       {
-        "externalDependencies": ["vitest"]
+        "externalDependencies": ["vitest", "@vitest/coverage-v8"]
       }
     ]
   }
