@@ -161,14 +161,14 @@ describe('VertexObjectPool', () => {
 
       vo.zack = 10;
 
-      expect(Array.from(vo[voBuffer]!.buffers.get('dynamic_float32')!.typedArray).slice(0, 3)).toEqual([3, -2, 10]);
+      expect(Array.from(vo[voBuffer]!.buffers.get('dynamic_float32')!.typedArray!).slice(0, 3)).toEqual([3, -2, 10]);
 
       vo.bar = 77;
       vo.a = 99;
       vo.b = 88;
       vo.c = 66;
 
-      expect(Array.from(vo[voBuffer]!.buffers.get('static_float32')!.typedArray).slice(0, 4)).toEqual([77, 99, 88, 66]);
+      expect(Array.from(vo[voBuffer]!.buffers.get('static_float32')!.typedArray!).slice(0, 4)).toEqual([77, 99, 88, 66]);
     });
 
     test('basePrototype', () => {

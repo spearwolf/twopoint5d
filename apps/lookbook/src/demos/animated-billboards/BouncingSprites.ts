@@ -29,7 +29,6 @@ export class BouncingSprites {
   ground: number;
 
   spriteSize: number;
-  initalSpriteCount: number;
 
   sprites: Sprite[] = [];
 

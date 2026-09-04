@@ -11,6 +11,10 @@
     },
     "preview": {
       "dependsOn": ["build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["{projectRoot}/src/**/*.ts", "sharedTsconfigs", "^default"]
     }
   }
 }

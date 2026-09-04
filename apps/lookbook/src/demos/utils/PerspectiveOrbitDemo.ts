@@ -25,14 +25,15 @@ export class PerspectiveOrbitDemo extends Display {
     this.camera = new PerspectiveCamera(75, this.width / this.height, 0.1, 1000);
     this.camera.position.z = 30;
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // inside the constructor of a Display subclass the renderer exists: `super(...)` made it
+    this.controls = new OrbitControls(this.camera, this.renderer!.domElement);
     this.controls.enableDamping = true;
 
     on(this, 'enableOrbitControls', (enabled) => {
       this.controls.enabled = enabled;
     });
 
-    this.renderer.setClearColor(new Color(0x000000), 0.0);
+    this.renderer!.setClearColor(new Color(0x000000), 0.0);
 
     on(this, OnDisplayResize, Priority.BB, ({camera, width, height}) => {
       camera.aspect = width / height;

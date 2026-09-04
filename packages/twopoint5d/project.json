@@ -12,6 +12,9 @@
         "makePackageJson"
       ]
     },
+    "typecheck": {
+      "inputs": ["{projectRoot}/src/**/*.ts", "{projectRoot}/tsconfig.typecheck.json", "sharedTsconfigs"]
+    },
     "test": {
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
       "outputs": ["{projectRoot}/coverage"]

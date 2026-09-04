@@ -55,7 +55,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       for (const [bufferName, oldBuf] of this.buffer.buffers) {
         const newBuf = newBuffer.buffers.get(bufferName)!;
         const copyLength = copyCount * vertexCount * oldBuf.itemSize;
-        newBuf.typedArray.set(oldBuf.typedArray.subarray(0, copyLength));
+        // both buffers are reached through a live pool, so both hold their arrays
+        newBuf.typedArray!.set(oldBuf.typedArray!.subarray(0, copyLength));
         newBuf.serial++;
       }
     }

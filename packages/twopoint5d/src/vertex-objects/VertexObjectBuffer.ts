@@ -14,7 +14,12 @@ interface Buffer {
   itemSize: number;
   dataType: VertexAttributeDataType;
   usageType: VertexAttributeUsageType;
-  typedArray: TypedArray;
+  /**
+   * Empty only for a buffer that someone grabbed a reference to before `VOBufferPool#dispose()`:
+   * dispose takes every buffer its array and clears the same map in the same breath, so a buffer
+   * still reachable through a living pool always holds its array.
+   */
+  typedArray: TypedArray | undefined;
   serial: number;
 }
 
@@ -125,8 +130,8 @@ export class VertexObjectBuffer {
    */
   copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
     for (const buf of this.buffers.values()) {
-      buf.typedArray.set(
-        other.buffers.get(buf.bufferName)!.typedArray,
+      buf.typedArray!.set(
+        other.buffers.get(buf.bufferName)!.typedArray!,
         targetObjectOffset * this.descriptor.vertexCount * buf.itemSize,
       );
       buf.serial++;
@@ -140,14 +145,14 @@ export class VertexObjectBuffer {
 
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
     const buf = this.buffers.get(bufferName)!;
-    buf.typedArray.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
+    buf.typedArray!.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
     buf.serial++;
   }
 
   copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
     const {vertexCount} = this.descriptor;
     for (const buf of this.buffers.values()) {
-      buf.typedArray.copyWithin(
+      buf.typedArray!.copyWithin(
         targetIndex * vertexCount * buf.itemSize,
         startIndex * vertexCount * buf.itemSize,
         endIndex * vertexCount * buf.itemSize,
@@ -163,6 +168,7 @@ export class VertexObjectBuffer {
       if (attr) {
         let attrObjCount = 0;
         const buffer = this.buffers.get(attr.bufferName)!;
+        const typedArray = buffer.typedArray!;
         const {vertexCount} = this.descriptor;
         const attrSize = this.descriptor.getAttribute(attrName)!.size;
         let idx = 0;
@@ -172,7 +178,7 @@ export class VertexObjectBuffer {
             const to = bufIdx + attr.offset;
             for (let k = 0; k < attrSize && idx + k < data.length; k++) {
               // the loop's own bound keeps `idx + k` below the length of data
-              buffer.typedArray[to + k] = data[idx + k]!;
+              typedArray[to + k] = data[idx + k]!;
             }
             idx += attrSize;
             bufIdx += buffer.itemSize;
@@ -188,12 +194,15 @@ export class VertexObjectBuffer {
     return copiedObjCount;
   }
 
-  toAttributeArrays(attributeNames: string[], startIndex = 0, endIndex = this.capacity): Record<string, TypedArray> {
+  toAttributeArrays(attributeNames: string[], startIndex = 0, endIndex = this.capacity): Record<string, TypedArray | undefined> {
     return Object.fromEntries(
-      attributeNames.map((attrName) => {
+      // the explicit tuple type picks the typed `Object.fromEntries()` overload; without it
+      // the result is `any` and no caller of this method gets its lookups checked
+      attributeNames.map((attrName): [string, TypedArray | undefined] => {
         const attr = this.bufferAttributes.get(attrName);
         if (attr) {
           const buffer = this.buffers.get(attr.bufferName)!;
+          const typedArray = buffer.typedArray!;
           const {vertexCount} = this.descriptor;
           const attrSize = this.descriptor.getAttribute(attrName)!.size;
 
@@ -204,14 +213,14 @@ export class VertexObjectBuffer {
 
           for (let objIdx = startIndex; objIdx < endIndex; objIdx++) {
             for (let i = 0; i < vertexCount; i++) {
-              targetArray.set(buffer.typedArray.subarray(bufferIdx, bufferIdx + attrSize), targetIdx);
+              targetArray.set(typedArray.subarray(bufferIdx, bufferIdx + attrSize), targetIdx);
               targetIdx += attrSize;
               bufferIdx += buffer.itemSize;
             }
           }
           return [attrName, targetArray];
         }
-        return [attrName];
+        return [attrName, undefined];
       }),
     );
   }

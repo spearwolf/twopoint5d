@@ -22,7 +22,6 @@ export class BouncingSprites {
   containerHeight: number;
 
   spriteSize: number;
-  initalSpriteCount: number;
 
   sprites: Sprite[] = [];
 
@@ -72,7 +71,8 @@ export class BouncingSprites {
 
     for (let i = 0; i < count; i++) {
       const spriteIndex = Math.floor(Math.random() * this.sprites.length);
-      this.spritePool.freeVO(this.sprites[spriteIndex]);
+      // the index comes from the array's own length, so it points at a sprite
+      this.spritePool.freeVO(this.sprites[spriteIndex]!);
       this.sprites.splice(spriteIndex, 1);
     }
   }

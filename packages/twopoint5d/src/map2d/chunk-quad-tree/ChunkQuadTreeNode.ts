@@ -265,20 +265,20 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     return out;
   }
 
-  isNorthWest(aabb: AABB2) {
-    return this.nodes.northWest && aabb.isNorthWest(this.originX!, this.originY!);
+  isNorthWest(aabb: AABB2): boolean {
+    return this.nodes.northWest != null && aabb.isNorthWest(this.originX!, this.originY!);
   }
 
-  isNorthEast(aabb: AABB2) {
-    return this.nodes.northEast && aabb.isNorthEast(this.originX!, this.originY!);
+  isNorthEast(aabb: AABB2): boolean {
+    return this.nodes.northEast != null && aabb.isNorthEast(this.originX!, this.originY!);
   }
 
-  isSouthEast(aabb: AABB2) {
-    return this.nodes.southEast && aabb.isSouthEast(this.originX!, this.originY!);
+  isSouthEast(aabb: AABB2): boolean {
+    return this.nodes.southEast != null && aabb.isSouthEast(this.originX!, this.originY!);
   }
 
-  isSouthWest(aabb: AABB2) {
-    return this.nodes.southWest && aabb.isSouthWest(this.originX!, this.originY!);
+  isSouthWest(aabb: AABB2): boolean {
+    return this.nodes.southWest != null && aabb.isSouthWest(this.originX!, this.originY!);
   }
 
   findChunksAt(x: number, y: number): ChunkType[] {

@@ -51,15 +51,22 @@ export function saveShowDemosConfig(config: LookBookShowDemosEventDetail) {
   }
 }
 
-let metadata: LookBookMetadata = undefined;
+let metadata: LookBookMetadata | undefined;
 
 export function getMetadataForDemos(): LookBookMetadata | undefined {
   if (metadata) return metadata;
 
   const lookMetatdataEl = document.getElementById('lookbook-metadata');
   if (lookMetatdataEl) {
-    const demos = JSON.parse(lookMetatdataEl.getAttribute('data-lookbook-demos'));
-    const tags = JSON.parse(lookMetatdataEl.getAttribute('data-lookbook-tags'));
+    const demosAttr = lookMetatdataEl.getAttribute('data-lookbook-demos');
+    const tagsAttr = lookMetatdataEl.getAttribute('data-lookbook-tags');
+
+    // without both attributes there is nothing to hand out; an empty object would be the
+    // claim that there had been metadata
+    if (demosAttr == null || tagsAttr == null) return undefined;
+
+    const demos = JSON.parse(demosAttr);
+    const tags = JSON.parse(tagsAttr);
 
     metadata = {
       demos,

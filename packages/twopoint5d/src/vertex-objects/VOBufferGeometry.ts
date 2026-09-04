@@ -158,7 +158,7 @@ export class VOBufferGeometry extends BufferGeometry {
       if (poolBufInfo) {
         const poolBuf = this.pool.buffer.buffers.get(poolBufInfo.bufferName);
         if (poolBuf) {
-          bufAttr.array = asThreeTypedArray(poolBuf.typedArray);
+          bufAttr.array = asThreeTypedArray(poolBuf.typedArray!);
         }
       }
     }

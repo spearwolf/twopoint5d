@@ -1,6 +1,6 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
-import type {TypedArray, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
+import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 export class VOBufferPool {
   readonly descriptor: VertexObjectDescriptor;
@@ -89,7 +89,7 @@ export class VOBufferPool {
     this.usedCount = 0;
     if (this.buffer != null) {
       for (const buffer of this.buffer.buffers.values()) {
-        buffer.typedArray = undefined as unknown as TypedArray;
+        buffer.typedArray = undefined;
       }
       this.buffer.buffers.clear();
     }
@@ -107,7 +107,8 @@ export class VOBufferPool {
       capacity: this.capacity,
       usedCount: this.usedCount,
       buffers: Object.fromEntries(
-        Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray]),
+        // a buffer still in this map holds its array; `dispose()` empties the map in the same breath
+        Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray!]),
       ),
     };
   }
@@ -127,8 +128,8 @@ export class VOBufferPool {
     for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {
       const buffer = this.buffer.buffers.get(bufferName);
       if (buffer) {
-        if (copyTypedArrays || typedArray.length < buffer.typedArray.length) {
-          buffer.typedArray.set(typedArray);
+        if (copyTypedArrays || typedArray.length < buffer.typedArray!.length) {
+          buffer.typedArray!.set(typedArray);
         } else {
           buffer.typedArray = typedArray;
         }

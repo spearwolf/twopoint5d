@@ -486,7 +486,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       // the pool has been disposed, there is no array left to point at
       if (poolBuf === undefined) continue;
 
-      bufAttr.array = asThreeTypedArray(poolBuf.typedArray);
+      bufAttr.array = asThreeTypedArray(poolBuf.typedArray!);
     }
   }
 

@@ -1,0 +1,11 @@
+{
+  // Checks only, emits nothing. `pnpm build` emits over `tsconfig.build.json`, which leaves the
+  // specs out — this config pulls them back in so their types are checked by something.
+  // A separate file rather than a `--noEmit` in the script: `tsconfig.json` carries
+  // `noEmit: false` and an `outDir` of `dist/lib`, so a forgotten flag would write the compiled
+  // specs into the published output.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

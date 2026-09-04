@@ -22,11 +22,12 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "clean": "pnpm nx run-many -t clean && rimraf dist",
+    "typecheck": "pnpm nx run-many -t typecheck",
     "checkPkgTypes": "pnpm nx run-many -t checkPkgTypes",
     "lintPkg": "pnpm nx run-many -t lintPkg",
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
-    "ci": "pnpm run clean && pnpm run lint && pnpm run build && pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run test:ci && pnpm run test:browser",
+    "ci": "pnpm run clean && pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run test:ci && pnpm run test:browser",
     "cbt": "pnpm run ci",
     "lookbook": "pnpm nx dev lookbook"
   },

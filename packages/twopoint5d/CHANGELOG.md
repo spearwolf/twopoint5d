@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` to `number | undefined` — coordinates outside the chunk have no data id
 - `TextureResource.fromTileSet()` takes `imageUrl` as `string | undefined`, the type the resource stores it at. `TextureStore#parse()` hands the value of an item straight through, and that value is optional
 - `FrameBasedAnimations#add()` throws when its third argument is neither a `TextureAtlas`, a `TileSet` nor an array of frames; the message names what that argument has to be, and no animation is registered
+- the `typedArray` of a buffer in `VertexObjectBuffer#buffers` is typed `TypedArray | undefined`: `VOBufferPool#dispose()` takes every buffer its array and clears the same map in the same breath, so the field is empty only in a reference that was grabbed before that call
+- change the return type of `VertexObjectBuffer#toAttributeArrays()` to `Record<string, TypedArray | undefined>` — an attribute name the descriptor does not know gets an entry without an array
+- change the return type of `FrameLoop#start()` to `(() => void) | undefined`: a missing `target`, or one already running on the loop, gets no second unsubscribe function
 
 ### Removed
 
@@ -538,6 +541,66 @@ const id: number = chunk.readDataIdAt(x, y);
 ```ts
 const id = chunk.readDataIdAt(x, y);
 if (id === undefined) return; // (x, y) is outside this chunk
+```
+
+#### `VertexObjectBuffer` buffers can hold no typed array
+
+`VOBufferPool#dispose()` drops the typed arrays so the underlying `ArrayBuffer`s can be
+reclaimed. A buffer reached through a living pool always holds its array; a reference kept
+across the `dispose()` does not.
+
+**Before**
+
+```ts
+const buf = pool.buffer.buffers.get('static_float32');
+const values = Array.from(buf.typedArray);
+```
+
+**After**
+
+```ts
+const buf = pool.buffer.buffers.get('static_float32');
+if (buf?.typedArray === undefined) return; // the pool has been disposed
+const values = Array.from(buf.typedArray);
+```
+
+#### `VertexObjectBuffer#toAttributeArrays()` can answer without an array
+
+The method returns one entry per requested name. A name the descriptor does not know gets
+an entry whose value is `undefined`, and the return type says so.
+
+**Before**
+
+```ts
+const arrays = vob.toAttributeArrays(['foo', 'bar']);
+const foo: TypedArray = arrays['foo'];
+```
+
+**After**
+
+```ts
+const arrays = vob.toAttributeArrays(['foo', 'bar']);
+const foo = arrays['foo'];
+if (foo === undefined) return; // 'foo' is not an attribute of this descriptor
+```
+
+#### `FrameLoop#start()` can answer `undefined`
+
+The method hands back a function that unsubscribes the `target` again. There is nothing to
+hand back for a missing `target` or for one that is already running on the loop.
+
+**Before**
+
+```ts
+const unsubscribe = frameLoop.start(target);
+unsubscribe();
+```
+
+**After**
+
+```ts
+const unsubscribe = frameLoop.start(target);
+unsubscribe?.(); // or use frameLoop.stop(target)
 ```
 
 ## [0.21.2] - 2026-06-19

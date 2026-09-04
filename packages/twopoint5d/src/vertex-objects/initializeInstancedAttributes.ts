@@ -15,6 +15,7 @@ export function initializeInstancedAttributes(
 ): void {
   const {descriptor} = pool;
   const meshPerAttribute = descriptor.meshCount;
+  // a buffer reached through a live pool holds its typed array
   for (const buffer of pool.buffer.buffers.values()) {
     // both maps are filled from the same list of attribute names in VertexObjectBuffer, so a
     // buffer name that has a buffer has its attributes, and an attribute name has its descriptor
@@ -24,7 +25,7 @@ export function initializeInstancedAttributes(
     );
     if (attributes.length > 1) {
       const interleavedBuffer = new InstancedInterleavedBuffer(
-        asThreeTypedArray(buffer.typedArray),
+        asThreeTypedArray(buffer.typedArray!),
         buffer.itemSize,
         meshPerAttribute,
       );
@@ -48,7 +49,7 @@ export function initializeInstancedAttributes(
         `the descriptor of attribute "${bufAttr.attributeName}"`,
       );
       const attr = new InstancedBufferAttribute(
-        asThreeTypedArray(buffer.typedArray),
+        asThreeTypedArray(buffer.typedArray!),
         buffer.itemSize,
         attrDesc.normalizedData,
         meshPerAttribute,

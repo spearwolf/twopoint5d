@@ -150,7 +150,11 @@ export class FrameLoop {
     this.#emitTolerance = this.#maxFps > 0 ? (1000 / this.#maxFps) * 0.02 : 0;
   }
 
-  start(target: object) {
+  /**
+   * @returns a function that unsubscribes `target` again, or `undefined` if there was nothing
+   *          to subscribe: a missing `target`, or one that is already on the loop.
+   */
+  start(target: object): (() => void) | undefined {
     if (target == null) return;
     if (this.#subscribers.has(target)) return;
 

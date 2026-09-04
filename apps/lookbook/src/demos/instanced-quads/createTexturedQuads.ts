@@ -15,7 +15,9 @@ export const createTexturedQuads = (
   initializeVertexObjects: (vertexObjectPool: VertexObjectPool<InstancedQuad>) => void,
 ) => {
   const geometry = new InstancedQuadsGeometry(capacity);
-  geometry.basePool.createVO().make();
+  // the geometry was built with a capacity, so it has its base pool, and the first
+  // createVO() on that pool finds room
+  geometry.basePool!.createVO()!.make();
 
   initializeVertexObjects(geometry.instancedPool);
 

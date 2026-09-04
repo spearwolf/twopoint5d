@@ -18,6 +18,13 @@
       },
       "cache": true
     },
+    "typecheck": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "typecheck"
+      },
+      "cache": true
+    },
     "checkPkgTypes": {
       "executor": "nx:run-script",
       "dependsOn": ["build"],

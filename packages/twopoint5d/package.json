@@ -44,7 +44,7 @@
   "types": "dist/lib/index.d.ts",
   "scripts": {
     "compile": "pnpm tsc -p tsconfig.build.json",
-    "strictCheck": "pnpm tsc -p tsconfig.strict.json",
+    "typecheck": "pnpm tsc -p tsconfig.typecheck.json",
     "build": "pnpm run compile && pnpm run makePackageJson",
     "clean": "pnpm rimraf build types dist",
     "test": "pnpm vitest --run --coverage",
