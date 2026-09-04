@@ -49,11 +49,9 @@ describe('selectAttributes', () => {
 
     expect(selectAttributes(geometry.pool, geometry.buffers, [])).toEqual([]);
 
-    expect(selectAttributes(geometry.pool, geometry.buffers, ['position', 'impact'])).toEqual(
-      expect.arrayContaining([geometry.buffers.get('dynamic_float32'), geometry.buffers.get('dynamic_uint32')]),
-    );
-    expect(selectAttributes(geometry.pool, geometry.buffers, ['position', 'impact'])).not.toEqual(
-      expect.arrayContaining([geometry.buffers.get('static_float32')]),
-    );
+    expect(selectAttributes(geometry.pool, geometry.buffers, ['position', 'impact'])).toEqual([
+      geometry.buffers.get('dynamic_float32'),
+      geometry.buffers.get('dynamic_uint32'),
+    ]);
   });
 });

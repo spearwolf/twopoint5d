@@ -116,5 +116,6 @@ import {description, showSource, title} from './_animated-billboards.json';
     console.log('AnimatedSprites', mesh);
   });
 
-  (document.querySelector('.loading-wrapper') as HTMLDivElement).style.display = 'none';
+  // the <div class="loading-wrapper"> is written by the markup of this very page
+  document.querySelector<HTMLDivElement>('.loading-wrapper')!.style.display = 'none';
 </script>

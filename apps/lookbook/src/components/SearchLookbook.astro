@@ -62,7 +62,8 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
 </style>
 
 <script>
-  const dialog = document.querySelector('dialog.search-lookbook-dialog') as HTMLDialogElement;
+  // the dialog is written by the markup of this component
+  const dialog = document.querySelector<HTMLDialogElement>('dialog.search-lookbook-dialog')!;
   // the dialog carries its close button in the markup of this component
   const closeButton = dialog.querySelector('button')!;
   const showButtons = document.querySelectorAll('button.open-search-dialog-action');

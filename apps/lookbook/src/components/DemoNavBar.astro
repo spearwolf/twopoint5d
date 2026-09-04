@@ -159,7 +159,8 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
 </style>
 
 <script>
-  const dialog = document.querySelector('dialog.show-source-dialog') as HTMLDialogElement;
+  // the dialog is written by the markup of this component
+  const dialog = document.querySelector<HTMLDialogElement>('dialog.show-source-dialog')!;
   // the dialog carries its close button in the markup of this component
   const closeButton = dialog.querySelector('button')!;
   const showButtons = document.querySelectorAll('button.open-show-source-dialog-action');

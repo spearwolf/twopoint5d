@@ -53,7 +53,9 @@ export class BouncingSprites {
     const [halfWidth, halfHeight] = [this.containerWidth / 2, this.containerHeight / 2];
 
     for (let i = 0; i < count; i++) {
-      const sprite = this.spritePool.createVO() as BounceSprite;
+      const sprite = this.spritePool.createVO() as BounceSprite | undefined;
+      // a full pool has no sprite left to hand out; stop instead of pushing a hole into the list
+      if (sprite == null) break;
 
       sprite.setSize(this.spriteSize, this.spriteSize);
 

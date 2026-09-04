@@ -43,7 +43,9 @@ export class BouncingSprites {
     }
 
     for (let i = 0; i < count; i++) {
-      const sprite = this.spritePool.createVO() as Sprite;
+      const sprite = this.spritePool.createVO() as Sprite | undefined;
+      // the loop bound was capped to the free capacity above, so this only guards the pool
+      if (sprite == null) break;
 
       sprite.setQuadSize([this.spriteSize, this.spriteSize]);
 

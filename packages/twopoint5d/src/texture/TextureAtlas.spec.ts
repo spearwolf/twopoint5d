@@ -102,8 +102,7 @@ describe('TextureAtlas', () => {
       const names = atlas.frameNames(/img_\d+/);
 
       expect(Array.isArray(names)).toBeTruthy();
-      expect(names).toEqual(expect.arrayContaining(['img_001', 'img_002']));
-      expect(names).toEqual(expect.not.arrayContaining(['foo', Bar]));
+      expect(names).toEqual(['img_001', 'img_002']);
     });
     test('with string', () => {
       const atlas = new TextureAtlas();
@@ -116,8 +115,7 @@ describe('TextureAtlas', () => {
       const names = atlas.frameNames('img.*');
 
       expect(Array.isArray(names)).toBeTruthy();
-      expect(names).toEqual(expect.arrayContaining(['img_001', 'img_002']));
-      expect(names).toEqual(expect.not.arrayContaining(['foo', Bar]));
+      expect(names).toEqual(['img_001', 'img_002']);
 
       expect(atlas.frameNames('foo')).toMatchObject(['foo']);
       expect(atlas.frameNames('f..')).toMatchObject(['foo']);
@@ -148,7 +146,7 @@ describe('TextureAtlas', () => {
       const names = atlas.frameNames();
 
       expect(Array.isArray(names)).toBeTruthy();
-      expect(names).toEqual(expect.arrayContaining(['foo', Bar, 'img_001', 'img_002']));
+      expect(names).toEqual(['foo', Bar, 'img_001', 'img_002']);
     });
   });
   test('randomFrameId', () => {

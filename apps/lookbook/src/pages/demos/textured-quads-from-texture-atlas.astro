@@ -44,7 +44,10 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
-  const sample = (arr: any) => arr[Math.floor(Math.random() * arr.length)];
+  // Math.random() stays below 1, so the index is inside a non-empty array
+  function sample<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)]!;
+  }
 
   // +================================================================================+
   //

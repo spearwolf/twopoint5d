@@ -129,7 +129,8 @@ const {tags, tagCategories} = loadMetadataForDemos();
     return target;
   }
 
-  const getClearTagsAction = () => document.querySelector('.tags .clear-tags-action') as HTMLButtonElement;
+  // the <button class="clear-tags-action"> is written by the markup of this component
+  const getClearTagsAction = () => document.querySelector<HTMLButtonElement>('.tags .clear-tags-action')!;
 
   function dispatchShowDemosEvent(payload: LookBookShowDemosEventDetail): void {
     getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
@@ -155,7 +156,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
 
   getClearTagsAction().addEventListener('pointerdown', () => clearTags());
 
-  const $tagCloud = document.querySelectorAll(CSS_TAG_CLOUD_FILTER);
+  const $tagCloud = document.querySelectorAll<HTMLElement>(CSS_TAG_CLOUD_FILTER);
 
   const localConfig = getShowDemosConfig();
 
@@ -184,10 +185,11 @@ const {tags, tagCategories} = loadMetadataForDemos();
   $tagCloud.forEach(($el) => {
     $el.addEventListener(
       'pointerdown',
-      (event: any) => {
-        if (event.isPrimary && event.button === 0 && event.target.hasAttribute(ATTR_TAG)) {
-          const $tag = event.target;
-          const $container = $tag.parentNode.parentNode as HTMLElement;
+      (event) => {
+        const $tag = event.target;
+        if (event.isPrimary && event.button === 0 && $tag instanceof HTMLElement && $tag.hasAttribute(ATTR_TAG)) {
+          // every tag cloud sits inside the <section class="tags"> of this component
+          const $container = $el.parentElement!;
           const $allTags = $container.querySelectorAll(`[${ATTR_TAG}]`);
 
           if ($tag.classList.contains(CSS_INACTIVE)) {
