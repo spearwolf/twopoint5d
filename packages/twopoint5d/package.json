@@ -44,7 +44,7 @@
   "types": "dist/lib/index.d.ts",
   "scripts": {
     "compile": "pnpm tsc -p tsconfig.build.json",
-    "build": "pnpm run-s -sn compile makePackageJson",
+    "build": "pnpm run compile && pnpm run makePackageJson",
     "clean": "pnpm rimraf build types dist",
     "test": "pnpm vitest --run",
     "watch": "pnpm vitest --watch",

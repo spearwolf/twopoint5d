@@ -2,15 +2,17 @@
   "defaultBase": "main",
   "parallel": 6,
   "tui": {
-    "autoExit": true
+    "enabled": false
   },
   "targetDefaults": {
     "build": {
       "dependsOn": ["^build"],
-      "cache": true
+      "cache": true,
+      "outputs": ["{projectRoot}/dist"]
     },
     "test": {
       "executor": "nx:run-script",
+      "dependsOn": ["^build"],
       "options": {
         "script": "test"
       },

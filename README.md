@@ -82,7 +82,7 @@ $ pnpm install
 ### 2. Build and test everything
 
 ```sh
-$ pnpm cbt  # => pnpm run clean > build > test
+$ pnpm cbt  # clean, lint, build, check package types, then all tests
 ```
 
 ### 3. Run the local LOOKBOOK app

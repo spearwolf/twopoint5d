@@ -1,5 +1,6 @@
 {
   "name": "lookbook",
+  "tags": ["app"],
   "root": "apps/lookbook",
   "targets": {
     "dev": {

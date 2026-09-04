@@ -10,8 +10,7 @@
         "{projectRoot}/tsconfig.build.json",
         "sharedTsconfigs",
         "makePackageJson"
-      ],
-      "outputs": ["{projectRoot}/dist"]
+      ]
     },
     "test": {
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]

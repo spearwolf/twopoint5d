@@ -14,12 +14,13 @@ All commands run from the repo root. Node ≥24 and pnpm ≥10.22 are required (
 - Build everything: `pnpm build` (nx orchestrates `^build` deps and caches outputs)
 - Build core lib only: `pnpm build:twopoint5d` (uses Nx tag `twopoint5d`)
 - Test everything: `pnpm test`
-- CI-tagged tests only (skips browser tests that need Playwright): `pnpm test:ci`
+- Unit tests only, no browser (Nx tag `ci`): `pnpm test:ci`
+- Browser tests only (Playwright via `@web/test-runner`, Nx tag `browser`): `pnpm test:browser`
 - Affected only: `pnpm test:affected`
 - Single Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts` (or `cd packages/twopoint5d && pnpm vitest --run src/path/to/file.spec.ts`)
 - Watch one package: `cd packages/twopoint5d && pnpm watch`
 - Lookbook dev server: `pnpm lookbook` (Astro at `http://localhost:4321`)
-- Full pre-commit gate: `pnpm cbt` (clean → lint → build → checkPkgTypes → test:ci) — same as `pnpm ci`
+- Full pre-commit gate: `pnpm run ci` (clean → lint → build → checkPkgTypes → test:ci → test:browser); `pnpm cbt` is an alias for it
 - Type-check published `.d.ts` shape: `pnpm checkPkgTypes` (Are The Types Wrong, runs against built `dist/`)
 
 Do **not** run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without explicit instruction.
@@ -31,6 +32,8 @@ Monorepo via Nx + pnpm workspaces (`pnpm-workspace.yaml`):
 - `packages/twopoint5d` — the published library `@spearwolf/twopoint5d`. ESM-only, `sideEffects: false`. Build = `tsc` → `dist/lib/` + `scripts/makePackageJson.mjs` synthesizes the publish-time `package.json` from `package.json` + `package.override.json`. **Never publish from `packages/twopoint5d/` directly — publish from `dist/`.**
 - `packages/twopoint5d-testing` — `@web/test-runner` browser integration tests (Playwright Chromium + Firefox). Lives outside the core lib so `packages/twopoint5d` keeps Vitest-only tests with no browser deps.
 - `apps/lookbook` — Astro app, the de-facto live documentation/showcase. `apps/handbook/` only contains leftover image assets (the VitePress app was removed in `bc361c9`); ignore any AGENTS.md mention of "VitePress (Handbook)".
+
+Nx tags: `twopoint5d` (the library and its browser harness), `ci` (the Vitest suite), `browser` (the Playwright suite), `app` (the Astro lookbook). Every project carries at least one — a project without tags silently drops out of every `--projects=tag:…` run.
 
 The library has **two test surfaces**: unit/logic tests (`*.spec.ts` next to source, run by Vitest in `packages/twopoint5d`) and visual/WebGL integration tests (`*.test.js` in `packages/twopoint5d-testing/test/`, run by `web-test-runner`). When changing rendering or GPU-buffer code in the core lib, also add a browser test in `twopoint5d-testing/`.
 
