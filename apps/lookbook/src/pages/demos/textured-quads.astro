@@ -109,7 +109,7 @@ import {description, showSource, title} from './_textured-quads.json';
   async function createMaterial(texture: Texture) {
     const material = new NodeMaterial();
 
-    material.positionNode = vertexByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
+    material.positionNode = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
 
     material.colorNode = colorFromTextureByTexCoords(texture);
 

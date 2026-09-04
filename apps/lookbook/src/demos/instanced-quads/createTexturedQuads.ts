@@ -5,7 +5,7 @@ import {NodeMaterial, type Texture} from 'three/webgpu';
 import {InstancedQuadsGeometry, type InstancedQuad} from './InstancedQuadsGeometry';
 
 const createMaterial = (texture: Texture, material = new NodeMaterial()) => {
-  material.positionNode = vertexByInstancePosition({scale: vec3(attribute('quadSize'), 1.0)});
+  material.positionNode = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
   material.colorNode = colorFromTextureByTexCoords(texture);
   return material;
 };
