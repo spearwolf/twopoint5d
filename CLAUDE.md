@@ -33,7 +33,7 @@ Monorepo via Nx + pnpm workspaces (`pnpm-workspace.yaml`):
 
 - `packages/twopoint5d` — the published library `@spearwolf/twopoint5d`. ESM-only, `sideEffects: false`. Build = `tsc` → `dist/lib/` + `scripts/makePackageJson.mjs` synthesizes the publish-time `package.json` from `package.json` + `package.override.json`. **Never publish from `packages/twopoint5d/` directly — publish from `dist/`.**
 - `packages/twopoint5d-testing` — `@web/test-runner` browser integration tests (Playwright Chromium + Firefox). Lives outside the core lib so `packages/twopoint5d` keeps Vitest-only tests with no browser deps.
-- `apps/lookbook` — Astro app, the de-facto live documentation/showcase. `apps/handbook/` only contains leftover image assets (the VitePress app was removed in `bc361c9`); ignore any AGENTS.md mention of "VitePress (Handbook)".
+- `apps/lookbook` — Astro app, the de-facto live documentation/showcase.
 
 Nx tags: `twopoint5d` (the library and its browser harness), `ci` (the Vitest suite), `browser` (the Playwright suite), `app` (the Astro lookbook). Every project carries at least one — a project without tags silently drops out of every `--projects=tag:…` run.
 
@@ -49,7 +49,7 @@ Other layers, all consumed via `public-api.ts`:
 - `display/` — `Display` wraps the three.js renderer + frame loop, `Chronometer` is the time source.
 - `stage/` — `Stage2D`, `StageRenderer`, projection strategies (Orthographic, Parallax).
 - `texture/` — `TextureAtlas`, `TileSet`, `TextureStore` (resource cache).
-- `map2d/` — Tiled-map integration including `Map2DLayer` and `CameraBasedVisibility` (frustum culling for tiles).
+- `map2d/` — Tiled-map integration: `Map2D` holds the tile streamer and its renderers, `CameraBasedVisibility` culls tiles against the camera frustum.
 - `controls/`, `utils/` — input + helpers.
 
 ## Conventions worth knowing

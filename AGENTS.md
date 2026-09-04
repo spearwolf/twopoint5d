@@ -20,13 +20,15 @@ Structure: **Monorepo** with **NX** and **pnpm Workspaces**.
 
 Run all commands from the project root.
 
+Node and pnpm versions come from `engines` in `package.json`; `.nvmrc` and `mise.toml` carry the same numbers for version managers.
+
 -   **Install:** `pnpm install`
 -   **Lint:** `pnpm lint` (ESLint and Prettier for workspace; `pnpm format` writes the Prettier changes)
 -   **Build:** `pnpm build` (All packages/apps). Single: `nx build <project>` (e.g., `twopoint5d`).
 -   **Test:** `pnpm test` (Runs all: `vitest` unit tests & `@web/test-runner` browser tests).
 -   **Start Demos:**
     -   `pnpm lookbook` (Astro demo app @ `http://localhost:4321`)
--   **CI Check:** `pnpm run ci` (Clean install, lint, build, test). **Run before committing.**
+-   **CI Check:** `pnpm run ci` (clean, lint, build, typecheck, checkPkgTypes, lintPkg, then the vitest and browser suites). **Run before committing.**
 
 ---
 
@@ -53,7 +55,7 @@ Modular architecture designed for high performance via direct GPU communication.
 -   `display/`: **Loop.** `Display` (renderer), `Chronometer` (time), `FrameLoop`.
 -   `stage/`: **Scene.** `Stage2D`, `StageRenderer`, Projections (`Orthographic`, `Parallax`).
 -   `texture/`: **Assets.** `TextureAtlas`, `TileSet`, `TextureStore`.
--   `tiled-maps/`: **Tiled Integration.** `Map2DLayer`, `CameraBasedVisibility` (culling).
+-   `map2d/`: **Tiled Integration.** `Map2D` (holds streamer and renderers), `Map2DTileStreamer`, `Map2DTileRenderer`, `CameraBasedVisibility` (culling).
 -   `controls/`: **Input.** `PanControl2D`.
 -   `utils/`: **Helpers.**
 
@@ -66,7 +68,7 @@ Modular architecture designed for high performance via direct GPU communication.
 -   **Repo:** NX
 -   **Tests:** Vitest (Unit), @web/test-runner (Integration)
 -   **Lint/Format:** ESLint, Prettier
--   **Apps:** Astro (Lookbook), VitePress (Handbook)
+-   **Apps:** Astro (Lookbook)
 
 ---
 
