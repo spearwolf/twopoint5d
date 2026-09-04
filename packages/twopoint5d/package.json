@@ -43,7 +43,7 @@
   "module": "dist/lib/index.js",
   "types": "dist/lib/index.d.ts",
   "scripts": {
-    "compile": "pnpm tsc",
+    "compile": "pnpm tsc -p tsconfig.build.json",
     "build": "pnpm run-s -sn compile makePackageJson",
     "clean": "pnpm rimraf build types dist",
     "test": "pnpm vitest --run",
