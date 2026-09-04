@@ -11,9 +11,7 @@ export interface DependencyCallbacks<T = any> {
 }
 
 export type DependencyProp<T = any> =
-  | DependencyKey
-  | [name: DependencyKey, equals: EqualityCallback<T>]
-  | [name: DependencyKey, callbacks: DependencyCallbacks];
+  DependencyKey | [name: DependencyKey, equals: EqualityCallback<T>] | [name: DependencyKey, callbacks: DependencyCallbacks];
 
 export class Dependencies {
   static cloneable = <

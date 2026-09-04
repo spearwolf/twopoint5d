@@ -15,16 +15,7 @@ export type TypedArray =
   | Int8Array;
 
 export type VertexAttributeDataType =
-  | 'float64'
-  | 'float32'
-  | 'float16'
-  | 'uint32'
-  | 'int32'
-  | 'uint16'
-  | 'int16'
-  | 'uint8clamped'
-  | 'uint8'
-  | 'int8';
+  'float64' | 'float32' | 'float16' | 'uint32' | 'int32' | 'uint16' | 'int16' | 'uint8clamped' | 'uint8' | 'int8';
 
 export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 

@@ -48,9 +48,7 @@ export type FrameBasedAnimationsDataByAtlas = FrameBasedAnimationsTimingData & {
 };
 
 export type FrameBasedAnimationsData =
-  | FrameBasedAnimationsDataByTileIds
-  | FrameBasedAnimationsDataByTileCount
-  | FrameBasedAnimationsDataByAtlas;
+  FrameBasedAnimationsDataByTileIds | FrameBasedAnimationsDataByTileCount | FrameBasedAnimationsDataByAtlas;
 
 export type FrameBasedAnimationsDataMap = Record<string, FrameBasedAnimationsData>;
 

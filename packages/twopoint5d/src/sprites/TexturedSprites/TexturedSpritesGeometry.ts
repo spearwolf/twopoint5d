@@ -10,8 +10,7 @@ export type TexturedSpritesBasePool = VertexObjectPool<BaseSprite>;
 export type TexturedSpritePool = VertexObjectPool<TexturedSprite>;
 
 export type TexturedSpriteMakeBaseSpriteArgs =
-  | [width: number, height: number]
-  | [width: number, height: number, xOffset: number, yOffset: number];
+  [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number];
 
 export interface TexturedSpriteGeometryParameters {
   capacity: number;
