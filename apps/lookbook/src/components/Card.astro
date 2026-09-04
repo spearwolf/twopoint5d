@@ -68,7 +68,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
       });
     } else if (activeTags?.size) {
       $tagEls.forEach((el) => {
-        const tag = el.getAttribute('data-tag');
+        // the elements were selected by [data-tag], so they carry the attribute
+        const tag = el.getAttribute('data-tag')!;
         if (activeTags.has(tag)) {
           el.classList.add('active');
         } else {
@@ -79,7 +80,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
 
   document.querySelectorAll('.link-card').forEach(($el) => {
-    const demoId = $el.getAttribute('data-demo-id');
+    // the card writes data-demo-id from a required prop in its own markup
+    const demoId = $el.getAttribute('data-demo-id')!;
 
     updateCardVisibility($el, demoId, localConfig.showAll, localConfig.filterById, localConfig.activeTags);
 

@@ -229,6 +229,14 @@ Combines with `pipeline` — the post-pass output also lands in the target.
 
 `StageRenderer` integrates with `three.RenderPipeline` in two ways:
 
+Two notes on the types in the examples below. `Display.renderer` is
+`WebGPURenderer | undefined` — `dispose()` takes it away again — so a display
+that is up and running asserts it with `!`. And `buildOutputNode` hands you its
+passes as plain `Node`s: neither the concrete `Node<'vec4'>` that `bloom()` asks
+for nor the arithmetic operators that TSL attaches through the ShaderNodeProxy at
+runtime are visible to the static type. One cast per pass covers both, and the
+comment next to it names the reason the pass is there at all.
+
 ### Mode C (§6.4) — pipeline samples an internal RT
 
 The simplest path: render the stages into an internally managed
@@ -239,7 +247,7 @@ No TSL knowledge required.
 import {RenderPipeline} from 'three/webgpu';
 
 const sr = new StageRenderer(display).setClearColor(new Color('#000')).add(stage);
-sr.pipeline = new RenderPipeline(display.renderer);
+sr.pipeline = new RenderPipeline(display.renderer!);
 // nothing else — the renderer wires `texture(internalRT)` into `pipeline.outputNode`
 ```
 
@@ -253,10 +261,15 @@ each stage's `asPassNode()` and returns the composed TSL graph.
 
 ```ts
 import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
+import type {Node} from 'three/webgpu';
 
 const sr = new StageRenderer(display).setClearColor(new Color('#000')).add(stage);
-sr.pipeline = new RenderPipeline(display.renderer);
-sr.buildOutputNode = ([scenePass]) => bloom(scenePass, 1.2, 0.6, 0.0);
+sr.pipeline = new RenderPipeline(display.renderer!);
+sr.buildOutputNode = ([scenePass]) => {
+  // `sr` was given exactly one stage above, so the pass list has its first entry
+  const pass = scenePass as Node<'vec4'>;
+  return bloom(pass, 1.2, 0.6, 0.0);
+};
 ```
 
 - `Stage2D.asPassNode()` returns `pass(scene, camera)` — handled per frame by
@@ -279,7 +292,7 @@ the subclass and uses its static composer as the default — no
 ```ts
 import {RootRenderPipeline} from '@spearwolf/twopoint5d';
 
-root.pipeline = new RootRenderPipeline(display.renderer);
+root.pipeline = new RootRenderPipeline(display.renderer!);
 // → pipeline.outputNode = pass0.add(pass1).add(pass2)…
 ```
 
@@ -298,14 +311,19 @@ const root = new StageRenderer(display).setClearColor(new Color('#000'));
 
 // World layer with its own bloom (Mode D — custom composition)
 const worldRenderer = new StageRenderer(root).add(worldStage);
-worldRenderer.pipeline = new RenderPipeline(display.renderer);
-worldRenderer.buildOutputNode = ([scene]) => scene.add(bloom(scene, 1.5, 0.5));
+worldRenderer.pipeline = new RenderPipeline(display.renderer!);
+worldRenderer.buildOutputNode = ([scenePass]) => {
+  // `worldRenderer` was given exactly one stage above, so the pass list has its
+  // first entry, and `.add()` lives on the ShaderNodeProxy rather than on `Node`
+  const pass = scenePass as Node<'vec4'> & {add(other: Node): Node};
+  return pass.add(bloom(pass, 1.5, 0.5));
+};
 
 // UI layer plain
 root.add(uiStage);
 
 // Root pipeline composes every child additively — no buildOutputNode needed
-root.pipeline = new RootRenderPipeline(display.renderer);
+root.pipeline = new RootRenderPipeline(display.renderer!);
 ```
 
 `worldRenderer.asPassNode()` returns a `texture()` node sampling the

@@ -32,7 +32,8 @@ import {description, showSource, title} from './_quadtree-playground.json';
 
   const display = new Display(document.getElementById('twopoint5d')!);
 
-  const visual = new QuadTreeVisualization(display.renderer, 1024, 1024);
+  // the display was just constructed, so it holds its renderer; only dispose() takes it away again
+  const visual = new QuadTreeVisualization(display.renderer!, 1024, 1024);
 
   visual.makeRandomQuadTree();
 

@@ -83,9 +83,11 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
     });
 
     return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
+      // the pool was built with a capacity of rows * columns and the two loops run exactly
+      // that many times, so every createVO() finds room
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
-          const quad = vertexObjectPool.createVO();
+          const quad = vertexObjectPool.createVO()!;
 
           quad.width = 1.0 + Math.random() * (size - 1.0);
           quad.height = quad.width;
@@ -112,7 +114,8 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
   //
   // +================================================================================+
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
 
   await demo.start(async () => {
     demo.renderer!.toneMapping = NeutralToneMapping;
@@ -128,7 +131,8 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
 
     console.log('loaded tileset', {imgEl, tileSet, texture});
 
-    document.getElementById('texture-preview').appendChild(imgEl.cloneNode());
+    // the <div id="texture-preview"> is written by the markup of this very page
+    document.getElementById('texture-preview')!.appendChild(imgEl.cloneNode());
 
     demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
 

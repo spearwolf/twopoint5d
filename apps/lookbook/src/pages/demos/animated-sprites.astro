@@ -62,10 +62,12 @@ import {description, showSource, title} from './_animated-sprites.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
 
+  // the .spriteCount readout is written by the markup of this very page
   const renderSpriteCount = (count: number) => {
-    document.querySelector('.spriteCount').textContent = count.toString();
+    document.querySelector('.spriteCount')!.textContent = count.toString();
   };
 
   on(demo, OnDisplayInit, async ({scene, camera, renderer}) => {
@@ -122,12 +124,13 @@ import {description, showSource, title} from './_animated-sprites.json';
     console.log('BouncingSprites', bouncingSprites);
     console.log('AnimatedSprites', mesh);
 
-    document.querySelector('.moreSprites').addEventListener('click', () => {
+    // the .moreSprites and .lessSprites buttons are written by the markup of this very page
+    document.querySelector('.moreSprites')!.addEventListener('click', () => {
       bouncingSprites.createSprites(20, animId);
       renderSpriteCount(bouncingSprites.sprites.length);
     });
 
-    document.querySelector('.lessSprites').addEventListener('click', () => {
+    document.querySelector('.lessSprites')!.addEventListener('click', () => {
       bouncingSprites.destroySprites(20);
       renderSpriteCount(bouncingSprites.sprites.length);
     });

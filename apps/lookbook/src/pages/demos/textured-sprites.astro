@@ -53,7 +53,8 @@ import {description, showSource, title} from './_textured-sprites.json';
 
   const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
 
   demo.onInit(async () => {
     const {tileSet, texture} = await new TileSetLoader().loadAsync(
@@ -70,15 +71,19 @@ import {description, showSource, title} from './_textured-sprites.json';
 
     const sprites = new TexturedSprites(CAPACITY, texture);
 
-    sprites.material.depthFunc = LessEqualDepth; // AlwaysDepth;
-    sprites.material.depthWrite = true;
-    sprites.material.depthTest = true;
+    // the constructor always creates a TexturedSpritesMaterial; only dispose() takes it away again
+    const material = sprites.material!;
 
-    document.querySelector(`.${RENDER_AS_BILLBOARDS}`).addEventListener('pointerdown', (e) => {
+    material.depthFunc = LessEqualDepth; // AlwaysDepth;
+    material.depthWrite = true;
+    material.depthTest = true;
+
+    // the .render-as-billboards element is written by the markup of this very page
+    document.querySelector(`.${RENDER_AS_BILLBOARDS}`)!.addEventListener('pointerdown', (e) => {
       const el = e.currentTarget as HTMLElement;
       const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
 
-      sprites.material.renderAsBillboards = dataValue;
+      material.renderAsBillboards = dataValue;
 
       el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
       if (dataValue) {

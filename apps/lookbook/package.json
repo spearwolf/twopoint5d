@@ -10,7 +10,7 @@
     "preview": "pnpm exec astro preview",
     "update": "pnpm dlx npm-check --update",
     "postinstall": "pnpm exec astro telemetry disable",
-    "typecheck": "pnpm exec tsc -p tsconfig.json",
+    "typecheck": "pnpm run astro:check",
     "astro:check": "pnpm exec astro check",
     "astro": "pnpm exec astro"
   },
@@ -28,6 +28,7 @@
     "three": "catalog:"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "caniuse-lite": "^1.0.30001810",
     "typescript": "^5.9.3"
   }

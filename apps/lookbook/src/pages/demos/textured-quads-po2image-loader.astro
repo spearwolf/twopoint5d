@@ -61,9 +61,11 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
     });
 
     return createTexturedQuads({capacity, texture, material}, (vertexObjectPool) => {
+      // the pool was built with a capacity of rows * columns and the two loops run exactly
+      // that many times, so every createVO() finds room
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
-          const quad = vertexObjectPool.createVO();
+          const quad = vertexObjectPool.createVO()!;
 
           quad.width = size * (0.6 + Math.random() * 0.45);
           quad.height = (quad.width * texCoords.height) / texCoords.width;
@@ -86,7 +88,8 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
   //
   // +================================================================================+
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
 
   const data = await new PowerOf2ImageLoader().loadAsync(assetsUrl('platform-blau.png'));
 
@@ -99,7 +102,8 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
   texture.colorSpace = 'srgb';
   texture.needsUpdate = true;
 
-  document.getElementById('texture-preview').appendChild(data.imgEl);
+  // the <div id="texture-preview"> is written by the markup of this very page
+  document.getElementById('texture-preview')!.appendChild(data.imgEl);
 
   await demo.start(() => {
     demo.renderer!.toneMapping = NeutralToneMapping;

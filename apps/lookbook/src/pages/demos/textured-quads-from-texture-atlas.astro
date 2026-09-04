@@ -53,12 +53,15 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
   // +================================================================================+
 
   function makeMesh(rows: number, columns: number, size: number, offset: number, atlas: TextureAtlas, texture: Texture) {
-    const frames = atlas.frameNames(/numbers32/).map((name) => atlas.frame(name).coords);
+    // the names come out of frameNames() of this very atlas, so frame() finds each of them
+    const frames = atlas.frameNames(/numbers32/).map((name) => atlas.frame(name)!.coords);
 
     return createTexturedQuads({capacity: rows * columns, texture}, (vertexObjectPool) => {
+      // the pool was built with a capacity of rows * columns and the two loops run exactly
+      // that many times, so every createVO() finds room
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
-          const quad = vertexObjectPool.createVO();
+          const quad = vertexObjectPool.createVO()!;
 
           quad.width = 1.0 + Math.random() * (size - 1.0);
           quad.height = quad.width;
@@ -82,7 +85,8 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
   //
   // +================================================================================+
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
 
   await demo.start(async () => {
     const {imgEl, texture, atlas} = await new TextureAtlasLoader().loadAsync(
@@ -95,7 +99,8 @@ import {description, showSource, title} from './_textured-quads-from-texture-atl
 
     console.log('loaded texture-atlas', {imgEl, atlas, texture});
 
-    document.getElementById('texture-preview').appendChild(imgEl);
+    // the <div id="texture-preview"> is written by the markup of this very page
+    document.getElementById('texture-preview')!.appendChild(imgEl);
 
     const mesh = makeMesh(16, 32, 3.5, 1, atlas, texture);
 

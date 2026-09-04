@@ -72,11 +72,15 @@ import {description, showSource, title} from './_textured-quads.json';
   ) {
     const geometry = new InstancedQuadsGeometry(rows * columns);
 
-    geometry.basePool.createVO().make();
+    // the geometry was built with a capacity, so it has its base pool, and the first
+    // createVO() on that pool finds room
+    geometry.basePool!.createVO()!.make();
 
+    // the instanced pool holds rows * columns quads and the two loops run exactly that
+    // many times, so every createVO() finds room
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < columns; x++) {
-        const quad = geometry.instancedPool.createVO();
+        const quad = geometry.instancedPool.createVO()!;
 
         quad.width = 1.0 + Math.random() * (size - 1.0);
         quad.height = quad.width;
@@ -122,7 +126,8 @@ import {description, showSource, title} from './_textured-quads.json';
   //
   // +================================================================================+
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
 
   const {imgEl, texture, texCoords} = await new TextureImageLoader().loadAsync(
     assetsUrl('ball-pattern-rot--not-power-of-2.png'),
@@ -131,7 +136,8 @@ import {description, showSource, title} from './_textured-quads.json';
 
   console.log('loaded texture-image', {imgEl, texCoords, texture});
 
-  document.getElementById('texture-preview').appendChild(imgEl);
+  // the <div id="texture-preview"> is written by the markup of this very page
+  document.getElementById('texture-preview')!.appendChild(imgEl);
 
   await demo.start(async () => {
     demo.renderer!.toneMapping = AgXToneMapping;

@@ -31,14 +31,17 @@ import {description, showSource, title} from './_crosses.json';
   const OFFSET = 1.2;
   const OFFSET_Z = -5;
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
 
   demo.onInit(() => {
     const geometry = new VertexObjectGeometry<Cross>(CrossDescriptor, ROWS * COLS);
 
+    // the pool was built with a capacity of ROWS * COLS and the two loops run exactly
+    // that many times, so every createVO() finds room
     for (let i = 0; i < COLS; i++) {
       for (let j = ROWS - 1; j >= 0; j--) {
-        const cross = geometry.pool.createVO();
+        const cross = geometry.pool.createVO()!;
 
         cross.make(SIZE, SIZE, 1 / 8, 1 / 2, OFFSET_Z * j);
         cross.rotate(i * 45 + j * 0.2);
@@ -53,7 +56,7 @@ import {description, showSource, title} from './_crosses.json';
 
     material.colorNode = vec4(
       directionToColor(attribute('position')).xyz,
-      sub(1, mul(abs(attribute('position').z), 1 / Math.abs(ROWS * OFFSET_Z))),
+      sub(1, mul(abs(attribute<'vec3'>('position').z), 1 / Math.abs(ROWS * OFFSET_Z))),
     );
 
     const mesh = new VertexObjects(geometry, material);

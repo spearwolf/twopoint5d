@@ -14,7 +14,10 @@ export interface DisplayEventProps {
 
 export type ResizeDisplayToFn = (display: Display) => [width: number, height: number];
 
-export type DisplayRendererParameters = Partial<Omit<ConstructorParameters<typeof WebGPURenderer>[0], 'canvas'>>;
+// The renderer's constructor parameter is optional, so `ConstructorParameters<…>[0]` is a union
+// with `undefined`; `keyof` of such a union is `never` and `Omit` would leave an empty type behind.
+// `NonNullable` unwraps it, which is what makes the renderer options visible here at all.
+export type DisplayRendererParameters = Partial<Omit<NonNullable<ConstructorParameters<typeof WebGPURenderer>[0]>, 'canvas'>>;
 
 export interface CreateRendererParameters extends DisplayRendererParameters {
   canvas: HTMLCanvasElement;

@@ -51,7 +51,8 @@ import {description, showSource, title} from './_animated-billboards.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false});
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
 
   await demo.start(async () => {
     demo.camera.position.set(0, 70, -220);

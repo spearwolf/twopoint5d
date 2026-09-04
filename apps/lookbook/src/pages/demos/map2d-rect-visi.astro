@@ -28,5 +28,6 @@ import {description, showSource, title} from './_map2d-rect-visi.json';
   import {run} from '~demos/map2d-rect-visi';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  run(new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {antialias: false}));
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  run(new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false}));
 </script>

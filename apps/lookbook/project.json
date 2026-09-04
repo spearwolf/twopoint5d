@@ -14,7 +14,14 @@
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": ["{projectRoot}/src/**/*.ts", "sharedTsconfigs", "^default"]
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/src/**/*.astro",
+        "{projectRoot}/src/**/*.json",
+        "{projectRoot}/astro.config.mjs",
+        "sharedTsconfigs",
+        "^default"
+      ]
     }
   }
 }

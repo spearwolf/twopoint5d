@@ -27,8 +27,10 @@ const {name, buttons} = Astro.props;
   const buttons = document.querySelectorAll(`button[data-radio-buttons-group]`);
 
   buttons.forEach((button) => {
-    const groupName = button.getAttribute('data-radio-buttons-group');
-    const stateValue = button.getAttribute('data-value');
+    // the buttons were selected by [data-radio-buttons-group], and the markup above writes
+    // both attributes from required props
+    const groupName = button.getAttribute('data-radio-buttons-group')!;
+    const stateValue = button.getAttribute('data-value')!;
 
     const isActive = button.classList.contains('is-active');
 
@@ -39,7 +41,8 @@ const {name, buttons} = Astro.props;
     }
 
     button.addEventListener('click', () => {
-      button.parentElement.querySelectorAll(`button[data-radio-buttons-group="${groupName}"]`).forEach((btn) => {
+      // every button sits inside the <div class="radio-buttons"> of this component
+      button.parentElement!.querySelectorAll(`button[data-radio-buttons-group="${groupName}"]`).forEach((btn) => {
         btn.classList.remove('is-active');
       });
       button.classList.add('is-active');

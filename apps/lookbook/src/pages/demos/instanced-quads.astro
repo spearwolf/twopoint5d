@@ -32,7 +32,8 @@ import {description, showSource, title} from './_instanced-quads.json';
   import {NodeMaterial} from 'three/webgpu';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container'), {forceWebGL: true});
+  // the <canvas id="canvas-container"> is written by the markup of this very page
+  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {forceWebGL: true});
 
   demo.camera.position.z = 110;
   demo.camera.position.y = -100;
@@ -99,8 +100,10 @@ import {description, showSource, title} from './_instanced-quads.json';
       BaseQuadDescriptor,
     );
 
-    // Create a base quad to use as a prototype for instanced quads
-    geometry.basePool.createVO().make();
+    // Create a base quad to use as a prototype for instanced quads.
+    // The geometry was built with a capacity, so it has its base pool, and the first
+    // createVO() on that pool finds room.
+    geometry.basePool!.createVO()!.make();
 
     // Now, create the instanced quads ..
     createQuads(geometry.instancedPool, rows, columns, size, offset);
@@ -127,9 +130,11 @@ import {description, showSource, title} from './_instanced-quads.json';
     size: number,
     offset: number,
   ) {
+    // the pool holds rows * columns instances and the two loops run exactly that many
+    // times, so every createVO() finds room
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < columns; x++) {
-        const quad = vertexObjectPool.createVO();
+        const quad = vertexObjectPool.createVO()!;
 
         quad.width = 1.0 + Math.random() * (size - 1.0);
         quad.height = 1.0 + Math.random() * (size - 1.0);
@@ -156,7 +161,7 @@ import {description, showSource, title} from './_instanced-quads.json';
 
     const pos = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
 
-    const instaPosLen = length(attribute('instancePosition').xy);
+    const instaPosLen = length(attribute<'vec3'>('instancePosition').xy);
 
     const z = sin(add(mul(time, -2.0), mul(instaPosLen, 0.05)));
 
