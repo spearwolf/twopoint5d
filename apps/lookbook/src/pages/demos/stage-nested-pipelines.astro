@@ -34,8 +34,8 @@ import {description, showSource, title} from './_stage-nested-pipelines.json';
 
   // ---------------------------------------------------------------
   // Outer renderer composes the two layers via its OWN pipeline.
-  // RenderPipeline must own the final draw to the canvas — see §6.3
-  // in `Backlog-StageRenderer.md`. Mixing pipeline.render() with
+  // RenderPipeline must own the final draw to the canvas — see "Mode E"
+  // in `packages/twopoint5d/src/stage/README.md`. Mixing pipeline.render() with
   // raw renderer.render(scene, camera) on the canvas inside one
   // frame is not supported.
   // ---------------------------------------------------------------

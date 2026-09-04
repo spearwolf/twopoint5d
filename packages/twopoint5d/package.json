@@ -50,8 +50,8 @@
     "test": "pnpm vitest --run --coverage",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "checkPkgTypes": "cd dist && pnpm exec attw --pack --ignore-rules cjs-resolves-to-esm no-resolution",
-    "lintPkg": "cd dist && pnpm exec publint",
+    "checkPkgTypes": "pnpm run build && pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",
+    "lintPkg": "pnpm run build && pnpm exec publint dist",
     "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {

@@ -2,8 +2,7 @@
 
 Quick reference for `Display` + `Stage2D` + `StageRenderer` and the optional
 `RenderPipeline` integration. Use this page when you want to ship something
-fast and need the canonical idioms — for a deeper dive into the design
-rationale see [`Backlog-StageRenderer.md`](../../../../Backlog-StageRenderer.md).
+fast and need the canonical idioms.
 
 ---
 

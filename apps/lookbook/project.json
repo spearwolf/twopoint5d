@@ -19,6 +19,7 @@
         "{projectRoot}/src/**/*.astro",
         "{projectRoot}/src/**/*.json",
         "{projectRoot}/astro.config.mjs",
+        "{projectRoot}/package.json",
         "sharedTsconfigs",
         "^default"
       ]

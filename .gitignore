@@ -8,7 +8,6 @@ tmp
 
 # dependencies
 node_modules
-.nx/cache
 
 # IDEs and editors
 /.idea
@@ -41,13 +40,11 @@ testem.log
 .DS_Store
 Thumbs.db
 
-.nx/
+# nx
+.nx/cache
 .nx/workspace-data
 
 playwright.browsers
-
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md

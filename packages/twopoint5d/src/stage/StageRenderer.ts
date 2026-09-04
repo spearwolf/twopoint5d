@@ -281,7 +281,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   // ---------------------------------------------------------------------------
-  // Pipeline / RenderTarget integration (§6 of Backlog-StageRenderer.md)
+  // Pipeline / RenderTarget integration — see "Post-processing" in ./README.md
   // ---------------------------------------------------------------------------
 
   /**

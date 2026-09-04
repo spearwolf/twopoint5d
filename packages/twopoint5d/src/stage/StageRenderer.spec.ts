@@ -317,7 +317,7 @@ describe('StageRenderer', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Pipeline integration (§6 of Backlog-StageRenderer.md)
+  // Pipeline integration — see "Post-processing" in ./README.md
   // ---------------------------------------------------------------------------
 
   describe('outputRenderTarget (§6.4 RT only, no pipeline)', () => {

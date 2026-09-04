@@ -13,7 +13,12 @@
       ]
     },
     "typecheck": {
-      "inputs": ["{projectRoot}/src/**/*.ts", "{projectRoot}/tsconfig.typecheck.json", "sharedTsconfigs"]
+      "inputs": [
+        "{projectRoot}/src/**/*.ts",
+        "{projectRoot}/tsconfig.typecheck.json",
+        "{projectRoot}/package.json",
+        "sharedTsconfigs"
+      ]
     },
     "test": {
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],

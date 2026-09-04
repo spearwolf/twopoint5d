@@ -21,14 +21,13 @@ The core features can be roughly classified into the following areas:
 - render as billboards
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
-#### 📚 [texture atlases and tilesets](src/vertex-objects/)
+#### 📚 [texture atlases and tilesets](src/texture/)
 - load texture atlases from json
 - create tilesets from images
 - :heavy_check_mark: api is stable and ready to use
 
-#### 📚 [tiled-maps](src/tiled-maps/)
-- create and render tiled maps which are laid out in [a 2D spatial grid map data structure](../../docs/Map2D.md)
-- api docs: [docs/Map2D](../../docs/Map2D.md)
+#### 📚 [map2d](src/map2d/)
+- create and render tiled maps which are laid out in a 2D spatial grid map data structure
 - :warning: work in progress
 
 #### 📚 [vertex-objects](src/vertex-objects/)
@@ -47,20 +46,19 @@ It should significantly cut down on the amount of boilerplate code and state man
 
 - provides an object based abstraction over instanced buffer geometries. build them with your own api
 - create, update and delete instances with ease
-- _legacy_ api docs: [docs/VertexObjects-legacy](../../docs/VertexObjects-legacy.md)
 - :heavy_check_mark: api is stable and ready to use
 
 #### [stage2d and projections](src/stage/)
 - create responsive three.js scenes by describing a _projection_
 - supports _orthogonal_ and _parallax_ (aka _perspective_) projections (more to come)
-- api docs: [docs/Stage2D](../../docs/Stage2D.md)
+- api docs: [stage layer cheat-sheet](src/stage/README.md)
 - :heavy_check_mark: api is stable and ready to use
 
 #### [display](src/display/)
 - cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop
 - nice starting point for your three.js demos
 - there is no other dependency than the three.js package itself
-- api docs: [docs/Display](../../docs/Display.md)
+- api docs: [stage layer cheat-sheet](src/stage/README.md)
 - :heavy_check_mark: api is stable and ready to use
 
 have fun!
