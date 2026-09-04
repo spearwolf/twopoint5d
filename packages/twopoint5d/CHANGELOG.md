@@ -273,8 +273,10 @@ vo.v; // 0.0999755859375
 
 Two things follow from the switch:
 
-- The runtime needs `Float16Array`. It shipped in Node 22.13 and has been available in every major
-  browser engine since 2025; a runtime without it throws on the first `float16` attribute.
+- The runtime needs `Float16Array`. It shipped in Node 24 and has been available in every major
+  browser engine since 2025; a runtime without it throws on the first `float16` attribute. The
+  published package carries no `engines` field, so npm does not warn — this note is the only
+  place the requirement is stated.
 - A consumer that names the `TypedArray` type from this package directly needs a `tsconfig.json`
   `lib` that includes `ESNext.Float16` (TypeScript 5.9.3: the declaration lives in
   `lib.esnext.float16.d.ts`, in no year-numbered `lib`).
