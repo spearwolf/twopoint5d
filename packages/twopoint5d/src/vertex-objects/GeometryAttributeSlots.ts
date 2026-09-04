@@ -1,5 +1,6 @@
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
 import type {VOBufferPool} from './VOBufferPool.js';
+import {expectDefined} from './expectDefined.js';
 import type {BufferLike} from './types.js';
 
 /**
@@ -62,7 +63,9 @@ export class GeometryAttributeSlots {
   /** The pool whose buffers feed the slot `attrName`, or `undefined` if no pool does. */
   poolOf(attrName: string): VOBufferPool | undefined {
     const claims = this.#slots.get(attrName);
-    return claims === undefined || claims.length === 0 ? undefined : claims[claims.length - 1].pool;
+    return claims === undefined || claims.length === 0
+      ? undefined
+      : expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).pool;
   }
 
   /**
@@ -81,7 +84,7 @@ export class GeometryAttributeSlots {
       if (held < 0) continue;
 
       const wasOnTop = held === claims.length - 1;
-      const [released] = claims.splice(held, 1);
+      const released = expectDefined(claims.splice(held, 1)[0], `the claim of route on slot "${attrName}"`);
       if (!wasOnTop) continue;
 
       if (claims.length === 0) {
@@ -90,7 +93,7 @@ export class GeometryAttributeSlots {
         this.#slots.delete(attrName);
         changed.push({attrName, vacated: released.attr});
       } else {
-        geometry.setAttribute(attrName, claims[claims.length - 1].attr);
+        geometry.setAttribute(attrName, expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).attr);
         changed.push({attrName});
       }
     }

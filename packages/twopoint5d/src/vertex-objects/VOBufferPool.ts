@@ -21,7 +21,9 @@ export class VOBufferPool {
     } else {
       const buffersData = capacityOrData;
       this.capacity = buffersData.capacity;
-      this.fromBuffersData(buffersData);
+      // the buffer is built from the given data rather than sized from a capacity
+      this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
+      this.usedCount = buffersData.usedCount;
     }
   }
 
@@ -122,19 +124,15 @@ export class VOBufferPool {
       throw new Error('Invalid buffersData capacity');
     }
     this.usedCount = buffersData.usedCount;
-    if (this.buffer == null) {
-      this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
-    } else {
-      for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {
-        const buffer = this.buffer.buffers.get(bufferName);
-        if (buffer) {
-          if (copyTypedArrays || typedArray.length < buffer.typedArray.length) {
-            buffer.typedArray.set(typedArray);
-          } else {
-            buffer.typedArray = typedArray;
-          }
-          buffer.serial++;
+    for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {
+      const buffer = this.buffer.buffers.get(bufferName);
+      if (buffer) {
+        if (copyTypedArrays || typedArray.length < buffer.typedArray.length) {
+          buffer.typedArray.set(typedArray);
+        } else {
+          buffer.typedArray = typedArray;
         }
+        buffer.serial++;
       }
     }
   }

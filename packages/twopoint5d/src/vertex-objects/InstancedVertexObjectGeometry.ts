@@ -1,4 +1,5 @@
 import {BufferGeometry} from 'three/webgpu';
+import {expectDefined} from './expectDefined.js';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import type {VertexObjectDescription, VO} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
@@ -36,7 +37,7 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
       this.declareOwnedPool(this.instancedPool);
     }
     if (!(args[2] instanceof BufferGeometry) && !(args[2] instanceof VertexObjectPool)) {
-      this.declareOwnedPool(this.basePool);
+      this.declareOwnedPool(expectDefined(this.basePool, 'the base pool'));
     }
   }
 }

@@ -70,11 +70,13 @@ export class TextureAtlas {
     return rand(this.#frames.length);
   }
 
-  randomFrame(): TextureAtlasFrame {
+  /** A frame drawn at random, or `undefined` for an atlas without frames. */
+  randomFrame(): TextureAtlasFrame | undefined {
     return this.#frames[this.randomFrameId()];
   }
 
-  randomFrameName(): TextureAtlasFrameName {
+  /** A frame name drawn at random, or `undefined` for an atlas without named frames. */
+  randomFrameName(): TextureAtlasFrameName | undefined {
     const randomIdx = rand(this.#frameNames.size);
     let idx = 0;
     for (const name of this.#frameNames.keys()) {
@@ -96,16 +98,18 @@ export class TextureAtlas {
     return frameIds;
   }
 
-  randomFrames(count: number): TextureAtlasFrame[] {
-    const frames: TextureAtlasFrame[] = [];
+  /** `count` frames drawn at random; every one of them is `undefined` for an atlas without frames. */
+  randomFrames(count: number): (TextureAtlasFrame | undefined)[] {
+    const frames: (TextureAtlasFrame | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       frames.push(this.randomFrame());
     }
     return frames;
   }
 
-  randomFrameNames(count: number): TextureAtlasFrameName[] {
-    const names: TextureAtlasFrameName[] = [];
+  /** `count` frame names drawn at random; every one of them is `undefined` for an atlas without named frames. */
+  randomFrameNames(count: number): (TextureAtlasFrameName | undefined)[] {
+    const names: (TextureAtlasFrameName | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       names.push(this.randomFrameName());
     }

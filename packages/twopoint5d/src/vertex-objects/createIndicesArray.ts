@@ -1,3 +1,5 @@
+import {expectDefined} from './expectDefined.js';
+
 export function createIndicesArray(indices: number[], count: number): Uint32Array {
   const itemCount = indices.length;
   const arr = new Uint32Array(count * itemCount);
@@ -5,7 +7,7 @@ export function createIndicesArray(indices: number[], count: number): Uint32Arra
 
   for (let i = 0; i < count; i++) {
     for (let j = 0; j < itemCount; j++) {
-      arr[i * itemCount + j] = indices[j] + i * stride;
+      arr[i * itemCount + j] = expectDefined(indices[j], `index ${j}`) + i * stride;
     }
   }
 

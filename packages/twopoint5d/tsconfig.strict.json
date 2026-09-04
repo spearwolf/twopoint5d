@@ -1,0 +1,14 @@
+{
+  // Checks only, emits nothing: the two switches hold here for a section of the sources,
+  // while `tsconfig.json` and the emitting build over `tsconfig.build.json` run without
+  // them. The section grows with every directory that stands clean underneath it, and this
+  // file goes away once both switches sit in `tsconfig.json` itself.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src/vertex-objects", "src/sprites"],
+  "exclude": ["src/**/*.spec.ts"]
+}

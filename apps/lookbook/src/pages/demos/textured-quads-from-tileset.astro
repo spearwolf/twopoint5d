@@ -96,7 +96,8 @@ import {description, showSource, title} from './_textured-quads-from-tileset.jso
             0,
           ]);
 
-          const texCoords = tileset.atlas.randomFrame().coords;
+          // the tileset is loaded before makeMesh() runs, so its atlas has frames to draw from
+          const texCoords = tileset.atlas.randomFrame()!.coords;
           console.log('texCoords', [texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
 
           quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);

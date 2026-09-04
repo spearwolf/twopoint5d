@@ -1,7 +1,7 @@
 import type {BufferLike} from './types.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 
-export function updateUpdateRange(pool: VOBufferPool, buffers: Map<string, BufferLike>) {
+export function updateUpdateRange(pool: VOBufferPool | undefined, buffers: Map<string, BufferLike> | undefined) {
   if (pool && buffers) {
     const {vertexCount} = pool.descriptor;
     for (const [name, {itemSize}] of pool.buffer.buffers) {

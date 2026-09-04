@@ -4,6 +4,7 @@ import type {AttributeRoute, ReleasedSlot} from './GeometryAttributeSlots.js';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
+import {expectDefined} from './expectDefined.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';
@@ -24,6 +25,7 @@ type TouchInstancedBuffersType = {
 
 export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly basePool?: VOBufferPool;
+  /** Set exactly when `basePool` is — the constructor builds the base route as a whole or not at all. */
   readonly baseBuffers?: Map<string, BufferLike>;
 
   readonly baseBufferSerials: Map<string, number> = new Map();
@@ -32,6 +34,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly instancedPool: VOBufferPool;
   readonly instancedBuffers: Map<string, BufferLike> = new Map();
 
+  /**
+   * The pools attached under a name, and the buffers and serials of their routes. All three are
+   * keyed alike and filled and emptied together, so a name that has a pool has the other two.
+   */
   readonly extraInstancedPools: Map<string, VOBufferPool> = new Map();
   readonly extraInstancedBuffers: Map<string, Map<string, BufferLike>> = new Map();
   readonly extraInstancedBufferSerials: Map<string, Map<string, number>> = new Map();
@@ -361,7 +367,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. */
   touchAttributes(...attrNames: string[]): void {
     if (this.basePool) {
-      selectAttributes(this.basePool, this.baseBuffers, attrNames).forEach((buffer) => {
+      selectAttributes(this.basePool, expectDefined(this.baseBuffers, 'the base buffers'), attrNames).forEach((buffer) => {
         buffer.needsUpdate = true;
       });
     }
@@ -371,12 +377,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     });
 
     for (const [name, pool] of this.extraInstancedPools) {
-      const buffers = this.extraInstancedBuffers.get(name);
-      if (buffers) {
-        selectAttributes(pool, buffers, attrNames).forEach((buffer) => {
-          buffer.needsUpdate = true;
-        });
-      }
+      const buffers = expectDefined(this.extraInstancedBuffers.get(name), `the buffers of the pool attached as "${name}"`);
+      selectAttributes(pool, buffers, attrNames).forEach((buffer) => {
+        buffer.needsUpdate = true;
+      });
     }
   }
 
@@ -503,14 +507,17 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     };
 
     if (this.basePool) {
-      checkBufferSerials(this.basePool, this.baseBuffers, this.baseBufferSerials);
+      checkBufferSerials(this.basePool, expectDefined(this.baseBuffers, 'the base buffers'), this.baseBufferSerials);
     }
 
     checkBufferSerials(this.instancedPool, this.instancedBuffers, this.instancedBufferSerials);
 
     for (const [name, pool] of this.extraInstancedPools) {
-      const buffers = this.extraInstancedBuffers.get(name);
-      const bufferSerials = this.extraInstancedBufferSerials.get(name);
+      const buffers = expectDefined(this.extraInstancedBuffers.get(name), `the buffers of the pool attached as "${name}"`);
+      const bufferSerials = expectDefined(
+        this.extraInstancedBufferSerials.get(name),
+        `the buffer serials of the pool attached as "${name}"`,
+      );
       checkBufferSerials(pool, buffers, bufferSerials);
     }
   }
@@ -520,7 +527,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     updateUpdateRange(this.instancedPool, this.instancedBuffers);
 
     for (const [name, pool] of this.extraInstancedPools) {
-      const buffers = this.extraInstancedBuffers.get(name);
+      const buffers = expectDefined(this.extraInstancedBuffers.get(name), `the buffers of the pool attached as "${name}"`);
       updateUpdateRange(pool, buffers);
     }
   }
@@ -581,14 +588,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       // not carry selects nothing there
       const buffers: BufferLike[] = [];
       if (this.basePool) {
-        buffers.push(...selectAttributes(this.basePool, this.baseBuffers, attrNames));
+        buffers.push(...selectAttributes(this.basePool, expectDefined(this.baseBuffers, 'the base buffers'), attrNames));
       }
       buffers.push(...selectAttributes(this.instancedPool, this.instancedBuffers, attrNames));
       for (const [name, pool] of this.extraInstancedPools) {
-        const routeBuffers = this.extraInstancedBuffers.get(name);
-        if (routeBuffers) {
-          buffers.push(...selectAttributes(pool, routeBuffers, attrNames));
-        }
+        const routeBuffers = expectDefined(this.extraInstancedBuffers.get(name), `the buffers of the pool attached as "${name}"`);
+        buffers.push(...selectAttributes(pool, routeBuffers, attrNames));
       }
       this.#autoTouchBuffers = buffers;
     }

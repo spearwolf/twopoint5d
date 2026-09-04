@@ -7,7 +7,8 @@ import {voBuffer} from './constants.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 export class VertexObjectPool<VOType> extends VOBufferPool {
-  #voIndex: Array<VOType & VO>;
+  // a slot is empty until a vertex object materializes in it, and empty again once one is freed
+  #voIndex: Array<(VOType & VO) | undefined>;
 
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
@@ -63,7 +64,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     this.buffer = newBuffer;
 
     // Resize the voIndex array and update buffer references in existing VOs
-    const newVoIndex: Array<VOType & VO> = new Array(capacity);
+    const newVoIndex: Array<(VOType & VO) | undefined> = new Array(capacity);
     for (let i = 0; i < copyCount; i++) {
       const vo = this.#voIndex[i];
       if (vo != null) {

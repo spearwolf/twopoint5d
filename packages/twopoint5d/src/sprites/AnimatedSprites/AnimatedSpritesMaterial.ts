@@ -46,8 +46,13 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
       () => {
         const animsImage = this.animsMap?.image as {width?: number; height?: number} | null | undefined;
 
-        if (animsImage != null && animsImage.width > 0 && animsImage.height > 0) {
-          const animsMapSize = vec2(animsImage.width, animsImage.height);
+        // a texture whose image has not loaded yet carries no dimensions; the neutral
+        // coordinates below hold until touchAnimsMap() picks the loaded image up
+        const width = animsImage?.width;
+        const height = animsImage?.height;
+
+        if (width != null && width > 0 && height != null && height > 0) {
+          const animsMapSize = vec2(width, height);
 
           const time = this.#timeUniform;
 

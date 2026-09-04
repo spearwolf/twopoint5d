@@ -4,6 +4,7 @@ import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSl
 import type {VOBufferPool} from './VOBufferPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {createIndicesArray} from './createIndicesArray.js';
+import {expectDefined} from './expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
 export function initializeAttributes(
@@ -22,22 +23,31 @@ export function initializeAttributes(
   for (const buffer of pool.buffer.buffers.values()) {
     // both maps are filled from the same list of attribute names in VertexObjectBuffer, so a
     // buffer name that has a buffer has its attributes, and an attribute name has its descriptor
-    const attributes = pool.buffer.bufferNameAttributes.get(buffer.bufferName);
+    const attributes = expectDefined(
+      pool.buffer.bufferNameAttributes.get(buffer.bufferName),
+      `the attributes of buffer "${buffer.bufferName}"`,
+    );
     if (attributes.length > 1) {
       const interleavedBuffer = new InterleavedBuffer(asThreeTypedArray(buffer.typedArray), buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
       bufferSerials.set(buffer.bufferName, buffer.serial);
       for (const bufAttr of attributes) {
-        const attrDesc = descriptor.attributes.get(bufAttr.attributeName);
+        const attrDesc = expectDefined(
+          descriptor.attributes.get(bufAttr.attributeName),
+          `the descriptor of attribute "${bufAttr.attributeName}"`,
+        );
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
         attr.name = bufAttr.attributeName;
         geometry.setAttribute(attrDesc.name, attr);
         slots.claim(attrDesc.name, buffers, pool, attr);
       }
     } else {
-      const bufAttr = attributes[0];
-      const attrDesc = descriptor.attributes.get(bufAttr.attributeName);
+      const bufAttr = expectDefined(attributes[0], `the sole attribute of buffer "${buffer.bufferName}"`);
+      const attrDesc = expectDefined(
+        descriptor.attributes.get(bufAttr.attributeName),
+        `the descriptor of attribute "${bufAttr.attributeName}"`,
+      );
       const attr = new BufferAttribute(asThreeTypedArray(buffer.typedArray), buffer.itemSize, attrDesc.normalizedData);
       attr.setUsage(toDrawUsage(buffer.usageType));
       attr.name = bufAttr.attributeName;

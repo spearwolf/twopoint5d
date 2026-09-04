@@ -10,7 +10,7 @@ export class VertexObjectDescriptor {
   readonly basePrototype?: object | null | undefined;
   readonly methods?: object | null | undefined;
 
-  voPrototype: object; // lazy initialization!!
+  voPrototype!: object; // lazy initialization!!
   // is initialized by the first VertexObjectBuffer that uses this descriptor => createVertexObjectPrototype()
 
   constructor(description: VertexObjectDescription) {

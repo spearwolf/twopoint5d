@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `VertexObjectPool<unknown>`
 - a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool that has the capacity of the geometry's `instancedPool`
 - `TexturedSprites#spritePool` is typed `TexturedSpritePool | undefined` and `#texture` is typed `Texture | undefined`: after `dispose()` the mesh holds neither geometry nor material, `spritePool` and `texture` answer `undefined`, `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
+- `VO[voBuffer]` is typed `VertexObjectBuffer | undefined`: a vertex object whose pool has let it go, through `freeVO()` or `dispose()`, reaches no buffer any more — the type `VOUtils.getBuffer()` answers with
+- change the return type of `getDescriptorOf()` to `VertexObjectDescriptor | undefined`: a vertex object without a buffer has no descriptor to answer with
+- `VertexObjects#geometry` is typed `GeoType | undefined` and `#material` `Material | Material[] | undefined`: the constructor takes both as optional, and `AnimatedSprites#dispose()` and `TexturedSprites#dispose()` give both up
+- `VertexObjects` extends `THREE.Mesh<any, any>`: neither type parameter of `THREE.Mesh` can carry the `undefined` that the `geometry` and `material` declarations of this class need. Both slots are re-declared in the class itself, and those declarations are the types it shows
+- change the return types of `TextureAtlas#randomFrame()` and `#randomFrameName()` to `TextureAtlasFrame | undefined` and `TextureAtlasFrameName | undefined`, and those of `#randomFrames()` and `#randomFrameNames()` to arrays of the same: an atlas without frames, or without named frames, has nothing to draw
+- a lookup whose result an invariant guarantees — an attribute descriptor, the claim on an attribute slot, the buffers of a pool attached under a name — throws an error naming what was missing when that invariant is broken, at the place that relies on it
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
 
 ### Removed
@@ -356,6 +362,72 @@ const projection = new OrthographicProjection();
 projection.projectionPlane?.getPointByDistance(100);
 
 const specs: Partial<OrthographicProjectionSpecs> = projection.viewSpecs;
+```
+
+#### `TextureAtlas#randomFrame()` and its siblings can answer `undefined`
+
+An atlas without frames has none to draw, and one without named frames has no name to hand back.
+Under `strictNullChecks` an unguarded call is a compile error.
+
+**Before**
+
+```ts
+const frame: TextureAtlasFrame = atlas.randomFrame();
+const names: TextureAtlasFrameName[] = atlas.randomFrameNames(4);
+```
+
+**After**
+
+```ts
+const frame = atlas.randomFrame();
+if (frame == null) return; // the atlas carries no frames
+
+const names = atlas.randomFrameNames(4).filter((name) => name != null);
+```
+
+For an atlas that is known to be loaded, `atlas.randomFrame()!` is the shorter way out.
+
+#### `getDescriptorOf()` and `VO[voBuffer]` follow the lifetime of the vertex object
+
+A vertex object that `freeVO()` or `dispose()` has released holds no buffer, so it has no
+descriptor either. Both now say so.
+
+**Before**
+
+```ts
+const {vertexCount} = getDescriptorOf(vo);
+```
+
+**After**
+
+```ts
+const descriptor = getDescriptorOf(vo);
+if (descriptor == null) return; // the pool has released this vertex object
+const {vertexCount} = descriptor;
+```
+
+Where the vertex object is known to be live — inside a getter it defines, for instance —
+`getDescriptorOf(vo)!` says that in one character.
+
+#### `VertexObjects#geometry` and `#material` can be `undefined`
+
+`VertexObjects` takes both as optional constructor arguments, and the sprite meshes built on it
+release both in `dispose()`. Reading through either needs a guard.
+
+**Before**
+
+```ts
+sprites.geometry.instancedPool.createVO();
+sprites.material.colorMap = texture;
+```
+
+**After**
+
+```ts
+sprites.geometry?.instancedPool.createVO();
+if (sprites.material != null) {
+  sprites.material.colorMap = texture;
+}
 ```
 
 #### `TexturedSprites#spritePool` and `#texture` can be `undefined`

@@ -85,7 +85,8 @@ export class Cross {
 
   transform(transform: Matrix4) {
     const v = new Vector3();
-    const {vertexCount} = getDescriptorOf(this);
+    // a cross being transformed is alive in its pool, so it reaches its descriptor
+    const {vertexCount} = getDescriptorOf(this)!;
     for (let i = 0; i < vertexCount; i++) {
       this.getVertexPosition(i as CrossVertexIndexType, v);
       v.applyMatrix4(transform);

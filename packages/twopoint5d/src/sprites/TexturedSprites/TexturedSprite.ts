@@ -1,5 +1,5 @@
 import {Color, type Node} from 'three/webgpu';
-import {voInitialize} from '../../index.js';
+import {voInitialize} from '../../vertex-objects/constants.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
 

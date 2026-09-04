@@ -59,7 +59,9 @@ export class BouncingSprites {
 
       sprite.setPosition(Math.random() * this.containerWidth - halfWidth, Math.random() * this.containerHeight - halfHeight);
 
-      sprite.setFrame(frameId != null ? this.textureAtlas.get(frameId) : this.textureAtlas.randomFrame());
+      // the atlas is loaded before any sprite is created, so both lookups answer a frame
+      const frame = (frameId != null ? this.textureAtlas.get(frameId) : this.textureAtlas.randomFrame())!;
+      sprite.setFrame(frame);
 
       sprite.speedX = Math.random() * this.startSpeedX + this.startSpeedBaseX;
       sprite.speedY = Math.random() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;

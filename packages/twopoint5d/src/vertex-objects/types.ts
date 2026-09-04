@@ -72,7 +72,11 @@ export interface VertexObjectDescription {
 }
 
 export interface VO {
-  [voBuffer]: VertexObjectBuffer;
+  /**
+   * The buffer that backs this vertex object, and unset once the pool has let it go:
+   * a disposed or freed vertex object keeps its properties but no longer reaches a buffer.
+   */
+  [voBuffer]: VertexObjectBuffer | undefined;
   [voIndex]: number;
 }
 

@@ -2,8 +2,15 @@ import {type Material, Mesh} from 'three/webgpu';
 import type {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import type {VOBufferGeometry} from './VOBufferGeometry.js';
 
-export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObjectGeometry<any, any>> extends Mesh {
-  declare geometry: GeoType;
+/**
+ * `THREE.Mesh` types both slots as always filled, so neither of its type parameters can carry
+ * the `undefined` the two declarations below need; the slots are opened here and closed again
+ * by those declarations, which are the types this class and its subclasses actually show.
+ */
+export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObjectGeometry<any, any>> extends Mesh<any, any> {
+  // a mesh can be built without either, and a subclass that disposes gives both up again
+  declare geometry: GeoType | undefined;
+  declare material: Material | Material[] | undefined;
 
   constructor(geometry?: GeoType, material?: Material | Material[]) {
     super(geometry, material);

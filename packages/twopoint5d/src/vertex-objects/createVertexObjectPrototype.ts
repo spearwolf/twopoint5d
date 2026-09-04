@@ -5,17 +5,23 @@ import type {VO} from './types.js';
 
 const makeAttributeGetter = (bufferName: string, instanceOffset: number, attrOffset: number) => {
   return function getAttribute(this: VO) {
+    // a vertex object alive in its pool has its buffer, and that buffer carries every attribute
+    // of its descriptor; these accessors run per sprite and per frame, so they assert that
+    // rather than pay for a check on every value
     const idx = this[voIndex] * instanceOffset + attrOffset;
-    const buf = this[voBuffer].buffers.get(bufferName);
-    return buf!.typedArray[idx];
+    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    return buf.typedArray[idx];
   };
 };
 
 const makeAttributeSetter = (bufferName: string, instanceOffset: number, attrOffset: number) => {
   return function setAttribute(this: VO, value: number) {
+    // a vertex object alive in its pool has its buffer, and that buffer carries every attribute
+    // of its descriptor; these accessors run per sprite and per frame, so they assert that
+    // rather than pay for a check on every value
     const idx = this[voIndex] * instanceOffset + attrOffset;
-    const buf = this[voBuffer].buffers.get(bufferName);
-    buf!.typedArray[idx] = value;
+    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    buf.typedArray[idx] = value;
   };
 };
 
@@ -27,13 +33,18 @@ const makeAttributeValuesGetter = (
   attrSize: number,
 ) => {
   return function getAttributeValues(this: VO) {
+    // a vertex object alive in its pool has its buffer, and that buffer carries every attribute
+    // of its descriptor; these accessors run per sprite and per frame, so they assert that
+    // rather than pay for a check on every value
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const buf = this[voBuffer].buffers.get(bufferName);
-    const source = buf!.typedArray;
-    const target = createTypedArray(buf!.dataType, vertexCount * attrSize);
+    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    const source = buf.typedArray;
+    const target = createTypedArray(buf.dataType, vertexCount * attrSize);
     for (let i = 0; i < vertexCount; i++) {
       if (attrSize === 1) {
-        target[i] = source[idx + i * bufferItemSize];
+        // the buffer holds vertexCount * bufferItemSize elements per object, so idx and every
+        // stride this loop adds to it stay inside the object's own slice
+        target[i] = source[idx + i * bufferItemSize]!;
       } else {
         target.set(source.subarray(idx + i * bufferItemSize, idx + i * bufferItemSize + attrSize), i * attrSize);
       }
@@ -50,15 +61,19 @@ const makeAttributeValueSetter = (
   attrSize: number,
 ) => {
   return function setAttributeValues(this: VO, ...values: number[] | [ArrayLike<number>]) {
+    // a vertex object alive in its pool has its buffer, and that buffer carries every attribute
+    // of its descriptor; these accessors run per sprite and per frame, so they assert that
+    // rather than pay for a check on every value
     const first = values[0];
     const source: ArrayLike<number> = values.length === 1 && typeof first !== 'number' ? first : (values as number[]);
     const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[voBuffer].buffers.get(bufferName)!.typedArray;
+    const target = this[voBuffer]!.buffers.get(bufferName)!.typedArray;
     const {length} = source;
     for (let i = 0, from = 0; i < vertexCount; i++, from += attrSize) {
       const to = idx + i * bufferItemSize;
       for (let j = 0; j < attrSize && from + j < length; j++) {
-        target[to + j] = source[from + j];
+        // the loop's own bound keeps `from + j` below the length of source
+        target[to + j] = source[from + j]!;
       }
     }
   };

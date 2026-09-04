@@ -51,7 +51,7 @@ export class VertexAttributeDescriptor {
   }
 
   get hasComponents(): boolean {
-    return this.description.components?.length > 0;
+    return (this.description.components?.length ?? 0) > 0;
   }
 
   get components(): string[] {

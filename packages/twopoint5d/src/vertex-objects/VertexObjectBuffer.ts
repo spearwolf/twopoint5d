@@ -61,26 +61,27 @@ export class VertexObjectBuffer {
       }
     } else {
       this.descriptor = source;
-      this.buffers = new Map();
       this.bufferAttributes = new Map();
       this.attributeNames = Object.freeze(Array.from(this.descriptor.attributeNames).sort());
+
+      // a buffer can only be sized once every attribute has contributed its share to itemSize,
+      // so the typed arrays come after this loop and the records carry none until then
+      const forming = new Map<string, Omit<Buffer, 'typedArray'>>();
 
       for (const attributeName of this.attributeNames) {
         const attribute = this.descriptor.getAttribute(attributeName)!;
         const {bufferName} = attribute;
         let offset = 0;
-        if (this.buffers.has(bufferName)) {
-          const buffer = this.buffers.get(bufferName)!;
+        const buffer = forming.get(bufferName);
+        if (buffer) {
           offset = buffer.itemSize;
           buffer.itemSize += attribute.size;
         } else {
-          this.buffers.set(bufferName, {
+          forming.set(bufferName, {
             bufferName,
             itemSize: attribute.size,
             dataType: attribute.dataType,
             usageType: attribute.usageType,
-            // the typed array is filled below, once every attribute has contributed its share to itemSize
-            typedArray: undefined,
             serial: 0,
           });
         }
@@ -91,10 +92,15 @@ export class VertexObjectBuffer {
         });
       }
 
-      for (const buffer of this.buffers.values()) {
-        buffer.typedArray =
-          buffersData?.buffers[buffer.bufferName] ??
-          createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize);
+      this.buffers = new Map();
+
+      for (const buffer of forming.values()) {
+        this.buffers.set(buffer.bufferName, {
+          ...buffer,
+          typedArray:
+            buffersData?.buffers[buffer.bufferName] ??
+            createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
+        });
       }
 
       this.bufferNameAttributes = new Map();
@@ -165,7 +171,8 @@ export class VertexObjectBuffer {
           for (let i = 0; i < vertexCount; i++) {
             const to = bufIdx + attr.offset;
             for (let k = 0; k < attrSize && idx + k < data.length; k++) {
-              buffer.typedArray[to + k] = data[idx + k];
+              // the loop's own bound keeps `idx + k` below the length of data
+              buffer.typedArray[to + k] = data[idx + k]!;
             }
             idx += attrSize;
             bufIdx += buffer.itemSize;
