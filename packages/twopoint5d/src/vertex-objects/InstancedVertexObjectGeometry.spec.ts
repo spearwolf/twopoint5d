@@ -63,17 +63,17 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(geometry.baseBuffers).toBeDefined();
     expect(geometry.instancedBuffers).toBeDefined();
 
-    expect(geometry.baseBuffers.get('static_float32').array).toBe(
-      geometry.basePool.buffer.buffers.get('static_float32').typedArray,
+    expect(geometry.baseBuffers!.get('static_float32')!.array).toBe(
+      geometry.basePool!.buffer.buffers.get('static_float32')!.typedArray,
     );
-    expect(geometry.instancedBuffers.get('dynamic_float32').array).toBe(
-      geometry.instancedPool.buffer.buffers.get('dynamic_float32').typedArray,
+    expect(geometry.instancedBuffers.get('dynamic_float32')!.array).toBe(
+      geometry.instancedPool.buffer.buffers.get('dynamic_float32')!.typedArray,
     );
-    expect(geometry.instancedBuffers.get('static_float32').array).toBe(
-      geometry.instancedPool.buffer.buffers.get('static_float32').typedArray,
+    expect(geometry.instancedBuffers.get('static_float32')!.array).toBe(
+      geometry.instancedPool.buffer.buffers.get('static_float32')!.typedArray,
     );
-    expect(geometry.instancedBuffers.get('dynamic_uint32').array).toBe(
-      geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray,
+    expect(geometry.instancedBuffers.get('dynamic_uint32')!.array).toBe(
+      geometry.instancedPool.buffer.buffers.get('dynamic_uint32')!.typedArray,
     );
   });
 
@@ -84,8 +84,8 @@ describe('InstancedVertexObjectGeometry', () => {
 
     expect(extraPool).toBeDefined();
 
-    expect(geometry.extraInstancedBuffers.get('extraPool').get('extraBuffer').array).toBe(
-      extraPool.buffer.buffers.get('extraBuffer').typedArray,
+    expect(geometry.extraInstancedBuffers.get('extraPool')!.get('extraBuffer')!.array).toBe(
+      extraPool.buffer.buffers.get('extraBuffer')!.typedArray,
     );
 
     expect(geometry.getAttribute('extra')).toBeDefined();
@@ -96,10 +96,10 @@ describe('InstancedVertexObjectGeometry', () => {
     const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor, capacity);
 
     expect(geometry.index).toBeDefined();
-    expect(geometry.index.array.length).toBe(baseDescriptor.indices.length * capacity);
+    expect(geometry.index!.array.length).toBe(baseDescriptor.indices.length * capacity);
 
     // prettier-ignore
-    expect(Array.from(geometry.index.array).slice(0, baseDescriptor.indices.length * 3)).toEqual([
+    expect(Array.from(geometry.index!.array).slice(0, baseDescriptor.indices.length * 3)).toEqual([
       0, 1, 2, 0, 2, 3,
       4, 5, 6, 4, 6, 7,
       8, 9, 10, 8, 10, 11,
@@ -109,15 +109,15 @@ describe('InstancedVertexObjectGeometry', () => {
   test('an explicit base capacity of 0 reaches the base pool', () => {
     const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 0);
 
-    expect(geometry.basePool.capacity).toBe(0);
+    expect(geometry.basePool!.capacity).toBe(0);
   });
 
   describe('dispose()', () => {
     test('disposes basePool and instancedPool it built itself', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
 
-      const baseDispose = sandbox.spy(geometry.basePool, 'dispose');
-      const instancedDispose = sandbox.spy(geometry.instancedPool, 'dispose');
+      const baseDispose = sandbox.spy(geometry.basePool!, 'dispose');
+      const instancedDispose = sandbox.spy(geometry.instancedPool!, 'dispose');
 
       geometry.dispose();
 

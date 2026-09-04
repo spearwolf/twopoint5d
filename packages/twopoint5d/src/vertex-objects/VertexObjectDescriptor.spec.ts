@@ -34,7 +34,7 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar', 'plah']));
     expect(Array.from(descriptor.bufferNames.values())).toEqual(expect.arrayContaining(['dynamic_float32', 'static_float32']));
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
-    expect(descriptor.getAttribute('bar').name).toBe('bar');
+    expect(descriptor.getAttribute('bar')!.name).toBe('bar');
   });
 
   test('construct with meshCount', () => {
@@ -62,7 +62,7 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar']));
     expect(Array.from(descriptor.bufferNames.values())).toMatchObject(['static_float32']);
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
-    expect(descriptor.getAttribute('bar').name).toBe('bar');
+    expect(descriptor.getAttribute('bar')!.name).toBe('bar');
   });
 
   test('construct with attributes only', () => {
@@ -87,6 +87,6 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.attributeNames.values())).toEqual(expect.arrayContaining(['foo', 'bar']));
     expect(Array.from(descriptor.bufferNames.values())).toEqual(expect.arrayContaining(['dynamic_float32', 'static_float32']));
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
-    expect(descriptor.getAttribute('bar').name).toBe('bar');
+    expect(descriptor.getAttribute('bar')!.name).toBe('bar');
   });
 });

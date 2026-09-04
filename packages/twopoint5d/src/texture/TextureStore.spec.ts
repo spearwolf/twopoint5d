@@ -88,13 +88,13 @@ describe('TextureStore', () => {
       store.onResource('a', (r) => {
         resourceCount++;
         on(r, 'dispose', () => {
-          resourceDisposes['a']++;
+          resourceDisposes['a']!++;
         });
       });
       store.onResource('b', (r) => {
         resourceCount++;
         on(r, 'dispose', () => {
-          resourceDisposes['b']++;
+          resourceDisposes['b']!++;
         });
       });
       expect(resourceCount).toBe(2);
@@ -289,7 +289,7 @@ describe('TextureStore', () => {
         await flushMicrotasks();
         await flushMicrotasks();
         expect(errorHandler).toHaveBeenCalledTimes(1);
-        const event = errorHandler.mock.calls[0][0];
+        const event = errorHandler.mock.calls[0]![0];
         expect(event.source).toBe('fetch');
       } finally {
         fetchMock.mockRestore();
@@ -306,7 +306,7 @@ describe('TextureStore', () => {
         await flushMicrotasks();
         await flushMicrotasks();
         expect(errorHandler).toHaveBeenCalledTimes(1);
-        expect(errorHandler.mock.calls[0][0].source).toBe('parse');
+        expect(errorHandler.mock.calls[0]![0].source).toBe('parse');
       } finally {
         fetchMock.mockRestore();
       }
@@ -374,14 +374,14 @@ describe('TextureStore', () => {
         resources['c'] = r;
       });
 
-      expect(resources['a'].refCount).toBe(1);
-      expect(resources['b'].refCount).toBe(0);
-      expect(resources['c'].refCount).toBe(0);
+      expect(resources['a']!.refCount).toBe(1);
+      expect(resources['b']!.refCount).toBe(0);
+      expect(resources['c']!.refCount).toBe(0);
 
       const disposedB = vi.fn();
       const disposedC = vi.fn();
-      on(resources['b'], 'dispose', disposedB);
-      on(resources['c'], 'dispose', disposedC);
+      on(resources['b']!, 'dispose', disposedB);
+      on(resources['c']!, 'dispose', disposedC);
 
       const removed = store.clearUnused();
       expect(removed).toBe(2);

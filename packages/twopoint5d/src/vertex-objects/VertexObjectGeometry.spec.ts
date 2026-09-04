@@ -45,9 +45,9 @@ describe('VertexObjectGeometry', () => {
     expect(geometry).toBeDefined();
     expect(geometry.buffers).toBeDefined();
 
-    expect(geometry.buffers.get('dynamic_float32').array).toBe(geometry.pool.buffer.buffers.get('dynamic_float32').typedArray);
-    expect(geometry.buffers.get('static_float32').array).toBe(geometry.pool.buffer.buffers.get('static_float32').typedArray);
-    expect(geometry.buffers.get('dynamic_uint32').array).toBe(geometry.pool.buffer.buffers.get('dynamic_uint32').typedArray);
+    expect(geometry.buffers.get('dynamic_float32')!.array).toBe(geometry.pool.buffer.buffers.get('dynamic_float32')!.typedArray);
+    expect(geometry.buffers.get('static_float32')!.array).toBe(geometry.pool.buffer.buffers.get('static_float32')!.typedArray);
+    expect(geometry.buffers.get('dynamic_uint32')!.array).toBe(geometry.pool.buffer.buffers.get('dynamic_uint32')!.typedArray);
   });
 
   test('index array buffer is created', () => {
@@ -55,10 +55,10 @@ describe('VertexObjectGeometry', () => {
     const geometry = new VertexObjectGeometry(descriptor, capacity);
 
     expect(geometry.index).toBeDefined();
-    expect(geometry.index.array.length).toBe(descriptor.indices.length * capacity);
+    expect(geometry.index!.array.length).toBe(descriptor.indices.length * capacity);
 
     // prettier-ignore
-    expect(Array.from(geometry.index.array).slice(0, descriptor.indices.length * 3)).toEqual([
+    expect(Array.from(geometry.index!.array).slice(0, descriptor.indices.length * 3)).toEqual([
       0, 1, 2, 0, 2, 3,
       4, 5, 6, 4, 6, 7,
       8, 9, 10, 8, 10, 11,

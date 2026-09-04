@@ -106,9 +106,9 @@ describe('StageRenderer + RootRenderPipeline (integration)', () => {
     sr.resize(100, 100);
 
     const passes = [makeNode('s0'), makeNode('s1'), makeNode('s2')];
-    sr.add(fakeStage('s0', passes[0]) as any)
-      .add(fakeStage('s1', passes[1]) as any)
-      .add(fakeStage('s2', passes[2]) as any);
+    sr.add(fakeStage('s0', passes[0]!) as any)
+      .add(fakeStage('s1', passes[1]!) as any)
+      .add(fakeStage('s2', passes[2]!) as any);
 
     sr.pipeline = fakeRootPipeline() as any;
     expect(sr.buildOutputNode).toBeUndefined();
@@ -128,7 +128,7 @@ describe('StageRenderer + RootRenderPipeline (integration)', () => {
     sr.resize(100, 100);
 
     const passes = [makeNode('a'), makeNode('b')];
-    sr.add(fakeStage('a', passes[0]) as any).add(fakeStage('b', passes[1]) as any);
+    sr.add(fakeStage('a', passes[0]!) as any).add(fakeStage('b', passes[1]!) as any);
 
     sr.pipeline = fakeRootPipeline() as any;
     const userBuilder = vi.fn((nodes: unknown[]) => nodes[0]);
@@ -137,7 +137,7 @@ describe('StageRenderer + RootRenderPipeline (integration)', () => {
     sr.renderTo(renderer as any);
 
     expect(userBuilder).toHaveBeenCalledTimes(1);
-    expect(userBuilder.mock.calls[0][0]).toEqual(passes);
+    expect(userBuilder.mock.calls[0]![0]).toEqual(passes);
     expect(sr.pipeline!.outputNode).toBe(passes[0]);
   });
 

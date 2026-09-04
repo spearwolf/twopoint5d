@@ -83,7 +83,7 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(renderer.clear).toHaveBeenCalledTimes(1);
       expect(renderer.clear).toHaveBeenCalledWith(true, true, true);
-      const callArgs = renderer.setClearColor.mock.calls[0];
+      const callArgs = renderer.setClearColor.mock.calls[0]!;
       expect(callArgs[0]).toBeInstanceOf(Color);
       expect((callArgs[0] as Color).getHexString()).toBe('112233');
       expect(callArgs[1]).toBe(0.25);
@@ -157,8 +157,8 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(a.renderTo).toHaveBeenCalledTimes(1);
       expect(b.renderTo).toHaveBeenCalledTimes(1);
-      const callOrderA = a.renderTo.mock.invocationCallOrder[0];
-      const callOrderB = b.renderTo.mock.invocationCallOrder[0];
+      const callOrderA = a.renderTo.mock.invocationCallOrder[0]!;
+      const callOrderB = b.renderTo.mock.invocationCallOrder[0]!;
       expect(callOrderA).toBeLessThan(callOrderB);
     });
 
@@ -182,8 +182,8 @@ describe('StageRenderer', () => {
       sr.renderOrder = 'world,*,debug';
       sr.renderTo(renderer as any);
       const order = [world, ui, debug].map((s) => s.renderTo.mock.invocationCallOrder[0]);
-      expect(order[0]).toBeLessThan(order[1]);
-      expect(order[1]).toBeLessThan(order[2]);
+      expect(order[0]!).toBeLessThan(order[1]!);
+      expect(order[1]!).toBeLessThan(order[2]!);
     });
   });
 
@@ -463,7 +463,7 @@ describe('StageRenderer', () => {
       sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
       sr.renderTo(renderer as any);
       expect(buildOutputNode).toHaveBeenCalledTimes(1);
-      expect(buildOutputNode.mock.calls[0][0]).toEqual([passA, passB]);
+      expect(buildOutputNode.mock.calls[0]![0]).toEqual([passA, passB]);
     });
 
     // -------------------------------------------------------------------------
@@ -489,50 +489,50 @@ describe('StageRenderer', () => {
       it('explicit list reorders inserted stages: "ui,world,bg" → passes [ui, world, bg]', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,world,bg');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
       });
 
       it('wildcard splices the rest in insertion order: "ui,*" → [ui, bg, world]', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,*');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['bg'], passByName['world']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['ui'], passByName['bg'], passByName['world']]);
       });
 
       it('wildcard between names: "bg,*,ui" → [bg, world, ui]', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'bg,*,ui');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
       });
 
       it('names missing from renderOrder are dropped from the pass list: "ui,bg" → [ui, bg] (world omitted)', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,bg');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['bg']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['ui'], passByName['bg']]);
       });
 
       it('unknown names in renderOrder are ignored: "ui,nope,world,*" → [ui, world, bg]', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'ui,nope,world,*');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
       });
 
       it('whitespace in renderOrder is trimmed: " ui , world , bg " → [ui, world, bg]', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], ' ui , world , bg ');
         sr.renderTo(renderer as any);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
       });
 
       it('changing renderOrder after the first render rebuilds outputNode with the new order', () => {
         const {sr, buildOutputNode, passByName} = makeOrderedSetup(['bg', 'world', 'ui'], 'bg,world,ui');
         sr.renderTo(renderer as any);
         expect(buildOutputNode).toHaveBeenCalledTimes(1);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([passByName['bg'], passByName['world'], passByName['ui']]);
 
         // Reorder
         sr.renderOrder = 'ui,world,bg';
         sr.renderTo(renderer as any);
         expect(buildOutputNode).toHaveBeenCalledTimes(2);
-        expect(buildOutputNode.mock.calls[1][0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
+        expect(buildOutputNode.mock.calls[1]![0]).toEqual([passByName['ui'], passByName['world'], passByName['bg']]);
       });
 
       it('order matches the parallel call order of asPassNode() per stage', () => {
@@ -563,7 +563,7 @@ describe('StageRenderer', () => {
         sr.renderTo(renderer as any);
         // asPassNode() called in the same order the nodes appear in buildOutputNode's argument
         expect(order).toEqual(['c', 'a', 'b']);
-        expect(buildOutputNode.mock.calls[0][0]).toEqual([c.node, a.node, b.node]);
+        expect(buildOutputNode.mock.calls[0]![0]).toEqual([c.node, a.node, b.node]);
       });
     });
 

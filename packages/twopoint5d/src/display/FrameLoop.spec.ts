@@ -42,8 +42,8 @@ describe('FrameLoop', () => {
     renderer.tick(1000);
 
     expect(events).toHaveLength(1);
-    expect(Number.isNaN(events[0].deltaTime)).toBe(false);
-    expect(events[0].deltaTime).toBe(0);
+    expect(Number.isNaN(events[0]!.deltaTime)).toBe(false);
+    expect(events[0]!.deltaTime).toBe(0);
   });
 
   it('emits a single OnFrame per rAF tick with monotonically increasing frameNo', () => {
@@ -67,13 +67,13 @@ describe('FrameLoop', () => {
     renderer.tick(1016);
 
     // first frame: no previous timestamp — falls back to `now`
-    expect(events[0].now).toBe(1);
-    expect(events[0].lastNow).toBe(1);
+    expect(events[0]!.now).toBe(1);
+    expect(events[0]!.lastNow).toBe(1);
 
     // second frame: lastNow is the first frame's now
-    expect(events[1].now).toBeCloseTo(1.016);
-    expect(events[1].lastNow).toBe(1);
-    expect(events[1].deltaTime).toBeCloseTo(0.016);
+    expect(events[1]!.now).toBeCloseTo(1.016);
+    expect(events[1]!.lastNow).toBe(1);
+    expect(events[1]!.deltaTime).toBeCloseTo(0.016);
   });
 
   it('measuredFps is 0 until the first measurement window completes', () => {
@@ -103,7 +103,7 @@ describe('FrameLoop', () => {
     }
 
     expect(events).toHaveLength(31);
-    expect(events[30].measuredFps).toBe(60);
+    expect(events[30]!.measuredFps).toBe(60);
   });
 
   it('maxFps throttles emissions to the target rate', () => {
@@ -140,8 +140,8 @@ describe('FrameLoop', () => {
     // the target interval; drift would show as a growing or shrinking spread.
     const targetDelta = 1 / 60; // seconds
     for (let i = 1; i < events.length; i++) {
-      expect(events[i].deltaTime).toBeGreaterThan(targetDelta * 0.95);
-      expect(events[i].deltaTime).toBeLessThan(targetDelta * 1.1);
+      expect(events[i]!.deltaTime).toBeGreaterThan(targetDelta * 0.95);
+      expect(events[i]!.deltaTime).toBeLessThan(targetDelta * 1.1);
     }
   });
 

@@ -111,25 +111,25 @@ describe('vertex-buffers-geometry-updates', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const pool = geometry.instancedPool;
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setColor([1, 2, 3, 4]);
       vo0.foo = 100;
       vo0.setBar([101, 102]);
       vo0.impact = 1000;
 
-      const vo1 = pool.createVO();
+      const vo1 = pool.createVO()!;
       vo1.setColor([5, 6, 7, 8]);
       vo1.foo = 103;
       vo1.setBar([104, 105]);
       vo1.impact = 1001;
 
-      const vo2 = pool.createVO();
+      const vo2 = pool.createVO()!;
       vo2.setColor([9, 10, 11, 12]);
       vo2.foo = 106;
       vo2.setBar([107, 108]);
       vo2.impact = 1002;
 
-      const base = geometry.basePool.createVO();
+      const base = geometry.basePool!.createVO()!;
       // prettier-ignore
       base.setPosition([
         0, 1, 2,
@@ -145,51 +145,51 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position', () => {
         const [geometry] = makeInstancedGeometry();
 
-        const static_float32 = geometry.baseBuffers.get('positions').array;
+        const static_float32 = geometry.baseBuffers!.get('positions')!.array;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
         expect(positionAttribute.isBufferAttribute).toBe(true);
         expect(positionAttribute.array).toBe(static_float32);
-        expect(static_float32).toBe(geometry.basePool.buffer.buffers.get('positions').typedArray);
+        expect(static_float32).toBe(geometry.basePool!.buffer.buffers.get('positions')!.typedArray);
       });
 
       test('color', () => {
         const [geometry] = makeInstancedGeometry();
 
-        expect(geometry.instancedBuffers.get('static_uint8').array).toBe(
-          geometry.instancedPool.buffer.buffers.get('static_uint8').typedArray,
+        expect(geometry.instancedBuffers.get('static_uint8')!.array).toBe(
+          geometry.instancedPool.buffer.buffers.get('static_uint8')!.typedArray,
         );
 
         const colorAttribute = geometry.getAttribute('color')! as InstancedBufferAttribute;
         expect(colorAttribute.isInstancedBufferAttribute).toBe(true);
-        expect(colorAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_uint8').typedArray);
+        expect(colorAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_uint8')!.typedArray);
       });
 
       test('foo, bar', () => {
         const [geometry] = makeInstancedGeometry();
 
-        expect(geometry.instancedBuffers.get('static_float32').array).toBe(
-          geometry.instancedPool.buffer.buffers.get('static_float32').typedArray,
+        expect(geometry.instancedBuffers.get('static_float32')!.array).toBe(
+          geometry.instancedPool.buffer.buffers.get('static_float32')!.typedArray,
         );
 
         const fooAttribute = geometry.getAttribute('foo')! as InterleavedBufferAttribute;
         expect(fooAttribute.isInterleavedBufferAttribute).toBe(true);
-        expect(fooAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32').typedArray);
+        expect(fooAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32')!.typedArray);
 
         const barAttribute = geometry.getAttribute('bar')! as InterleavedBufferAttribute;
         expect(barAttribute.isInterleavedBufferAttribute).toBe(true);
-        expect(barAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32').typedArray);
+        expect(barAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_float32')!.typedArray);
       });
 
       test('impact', () => {
         const [geometry] = makeInstancedGeometry();
-        expect(geometry.instancedBuffers.get('dynamic_uint32').array).toBe(
-          geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray,
+        expect(geometry.instancedBuffers.get('dynamic_uint32')!.array).toBe(
+          geometry.instancedPool.buffer.buffers.get('dynamic_uint32')!.typedArray,
         );
 
         const impactAttribute = geometry.getAttribute('impact')! as InstancedBufferAttribute;
         expect(impactAttribute.isInstancedBufferAttribute).toBe(true);
-        expect(impactAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('dynamic_uint32').typedArray);
+        expect(impactAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('dynamic_uint32')!.typedArray);
       });
     });
 
@@ -197,12 +197,12 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position: zero-copy', () => {
         const [geometry, , , , , base] = makeInstancedGeometry();
 
-        const buffer = geometry.basePool.buffer.buffers.get('positions');
+        const buffer = geometry.basePool!.buffer.buffers.get('positions')!;
         const initialPositions = buffer.typedArray;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
         expect(positionAttribute.array).toBe(initialPositions);
-        expect(geometry.basePool.capacity).toBe(1);
+        expect(geometry.basePool!.capacity).toBe(1);
 
         expect(base.x0).toBe(0);
         expect(base.y0).toBe(1);
@@ -219,7 +219,7 @@ describe('vertex-buffers-geometry-updates', () => {
           109, 110, 111,
         ]);
 
-        geometry.basePool.fromBuffersData({
+        geometry.basePool!.fromBuffersData({
           capacity: 1,
           usedCount: 1,
           buffers: {
@@ -247,12 +247,12 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position: copy', () => {
         const [geometry, , , , , base] = makeInstancedGeometry();
 
-        const buffer = geometry.baseBuffers.get('positions');
+        const buffer = geometry.baseBuffers!.get('positions')!;
         const initialPositions = buffer.array;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
         expect(positionAttribute.array).toBe(initialPositions);
-        expect(geometry.basePool.capacity).toBe(1);
+        expect(geometry.basePool!.capacity).toBe(1);
 
         expect(base.x0).toBe(0);
         expect(base.y0).toBe(1);
@@ -269,7 +269,7 @@ describe('vertex-buffers-geometry-updates', () => {
           109, 110, 111,
         ]);
 
-        geometry.basePool.fromBuffersData(
+        geometry.basePool!.fromBuffersData(
           {
             capacity: 1,
             usedCount: 1,
@@ -296,7 +296,7 @@ describe('vertex-buffers-geometry-updates', () => {
       test('position: copy (because of smaller array)', () => {
         const [geometry, , , , , base] = makeInstancedGeometry();
 
-        const buffer = geometry.baseBuffers.get('positions');
+        const buffer = geometry.baseBuffers!.get('positions')!;
         const initialPositions = buffer.array;
         const positionAttribute = geometry.getAttribute('position')! as BufferAttribute;
 
@@ -319,7 +319,7 @@ describe('vertex-buffers-geometry-updates', () => {
           103, 104, 105,
         ]);
 
-        geometry.basePool.fromBuffersData({
+        geometry.basePool!.fromBuffersData({
           capacity: 1,
           usedCount: 1,
           buffers: {
@@ -349,7 +349,7 @@ describe('vertex-buffers-geometry-updates', () => {
       test('foo: zero-copy', () => {
         const [geometry, , vo0, vo1, vo2] = makeInstancedGeometry();
 
-        const buffer = geometry.instancedBuffers.get('static_float32');
+        const buffer = geometry.instancedBuffers.get('static_float32')!;
         const initialDataArray = buffer.array;
         const fooAttribute = geometry.getAttribute('foo')! as InterleavedBufferAttribute;
 
@@ -580,7 +580,7 @@ describe('vertex-buffers-geometry-updates', () => {
     test('the base pool of an instanced geometry uploads every vertex of a used object', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
-      geometry.basePool.createVO();
+      geometry.basePool!.createVO();
       geometry.update();
 
       // 3 components per vertex, 4 vertices per object, 1 object in use
@@ -660,7 +660,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.dispose();
 
       expect(instancedPool.isDisposed).toBe(true);
-      expect(basePool.isDisposed).toBe(true);
+      expect(basePool!.isDisposed).toBe(true);
     });
 
     test('the attributes of every released route leave the geometry', () => {
@@ -906,7 +906,7 @@ describe('vertex-buffers-geometry-updates', () => {
       // this first post-attach update() also sees the buffer's serial for the first time, which
       // touches it regardless of the auto-touch cache - it is not yet the measurement
       geometry.update();
-      const buffer = bufferInSlot(geometry, 'quux');
+      const buffer = bufferInSlot(geometry, 'quux')!;
       const versionAfterFirstUpdate = buffer.version;
 
       // the serial is stable by now, so only a correctly invalidated auto-touch cache touches
@@ -926,7 +926,7 @@ describe('vertex-buffers-geometry-updates', () => {
       pool.createVO();
       geometry.update(); // primes the cache with the extra route included
 
-      const buffer = bufferInSlot(geometry, 'quux');
+      const buffer = bufferInSlot(geometry, 'quux')!;
       const versionBeforeDetach = buffer.version;
 
       geometry.detachInstancedPool('extra');
@@ -990,7 +990,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(Object.keys(withOwnPools.attributes)).toEqual([]);
       expect(withOwnPools.index).toBeNull();
       expect(instancedPool.isDisposed).toBe(true);
-      expect(basePool.isDisposed).toBe(true);
+      expect(basePool!.isDisposed).toBe(true);
     });
 
     test('stays a no-op on a non-instanced geometry, whoever owns the pool', () => {
@@ -1047,7 +1047,7 @@ describe('vertex-buffers-geometry-updates', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(handedIn, 10, baseDesc, 1);
       geometry.update(); // primes the cache with the handed-in pool's autoTouch buffer (`impact`)
 
-      const buffer = bufferInSlot(geometry, 'impact');
+      const buffer = bufferInSlot(geometry, 'impact')!;
       geometry.dispose();
       const versionAfterDispose = buffer.version;
 
@@ -1078,7 +1078,7 @@ describe('vertex-buffers-geometry-updates', () => {
       const geometry = new VertexObjectGeometry<MyBaseVO>(handedIn, 10);
       geometry.update(); // primes the cache with the handed-in pool's autoTouch buffer (`position`)
 
-      const buffer = bufferInSlot(geometry, 'position');
+      const buffer = bufferInSlot(geometry, 'position')!;
       geometry.dispose();
       const versionAfterDispose = buffer.version;
 
@@ -1114,7 +1114,7 @@ describe('vertex-buffers-geometry-updates', () => {
       },
     });
 
-    const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) => pool.buffer.bufferAttributes.get(attrName).bufferName;
+    const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) => pool.buffer.bufferAttributes.get(attrName)!.bufferName;
 
     test('a route that gives up a shared pool hands the slot back to the route that keeps it', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
@@ -1125,13 +1125,13 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.detachInstancedPool('two');
 
       // the slot belongs to the route that is still there, so touching the attribute reaches it
-      const buffer = bufferInSlot(geometry, 'quux');
-      expect(buffer).toBe(geometry.extraInstancedBuffers.get('one').get(bufferNameOf(shared, 'quux')));
+      const buffer = bufferInSlot(geometry, 'quux')!;
+      expect(buffer).toBe(geometry.extraInstancedBuffers.get('one')!.get(bufferNameOf(shared, 'quux')));
 
       const version = buffer.version;
       geometry.touchAttributes('quux');
 
-      expect(bufferInSlot(geometry, 'quux').version).toBeGreaterThan(version);
+      expect(bufferInSlot(geometry, 'quux')!.version).toBeGreaterThan(version);
     });
 
     test('a route that shares its typed arrays with another pool gives up only its own slots', () => {
@@ -1150,8 +1150,8 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const bufferName = bufferNameOf(a, 'quux');
-      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a').get(bufferName));
-      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName).typedArray);
+      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a')!.get(bufferName));
+      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName)!.typedArray);
     });
 
     test('two pools declaring the same attribute name keep the slot with the surviving route', () => {
@@ -1165,8 +1165,8 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.detachInstancedPool('b');
 
       const bufferName = bufferNameOf(a, 'quux');
-      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a').get(bufferName));
-      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName).typedArray);
+      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a')!.get(bufferName));
+      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName)!.typedArray);
     });
 
     test('dispose() gives a slot back to the attribute of the geometry handed in', () => {
@@ -1191,7 +1191,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const bufferName = bufferNameOf(extraPool, 'foo');
-      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(extraPool.buffer.buffers.get(bufferName).typedArray);
+      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(extraPool.buffer.buffers.get(bufferName)!.typedArray);
     });
   });
 });

@@ -265,7 +265,7 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const ne = new StringDataChunk2D({x: 10, y: -10, width: 5, height: 5, data: 'NE'});
       n.appendChunk(ne);
       expect(n.nodes.northEast).not.toBeNull();
-      expect(n.nodes.northEast.chunks.map((c) => c.toString())).toContain('NE');
+      expect(n.nodes.northEast!.chunks.map((c) => c.toString())).toContain('NE');
     });
   });
 
@@ -409,8 +409,8 @@ describe('ChunkQuadTreeNode (extended)', () => {
       if (missing != null) {
         const pt =
           missing === 'northEast' ? [5, -5] : missing === 'northWest' ? [-5, -5] : missing === 'southEast' ? [5, 5] : [-5, 5];
-        expect(() => n.findChunksAt(pt[0], pt[1])).not.toThrow();
-        expect(n.findChunksAt(pt[0], pt[1])).toEqual([]);
+        expect(() => n.findChunksAt(pt[0]!, pt[1]!)).not.toThrow();
+        expect(n.findChunksAt(pt[0]!, pt[1]!)).toEqual([]);
       }
     });
 

@@ -105,7 +105,7 @@ describe('the generated attribute accessors', () => {
     const vo = pool.createVO()!;
     vo.setFoo(new Float32Array([7, 8, 9, 10]));
     // prettier-ignore
-    expect(Array.from(pool.buffer.buffers.get('static_float32').typedArray)).toEqual([
+    expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray)).toEqual([
       0, 0, 0, 7, 8,
       0, 0, 0, 9, 10,
     ]);

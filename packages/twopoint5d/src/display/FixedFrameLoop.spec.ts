@@ -42,14 +42,14 @@ describe('FixedFrameLoop', () => {
     emit(display, OnDisplayRenderFrame, makeFrame(1 / 60));
 
     expect(ticks).toHaveLength(1);
-    expect(ticks[0].tickNo).toBe(0);
-    expect(ticks[0].tickTime).toBe(0);
-    expect(ticks[0].fixedDelta).toBeCloseTo(1 / 60);
+    expect(ticks[0]!.tickNo).toBe(0);
+    expect(ticks[0]!.tickTime).toBe(0);
+    expect(ticks[0]!.fixedDelta).toBeCloseTo(1 / 60);
 
     expect(renders).toHaveLength(1);
-    expect(renders[0].alpha).toBeCloseTo(0);
-    expect(renders[0].tickTime).toBeCloseTo(1 / 60);
-    expect(renders[0].tickNo).toBe(1);
+    expect(renders[0]!.alpha).toBeCloseTo(0);
+    expect(renders[0]!.tickTime).toBeCloseTo(1 / 60);
+    expect(renders[0]!.tickNo).toBe(1);
   });
 
   it('emits no sim ticks when render frames are faster than the sim rate', () => {
@@ -58,7 +58,7 @@ describe('FixedFrameLoop', () => {
 
     expect(ticks).toHaveLength(0);
     expect(renders).toHaveLength(1);
-    expect(renders[0].alpha).toBeCloseTo(0.25, 2);
+    expect(renders[0]!.alpha).toBeCloseTo(0.25, 2);
   });
 
   it('accumulator drains over multiple short frames and produces one tick', () => {
@@ -68,7 +68,7 @@ describe('FixedFrameLoop', () => {
     expect(ticks).toHaveLength(1);
     expect(renders).toHaveLength(4);
     // After the tick, alpha drops back near zero
-    expect(renders[3].alpha).toBeLessThan(0.1);
+    expect(renders[3]!.alpha).toBeLessThan(0.1);
   });
 
   it('alpha increases monotonically across render frames between sim ticks', () => {
@@ -76,9 +76,9 @@ describe('FixedFrameLoop', () => {
     emit(display, OnDisplayRenderFrame, makeFrame(1 / 240));
     emit(display, OnDisplayRenderFrame, makeFrame(1 / 240));
 
-    expect(renders[0].alpha).toBeLessThan(renders[1].alpha);
-    expect(renders[1].alpha).toBeLessThan(renders[2].alpha);
-    expect(renders[2].alpha).toBeLessThan(1);
+    expect(renders[0]!.alpha).toBeLessThan(renders[1]!.alpha);
+    expect(renders[1]!.alpha).toBeLessThan(renders[2]!.alpha);
+    expect(renders[2]!.alpha).toBeLessThan(1);
   });
 
   it('emits multiple sim ticks when deltaTime is larger than fixedDelta', () => {
@@ -87,9 +87,9 @@ describe('FixedFrameLoop', () => {
 
     expect(ticks).toHaveLength(3);
     expect(ticks.map((t) => t.tickNo)).toEqual([0, 1, 2]);
-    expect(renders[0].tickNo).toBe(3);
-    expect(renders[0].alpha).toBeGreaterThan(0);
-    expect(renders[0].alpha).toBeLessThan(1);
+    expect(renders[0]!.tickNo).toBe(3);
+    expect(renders[0]!.alpha).toBeGreaterThan(0);
+    expect(renders[0]!.alpha).toBeLessThan(1);
   });
 
   it('spiral-of-death guard caps ticks per frame and discards the backlog', () => {
@@ -108,11 +108,11 @@ describe('FixedFrameLoop', () => {
   it('forwards the original Display event props on OnRender', () => {
     emit(display, OnDisplayRenderFrame, makeFrame(1 / 60, {width: 1920, height: 1080, pixelRatio: 2, frameNo: 42, now: 123.45}));
 
-    expect(renders[0].width).toBe(1920);
-    expect(renders[0].height).toBe(1080);
-    expect(renders[0].pixelRatio).toBe(2);
-    expect(renders[0].frameNo).toBe(42);
-    expect(renders[0].now).toBe(123.45);
+    expect(renders[0]!.width).toBe(1920);
+    expect(renders[0]!.height).toBe(1080);
+    expect(renders[0]!.pixelRatio).toBe(2);
+    expect(renders[0]!.frameNo).toBe(42);
+    expect(renders[0]!.now).toBe(123.45);
   });
 
   it('fps can be updated at runtime', () => {

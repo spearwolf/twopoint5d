@@ -17,12 +17,12 @@ describe('Map2DSpatialHashGrid', () => {
     expect(grid.add(a)).toBe(grid);
     expect(grid.add(b)).toBe(grid);
 
-    let tileset = grid.getTiles(-1, -1, 2, 2);
+    let tileset = grid.getTiles(-1, -1, 2, 2)!;
     expect(tileset.size).toBe(2);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeTruthy();
 
-    tileset = grid.getTiles(0, 0, 1, 1);
+    tileset = grid.getTiles(0, 0, 1, 1)!;
     expect(tileset.size).toBe(1);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeFalsy();
@@ -36,14 +36,14 @@ describe('Map2DSpatialHashGrid', () => {
     const b: IMap2DRenderableArea = {aabb: new AABB2(-50, -50, 50, 50)};
     grid.add(a, b);
 
-    let tileset = grid.getTiles(-1, -1, 2, 2);
+    let tileset = grid.getTiles(-1, -1, 2, 2)!;
     expect(tileset.size).toBe(2);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeTruthy();
 
     expect(grid.remove(a)).toBe(grid);
 
-    tileset = grid.getTiles(-1, -1, 2, 2);
+    tileset = grid.getTiles(-1, -1, 2, 2)!;
     expect(tileset.size).toBe(1);
     expect(tileset.has(a)).toBeFalsy();
     expect(tileset.has(b)).toBeTruthy();
@@ -60,25 +60,25 @@ describe('Map2DSpatialHashGrid', () => {
     const c: IMap2DRenderableArea = {aabb: new AABB2(-90, 50, 50, 50)};
     grid.add(a, b, c);
 
-    let tileset = grid.findWithin(new AABB2(-50, -50, 100, 110));
+    let tileset = grid.findWithin(new AABB2(-50, -50, 100, 110))!;
     expect(tileset.size).toBe(3);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeTruthy();
     expect(tileset.has(c)).toBeTruthy();
 
-    tileset = grid.findWithin(new AABB2(-50, -50, 100, 90));
+    tileset = grid.findWithin(new AABB2(-50, -50, 100, 90))!;
     expect(tileset.size).toBe(2);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeTruthy();
     expect(tileset.has(c)).toBeFalsy();
 
-    tileset = grid.findWithin(new AABB2(0, 0, 30, 30));
+    tileset = grid.findWithin(new AABB2(0, 0, 30, 30))!;
     expect(tileset.size).toBe(2);
     expect(tileset.has(a)).toBeTruthy();
     expect(tileset.has(b)).toBeTruthy();
     expect(tileset.has(c)).toBeFalsy();
 
-    tileset = grid.findWithin(new AABB2(-40, 20, 50, 50));
+    tileset = grid.findWithin(new AABB2(-40, 20, 50, 50))!;
     expect(tileset).toBeUndefined();
   });
 });

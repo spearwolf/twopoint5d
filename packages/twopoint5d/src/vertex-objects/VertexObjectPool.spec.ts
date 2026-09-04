@@ -112,7 +112,7 @@ describe('VertexObjectPool', () => {
     test('vertexCount > 1', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
       vo.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
       vo.y1 = -1;
       vo.x2 = -4;
@@ -145,7 +145,7 @@ describe('VertexObjectPool', () => {
     test('vertexCount = 1', () => {
       const pool = new VertexObjectPool<MyInstancedVertexObject>({meshCount: 1, attributes: descriptor.attributes}, 100);
 
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
       vo.setFoo(3, 2);
       vo.y = -2;
 
@@ -161,20 +161,20 @@ describe('VertexObjectPool', () => {
 
       vo.zack = 10;
 
-      expect(Array.from(vo[voBuffer].buffers.get('dynamic_float32').typedArray).slice(0, 3)).toEqual([3, -2, 10]);
+      expect(Array.from(vo[voBuffer]!.buffers.get('dynamic_float32')!.typedArray).slice(0, 3)).toEqual([3, -2, 10]);
 
       vo.bar = 77;
       vo.a = 99;
       vo.b = 88;
       vo.c = 66;
 
-      expect(Array.from(vo[voBuffer].buffers.get('static_float32').typedArray).slice(0, 4)).toEqual([77, 99, 88, 66]);
+      expect(Array.from(vo[voBuffer]!.buffers.get('static_float32')!.typedArray).slice(0, 4)).toEqual([77, 99, 88, 66]);
     });
 
     test('basePrototype', () => {
       class BaseVO {}
       const pool = new VertexObjectPool({...descriptor, basePrototype: BaseVO.prototype}, 1);
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
       expect(vo).toBeInstanceOf(BaseVO);
     });
   });
@@ -182,7 +182,7 @@ describe('VertexObjectPool', () => {
   describe('freeVO()', () => {
     test('clears the internal buffer reference', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
 
       expect(pool.usedCount).toBe(1);
       expect(vo[voBuffer]).toBe(pool.buffer);
@@ -197,9 +197,9 @@ describe('VertexObjectPool', () => {
     test('copies and re-link the underlying internal buffers', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
-      const vo2 = pool.createVO();
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
 
       vo1.setFoo(30, 20, 10, 0, 40, 50, 60, 70);
       vo2.setFoo(3, 2, 1, 0, 4, 5, 6, 7);
@@ -224,7 +224,7 @@ describe('VertexObjectPool', () => {
       expect(Array.from(vo1.getFoo())).toEqual([30, 20, 10, 0, 40, 50, 60, 70]);
       expect(Array.from(vo2.getFoo())).toEqual([3, 2, 1, 0, 4, 5, 6, 7]);
 
-      const vo3 = pool.createVO();
+      const vo3 = pool.createVO()!;
       vo3.setFoo(33, 22, 11, 0, 44, 55, 66, 77);
 
       expect(pool.usedCount).toBe(3);
@@ -257,15 +257,15 @@ describe('VertexObjectPool', () => {
 
       expect(pool.usedCount).toEqual(8);
 
-      expect(Array.from(pool.getVO(2).getBar())).toEqual([3, 3, 3, 3]);
-      expect(Array.from(pool.getVO(3).getBar())).toEqual([1, 1, 1, 1]);
-      expect(Array.from(pool.getVO(5).getBar())).toEqual([3, 33, 333, 3333]);
-      expect(Array.from(pool.getVO(7).getZack())).toEqual([5, 55, 555, 5555]);
+      expect(Array.from(pool.getVO(2)!.getBar())).toEqual([3, 3, 3, 3]);
+      expect(Array.from(pool.getVO(3)!.getBar())).toEqual([1, 1, 1, 1]);
+      expect(Array.from(pool.getVO(5)!.getBar())).toEqual([3, 33, 333, 3333]);
+      expect(Array.from(pool.getVO(7)!.getZack())).toEqual([5, 55, 555, 5555]);
     });
 
     test('use VertexObjectPool.setIndex() to use a single VO as proxy', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
 
       vo.setBar([1, 2, 3, 4]);
 
@@ -276,8 +276,8 @@ describe('VertexObjectPool', () => {
 
       VOUtils.setIndex(vo, 0);
 
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
-      expect(Array.from(pool.getVO(1).getBar())).toEqual([5, 6, 7, 8]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1)!.getBar())).toEqual([5, 6, 7, 8]);
 
       expect(vo).toBe(pool.getVO(0));
       expect(vo).not.toBe(pool.getVO(1));
@@ -286,8 +286,8 @@ describe('VertexObjectPool', () => {
     test('use buffersData structure to directly create a pool from typed arrays data without copying values', () => {
       const source = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
-      source.createVO().setBar([1, 2, 3, 4]);
-      source.createVO().setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+      source.createVO()!.setBar([1, 2, 3, 4]);
+      source.createVO()!.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
 
       const buffersData = source.toBuffersData();
 
@@ -295,16 +295,16 @@ describe('VertexObjectPool', () => {
 
       expect(pool.capacity).toBe(100);
       expect(pool.usedCount).toBe(2);
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
-      expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1)!.getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
     });
 
     test('the swap path leaves no stale vertex object behind in the vacated slot', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       pool.createVO();
-      const vo2 = pool.createVO();
+      const vo2 = pool.createVO()!;
 
       pool.freeVO(vo0);
 
@@ -318,7 +318,7 @@ describe('VertexObjectPool', () => {
       // each vertex object consumes `vertexCount` values per attribute, so this fills three of them
       pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]});
 
-      expect(() => pool.freeVO(pool.getVO(0))).not.toThrow();
+      expect(() => pool.freeVO(pool.getVO(0)!)).not.toThrow();
       expect(pool.usedCount).toBe(2);
     });
   });
@@ -327,10 +327,10 @@ describe('VertexObjectPool', () => {
     test('resize to larger capacity preserves existing data', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setBar([1, 2, 3, 4]);
 
-      const vo1 = pool.createVO();
+      const vo1 = pool.createVO()!;
       vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
 
       expect(pool.capacity).toBe(10);
@@ -343,26 +343,26 @@ describe('VertexObjectPool', () => {
       expect(pool.availableCount).toBe(48);
 
       // Verify data is preserved
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
-      expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1)!.getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
 
       // Verify we can create more VOs
-      const vo2 = pool.createVO();
+      const vo2 = pool.createVO()!;
       vo2.setBar([5, 6, 7, 8]);
       expect(pool.usedCount).toBe(3);
-      expect(Array.from(pool.getVO(2).getBar())).toEqual([5, 6, 7, 8]);
+      expect(Array.from(pool.getVO(2)!.getBar())).toEqual([5, 6, 7, 8]);
     });
 
     test('resize to smaller capacity preserves data within new capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 100);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setBar([1, 2, 3, 4]);
 
-      const vo1 = pool.createVO();
+      const vo1 = pool.createVO()!;
       vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
 
-      const vo2 = pool.createVO();
+      const vo2 = pool.createVO()!;
       vo2.setBar([5, 6, 7, 8]);
 
       expect(pool.capacity).toBe(100);
@@ -375,21 +375,21 @@ describe('VertexObjectPool', () => {
       expect(pool.availableCount).toBe(0);
 
       // Verify first two VOs are preserved
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
-      expect(Array.from(pool.getVO(1).getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(1)!.getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
 
       // Third VO should not be accessible
       expect(pool.getVO(2)).toBeUndefined();
 
       // Cannot create more VOs when at capacity
-      const vo3 = pool.createVO();
+      const vo3 = pool.createVO()!;
       expect(vo3).toBeUndefined();
     });
 
     test('resize to same capacity is a no-op', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setBar([1, 2, 3, 4]);
 
       const oldBuffer = pool.buffer;
@@ -399,14 +399,14 @@ describe('VertexObjectPool', () => {
       expect(pool.capacity).toBe(10);
       expect(pool.usedCount).toBe(1);
       expect(pool.buffer).toBe(oldBuffer); // Buffer should not change
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
     });
 
     test('resize to 0 capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      pool.createVO().setBar([1, 2, 3, 4]);
-      pool.createVO().setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
+      pool.createVO()!.setBar([1, 2, 3, 4]);
+      pool.createVO()!.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
 
       pool.resize(0);
 
@@ -414,17 +414,17 @@ describe('VertexObjectPool', () => {
       expect(pool.usedCount).toBe(0);
       expect(pool.availableCount).toBe(0);
 
-      const vo = pool.createVO();
+      const vo = pool.createVO()!;
       expect(vo).toBeUndefined();
     });
 
     test('resize preserves VO references in voIndex', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setBar([1, 2, 3, 4]);
 
-      const vo1 = pool.createVO();
+      const vo1 = pool.createVO()!;
       vo1.setFoo([11, 22, 33, 44, 55, 66, 77, 88]);
 
       pool.resize(50);
@@ -441,7 +441,7 @@ describe('VertexObjectPool', () => {
     test('resize updates buffer reference for existing VOs', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      const vo0 = pool.createVO();
+      const vo0 = pool.createVO()!;
       vo0.setBar([1, 2, 3, 4]);
 
       const oldBuffer = pool.buffer;
@@ -452,11 +452,11 @@ describe('VertexObjectPool', () => {
       expect(pool.buffer).not.toBe(oldBuffer);
 
       // VO should be accessible and functional
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([1, 2, 3, 4]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([1, 2, 3, 4]);
 
       // Modifying the VO should work with the new buffer
       vo0.setBar([10, 20, 30, 40]);
-      expect(Array.from(pool.getVO(0).getBar())).toEqual([10, 20, 30, 40]);
+      expect(Array.from(pool.getVO(0)!.getBar())).toEqual([10, 20, 30, 40]);
     });
 
     test('resize throws error for negative capacity', () => {
@@ -474,12 +474,12 @@ describe('VertexObjectPool', () => {
     test('shrinking unlinks every vertex object beyond the new capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 6);
 
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
-      const vo2 = pool.createVO();
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
       pool.createVO();
-      const vo4 = pool.createVO();
-      const vo5 = pool.createVO();
+      const vo4 = pool.createVO()!;
+      const vo5 = pool.createVO()!;
 
       pool.resize(3);
 
@@ -555,8 +555,8 @@ describe('VertexObjectPool', () => {
 
     /** The buffer the route `name` built for the attribute `attrName`. */
     const bufferOfRoute = (geometry: InstancedVOBufferGeometry, name: string, attrName: string): BufferLike => {
-      const {bufferName} = geometry.extraInstancedPools.get(name).buffer.bufferAttributes.get(attrName);
-      return geometry.extraInstancedBuffers.get(name).get(bufferName);
+      const {bufferName} = geometry.extraInstancedPools.get(name)!.buffer.bufferAttributes.get(attrName)!;
+      return geometry.extraInstancedBuffers.get(name)!.get(bufferName)!;
     };
 
     test('an instanced geometry holds both its base and its instanced pool', () => {
@@ -774,9 +774,9 @@ describe('VertexObjectPool', () => {
     test('VertexObjectPool: clears buffer reference on every tracked VO', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
-      const vo2 = pool.createVO();
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
 
       expect(vo0[voBuffer]).toBe(pool.buffer);
       expect(vo1[voBuffer]).toBe(pool.buffer);
@@ -806,8 +806,8 @@ describe('VertexObjectPool', () => {
     test('VertexObjectPool: dispose() is idempotent', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
 
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
 
       expect(() => {
         pool.dispose();
@@ -822,9 +822,9 @@ describe('VertexObjectPool', () => {
     test('VertexObjectPool: dispose() while VOs were freed-via-swap still tears the swapped slot down cleanly', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
 
-      const vo0 = pool.createVO();
-      const vo1 = pool.createVO();
-      const vo2 = pool.createVO();
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
 
       // Free vo0 → vo2 is swapped into slot 0 (see freeVO()).
       pool.freeVO(vo0);

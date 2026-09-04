@@ -9,8 +9,8 @@ describe('TexturedSprites', () => {
     const sprite = sprites.createSprite();
 
     expect(sprite).toBeDefined();
-    expect(sprites.spritePool.usedCount).toBe(1);
-    expect(sprites.spritePool.containsVO(sprite!)).toBe(true);
+    expect(sprites.spritePool!.usedCount).toBe(1);
+    expect(sprites.spritePool!.containsVO(sprite!)).toBe(true);
 
     sprites.dispose();
   });
@@ -21,7 +21,7 @@ describe('TexturedSprites', () => {
     const sprite = sprites.createSprite()!;
     sprite.setPosition(1, 2, 3);
 
-    expect(sprites.spritePool.getVO(0)!.x).toBe(1);
+    expect(sprites.spritePool!.getVO(0)!.x).toBe(1);
 
     sprites.dispose();
   });
@@ -32,7 +32,7 @@ describe('TexturedSprites', () => {
     const sprite = sprites.createSprite()!;
     sprites.freeSprite(sprite);
 
-    expect(sprites.spritePool.usedCount).toBe(0);
+    expect(sprites.spritePool!.usedCount).toBe(0);
 
     sprites.dispose();
   });

@@ -46,8 +46,8 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'static',
     });
-    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(Float32Array);
-    expect(vob.buffers.get('static_float32').typedArray.length).toBe(20);
+    expect(vob.buffers.get('static_float32')!.typedArray).toBeInstanceOf(Float32Array);
+    expect(vob.buffers.get('static_float32')!.typedArray.length).toBe(20);
 
     expect(vob.buffers.get('dynamic_float32')).toMatchObject({
       bufferName: 'dynamic_float32',
@@ -55,8 +55,8 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'dynamic',
     });
-    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(Float32Array);
-    expect(vob.buffers.get('dynamic_float32').typedArray.length).toBe(8);
+    expect(vob.buffers.get('dynamic_float32')!.typedArray).toBeInstanceOf(Float32Array);
+    expect(vob.buffers.get('dynamic_float32')!.typedArray.length).toBe(8);
 
     expect(vob.bufferAttributes.get('foo')).toEqual({
       attributeName: 'foo',
@@ -81,13 +81,13 @@ describe('VertexObjectBuffer', () => {
 
     expect(
       vob.bufferNameAttributes
-        .get('dynamic_float32')
+        .get('dynamic_float32')!
         .map((bufAttr) => bufAttr.attributeName)
         .sort(),
     ).toEqual(['foo']);
     expect(
       vob.bufferNameAttributes
-        .get('static_float32')
+        .get('static_float32')!
         .map((bufAttr) => bufAttr.attributeName)
         .sort(),
     ).toEqual(['bar', 'plah', 'zack']);
@@ -139,8 +139,8 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'static',
     });
-    expect(vob.buffers.get('static_float32').typedArray).toBeInstanceOf(Float32Array);
-    expect(vob.buffers.get('static_float32').typedArray.length).toBe(40);
+    expect(vob.buffers.get('static_float32')!.typedArray).toBeInstanceOf(Float32Array);
+    expect(vob.buffers.get('static_float32')!.typedArray.length).toBe(40);
 
     expect(vob.buffers.get('dynamic_float32')).toMatchObject({
       bufferName: 'dynamic_float32',
@@ -148,18 +148,18 @@ describe('VertexObjectBuffer', () => {
       dataType: 'float32',
       usageType: 'dynamic',
     });
-    expect(vob.buffers.get('dynamic_float32').typedArray).toBeInstanceOf(Float32Array);
-    expect(vob.buffers.get('dynamic_float32').typedArray.length).toBe(16);
+    expect(vob.buffers.get('dynamic_float32')!.typedArray).toBeInstanceOf(Float32Array);
+    expect(vob.buffers.get('dynamic_float32')!.typedArray.length).toBe(16);
 
     expect(
       vob.bufferNameAttributes
-        .get('dynamic_float32')
+        .get('dynamic_float32')!
         .map((bufAttr) => bufAttr.attributeName)
         .sort(),
     ).toEqual(['foo']);
     expect(
       vob.bufferNameAttributes
-        .get('static_float32')
+        .get('static_float32')!
         .map((bufAttr) => bufAttr.attributeName)
         .sort(),
     ).toEqual(['bar', 'plah', 'zack']);
@@ -207,7 +207,7 @@ describe('VertexObjectBuffer', () => {
 
     // vertex-object-pool uses the voPrototype prop from descriptor ---------------
     const pool = new VertexObjectPool<VO & {moinMoin(): number; fooBarPlah(): number}>(descriptor, 1);
-    const vo = pool.createVO();
+    const vo = pool.createVO()!;
 
     expect(vo).toBeDefined();
     expect(Object.getPrototypeOf(vo)).toBe(descriptor.voPrototype);
@@ -258,13 +258,13 @@ describe('VertexObjectBuffer', () => {
     ).toEqual(2);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('static_float32').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('static_float32')!.typedArray)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       9, 10, 0, 0, 0, 11, 12, 0, 0, 0, 13, 14, 0, 0, 0, 15, 16, 0, 0, 0,
     ]);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('dynamic_float32').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('dynamic_float32')!.typedArray)).toEqual([
       100, 101, 102, 103,
       0, 0, 0, 0,
     ]);
@@ -293,7 +293,7 @@ describe('VertexObjectBuffer', () => {
     vob.copyArray(new Float32Array([100, 101, 102, 103]), 'bar');
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('bar').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('bar')!.typedArray)).toEqual([
       100, 101, 102, 103,
       0, 0, 0, 0,
     ]);
@@ -301,7 +301,7 @@ describe('VertexObjectBuffer', () => {
     vob.copyArray(new Float32Array([200, 201, 202, 203]), 'bar', 1);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('bar').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('bar')!.typedArray)).toEqual([
       100, 101, 102, 103,
       200, 201, 202, 203,
     ]);
@@ -334,13 +334,13 @@ describe('VertexObjectBuffer', () => {
     vob.copyWithin(1, 0, 1);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('static_float32').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('static_float32')!.typedArray)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
     ]);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('dynamic_float32').typedArray)).toEqual([100, 101, 102, 103, 100, 101, 102, 103]);
+    expect(Array.from(vob.buffers.get('dynamic_float32')!.typedArray)).toEqual([100, 101, 102, 103, 100, 101, 102, 103]);
   });
 
   test('clone', () => {
@@ -374,13 +374,13 @@ describe('VertexObjectBuffer', () => {
     const vob1 = vob.clone();
 
     // prettier-ignore
-    expect(Array.from(vob1.buffers.get('static_float32').typedArray)).toEqual([
+    expect(Array.from(vob1.buffers.get('static_float32')!.typedArray)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
     ]);
 
     // prettier-ignore
-    expect(Array.from(vob1.buffers.get('dynamic_float32').typedArray)).toEqual([
+    expect(Array.from(vob1.buffers.get('dynamic_float32')!.typedArray)).toEqual([
       100, 101, 102, 103,
       100, 101, 102, 103,
     ]);
@@ -406,7 +406,7 @@ describe('VertexObjectBuffer', () => {
     ).toEqual(1);
 
     // prettier-ignore
-    expect(Array.from(vob.buffers.get('static_float32').typedArray)).toEqual([
+    expect(Array.from(vob.buffers.get('static_float32')!.typedArray)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 0,
       0, 0, 0, 0, 0, 0, 0, 0,
     ]);
@@ -440,9 +440,9 @@ describe('VertexObjectBuffer', () => {
     });
 
     // prettier-ignore
-    expect(Array.from(vob.toAttributeArrays(['foo'], 1)['foo'])).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(Array.from(vob.toAttributeArrays(['foo'], 1)['foo']!)).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
 
     // prettier-ignore
-    expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar'])).toEqual([100, 101, 102, 103]);
+    expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar']!)).toEqual([100, 101, 102, 103]);
   });
 });

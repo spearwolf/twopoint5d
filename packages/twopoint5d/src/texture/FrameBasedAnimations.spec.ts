@@ -232,12 +232,12 @@ describe('FrameBasedAnimations', () => {
       // Second animation: walk (2 frames)
       expect(buffer[4]).toBe(2); // frames.length
       expect(buffer[5]).toBe(0.5); // duration
-      expect(buffer[6]).toBeGreaterThan(buffer[2]); // offset > previous offset
+      expect(buffer[6]).toBeGreaterThan(buffer[2]!); // offset > previous offset
 
       // Third animation: run (3 frames)
       expect(buffer[8]).toBe(3); // frames.length
       expect(buffer[9]).toBeCloseTo(0.3, 5); // duration (use toBeCloseTo for float comparison)
-      expect(buffer[10]).toBeGreaterThan(buffer[6]); // offset > previous offset
+      expect(buffer[10]).toBeGreaterThan(buffer[6]!); // offset > previous offset
     });
 
     test('bake empty DataTexture', () => {

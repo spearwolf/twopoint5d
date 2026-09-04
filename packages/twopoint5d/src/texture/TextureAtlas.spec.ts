@@ -19,7 +19,7 @@ describe('TextureAtlas', () => {
       const frameId = atlas.add(texCoords);
 
       expect(frameId).toBeGreaterThanOrEqual(0);
-      expect(atlas.get(frameId).coords).toBe(texCoords);
+      expect(atlas.get(frameId)!.coords).toBe(texCoords);
       expect(atlas.size).toBe(1);
     });
     test('with coords + data', () => {
@@ -48,12 +48,12 @@ describe('TextureAtlas', () => {
 
       expect(atlas.size).toBe(2);
 
-      expect(atlas.get(frameId0).coords).toBe(texCoords0);
-      expect(atlas.frame('foo').coords).toBe(texCoords0);
+      expect(atlas.get(frameId0)!.coords).toBe(texCoords0);
+      expect(atlas.frame('foo')!.coords).toBe(texCoords0);
       expect(atlas.frameId('foo')).toBe(frameId0);
 
-      expect(atlas.get(frameId0).coords).toBe(texCoords0);
-      expect(atlas.frame(Bar).coords).toBe(texCoords1);
+      expect(atlas.get(frameId0)!.coords).toBe(texCoords0);
+      expect(atlas.frame(Bar)!.coords).toBe(texCoords1);
       expect(atlas.frameId(Bar)).toBe(frameId1);
     });
     test('with name + coords + data', () => {
@@ -186,7 +186,7 @@ describe('TextureAtlas', () => {
     atlas.add('img_002', new TextureCoords());
 
     for (let i = 0; i < NO_LONGER_BE_A_COINCIDENCE; i++) {
-      expect(atlas.frameNames().includes(atlas.randomFrameName())).toBeTruthy();
+      expect(atlas.frameNames().includes(atlas.randomFrameName()!)).toBeTruthy();
     }
   });
   test('randomFrameIds', () => {
@@ -211,7 +211,7 @@ describe('TextureAtlas', () => {
     const frames = atlas.randomFrames(20);
 
     expect(frames).toHaveLength(20);
-    expect(frames[0].coords).toBeInstanceOf(TextureCoords);
+    expect(frames[0]!.coords).toBeInstanceOf(TextureCoords);
   });
   test('randomFrameNames', () => {
     const atlas = new TextureAtlas();
