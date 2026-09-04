@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
+- export 31 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes`, `FrameBasedAnimationsTimingData` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
 
 ### Changed
 
@@ -45,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the `typedArray` of a buffer in `VertexObjectBuffer#buffers` is typed `TypedArray | undefined`: `VOBufferPool#dispose()` takes every buffer its array and clears the same map in the same breath, so the field is empty only in a reference that was grabbed before that call
 - change the return type of `VertexObjectBuffer#toAttributeArrays()` to `Record<string, TypedArray | undefined>` — an attribute name the descriptor does not know gets an entry without an array
 - change the return type of `FrameLoop#start()` to `(() => void) | undefined`: a missing `target`, or one already running on the loop, gets no second unsubscribe function
+- upgrade the `three` peer dependency to `~0.185.1` (was `~0.183.1`) and `@types/three` to `~0.185.4`. Under the new types `vec3()` no longer accepts an `AttributeNode<unknown>` in any overload: a bare `attribute('name')` passed into a TSL constructor needs its type argument, as in `attribute<'vec2'>('quadSize')`
+- `DisplayRendererParameters` names the 17 options it carries instead of being the empty type `{}`. An object literal handed to the `Display` constructor is now checked against them; an unknown key is an error where it used to pass unnoticed
 
 ### Removed
 
@@ -70,6 +73,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 
 ### Migration Guide
+
+#### The `three` peer dependency range
+
+**Before**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.183.1"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.185.1"
+  }
+}
+```
+
+Callers who write their own TSL materials need one change that the range alone does not show. `vec3()` and its siblings dropped the overload that took an `AttributeNode<unknown>`, which is what a bare `attribute('name')` returns:
+
+```ts
+// before
+const size = vec3(attribute('quadSize'));
+
+// after
+const size = vec3(attribute<'vec2'>('quadSize'));
+```
+
+Nothing changes at runtime — the shader attribute was already read at that type. The type argument only says so where the compiler can see it.
 
 #### `@spearwolf/eventize` and `@spearwolf/signalize` peer dependency ranges
 
