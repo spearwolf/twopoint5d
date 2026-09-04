@@ -8,7 +8,10 @@ import type {pass} from 'three/tsl';
  *
  * Call as a single positional `Fn` argument:
  * ```ts
- * stageRenderer.buildOutputNode = ([scenePass]) => fovealVisionEffect(scenePass);
+ * import type {PassNode} from 'three/webgpu';
+ *
+ * // the composer gets one pass node per stage; this renderer was given a single stage
+ * stageRenderer.buildOutputNode = ([scenePass]) => fovealVisionEffect(scenePass as PassNode);
  * ```
  */
 export const fovealVisionEffect = Fn(([scenePass]: [ReturnType<typeof pass>]) => {

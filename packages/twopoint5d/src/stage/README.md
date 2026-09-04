@@ -70,7 +70,7 @@ import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/tw
 import {Color} from 'three/webgpu';
 
 const display = new Display(document.getElementById('canvas')!);
-const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain'}));
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 800, height: 600}));
 
 new StageRenderer(display)
   .setClearColor(new Color('#90b0d0'))
@@ -226,15 +226,18 @@ Combines with `pipeline` — the post-pass output also lands in the target.
 
 ## Post-processing: `pipeline` and `buildOutputNode`
 
-`StageRenderer` integrates with `three.RenderPipeline` in two ways:
+`StageRenderer` integrates with `three.RenderPipeline` in two ways — Mode C lets the
+pipeline sample an internal render target, Mode D composes the pass nodes into a TSL
+graph yourself.
 
 Two notes on the types in the examples below. `Display.renderer` is
 `WebGPURenderer | undefined` — `dispose()` takes it away again — so a display
 that is up and running asserts it with `!`. And `buildOutputNode` hands you its
 passes as plain `Node`s: neither the concrete `Node<'vec4'>` that `bloom()` asks
 for nor the arithmetic operators that TSL attaches through the ShaderNodeProxy at
-runtime are visible to the static type. One cast per pass covers both, and the
-comment next to it names the reason the pass is there at all.
+runtime are visible to the static type. Each example casts for what it needs —
+`Node<'vec4'>` alone where it only feeds the pass onward, plus `.add()` where it
+composes — and the comment next to the cast names the reason the pass is there at all.
 
 ### Mode C (§6.4) — pipeline samples an internal RT
 
@@ -370,10 +373,15 @@ To make it work inside a parent pipeline's `buildOutputNode`, also implement
 `IPassProvider`:
 
 ```ts
+import type {IPassProvider} from '@spearwolf/twopoint5d';
 import {pass} from 'three/tsl';
 
 class MyStage implements IStage, IRenderable, IPassProvider {
-  // … as above …
+  name = 'my';
+  resize(w: number, h: number) { /* … as above … */ }
+  updateFrame(now: number, dt: number, frameNo: number) { /* … as above … */ }
+  renderTo(renderer: WebGPURenderer) { /* … as above … */ }
+
   asPassNode(renderer: WebGPURenderer) { return pass(myScene, myCamera); }
 }
 ```

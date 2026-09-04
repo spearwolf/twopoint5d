@@ -6,7 +6,8 @@ import {type Node, RenderPipeline, type WebGPURenderer} from 'three/webgpu';
  * to skip the `buildOutputNode` boilerplate.
  *
  * ```ts
- * root.pipeline = new RootRenderPipeline(display.renderer);
+ * // a running display holds its renderer; only dispose() takes it away again
+ * root.pipeline = new RootRenderPipeline(display.renderer!);
  * // → pipeline.outputNode = pass0.add(pass1).add(pass2)…
  * ```
  *

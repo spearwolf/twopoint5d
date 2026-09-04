@@ -170,7 +170,7 @@ export function calculateAnchorOffset(
  * @example
  * ```ts
  * const rect = new Vector2(800, 600);
- * const specs = { fit: 'contain', width: 640, height: 480, anchorPosition: 'top center' };
+ * const specs = {fit: 'contain', width: 640, height: 480, anchorPosition: 'top center'} as const;
  * const view = fitIntoRectangle(rect, specs);
  * const offset = calculateAnchorOffset(rect, view, specs.anchorPosition);
  * ```

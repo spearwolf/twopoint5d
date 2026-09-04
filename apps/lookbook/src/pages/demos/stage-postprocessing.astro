@@ -34,7 +34,7 @@ import {description, showSource, title} from './_stage-postprocessing.json';
   // Build a tiny post-pass: bloom on top of the rendered scene.
   // The display was constructed above, so it holds its renderer; only dispose() takes it away again.
   stageRenderer.pipeline = new RenderPipeline(display.renderer!);
-  // stageRenderer.buildOutputNode = ([scenePass]) => bloom(scenePass, 1.2, 0.6, 0.0);
+  // stageRenderer.buildOutputNode = ([scenePass]) => bloom(scenePass as Node<'vec4'>, 1.2, 0.6, 0.0);
   stageRenderer.buildOutputNode = ([scenePass]) => {
     // stageRenderer was given exactly one stage above, so the pass list has its first entry.
     // TSL nodes expose their arithmetic operators via the ShaderNodeProxy at runtime; the
