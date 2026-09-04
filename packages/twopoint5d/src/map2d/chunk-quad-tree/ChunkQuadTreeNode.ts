@@ -1,14 +1,14 @@
 import type {AABB2} from '../AABB2.js';
 import type {IDataChunk2D} from './IDataChunk2D.js';
 
-enum Quadrant {
+export enum Quadrant {
   NorthEast = 'northEast',
   SouthEast = 'southEast',
   SouthWest = 'southWest',
   NorthWest = 'northWest',
 }
 
-type IChunkQuadTreeChildNodes<ChunkType extends IDataChunk2D> = {
+export type IChunkQuadTreeChildNodes<ChunkType extends IDataChunk2D> = {
   [index in Quadrant]: ChunkQuadTreeNode<ChunkType> | null;
 };
 

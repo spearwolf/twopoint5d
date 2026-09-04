@@ -19,6 +19,9 @@ export type VertexAttributeDataType =
 
 export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 
+/** Selects which buffers a geometry uploads to the GPU, keyed by the usage type of their attributes. */
+export type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
+
 export interface VADescription {
   type?: VertexAttributeDataType;
   normalized?: boolean;

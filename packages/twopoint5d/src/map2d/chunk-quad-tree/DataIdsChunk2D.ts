@@ -1,12 +1,12 @@
 import {DataChunk2D, type DataChunkCoords2D} from './DataChunk2D.js';
 import {base64toUint32Arr} from './base64toUint32Arr.js';
 
-interface StringDataIdsChunk2DParams extends DataChunkCoords2D {
+export interface StringDataIdsChunk2DParams extends DataChunkCoords2D {
   data: string;
   compression?: string;
 }
 
-interface Uint32DataIdsChunk2DParams extends DataChunkCoords2D {
+export interface Uint32DataIdsChunk2DParams extends DataChunkCoords2D {
   uint32Arr: Uint32Array;
 }
 

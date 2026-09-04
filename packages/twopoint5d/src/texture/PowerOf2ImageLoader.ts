@@ -8,8 +8,8 @@ export interface ImageWithTexCoords {
   texCoords: TextureCoords;
 }
 
-type OnImageLoadCallback = (image: ImageWithTexCoords) => void;
-type OnErrorCallback = ((err: unknown) => void) | undefined;
+export type PowerOf2ImageLoadCallback = (image: ImageWithTexCoords) => void;
+export type PowerOf2ImageLoadErrorCallback = ((err: unknown) => void) | undefined;
 
 export class PowerOf2ImageLoader {
   #imageLoader?: ImageLoader;
@@ -25,7 +25,7 @@ export class PowerOf2ImageLoader {
     this.#imageLoader = loader;
   }
 
-  load(url: string, onLoadCallback: OnImageLoadCallback, onErrorCallback?: OnErrorCallback): void {
+  load(url: string, onLoadCallback: PowerOf2ImageLoadCallback, onErrorCallback?: PowerOf2ImageLoadErrorCallback): void {
     this.imageLoader.load(
       url,
       (img: HTMLImageElement) => {

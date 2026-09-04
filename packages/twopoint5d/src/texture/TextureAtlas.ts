@@ -7,11 +7,11 @@ export interface TextureAtlasFrame {
   data?: TextureAtlasFrameData;
 }
 
-type TextureAtlasArgs = [coords: TextureCoords, data?: TextureAtlasFrameData];
+export type TextureAtlasArgs = [coords: TextureCoords, data?: TextureAtlasFrameData];
 
-type TextureAtlasFrameName = string | symbol;
+export type TextureAtlasFrameName = string | symbol;
 
-type NamedTextureAtlasArgs = [name: TextureAtlasFrameName, coords: TextureCoords, data?: TextureAtlasFrameData];
+export type NamedTextureAtlasArgs = [name: TextureAtlasFrameName, coords: TextureCoords, data?: TextureAtlasFrameData];
 
 const isNamedTextureAtlasArgs = (args: TextureAtlasArgs | NamedTextureAtlasArgs): args is NamedTextureAtlasArgs =>
   typeof args[0] === 'string' || typeof args[0] === 'symbol';

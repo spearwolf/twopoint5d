@@ -3,13 +3,13 @@ import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
 import type {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
-interface BufferAttribute {
+export interface AttributeBufferLayout {
   bufferName: string;
   attributeName: string;
   offset: number;
 }
 
-interface Buffer {
+export interface AttributeBuffer {
   bufferName: string;
   itemSize: number;
   dataType: VertexAttributeDataType;
@@ -30,13 +30,13 @@ export class VertexObjectBuffer {
   /** the names are always sorted the same way */
   readonly attributeNames: readonly string[];
 
-  readonly buffers: Map<string, Buffer>;
+  readonly buffers: Map<string, AttributeBuffer>;
 
   /** map attribute name to buffer-attribute info */
-  readonly bufferAttributes: Map<string, BufferAttribute>;
+  readonly bufferAttributes: Map<string, AttributeBufferLayout>;
 
   /** buffer name -> list of buffer attributes */
-  readonly bufferNameAttributes: Map<string, BufferAttribute[]>;
+  readonly bufferNameAttributes: Map<string, AttributeBufferLayout[]>;
 
   constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
     let buffersData: VertexObjectBuffersData | undefined;
@@ -71,7 +71,7 @@ export class VertexObjectBuffer {
 
       // a buffer can only be sized once every attribute has contributed its share to itemSize,
       // so the typed arrays come after this loop and the records carry none until then
-      const forming = new Map<string, Omit<Buffer, 'typedArray'>>();
+      const forming = new Map<string, Omit<AttributeBuffer, 'typedArray'>>();
 
       for (const attributeName of this.attributeNames) {
         const attribute = this.descriptor.getAttribute(attributeName)!;

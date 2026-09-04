@@ -4,7 +4,7 @@ import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
 
-type AnimName = string | symbol;
+export type AnimName = string | symbol;
 
 export interface FrameBasedAnimDef {
   frames: TextureCoords[];

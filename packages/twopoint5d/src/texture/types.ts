@@ -19,7 +19,7 @@ export type TextureSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElem
  * // Using frameRate (10 frames at 20 fps = 0.5 seconds)
  * { frameRate: 20 }
  */
-type FrameBasedAnimationsTimingData = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
+export type FrameBasedAnimationsTimingData = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
 
 /**
  * Animation data for tile-based animations using specific tile IDs.

@@ -6,7 +6,7 @@ import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
-interface TileBox {
+export interface TileBox {
   id: string;
   x: number;
   y: number;

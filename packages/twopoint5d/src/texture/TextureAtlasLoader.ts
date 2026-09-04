@@ -13,8 +13,8 @@ export interface TextureAtlasLoadOptions {
   overrideImageUrl?: string;
 }
 
-type OnLoadCallback = (textureData: TextureAtlasData) => void;
-type OnErrorCallback = ((err: unknown) => void) | undefined;
+export type TextureAtlasLoadCallback = (textureData: TextureAtlasData) => void;
+export type TextureAtlasLoadErrorCallback = ((err: unknown) => void) | undefined;
 
 const makeFileLoader = () => {
   const loader = new FileLoader();
@@ -35,8 +35,8 @@ export class TextureAtlasLoader {
     url: string,
     textureClasses: Array<TextureOptionClasses> | undefined,
     options: TextureAtlasLoadOptions | undefined,
-    onLoadCallback: OnLoadCallback,
-    onErrorCallback?: OnErrorCallback,
+    onLoadCallback: TextureAtlasLoadCallback,
+    onErrorCallback?: TextureAtlasLoadErrorCallback,
   ): void {
     this.fileLoader.load(
       url,

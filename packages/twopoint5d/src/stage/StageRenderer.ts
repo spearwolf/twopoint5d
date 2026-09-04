@@ -23,7 +23,7 @@ const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProv
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
-interface StageItem {
+export interface StageItem {
   stage: IStage & IRenderable;
 
   width: number;

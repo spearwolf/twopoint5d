@@ -1,11 +1,11 @@
 import {emit, type EventizedObject, eventize, off, on} from '@spearwolf/eventize';
 
-interface ISetAnimationLoop {
+export interface ISetAnimationLoop {
   // `null` is how three.js stops the loop again, and `stop()` below uses it.
   setAnimationLoop(callback: ((now: number) => unknown) | null): unknown;
 }
 
-const OnRAF = Symbol.for('onRAF');
+export const OnRAF = Symbol.for('onRAF');
 const OnFrame = Symbol.for('onFrame');
 
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;

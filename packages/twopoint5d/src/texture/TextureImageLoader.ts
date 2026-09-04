@@ -10,8 +10,8 @@ export interface TextureImage {
   texCoords: TextureCoords;
 }
 
-type OnLoadCallback = (textureData: TextureImage) => void;
-type OnErrorCallback = ((err: unknown) => void) | undefined;
+export type TextureImageLoadCallback = (textureData: TextureImage) => void;
+export type TextureImageLoadErrorCallback = ((err: unknown) => void) | undefined;
 
 export class TextureImageLoader {
   imageLoader: PowerOf2ImageLoader;
@@ -28,8 +28,8 @@ export class TextureImageLoader {
   load(
     url: string,
     textureClasses: Array<TextureOptionClasses>,
-    onLoadCallback: OnLoadCallback,
-    onErrorCallback?: OnErrorCallback,
+    onLoadCallback: TextureImageLoadCallback,
+    onErrorCallback?: TextureImageLoadErrorCallback,
   ): void {
     this.imageLoader.load(
       url,

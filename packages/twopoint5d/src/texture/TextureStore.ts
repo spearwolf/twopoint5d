@@ -12,7 +12,7 @@ import type {TextureStoreData} from './types.js';
 /**
  * Maps each TextureResourceSubType to its corresponding TypeScript type.
  */
-type TextureResourceSubTypeMap = {
+export type TextureResourceSubTypeMap = {
   imageCoords: TextureCoords;
   atlas: TextureAtlas;
   tileSet: TileSet;
@@ -23,7 +23,7 @@ type TextureResourceSubTypeMap = {
 /**
  * Helper type to recursively map a tuple of TextureResourceSubType to their corresponding types.
  */
-type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
+export type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
   infer First extends TextureResourceSubType,
   ...infer Rest extends TextureResourceSubType[],
 ]
@@ -34,7 +34,7 @@ type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly 
  * Maps an array of TextureResourceSubType to a tuple of their corresponding types.
  * For single types, returns the mapped type directly.
  */
-type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
+export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
   T extends keyof TextureResourceSubTypeMap
     ? TextureResourceSubTypeMap[T]
     : T extends readonly TextureResourceSubType[]

@@ -9,10 +9,8 @@ import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
-import type {BufferLike, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
+import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 import {updateUpdateRange} from './updateUpdateRange.js';
-
-type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
 export class VOBufferGeometry extends BufferGeometry {
   readonly pool: VOBufferPool;

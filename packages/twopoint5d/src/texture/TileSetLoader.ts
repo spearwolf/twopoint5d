@@ -12,8 +12,8 @@ export interface TileSetData {
   texCoords: TextureCoords;
 }
 
-type OnLoadCallback = (tileSetData: TileSetData) => void;
-type OnErrorCallback = ((err: unknown) => void) | undefined;
+export type TileSetLoadCallback = (tileSetData: TileSetData) => void;
+export type TileSetLoadErrorCallback = ((err: unknown) => void) | undefined;
 
 export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
@@ -31,8 +31,8 @@ export class TileSetLoader {
     url: string,
     tileSetOptions: TileSetOptions,
     textureClasses: Array<TextureOptionClasses> | null | undefined,
-    onLoadCallback: OnLoadCallback,
-    onErrorCallback?: OnErrorCallback,
+    onLoadCallback: TileSetLoadCallback,
+    onErrorCallback?: TileSetLoadErrorCallback,
   ): void {
     this.imageLoader.load(
       url,

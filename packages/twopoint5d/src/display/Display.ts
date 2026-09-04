@@ -42,7 +42,7 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   }
 }
 
-type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
+export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
 /**
  * The `Display` is the entry point for rendering with twopoint5d. It owns the
