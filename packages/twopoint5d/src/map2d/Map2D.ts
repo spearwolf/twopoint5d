@@ -35,7 +35,7 @@ export class Map2D extends Group {
     }
   }
 
-  get visibilitor(): IMap2DVisibilitor {
+  get visibilitor(): IMap2DVisibilitor | undefined {
     return this.#visibilitor;
   }
 

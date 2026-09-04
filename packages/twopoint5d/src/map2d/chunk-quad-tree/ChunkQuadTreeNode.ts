@@ -26,7 +26,8 @@ const scoreAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AAB
   let afterCount = 0;
 
   for (let i = 0; i < chunksCount; i++) {
-    const c = chunks[i];
+    // The loop bound is `chunks.length`.
+    const c = chunks[i]!;
     if (c[beforeKey] <= origin) {
       beforeCount++;
     } else if (c[afterKey] >= origin) {
@@ -60,7 +61,8 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
   let best: IChunkAxis | undefined;
   let lastOrigin = Number.NaN;
   for (let i = 0; i < chunks.length; i++) {
-    const origin = chunks[i][beforeKey];
+    // The loop bound is `chunks.length`.
+    const origin = chunks[i]![beforeKey];
     if (origin === lastOrigin) continue;
     lastOrigin = origin;
     const axis = scoreAxis(chunks, beforeKey, afterKey, origin);
@@ -101,6 +103,9 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //               +y
   //
 
+  // Both origins are set in the same step that clears `isLeaf` — `subdivide()` — and `clear()`
+  // takes both back together with it. A node that is not a leaf therefore carries both, which is
+  // what the reads below rest on; they do not repeat this note.
   originX: number | null = null;
   originY: number | null = null;
 
@@ -168,7 +173,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     const straddlers: ChunkType[] = [];
 
     for (let i = 0, n = chunks.length; i < n; i++) {
-      const chunk = chunks[i];
+      // The loop bound is `n`, taken from `chunks.length`.
+      const chunk = chunks[i]!;
       if (chunk.left >= originX) {
         if (chunk.top >= originY) se.push(chunk);
         else if (chunk.bottom <= originY) ne.push(chunk);
@@ -205,7 +211,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
       return;
     }
 
-    const {originY, originX} = this;
+    const originX = this.originX!;
+    const originY = this.originY!;
 
     if (chunk.left >= originX) {
       if (chunk.top >= originY) {
@@ -247,7 +254,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   findChunks(aabb: AABB2, out: ChunkType[] = []): ChunkType[] {
     const local = this.chunks;
     for (let i = 0, n = local.length; i < n; i++) {
-      const c = local[i];
+      // The loop bound is `n`, taken from `local.length`.
+      const c = local[i]!;
       if (c.isIntersecting(aabb)) out.push(c);
     }
     if (this.isNorthWest(aabb)) this.nodes.northWest!.findChunks(aabb, out);
@@ -258,19 +266,19 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   }
 
   isNorthWest(aabb: AABB2) {
-    return this.nodes.northWest && aabb.isNorthWest(this.originX, this.originY);
+    return this.nodes.northWest && aabb.isNorthWest(this.originX!, this.originY!);
   }
 
   isNorthEast(aabb: AABB2) {
-    return this.nodes.northEast && aabb.isNorthEast(this.originX, this.originY);
+    return this.nodes.northEast && aabb.isNorthEast(this.originX!, this.originY!);
   }
 
   isSouthEast(aabb: AABB2) {
-    return this.nodes.southEast && aabb.isSouthEast(this.originX, this.originY);
+    return this.nodes.southEast && aabb.isSouthEast(this.originX!, this.originY!);
   }
 
   isSouthWest(aabb: AABB2) {
-    return this.nodes.southWest && aabb.isSouthWest(this.originX, this.originY);
+    return this.nodes.southWest && aabb.isSouthWest(this.originX!, this.originY!);
   }
 
   findChunksAt(x: number, y: number): ChunkType[] {

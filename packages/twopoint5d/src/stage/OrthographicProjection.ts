@@ -1,5 +1,6 @@
 import {OrthographicCamera, Vector2} from 'three/webgpu';
 
+import {expectDefined} from '../utils/expectDefined.js';
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {asFitIntoRectangleSpecs} from './asFitIntoRectangleSpecs.js';
@@ -18,13 +19,14 @@ export class OrthographicProjection implements IProjection {
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();
 
-  #halfWidth: number;
-  #halfHeight: number;
+  // The fields below are assigned by `updateViewRect()`; a camera built before that call carries `NaN`.
+  #halfWidth!: number;
+  #halfHeight!: number;
 
-  #near: number;
-  #far: number;
+  #near!: number;
+  #far!: number;
 
-  #distanceToProjectionPlane: number;
+  #distanceToProjectionPlane!: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: OrthographicProjectionSpecs) {
     this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
@@ -59,9 +61,11 @@ export class OrthographicProjection implements IProjection {
       this.#far,
     );
 
-    this.projectionPlane.applyRotation(camera);
+    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
 
-    camera.position.copy(this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
+    projectionPlane.applyRotation(camera);
+
+    camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
     camera.updateProjectionMatrix();
     return camera;

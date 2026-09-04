@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return types of `TextureAtlas#randomFrame()` and `#randomFrameName()` to `TextureAtlasFrame | undefined` and `TextureAtlasFrameName | undefined`, and those of `#randomFrames()` and `#randomFrameNames()` to arrays of the same: an atlas without frames, or without named frames, has nothing to draw
 - a lookup whose result an invariant guarantees — an attribute descriptor, the claim on an attribute slot, the buffers of a pool attached under a name — throws an error naming what was missing when that invariant is broken, at the place that relies on it
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
+- the `Map2D#visibilitor` getter is typed `IMap2DVisibilitor | undefined`: a map that has not been given a visibilitor answers with nothing. The setter still takes an `IMap2DVisibilitor`
+- `Map2DTileRenderer#tileFactory` is typed `IMapTileFactory | null` and holds `null` once `dispose()` has run. `endUpdatingTiles()` and `dispose()` answer a call on a disposed renderer with an error that names what is gone; `addTile()` and `reuseTile()` fail with a `TypeError` there, `removeTile()` and `clearTiles()` find no tiles left and stay silent — none of the four guards the field: for the three per-tile methods such a check would run on a path the tile streamer walks on every update, and `clearTiles()` only reaches the factory inside a loop over tiles that `dispose()` has already emptied
+- `CameraBasedVisibility#pointOnPlane` is typed `Vector3 | null | undefined`: `null` marks a plane the camera looks past, `undefined` a point that was never computed
+- change the return type of `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` to `number | undefined` — coordinates outside the chunk have no data id
+- `TextureResource.fromTileSet()` takes `imageUrl` as `string | undefined`, the type the resource stores it at. `TextureStore#parse()` hands the value of an item straight through, and that value is optional
+- `FrameBasedAnimations#add()` throws when its third argument is neither a `TextureAtlas`, a `TileSet` nor an array of frames; the message names what that argument has to be, and no animation is registered
 
 ### Removed
 
@@ -452,6 +458,86 @@ const pool: TexturedSpritePool = sprites.spritePool;
 const sprites = new TexturedSprites(1000);
 const pool = sprites.spritePool;
 if (pool == null) return; // the sprites were disposed
+```
+
+#### `Map2D#visibilitor` can be `undefined`
+
+A `Map2D` carries a visibilitor only once one has been assigned. The getter names that;
+the setter is unchanged and still takes an `IMap2DVisibilitor`. Under `strictNullChecks`,
+reading the getter into a non-optional binding turns into a compile error.
+
+**Before**
+
+```ts
+const visibilitor: IMap2DVisibilitor = map2d.visibilitor;
+```
+
+**After**
+
+```ts
+const visibilitor = map2d.visibilitor;
+if (visibilitor == null) return; // none assigned yet
+```
+
+#### `Map2DTileRenderer#tileFactory` is `null` after `dispose()`
+
+`dispose()` drops the factory, and the field names that with `| null`. `endUpdatingTiles()` and
+`dispose()` answer a call on a disposed renderer with an error that says the renderer is spent;
+`addTile()` and `reuseTile()` reach the field directly and fail with a `TypeError`, while
+`removeTile()` and `clearTiles()` find the tile map already empty and return without touching the
+factory. None of the four guards the field: for the three per-tile methods such a check would run
+on a path the tile streamer walks on every update, and `clearTiles()` only reaches the factory
+inside a loop over tiles that `dispose()` has already emptied. A renderer in use needs no guard — only code that reads
+`tileFactory` itself does.
+
+**Before**
+
+```ts
+const factory: IMapTileFactory = renderer.tileFactory;
+```
+
+**After**
+
+```ts
+const factory = renderer.tileFactory;
+if (factory == null) return; // the renderer has been disposed
+```
+
+#### `CameraBasedVisibility#pointOnPlane` can be `null`
+
+The field holds `null` while the camera looks past the map plane, and `undefined` before the
+first frame has computed anything. Both states are reachable at runtime, and the type names
+them. A `== null` check covers both.
+
+**Before**
+
+```ts
+const point: Vector3 = visibility.pointOnPlane;
+```
+
+**After**
+
+```ts
+const point = visibility.pointOnPlane;
+if (point == null) return; // the camera does not look at the plane
+```
+
+#### `DataIdsChunk2D#readDataIdAt()` can answer `undefined`
+
+Coordinates outside the chunk read past its data array. The return type names that; use
+`containsDataAt()` to ask first, or take the `undefined`.
+
+**Before**
+
+```ts
+const id: number = chunk.readDataIdAt(x, y);
+```
+
+**After**
+
+```ts
+const id = chunk.readDataIdAt(x, y);
+if (id === undefined) return; // (x, y) is outside this chunk
 ```
 
 ## [0.21.2] - 2026-06-19

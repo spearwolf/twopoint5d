@@ -50,7 +50,8 @@ export class TextureAtlas {
   }
 
   frame(name: TextureAtlasFrameName): TextureAtlasFrame | undefined {
-    return this.#frames[this.#frameNames.get(name)!];
+    const frameId = this.#frameNames.get(name);
+    return frameId != null ? this.#frames[frameId] : undefined;
   }
 
   /**

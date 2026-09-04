@@ -12,8 +12,12 @@ export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
 export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   limitToAxis: LimitToAxisType;
 
-  #tileIds: number[][];
+  // Assigned in the constructor through the `tileIds` setter, which falls back to an empty pattern.
+  #tileIds!: number[][];
 
+  // `#rows` and `#cols` are taken from the very array that is indexed below, in the `tileIds`
+  // setter. Every index into `#tileIds` therefore passes through `% #rows` / `% #cols` or
+  // through a range check against them first, and cannot point past the pattern.
   #rows = 0;
   #cols = 0;
 
@@ -24,7 +28,9 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   set tileIds(tileIds: number[][]) {
     this.#tileIds = tileIds;
     this.#rows = tileIds.length;
-    this.#cols = tileIds[0].length;
+    // Every pattern the constructor builds carries at least one row — it substitutes `[[]]` for a
+    // missing one. An empty array assigned through this setter fails on this line.
+    this.#cols = tileIds[0]!.length;
   }
 
   constructor(tileIds?: RepeatingTilesPatternType, limitToAxis: LimitToAxisType = 'none') {
@@ -48,20 +54,20 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
       case 'vertical':
         if (col >= 0 && col < this.#cols) {
           row = row < 0 ? row + Math.ceil(-row / this.#rows) * this.#rows : row;
-          return this.#tileIds[row % this.#rows][col];
+          return this.#tileIds[row % this.#rows]![col]!;
         }
         break;
       case 'horizontal':
         if (row >= 0 && row < this.#rows) {
           col = col < 0 ? col + Math.ceil(-col / this.#cols) * this.#cols : col;
-          return this.#tileIds[row][col % this.#cols];
+          return this.#tileIds[row]![col % this.#cols]!;
         }
         break;
       case 'none':
       default:
         col = col < 0 ? col + Math.ceil(-col / this.#cols) * this.#cols : col;
         row = row < 0 ? row + Math.ceil(-row / this.#rows) * this.#rows : row;
-        return this.#tileIds[row % this.#rows][col % this.#cols];
+        return this.#tileIds[row % this.#rows]![col % this.#cols]!;
     }
     return 0;
   }
@@ -91,7 +97,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
           const leftOffset = -left;
           let tilesRowOffset = top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
           for (let y = 0; y < height; y++) {
-            const tiles = this.tileIds[tilesRowOffset++ % this.#rows].slice(0, width - leftOffset);
+            const tiles = this.tileIds[tilesRowOffset++ % this.#rows]!.slice(0, width - leftOffset);
             const rowOffset = y * width;
             if (leftOffset > 0) {
               target.fill(0, rowOffset, rowOffset + leftOffset);
@@ -120,12 +126,12 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
             const targetRowOffset = y * width;
             if (patternRow < this.#rows) {
               if (this.#cols === 1) {
-                target.fill(this.tileIds[patternRow][0], targetRowOffset, targetRowOffset + width);
+                target.fill(this.tileIds[patternRow]![0]!, targetRowOffset, targetRowOffset + width);
               } else {
                 let x = 0;
                 let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
                 while (x < width) {
-                  const tiles = this.tileIds[patternRow].slice(col, col + width - x);
+                  const tiles = this.tileIds[patternRow]!.slice(col, col + width - x);
                   target.set(tiles, targetRowOffset + x);
                   x += tiles.length;
                   col = (col + x) % this.#cols;
@@ -141,19 +147,19 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
 
       case 'none':
         if (this.#cols === 1 && this.#rows === 1) {
-          target.fill(this.tileIds[0][0]);
+          target.fill(this.tileIds[0]![0]!);
         } else {
           const topOffset = top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
           for (let y = 0; y < height; y++) {
             const patternRow = (y + topOffset) % this.#rows;
             const targetRowOffset = y * width;
             if (this.#cols === 1) {
-              target.fill(this.tileIds[patternRow][0], targetRowOffset, targetRowOffset + width);
+              target.fill(this.tileIds[patternRow]![0]!, targetRowOffset, targetRowOffset + width);
             } else {
               let x = 0;
               let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
               while (x < width) {
-                const tiles = this.tileIds[patternRow].slice(col, col + width - x);
+                const tiles = this.tileIds[patternRow]!.slice(col, col + width - x);
                 target.set(tiles, targetRowOffset + x);
                 x += tiles.length;
                 col = (col + x) % this.#cols;

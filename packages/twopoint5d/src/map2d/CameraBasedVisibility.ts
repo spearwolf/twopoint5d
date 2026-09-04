@@ -72,7 +72,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   planeWorld = CameraBasedVisibility.Plane.clone();
   planeOrigin = new Vector3();
 
-  pointOnPlane?: Vector3;
+  // `null` marks a plane that was deliberately cleared because the camera looks past it, as
+  // opposed to a `pointOnPlane` that was never set.
+  pointOnPlane?: Vector3 | null;
 
   planeCoords2D = new Vector2();
   #centerPoint2D = new Vector2();
@@ -125,14 +127,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private dependenciesChanged(matrixWorld: Matrix4): boolean {
+    // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
+    const camera = this.camera!;
+
     return this.#deps.changed({
       depth: this.depth,
       lookAtCenter: this.lookAtCenter,
       centerPoint2D: this.#centerPoint2D,
       map2dTileCoords: this.map2dTileCoords,
       matrixWorld,
-      cameraMatrixWorld: this.camera.matrixWorld,
-      cameraProjectionMatrix: this.camera.projectionMatrix,
+      cameraMatrixWorld: camera.matrixWorld,
+      cameraProjectionMatrix: camera.projectionMatrix,
     });
   }
 
@@ -214,8 +219,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private findPointOnPlaneThatIsInViewFrustum(): Vector3 | null | undefined {
-    const camWorldDir = this.camera.getWorldDirection(this.#scratchCamDir).setLength(this.camera.far);
-    this.#cameraWorldPosition.setFromMatrixPosition(this.camera.matrixWorld);
+    // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
+    const camera = this.camera!;
+
+    const camWorldDir = camera.getWorldDirection(this.#scratchCamDir).setLength(camera.far);
+    this.#cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
 
     this.#scratchLineEnd.copy(camWorldDir).add(this.#cameraWorldPosition);
     this.#scratchLineOfSight.set(this.#cameraWorldPosition, this.#scratchLineEnd);
@@ -251,10 +259,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // Index previousTiles by id for O(1) reuse lookups (replaces the original O(n²) splice loop).
     this.#previousTilesById.clear();
     for (let i = 0; i < previousTiles.length; ++i) {
-      this.#previousTilesById.set(previousTiles[i].id, previousTiles[i]);
+      // The loop bound is `previousTiles.length`.
+      const previousTile = previousTiles[i]!;
+      this.#previousTilesById.set(previousTile.id, previousTile);
     }
 
-    makeCameraFrustum(this.camera, this.#cameraFrustum);
+    // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
+    makeCameraFrustum(this.camera!, this.#cameraFrustum);
 
     const primaryTiles = this.map2dTileCoords.computeTilesWithinCoords(
       this.planeCoords2D.x - this.map2dTileCoords.tileWidth / 2,
@@ -325,8 +336,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         }
 
         for (let i = 0; i < NEIGHBOR_DX_DY.length; ++i) {
-          const dx = NEIGHBOR_DX_DY[i][0];
-          const dy = NEIGHBOR_DX_DY[i][1];
+          // The loop bound is `NEIGHBOR_DX_DY.length`.
+          const [dx, dy] = NEIGHBOR_DX_DY[i]!;
           const tx = tile.coords.tileLeft + dx;
           const ty = tile.coords.tileTop + dy;
           if (!this.#visitedIds.has(toBoxId(tx, ty))) {
@@ -339,7 +350,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.visibles.sort(sortByDistance);
 
     const tiles: IMap2DTileCoords[] = new Array(this.visibles.length);
-    for (let i = 0; i < this.visibles.length; ++i) tiles[i] = this.visibles[i].map2dTile!;
+    // The loop bound is `this.visibles.length`.
+    for (let i = 0; i < this.visibles.length; ++i) tiles[i] = this.visibles[i]!.map2dTile!;
 
     const removeTiles: IMap2DTileCoords[] = [];
     for (const t of this.#previousTilesById.values()) removeTiles.push(t);

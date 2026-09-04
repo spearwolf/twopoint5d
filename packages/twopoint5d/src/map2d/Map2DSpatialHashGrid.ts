@@ -65,7 +65,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   getTiles(tileX: number, tileY: number, width = 1, height = 1): Set<Renderable> | undefined {
-    let renderables: Set<Renderable>;
+    let renderables: Set<Renderable> | undefined;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tileSet = this.getTile(tileX + x, tileY + y);

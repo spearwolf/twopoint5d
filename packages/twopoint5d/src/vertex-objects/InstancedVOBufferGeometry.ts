@@ -4,7 +4,7 @@ import type {AttributeRoute, ReleasedSlot} from './GeometryAttributeSlots.js';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import {VOBufferPool} from './VOBufferPool.js';
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';

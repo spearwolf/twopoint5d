@@ -56,11 +56,14 @@ export class DataIdsChunk2D extends DataChunk2D {
     return this.#uint32Data!;
   }
 
-  protected readDataIdAtLocal(x: number, y: number): number {
+  protected readDataIdAtLocal(x: number, y: number): number | undefined {
     return this.uint32Arr[y * this.data.width + x];
   }
 
-  readDataIdAt(x: number, y: number): number {
+  /**
+   * The data id stored at `(x, y)`, or `undefined` when the coordinates lie outside this chunk.
+   */
+  readDataIdAt(x: number, y: number): number | undefined {
     return this.readDataIdAtLocal(x - this.left, y - this.top);
   }
 }

@@ -2,6 +2,7 @@ import {emit, type EventizedObject, eventize, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {Color, type Node, RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {
   OnAddToParent,
   OnRemoveFromParent,
@@ -545,7 +546,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       if (name !== '*') {
         const index = otherStages.findIndex((stage) => stage.stage.name === name);
         if (index !== -1) {
-          const stage = otherStages.splice(index, 1)[0];
+          const stage = expectDefined(otherStages.splice(index, 1)[0], `the stage named "${name}"`);
           explicitlyNamedStages.set(name, stage);
         }
       }

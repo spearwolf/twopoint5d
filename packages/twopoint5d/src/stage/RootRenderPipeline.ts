@@ -30,7 +30,8 @@ export class RootRenderPipeline extends RenderPipeline {
     // runtime; the static `Node` type does not surface `.add()`.
     let out = passes[0] as Node & {add(other: Node): Node};
     for (let i = 1; i < passes.length; i++) {
-      out = out.add(passes[i]) as typeof out;
+      // The loop bound is `passes.length`.
+      out = out.add(passes[i]!) as typeof out;
     }
     return out;
   }

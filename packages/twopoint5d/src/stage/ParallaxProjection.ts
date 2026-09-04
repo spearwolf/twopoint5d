@@ -1,5 +1,6 @@
 import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
+import {expectDefined} from '../utils/expectDefined.js';
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {asFitIntoRectangleSpecs} from './asFitIntoRectangleSpecs.js';
@@ -18,15 +19,16 @@ export class ParallaxProjection implements IProjection {
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();
 
-  #halfHeight: number;
+  // The fields below are assigned by `updateViewRect()`; a camera built before that call carries `NaN`.
+  #halfHeight!: number;
 
-  #near: number;
-  #far: number;
+  #near!: number;
+  #far!: number;
 
-  #distanceToProjectionPlane: number;
+  #distanceToProjectionPlane!: number;
 
-  #aspect: number;
-  #fovy: number;
+  #aspect!: number;
+  #fovy!: number;
 
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
     this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
@@ -57,9 +59,11 @@ export class ParallaxProjection implements IProjection {
   createCamera(): PerspectiveCamera {
     const camera = new PerspectiveCamera(this.#fovy, this.#aspect, this.#near, this.#far);
 
-    this.projectionPlane.applyRotation(camera);
+    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
 
-    camera.position.copy(this.projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
+    projectionPlane.applyRotation(camera);
+
+    camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
     camera.updateProjectionMatrix();
     return camera;

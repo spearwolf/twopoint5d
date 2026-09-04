@@ -1,5 +1,6 @@
 import type {Box3, Object3D} from 'three/webgpu';
 import {Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
+import {expectDefined} from '../utils/expectDefined.js';
 import type {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
 import {type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
@@ -84,18 +85,29 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     const primaries = visibles.filter((v) => v.primary);
 
     primaries.forEach((tile) => {
-      this.addBoxHelper(tile.frustumBox, this.frustumBoxHelperExpand, this.frustumBoxPrimaryHelperColor, true);
+      this.addBoxHelper(
+        expectDefined(tile.frustumBox, `the frustum box of tile ${tile.id}`),
+        this.frustumBoxHelperExpand,
+        this.frustumBoxPrimaryHelperColor,
+        true,
+      );
     });
 
     for (let i = 0; i < visibles.length; ++i) {
-      const tile = visibles[i];
+      // The loop bound is `visibles.length`.
+      const tile = visibles[i]!;
 
       if (!tile.primary && i < this.maxDebugHelpers) {
-        this.addBoxHelper(tile.frustumBox, this.frustumBoxHelperExpand, this.frustumBoxHelperColor, true);
+        this.addBoxHelper(
+          expectDefined(tile.frustumBox, `the frustum box of tile ${tile.id}`),
+          this.frustumBoxHelperExpand,
+          this.frustumBoxHelperColor,
+          true,
+        );
       }
 
       this.addBoxHelper(
-        tile.box,
+        expectDefined(tile.box, `the box of tile ${tile.id}`),
         this.tileBoxHelperExpand,
         tile.primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor,
         false,

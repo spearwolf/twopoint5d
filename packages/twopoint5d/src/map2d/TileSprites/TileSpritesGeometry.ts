@@ -1,3 +1,4 @@
+import {expectDefined} from '../../utils/expectDefined.js';
 import {InstancedVertexObjectGeometry} from '../../vertex-objects/InstancedVertexObjectGeometry.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {TileBaseSprite} from './descriptors.js';
@@ -14,6 +15,6 @@ export class TileSpritesGeometry extends InstancedVertexObjectGeometry<TileSprit
 
     this.name = 'twopoint5d.TileSpritesGeometry';
 
-    this.basePool.createVO().make();
+    expectDefined(this.basePool.createVO(), 'the base sprite of this geometry').make();
   }
 }

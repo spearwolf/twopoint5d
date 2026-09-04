@@ -3,7 +3,7 @@ import {InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferA
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
 export function initializeInstancedAttributes(

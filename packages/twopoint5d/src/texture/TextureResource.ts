@@ -120,7 +120,7 @@ export class TextureResource {
 
   static fromTileSet(
     id: string,
-    imageUrl: string,
+    imageUrl: string | undefined,
     tileSetOptions: TileSetOptions,
     textureClasses?: TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
@@ -129,7 +129,10 @@ export class TextureResource {
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.#tileSetOptions = createSignal(tileSetOptions, {compare: cmpTileSetOptions, attach: resource});
+      resource.#tileSetOptions = createSignal<TileSetOptions | undefined>(tileSetOptions, {
+        compare: cmpTileSetOptions,
+        attach: resource,
+      });
       resource.#tileSet = createSignal(undefined, {attach: resource});
       resource.#atlas = createSignal(undefined, {attach: resource});
       resource.textureClasses = textureClasses?.slice();
@@ -149,10 +152,10 @@ export class TextureResource {
     const resource = new TextureResource(id, 'atlas');
 
     batch(() => {
-      resource.#atlasUrl = createSignal(atlasUrl, {attach: resource});
+      resource.#atlasUrl = createSignal<string | undefined>(atlasUrl, {attach: resource});
       resource.#atlasJson = createSignal(undefined, {attach: resource});
       resource.#atlas = createSignal(undefined, {attach: resource});
-      resource.#overrideImageUrl = createSignal(overrideImageUrl, {attach: resource});
+      resource.#overrideImageUrl = createSignal<string | undefined>(overrideImageUrl, {attach: resource});
       resource.textureClasses = textureClasses?.slice();
       resource.frameBasedAnimationsData = frameBasedAnimations;
     });
@@ -387,13 +390,17 @@ export class TextureResource {
       );
 
       if (this.tileSetOptions) {
+        // A tileset resource creates these signals in the same batch() that received the value the guard just read.
+        const tileSetOptionsSignal = this.#tileSetOptions!;
+        const tileSetSignal = this.#tileSet!;
+
         unsubscribeOnDispose(
           createEffect(() => {
             if (this.imageCoords && this.tileSetOptions) {
               this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
               this.atlas = this.tileSet.atlas;
             }
-          }, [this.#imageCoords, this.#tileSetOptions]),
+          }, [this.#imageCoords, tileSetOptionsSignal]),
         );
 
         unsubscribeOnDispose(
@@ -410,11 +417,17 @@ export class TextureResource {
                 }
               }
             }
-          }, [this.#tileSet, this.#frameBasedAnimationsData]),
+          }, [tileSetSignal, this.#frameBasedAnimationsData]),
         );
       }
 
       if (this.atlasUrl) {
+        // An atlas resource creates these signals in the same batch() that received the value the guard just read.
+        const atlasUrlSignal = this.#atlasUrl!;
+        const atlasJsonSignal = this.#atlasJson!;
+        const overrideImageUrlSignal = this.#overrideImageUrl!;
+        const atlasSignal = this.#atlas!;
+
         unsubscribeOnDispose(
           createEffect(() => {
             const atlasUrl = this.atlasUrl;
@@ -436,7 +449,7 @@ export class TextureResource {
               aborted = true;
               ac.abort();
             };
-          }, [this.#atlasUrl]),
+          }, [atlasUrlSignal]),
         );
 
         unsubscribeOnDispose(
@@ -444,7 +457,7 @@ export class TextureResource {
             if (this.atlasJson) {
               this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
             }
-          }, [this.#atlasJson, this.#overrideImageUrl]),
+          }, [atlasJsonSignal, overrideImageUrlSignal]),
         );
 
         unsubscribeOnDispose(
@@ -453,7 +466,7 @@ export class TextureResource {
               const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
               this.atlas = atlas;
             }
-          }, [this.#atlasJson, this.#imageCoords]),
+          }, [atlasJsonSignal, this.#imageCoords]),
         );
 
         unsubscribeOnDispose(
@@ -467,10 +480,10 @@ export class TextureResource {
                 }
               }
             }
-          }, [this.#atlas, this.#frameBasedAnimationsData]),
+          }, [atlasSignal, this.#frameBasedAnimationsData]),
         );
 
-        touch(this.#atlasUrl);
+        touch(atlasUrlSignal);
       }
 
       // Standalone fallback: if a user assigns `renderer` directly on this resource

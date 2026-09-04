@@ -1,7 +1,8 @@
 import {emit, type EventizedObject, eventize, off, on} from '@spearwolf/eventize';
 
 interface ISetAnimationLoop {
-  setAnimationLoop(callback: (now: number) => unknown): unknown;
+  // `null` is how three.js stops the loop again, and `stop()` below uses it.
+  setAnimationLoop(callback: ((now: number) => unknown) | null): unknown;
 }
 
 const OnRAF = Symbol.for('onRAF');
@@ -11,7 +12,7 @@ const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 const MEASURE_COLLECTION_SIZE = 10;
 
 const rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
-let rafUniqueInstance: RAF = null;
+let rafUniqueInstance: RAF | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface RAF extends EventizedObject {}
@@ -19,10 +20,12 @@ interface RAF extends EventizedObject {}
 class RAF {
   static get(renderer?: ISetAnimationLoop): RAF {
     if (renderer != null) {
-      if (!rafUniqueInstances.has(renderer)) {
-        rafUniqueInstances.set(renderer, new RAF(renderer));
+      let raf = rafUniqueInstances.get(renderer);
+      if (raf == null) {
+        raf = new RAF(renderer);
+        rafUniqueInstances.set(renderer, raf);
       }
-      return rafUniqueInstances.get(renderer);
+      return raf;
     }
     if (rafUniqueInstance == null) {
       rafUniqueInstance = new RAF();

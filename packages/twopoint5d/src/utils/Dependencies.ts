@@ -56,8 +56,9 @@ export class Dependencies {
 
   update(nextProps: Record<DependencyKey, any>): void {
     for (const [name, value] of Object.entries(nextProps)) {
-      if (this.#callbacks.has(name)) {
-        const {clone, copy} = this.#callbacks.get(name);
+      const callbacks = this.#callbacks.get(name);
+      if (callbacks != null) {
+        const {clone, copy} = callbacks;
         if (value != null && clone != null && copy != null) {
           const curValue = this.#state.get(name);
           if (curValue == null) {
@@ -74,7 +75,8 @@ export class Dependencies {
 
   equals(nextProps: Record<DependencyKey, any>): boolean {
     for (let i = 0; i < this.#props.length; i++) {
-      const [name, callbacks] = this.#props[i];
+      // The loop bound is `this.#props.length`.
+      const [name, callbacks] = this.#props[i]!;
 
       const nextValue = nextProps[name];
       const curValue = this.#state.get(name);

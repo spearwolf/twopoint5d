@@ -67,9 +67,9 @@ const OnResource = TextureStoreEvents.Resource;
 const OnDispose = TextureStoreEvents.Dispose;
 const OnError = TextureStoreEvents.Error;
 
-const joinTextureClasses = (...classes: TextureOptionClasses[][] | undefined): TextureOptionClasses[] | undefined => {
-  const all = classes?.filter((c) => c != null);
-  if (all && all.length) {
+const joinTextureClasses = (...classes: Array<TextureOptionClasses[] | undefined>): TextureOptionClasses[] | undefined => {
+  const all = classes.filter((c) => c != null);
+  if (all.length) {
     return Array.from(new Set(all.flat()).values());
   }
   return undefined;
@@ -224,11 +224,13 @@ export class TextureStore {
             if (resource.type !== 'tileset') {
               throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "tileset"`);
             }
+            // The narrowing of `resource` does not reach into the callback, so it is bound here.
+            const knownResource = resource;
             batch(() => {
-              resource.imageUrl = item.imageUrl;
-              resource.tileSetOptions = item.tileSet;
-              resource.textureClasses = textureClasses;
-              resource.frameBasedAnimationsData = item.frameBasedAnimations;
+              knownResource.imageUrl = item.imageUrl;
+              knownResource.tileSetOptions = item.tileSet;
+              knownResource.textureClasses = textureClasses;
+              knownResource.frameBasedAnimationsData = item.frameBasedAnimations;
             });
           } else {
             resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
@@ -238,11 +240,12 @@ export class TextureStore {
             if (resource.type !== 'atlas') {
               throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "atlas"`);
             }
+            const knownResource = resource;
             batch(() => {
-              resource.atlasUrl = item.atlasUrl;
-              resource.overrideImageUrl = item.overrideImageUrl;
-              resource.textureClasses = textureClasses;
-              resource.frameBasedAnimationsData = item.frameBasedAnimations;
+              knownResource.atlasUrl = item.atlasUrl;
+              knownResource.overrideImageUrl = item.overrideImageUrl;
+              knownResource.textureClasses = textureClasses;
+              knownResource.frameBasedAnimationsData = item.frameBasedAnimations;
             });
           } else {
             resource = TextureResource.fromAtlas(
@@ -258,9 +261,10 @@ export class TextureStore {
             if (resource.type !== 'image') {
               throw new Error(`Resource ${id} already exists with type "${resource.type}" - cannot change to "image"`);
             }
+            const knownResource = resource;
             batch(() => {
-              resource.imageUrl = item.imageUrl;
-              resource.textureClasses = textureClasses;
+              knownResource.imageUrl = item.imageUrl;
+              knownResource.textureClasses = textureClasses;
             });
           } else {
             resource = TextureResource.fromImage(id, item.imageUrl, textureClasses);
@@ -329,11 +333,15 @@ export class TextureStore {
           });
 
           if (isMultipleTypes) {
+            // `values` is created exactly when `isMultipleTypes` holds — both spring from the same `Array.isArray(type)` check.
+            const valuesByType = values!;
             (type as Array<TextureResourceSubType>).forEach((t) => {
               unsubscribeFromSubType.push(
                 on(resource, t, (val) => {
-                  values.set(t, val);
-                  const valuesArg = (type as Array<TextureResourceSubType>).map((t) => values.get(t)).filter((v) => v != null);
+                  valuesByType.set(t, val);
+                  const valuesArg = (type as Array<TextureResourceSubType>)
+                    .map((t) => valuesByType.get(t))
+                    .filter((v) => v != null);
                   if (valuesArg.length === type.length) {
                     callback(valuesArg as MapSubTypes<T>);
                   }

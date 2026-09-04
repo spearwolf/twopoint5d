@@ -1,7 +1,9 @@
+import {expectDefined} from '../utils/expectDefined.js';
+
 export const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
 export const globalStylesID = `display3--${postFixID}`;
 
-let sheet: CSSStyleSheet = null;
+let sheet: CSSStyleSheet | null = null;
 
 const installedRules: Map<string, {index: number; css: string}> = new Map();
 
@@ -14,7 +16,8 @@ export class Stylesheets {
       const styleEl = document.createElement('style');
       styleEl.setAttribute('id', globalStylesID);
       root.appendChild(styleEl);
-      sheet = styleEl.sheet;
+      // A <style> element carries a sheet only once it sits in a document — the appendChild above put it there.
+      sheet = expectDefined(styleEl.sheet, 'the stylesheet of the freshly appended <style> element');
     }
     return sheet;
   }
@@ -27,8 +30,8 @@ export class Stylesheets {
 
     let index = sheet.cssRules.length;
 
-    if (installedRules.has(name)) {
-      const prevRule = installedRules.get(name);
+    const prevRule = installedRules.get(name);
+    if (prevRule != null) {
       if (prevRule.css === css) {
         return className;
       }

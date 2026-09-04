@@ -4,7 +4,7 @@ import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSl
 import type {VOBufferPool} from './VOBufferPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {createIndicesArray} from './createIndicesArray.js';
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
 export function initializeAttributes(

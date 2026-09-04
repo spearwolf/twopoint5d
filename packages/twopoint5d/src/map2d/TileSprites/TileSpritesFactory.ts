@@ -1,5 +1,6 @@
 import type {Object3D} from 'three/webgpu';
 import type {TileSet} from '../../texture/TileSet.js';
+import {expectDefined} from '../../utils/expectDefined.js';
 import type {IMap2DTileCoords, IMap2DTileDataProvider, IMapTileFactory} from '../types.js';
 import type {TileSprite} from './descriptors.js';
 import type {TileSprites} from './TileSprites.js';
@@ -31,7 +32,8 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   }
 
   createTile(tileCoords: IMap2DTileCoords): TileSprite | undefined {
-    const tileDataId = this.tileDataProvider.getTileIdAt(tileCoords.x, tileCoords.y);
+    const tileDataProvider = expectDefined(this.tileDataProvider, 'the tile data provider of this factory');
+    const tileDataId = tileDataProvider.getTileIdAt(tileCoords.x, tileCoords.y);
 
     if (tileDataId === 0) return;
 
@@ -42,8 +44,9 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
     sprite.setQuadSize([tileCoords.view.width, tileCoords.view.height]);
     sprite.setInstancePosition([tileCoords.view.left, 0, tileCoords.view.top]);
 
-    const frameId = this.tileSet.frameId(tileDataId);
-    const texCoords = this.tileSet.atlas.get(frameId).coords;
+    const tileSet = expectDefined(this.tileSet, 'the tile set of this factory');
+    const frameId = tileSet.frameId(tileDataId);
+    const texCoords = expectDefined(tileSet.atlas.get(frameId), `the atlas frame of tile ${tileDataId}`).coords;
 
     sprite.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
 

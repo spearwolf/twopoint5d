@@ -1,5 +1,5 @@
 import {BufferGeometry} from 'three/webgpu';
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import type {VertexObjectDescription, VO} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';

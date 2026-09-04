@@ -153,6 +153,8 @@ export class FrameBasedAnimations {
           frames.push(tileSet.frame(tileId).coords);
         }
       }
+    } else {
+      throw new Error('add(): the third argument must be a TextureAtlas, a TileSet or an array of frames');
     }
 
     const id = this.#names.length;

@@ -1,6 +1,6 @@
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
 import type {VOBufferPool} from './VOBufferPool.js';
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import type {BufferLike} from './types.js';
 
 /**

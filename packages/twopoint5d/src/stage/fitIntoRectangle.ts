@@ -218,9 +218,9 @@ export function fitIntoRectangle(rect: Vector2, specs: FitIntoRectangleSpecs, ta
         target.set(specs.width, specs.height);
       }
     }
-    if ('minPixelZoom' in specs && rect.width / target.width < specs.minPixelZoom) {
+    if (specs.minPixelZoom != null && rect.width / target.width < specs.minPixelZoom) {
       target.copy(rect).divideScalar(specs.minPixelZoom);
-    } else if ('maxPixelZoom' in specs && rect.width / target.width > specs.maxPixelZoom) {
+    } else if (specs.maxPixelZoom != null && rect.width / target.width > specs.maxPixelZoom) {
       target.copy(rect).divideScalar(specs.maxPixelZoom);
     }
   }

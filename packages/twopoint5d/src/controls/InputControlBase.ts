@@ -1,3 +1,5 @@
+import {expectDefined} from '../utils/expectDefined.js';
+
 export class InputControlBase {
   readonly #listeners: [host: EventTarget, eventName: string, callback: any, passive: boolean][] = [];
 
@@ -22,7 +24,7 @@ export class InputControlBase {
     const index = this.#findListenerIndex(host, eventName, callback, passive);
     if (index >= 0) {
       if (this.#active) {
-        const [host, eventName, callback] = this.#listeners[index];
+        const [host, eventName, callback] = expectDefined(this.#listeners[index], `the listener at index ${index}`);
         host.removeEventListener(eventName, callback);
       }
       this.#listeners.splice(index, 1);

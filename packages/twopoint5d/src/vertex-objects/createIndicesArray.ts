@@ -1,4 +1,4 @@
-import {expectDefined} from './expectDefined.js';
+import {expectDefined} from '../utils/expectDefined.js';
 
 export function createIndicesArray(indices: number[], count: number): Uint32Array {
   const itemCount = indices.length;

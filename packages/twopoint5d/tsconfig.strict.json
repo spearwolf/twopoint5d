@@ -9,6 +9,6 @@
     "strictNullChecks": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/vertex-objects", "src/sprites"],
+  "include": ["src"],
   "exclude": ["src/**/*.spec.ts"]
 }

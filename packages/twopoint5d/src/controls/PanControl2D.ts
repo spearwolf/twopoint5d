@@ -104,7 +104,8 @@ export class PanControl2D extends InputControlBase {
 
   #pointersDown: Map<number, PanInternalState> = new Map();
 
-  #cursorPanStyle: string;
+  // Assigned in the constructor through the `cursorPanStyle` setter.
+  #cursorPanStyle!: string;
   #cursorPanClass?: string;
   #cursorStylesTarget?: HTMLElement;
   #hideCursorState = HideCursorState.NO;
@@ -147,7 +148,8 @@ export class PanControl2D extends InputControlBase {
   #installCursorPanStyleRules = (): string =>
     Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`);
 
-  #panView: PanViewState;
+  // Assigned in the constructor through the `panView` setter, which substitutes a default for a missing state.
+  #panView!: PanViewState;
   #isFirstPanViewUpdate = true;
 
   get panView(): PanViewState {
