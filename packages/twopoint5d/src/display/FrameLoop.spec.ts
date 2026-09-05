@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {FrameLoop} from './FrameLoop.js';
 
 interface FrameProps {
@@ -246,5 +246,63 @@ describe('FrameLoop', () => {
     loop.clear();
 
     expect(loop.subscriptionCount).toBe(0);
+  });
+
+  describe('resetRAF()', () => {
+    afterEach(() => {
+      // the module state must not travel from one case into the next; the globals go last,
+      // because the reset above still cancels through them
+      FrameLoop.resetRAF();
+      vi.unstubAllGlobals();
+    });
+
+    it('gives the same renderer a fresh driver', () => {
+      const renderer = makeFakeRenderer();
+
+      expect(new FrameLoop(0, renderer).subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      const firstCallback = renderer.callback;
+      expect(firstCallback, 'the driver installs itself on the renderer').not.toBeNull();
+
+      expect(new FrameLoop(0, renderer).subscriptionCount).toBe(0);
+      expect(renderer.callback, 'a second loop shares the driver of the first').toBe(firstCallback);
+
+      FrameLoop.resetRAF();
+
+      expect(new FrameLoop(0, renderer).subscriptionCount).toBe(0);
+      expect(renderer.callback, 'after the reset the renderer drives a new driver').not.toBe(firstCallback);
+    });
+
+    it('stops the driver that runs without a renderer', () => {
+      // requestAnimationFrame and cancelAnimationFrame do not exist under node at all,
+      // so there is nothing to spy on — they have to be put there
+      const rafIDs: number[] = [];
+      const cancelled: number[] = [];
+      let nextRafID = 100;
+
+      vi.stubGlobal('requestAnimationFrame', () => {
+        nextRafID += 1;
+        rafIDs.push(nextRafID);
+        return nextRafID;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+        cancelled.push(id);
+      });
+
+      expect(new FrameLoop(0).subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      expect(rafIDs, 'the driver has asked for a frame').toHaveLength(1);
+
+      FrameLoop.resetRAF();
+
+      expect(cancelled, 'the pending frame request is cancelled').toEqual([rafIDs[0]]);
+
+      expect(new FrameLoop(0).subscriptionCount).toBe(0);
+      expect(rafIDs, 'the next loop builds a new driver').toHaveLength(2);
+    });
+
+    it('does nothing when no driver ever ran without a renderer', () => {
+      // no stubs here on purpose: this runs under bare node, where requestAnimationFrame
+      // is missing — and that is exactly the environment a test suite calls the reset from
+      expect(() => FrameLoop.resetRAF()).not.toThrow();
+    });
   });
 });

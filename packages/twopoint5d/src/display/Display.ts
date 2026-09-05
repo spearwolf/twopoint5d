@@ -5,7 +5,6 @@ import {
   off,
   on,
   once,
-  onceAsync,
   retain,
   retainClear,
   type UnsubscribeFunc,
@@ -42,6 +41,12 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   }
 }
 
+// one message for every member that refuses to answer once the display is gone, so the class
+// and the state are always in the text a caller reads out of a foreign stack
+function disposedError(member: string): Error {
+  return new Error(`Display#${member} is not available: this display has been disposed`);
+}
+
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
 /**
@@ -60,6 +65,21 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    (once), `OnDisplayStart` and begins emitting `OnDisplayRenderFrame`.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    releases the renderer.
+ * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
+ *    answers `undefined` and {@link Display.isDisposed} answers `true`.
+ *    {@link Display.canvas}, {@link Display.start} and {@link Display.getEventProps}
+ *    throw. {@link Display.resize}, {@link Display.renderFrame},
+ *    {@link Display.stop}, a write to {@link Display.pause} and a further
+ *    `dispose()` do nothing.
+ *    {@link Display.nextFrame} is rejected, and so is a promise it handed out
+ *    earlier that is still pending. {@link Display.width},
+ *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
+ *    {@link Display.deltaTime} keep their last value, {@link Display.pixelRatio}
+ *    keeps reading the window, {@link Display.isRunning} is `false`, and
+ *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend} are
+ *    `false` — the renderer they ask about is gone. No further event is emitted,
+ *    and a listener attached afterwards receives nothing — not even a retained
+ *    value.
  *
  * ## Resize model
  *
@@ -196,6 +216,8 @@ export class Display {
    */
   styleImageRendering?: 'pixelated' | 'auto' = undefined;
 
+  #disposed = false;
+
   #width = 0;
   #height = 0;
 
@@ -278,8 +300,25 @@ export class Display {
 
   renderer?: WebGPURenderer;
 
+  /**
+   * `true` once {@link Display.dispose} has run. Branch on this wherever a display
+   * arrives from somewhere else and may already be gone.
+   */
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
+  /**
+   * The canvas element the renderer draws into.
+   *
+   * Throws after {@link Display.dispose}: the renderer that holds the canvas is gone,
+   * and this type promises an element.
+   */
   get canvas(): HTMLCanvasElement {
-    return this.renderer!.domElement;
+    if (this.renderer == null) {
+      throw disposedError('canvas');
+    }
+    return this.renderer.domElement;
   }
 
   get isWebGPUBackend(): boolean {
@@ -444,11 +483,22 @@ export class Display {
     this.#chronometer.maxDeltaTime = value;
   }
 
+  /**
+   * Whether the frame loop is paused.
+   *
+   * After {@link Display.dispose} a write does nothing, while the getter keeps reading the
+   * state the display was left in — one that was running when it was disposed answers `true`,
+   * whatever is written to it.
+   */
   get pause(): boolean {
     return this.#stateMachine.state === DisplayStateMachine.PAUSED;
   }
 
   set pause(pause: boolean) {
+    // un-pausing is a restart: the state machine would go back to RUNNING and the chronometer
+    // with it. There is nothing left to run, so a disposed display stays where dispose() put it
+    if (this.#disposed) return;
+
     this.#stateMachine.pausedByUser = pause;
   }
 
@@ -487,8 +537,12 @@ export class Display {
    *
    * Emission of `OnDisplayResize` is deferred to
    * {@link Display.renderFrame}; this method only mutates state and returns.
+   *
+   * Does nothing after {@link Display.dispose} — there is no canvas left to measure.
    */
   resize(): void {
+    if (this.#disposed) return;
+
     this.#didEmitResize = false;
 
     if (this.resizePollIntervalMs > 0) {
@@ -645,8 +699,12 @@ export class Display {
    *
    * You normally do not call this yourself — the {@link FrameLoop} drives it
    * automatically once {@link Display.start} has resolved.
+   *
+   * Does nothing after {@link Display.dispose} — there is no renderer left to draw with.
    */
   renderFrame(now = window.performance.now()): void {
+    if (this.#disposed) return;
+
     this.#isFirstFrame = this.frameNo === 0;
     this.frameNo += 1;
 
@@ -665,11 +723,30 @@ export class Display {
     this.#emit(OnDisplayRenderFrame);
   }
 
+  /**
+   * Awaits the renderer initialization, runs `beforeStartCallback` and starts the
+   * frame loop.
+   *
+   * Throws after {@link Display.dispose}. A promise that resolves without a frame ever
+   * following would be a dead end the caller cannot see, and the caller is waiting on
+   * the effect, not on the value.
+   */
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
+    if (this.#disposed) throw disposedError('start()');
+
     await this.#waitForRenderer;
+
+    // dispose() can land inside the await above; without this the state machine
+    // would report a display as running that has already given up its renderer
+    if (this.#disposed) throw disposedError('start()');
 
     if (typeof beforeStartCallback === 'function') {
       await beforeStartCallback(this.getEventProps());
+
+      // the callback is foreign code and holds the start for as long as it likes — a teardown
+      // that runs while it loads its assets lands right here, and the two lines below would
+      // hand a display that has given up its renderer back to the state machine as running
+      if (this.#disposed) throw disposedError('start()');
     }
 
     this.#stateMachine.pausedByUser = false;
@@ -683,8 +760,13 @@ export class Display {
   }
 
   dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+
     this.stop();
     this.frameLoop.stop(this);
+    // the listeners are still attached here: this event is what tells them to let go,
+    // and off(this) below is what makes it the last event this display ever emits
     emit(this, OnDisplayDispose, this);
     off(this);
     this.renderer?.dispose();
@@ -693,11 +775,17 @@ export class Display {
 
   /**
    * This is a public method so it's easy to override if you want
+   *
+   * Throws after {@link Display.dispose}: `DisplayEventProps` promises a `renderer`,
+   * and there is none left to put in it.
    */
   getEventProps(): DisplayEventProps {
+    if (this.renderer == null) {
+      throw disposedError('getEventProps()');
+    }
     return {
       display: this,
-      renderer: this.renderer!,
+      renderer: this.renderer,
 
       width: this.width,
       height: this.height,
@@ -720,12 +808,40 @@ export class Display {
 
   readonly onRenderFrame = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayRenderFrame, listener);
   readonly onNextFrame = (listener: DisplayEventListener): UnsubscribeFunc => once(this, OnDisplayRenderFrame, listener);
-  readonly nextFrame = (): Promise<DisplayEventProps> => onceAsync<DisplayEventProps>(this, OnDisplayRenderFrame);
+
+  /**
+   * Resolves with the props of the next rendered frame.
+   *
+   * Rejects after {@link Display.dispose}, and a promise still pending when
+   * `dispose()` runs is rejected as well — no frame is ever going to follow it.
+   */
+  readonly nextFrame = (): Promise<DisplayEventProps> =>
+    new Promise<DisplayEventProps>((resolve, reject) => {
+      if (this.#disposed) {
+        reject(disposedError('nextFrame()'));
+        return;
+      }
+      // dispose() emits before it drops its listeners, so this is the last moment
+      // at which a caller waiting for a frame that will never come can be told
+      const unsubscribeDispose = once(this, OnDisplayDispose, () => {
+        reject(disposedError('nextFrame()'));
+      });
+      once(this, OnDisplayRenderFrame, (props: DisplayEventProps) => {
+        unsubscribeDispose();
+        resolve(props);
+      });
+    });
 
   readonly onInit = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayInit, listener);
   readonly onStart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayStart, listener);
   readonly onRestart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayRestart, listener);
   readonly onPause = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayPause, listener);
 
+  /**
+   * Subscribes `listener` to the one `OnDisplayDispose` event this display emits.
+   *
+   * A listener attached after {@link Display.dispose} is never called: the event has
+   * already gone out, and it is not replayed.
+   */
   readonly onDispose = (listener: DisplayEventListener<Display>): UnsubscribeFunc => once(this, OnDisplayDispose, listener);
 }

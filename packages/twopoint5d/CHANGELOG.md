@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
 - export 31 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes`, `FrameBasedAnimationsTimingData` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
+- add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
+- add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
 
 ### Changed
 
@@ -52,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedSprites#dispose()` releases neither the geometry nor the material: this mesh builds neither of them, both are handed to its constructor and stay the caller's. It takes itself out of the scene graph and gives both slots up
 - `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
+- a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` are `false` because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 
 ### Removed
 
@@ -75,8 +78,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 - fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds an empty object from construction on, the shape `ParallaxProjection` starts from as well
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
+- fix `Display#canvas` after `dispose()`: it answers with `Display#canvas is not available: this display has been disposed` instead of a `TypeError` about a property of `undefined`
+- fix `Display#nextFrame()`: a promise still pending when `dispose()` runs is rejected, instead of waiting for a frame that is never rendered again
 
 ### Migration Guide
+
+#### A disposed display refuses to be used
+
+`Display#canvas`, `#start()` and `#getEventProps()` throw once `dispose()` has run, and
+`#nextFrame()` is rejected — both a call made afterwards and a promise that was still open when
+`dispose()` ran. `#resize()`, `#renderFrame()`, `#stop()`, a write to `#pause` and a further
+`#dispose()` do nothing. `#pause` is the one of them with a getter, and it keeps reading the state
+the display was left in: a display disposed while it was running answers `true` however it is
+written. Use `Display#isDisposed` where a display may already be gone.
+
+The case that slips through without a compile error is an awaited `nextFrame()` next to a
+`dispose()` from another path: that `await` needs a `catch` around it.
+
+**Before**
+
+```ts
+async function renderLoop(display: Display) {
+  while (true) {
+    const {now} = await display.nextFrame(); // hangs once someone disposes the display
+    drawSomething(now);
+  }
+}
+```
+
+**After**
+
+```ts
+async function renderLoop(display: Display) {
+  try {
+    while (true) {
+      const {now} = await display.nextFrame();
+      drawSomething(now);
+    }
+  } catch {
+    // the display is gone — leave the loop
+  }
+}
+```
 
 #### Geometry, material and texture handed in stay the caller's to dispose
 

@@ -103,7 +103,9 @@ which one is decided by its type:
 2. **A member whose type claims presence throws.** If the declared type is `T`, do
    not hand back `undefined` and lie about the type. Throw an `Error` that names the
    class and the state, so the stack points at the real mistake — using an instance
-   after it was released.
+   after it was released. [`Display#canvas`](../src/display/Display.ts) is typed
+   `HTMLCanvasElement`, and a read after `dispose()` raises
+   `Display#canvas is not available: this display has been disposed`.
 3. **A mutating method with nothing left to act on is a silent no-op.**
    [`TexturedSprites#freeSprite()`](../src/sprites/TexturedSprites/TexturedSprites.ts)
    returns a sprite to a pool that no longer exists, and simply does nothing.
@@ -158,8 +160,13 @@ reaches nobody. [`Display.dispose()`](../src/display/Display.ts):
 
 ```ts
 dispose(): void {
+  if (this.#disposed) return;
+  this.#disposed = true;
+
   this.stop();
   this.frameLoop.stop(this);
+  // the listeners are still attached here: this event is what tells them to let go,
+  // and off(this) below is what makes it the last event this display ever emits
   emit(this, OnDisplayDispose, this);
   off(this);
   this.renderer?.dispose();

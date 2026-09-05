@@ -11,7 +11,8 @@ const OnFrame = Symbol.for('onFrame');
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 const MEASURE_COLLECTION_SIZE = 10;
 
-const rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
+// `let`, because a WeakMap cannot be emptied — only replaced. See FrameLoop.resetRAF().
+let rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
 let rafUniqueInstance: RAF | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -116,6 +117,33 @@ export interface FrameLoop extends EventizedObject {}
 
 export class FrameLoop {
   static OnFrame = OnFrame;
+
+  /**
+   * Drops the rAF drivers that every `FrameLoop` of this module shares, so the next
+   * `FrameLoop` builds a fresh one.
+   *
+   * This is a testing aid. A test file that constructs several loops in one worker
+   * otherwise inherits the frame counter and the fps measurement of the previous case;
+   * after this call every case starts at frame zero with an unmeasured fps.
+   *
+   * A `FrameLoop` that is still running keeps pointing at its old driver: on the
+   * renderer-less driver it stops receiving frames, because that one is stopped here;
+   * on a renderer-bound driver it goes on ticking until the next `FrameLoop` built on that
+   * renderer takes its frames away without a sound. Either way this belongs in a
+   * teardown hook, next to nothing that is still alive.
+   *
+   * The drivers bound to a renderer are not stopped here: they live in a `WeakMap`,
+   * which cannot be walked. They also need no stopping, because `Renderer.dispose()`
+   * of three.js ends with `setAnimationLoop(null)`.
+   *
+   * The call is safe in any environment, `requestAnimationFrame` or not: without it
+   * no renderer-less driver can ever have been built.
+   */
+  static resetRAF(): void {
+    rafUniqueInstance?.stop();
+    rafUniqueInstance = null;
+    rafUniqueInstances = new WeakMap();
+  }
 
   #maxFps = 0;
   #subscribers = new Set<object>();
