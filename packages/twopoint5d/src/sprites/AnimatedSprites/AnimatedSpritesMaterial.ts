@@ -92,8 +92,11 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
    * an event, so a texture assigned before it finished loading needs this call once it has.
    *
    * A silent no-op on a disposed material. On a live material without an animsMap it is not:
-   * the call rebuilds the neutral texture coordinates and sets `needsUpdate`, which costs a
-   * shader recompile. Call it when a texture has loaded, not once per frame.
+   * the call rebuilds the neutral texture coordinates and sets `needsUpdate`, which can make
+   * three.js drop the render object and generate the shader source for it again on the next
+   * frame. That source comes out unchanged, so the shader program and the render pipeline
+   * come back out of the renderer's caches and nothing is compiled. Call it when a texture
+   * has loaded, not once per frame.
    */
   touchAnimsMap(): void {
     this.#animsMap.touch();
