@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
 - export 31 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes`, `FrameBasedAnimationsTimingData` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
 - add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
+- add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
 
 ### Changed
@@ -55,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` are `false` because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
+- `TextureResource#dispose()` releases the texture the resource built for itself, and `texture` answers `undefined` afterwards. A texture assigned through the `texture` setter belongs to the caller and is left alone; every other member keeps its last value. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller
 
 ### Removed
 
@@ -80,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 - fix `Display#canvas` after `dispose()`: it answers with `Display#canvas is not available: this display has been disposed` instead of a `TypeError` about a property of `undefined`
 - fix `Display#nextFrame()`: a promise still pending when `dispose()` runs is rejected, instead of waiting for a frame that is never rendered again
+- fix `TextureStore#get()`, `#whenReady()` and `#whenResource()`: a promise still pending when `dispose()` runs is rejected with an error naming the class and the state, instead of waiting for an event that never comes again. A call on a store that is already disposed is rejected right away
+- fix `TextureStore#get()` for a value that is already there when it is called: it resolves with that value, instead of leaving the promise pending for good and reporting a `ReferenceError` through `console.warn`
+- fix the moment a `TextureResource` releases a texture it replaces: the successor is published on the `texture` signal first, and only then does the predecessor fall. No subscriber of the `texture` event, and no read of `TextureResource#texture`, ever reaches a texture that is already disposed
+- fix the clean-up chain of `TextureResource#load()`: every effect it registers is attached to the resource and torn down with it, so `load()` adds no listener of its own to the resource
 
 ### Migration Guide
 
@@ -119,6 +127,68 @@ async function renderLoop(display: Display) {
     // the display is gone — leave the loop
   }
 }
+```
+
+#### A disposed texture store rejects what its callers are still awaiting
+
+`TextureStore#get()`, `#whenReady()` and `#whenResource()` reject once `dispose()` has run —
+both a call made afterwards and a promise that was still open when `dispose()` ran. The case
+that slips through without a compile error is a `get()` whose result nobody guards.
+
+**Before**
+
+```ts
+const store = new TextureStore(renderer);
+store.parse(data);
+
+store.get('hero', 'texture').then((texture) => {
+  material.map = texture; // never runs once the store is gone, and nothing says why
+});
+
+store.dispose();
+```
+
+**After**
+
+```ts
+const store = new TextureStore(renderer);
+store.parse(data);
+
+store.get('hero', 'texture')
+  .then((texture) => {
+    material.map = texture;
+  })
+  .catch(() => {
+    // the store is gone — nothing left to wait for
+  });
+
+store.dispose();
+```
+
+#### `TextureStore#get()` gives up on an id the data does not name
+
+An id that is still missing after the first `parse()` is rejected instead of waiting for a
+second one. Code that relied on the wait has to subscribe rather than ask.
+
+**Before**
+
+```ts
+const texture = store.get('hero', 'texture'); // waits for whichever parse() brings 'hero'
+
+store.parse(baseData);
+store.parse(extraData); // 'hero' arrives here
+```
+
+**After**
+
+```ts
+// a subscription still waits for a later parse()
+const unsubscribe = store.on('hero', 'texture', (texture) => {
+  material.map = texture;
+});
+
+store.parse(baseData);
+store.parse(extraData);
 ```
 
 #### Geometry, material and texture handed in stay the caller's to dispose

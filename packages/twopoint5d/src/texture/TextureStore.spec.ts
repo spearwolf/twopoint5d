@@ -109,6 +109,55 @@ describe('TextureStore', () => {
       expect(() => resource.dispose()).not.toThrow();
       expect(() => resource.dispose()).not.toThrow();
     });
+
+    test('a second dispose() does not emit the dispose event again', () => {
+      const store = new TextureStore();
+      store.dispose();
+
+      const disposeAgain = vi.fn();
+      on(store, TextureStoreEvents.Dispose, disposeAgain);
+
+      expect(() => store.dispose()).not.toThrow();
+      expect(disposeAgain).not.toHaveBeenCalled();
+    });
+
+    test('does NOT dispose a renderer that was handed to the constructor', () => {
+      const rendererDispose = vi.fn();
+      const renderer = {getMaxAnisotropy: () => 16, dispose: rendererDispose};
+
+      const store = new TextureStore(renderer as never);
+      store.dispose();
+
+      expect(rendererDispose).not.toHaveBeenCalled();
+    });
+
+    test('rejects a get() promise that is still pending', async () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      const pending = store.get('a', 'texture');
+      store.dispose();
+
+      await expect(pending).rejects.toThrow(/this store has been disposed/);
+    });
+
+    test('rejects a whenReady() promise that is still pending', async () => {
+      const store = new TextureStore();
+
+      const pending = store.whenReady();
+      store.dispose();
+
+      await expect(pending).rejects.toThrow(/this store has been disposed/);
+    });
+
+    test('rejects a whenResource() promise that is still pending', async () => {
+      const store = new TextureStore();
+
+      const pending = store.whenResource('a');
+      store.dispose();
+
+      await expect(pending).rejects.toThrow(/this store has been disposed/);
+    });
   });
 
   describe('defaultTextureClasses as signal (§4.6)', () => {
@@ -248,9 +297,9 @@ describe('TextureStore', () => {
       ac.abort();
       const pAborted = store.get('a', ['texture', 'imageCoords'], {signal: ac.signal});
       await expect(pAborted).rejects.toThrow();
-      // p never resolves in this test (no image loader); intentionally leave dangling.
-      void p;
+      // no image loader runs here, so `p` is still pending when the store goes away
       store.dispose();
+      await expect(p).rejects.toThrow(/this store has been disposed/);
     });
   });
 
@@ -344,6 +393,57 @@ describe('TextureStore', () => {
       ac.abort();
       await expect(p).rejects.toThrow(/aborted/i);
     });
+
+    test('get() rejects once the first parse() has gone by without the id', async () => {
+      const store = new TextureStore();
+      const pending = store.get('missing', 'texture');
+
+      store.parse({defaultTextureClasses: [], items: {other: {imageUrl: 'o.png'}}});
+
+      await expect(pending).rejects.toThrow(/No resource with id "missing"/);
+
+      store.dispose();
+    });
+
+    test('get() on an already disposed store is rejected', async () => {
+      const store = new TextureStore();
+      store.dispose();
+
+      await expect(store.get('a', 'texture')).rejects.toThrow(/this store has been disposed/);
+    });
+
+    test('get() resolves when the value is already there at call time', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 4, height: 4, tag: 'ready'}) as unknown as HTMLImageElement);
+
+      const factory = {
+        create(image: {tag: string}) {
+          return {tag: image.tag, name: '', dispose() {}};
+        },
+      };
+
+      try {
+        const store = new TextureStore();
+        store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+        // warm the resource up — this is what puts a value on the retained texture event,
+        // so that the get() below is answered from within its own subscription call
+        const warm = store.on('a', 'texture', () => {});
+        store.onResource('a', (resource) => {
+          resource.textureFactory = factory as never;
+        });
+        await flushMicrotasks();
+
+        const texture = await store.get('a', 'texture');
+        expect((texture as unknown as {tag: string}).tag).toBe('ready');
+
+        warm();
+        store.dispose();
+      } finally {
+        loadSpy.mockRestore();
+      }
+    });
   });
 
   describe('clearUnused()', () => {
@@ -420,6 +520,95 @@ describe('TextureStore', () => {
 
       expect(getSubscriptionCount(store)).toBe(base);
     });
+
+    test('a get() that was aborted leaves no listener behind', async () => {
+      const store = new TextureStore();
+      const base = getSubscriptionCount(store);
+
+      const ac = new AbortController();
+      const aborted = store.get('a', 'texture', {signal: ac.signal});
+      ac.abort();
+
+      await expect(aborted).rejects.toThrow(/aborted/i);
+      expect(getSubscriptionCount(store)).toBe(base);
+
+      store.dispose();
+    });
+
+    test('a get() that gave up on a missing id leaves no listener behind', async () => {
+      const store = new TextureStore();
+      const base = getSubscriptionCount(store);
+
+      const missing = store.get('missing', 'texture');
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      await expect(missing).rejects.toThrow(/No resource with id "missing"/);
+      expect(getSubscriptionCount(store)).toBe(base);
+
+      store.dispose();
+    });
+
+    test('a get() that resolved leaves no listener behind', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 2, height: 2}) as unknown as HTMLImageElement);
+
+      try {
+        const store = new TextureStore();
+        const base = getSubscriptionCount(store);
+        store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+        store.onResource('a', (resource) => {
+          resource.textureFactory = {create: () => ({name: '', dispose() {}})} as never;
+        });
+
+        const value = await store.get('a', 'texture');
+
+        expect(value).toBeDefined();
+        expect(getSubscriptionCount(store)).toBe(base);
+
+        store.dispose();
+      } finally {
+        loadSpy.mockRestore();
+      }
+    });
+
+    test('a get() answered synchronously installs no abort listener on the caller signal', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 2, height: 2}) as unknown as HTMLImageElement);
+
+      try {
+        const store = new TextureStore();
+        store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+        // warm the resource up, so that the get() below is answered from within its own
+        // subscription call and never reaches a state in which an abort could still matter
+        const warm = store.on('a', 'texture', () => {});
+        store.onResource('a', (resource) => {
+          resource.textureFactory = {create: () => ({name: '', dispose() {}})} as never;
+        });
+        await flushMicrotasks();
+
+        const ac = new AbortController();
+        const addEventListener = vi.spyOn(ac.signal, 'addEventListener');
+
+        const value = await store.get('a', 'texture', {signal: ac.signal});
+
+        expect(value).toBeDefined();
+        expect(addEventListener.mock.calls.filter(([type]) => type === 'abort')).toEqual([]);
+
+        warm();
+        store.dispose();
+      } finally {
+        loadSpy.mockRestore();
+      }
+    });
+
+    // The fourth exit — the store being disposed under a pending get() — is deliberately
+    // not measured here. dispose() ends with off(this), which drops every listener of the
+    // store whether or not the promise cleaned up after itself, so a count taken around it
+    // says nothing about this teardown. The exit itself is covered by "rejects a get()
+    // promise that is still pending" in the dispose() block.
   });
 
   describe('parse() update path', () => {
@@ -488,6 +677,49 @@ describe('TextureStore', () => {
       store.parse(updated);
 
       expect(resource?.frameBasedAnimationsData).toEqual({jump: {duration: 0.3, frameNameQuery: 'jump.*'}});
+    });
+
+    test('parse({evictMissing: true}) disposes and removes resources the new data no longer names', () => {
+      const store = new TextureStore();
+      store.parse({
+        defaultTextureClasses: [],
+        items: {keep: {imageUrl: 'keep.png'}, drop: {imageUrl: 'drop.png'}, held: {imageUrl: 'held.png'}},
+      });
+
+      // a subscribed resource keeps its refCount above zero and therefore stays
+      const unsubHeld = store.on('held', 'imageCoords', () => {});
+
+      const resources: Record<string, TextureResource> = {};
+      for (const id of ['keep', 'drop', 'held']) {
+        store.onResource(id, (resource) => {
+          resources[id] = resource;
+        });
+      }
+
+      const dropDisposed = vi.fn();
+      on(resources['drop']!, 'dispose', dropDisposed);
+      const heldDisposed = vi.fn();
+      on(resources['held']!, 'dispose', heldDisposed);
+
+      store.parse({defaultTextureClasses: [], items: {keep: {imageUrl: 'keep.png'}}}, {evictMissing: true});
+
+      expect(dropDisposed).toHaveBeenCalledTimes(1);
+      expect(heldDisposed).not.toHaveBeenCalled();
+
+      let dropSeen: TextureResource | undefined;
+      store.onResource('drop', (resource) => {
+        dropSeen = resource;
+      });
+      expect(dropSeen).toBeUndefined();
+
+      let keepSeen: TextureResource | undefined;
+      store.onResource('keep', (resource) => {
+        keepSeen = resource;
+      });
+      expect(keepSeen).toBe(resources['keep']);
+
+      unsubHeld();
+      store.dispose();
     });
 
     test('TextureResource.fromAtlas accepts initial frameBasedAnimations data', () => {

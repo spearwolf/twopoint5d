@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, off, on, once, onceAsync, retain} from '@spearwolf/eventize';
+import {emit, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import type {Texture, WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -75,6 +75,14 @@ const joinTextureClasses = (...classes: Array<TextureOptionClasses[] | undefined
   return undefined;
 };
 
+// one message for a missing id, shared by every method that gives up on one, so the two
+// ways of asking for a resource cannot drift apart in what they say
+const noResourceError = (id: string): Error =>
+  new Error(`[TextureStore] No resource with id "${id}" — check your TextureStoreData.items keys.`);
+
+// one message for every promise that is cut short, naming the class and the state
+const disposedError = (what: string): Error => new Error(`[TextureStore] ${what} was cancelled: this store has been disposed`);
+
 const cmpDefaultClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -82,6 +90,22 @@ const cmpDefaultClasses = (a: TextureOptionClasses[] | undefined, b: TextureOpti
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 };
+
+export interface TextureStoreParseOptions {
+  /**
+   * Dispose and remove every resource that the parsed data no longer names and whose
+   * `refCount` is 0.
+   *
+   * `refCount` counts the live {@link TextureStore.on} subscriptions of a resource. A
+   * value fetched through {@link TextureStore.get} does not raise it: that promise gives
+   * its subscription up as it settles, so a texture sitting in a material counts for
+   * nothing here. A caller who wants to keep such a value keeps a subscription as well.
+   *
+   * Defaults to `false`, which keeps every resource until
+   * {@link TextureStore.clearUnused} is called.
+   */
+  evictMissing?: boolean;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureStore extends EventizedObject {}
@@ -125,6 +149,8 @@ export class TextureStore {
 
   #resources = new Map<string, TextureResource>();
 
+  #disposed = false;
+
   constructor(renderer?: WebGPURenderer) {
     retain(this, [OnReady, OnRendererChanged]);
 
@@ -153,8 +179,14 @@ export class TextureStore {
     });
   }
 
+  /**
+   * Resolve once this store has parsed its data for the first time.
+   *
+   * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
+   * call on a store that is already disposed is rejected right away.
+   */
   async whenReady(): Promise<TextureStore> {
-    await onceAsync(this, OnReady);
+    await this.#whenReady('whenReady()');
     return this;
   }
 
@@ -163,19 +195,47 @@ export class TextureStore {
    * the first `parse()` call). Rejects if the store has fired `OnReady` and the
    * id is still not present — useful to surface configuration mistakes instead
    * of hanging promises.
+   *
+   * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
+   * call on a store that is already disposed is rejected right away.
    */
   async whenResource(id: string): Promise<TextureResource> {
     const existing = this.#resources.get(id);
     if (existing) return existing;
-    await onceAsync(this, OnReady);
+    await this.#whenReady(`whenResource(${id})`);
     const resource = this.#resources.get(id);
     if (!resource) {
-      throw new Error(`[TextureStore] No resource with id "${id}" — check your TextureStoreData.items keys.`);
+      throw noResourceError(id);
     }
     return resource;
   }
 
-  load(url: string | URL) {
+  #whenReady(what: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (this.#disposed) {
+        reject(disposedError(what));
+        return;
+      }
+      // dispose() emits before it drops its listeners, so this is the last moment at
+      // which a caller waiting for a store that will never be ready can be told
+      const unsubscribeDispose = once(this, OnDispose, () => {
+        reject(disposedError(what));
+      });
+      once(this, OnReady, () => {
+        unsubscribeDispose();
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Fetch texture store data from `url` and hand it to {@link TextureStore.parse}.
+   *
+   * With `{evictMissing: true}` the parse step also disposes and removes every resource
+   * the new data no longer names and whose `refCount` is 0 — see
+   * {@link TextureStoreParseOptions.evictMissing} for what that count covers.
+   */
+  load(url: string | URL, options?: TextureStoreParseOptions) {
     void (async () => {
       let response: Response;
       try {
@@ -192,7 +252,7 @@ export class TextureStore {
         return;
       }
       try {
-        this.parse(data);
+        this.parse(data, options);
       } catch (error) {
         emit(this, OnError, {source: 'parse', url, error});
       }
@@ -205,8 +265,14 @@ export class TextureStore {
    *
    * This method can be called multiple times. Resources that were previously loaded
    * and now receive new specifications will be updated accordingly.
+   *
+   * With `{evictMissing: true}` every resource this data no longer names and whose
+   * `refCount` is 0 is disposed and removed — the same criterion
+   * {@link TextureStore.clearUnused} applies, narrowed to the resources that fell out
+   * of the data. See {@link TextureStoreParseOptions.evictMissing} for what that count
+   * covers, and what it does not.
    */
-  parse(data: TextureStoreData) {
+  parse(data: TextureStoreData, options?: TextureStoreParseOptions) {
     if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
       this.defaultTextureClasses = data.defaultTextureClasses.slice();
     }
@@ -286,6 +352,18 @@ export class TextureStore {
     updatedResources.forEach((resource) => {
       emit(this, `${OnResource}:${resource.id}`, resource);
     });
+
+    if (options?.evictMissing) {
+      // the set comes from the resources this run touched, not from the data keys: an item
+      // that matches none of the three shapes builds no resource, yet leaves an existing one
+      // in place — and that one is in `updatedResources`
+      const keep = new Set(updatedResources.map((resource) => resource.id));
+      for (const [id, resource] of this.#resources) {
+        if (keep.has(id) || resource.refCount > 0) continue;
+        resource.dispose();
+        this.#resources.delete(id);
+      }
+    }
   }
 
   on<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
@@ -365,6 +443,15 @@ export class TextureStore {
     return unsubscribe;
   }
 
+  /**
+   * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
+   * resource `id` has them.
+   *
+   * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
+   * call on a store that is already disposed is rejected right away. An id that is
+   * still missing once the first `parse()` has gone by is rejected with the same error
+   * {@link TextureStore.whenResource} throws, instead of waiting for a later `parse()`.
+   */
   get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
@@ -372,20 +459,72 @@ export class TextureStore {
   ): Promise<MapSubTypes<T>> {
     const signal = options?.signal;
     return new Promise((resolve, reject) => {
+      if (this.#disposed) {
+        reject(disposedError(`get(${id}, ${String(type)})`));
+        return;
+      }
       if (signal?.aborted) {
         reject(new DOMException('get() aborted before subscription', 'AbortError'));
         return;
       }
-      const unsubscribe = this.on(id, type, (value) => {
-        if (signal) signal.removeEventListener('abort', onAbort);
-        unsubscribe();
-        resolve(value);
-      });
+
+      const teardown: Array<() => void> = [];
+      let settled = false;
+
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener('abort', onAbort);
+        for (const unsubscribe of teardown) unsubscribe();
+        teardown.length = 0;
+      };
+
+      // every listener this promise installs goes through here: on() can deliver a retained
+      // value synchronously, before it has even returned its unsubscribe function, so a
+      // subscription registered into an already settled promise is dropped instead of left
+      const track = (unsubscribe: () => void) => {
+        if (settled) {
+          unsubscribe();
+        } else {
+          teardown.push(unsubscribe);
+        }
+      };
+
       const onAbort = () => {
-        unsubscribe();
+        settle();
         reject(new DOMException(`get(${id}, ${String(type)}) aborted`, 'AbortError'));
       };
-      signal?.addEventListener('abort', onAbort, {once: true});
+
+      track(
+        this.on(id, type, (value) => {
+          settle();
+          resolve(value);
+        }),
+      );
+
+      track(
+        once(this, OnDispose, () => {
+          settle();
+          reject(disposedError(`get(${id}, ${String(type)})`));
+        }),
+      );
+
+      // on() keeps waiting for a later parse(); get() answers like whenResource() and gives
+      // up once the first ready has gone by without the id showing up
+      track(
+        once(this, OnReady, () => {
+          if (this.#resources.has(id)) return;
+          settle();
+          reject(noResourceError(id));
+        }),
+      );
+
+      // the promise may already have settled synchronously; a listener installed now would sit
+      // on the caller's signal until that signal aborts — one per such get() on a long-lived
+      // AbortController
+      if (!settled) {
+        signal?.addEventListener('abort', onAbort, {once: true});
+      }
     });
   }
 
@@ -405,7 +544,18 @@ export class TextureStore {
     return removed;
   }
 
+  /**
+   * Release this store and every resource it holds.
+   *
+   * Every promise handed out by {@link TextureStore.get},
+   * {@link TextureStore.whenReady} and {@link TextureStore.whenResource} that is still
+   * pending is rejected. The renderer belongs to whoever handed it in and is not
+   * disposed. A second call does nothing.
+   */
   dispose() {
+    if (this.#disposed) return;
+    this.#disposed = true;
+
     emit(this, OnDispose);
 
     for (const resource of this.#resources.values()) {

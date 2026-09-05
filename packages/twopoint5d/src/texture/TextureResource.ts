@@ -1,5 +1,5 @@
-import {emit, type EventizedObject, eventize, off, once, retain} from '@spearwolf/eventize';
-import type {Effect, Signal} from '@spearwolf/signalize';
+import {emit, type EventizedObject, eventize, off, retain} from '@spearwolf/eventize';
+import type {Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
@@ -285,10 +285,20 @@ export class TextureResource {
     this.#textureFactory.set(value);
   }
 
+  /**
+   * The texture of this resource, or `undefined` while none has been built or assigned.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
+   */
   get texture(): Texture | undefined {
     return this.#texture.value;
   }
 
+  /**
+   * A texture assigned here belongs to the caller: this resource publishes it, but never
+   * releases it — neither when the next texture replaces it nor in
+   * {@link TextureResource.dispose}.
+   */
   set texture(value: Texture | undefined) {
     this.#texture.set(value);
   }
@@ -300,6 +310,10 @@ export class TextureResource {
   set renderer(value: WebGPURenderer | undefined) {
     this.#renderer.set(value);
   }
+
+  // the texture this resource built for itself and therefore owns; a texture assigned
+  // through the public setter never lands here and is never released by this class
+  #ownTexture?: Texture;
 
   #load = false;
   #disposed = false;
@@ -313,10 +327,33 @@ export class TextureResource {
     retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture', 'frameBasedAnimations']);
   }
 
+  /**
+   * Release this resource.
+   *
+   * Disposes the texture this resource built for itself. A texture that came in through
+   * the {@link TextureResource.texture} setter belongs to the caller and is left alone,
+   * as are the atlas, the tile set and the texture factory.
+   *
+   * Afterwards {@link TextureResource.texture} answers `undefined`; every other member
+   * keeps the last value it had. A second call does nothing.
+   */
   dispose() {
     if (this.#disposed) return;
     this.#disposed = true;
+
     emit(this, OnDispose);
+
+    // the dispose event above is how subscribers learn this resource is gone; muting
+    // keeps the clean-up below from following it with a texture update that would hand
+    // a subscriber an undefined where the event type promises a Texture
+    this.#texture.muted = true;
+    this.#texture.set(undefined);
+
+    // released only after the signal has given it up, so no reader can ever reach a
+    // texture that is already freed
+    this.#ownTexture?.dispose();
+    this.#ownTexture = undefined;
+
     SignalGroup.delete(this);
     off(this);
   }
@@ -325,6 +362,8 @@ export class TextureResource {
     if (!this.#load) {
       this.#load = true;
 
+      // these bridges end with the signals they read: the signals are attached to this
+      // resource, and SignalGroup.delete(this) in dispose() destroys them
       this.#imageCoords.onChange((value) => {
         emit(this, 'imageCoords', value);
       });
@@ -345,19 +384,13 @@ export class TextureResource {
         emit(this, 'texture', value);
       });
 
-      const unsubscribeOnDispose = (effect: Effect) => {
-        once(this, OnDispose, () => {
-          effect.destroy();
-        });
-      };
-
       // auto-tracking effect (no static deps) so it autoruns at registration
       // — load() is typically called AFTER `textureFactory` and `imageUrl` are
       // already set on the resource (by the store's parse-time injection), and
       // a static-dep effect would otherwise never fire because no dep changes
       // post-registration.
-      unsubscribeOnDispose(
-        createEffect(() => {
+      createEffect(
+        () => {
           const factory = this.#textureFactory.get();
           const url = this.#imageUrl.get();
           const classes = this.#textureClasses.get();
@@ -376,6 +409,11 @@ export class TextureResource {
                 this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
                 this.texture = texture;
               });
+              // the predecessor stayed alive while it was still the published value; now that
+              // the successor is on the signal, no reader can reach the old one any more
+              const previous = this.#ownTexture;
+              this.#ownTexture = texture;
+              previous?.dispose();
             })
             .catch((error) => {
               if (aborted) return;
@@ -383,10 +421,13 @@ export class TextureResource {
             });
 
           return () => {
+            // a texture that reached the signal outlives this run and is released by the run
+            // that replaces it, or by dispose() — freeing it here would leave the signal
+            // pointing at a texture that is already gone
             aborted = true;
-            texture?.dispose();
           };
-        }),
+        },
+        {attach: this},
       );
 
       if (this.tileSetOptions) {
@@ -394,17 +435,19 @@ export class TextureResource {
         const tileSetOptionsSignal = this.#tileSetOptions!;
         const tileSetSignal = this.#tileSet!;
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             if (this.imageCoords && this.tileSetOptions) {
               this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
               this.atlas = this.tileSet.atlas;
             }
-          }, [this.#imageCoords, tileSetOptionsSignal]),
+          },
+          [this.#imageCoords, tileSetOptionsSignal],
+          {attach: this},
         );
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             if (this.tileSet && this.frameBasedAnimationsData) {
               this.frameBasedAnimations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
@@ -417,7 +460,9 @@ export class TextureResource {
                 }
               }
             }
-          }, [tileSetSignal, this.#frameBasedAnimationsData]),
+          },
+          [tileSetSignal, this.#frameBasedAnimationsData],
+          {attach: this},
         );
       }
 
@@ -428,8 +473,8 @@ export class TextureResource {
         const overrideImageUrlSignal = this.#overrideImageUrl!;
         const atlasSignal = this.#atlas!;
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             const atlasUrl = this.atlasUrl;
             if (!atlasUrl) return;
             const ac = new AbortController();
@@ -449,28 +494,34 @@ export class TextureResource {
               aborted = true;
               ac.abort();
             };
-          }, [atlasUrlSignal]),
+          },
+          [atlasUrlSignal],
+          {attach: this},
         );
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             if (this.atlasJson) {
               this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
             }
-          }, [atlasJsonSignal, overrideImageUrlSignal]),
+          },
+          [atlasJsonSignal, overrideImageUrlSignal],
+          {attach: this},
         );
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             if (this.atlasJson && this.imageCoords) {
               const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
               this.atlas = atlas;
             }
-          }, [atlasJsonSignal, this.#imageCoords]),
+          },
+          [atlasJsonSignal, this.#imageCoords],
+          {attach: this},
         );
 
-        unsubscribeOnDispose(
-          createEffect(() => {
+        createEffect(
+          () => {
             if (this.atlas && this.frameBasedAnimationsData) {
               this.frameBasedAnimations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
@@ -480,7 +531,9 @@ export class TextureResource {
                 }
               }
             }
-          }, [atlasSignal, this.#frameBasedAnimationsData]),
+          },
+          [atlasSignal, this.#frameBasedAnimationsData],
+          {attach: this},
         );
 
         touch(atlasUrlSignal);
@@ -490,13 +543,14 @@ export class TextureResource {
       // (i.e. without going through a `TextureStore`), spin up a per-resource
       // `TextureFactory`. When the resource is managed by a store, the store
       // injects its shared factory and this branch never fires.
-      unsubscribeOnDispose(
-        createEffect(() => {
+      createEffect(
+        () => {
           const renderer = this.#renderer.get();
           if (renderer && !this.#textureFactory.value) {
             this.textureFactory = new TextureFactory(renderer);
           }
-        }),
+        },
+        {attach: this},
       );
     }
     return this;
