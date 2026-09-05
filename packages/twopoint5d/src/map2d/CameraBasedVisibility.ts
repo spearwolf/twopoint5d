@@ -108,6 +108,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   // Pool of TileBox slots keyed by `${x},${y}`. Each slot owns its Box3/Vector3/Map2DTileCoords
   // shells so subsequent frames can mutate them in place instead of allocating new ones.
+  // It holds the tiles of the last recomputation that found the map plane, and no others: a frame
+  // in which the camera looks past the plane computes no tiles and leaves the pool as it stands.
   readonly #tileBoxPool = new Map<string, TileBox>();
 
   // Snapshot of the tile-grid parameters that drive `tile.coords`. When any of these change
@@ -344,6 +346,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
             this.#nextStack.push(this.acquireTileBox(tx, ty, false));
           }
         }
+      }
+    }
+
+    // The pool exists to let the next frame mutate the same shells instead of allocating
+    // new ones — that pays off only for a slot the next frame comes back to. A slot that
+    // was not visited this time keeps a Box3, a Vector3 and a Map2DTileCoords alive for a
+    // tile the camera has left behind, so it goes. Both sets are keyed by `toBoxId()`.
+    for (const id of this.#tileBoxPool.keys()) {
+      if (!this.#visitedIds.has(id)) {
+        this.#tileBoxPool.delete(id);
       }
     }
 

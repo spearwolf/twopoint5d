@@ -24,10 +24,12 @@ export class TileSpritesMaterial extends NodeMaterial {
 
   #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
+  /** The color map texture — `undefined` once the material has been disposed. */
   get colorMap(): Texture | undefined {
     return this.#colorMap.get();
   }
 
+  /** Sets the color map texture. The texture stays the caller's; {@link dispose} does not release it. */
   set colorMap(value: Texture | undefined) {
     this.#colorMap.set(value);
   }
@@ -94,7 +96,17 @@ export class TileSpritesMaterial extends NodeMaterial {
     this.colorMap = options?.colorMap;
   }
 
+  /**
+   * Tears down the signals and effects of this material and gives up its optional member:
+   * {@link colorMap} answers `undefined` afterwards. The `colorMap` texture itself is handed in
+   * and belongs to the caller, so it is not released here. The node accessors keep their last
+   * node. A second call does nothing.
+   */
   override dispose() {
+    // the reference is given up while its signal is still live — a write after
+    // SignalGroup.delete() would land in a destroyed signal and notify nobody
+    this.#colorMap.set(undefined);
+
     SignalGroup.delete(this);
     super.dispose();
   }

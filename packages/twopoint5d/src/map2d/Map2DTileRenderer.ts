@@ -1,6 +1,5 @@
 import type {Vector3} from 'three/webgpu';
 import {Object3D} from 'three/webgpu';
-import {expectDefined} from '../utils/expectDefined.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './types.js';
 
 export class Map2DTileRenderer implements IMap2DTileRenderer {
@@ -13,16 +12,13 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
 
   /**
    * `null` once `dispose()` has run; the renderer is spent from then on. The constructor fills
-   * the field and `dispose()` is the only place that empties it again — that is what the reads
-   * in the per-tile methods below rest on, and they do not repeat this note.
+   * the field and `dispose()` is the only place that empties it again.
+   *
+   * Each of the six update-cycle methods — {@link beginUpdatingTiles}, {@link addTile},
+   * {@link reuseTile}, {@link removeTile}, {@link clearTiles} and {@link endUpdatingTiles} —
+   * does nothing while the field is `null`.
    */
   tileFactory: IMapTileFactory | null;
-
-  // The checked way to the factory, for the calls that happen once per update cycle rather than
-  // once per tile: a check per tile is measurable next to a map lookup and a position write.
-  get #factory(): IMapTileFactory {
-    return expectDefined(this.tileFactory, 'the tile factory of this renderer, which has been disposed');
-  }
 
   constructor(tileFactory: IMapTileFactory) {
     this.tileFactory = tileFactory;
@@ -31,11 +27,18 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   }
 
   beginUpdatingTiles(position: Vector3): void {
+    // this one never reaches the factory, but moving the node of a spent renderer is a
+    // mutation all the same
+    if (this.tileFactory === null) return;
+
     this.node.position.copy(position);
   }
 
   addTile(tileCoords: IMap2DTileCoords): void {
-    const tile = this.tileFactory!.createTile(tileCoords);
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
+    const tile = tileFactory.createTile(tileCoords);
     if (tile == null) return;
 
     this.#tiles.set(tileCoords.id, tile);
@@ -44,9 +47,12 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   }
 
   reuseTile(tileCoords: IMap2DTileCoords): void {
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
     const tile = this.#tiles.get(tileCoords.id);
     if (tile) {
-      this.tileFactory!.updateTile(tile, tileCoords);
+      tileFactory.updateTile(tile, tileCoords);
       ++this.#dataSerial;
     } else {
       this.addTile(tileCoords);
@@ -54,16 +60,21 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   }
 
   removeTile(tileCoords: IMap2DTileCoords): void {
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
     const tile = this.#tiles.get(tileCoords.id);
     if (tile) {
       this.#tiles.delete(tileCoords.id);
-      this.tileFactory!.destroyTile(tile);
+      tileFactory.destroyTile(tile);
       ++this.#dataSerial;
     }
   }
 
   clearTiles(): void {
-    const tileFactory = this.tileFactory!;
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
     for (const tile of this.#tiles.values()) {
       tileFactory.destroyTile(tile);
     }
@@ -72,13 +83,29 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   }
 
   endUpdatingTiles(): void {
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
     if (this.#updateDataSerial >= this.#dataSerial) return;
     this.#updateDataSerial = this.#dataSerial;
-    this.#factory.update();
+    tileFactory.update();
   }
 
+  /**
+   * Takes the tile factory content out of {@link node} and gives the factory up:
+   * {@link tileFactory} answers `null` afterwards.
+   *
+   * Releases nothing — the factory is handed to the constructor and belongs to the caller,
+   * and `IMapTileFactory` has no `dispose()` to call. The tiles this renderer holds are dropped
+   * without a `destroyTile()` for each of them, so whatever the factory set aside for a tile
+   * stays set aside. {@link node} keeps its `Object3D`; the factory has taken its content out of
+   * it. A second call does nothing.
+   */
   dispose(): void {
-    this.#factory.removeFromNode(this.node);
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
+    tileFactory.removeFromNode(this.node);
     this.tileFactory = null;
     this.#tiles.clear();
     this.#dataSerial = 0;

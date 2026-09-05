@@ -41,7 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a lookup whose result an invariant guarantees — an attribute descriptor, the claim on an attribute slot, the buffers of a pool attached under a name — throws an error naming what was missing when that invariant is broken, at the place that relies on it
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name
 - the `Map2D#visibilitor` getter is typed `IMap2DVisibilitor | undefined`: a map that has not been given a visibilitor answers with nothing. The setter still takes an `IMap2DVisibilitor`
-- `Map2DTileRenderer#tileFactory` is typed `IMapTileFactory | null` and holds `null` once `dispose()` has run. `endUpdatingTiles()` and `dispose()` answer a call on a disposed renderer with an error that names what is gone; `addTile()` and `reuseTile()` fail with a `TypeError` there, `removeTile()` and `clearTiles()` find no tiles left and stay silent — none of the four guards the field: for the three per-tile methods such a check would run on a path the tile streamer walks on every update, and `clearTiles()` only reaches the factory inside a loop over tiles that `dispose()` has already emptied
+- `Map2DTileRenderer#tileFactory` is typed `IMapTileFactory | null` and holds `null` once `dispose()` has run. The six update-cycle methods — `beginUpdatingTiles()`, `addTile()`, `reuseTile()`, `removeTile()`, `clearTiles()` and `endUpdatingTiles()` — do nothing on a disposed renderer and none of them throws; `beginUpdatingTiles()` leaves `node` where it stands. `dispose()` takes the factory content out of `node` and releases nothing else: the factory is handed to the constructor and stays the caller's. A second `dispose()` does nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `Map2D#dispose()` releases nothing — the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to the constructor all belong to the caller, and a renderer that should go is disposed by whoever created it. The map takes every renderer off itself and leaves the scene graph; every one of its members answers afterwards as it did before, and a second call does nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `TileSpritesMaterial#dispose()` gives up its `colorMap`, so it answers `undefined` afterwards; the texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - `CameraBasedVisibility#pointOnPlane` is typed `Vector3 | null | undefined`: `null` marks a plane the camera looks past, `undefined` a point that was never computed
 - change the return type of `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` to `number | undefined` — coordinates outside the chunk have no data id
 - `TextureResource.fromTileSet()` takes `imageUrl` as `string | undefined`, the type the resource stores it at. `TextureStore#parse()` hands the value of an item straight through, and that value is optional
@@ -89,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureStore#get()` for a value that is already there when it is called: it resolves with that value, instead of leaving the promise pending for good and reporting a `ReferenceError` through `console.warn`
 - fix the moment a `TextureResource` releases a texture it replaces: the successor is published on the `texture` signal first, and only then does the predecessor fall. No subscriber of the `texture` event, and no read of `TextureResource#texture`, ever reaches a texture that is already disposed
 - fix the clean-up chain of `TextureResource#load()`: every effect it registers is attached to the resource and torn down with it, so `load()` adds no listener of its own to the resource
+- fix the `TileBox` pool of `CameraBasedVisibility`: every recomputation that finds the map plane leaves it holding the tiles that run visited and no others, and a frame in which the camera looks past the plane leaves it as it stands. A camera travelling far no longer leaves a `Box3`, a `Vector3` and a `Map2DTileCoords` behind per tile it has passed, and a tile that stays visible keeps its pooled objects as before
 - fix the gpu buffer of an attribute that a second route pushed out of an attribute slot of an `InstancedVOBufferGeometry`: it stayed with the renderer with nothing left to reach it. three.js frees one attribute per name through the dispose event of the geometry — the one sitting in the slot at that moment — so the second route is refused instead
 
 ### Migration Guide
@@ -708,14 +711,11 @@ if (visibilitor == null) return; // none assigned yet
 
 #### `Map2DTileRenderer#tileFactory` is `null` after `dispose()`
 
-`dispose()` drops the factory, and the field names that with `| null`. `endUpdatingTiles()` and
-`dispose()` answer a call on a disposed renderer with an error that says the renderer is spent;
-`addTile()` and `reuseTile()` reach the field directly and fail with a `TypeError`, while
-`removeTile()` and `clearTiles()` find the tile map already empty and return without touching the
-factory. None of the four guards the field: for the three per-tile methods such a check would run
-on a path the tile streamer walks on every update, and `clearTiles()` only reaches the factory
-inside a loop over tiles that `dispose()` has already emptied. A renderer in use needs no guard — only code that reads
-`tileFactory` itself does.
+`dispose()` drops the factory, and the field names that with `| null`. The six update-cycle
+methods do nothing while it is `null`, so a renderer that is passed around after it was disposed
+raises nothing and changes nothing — a `try`/`catch` placed around such a call has nothing left to
+catch and can go. A renderer in use needs no guard; only code that reads `tileFactory` itself
+does.
 
 **Before**
 
@@ -728,6 +728,32 @@ const factory: IMapTileFactory = renderer.tileFactory;
 ```ts
 const factory = renderer.tileFactory;
 if (factory == null) return; // the renderer has been disposed
+```
+
+#### A disposed `Map2D` releases none of its tile renderers
+
+`Map2D#dispose()` takes every tile renderer off the map and off the scene graph, and releases
+none of them. A renderer is disposed by whoever created it. The case that slips through without a
+compile error is a caller that handed a renderer in and relied on the map to take it down.
+
+**Before**
+
+```ts
+const map2d = new Map2D();
+map2d.addTileRenderer(new Map2DTileRenderer(tileSpritesFactory));
+
+map2d.dispose(); // the renderer went down with the map
+```
+
+**After**
+
+```ts
+const map2d = new Map2D();
+const renderer = new Map2DTileRenderer(tileSpritesFactory);
+map2d.addTileRenderer(renderer);
+
+map2d.dispose();
+renderer.dispose(); // built by the caller, released by the caller
 ```
 
 #### `CameraBasedVisibility#pointOnPlane` can be `null`

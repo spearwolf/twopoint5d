@@ -126,10 +126,21 @@ export class Map2D extends Group {
     this.#tileStreamer.clearTiles();
   }
 
+  /**
+   * Takes every tile renderer off this map and leaves the scene graph.
+   *
+   * Releases nothing: the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to
+   * the constructor all belong to the caller, and whoever wants a renderer disposed disposes it.
+   * Every member answers afterwards as it did before — `tileStreamer` included — because nothing
+   * was given up. A second call does nothing.
+   */
   dispose(): void {
+    // this map is a scene-graph node itself: it goes before it lets its renderers go,
+    // so nothing reaches a half-emptied group in the next frame
+    this.removeFromParent();
+
     for (const renderer of this.#renderers) {
       this.removeTileRenderer(renderer);
-      renderer.dispose();
     }
   }
 }

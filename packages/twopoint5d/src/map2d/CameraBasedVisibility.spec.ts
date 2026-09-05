@@ -227,6 +227,37 @@ describe('CameraBasedVisibility', () => {
         expect(warmCenterWorlds.get(v.id), `centerWorld for ${v.id} is reused`).toBe(v.centerWorld);
       }
     });
+
+    test('drops the pooled TileBox of a tile that is no longer visited', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      // Warm-up frame around the origin.
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const warmBoxes = new Map(visibility.visibles.map((v) => [v.id, v]));
+      expect(warmBoxes.size).toBeGreaterThan(0);
+
+      // Drive the center point tens of tile widths away, so none of the warm-up tiles is
+      // visited any more — not even as a neighbour of a visible one.
+      const second = visibility.computeVisibleTiles(first.tiles, [4000, 0], tileCoords, matrixWorld)!;
+      const third = visibility.computeVisibleTiles(second.tiles, [8000, 0], tileCoords, matrixWorld)!;
+
+      for (const v of visibility.visibles) {
+        expect(warmBoxes.has(v.id), `tile ${v.id} of the far frame is none of the warm-up tiles`).toBe(false);
+      }
+
+      // Back to where the warm-up frame was: the slots it used are gone, so the same tile
+      // coordinates come back on fresh TileBox objects.
+      visibility.computeVisibleTiles(third.tiles, [0, 0], tileCoords, matrixWorld);
+
+      expect(
+        visibility.visibles.some((v) => warmBoxes.has(v.id)),
+        'the warm-up tiles are visible again',
+      ).toBe(true);
+
+      for (const v of visibility.visibles) {
+        expect(v, `tile box for ${v.id} is a fresh slot`).not.toBe(warmBoxes.get(v.id));
+      }
+    });
   });
 
   describe('frustumBoxScale', () => {
