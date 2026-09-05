@@ -61,5 +61,10 @@ It should significantly cut down on the amount of boilerplate code and state man
 - api docs: [stage layer cheat-sheet](src/stage/README.md)
 - :heavy_check_mark: api is stable and ready to use
 
+#### [resource lifecycle](docs/resource-lifecycle.md)
+- the binding rules for `dispose()` and ownership of geometries, materials, textures and pools
+- what a disposed instance answers, and how signals, effects and events are torn down
+- a checklist and a test pattern for every new `dispose()`
+
 have fun!
 :rocket:

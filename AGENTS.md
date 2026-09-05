@@ -78,6 +78,7 @@ Modular architecture designed for high performance via direct GPU communication.
 -   **Docs:** TSDoc for public APIs.
 -   **Tests:** Unit tests for logic, Browser tests for visuals.
 -   **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+-   **Resource lifecycle:** `dispose()` and ownership follow [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md).
 
 ---
 
