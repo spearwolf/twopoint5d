@@ -49,10 +49,12 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
+  /** The color map texture — `undefined` once the material has been disposed. */
   get colorMap(): Texture | undefined {
     return this.#colorMap.get();
   }
 
+  /** Sets the color map texture. The texture stays the caller's; {@link dispose} does not release it. */
   set colorMap(value: Texture | undefined) {
     this.#colorMap.set(value);
   }
@@ -65,6 +67,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.#vertexPositionNode.set(node);
   }
 
+  /** The texture coordinates node — `undefined` once the material has been disposed. */
   get texCoordsNode() {
     return this.#texCoordsNode.get();
   }
@@ -97,6 +100,10 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.#quadSizeNode.set(node);
   }
 
+  /**
+   * Whether the sprites face the camera. Keeps its last value once the material has been
+   * disposed, and a write there reaches nothing that still renders.
+   */
   get renderAsBillboards() {
     return this.#renderAsBillboards.get();
   }
@@ -148,7 +155,18 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     );
   }
 
+  /**
+   * Tears down the signals and effects of this material and gives up its optional members:
+   * {@link colorMap} and {@link texCoordsNode} answer `undefined` afterwards. A `colorMap`
+   * handed in belongs to the caller and is not released here. The node accessors keep their
+   * last node. A second call does nothing.
+   */
   override dispose() {
+    // both references are given up while their signals are still live — a write after
+    // SignalGroup.delete() would land in a destroyed signal and notify nobody
+    this.#colorMap.set(undefined);
+    this.#texCoordsNode.set(undefined);
+
     SignalGroup.delete(this);
     super.dispose();
   }

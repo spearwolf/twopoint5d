@@ -14,6 +14,7 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
   #animsMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
+  /** The animation lookup texture — `undefined` once the material has been disposed. */
   get animsMap(): Texture | undefined {
     return this.#animsMap.get();
   }
@@ -22,6 +23,8 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
    * Sets the animsMap texture. Plain assignment does not re-read the texture's image — an
    * assignment of the same texture instance is a no-op to the underlying signal. Call
    * {@link touchAnimsMap} once a texture assigned here has finished loading.
+   *
+   * The texture stays the caller's; {@link dispose} does not release it.
    */
   set animsMap(value: Texture | undefined) {
     this.#animsMap.set(value);
@@ -29,6 +32,11 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
   #timeUniform = uniform(0);
 
+  /**
+   * The animation time, in seconds. Backed by a shader uniform rather than a signal: reads and
+   * writes keep working once the material has been disposed, they just reach nothing that still
+   * renders.
+   */
   set time(value: number) {
     this.#timeUniform.value = value;
   }
@@ -82,15 +90,24 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
    * Re-reads the animsMap texture and rebuilds the animation lookup from its current image.
    * `TextureLoader` writes the loaded image into the same texture instance without emitting
    * an event, so a texture assigned before it finished loading needs this call once it has.
+   *
+   * A silent no-op on a disposed material. On a live material without an animsMap it is not:
+   * the call rebuilds the neutral texture coordinates and sets `needsUpdate`, which costs a
+   * shader recompile. Call it when a texture has loaded, not once per frame.
    */
   touchAnimsMap(): void {
     this.#animsMap.touch();
   }
 
+  /**
+   * Gives up the animsMap texture. It was handed in and belongs to the caller, so it is not
+   * released here. Afterwards {@link animsMap} answers `undefined`. A second call does nothing.
+   */
   override dispose(): void {
-    this.#animsMap.value?.dispose();
+    // the animsMap texture was handed in and stays the caller's; the reference is cleared
+    // here, before super.dispose() tears the signal group down, so the getter answers
+    // undefined without a write to an already destroyed signal
     this.#animsMap.set(undefined);
-    this.#animsMap.destroy();
     super.dispose();
   }
 }

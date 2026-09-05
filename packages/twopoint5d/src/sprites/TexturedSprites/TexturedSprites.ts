@@ -14,15 +14,20 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   declare geometry: TexturedSpritesGeometry | undefined;
   declare material: TexturedSpritesMaterial | undefined;
 
+  #ownsGeometry: boolean;
+  #ownsMaterial: boolean;
+
   /** The sprite pool of the geometry this mesh was built with — `undefined` once disposed. */
   get spritePool(): TexturedSpritePool | undefined {
     return this.geometry?.instancedPool;
   }
 
+  /** The color map of the material of this mesh — `undefined` once disposed. */
   get texture(): Texture | undefined {
     return this.material?.colorMap;
   }
 
+  /** Sets the color map of the material. Does nothing once the sprites have been disposed. */
   set texture(texture: Texture | undefined) {
     if (this.material != null) {
       this.material.colorMap = texture;
@@ -31,16 +36,21 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
 
   constructor(
     geometry?: number | TexturedSpritesGeometry | TexturedSpriteGeometryParameters,
-    material: Texture | TexturedSpritesMaterial | TexturedSpritesMaterialParameters = new TexturedSpritesMaterial(),
+    material?: Texture | TexturedSpritesMaterial | TexturedSpritesMaterialParameters,
   ) {
     super(
       geometry instanceof TexturedSpritesGeometry ? geometry : new TexturedSpritesGeometry(geometry),
-      isTexture(material)
-        ? new TexturedSpritesMaterial({colorMap: material})
-        : material instanceof TexturedSpritesMaterial
-          ? material
+      material instanceof TexturedSpritesMaterial
+        ? material
+        : isTexture(material)
+          ? new TexturedSpritesMaterial({colorMap: material})
           : new TexturedSpritesMaterial(material),
     );
+
+    // only the geometry and the material built right here belong to this mesh; a texture
+    // handed in as `material` stays the caller's, the material wrapped around it does not
+    this.#ownsGeometry = !(geometry instanceof TexturedSpritesGeometry);
+    this.#ownsMaterial = !(material instanceof TexturedSpritesMaterial);
 
     this.name = 'twopoint5d.TexturedSprites';
   }
@@ -60,10 +70,28 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     this.geometry?.instancedPool.freeVO(sprite);
   }
 
+  /**
+   * Releases the geometry and the material that this mesh built for itself. A
+   * `TexturedSpritesGeometry` or a `TexturedSpritesMaterial` handed to the constructor belongs
+   * to the caller and is left untouched, and so is a `Texture` passed as the material argument.
+   *
+   * The mesh takes itself out of the scene graph first. Afterwards `geometry`, `material`,
+   * {@link spritePool} and {@link texture} answer `undefined`, {@link createSprite} answers
+   * `undefined` and {@link freeSprite} does nothing. A second call does nothing.
+   */
   dispose(): void {
-    this.geometry?.dispose();
+    // a mesh without geometry and material cannot be rendered, so it leaves the
+    // scene graph before it gives them up, rather than asking the caller to do it first
+    this.removeFromParent();
+
+    if (this.#ownsGeometry) {
+      this.geometry?.dispose();
+    }
     this.geometry = undefined;
-    this.material?.dispose();
+
+    if (this.#ownsMaterial) {
+      this.material?.dispose();
+    }
     this.material = undefined;
   }
 }

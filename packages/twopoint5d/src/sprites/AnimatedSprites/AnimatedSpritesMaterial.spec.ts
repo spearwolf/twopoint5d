@@ -1,7 +1,7 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import type {TextureNode} from 'three/webgpu';
-import {NodeMaterial, Texture} from 'three/webgpu';
+import {Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
@@ -39,14 +39,16 @@ describe('AnimatedSpritesMaterial', () => {
   });
 
   describe('dispose()', () => {
-    test('disposes the animsMap texture', () => {
+    test('does NOT dispose an animsMap that was handed in', () => {
       const animsMap = makeAnimsMap();
       const animsMapDispose = sandbox.spy(animsMap, 'dispose');
 
       const material = new AnimatedSpritesMaterial({animsMap});
       material.dispose();
 
-      expect(animsMapDispose.calledOnce).toBe(true);
+      expect(animsMapDispose.called).toBe(false);
+
+      animsMap.dispose();
     });
 
     test('does not throw when no animsMap was set', () => {
@@ -62,23 +64,6 @@ describe('AnimatedSpritesMaterial', () => {
       material.dispose();
 
       expect(material.animsMap).toBeUndefined();
-    });
-
-    test('disposes the animsMap texture before the underlying NodeMaterial dispose runs', () => {
-      // Order matters: super.dispose() in TexturedSpritesMaterial destroys the SignalGroup
-      // attached to `this`, which destroys the #animsMap signal handle. The animsMap texture
-      // must be released BEFORE that happens, so we don't rely on signalize's "destroyed
-      // signal still returns last value" lenience to clean up the texture.
-      const animsMap = makeAnimsMap();
-      const animsMapDispose = sandbox.spy(animsMap, 'dispose');
-      const nodeMaterialDispose = sandbox.spy(NodeMaterial.prototype, 'dispose');
-
-      const material = new AnimatedSpritesMaterial({animsMap});
-      material.dispose();
-
-      expect(animsMapDispose.calledOnce).toBe(true);
-      expect(nodeMaterialDispose.called).toBe(true);
-      expect(animsMapDispose.calledBefore(nodeMaterialDispose)).toBe(true);
     });
 
     test('does not leak signals or effects', () => {
@@ -109,8 +94,10 @@ describe('AnimatedSpritesMaterial', () => {
         material.dispose();
       }).not.toThrow();
 
-      // The texture should only be disposed once — the second call has nothing left to release.
-      expect(animsMapDispose.calledOnce).toBe(true);
+      // The texture belongs to the caller, so neither call may release it.
+      expect(animsMapDispose.called).toBe(false);
+
+      animsMap.dispose();
     });
   });
 

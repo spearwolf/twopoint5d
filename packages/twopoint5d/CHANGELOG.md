@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `FrameLoop#start()` to `(() => void) | undefined`: a missing `target`, or one already running on the loop, gets no second unsubscribe function
 - upgrade the `three` peer dependency to `~0.185.1` (was `~0.183.1`) and `@types/three` to `~0.185.4`. Under the new types `vec3()` no longer accepts an `AttributeNode<unknown>` in any overload: a bare `attribute('name')` passed into a TSL constructor needs its type argument, as in `attribute<'vec2'>('quadSize')`
 - `DisplayRendererParameters` names the 17 options it carries instead of being the empty type `{}`. An object literal handed to the `Display` constructor is now checked against them; an unknown key is an error where it used to pass unnoticed
+- `TexturedSprites#dispose()` releases exactly the geometry and the material the mesh built for itself, and leaves a `TexturedSpritesGeometry`, a `TexturedSpritesMaterial` or a `Texture` handed to the constructor untouched — those belong to the caller. The mesh also takes itself out of the scene graph before it gives both slots up. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `AnimatedSprites#dispose()` releases neither the geometry nor the material: this mesh builds neither of them, both are handed to its constructor and stay the caller's. It takes itself out of the scene graph and gives both slots up
+- `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
+- `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 
 ### Removed
 
@@ -73,6 +77,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 
 ### Migration Guide
+
+#### Geometry, material and texture handed in stay the caller's to dispose
+
+`TexturedSprites#dispose()`, `AnimatedSprites#dispose()` and `AnimatedSpritesMaterial#dispose()`
+release only what the instance built itself. Whatever was handed to a constructor or a setter is
+now disposed by whoever created it. The case that slips through without a compile error is
+`new AnimatedSprites(geometry, material)`: that mesh built neither, so it releases nothing.
+
+**Before**
+
+```ts
+const sprites = new AnimatedSprites(geometry, material);
+material.animsMap = animsMap;
+
+sprites.dispose();
+// geometry, material and animsMap were all released along with the mesh
+```
+
+**After**
+
+```ts
+const sprites = new AnimatedSprites(geometry, material);
+material.animsMap = animsMap;
+
+sprites.dispose();
+
+geometry.dispose(); // built by the caller, released by the caller
+material.dispose();
+animsMap.dispose();
+```
+
+A mesh that builds its own geometry and material still releases them, so
+`new TexturedSprites(1000).dispose()` needs no change.
 
 #### The `three` peer dependency range
 
@@ -458,7 +495,7 @@ Where the vertex object is known to be live — inside a getter it defines, for 
 #### `VertexObjects#geometry` and `#material` can be `undefined`
 
 `VertexObjects` takes both as optional constructor arguments, and the sprite meshes built on it
-release both in `dispose()`. Reading through either needs a guard.
+give both slots up in `dispose()`. Reading through either needs a guard.
 
 **Before**
 
@@ -478,7 +515,7 @@ if (sprites.material != null) {
 
 #### `TexturedSprites#spritePool` and `#texture` can be `undefined`
 
-`TexturedSprites#dispose()` releases the geometry and the material and leaves the mesh
+`TexturedSprites#dispose()` gives up the geometry and the material and leaves the mesh
 holding neither. `spritePool` and `texture` name that: both are typed `| undefined`,
 `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
 once the sprites are disposed. Under `strictNullChecks`, code that reads either field

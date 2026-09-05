@@ -67,6 +67,16 @@ dispose(): void {
 }
 ```
 
+The flag is the default shape and the safe answer whenever a step would do real work
+twice. A `dispose()` in which every single step runs empty on the second call needs
+none: a reference that has been given up makes the optional call behind it fall
+through, `removeFromParent()` checks for a missing parent, `SignalGroup.delete()` and
+a repeated `set(undefined)` change nothing, and `Material.dispose()` reaches nobody the
+second time because its `dispose` event is what makes the renderer's listeners unsubscribe
+themselves. Such a method satisfies this rule by
+construction — but only if that is shown rather than claimed, which is what assertion
+(d) of section 8 is for: a second call throws nothing and releases nothing again.
+
 Where a caller needs to know the state, expose it as a read-only `isDisposed`
 getter. [`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts) and
 [`FixedFrameLoop`](../src/display/FixedFrameLoop.ts) both do:
@@ -129,6 +139,11 @@ and its `dispose()`:
 
 ```ts
 override dispose() {
+  // both references are given up while their signals are still live — a write after
+  // SignalGroup.delete() would land in a destroyed signal and notify nobody
+  this.#colorMap.set(undefined);
+  this.#texCoordsNode.set(undefined);
+
   SignalGroup.delete(this);
   super.dispose();
 }
@@ -195,21 +210,24 @@ override dispose(): void {
 ```
 
 [`AnimatedSpritesMaterial.dispose()`](../src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts)
-is ordered this way, for that reason.
+is ordered this way for the same reason: it clears its `animsMap` reference — a texture that
+belongs to the caller and is therefore not released — while the signal holding it is still
+live, and only then calls `super.dispose()`.
 
 The single rule behind both, and the only one worth memorising: **release nothing
 whose access path the `super` call has already cut, and take away nothing the `super`
 call is still going to read.**
 
-A `Mesh` that owns its geometry and material takes itself out of the scene graph in
-`dispose()` via `removeFromParent()`, rather than demanding the right order from the
-caller.
+A `Mesh` that gives up its geometry or its material in `dispose()` takes itself out of the
+scene graph first, via `removeFromParent()`, rather than demanding the right order from the
+caller. That holds whether or not it owned them: a mesh with an empty geometry slot cannot be
+rendered, and the next frame would fail deep inside the renderer.
 
 ## 7. Checklist for a new `dispose()`
 
 1. Release every resource this instance created itself, and touch none that was
    handed in.
-2. Guard against the second call, so `dispose()` is idempotent.
+2. Make `dispose()` idempotent — by a flag, or by construction as in section 3.
 3. Emit the dispose event, then remove the listeners with `off(this)`.
 4. Call `SignalGroup.delete(this)` for the signal side — after your own release, and
    never `SignalGroup.destroy()`.

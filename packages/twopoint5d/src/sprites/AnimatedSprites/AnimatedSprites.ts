@@ -14,10 +14,19 @@ export class AnimatedSprites extends VertexObjects<AnimatedSpritesGeometry> {
     this.name = 'twopoint5d.AnimatedSprites';
   }
 
+  /**
+   * Gives up the geometry and the material. Both were handed to the constructor and belong to
+   * the caller, so neither is released here — the caller disposes them.
+   *
+   * The mesh takes itself out of the scene graph first. Afterwards `geometry` and `material`
+   * answer `undefined`. A second call does nothing.
+   */
   dispose(): void {
-    this.geometry?.dispose();
+    // a mesh without geometry and material cannot be rendered, so it leaves the
+    // scene graph before it gives them up, rather than asking the caller to do it first
+    this.removeFromParent();
+
     this.geometry = undefined;
-    this.material?.dispose();
     this.material = undefined;
   }
 }
