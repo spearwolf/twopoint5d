@@ -87,12 +87,10 @@ export class VOBufferPool {
     if (this.#disposed) return;
     this.#disposed = true;
     this.usedCount = 0;
-    if (this.buffer != null) {
-      for (const buffer of this.buffer.buffers.values()) {
-        buffer.typedArray = undefined;
-      }
-      this.buffer.buffers.clear();
+    for (const buffer of this.buffer.buffers.values()) {
+      buffer.typedArray = undefined;
     }
+    this.buffer.buffers.clear();
   }
 
   createFromAttributes(attributes: Record<string, ArrayLike<number>>): [objectCount: number, firstObjectIndex: number] {

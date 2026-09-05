@@ -9,6 +9,7 @@ import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
+import {attributeNamesOf} from './attributeNamesOf.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
@@ -48,9 +49,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * lends them back to their slots for the length of the dispose event.
    *
    * Only slots that stay empty are collected — one that falls back to the claim underneath is
-   * filled and belongs to the route it fell back to. An entry lives until `dispose()` unless the
-   * same attribute name is filled again, so a geometry that gives up many routes with different
-   * attribute names holds one attribute, and its typed array, per name until then.
+   * filled and belongs to the route it fell back to. A vacated name is never filled again, so
+   * there is at most one entry per name and it lives until `dispose()`: a geometry that gives up
+   * many routes with different attribute names holds one attribute, and its typed array, per
+   * name until then.
    */
   readonly #vacatedSlots: Map<string, BufferAttribute | InterleavedBufferAttribute> = new Map();
 
@@ -58,6 +60,13 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly #slots = new GeometryAttributeSlots();
   readonly #ownedPools = new Set<VOBufferPool>();
 
+  /**
+   * The base route, the instanced route and the attributes copied from a `BufferGeometry` handed
+   * in here may all claim the same attribute name; the route that initializes later shows its
+   * attribute, and {@link attachInstancedPool} refuses that name afterwards. Until this
+   * constructor returns, no attribute of this geometry has reached the renderer, so one that is
+   * displaced here holds no gpu buffer — which is exactly what makes it safe to displace it.
+   */
   constructor(
     ...args:
       | [VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
@@ -124,6 +133,15 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * a different capacity can still be attached; matching it to the `.instancedPool` is then the
    * caller's responsibility.
    *
+   * An attribute slot of this geometry belongs to one route for the whole life of the geometry:
+   * a pool whose attributes would take a slot this geometry has already had an attribute in is
+   * refused. The gpu buffer of a displaced attribute could never be handed back — three.js frees
+   * one attribute per name, the one sitting in the slot when the geometry is disposed. Give such
+   * a pool attribute names of its own, or build a second geometry for it.
+   *
+   * Handing the same pool back under the name it already has changes nothing: every attribute
+   * stays where it is, and an `autoDispose` passed along with it still takes effect.
+   *
    * _Pro-Hint:_ It is also possible to attach a vertex-buffer-pool to several instanced geometries at the same time.
    *
    * @typeParam VOType - the vertex object type of the attached pool; `unknown` if not given.
@@ -135,17 +153,29 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *   geometry on {@link dispose}. The **default** is whether this geometry built the pool itself: a descriptor or
    *   description handed in here becomes a pool that belongs to this geometry (e.g. created on the fly when an
    *   `InstancedMesh` is built and torn down again), while a pool from elsewhere belongs to the caller. That answer follows the
-   *   pool, so handing a pool this geometry built back to it — under the same name or a second one — keeps it owned here.
+   *   pool, so handing a pool this geometry built back to it under the name it already has keeps it owned here.
    *   Set to `false` when the same
    *   pool is shared with other geometries or otherwise managed by the caller — in that case the pool will be
    *   detached from the internal bookkeeping on `dispose`, but its buffers and typed arrays remain untouched and the
    *   caller is responsible for releasing them.
+   * @throws when an attribute of `pool` would take an attribute slot that this geometry has
+   *   already had an attribute in. The message names the call and every slot it is about, and
+   *   the geometry is left exactly as it was.
    */
   attachInstancedPool<VOType = unknown>(
     name: string,
     pool: VertexObjectPool<VOType> | VertexObjectDescriptor | VertexObjectDescription,
     options?: {autoDispose?: boolean},
   ): VertexObjectPool<VOType> {
+    // the same pool taking its own name over again changes nothing about the slots, and
+    // rebuilding the attributes would push the live ones off the geometry for good
+    if (pool instanceof VertexObjectPool && this.extraInstancedPools.get(name) === pool) {
+      if (options?.autoDispose !== undefined) {
+        this.#extraInstancedPoolAutoDispose.set(name, options.autoDispose);
+      }
+      return pool;
+    }
+
     // asked before the descriptor is wrapped below, or every pool would look self-made afterwards
     const ownsPool = !(pool instanceof VertexObjectPool);
 
@@ -153,13 +183,32 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     if (ownsPool) {
       const descriptor = pool instanceof VertexObjectDescriptor ? pool : new VertexObjectDescriptor(pool);
       extraPool = new VertexObjectPool(descriptor, this.instancedPool.capacity) as VertexObjectPool<VOType>;
-      this.declareOwnedPool(extraPool);
     } else {
       extraPool = pool;
     }
 
+    // three.js frees a gpu buffer only through the dispose event of the geometry, and there
+    // for exactly one attribute per name — the one sitting in the slot at that moment. An
+    // attribute a second route pushes out of a slot can never be handed back, so the slot is
+    // refused instead of leaking it
+    const taken = this.#slots.everHeld(attributeNamesOf(extraPool));
+    if (taken.length > 0) {
+      const slots = taken.map((attrName) => `"${attrName}"`).join(', ');
+      throw new Error(
+        `InstancedVOBufferGeometry#attachInstancedPool("${name}"): this geometry has already had an attribute in the slot ${slots}. ` +
+          'An attribute slot belongs to one route for the life of the geometry — give this pool attribute names of its own, ' +
+          'or build a new geometry.',
+      );
+    }
+
+    // only once the guard above has let the pool through: a throw must leave nothing behind that
+    // dispose() would release later
+    if (ownsPool) {
+      this.declareOwnedPool(extraPool);
+    }
+
     // taking over a name that is already in use releases whatever was attached under it
-    this.#detachRoute(name, extraPool);
+    this.#detachRoute(name);
 
     this.extraInstancedPools.set(name, extraPool);
     this.#attachments.attach(extraPool);
@@ -178,14 +227,6 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
 
-    // a name that is filled again needs no stand-in, and the entry would keep the typed arrays
-    // of a pool this geometry has let go of alive until dispose()
-    for (const attrName of this.#vacatedSlots.keys()) {
-      if (this.getAttribute(attrName) !== undefined) {
-        this.#vacatedSlots.delete(attrName);
-      }
-    }
-
     // the buffer selection is already gone with the detach above; what is still owed is the
     // first auto-touch, which uploads every attribute of the new route once
     this.#firstAutoTouch = true;
@@ -199,10 +240,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * Both halves belong together: as long as an attribute reads from the pool's typed arrays,
    * the pool has to keep reporting itself as attached, or a `resize()` would swap those arrays
-   * out from under the geometry. Only the attribute slots this route owns are given up: a slot
-   * that another route has claimed since stays with that route, and a slot this route had taken
-   * over goes back to the route it took it from — the base pool, the default instanced pool, or
-   * another name the same pool is attached under.
+   * out from under the geometry. The slots of this route are empty when it is gone, and they
+   * stay taken for the life of the geometry — {@link attachInstancedPool} refuses a later route
+   * that asks for one of them.
    *
    * A pool that belongs to this geometry — one built here from a descriptor, or attached with
    * `autoDispose: true` — is disposed as its last route from this geometry goes away. It is
@@ -218,17 +258,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * @returns the pool that was attached under `name`, or `undefined` if the name was free.
    */
   detachInstancedPool(name: string): VOBufferPool | undefined {
-    return this.#detachRoute(name, undefined);
+    return this.#detachRoute(name);
   }
 
-  /**
-   * Take the route `name` off this geometry.
-   *
-   * `replacement` is the pool that is about to take the name over. A route giving way to its
-   * own pool must not release it — the attributes are rebuilt on that very pool right after,
-   * and a disposed pool has no buffers left to build them from.
-   */
-  #detachRoute(name: string, replacement: VOBufferPool | undefined): VOBufferPool | undefined {
+  /** Take the route `name` off this geometry. */
+  #detachRoute(name: string): VOBufferPool | undefined {
     const pool = this.extraInstancedPools.get(name);
     const buffers = this.extraInstancedBuffers.get(name);
     const autoDispose = pool != null && this.#releasesExtraPool(name, pool);
@@ -250,9 +284,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#attachments.detach(pool);
     this.#autoTouchBuffers = undefined;
 
-    // another route of this geometry reading the same pool keeps it alive: its attributes stay
-    // on the geometry, and they would be left reading arrays that are no longer there
-    if (pool != null && pool !== replacement && !this.#attachments.holds(pool)) {
+    // a pool reaches a second route of this geometry only when it puts nothing into a slot: a
+    // descriptor that declares no attributes, or a pool that was disposed before it was attached.
+    // Its last route decides — releasing it while the geometry still counts an attachment would
+    // leave a dead pool under a live route
+    if (pool != null && !this.#attachments.holds(pool)) {
       // nothing of this geometry reaches the pool from here on, so it stops counting as one of
       // its own — a pool that survives its detach is a pool from outside when it comes back
       this.#ownedPools.delete(pool);

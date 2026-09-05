@@ -35,9 +35,16 @@ type SlotClaim = {
  * kept, oldest first, and the topmost one is the attribute the geometry really shows. That
  * is what lets a route give up its own slots and nothing else: what it displaced comes back,
  * what displaced it stays, and an attribute name resolves to the pool that actually feeds it.
+ *
+ * Claims stack only as far as the constructor of the geometry lays them down. Every slot name
+ * this bookkeeping has ever seen is remembered, and {@link everHeld} lets the geometry refuse a
+ * later route that would take one of them.
  */
 export class GeometryAttributeSlots {
   readonly #slots: Map<string, SlotClaim[]> = new Map();
+
+  /** Every slot name that has been claimed here, including the ones released since. */
+  readonly #everHeld = new Set<string>();
 
   /**
    * Note that `route` has put `attr` into the slot `attrName`. A route that already holds
@@ -58,6 +65,21 @@ export class GeometryAttributeSlots {
     for (const [attrName, attr] of Object.entries(geometry.attributes)) {
       this.#claim(attrName, undefined, undefined, attr);
     }
+  }
+
+  /**
+   * Which of `attrNames` this geometry has already had an attribute in. A slot is never
+   * handed on: what a second attribute would push out of it could not be given back to the
+   * renderer afterwards, so the caller is refused instead.
+   */
+  everHeld(attrNames: Iterable<string>): string[] {
+    const taken: string[] = [];
+    for (const attrName of attrNames) {
+      if (this.#everHeld.has(attrName)) {
+        taken.push(attrName);
+      }
+    }
+    return taken;
   }
 
   /** The pool whose buffers feed the slot `attrName`, or `undefined` if no pool does. */
@@ -107,6 +129,8 @@ export class GeometryAttributeSlots {
     pool: VOBufferPool | undefined,
     attr: BufferAttribute | InterleavedBufferAttribute,
   ): void {
+    this.#everHeld.add(attrName);
+
     const claims = this.#slots.get(attrName);
     if (claims === undefined) {
       this.#slots.set(attrName, [{route, pool, attr}]);

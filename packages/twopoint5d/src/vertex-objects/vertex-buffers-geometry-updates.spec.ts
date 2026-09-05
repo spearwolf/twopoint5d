@@ -91,6 +91,30 @@ describe('vertex-buffers-geometry-updates', () => {
     },
   });
 
+  // shares no attribute name with any other descriptor here
+  const otherExtraDesc = new VertexObjectDescriptor({
+    meshCount: 1,
+
+    attributes: {
+      plah: {
+        size: 1,
+        type: 'float32',
+      },
+    },
+  });
+
+  // declares an attribute name of `instancedDesc`
+  const fooDesc = new VertexObjectDescriptor({
+    meshCount: 1,
+
+    attributes: {
+      foo: {
+        size: 1,
+        type: 'float32',
+      },
+    },
+  });
+
   interface MyInstancedVO extends VO {
     r: number;
     g: number;
@@ -755,10 +779,20 @@ describe('vertex-buffers-geometry-updates', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
       const first = geometry.attachInstancedPool('extra', extraDesc);
-      const second = geometry.attachInstancedPool('extra', extraDesc);
+      const second = geometry.attachInstancedPool('extra', otherExtraDesc);
 
       expect(first.isDisposed).toBe(true);
       expect(second.isDisposed).toBe(false);
+    });
+
+    test('a refused attach leaves the pool that holds the slot alone', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const first = geometry.attachInstancedPool('extra', extraDesc);
+
+      expect(() => geometry.attachInstancedPool('extra', extraDesc)).toThrow();
+
+      expect(first.isDisposed).toBe(false);
+      expect(geometry.extraInstancedPools.get('extra')).toBe(first);
     });
 
     test('attaching the same pool again under its own name keeps it alive', () => {
@@ -782,13 +816,13 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
-    test('a pool the geometry built stays its own when it is attached under a second name', () => {
+    test('a pool the geometry built stays its own when a second name for it is refused', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const pool = geometry.attachInstancedPool('extra', extraDesc);
 
-      geometry.attachInstancedPool('sameAgain', pool);
-      geometry.detachInstancedPool('extra');
+      expect(() => geometry.attachInstancedPool('sameAgain', pool)).toThrow();
 
+      expect(geometry.extraInstancedPools.has('sameAgain')).toBe(false);
       expect(pool.isDisposed).toBe(false);
 
       geometry.dispose();
@@ -796,7 +830,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
-    test('a pool that outlives its detach stops belonging to the geometry', () => {
+    test('a pool that outlives its detach stops belonging to the geometry that built it', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const pool = geometry.attachInstancedPool('extra', extraDesc, {autoDispose: false});
 
@@ -804,26 +838,25 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(pool.isDisposed).toBe(false);
 
-      // no route of this geometry reaches the pool any more, so attaching it again is attaching
-      // a pool from outside
-      geometry.attachInstancedPool('extra', pool);
+      // no route of the geometry that built the pool reaches it any more, so the geometry it
+      // goes to next takes a pool from outside
+      const next = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      next.attachInstancedPool('extra', pool);
+
+      next.dispose();
       geometry.dispose();
 
       expect(pool.isDisposed).toBe(false);
     });
 
-    test('every pool of an attach/detach cycle under one name is released', () => {
+    test('the pool of an attach/detach cycle is released, and the name it had stays taken', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
-      const pools = [];
-      for (let i = 0; i < 3; i++) {
-        pools.push(geometry.attachInstancedPool('extra', extraDesc));
-        geometry.detachInstancedPool('extra');
-      }
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+      geometry.detachInstancedPool('extra');
 
-      geometry.dispose();
-
-      expect(pools.map((pool) => pool.isDisposed)).toEqual([true, true, true]);
+      expect(pool.isDisposed).toBe(true);
+      expect(() => geometry.attachInstancedPool('extra', extraDesc)).toThrow();
     });
 
     test('an explicit autoDispose decides over a pool the geometry built', () => {
@@ -860,17 +893,6 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(owner.pool.isDisposed).toBe(true);
     });
-
-    test('detachInstancedPool() keeps a pool that another route still reads', () => {
-      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
-
-      const pool = geometry.attachInstancedPool('extra', extraDesc);
-      geometry.attachInstancedPool('sameAgain', pool);
-
-      geometry.detachInstancedPool('extra');
-
-      expect(pool.isDisposed).toBe(false);
-    });
   });
 
   describe('attachInstancedPool()', () => {
@@ -883,6 +905,58 @@ describe('vertex-buffers-geometry-updates', () => {
           usage: 'dynamic',
         },
       },
+    });
+
+    test('a route that would take an attribute slot of the instanced pool is refused', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      expect(() => geometry.attachInstancedPool('extra', new VertexObjectPool<VO>(fooDesc, 10))).toThrow();
+    });
+
+    test('an attribute name that a detached route had stays taken', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      geometry.attachInstancedPool('extra', extraDesc);
+      geometry.detachInstancedPool('extra');
+
+      expect(() => geometry.attachInstancedPool('extra', extraDesc)).toThrow();
+    });
+
+    test('the same pool under a second name is refused', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      expect(() => geometry.attachInstancedPool('sameAgain', pool)).toThrow();
+    });
+
+    test('the refusal names the class, the call and the slots it is about', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.attachInstancedPool('first', extraDesc);
+
+      expect(() => geometry.attachInstancedPool('extra', extraDesc)).toThrow(
+        /InstancedVOBufferGeometry#attachInstancedPool\("extra"\)/,
+      );
+      expect(() => geometry.attachInstancedPool('extra', extraDesc)).toThrow(/"quux"/);
+    });
+
+    test('the same pool under the same name again leaves the attributes it built where they are', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+      const attr = geometry.getAttribute('quux');
+
+      geometry.attachInstancedPool('extra', pool);
+
+      expect(geometry.getAttribute('quux')).toBe(attr);
+    });
+
+    test('the same pool under the same name again takes an autoDispose handed in with it', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      geometry.attachInstancedPool('extra', pool, {autoDispose: false});
+      geometry.dispose();
+
+      expect(pool.isDisposed).toBe(false);
     });
 
     test('a descriptor is wrapped in a pool with the capacity of the instancedPool', () => {
@@ -1102,39 +1176,9 @@ describe('vertex-buffers-geometry-updates', () => {
       },
     });
 
-    // declares an attribute name of `instancedDesc`
-    const fooDesc = new VertexObjectDescriptor({
-      meshCount: 1,
-
-      attributes: {
-        foo: {
-          size: 1,
-          type: 'float32',
-        },
-      },
-    });
-
     const bufferNameOf = (pool: VertexObjectPool<VO>, attrName: string) => pool.buffer.bufferAttributes.get(attrName)!.bufferName;
 
-    test('a route that gives up a shared pool hands the slot back to the route that keeps it', () => {
-      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
-      const shared = new VertexObjectPool<VO>(extraDesc, 10);
-
-      geometry.attachInstancedPool('one', shared);
-      geometry.attachInstancedPool('two', shared);
-      geometry.detachInstancedPool('two');
-
-      // the slot belongs to the route that is still there, so touching the attribute reaches it
-      const buffer = bufferInSlot(geometry, 'quux')!;
-      expect(buffer).toBe(geometry.extraInstancedBuffers.get('one')!.get(bufferNameOf(shared, 'quux')));
-
-      const version = buffer.version;
-      geometry.touchAttributes('quux');
-
-      expect(bufferInSlot(geometry, 'quux')!.version).toBeGreaterThan(version);
-    });
-
-    test('a route that shares its typed arrays with another pool gives up only its own slots', () => {
+    test('a pool that reads the typed arrays of the route in the slot is refused all the same', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
       const a = new VertexObjectPool<VO>(extraDesc, 10);
@@ -1142,28 +1186,21 @@ describe('vertex-buffers-geometry-updates', () => {
       const b = new VertexObjectPool<VO>(extraDesc, a.toBuffersData());
 
       geometry.attachInstancedPool('a', a);
-      geometry.attachInstancedPool('b', b);
-      geometry.detachInstancedPool('b');
 
-      // detached, so it may resize — and that gives it typed arrays of its own
-      b.resize(20);
-      geometry.update();
-
-      const bufferName = bufferNameOf(a, 'quux');
-      expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a')!.get(bufferName));
-      expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName)!.typedArray);
+      expect(() => geometry.attachInstancedPool('b', b)).toThrow();
     });
 
-    test('two pools declaring the same attribute name keep the slot with the surviving route', () => {
+    test('a second pool declaring the attribute name of a route is refused', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
       const a = new VertexObjectPool<VO>(extraDesc, 10);
       const b = new VertexObjectPool<VO>(otherQuuxDesc, 10);
 
       geometry.attachInstancedPool('a', a);
-      geometry.attachInstancedPool('b', b);
-      geometry.detachInstancedPool('b');
 
+      expect(() => geometry.attachInstancedPool('b', b)).toThrow();
+
+      // the route that has the slot still feeds it
       const bufferName = bufferNameOf(a, 'quux');
       expect(bufferInSlot(geometry, 'quux')).toBe(geometry.extraInstancedBuffers.get('a')!.get(bufferName));
       expect((geometry.getAttribute('quux') as BufferAttribute).array).toBe(a.buffer.buffers.get(bufferName)!.typedArray);
@@ -1181,17 +1218,6 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(Object.keys(geometry.attributes).sort()).toEqual(['foo', 'position']);
       expect(Array.from((geometry.getAttribute('foo') as BufferAttribute).array)).toEqual([1, 2, 3, 4]);
-    });
-
-    test('an extra pool that declares an attribute name of the instanced pool feeds the slot it took', () => {
-      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
-      const extraPool = new VertexObjectPool<VO>(fooDesc, 10);
-
-      geometry.attachInstancedPool('extra', extraPool);
-      geometry.update();
-
-      const bufferName = bufferNameOf(extraPool, 'foo');
-      expect((geometry.getAttribute('foo') as BufferAttribute).array).toBe(extraPool.buffer.buffers.get(bufferName)!.typedArray);
     });
   });
 });

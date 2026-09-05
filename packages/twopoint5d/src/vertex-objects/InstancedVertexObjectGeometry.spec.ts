@@ -50,6 +50,18 @@ describe('InstancedVertexObjectGeometry', () => {
     },
   });
 
+  // shares no attribute name with `extraInstancedDescriptor`, so both fit on one geometry
+  const secondExtraInstancedDescriptor = new VertexObjectDescriptor({
+    meshCount: 2,
+
+    attributes: {
+      extraToo: {
+        size: 1,
+        bufferName: 'extraTooBuffer',
+      },
+    },
+  });
+
   const sandbox = createSandbox();
 
   afterEach(() => {
@@ -162,7 +174,7 @@ describe('InstancedVertexObjectGeometry', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
 
       const ownedPool = geometry.attachInstancedPool('owned', extraInstancedDescriptor);
-      const sharedPool = geometry.attachInstancedPool('shared', extraInstancedDescriptor, {autoDispose: false});
+      const sharedPool = geometry.attachInstancedPool('shared', secondExtraInstancedDescriptor, {autoDispose: false});
 
       const ownedDispose = sandbox.spy(ownedPool, 'dispose');
       const sharedDispose = sandbox.spy(sharedPool, 'dispose');
@@ -176,7 +188,7 @@ describe('InstancedVertexObjectGeometry', () => {
     test('empties all extra-instanced bookkeeping maps', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       geometry.attachInstancedPool('a', extraInstancedDescriptor);
-      geometry.attachInstancedPool('b', extraInstancedDescriptor, {autoDispose: false});
+      geometry.attachInstancedPool('b', secondExtraInstancedDescriptor, {autoDispose: false});
 
       expect(geometry.extraInstancedPools.size).toBe(2);
       expect(geometry.extraInstancedBuffers.size).toBe(2);

@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `VertexObjectPool#createVO()` to `(VOType & VO) | undefined` — the method returns `undefined` once `usedCount` has reached `capacity`
 - `VertexObjectPool#resize()` throws for every change of capacity while the pool backs a geometry — resizing to the capacity the pool already has stays a no-op and is allowed. The `THREE.BufferAttribute`s and their GPU buffers take their size from the pool capacity exactly once, so a live geometry cannot follow a capacity change
 - `VOBufferGeometry#dispose()` and `InstancedVOBufferGeometry#dispose()` release exactly the pools the geometry created itself, and leave every pool that was handed to the constructor untouched. Both also take the attributes built on the pool buffers off the geometry and drop the index, so nothing keeps the typed arrays alive through the geometry; attributes copied from a `BufferGeometry` passed to `InstancedVOBufferGeometry` stay where they are, because they belong to the caller. A further `update()` on a disposed geometry finds no attributes left to write to — it still sets the draw range and, on `InstancedVOBufferGeometry`, `instanceCount`
-- `InstancedVOBufferGeometry#detachInstancedPool()` takes the attributes that route built off the geometry, and disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, and one that a second route of the same geometry still reads stays alive. Attaching over a name that is already taken runs the same path — the attributes of the route it replaces come off with it — while a pool that takes its own name over again keeps everything it has. A material whose shader still reads an attribute of the detached route cannot render the geometry any more; disposing the geometry goes through.
+- `InstancedVOBufferGeometry#detachInstancedPool()` takes the attributes that route built off the geometry, and disposes a pool that belongs to the geometry as its last route from that geometry goes away. The pool is still returned, so a caller who wants to look at it can. Attaching over a name that is already taken runs the same path — the attributes of the route it replaces come off with it — and the pool taking the name over needs attribute names of its own. Handing the same pool back under the name it already has keeps everything it has. A material whose shader still reads an attribute of the detached route cannot render the geometry any more; disposing the geometry goes through.
 - the `autoDispose` option of `InstancedVOBufferGeometry#attachInstancedPool()` defaults to whether the geometry built the pool itself: a descriptor or description handed in becomes a pool the geometry releases with itself, an existing `VertexObjectPool` stays the caller's. An explicit `autoDispose` still decides
 - `TexturedSprites#createSprite()` and `#freeSprite()` are methods on the mesh and operate on its geometry's sprite pool; `createSprite()` returns `TexturedSprite | undefined` and answers `undefined` once the pool has reached its capacity
 - `float16` attributes are backed by a `Float16Array`; a value written through the generated accessors is stored and read back as a half float. The `TypedArray` union lists `Float16Array` and every other type exactly once. A runtime without `Float16Array` throws on the first `float16` attribute; every other data type is unaffected
@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
 - `TextureResource#dispose()` releases the texture the resource built for itself, and `texture` answers `undefined` afterwards. A texture assigned through the `texture` setter belongs to the caller and is left alone; every other member keeps its last value. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller
+- an attribute slot of an `InstancedVOBufferGeometry` belongs to one route for the whole life of the geometry: `attachInstancedPool()` throws when an attribute of the pool would take a slot this geometry has already had an attribute in, and the geometry is left exactly as it was. The message names the call and the slots it is about. The base route, the instanced route and the attributes copied from a `BufferGeometry` handed to the constructor may still share a name — until the constructor returns, no attribute of the geometry has reached the renderer. Handing the same pool back under the name it already has changes nothing: every attribute stays where it is, and an `autoDispose` passed along with it still takes effect
 
 ### Removed
 
@@ -74,8 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` for a pool that was disposed while the geometry still reads it: the buffers of such a pool are gone, and the geometry leaves the attributes built on them alone
 - fix `InstancedVOBufferGeometry#update()` for the `[pool, capacity, BufferGeometry]` constructor variant: an attribute that none of the geometry's pools declares stays as it is. That is what the attributes copied from the given `BufferGeometry` need — they belong to the caller, and this constructor path has no base pool to resolve them against
 - fix `InstancedVOBufferGeometry#detachInstancedPool()` and both `dispose()` methods: giving up a route removes exactly the attributes that route put on the geometry, even when two pools share their typed arrays or declare the same attribute name. A pool is therefore safe to `resize()` once its last route to any geometry is gone
-- fix the attribute slot a route took over: giving up that route hands the slot back to the route it took it from — an earlier pool route, or an attribute copied from a `BufferGeometry` passed to the `InstancedVOBufferGeometry` constructor
-- fix the pool an attribute name resolves to in `InstancedVOBufferGeometry#update()`: it is the pool that feeds the attribute currently sitting in that slot. Attribute names of extra pools may therefore collide with those of the instanced and base pool
+- fix the attribute slot a route took over: giving up that route hands the slot back to the route it took it from — the base route, or an attribute copied from a `BufferGeometry` passed to the `InstancedVOBufferGeometry` constructor
+- fix the pool an attribute name resolves to in `InstancedVOBufferGeometry#update()`: it is the pool that feeds the attribute currently sitting in that slot. The base and the instanced route may therefore declare the same attribute name
 - fix `TexturedSprites#createSprite()` and `TexturedSprites#freeSprite()` losing their bind to the sprite pool when called as `sprites.createSprite()` and `sprites.freeSprite(sprite)`; both run on the sprite pool of the mesh they are called on
 - fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
@@ -88,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureStore#get()` for a value that is already there when it is called: it resolves with that value, instead of leaving the promise pending for good and reporting a `ReferenceError` through `console.warn`
 - fix the moment a `TextureResource` releases a texture it replaces: the successor is published on the `texture` signal first, and only then does the predecessor fall. No subscriber of the `texture` event, and no read of `TextureResource#texture`, ever reaches a texture that is already disposed
 - fix the clean-up chain of `TextureResource#load()`: every effect it registers is attached to the resource and torn down with it, so `load()` adds no listener of its own to the resource
+- fix the gpu buffer of an attribute that a second route pushed out of an attribute slot of an `InstancedVOBufferGeometry`: it stayed with the renderer with nothing left to reach it. three.js frees one attribute per name through the dispose event of the geometry — the one sitting in the slot at that moment — so the second route is refused instead
 
 ### Migration Guide
 
@@ -189,6 +191,41 @@ const unsubscribe = store.on('hero', 'texture', (texture) => {
 
 store.parse(baseData);
 store.parse(extraData);
+```
+
+#### An attribute slot belongs to one route
+
+`InstancedVOBufferGeometry#attachInstancedPool()` throws when an attribute of the pool would take
+an attribute slot that the geometry has already had an attribute in — including a slot that a
+detached route has left empty. Give each pool attribute names of its own, or build a geometry per
+pool. The same pool under a second name, and the `instancedPool` attached as an extra pool, are
+refused for the same reason.
+
+**Before**
+
+```ts
+const geometry = new InstancedVertexObjectGeometry(instancedDesc, 1000, quadDesc, 1);
+
+// both declare an attribute named 'offset'
+geometry.attachInstancedPool('a', offsetDesc);
+geometry.attachInstancedPool('b', otherOffsetDesc); // the attribute of 'a' is stuck on the gpu
+```
+
+**After**
+
+```ts
+const geometry = new InstancedVertexObjectGeometry(instancedDesc, 1000, quadDesc, 1);
+
+geometry.attachInstancedPool('a', offsetDesc);
+geometry.attachInstancedPool('b', velocityDesc); // 'velocity' is a slot of its own
+```
+
+Replacing a route under a name it already holds still works, as long as the pool taking over
+brings attribute names the geometry has not had yet:
+
+```ts
+geometry.attachInstancedPool('a', offsetDesc);
+geometry.attachInstancedPool('a', velocityDesc); // releases the route 'a' had, takes a free slot
 ```
 
 #### Geometry, material and texture handed in stay the caller's to dispose

@@ -527,6 +527,10 @@ describe('VertexObjectPool', () => {
   describe('geometry attachments', () => {
     const makePool = () => new VertexObjectPool<VO>(descriptor, 10);
 
+    /** A pool whose attribute names are its own, so a route to it fits next to the routes of makePool(). */
+    const makeOtherPool = (attrName = 'somethingElse') =>
+      new VertexObjectPool<VO>({vertexCount: 1, attributes: {[attrName]: {size: 1, type: 'float32'}}}, 10);
+
     // reads the geometry side of the attachment: which attributes still point into the
     // typed arrays of this pool, regardless of how the geometry books its attachments.
     // Two pools that share their typed arrays are indistinguishable here, and so are two
@@ -595,14 +599,14 @@ describe('VertexObjectPool', () => {
 
     test('attachInstancedPool() holds the pool until detachInstancedPool() gives it back', () => {
       const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
-      const extraPool = makePool();
+      const extraPool = makeOtherPool();
 
       geometry.attachInstancedPool('extra', extraPool);
 
       expect(extraPool.isAttachedToGeometry).toBe(true);
       expect(() => extraPool.resize(20)).toThrow();
 
-      expect(attributesBackedBy(geometry, extraPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
+      expect(attributesBackedBy(geometry, extraPool)).toEqual(['somethingElse']);
 
       geometry.detachInstancedPool('extra');
 
@@ -618,7 +622,7 @@ describe('VertexObjectPool', () => {
       const instancedPool = makePool();
       const geometry = new InstancedVOBufferGeometry(instancedPool, 10, basePool, 10);
 
-      const extraPool = new VertexObjectPool<VO>({vertexCount: 1, attributes: {somethingElse: {size: 1, type: 'float32'}}}, 10);
+      const extraPool = makeOtherPool();
 
       geometry.attachInstancedPool('extra', extraPool);
       geometry.detachInstancedPool('extra');
@@ -629,8 +633,8 @@ describe('VertexObjectPool', () => {
 
     test('attaching under a name that is already taken releases the attachment of the pool it replaces', () => {
       const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
-      const replaced = makePool();
-      const replacement = new VertexObjectPool<VO>({vertexCount: 1, attributes: {somethingElse: {size: 1, type: 'float32'}}}, 10);
+      const replaced = makeOtherPool();
+      const replacement = makeOtherPool('yetSomethingElse');
 
       geometry.attachInstancedPool('extra', replaced);
       geometry.attachInstancedPool('extra', replacement);
@@ -641,7 +645,7 @@ describe('VertexObjectPool', () => {
       // the replacement covers none of the attribute names of the pool it displaced, so
       // nothing overwrites them and they have to go with the pool they belong to
       expect(attributesBackedBy(geometry, replaced)).toEqual([]);
-      expect(attributesBackedBy(geometry, replacement)).toEqual(['somethingElse']);
+      expect(attributesBackedBy(geometry, replacement)).toEqual(['yetSomethingElse']);
     });
 
     test('one pool serving as base and instanced pool at once stays held until the geometry is gone', () => {
@@ -657,41 +661,19 @@ describe('VertexObjectPool', () => {
       expect(() => pool.resize(20)).not.toThrow();
     });
 
-    test('one pool attached under two names stays held until both names are gone', () => {
+    test('a pool under a second name is refused, and the route that has it keeps everything', () => {
       const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
-      const shared = makePool();
+      const shared = makeOtherPool();
 
       geometry.attachInstancedPool('one', shared);
-      geometry.attachInstancedPool('two', shared);
 
-      geometry.detachInstancedPool('one');
+      // a second route would push the attributes of 'one' out of their slots, and what leaves a
+      // slot can never be handed back to the renderer
+      expect(() => geometry.attachInstancedPool('two', shared)).toThrow();
 
       expect(shared.isAttachedToGeometry).toBe(true);
-      expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
-      // 'two' claimed the slots after 'one' did, so they stay with 'two'
-      expect(bufferInSlot(geometry, 'foo')).toBe(bufferOfRoute(geometry, 'two', 'foo'));
-
-      geometry.detachInstancedPool('two');
-
-      expect(shared.isAttachedToGeometry).toBe(false);
-      expect(attributesBackedBy(geometry, shared)).toEqual([]);
-    });
-
-    test('one pool attached under two names keeps its attributes while either name still holds it', () => {
-      const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
-      const shared = makePool();
-
-      geometry.attachInstancedPool('one', shared);
-      geometry.attachInstancedPool('two', shared);
-
-      geometry.detachInstancedPool('two');
-
-      // 'one' still reads the very same typed arrays, so the attributes have to stay —
-      // the attachment the pool reports and the attributes on the geometry say the same thing
-      expect(shared.isAttachedToGeometry).toBe(true);
-      expect(attributesBackedBy(geometry, shared)).toEqual(['bar', 'foo', 'plah', 'zack']);
-      // and they are the ones 'one' built: a touch has to reach the buffer that sits in the slot
-      expect(bufferInSlot(geometry, 'foo')).toBe(bufferOfRoute(geometry, 'one', 'foo'));
+      expect(attributesBackedBy(geometry, shared)).toEqual(['somethingElse']);
+      expect(bufferInSlot(geometry, 'somethingElse')).toBe(bufferOfRoute(geometry, 'one', 'somethingElse'));
 
       geometry.detachInstancedPool('one');
 
@@ -699,12 +681,12 @@ describe('VertexObjectPool', () => {
       expect(attributesBackedBy(geometry, shared)).toEqual([]);
     });
 
-    test('the default instanced pool keeps its attributes when it is detached as an extra pool', () => {
+    test('the default instanced pool is refused as an extra pool', () => {
       const instancedPool = makePool();
       const geometry = new InstancedVOBufferGeometry(instancedPool, 10, makePool(), 10);
 
-      geometry.attachInstancedPool('again', instancedPool);
-      geometry.detachInstancedPool('again');
+      // the instanced route filled these slots in the constructor, and they stay with it
+      expect(() => geometry.attachInstancedPool('again', instancedPool)).toThrow();
 
       expect(instancedPool.isAttachedToGeometry).toBe(true);
       expect(attributesBackedBy(geometry, instancedPool)).toEqual(['bar', 'foo', 'plah', 'zack']);
@@ -712,7 +694,7 @@ describe('VertexObjectPool', () => {
 
     test('dispose() releases an extra pool that it leaves untouched otherwise', () => {
       const geometry = new InstancedVOBufferGeometry(makePool(), 10, makePool(), 10);
-      const extraPool = makePool();
+      const extraPool = makeOtherPool();
 
       geometry.attachInstancedPool('extra', extraPool, {autoDispose: false});
       extraPool.createVO();

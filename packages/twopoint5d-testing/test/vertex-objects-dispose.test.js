@@ -80,6 +80,18 @@ describe('vertex-objects — dispose', function () {
     await display.nextFrame();
   }
 
+  /**
+   * The number of attributes the renderer holds before anything of the test is in the scene. The
+   * renderer builds attributes of its own with the first frame, and how many depends on the
+   * backend — chromium falls back to webgl2, firefox runs webgpu. Every count below is compared
+   * against this line, never against a fixed number.
+   */
+  async function attributesBaseline() {
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+    return display.renderer.info.memory.attributes;
+  }
+
   it('a rendered geometry disposes and gives up its slots', async function () {
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
@@ -154,6 +166,55 @@ describe('vertex-objects — dispose', function () {
     expect(display.renderer.info.memory.geometries).to.equal(geometriesBefore - 1);
     expect(Object.keys(geometry.attributes)).to.deep.equal([]);
     expect(geometry.index).to.be.null;
+  });
+
+  it("every attribute of a detached route reaches the renderer's free list", async function () {
+    const attributesBefore = await attributesBaseline();
+    const {geometry, material} = makeGeometryWithExtraRoute();
+    await renderOnce(new VertexObjects(geometry, material));
+
+    geometry.detachInstancedPool('extra');
+    geometry.dispose();
+
+    expect(display.renderer.info.memory.attributes).to.equal(attributesBefore);
+  });
+
+  it("every attribute of a detached route reaches the renderer's free list across a further frame", async function () {
+    const attributesBefore = await attributesBaseline();
+    const {geometry, material} = makeGeometryWithExtraRoute();
+    const mesh = new VertexObjects(geometry, material);
+    await renderOnce(mesh);
+
+    geometry.detachInstancedPool('extra');
+
+    // the slot of the detached route is empty, so the shader may not read it any more
+    const withoutExtra = new MeshBasicNodeMaterial();
+    withoutExtra.positionNode = attribute('position', 'vec3').add(attribute('instanceOffset', 'vec3'));
+    mesh.material = withoutExtra;
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    geometry.dispose();
+
+    expect(display.renderer.info.memory.attributes).to.equal(attributesBefore);
+  });
+
+  it('a route may not take a slot another route filled', async function () {
+    const attributesBefore = await attributesBaseline();
+    const {geometry, material} = makeGeometryWithExtraRoute();
+    await renderOnce(new VertexObjects(geometry, material));
+
+    // instanceOffset sits in a slot the instanced route filled, and the attribute that a second
+    // route pushes out of it could never be handed back to the renderer
+    expect(() => geometry.attachInstancedPool('colliding', instancedDescription)).to.throw(/instanceOffset/);
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    geometry.dispose();
+
+    expect(display.renderer.info.memory.attributes).to.equal(attributesBefore);
   });
 
   it('a rendered geometry disposes after a route was replaced by one with other attributes', async function () {
