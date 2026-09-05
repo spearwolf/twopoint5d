@@ -1,4 +1,4 @@
-import {emit, eventize} from '@spearwolf/eventize';
+import {emit, eventize, getSubscribedEventNames, getSubscriptionCount} from '@spearwolf/eventize';
 import {beforeEach, describe, expect, it} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
 import {FixedFrameLoop, type FixedFrameLoopRenderProps, type FixedFrameLoopTickProps} from './FixedFrameLoop.js';
@@ -146,24 +146,86 @@ describe('FixedFrameLoop', () => {
     expect(sim.alpha).toBe(0);
   });
 
-  it('dispose() unsubscribes from Display and ignores further frames', () => {
-    sim.dispose();
+  describe('dispose()', () => {
+    // (a) has no subject here: this loop builds nothing that needs releasing. It holds the
+    // Display it was handed and a handful of numbers of its own.
 
-    emit(display, OnDisplayRenderFrame, makeFrame(1 / 60));
+    // (b) the Display is handed in and belongs to the caller — the loop leaves it holding
+    // exactly the subscriptions it found on it
+    it('leaves the Display it was handed exactly as it found it', () => {
+      const ownDisplay = makeFakeDisplay();
+      const subscriptionsBefore = getSubscriptionCount(ownDisplay);
 
-    expect(ticks).toHaveLength(0);
-    expect(renders).toHaveLength(0);
-    expect(sim.isDisposed).toBe(true);
-  });
+      const loop = new FixedFrameLoop(ownDisplay, {fps: 60});
 
-  it('dispose() is idempotent', () => {
-    sim.dispose();
-    expect(() => sim.dispose()).not.toThrow();
-    expect(sim.isDisposed).toBe(true);
-  });
+      expect(getSubscriptionCount(ownDisplay), 'the loop subscribes while it is alive').toBeGreaterThan(subscriptionsBefore);
 
-  it('disposes itself when Display fires OnDisplayDispose', () => {
-    emit(display, OnDisplayDispose, display);
-    expect(sim.isDisposed).toBe(true);
+      loop.dispose();
+
+      // naming the events makes a leftover subscription readable in the failure message
+      expect(getSubscribedEventNames(ownDisplay)).toEqual([]);
+      expect(getSubscriptionCount(ownDisplay)).toBe(subscriptionsBefore);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    it('dispose() unsubscribes from Display and ignores further frames', () => {
+      sim.dispose();
+
+      emit(display, OnDisplayRenderFrame, makeFrame(1 / 60));
+
+      expect(ticks).toHaveLength(0);
+      expect(renders).toHaveLength(0);
+      expect(sim.isDisposed).toBe(true);
+    });
+
+    it('behaves as documented after dispose()', () => {
+      emit(display, OnDisplayRenderFrame, makeFrame(0.05));
+
+      const {fps, fixedDelta, tickTime, tickNo, alpha} = sim;
+      expect(tickNo, 'the loop ran before it was disposed').toBe(3);
+      expect(alpha, 'the loop ran before it was disposed').toBeGreaterThan(0);
+
+      sim.dispose();
+
+      expect(sim.isDisposed).toBe(true);
+
+      expect(sim.fps).toBe(fps);
+      expect(sim.fixedDelta).toBe(fixedDelta);
+      expect(sim.tickTime).toBe(tickTime);
+      expect(sim.tickNo).toBe(tickNo);
+      expect(sim.alpha).toBe(alpha);
+
+      sim.reset();
+
+      expect(sim.tickTime, 'reset() after dispose()').toBe(tickTime);
+      expect(sim.tickNo, 'reset() after dispose()').toBe(tickNo);
+      expect(sim.alpha, 'reset() after dispose()').toBe(alpha);
+
+      let lateCalls = 0;
+      sim.onTick(() => {
+        lateCalls += 1;
+      });
+      sim.onRender(() => {
+        lateCalls += 1;
+      });
+
+      emit(display, OnDisplayRenderFrame, makeFrame(0.05));
+
+      expect(lateCalls, 'a handler subscribed after dispose()').toBe(0);
+    });
+
+    // (d) the second call throws nothing and releases nothing a second time
+    it('dispose() is idempotent', () => {
+      sim.dispose();
+      expect(() => sim.dispose()).not.toThrow();
+      expect(sim.isDisposed).toBe(true);
+    });
+
+    it('disposes itself when Display fires OnDisplayDispose', () => {
+      emit(display, OnDisplayDispose, display);
+      expect(sim.isDisposed).toBe(true);
+    });
+
+    // (e) has no subject here: this loop creates neither signals nor effects.
   });
 });

@@ -1,5 +1,6 @@
-import {Color} from 'three/webgpu';
-import {beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
+import {createSandbox} from 'sinon';
+import {Color, RenderTarget} from 'three/webgpu';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
@@ -70,6 +71,47 @@ describe('StageRenderer', () => {
   beforeEach(() => {
     renderer = createRendererMock();
   });
+
+  function makeHost(): IStageRendererHost & {
+    _emitResize: (w: number, h: number) => void;
+    _emitFrame: (now: number, dt: number, frame: number) => void;
+    _unsubs: number;
+  } {
+    let resizeHandler: any;
+    let frameHandler: any;
+    let unsubs = 0;
+    // an honest unsubscribe: the host drops the handler, so a later event reaches nobody.
+    // Counting the calls alone would let a renderer that never unsubscribed pass unnoticed.
+    const makeUnsub = (forget: () => void): StageRendererHostUnsubscribe => {
+      return () => {
+        unsubs += 1;
+        forget();
+      };
+    };
+    return {
+      onResize: (h) => {
+        resizeHandler = h;
+        return makeUnsub(() => {
+          resizeHandler = undefined;
+        });
+      },
+      onRenderFrame: (h) => {
+        frameHandler = h;
+        return makeUnsub(() => {
+          frameHandler = undefined;
+        });
+      },
+      _emitResize(w, h) {
+        resizeHandler?.({width: w, height: h, renderer, now: 0, deltaTime: 0, frameNo: 1});
+      },
+      _emitFrame(now, dt, frameNo) {
+        frameHandler?.({renderer, now, deltaTime: dt, frameNo});
+      },
+      get _unsubs() {
+        return unsubs;
+      },
+    };
+  }
 
   describe('clear policy', () => {
     it('does not clear by default', () => {
@@ -238,38 +280,6 @@ describe('StageRenderer', () => {
   });
 
   describe('parent / host wiring (3.7)', () => {
-    function makeHost(): IStageRendererHost & {
-      _emitResize: (w: number, h: number) => void;
-      _emitFrame: (now: number, dt: number, frame: number) => void;
-      _unsubs: number;
-    } {
-      let resizeHandler: any;
-      let frameHandler: any;
-      let unsubs = 0;
-      const unsub: StageRendererHostUnsubscribe = () => {
-        unsubs += 1;
-      };
-      return {
-        onResize: (h) => {
-          resizeHandler = h;
-          return unsub;
-        },
-        onRenderFrame: (h) => {
-          frameHandler = h;
-          return unsub;
-        },
-        _emitResize(w, h) {
-          resizeHandler({width: w, height: h, renderer, now: 0, deltaTime: 0, frameNo: 1});
-        },
-        _emitFrame(now, dt, frameNo) {
-          frameHandler({renderer, now, deltaTime: dt, frameNo});
-        },
-        get _unsubs() {
-          return unsubs;
-        },
-      };
-    }
-
     it('auto-drives resize + updateFrame + renderTo via a custom host', () => {
       const host = makeHost();
       const sr = new StageRenderer(host);
@@ -421,18 +431,6 @@ describe('StageRenderer', () => {
       sr.pipeline = pipeline as any;
       sr.renderTo(renderer as any);
       expect(rtDuringPipeline).toBe(outRT);
-    });
-
-    it('dispose() releases internal RT and pipeline', () => {
-      const sr = new StageRenderer();
-      sr.resize(50, 50);
-      sr.add(fakeStage('s'));
-      const dispose = vi.fn();
-      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose} as any;
-      sr.renderTo(renderer as any);
-      sr.dispose();
-      expect(dispose).toHaveBeenCalledTimes(1);
-      expect(sr.pipeline).toBeUndefined();
     });
   });
 
@@ -619,5 +617,121 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(sr.pipeline!.needsUpdate).toBe(true);
     });
+  });
+
+  describe('dispose()', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    function makePipelineMock() {
+      return {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+    }
+
+    // (a) a resource the instance built itself is released exactly once
+    it('disposes the render targets it built itself', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.add(fakeStage('s'));
+      sr.pipeline = makePipelineMock() as any;
+
+      // the pipeline path drives the internal pass-target into existence, asPassNode() the second one
+      sr.renderTo(renderer as any);
+      sr.asPassNode(renderer as any);
+
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+      sr.dispose();
+
+      expect(rtDispose.callCount).toBe(2);
+    });
+
+    // (b) a resource handed in belongs to the caller and is not touched
+    it('does NOT dispose a pipeline or an output target that was handed in', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.add(fakeStage('s'));
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      const outputRenderTarget = new RenderTarget(50, 50);
+      sr.outputRenderTarget = outputRenderTarget;
+      const outputRTDispose = sandbox.spy(outputRenderTarget, 'dispose');
+      sr.renderTo(renderer as any);
+
+      sr.dispose();
+
+      expect(pipeline.dispose).not.toHaveBeenCalled();
+      expect(sr.pipeline).toBeUndefined();
+      expect(outputRTDispose.called, 'the output target belongs to the caller').toBe(false);
+      expect(sr.outputRenderTarget).toBe(outputRenderTarget);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    it('behaves as documented after dispose()', () => {
+      const host = makeHost();
+      const sr = new StageRenderer(host);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+
+      host._emitResize(100, 50);
+      host._emitFrame(1, 0.016, 1);
+      expect(stage.renderTo, 'the renderer is driven while it is alive').toHaveBeenCalledTimes(1);
+
+      sr.dispose();
+
+      expect(sr.isDisposed).toBe(true);
+      expect(sr.parent).toBeUndefined();
+      expect(sr.pipeline).toBeUndefined();
+      expect(sr.stages).toEqual([]);
+      expect(sr.orderedStages).toEqual([]);
+
+      // the renderer let go of both host subscriptions — the host has nothing left to call
+      expect(host._unsubs, 'host subscriptions given up').toBe(2);
+
+      // and the host keeps firing: a renderer still wired in would answer here
+      host._emitResize(640, 480);
+      host._emitFrame(2, 0.016, 2);
+
+      expect(stage.updateFrame, 'updateFrame() after dispose()').toHaveBeenCalledTimes(1);
+      expect(stage.renderTo, 'renderTo() after dispose()').toHaveBeenCalledTimes(1);
+      expect(sr.width, 'width after dispose()').toBe(100);
+      expect(sr.height, 'height after dispose()').toBe(50);
+
+      // a disposed renderer takes neither a new host nor a new stage
+      const otherHost = makeHost();
+      expect(sr.attach(otherHost)).toBe(sr);
+      expect(sr.parent, 'parent after attach()').toBeUndefined();
+
+      otherHost._emitFrame(3, 0.016, 3);
+      expect(stage.renderTo, 'renderTo() after attach()').toHaveBeenCalledTimes(1);
+
+      expect(sr.add(fakeStage('late'))).toBe(sr);
+      expect(sr.stages, 'stages after add()').toEqual([]);
+    });
+
+    // (d) the second call throws nothing and releases nothing a second time
+    it('is safe to call twice', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.add(fakeStage('s'));
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+      expect(() => {
+        sr.dispose();
+        sr.dispose();
+      }).not.toThrow();
+
+      expect(rtDispose.callCount).toBe(1);
+      expect(pipeline.dispose).not.toHaveBeenCalled();
+    });
+
+    // (e) has no subject here: this renderer creates neither signals nor effects.
   });
 });

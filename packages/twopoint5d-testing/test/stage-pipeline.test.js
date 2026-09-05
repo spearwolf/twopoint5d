@@ -91,15 +91,30 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses).to.have.length(1);
   });
 
-  it('dispose() releases the pipeline and internal RTs', async () => {
+  it('dispose() drops the pipeline reference and leaves the pipeline itself to its owner', async () => {
     host = makeContainer({width: 200, height: 200});
     display = new Display(host);
     const sr = new StageRenderer(display);
-    sr.pipeline = new RenderPipeline(display.renderer);
+    const pipeline = new RenderPipeline(display.renderer);
+    sr.pipeline = pipeline;
     sr.add(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 200})));
     await display.start();
     await display.nextFrame();
+
+    let disposeCalls = 0;
+    const origDispose = pipeline.dispose.bind(pipeline);
+    pipeline.dispose = (...a) => {
+      disposeCalls += 1;
+      return origDispose(...a);
+    };
+
     sr.dispose();
+
     expect(sr.pipeline).to.be.undefined;
+    expect(disposeCalls, 'the renderer does not dispose a pipeline it was handed').to.equal(0);
+
+    // the owner disposes it, and the pipeline is still there to take the call
+    pipeline.dispose();
+    expect(disposeCalls).to.equal(1);
   });
 });

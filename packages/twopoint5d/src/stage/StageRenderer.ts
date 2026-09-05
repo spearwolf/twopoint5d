@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, once} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {Color, type Node, RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
@@ -182,6 +182,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   set parent(parent: StageRendererParentType | undefined) {
+    if (this.#disposed) return;
+
     if (this.#parent !== parent) {
       this.#removeFromParent();
       this.#parent = parent;
@@ -513,17 +515,60 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
   }
 
+  #disposed = false;
+
+  /** `true` once {@link dispose} has run. */
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
   /**
-   * Release internal `RenderTarget`s and the pipeline (if any).
-   * Call when this renderer is no longer needed.
+   * Release the `RenderTarget`s this renderer built for itself, let go of the host that
+   * drives it, and give up its stages. Call when this renderer is no longer needed.
+   *
+   * A {@link pipeline}, an {@link outputRenderTarget} and every stage were handed in and
+   * belong to the caller: none of them is disposed here. Dispose them where they were built.
+   *
+   * Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages`
+   * and `orderedStages` are empty, and no host event reaches this renderer any more —
+   * `updateFrame()` and `renderTo()` have no stage left to drive. A write to `parent`,
+   * `attach()`, `detach()`, `add()`, `remove()` and a further `dispose()` do nothing.
+   * Every listener on this renderer goes with it, including the `OnStageAdded` and
+   * `OnStageRemoved` subscriptions a caller placed on it.
+   *
+   * The plain state stays writable, it just no longer drives anything: `resize()` writes
+   * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
+   * `setClearColor()` and the clear fields still take values, and `invalidateOutputNode()`
+   * still marks the output node for a rebuild that never comes. `outputRenderTarget`,
+   * `buildOutputNode`, `name` and `renderOrder` keep the values the renderer was left with.
+   * Two calls still build a `RenderTarget` on demand: `asPassNode()`, and `renderTo()` after
+   * a fresh `pipeline` was assigned post-dispose. Either way, a disposed renderer has no
+   * `dispose()` left to free it with.
    */
   dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+
+    // the stages came in through add() and stay the caller's — this renderer only lets go
+    for (const {stage} of this.stages.slice()) {
+      this.remove(stage);
+    }
+
+    // the parent setter refuses a disposed renderer, so the detach runs on the field itself.
+    // #removeFromParent() is what emits OnRemoveFromParent, and that event is what makes the
+    // host subscriptions from #addToHost() unsubscribe.
+    this.#removeFromParent();
+    this.#parent = undefined;
+
     this.#internalRT?.dispose();
     this.#internalRT = undefined;
     this.#asPassNodeRT?.dispose();
     this.#asPassNodeRT = undefined;
-    this.pipeline?.dispose();
+
     this.pipeline = undefined;
+
+    // last: the events above still have to reach the listeners that act on them
+    off(this);
   }
 
   protected renderStage(stageItem: StageItem, renderer: WebGPURenderer): void {
@@ -585,6 +630,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * already uses the same `name` — sort order is ambiguous in that case.
    */
   add(stage: IStage & IRenderable): this {
+    if (this.#disposed) return this;
+
     if (!this.hasStage(stage)) {
       if (this.#renderOrder !== '*' && this.stages.some((item) => item.stage.name === stage.name)) {
         // eslint-disable-next-line no-console

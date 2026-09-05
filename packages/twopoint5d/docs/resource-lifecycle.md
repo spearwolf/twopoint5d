@@ -75,7 +75,10 @@ a repeated `set(undefined)` change nothing, and `Material.dispose()` reaches nob
 second time because its `dispose` event is what makes the renderer's listeners unsubscribe
 themselves. Such a method satisfies this rule by
 construction — but only if that is shown rather than claimed, which is what assertion
-(d) of section 8 is for: a second call throws nothing and releases nothing again.
+(d) of section 8 is for: a second call throws nothing and releases nothing again. A third shape
+guards on the state the method itself gives up instead of on a private flag:
+[`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) returns early on
+`tileFactory === null`, the public member it clears.
 
 Where a caller needs to know the state, expose it as a read-only `isDisposed`
 getter. [`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts) and
@@ -108,7 +111,10 @@ which one is decided by its type:
    `Display#canvas is not available: this display has been disposed`.
 3. **A mutating method with nothing left to act on is a silent no-op.**
    [`TexturedSprites#freeSprite()`](../src/sprites/TexturedSprites/TexturedSprites.ts)
-   returns a sprite to a pool that no longer exists, and simply does nothing.
+   returns a sprite to a pool that no longer exists, and simply does nothing. A method that
+   already turns invalid input away goes on turning it away rather than giving in silently:
+   [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) rejects a capacity
+   that does not match its own, and a disposed pool has none left to match.
 
 What this section rules out has a name: a `TypeError` raised deep inside the class
 because a field quietly became `undefined`. That is none of the three reactions. The

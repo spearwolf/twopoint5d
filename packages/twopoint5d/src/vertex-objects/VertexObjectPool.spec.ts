@@ -708,6 +708,10 @@ describe('VertexObjectPool', () => {
   });
 
   describe('dispose()', () => {
+    // (b) has no subject here: the constructor takes a descriptor and a capacity, not a
+    // resource that would need releasing. Both pools allocate everything they hold.
+
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('VOBufferPool: starts as not disposed and toggles isDisposed on dispose()', () => {
       const pool = new VOBufferPool(descriptor, 10);
 
@@ -718,6 +722,7 @@ describe('VertexObjectPool', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
+    // (a) the buffers the pool built for itself are released
     test('VOBufferPool: resets usedCount and releases typed-array references', () => {
       const pool = new VOBufferPool(descriptor, 10);
 
@@ -741,6 +746,7 @@ describe('VertexObjectPool', () => {
       }
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('VOBufferPool: dispose() is idempotent', () => {
       const pool = new VOBufferPool(descriptor, 4);
 
@@ -753,6 +759,7 @@ describe('VertexObjectPool', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
+    // (a) the vertex objects the pool handed out are unlinked from the buffer it built
     test('VertexObjectPool: clears buffer reference on every tracked VO', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
@@ -771,6 +778,7 @@ describe('VertexObjectPool', () => {
       expect(vo2[voBuffer]).toBeUndefined();
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('VertexObjectPool: getVO() answers nothing after dispose()', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
 
@@ -785,6 +793,7 @@ describe('VertexObjectPool', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('VertexObjectPool: dispose() is idempotent', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
 
@@ -820,5 +829,25 @@ describe('VertexObjectPool', () => {
       expect(vo1[voBuffer]).toBeUndefined();
       expect(vo2[voBuffer]).toBeUndefined();
     });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: toBuffersData() and fromBuffersData() refuse a disposed pool', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2]});
+
+      const buffersData = pool.toBuffersData();
+
+      pool.dispose();
+
+      const read = () => pool.toBuffersData();
+      expect(read, 'the message names the class and the method').toThrow(/VOBufferPool#toBuffersData\(\)/);
+      expect(read, 'the message names the state').toThrow(/disposed/);
+
+      const write = () => pool.fromBuffersData(buffersData);
+      expect(write, 'the message names the class and the method').toThrow(/VOBufferPool#fromBuffersData\(\)/);
+      expect(write, 'the message names the state').toThrow(/disposed/);
+    });
+
+    // (e) has no subject here: neither pool creates a signal or an effect.
   });
 });

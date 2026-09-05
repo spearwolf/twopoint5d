@@ -94,6 +94,10 @@ export class FixedFrameLoop {
   #alpha = 0;
   #disposed = false;
 
+  // the loop puts a listener on a Display it does not own, so it keeps the handle that takes
+  // that listener off again — the Display outlives the loop and would carry it forever
+  readonly #unsubscribeFromDisplayDispose: () => void;
+
   /**
    * Hard upper bound on simulation ticks per render frame. Prevents the
    * "spiral of death" where slow rendering accumulates more sim work
@@ -147,7 +151,7 @@ export class FixedFrameLoop {
     this.maxStepsPerFrame = options?.maxStepsPerFrame ?? FixedFrameLoop.DefaultMaxStepsPerFrame;
 
     on(display, OnDisplayRenderFrame, this as FixedFrameLoop);
-    once(display, OnDisplayDispose, () => this.dispose());
+    this.#unsubscribeFromDisplayDispose = once(display, OnDisplayDispose, () => this.dispose());
   }
 
   [OnDisplayRenderFrame](props: DisplayEventProps): void {
@@ -188,18 +192,37 @@ export class FixedFrameLoop {
    * `Display` subscription stays active. Useful when changing scenes or
    * after a long external pause where the simulation history should be
    * discarded rather than caught up.
+   *
+   * Does nothing once {@link dispose} has run: a disposed loop keeps the
+   * values it was left with.
    */
   reset(): void {
+    if (this.#disposed) return;
+
     this.#accumulator = 0;
     this.#tickTime = 0;
     this.#tickNo = 0;
     this.#alpha = 0;
   }
 
+  /**
+   * Stop the loop and let the `Display` go. The `Display` is handed to the constructor and
+   * belongs to the caller: it is not disposed, and it is left holding exactly the
+   * subscriptions it carried before this loop was built.
+   *
+   * Afterwards `isDisposed` is `true` and no further `OnTick` or `OnRender` is emitted — a
+   * handler subscribed through {@link onTick} or {@link onRender} after this call is never
+   * reached. `display`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left
+   * with; nothing behind them was released. {@link reset} and a further `dispose()` do
+   * nothing. `fps` and `maxStepsPerFrame` stay writable and keep their values until someone
+   * writes them: a write lands, `fps` recomputes `fixedDelta` with it, and no tick ever
+   * reads either one again.
+   */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
     off(this.display, OnDisplayRenderFrame, this);
+    this.#unsubscribeFromDisplayDispose();
     off(this);
   }
 

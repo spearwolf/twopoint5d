@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
+- add `StageRenderer#isDisposed`: `true` once `dispose()` has run, so a caller holding a renderer it did not create has a question it can ask
 
 ### Changed
 
@@ -62,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureResource#dispose()` releases the texture the resource built for itself, and `texture` answers `undefined` afterwards. A texture assigned through the `texture` setter belongs to the caller and is left alone; every other member keeps its last value. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller
 - an attribute slot of an `InstancedVOBufferGeometry` belongs to one route for the whole life of the geometry: `attachInstancedPool()` throws when an attribute of the pool would take a slot this geometry has already had an attribute in, and the geometry is left exactly as it was. The message names the call and the slots it is about. The base route, the instanced route and the attributes copied from a `BufferGeometry` handed to the constructor may still share a name — until the constructor returns, no attribute of the geometry has reached the renderer. Handing the same pool back under the name it already has changes nothing: every attribute stays where it is, and an `autoDispose` passed along with it still takes effect
+- `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
+- `VOBufferPool#toBuffersData()` and `#fromBuffersData()` throw on a disposed pool, with a message naming the class, the method and the state. The return type of `toBuffersData()` promises the buffers of a live pool, and a disposed one has none to answer with; `fromBuffersData()` turns away a capacity it cannot serve, as it already does for a capacity that does not match its own. `VertexObjectPool` inherits both
 
 ### Removed
 
@@ -93,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the clean-up chain of `TextureResource#load()`: every effect it registers is attached to the resource and torn down with it, so `load()` adds no listener of its own to the resource
 - fix the `TileBox` pool of `CameraBasedVisibility`: every recomputation that finds the map plane leaves it holding the tiles that run visited and no others, and a frame in which the camera looks past the plane leaves it as it stands. A camera travelling far no longer leaves a `Box3`, a `Vector3` and a `Map2DTileCoords` behind per tile it has passed, and a tile that stays visible keeps its pooled objects as before
 - fix the gpu buffer of an attribute that a second route pushed out of an attribute slot of an `InstancedVOBufferGeometry`: it stayed with the renderer with nothing left to reach it. three.js frees one attribute per name through the dispose event of the geometry — the one sitting in the slot at that moment — so the second route is refused instead
+- fix the listener `FixedFrameLoop` leaves on its `Display`: the loop takes its own `OnDisplayDispose` subscription off again, so a display that outlives a series of short-lived loops no longer collects one closure over a spent loop per loop
 
 ### Migration Guide
 
@@ -852,6 +857,35 @@ unsubscribe();
 const unsubscribe = frameLoop.start(target);
 unsubscribe?.(); // or use frameLoop.stop(target)
 ```
+
+#### A disposed `StageRenderer` leaves its pipeline alone
+
+`StageRenderer#dispose()` releases the render targets the renderer built for itself. A
+`pipeline` was assigned from outside and is disposed by whoever built it. The case that slips
+through without a compile error is a renderer that was the only thing holding the pipeline.
+
+**Before**
+
+```ts
+const sr = new StageRenderer(display);
+sr.pipeline = new RootRenderPipeline(display.renderer!);
+
+sr.dispose(); // the pipeline went with it
+```
+
+**After**
+
+```ts
+const sr = new StageRenderer(display);
+const pipeline = new RootRenderPipeline(display.renderer!);
+sr.pipeline = pipeline;
+
+sr.dispose();
+
+pipeline.dispose(); // built by the caller, released by the caller
+```
+
+A renderer without a pipeline needs no change.
 
 ## [0.21.2] - 2026-06-19
 

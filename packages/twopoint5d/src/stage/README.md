@@ -426,9 +426,12 @@ new StageRenderer(host).add(stage);
 
 - Internal `RenderTarget`s are created lazily on first render and resized
   in `resize(width, height)`.
-- `StageRenderer.dispose()` releases both internal RTs and `this.pipeline`.
+- `StageRenderer.dispose()` releases both internal RTs, and nothing else. It also
+  detaches from its host and drops its stages, so a disposed renderer is no longer
+  driven by any frame loop.
 - `Display.dispose()` releases the renderer + canvas.
-- Stages added via `add()` are not auto-disposed — the caller owns them.
+- Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
+  `pipeline` or an `outputRenderTarget` assigned from outside.
 
 ---
 
@@ -447,10 +450,10 @@ new StageRenderer(host).add(stage);
 - **`buildOutputNode` + non-pass stages**: every stage in the list must
   implement `asPassNode()`. `ClearStage` doesn't — keep it for non-pipeline
   layering only. The renderer throws with a clear message in that case.
-- **Pipeline lifecycle**: when you replace a renderer's `pipeline` or
-  `outputRenderTarget`, dispose the previous instance yourself if you no
-  longer need it; the renderer only disposes what it owns (its internal
-  RTs and the assigned `pipeline` on `StageRenderer.dispose()`).
+- **Pipeline lifecycle**: a `pipeline` and an `outputRenderTarget` belong to
+  whoever assigned them. Dispose the previous instance yourself when you replace
+  one, and dispose the current one when you dispose the renderer; the renderer
+  only releases what it owns — its internal RTs.
 - **Mixed pipeline / plain writers to the canvas**: don't mix a
   `pipeline.render()` and a plain `renderer.render(scene, camera)` on the
   same canvas in the same frame. Compose everything via one outer pipeline

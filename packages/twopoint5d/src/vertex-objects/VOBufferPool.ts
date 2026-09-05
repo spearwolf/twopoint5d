@@ -2,6 +2,12 @@ import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
+// one message for every method that refuses to work once the pool is gone, so the class, the
+// method and the state are always in the text a caller reads out of a foreign stack
+function disposedError(method: string): Error {
+  return new Error(`VOBufferPool#${method} is not available: this pool has been disposed`);
+}
+
 export class VOBufferPool {
   readonly descriptor: VertexObjectDescriptor;
   readonly capacity: number;
@@ -77,7 +83,8 @@ export class VOBufferPool {
    * so the underlying `ArrayBuffer`s can be reclaimed by the garbage collector
    * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
    * the array reference. After `dispose()` the pool is **dead**: any further
-   * read/write operation on its vertex objects will fail. The method is idempotent.
+   * read/write operation on its vertex objects will fail, and
+   * {@link toBuffersData} and {@link fromBuffersData} throw. The method is idempotent.
    *
    * NOTE: `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
    * that were created on top of this pool — the geometry that owns those is
@@ -100,7 +107,16 @@ export class VOBufferPool {
     return [objectCount, firstObjectIndex];
   }
 
+  /**
+   * Snapshot of the buffers this pool holds, for transfer or for handing to a second pool.
+   *
+   * Throws on a disposed pool: the return type promises the buffers of a live pool, and an
+   * empty snapshot would read like an untouched pool rather than a spent one.
+   */
   toBuffersData(): VertexObjectBuffersData {
+    if (this.#disposed) {
+      throw disposedError('toBuffersData()');
+    }
     return {
       capacity: this.capacity,
       usedCount: this.usedCount,
@@ -114,11 +130,18 @@ export class VOBufferPool {
   /**
    * NOTE: The capacity should be the same as the original pool.
    *
+   * Throws on a disposed pool, which has no capacity left to serve: the method turns away a
+   * mismatched capacity as it is, and a silent no-op here would let a caller believe the data
+   * arrived.
+   *
    * @param copyTypedArrays By default, the typed-array references are simply shared (zero-copy) if possible.
    *                        But if `copyTypedArrays` is set to `true` or the typed-array from the input is smaller
    *                        than the current array from the buffer then the data is copied.
    */
   fromBuffersData(buffersData: VertexObjectBuffersData, copyTypedArrays = false): void {
+    if (this.#disposed) {
+      throw disposedError('fromBuffersData()');
+    }
     if (buffersData.capacity !== this.capacity) {
       throw new Error('Invalid buffersData capacity');
     }
