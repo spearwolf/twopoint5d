@@ -348,8 +348,19 @@ export class Display {
     return (this.renderer?.backend as any)?.['isWebGLBackend'] ?? false;
   }
 
-  readonly #waitForRenderer!: Promise<WebGPURenderer>;
+  readonly #waitForRenderer: Promise<WebGPURenderer>;
 
+  /**
+   * Create a display around a canvas, around a container element that gets a canvas of its own,
+   * or around a `WebGPURenderer` that is already built.
+   *
+   * A renderer handed in here is adopted, not borrowed: the display takes it and its
+   * `domElement` as its own, and {@link Display.dispose} calls `renderer.dispose()` on the way
+   * out. A renderer that has to outlive this display therefore does not belong in here.
+   *
+   * @param domElementOrRenderer a `<canvas>`, any other `HTMLElement` to host a canvas, or a
+   *   ready-made `WebGPURenderer`
+   */
   constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
     retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
@@ -409,9 +420,11 @@ export class Display {
         powerPreference: 'high-performance',
         ...options,
       } as CreateRendererParameters);
-
-      this.#waitForRenderer = this.renderer.init();
     }
+
+    // Both construction paths end with a renderer and both have to wait for the same promise.
+    // One assignment, so a path that gets added later cannot leave the field empty.
+    this.#waitForRenderer = this.renderer!.init();
 
     this.frameLoop = new FrameLoop(options?.maxFps ?? 0, this.renderer);
 

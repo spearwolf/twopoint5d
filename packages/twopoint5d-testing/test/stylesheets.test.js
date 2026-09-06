@@ -6,16 +6,33 @@ function uniqueName(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function ruleCount() {
-  return Stylesheets.getGlobalSheet().cssRules.length;
+function ruleCount(root) {
+  return Stylesheets.getGlobalSheet(root).cssRules.length;
 }
 
-function findRule(className) {
+function findRule(className, root) {
   const selector = `.${className}`;
-  return Array.from(Stylesheets.getGlobalSheet().cssRules).find((rule) => rule.selectorText === selector);
+  return Array.from(Stylesheets.getGlobalSheet(root).cssRules).find((rule) => rule.selectorText === selector);
 }
 
 describe('Stylesheets', function () {
+  /** @type {HTMLElement[]} */
+  let hosts = [];
+
+  function makeShadowRoot() {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    hosts.push(host);
+    return host.attachShadow({mode: 'open'});
+  }
+
+  afterEach(() => {
+    for (const host of hosts) {
+      host.remove();
+    }
+    hosts = [];
+  });
+
   it('installs one rule per name, whatever the css', () => {
     const name = uniqueName('one-rule-per-name');
     const before = ruleCount();
@@ -44,5 +61,22 @@ describe('Stylesheets', function () {
     Stylesheets.installRule(name, 'cursor: pointer;');
 
     expect(ruleCount() - before, 'rules added to the global sheet').to.equal(1);
+  });
+
+  it('installs its rule in the root it was given', () => {
+    const rootA = makeShadowRoot();
+    const rootB = makeShadowRoot();
+
+    const name = uniqueName('per-root');
+    const classNameA = Stylesheets.installRule(name, 'cursor: pointer;', rootA);
+    const classNameB = Stylesheets.installRule(name, 'cursor: pointer;', rootB);
+
+    expect(Stylesheets.getGlobalSheet(rootA), 'the sheet of the first shadow root').to.not.equal(
+      Stylesheets.getGlobalSheet(rootB),
+    );
+    expect(Stylesheets.getGlobalSheet(rootA), 'the sheet of the first shadow root').to.not.equal(Stylesheets.getGlobalSheet());
+
+    expect(findRule(classNameA, rootA), 'the rule inside the first shadow root').to.exist;
+    expect(findRule(classNameB, rootB), 'the rule inside the second shadow root').to.exist;
   });
 });

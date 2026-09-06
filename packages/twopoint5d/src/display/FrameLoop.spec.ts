@@ -106,6 +106,28 @@ describe('FrameLoop', () => {
     expect(events[30]!.measuredFps).toBe(60);
   });
 
+  it('averages the fps over MEASURE_COLLECTION_SIZE samples, not one more', () => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(0, renderer);
+    const {events} = subscribe(loop);
+
+    // A sample is taken every 30th frame. Sample 2 runs at 30fps, every other one at 60:
+    // a window of ten has let go of sample 2 by the time sample 12 arrives, a window of
+    // eleven still carries it.
+    let now = 1000;
+    renderer.tick(now);
+    for (let sample = 1; sample <= 12; sample++) {
+      const dt = sample === 2 ? 1000 / 30 : 1000 / 60;
+      for (let i = 0; i < 30; i++) {
+        now += dt;
+        renderer.tick(now);
+      }
+    }
+
+    expect(events).toHaveLength(361);
+    expect(events[360]!.measuredFps, 'the average over the last ten samples').toBe(60);
+  });
+
   it('maxFps throttles emissions to the target rate', () => {
     const renderer = makeFakeRenderer();
     const loop = new FrameLoop(30, renderer);
@@ -230,9 +252,25 @@ describe('FrameLoop', () => {
     expect(loop.subscriptionCount).toBe(1);
     expect(typeof unsubscribe).toBe('function');
 
-    unsubscribe!();
+    unsubscribe();
 
     expect(loop.subscriptionCount).toBe(0);
+  });
+
+  it('start() hands back an unsubscribe function for a target that is already on the loop', () => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(0, renderer);
+
+    const target = {[FrameLoop.OnFrame]() {}};
+    loop.start(target);
+    const unsubscribe = loop.start(target);
+
+    expect(loop.subscriptionCount, 'the second start() adds nothing').toBe(1);
+    expect(typeof unsubscribe, 'what the second start() hands back').toBe('function');
+
+    unsubscribe();
+
+    expect(loop.subscriptionCount, 'after the returned function ran').toBe(0);
   });
 
   it('clear() removes all subscribers', () => {

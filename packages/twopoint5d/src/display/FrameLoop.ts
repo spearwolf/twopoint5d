@@ -130,13 +130,16 @@ class RAF {
 
       this.measuredFpsCollection.push(measuredFps);
 
+      // Trimmed before it is averaged: a collection that still carries the sample beyond the
+      // window would average over one value more than the window is named for.
+      while (this.measuredFpsCollection.length > MEASURE_COLLECTION_SIZE) {
+        this.measuredFpsCollection.shift();
+      }
+
       if (this.measuredFpsCollection.length >= MEASURE_COLLECTION_SIZE) {
         this.measuredFps = Math.round(
           this.measuredFpsCollection.reduce((sum, fps) => sum + fps, 0) / this.measuredFpsCollection.length,
         );
-        while (this.measuredFpsCollection.length > MEASURE_COLLECTION_SIZE) {
-          this.measuredFpsCollection.shift();
-        }
       } else {
         this.measuredFps = measuredFps;
       }
@@ -211,20 +214,22 @@ export class FrameLoop {
   }
 
   /**
-   * @returns a function that unsubscribes `target` again, or `undefined` if there was nothing
-   *          to subscribe: a missing `target`, or one that is already on the loop.
+   * Subscribe `target` to the loop.
+   *
+   * A `target` that is already on the loop stays subscribed exactly once.
+   *
+   * @returns a function that takes `target` off the loop again — every call hands one back.
    */
-  start(target: object): (() => void) | undefined {
-    if (target == null) return;
-    if (this.#subscribers.has(target)) return;
+  start(target: object): () => void {
+    if (target != null && !this.#subscribers.has(target)) {
+      this.#subscribers.add(target);
 
-    this.#subscribers.add(target);
+      if (this.subscriptionCount === 1) {
+        this.raf.attach(this);
+      }
 
-    if (this.subscriptionCount === 1) {
-      this.raf.attach(this);
+      on(this as FrameLoop, FrameLoop.OnFrame, target);
     }
-
-    on(this as FrameLoop, FrameLoop.OnFrame, target);
 
     return () => {
       this.stop(target);

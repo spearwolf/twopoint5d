@@ -61,6 +61,17 @@ export interface PanControl2DOptions {
 
   cursorStylesTarget?: HTMLElement;
 
+  /**
+   * The root the cursor style rule is installed in. Default is `document.head`.
+   *
+   * A rule only reaches the elements of the root it sits in, so a control whose
+   * `cursorStylesTarget` lives inside a shadow root has to name that root here — otherwise the
+   * target carries the cursor class without a rule behind it. Both options have to mean the same
+   * root: a `styleSheetRoot` named here while `cursorStylesTarget` stays on `document.body` puts
+   * the class just as far out of the rule's reach.
+   */
+  styleSheetRoot?: HTMLElement | ShadowRoot;
+
   /** Scroll speed while using the keys. Pixels per seconds. Default is 100. */
   speed?: number;
 
@@ -108,6 +119,7 @@ export class PanControl2D extends InputControlBase {
   #cursorPanStyle!: string;
   #cursorPanClass?: string;
   #cursorStylesTarget?: HTMLElement;
+  #styleSheetRoot: HTMLElement | ShadowRoot;
   #hideCursorState = HideCursorState.NO;
 
   mouseButton: number;
@@ -123,6 +135,10 @@ export class PanControl2D extends InputControlBase {
     this.panView = options?.state;
 
     this.pixelsPerSecond = readOption(options, 'speed', 100);
+
+    // before the cursorPanStyle below: the setter installs the rule, and it has to know by
+    // then which root the rule belongs in
+    this.#styleSheetRoot = readOption(options, 'styleSheetRoot', document.head);
 
     this.cursorPanStyle = readOption(options, 'cursorPanStyle', 'none');
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
@@ -143,11 +159,12 @@ export class PanControl2D extends InputControlBase {
    * Set the cursor css style shown while panning.
    *
    * On a disposed control the write is refused and the getter keeps its last value: the style
-   * rule behind it is shared by every control of the module.
+   * rule behind it is shared by every control that writes into the same
+   * {@link PanControl2DOptions.styleSheetRoot}.
    */
   set cursorPanStyle(value: string) {
-    // the rule is installed under one name for the whole module and shared by every control
-    // of it — a disposed control does not get to rewrite what the living ones are showing
+    // the rule is installed under one name per root and shared by every control writing into
+    // that root — a disposed control does not get to rewrite what the living ones are showing
     if (this.isDisposed) return;
 
     if (this.#cursorPanStyle !== value) {
@@ -157,7 +174,7 @@ export class PanControl2D extends InputControlBase {
   }
 
   #installCursorPanStyleRules = (): string =>
-    Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`);
+    Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`, this.#styleSheetRoot);
 
   // Assigned in the constructor through the `panView` setter, which substitutes a default for a missing state.
   #panView!: PanViewState;
@@ -385,11 +402,12 @@ export class PanControl2D extends InputControlBase {
    * reaches this control any more. {@link update} still moves {@link panView} by the speed
    * fields a caller sets by hand — what it no longer delivers is a pan from a drag before the
    * call. A write to {@link cursorPanStyle} is refused: it would rewrite a style rule every
-   * control of the module shares. `pixelsPerSecond`, `mouseButton`, `keyCodes`,
-   * `keyboardDisabled`, `pointerDisabled`, `panView` and the four `speed…` fields still take
-   * values, they just drive nothing. A control that was hiding the cursor emits one last
-   * `restoreCursor` while its subscribers can still hear it; after that every listener on this
-   * control goes with it, and a further `dispose()` does nothing.
+   * control writing into the same {@link PanControl2DOptions.styleSheetRoot} shares.
+   * `pixelsPerSecond`, `mouseButton`, `keyCodes`, `keyboardDisabled`, `pointerDisabled`,
+   * `panView` and the four `speed…` fields still take values, they just drive nothing. A
+   * control that was hiding the cursor emits one last `restoreCursor` while its subscribers
+   * can still hear it; after that every listener on this control goes with it, and a further
+   * `dispose()` does nothing.
    */
   override dispose(): void {
     if (this.isDisposed) return;
