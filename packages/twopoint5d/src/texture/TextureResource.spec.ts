@@ -168,9 +168,10 @@ describe('TextureResource', () => {
 
       expect(resource.texture).toBeUndefined();
       expect(resource.id).toBe('documented');
-      expect(resource.imageUrl).toBe('documented.png');
-      expect(resource.imageCoords?.width).toBe(8);
-      expect(resource.textureFactory).toBeDefined();
+      expect(resource.type).toBe('image');
+      expect(resource.imageUrl).toBeUndefined();
+      expect(resource.imageCoords).toBeUndefined();
+      expect(resource.textureFactory).toBeUndefined();
       expect(() => {
         resource.texture = undefined;
       }).not.toThrow();
@@ -217,6 +218,29 @@ describe('TextureResource', () => {
       expect(getSubscriptionCount(resource)).toBe(before);
 
       resource.dispose();
+    });
+
+    test('load() on a disposed resource registers nothing', () => {
+      const baselineSignals = getSignalsCount();
+      const baselineEffects = getEffectsCount();
+
+      const resource = TextureResource.fromImage('late', 'late.png');
+      resource.dispose();
+
+      expect(getSignalsCount()).toBe(baselineSignals);
+      expect(getEffectsCount()).toBe(baselineEffects);
+
+      resource.load();
+
+      expect(getSignalsCount()).toBe(baselineSignals);
+      expect(getEffectsCount()).toBe(baselineEffects);
+
+      // nothing this resource could still tear down: the second call returns at the flag,
+      // so whatever load() registered here would stay for the life of the process
+      resource.dispose();
+
+      expect(getSignalsCount()).toBe(baselineSignals);
+      expect(getEffectsCount()).toBe(baselineEffects);
     });
   });
 });

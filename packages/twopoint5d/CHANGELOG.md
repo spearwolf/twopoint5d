@@ -60,8 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
-- `TextureResource#dispose()` releases the texture the resource built for itself, and `texture` answers `undefined` afterwards. A texture assigned through the `texture` setter belongs to the caller and is left alone; every other member keeps its last value. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
-- a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller
+- `TextureResource#dispose()` releases the texture the resource built for itself. A texture assigned through the `texture` setter belongs to the caller and is left alone. Afterwards every getter of the resource answers `undefined`, while `id` and `type` still say which resource this was, and a write to a setter, a `load()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller. That dispose event is also the last event the store emits; afterwards `renderer` and `textureFactory` answer `undefined`, `parse()`, `load()`, `on()`, `onResource()` and a write to `renderer` do nothing, and `defaultTextureClasses` keeps its last value — a configuration array is no resource, and the answer stays right
 - an attribute slot of an `InstancedVOBufferGeometry` belongs to one route for the whole life of the geometry: `attachInstancedPool()` throws when an attribute of the pool would take a slot this geometry has already had an attribute in, and the geometry is left exactly as it was. The message names the call and the slots it is about. The base route, the instanced route and the attributes copied from a `BufferGeometry` handed to the constructor may still share a name — until the constructor returns, no attribute of the geometry has reached the renderer. Handing the same pool back under the name it already has changes nothing: every attribute stays where it is, and an `autoDispose` passed along with it still takes effect
 - `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
@@ -225,6 +225,37 @@ const unsubscribe = store.on('hero', 'texture', (texture) => {
 
 store.parse(baseData);
 store.parse(extraData);
+```
+
+#### A disposed texture store and its resources go quiet
+
+Once `TextureStore#dispose()` has run, `renderer` and `textureFactory` answer `undefined`, and
+`parse()`, `load()`, `on()`, `onResource()` and a write to `renderer` do nothing. The same holds
+for the resources it handed out: every getter of a disposed `TextureResource` answers `undefined`
+and its `load()` registers nothing, while `id` and `type` still say which resource it was.
+
+Nothing here shows up as a compile error — the getters are typed `T | undefined` either way. Read
+what you need while the store is alive, and keep the value rather than the store.
+
+**Before**
+
+```ts
+const resource = await store.whenResource('hero');
+
+store.dispose();
+
+resource.load(); // registers effects that no dispose() can take down again
+const tileSet = resource.tileSet; // a tile set out of a resource that is already gone
+```
+
+**After**
+
+```ts
+const resource = await store.whenResource('hero');
+resource.load();
+const tileSet = resource.tileSet;
+
+store.dispose(); // the value you took stays; the resource says nothing more
 ```
 
 #### An attribute slot belongs to one route

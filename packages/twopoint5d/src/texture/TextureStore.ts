@@ -119,6 +119,13 @@ export class TextureStore {
 
   #defaultTextureClasses = createSignal<TextureOptionClasses[]>([], {compare: cmpDefaultClasses, attach: this});
 
+  /**
+   * The texture classes every resource of this store starts from, merged with whatever an
+   * item names for itself.
+   *
+   * Keeps its last value once {@link TextureStore.dispose} has run: a configuration array
+   * is no resource, and the answer stays right.
+   */
   get defaultTextureClasses(): TextureOptionClasses[] {
     return this.#defaultTextureClasses.value;
   }
@@ -130,8 +137,14 @@ export class TextureStore {
   #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
   #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
 
+  /**
+   * The renderer this store builds its textures with, or `undefined` while none is set.
+   *
+   * Answers `undefined` once {@link TextureStore.dispose} has run, whatever is written
+   * to the setter afterwards.
+   */
   get renderer(): WebGPURenderer | undefined {
-    return this.#renderer.value;
+    return this.#disposed ? undefined : this.#renderer.value;
   }
 
   set renderer(value: WebGPURenderer | undefined) {
@@ -142,9 +155,11 @@ export class TextureStore {
    * The shared `TextureFactory` used to materialize textures for every resource
    * managed by this store. Re-created automatically whenever `renderer` changes;
    * consumers should not assign it directly.
+   *
+   * Answers `undefined` once {@link TextureStore.dispose} has run.
    */
   get textureFactory(): TextureFactory | undefined {
-    return this.#textureFactory.value;
+    return this.#disposed ? undefined : this.#textureFactory.value;
   }
 
   #resources = new Map<string, TextureResource>();
@@ -168,7 +183,16 @@ export class TextureStore {
     this.renderer = renderer;
   }
 
+  /**
+   * Call `callback` with the resource `id` — right away if it is already there, otherwise
+   * as soon as a {@link TextureStore.parse} brings it.
+   *
+   * On a disposed store this does nothing: the callback is never called, and the returned
+   * unsubscribe function has nothing to take back.
+   */
   onResource(id: string, callback: (resource: TextureResource) => void): () => void {
+    if (this.#disposed) return () => {};
+
     const resource = this.#resources.get(id);
     if (resource) {
       callback(resource);
@@ -234,8 +258,12 @@ export class TextureStore {
    * With `{evictMissing: true}` the parse step also disposes and removes every resource
    * the new data no longer names and whose `refCount` is 0 — see
    * {@link TextureStoreParseOptions.evictMissing} for what that count covers.
+   *
+   * On a disposed store this does nothing — nothing is fetched — and returns `this`.
    */
   load(url: string | URL, options?: TextureStoreParseOptions) {
+    if (this.#disposed) return this;
+
     void (async () => {
       let response: Response;
       try {
@@ -271,8 +299,12 @@ export class TextureStore {
    * {@link TextureStore.clearUnused} applies, narrowed to the resources that fell out
    * of the data. See {@link TextureStoreParseOptions.evictMissing} for what that count
    * covers, and what it does not.
+   *
+   * On a disposed store this does nothing: no resource is built, and none is updated.
    */
   parse(data: TextureStoreData, options?: TextureStoreParseOptions) {
+    if (this.#disposed) return;
+
     if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
       this.defaultTextureClasses = data.defaultTextureClasses.slice();
     }
@@ -366,11 +398,21 @@ export class TextureStore {
     }
   }
 
+  /**
+   * Subscribe to the given subtype(s) of the resource `id`, for as long as the returned
+   * function is not called. The callback fires whenever the value — or, for several
+   * subtypes, every value of the tuple — is there.
+   *
+   * On a disposed store this does nothing: the callback is never called, and the returned
+   * unsubscribe function has nothing to take back.
+   */
   on<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
     callback: (val: MapSubTypes<T>) => void,
   ): () => void {
+    if (this.#disposed) return () => {};
+
     const isMultipleTypes = Array.isArray(type);
     const values = isMultipleTypes
       ? new Map<TextureResourceSubType, TextureResourceSubTypeMap[TextureResourceSubType]>()
@@ -551,12 +593,23 @@ export class TextureStore {
    * {@link TextureStore.whenReady} and {@link TextureStore.whenResource} that is still
    * pending is rejected. The renderer belongs to whoever handed it in and is not
    * disposed. A second call does nothing.
+   *
+   * The dispose event is the last event this store emits. Afterwards
+   * {@link TextureStore.renderer} and {@link TextureStore.textureFactory} answer
+   * `undefined`, and {@link TextureStore.parse}, {@link TextureStore.load},
+   * {@link TextureStore.on}, {@link TextureStore.onResource} and a write to `renderer`
+   * do nothing. {@link TextureStore.defaultTextureClasses} keeps its last value.
    */
   dispose() {
     if (this.#disposed) return;
     this.#disposed = true;
 
+    // the listeners are still attached here: this event is what tells them to let go,
+    // and off(this) below is what makes it the last event this store ever emits — the
+    // clean-up underneath gives the renderer up, and the change bridge would otherwise
+    // follow the dispose event with a rendererChanged
     emit(this, OnDispose);
+    off(this);
 
     for (const resource of this.#resources.values()) {
       resource.dispose();
@@ -565,7 +618,5 @@ export class TextureStore {
 
     this.#renderer.set(undefined);
     SignalGroup.delete(this);
-
-    off(this);
   }
 }

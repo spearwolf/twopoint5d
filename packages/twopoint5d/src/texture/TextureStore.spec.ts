@@ -1,4 +1,5 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
+import {getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
@@ -157,6 +158,118 @@ describe('TextureStore', () => {
       store.dispose();
 
       await expect(pending).rejects.toThrow(/this store has been disposed/);
+    });
+
+    test('emits nothing after the dispose event', () => {
+      // the store never reads the renderer it is given; it only has to be something
+      const store = new TextureStore({backend: {}} as never);
+
+      const events: string[] = [];
+      on(store, TextureStoreEvents.Dispose, () => {
+        events.push(TextureStoreEvents.Dispose);
+      });
+      on(store, TextureStoreEvents.RendererChanged, () => {
+        events.push(TextureStoreEvents.RendererChanged);
+      });
+
+      // rendererChanged is retained, so subscribing replays the renderer that is already there
+      events.length = 0;
+
+      store.dispose();
+
+      expect(events).toEqual([TextureStoreEvents.Dispose]);
+
+      // and nothing reaches a listener that arrives afterwards either: the store lets its
+      // retain policies go along with its listeners, so there is no replay left to catch
+      const late: string[] = [];
+      for (const event of Object.values(TextureStoreEvents)) {
+        on(store, event, () => {
+          late.push(event);
+        });
+      }
+
+      expect(late).toEqual([]);
+    });
+
+    test('parse() on a disposed store builds no resources', () => {
+      const store = new TextureStore();
+      store.dispose();
+
+      const signalsAfterDispose = getSignalsCount();
+
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+      store.parse({defaultTextureClasses: [], items: {b: {imageUrl: 'b.png'}}});
+      store.parse({defaultTextureClasses: [], items: {c: {imageUrl: 'c.png'}}});
+
+      expect(getSignalsCount()).toBe(signalsAfterDispose);
+      expect(store.clearUnused()).toBe(0);
+    });
+
+    test('load() on a disposed store does not fetch', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+      try {
+        const store = new TextureStore();
+        store.dispose();
+
+        store.load('http://example.test/data.json');
+        await flushMicrotasks();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+
+    test('on() and onResource() on a disposed store leave no subscription', () => {
+      const store = new TextureStore();
+      store.dispose();
+
+      const base = getSubscriptionCount(store);
+
+      const unsubscribe = [
+        store.on('a', 'texture', () => {}),
+        store.on('b', ['atlas', 'imageCoords'], () => {}),
+        store.onResource('c', () => {}),
+      ];
+
+      expect(getSubscriptionCount(store)).toBe(base);
+
+      expect(() => {
+        for (const cb of unsubscribe) cb();
+      }).not.toThrow();
+
+      expect(getSubscriptionCount(store)).toBe(base);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('behaves as documented after dispose()', () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+      try {
+        const store = new TextureStore({backend: {}} as never);
+        store.defaultTextureClasses = ['nearest'];
+
+        store.dispose();
+
+        expect(store.renderer).toBeUndefined();
+        expect(store.textureFactory).toBeUndefined();
+
+        expect(() => {
+          store.renderer = {backend: {}} as never;
+        }).not.toThrow();
+
+        expect(store.renderer).toBeUndefined();
+        expect(store.textureFactory).toBeUndefined();
+
+        expect(() => store.dispose()).not.toThrow();
+        expect(() => store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
+        expect(() => store.load('http://example.test/data.json')).not.toThrow();
+        expect(store.clearUnused()).toBe(0);
+
+        // a configuration array is no resource, and its last value stays right
+        expect(store.defaultTextureClasses).toEqual(['nearest']);
+      } finally {
+        fetchMock.mockRestore();
+      }
     });
   });
 

@@ -186,8 +186,12 @@ export class TextureResource {
 
   refCount: number = 0;
 
+  // Every getter of this class answers `undefined` once dispose() has run; the setters
+  // need no guard of their own. Once dispose() has returned, SignalGroup.delete(this) has
+  // taken the change bridges and the effects down, so nothing reads what a write would
+  // still put into a signal.
   get imageUrl(): string | undefined {
-    return this.#imageUrl.value;
+    return this.#disposed ? undefined : this.#imageUrl.value;
   }
 
   set imageUrl(val: string | undefined) {
@@ -195,7 +199,7 @@ export class TextureResource {
   }
 
   get imageCoords(): TextureCoords | undefined {
-    return this.#imageCoords.value;
+    return this.#disposed ? undefined : this.#imageCoords.value;
   }
 
   set imageCoords(val: TextureCoords | undefined) {
@@ -203,7 +207,7 @@ export class TextureResource {
   }
 
   get atlasUrl(): string | undefined {
-    return this.#atlasUrl?.value;
+    return this.#disposed ? undefined : this.#atlasUrl?.value;
   }
 
   set atlasUrl(value: string | undefined) {
@@ -211,7 +215,7 @@ export class TextureResource {
   }
 
   get atlasJson(): TexturePackerJsonData | undefined {
-    return this.#atlasJson?.value;
+    return this.#disposed ? undefined : this.#atlasJson?.value;
   }
 
   set atlasJson(value: TexturePackerJsonData | undefined) {
@@ -219,7 +223,7 @@ export class TextureResource {
   }
 
   get overrideImageUrl(): string | undefined {
-    return this.#overrideImageUrl?.value;
+    return this.#disposed ? undefined : this.#overrideImageUrl?.value;
   }
 
   set overrideImageUrl(value: string | undefined) {
@@ -227,7 +231,7 @@ export class TextureResource {
   }
 
   get atlas(): TextureAtlas | undefined {
-    return this.#atlas?.value;
+    return this.#disposed ? undefined : this.#atlas?.value;
   }
 
   set atlas(value: TextureAtlas | undefined) {
@@ -235,7 +239,7 @@ export class TextureResource {
   }
 
   get tileSetOptions(): TileSetOptions | undefined {
-    return this.#tileSetOptions?.value;
+    return this.#disposed ? undefined : this.#tileSetOptions?.value;
   }
 
   set tileSetOptions(value: TileSetOptions | undefined) {
@@ -243,7 +247,7 @@ export class TextureResource {
   }
 
   get tileSet(): TileSet | undefined {
-    return this.#tileSet?.value;
+    return this.#disposed ? undefined : this.#tileSet?.value;
   }
 
   set tileSet(value: TileSet | undefined) {
@@ -251,7 +255,7 @@ export class TextureResource {
   }
 
   get frameBasedAnimations(): FrameBasedAnimations | undefined {
-    return this.#frameBasedAnimations.value;
+    return this.#disposed ? undefined : this.#frameBasedAnimations.value;
   }
 
   set frameBasedAnimations(value: FrameBasedAnimations | undefined) {
@@ -259,7 +263,7 @@ export class TextureResource {
   }
 
   get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
-    return this.#frameBasedAnimationsData.value;
+    return this.#disposed ? undefined : this.#frameBasedAnimationsData.value;
   }
 
   set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
@@ -267,7 +271,7 @@ export class TextureResource {
   }
 
   get textureClasses(): TextureOptionClasses[] | undefined {
-    return this.#textureClasses.value;
+    return this.#disposed ? undefined : this.#textureClasses.value;
   }
 
   set textureClasses(value: TextureOptionClasses[] | undefined) {
@@ -278,7 +282,7 @@ export class TextureResource {
   }
 
   get textureFactory(): TextureFactory | undefined {
-    return this.#textureFactory.value;
+    return this.#disposed ? undefined : this.#textureFactory.value;
   }
 
   set textureFactory(value: TextureFactory | undefined) {
@@ -291,7 +295,7 @@ export class TextureResource {
    * Answers `undefined` once {@link TextureResource.dispose} has run.
    */
   get texture(): Texture | undefined {
-    return this.#texture.value;
+    return this.#disposed ? undefined : this.#texture.value;
   }
 
   /**
@@ -304,7 +308,7 @@ export class TextureResource {
   }
 
   get renderer(): WebGPURenderer | undefined {
-    return this.#renderer.value;
+    return this.#disposed ? undefined : this.#renderer.value;
   }
 
   set renderer(value: WebGPURenderer | undefined) {
@@ -334,8 +338,10 @@ export class TextureResource {
    * the {@link TextureResource.texture} setter belongs to the caller and is left alone,
    * as are the atlas, the tile set and the texture factory.
    *
-   * Afterwards {@link TextureResource.texture} answers `undefined`; every other member
-   * keeps the last value it had. A second call does nothing.
+   * Afterwards every getter of this resource answers `undefined`, while
+   * {@link TextureResource.id} and {@link TextureResource.type} still say which resource
+   * this was. A write to any setter, a {@link TextureResource.load} and a second
+   * `dispose()` do nothing.
    */
   dispose() {
     if (this.#disposed) return;
@@ -358,7 +364,16 @@ export class TextureResource {
     off(this);
   }
 
+  /**
+   * Register the effects that turn the data of this resource into an atlas, a tile set
+   * and a texture. Calling it more than once registers them once.
+   *
+   * On a disposed resource this does nothing — no effect and no signal is created — and
+   * returns `this`.
+   */
   load(): TextureResource {
+    if (this.#disposed) return this;
+
     if (!this.#load) {
       this.#load = true;
 
