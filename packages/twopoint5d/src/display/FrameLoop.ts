@@ -36,6 +36,14 @@ class RAF {
 
   #rafID = 0;
 
+  // The driver runs exactly as long as somebody drives it: a rAF chain nobody listens to keeps
+  // the page awake and measures fps into the void.
+  #loops = new Set<FrameLoop>();
+
+  // Set whenever the driver picks its work back up. The first tick after that has no previous
+  // timestamp to measure against, so it anchors the window instead of producing a sample.
+  #needsMeasureAnchor = true;
+
   frameNo = 0;
 
   measureOnFrame = 0;
@@ -47,7 +55,25 @@ class RAF {
 
   constructor(private readonly renderer?: ISetAnimationLoop) {
     eventize(this);
+  }
+
+  attach(loop: FrameLoop): void {
+    if (this.#loops.has(loop)) return;
+
+    this.#loops.add(loop);
+    on(this, OnRAF, loop);
+
     this.start();
+  }
+
+  detach(loop: FrameLoop): void {
+    if (!this.#loops.delete(loop)) return;
+
+    off(this, OnRAF, loop);
+
+    if (this.#loops.size === 0) {
+      this.stop();
+    }
   }
 
   #onAnimationFrame = (now: number) => {
@@ -73,21 +99,27 @@ class RAF {
   }
 
   stop() {
+    // an already halted driver has nothing to hand back, and cancelAnimationFrame(0) needs a
+    // global that a bare node process does not have
+    if (this.#rafID === 0) return;
+
     if (this.renderer) {
       this.renderer.setAnimationLoop(null);
     } else {
       cancelAnimationFrame(this.#rafID);
     }
     this.#rafID = 0;
+    this.#needsMeasureAnchor = true;
   }
 
   measureFps(now: number) {
-    if (this.frameNo === 0) {
-      // First tick: anchor the measurement window. We can't compute a
-      // sample yet (there's no previous timestamp) — the original code
-      // used measureTimeBegin=0 here and produced a ~6fps phantom value.
+    if (this.#needsMeasureAnchor) {
+      // The tick that opens a measurement window anchors it. There is no previous timestamp to
+      // measure against yet, and a window anchored at 0 — or across the span in which nobody
+      // asked for a frame — reports an fps the renderer never ran at.
       this.measureTimeBegin = now;
-      this.measureOnFrame = MEASURE_FPS_AFTER_NTH_FRAME;
+      this.measureOnFrame = this.frameNo + MEASURE_FPS_AFTER_NTH_FRAME;
+      this.#needsMeasureAnchor = false;
       return;
     }
     if (this.frameNo >= this.measureOnFrame) {
@@ -189,7 +221,7 @@ export class FrameLoop {
     this.#subscribers.add(target);
 
     if (this.subscriptionCount === 1) {
-      on(this.raf, OnRAF, this as FrameLoop);
+      this.raf.attach(this);
     }
 
     on(this as FrameLoop, FrameLoop.OnFrame, target);
@@ -207,7 +239,7 @@ export class FrameLoop {
       off(this, FrameLoop.OnFrame, target);
 
       if (this.subscriptionCount === 0) {
-        off(this.raf, OnRAF, this);
+        this.raf.detach(this);
       }
     }
   }

@@ -67,7 +67,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    releases the renderer.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
- *    {@link Display.canvas}, {@link Display.start} and {@link Display.getEventProps}
+ *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
+ *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend}
  *    throw. {@link Display.resize}, {@link Display.renderFrame},
  *    {@link Display.stop}, a write to {@link Display.pause} and a further
  *    `dispose()` do nothing.
@@ -75,11 +76,9 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    earlier that is still pending. {@link Display.width},
  *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
  *    {@link Display.deltaTime} keep their last value, {@link Display.pixelRatio}
- *    keeps reading the window, {@link Display.isRunning} is `false`, and
- *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend} are
- *    `false` — the renderer they ask about is gone. No further event is emitted,
- *    and a listener attached afterwards receives nothing — not even a retained
- *    value.
+ *    keeps reading the window and {@link Display.isRunning} is `false`. No further
+ *    event is emitted, and a listener attached afterwards receives nothing — not
+ *    even a retained value.
  *
  * ## Resize model
  *
@@ -321,11 +320,31 @@ export class Display {
     return this.renderer.domElement;
   }
 
+  /**
+   * `true` when the renderer draws through a WebGPU backend.
+   *
+   * Throws after {@link Display.dispose}: the renderer this asks about is gone, and this type
+   * promises an answer about a backend. Branch on {@link Display.isDisposed} first where a
+   * display may already be gone.
+   */
   get isWebGPUBackend(): boolean {
+    if (this.#disposed) {
+      throw disposedError('isWebGPUBackend');
+    }
     return (this.renderer?.backend as any)?.['isWebGPUBackend'] ?? false;
   }
 
+  /**
+   * `true` when the renderer draws through a WebGL backend.
+   *
+   * Throws after {@link Display.dispose}: the renderer this asks about is gone, and this type
+   * promises an answer about a backend. Branch on {@link Display.isDisposed} first where a
+   * display may already be gone.
+   */
   get isWebGLBackend(): boolean {
+    if (this.#disposed) {
+      throw disposedError('isWebGLBackend');
+    }
     return (this.renderer?.backend as any)?.['isWebGLBackend'] ?? false;
   }
 
@@ -445,6 +464,10 @@ export class Display {
     }
 
     this.#waitForRenderer.then(() => {
+      // a dispose() inside this await would otherwise put the display back into the subscriber
+      // list of the loop, where it stays until the page goes
+      if (this.#disposed) return;
+
       this.frameLoop.start(this);
     });
   }

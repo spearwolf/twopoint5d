@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedSprites#dispose()` releases neither the geometry nor the material: this mesh builds neither of them, both are handed to its constructor and stay the caller's. It takes itself out of the scene graph and gives both slots up
 - `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
-- a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` are `false` because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
 - `TextureResource#dispose()` releases the texture the resource built for itself, and `texture` answers `undefined` afterwards. A texture assigned through the `texture` setter belongs to the caller and is left alone; every other member keeps its last value. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller
@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
 - `VOBufferPool#toBuffersData()` and `#fromBuffersData()` throw on a disposed pool, with a message naming the class, the method and the state. The return type of `toBuffersData()` promises the buffers of a live pool, and a disposed one has none to answer with; `fromBuffersData()` turns away a capacity it cannot serve, as it already does for a capacity that does not match its own. `VertexObjectPool` inherits both
+- the rAF driver every `FrameLoop` of the module shares runs exactly as long as at least one `FrameLoop` has subscribers, and it picks its work back up by itself when one comes back. A `FrameLoop` without subscribers asks for no frames, and the fps measurement anchors a fresh window on the tick that resumes it
 
 ### Removed
 
@@ -98,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `TileBox` pool of `CameraBasedVisibility`: every recomputation that finds the map plane leaves it holding the tiles that run visited and no others, and a frame in which the camera looks past the plane leaves it as it stands. A camera travelling far no longer leaves a `Box3`, a `Vector3` and a `Map2DTileCoords` behind per tile it has passed, and a tile that stays visible keeps its pooled objects as before
 - fix the gpu buffer of an attribute that a second route pushed out of an attribute slot of an `InstancedVOBufferGeometry`: it stayed with the renderer with nothing left to reach it. three.js frees one attribute per name through the dispose event of the geometry — the one sitting in the slot at that moment — so the second route is refused instead
 - fix the listener `FixedFrameLoop` leaves on its `Display`: the loop takes its own `OnDisplayDispose` subscription off again, so a display that outlives a series of short-lived loops no longer collects one closure over a spent loop per loop
+- fix `Stylesheets.installRule()`: a name carries exactly one rule in the global stylesheet, and a call with a different `css` rewrites that rule instead of appending another one. The sheet no longer grows by a rule per `Display`, per created container, per fullscreen toggle and per value written to `PanControl2D#cursorPanStyle`
+- fix a `Display` that is disposed before its renderer is ready: it does not put itself into its frame loop once the renderer initialization resolves, so the loop is left with no subscriber to carry
 
 ### Migration Guide
 
@@ -136,6 +139,29 @@ async function renderLoop(display: Display) {
   } catch {
     // the display is gone — leave the loop
   }
+}
+```
+
+#### `Display#isWebGPUBackend` and `#isWebGLBackend` answer only while the display is alive
+
+Both getters throw once `dispose()` has run: `false` cannot tell "the backend was never WebGPU"
+apart from "the display is gone". Ask `Display#isDisposed` first wherever a display may already
+have been released.
+
+**Before**
+
+```ts
+function backendName(display: Display) {
+  return display.isWebGPUBackend ? 'webgpu' : 'webgl'; // says "webgl" for a disposed display
+}
+```
+
+**After**
+
+```ts
+function backendName(display: Display) {
+  if (display.isDisposed) return 'gone';
+  return display.isWebGPUBackend ? 'webgpu' : 'webgl';
 }
 ```
 

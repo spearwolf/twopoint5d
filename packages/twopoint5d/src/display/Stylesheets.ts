@@ -5,7 +5,9 @@ export const globalStylesID = `display3--${postFixID}`;
 
 let sheet: CSSStyleSheet | null = null;
 
-const installedRules: Map<string, {index: number; css: string}> = new Map();
+// `getGlobalSheet()` hands out the same sheet for the whole module run, and this map keeps its
+// entries under that assumption. Whoever introduces a second sheet keeps one map per sheet.
+const installedRules = new Map<string, {rule: CSSStyleRule; css: string}>();
 
 /**
  * Helpers for installing simple css-class-based rules
@@ -22,23 +24,36 @@ export class Stylesheets {
     return sheet;
   }
 
+  /**
+   * Install a className-based rule in the global stylesheet.
+   *
+   * A name carries exactly one rule: a call with a different `css` rewrites that rule, and a call
+   * with the `css` it already has does nothing.
+   *
+   * @param name The base class name
+   * @param css The styles
+   * @param root default is document.head
+   * @returns The postfixed class name
+   */
   static installRule(name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {
     const sheet = Stylesheets.getGlobalSheet(root);
 
     const className = `${name}-${postFixID}`;
-    const selector = `.${className}`;
-
-    let index = sheet.cssRules.length;
 
     const prevRule = installedRules.get(name);
     if (prevRule != null) {
       if (prevRule.css === css) {
         return className;
       }
-      index = prevRule.index;
+      // the rule object stays valid wherever it sits in the sheet: writing through it
+      // cannot be thrown off by a rule someone else inserted in front of it
+      prevRule.rule.style.cssText = css;
+      prevRule.css = css;
+      return className;
     }
 
-    sheet.insertRule(`${selector} {${css}}`, index);
+    const index = sheet.insertRule(`.${className} {${css}}`, sheet.cssRules.length);
+    installedRules.set(name, {rule: sheet.cssRules[index] as CSSStyleRule, css});
 
     return className;
   }

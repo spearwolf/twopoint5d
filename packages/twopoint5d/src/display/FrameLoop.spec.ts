@@ -259,16 +259,22 @@ describe('FrameLoop', () => {
     it('gives the same renderer a fresh driver', () => {
       const renderer = makeFakeRenderer();
 
-      expect(new FrameLoop(0, renderer).subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      const first = new FrameLoop(0, renderer);
+      expect(first.subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      first.start({[FrameLoop.OnFrame]() {}});
       const firstCallback = renderer.callback;
       expect(firstCallback, 'the driver installs itself on the renderer').not.toBeNull();
 
-      expect(new FrameLoop(0, renderer).subscriptionCount).toBe(0);
+      const second = new FrameLoop(0, renderer);
+      expect(second.subscriptionCount).toBe(0);
+      second.start({[FrameLoop.OnFrame]() {}});
       expect(renderer.callback, 'a second loop shares the driver of the first').toBe(firstCallback);
 
       FrameLoop.resetRAF();
 
-      expect(new FrameLoop(0, renderer).subscriptionCount).toBe(0);
+      const third = new FrameLoop(0, renderer);
+      expect(third.subscriptionCount).toBe(0);
+      third.start({[FrameLoop.OnFrame]() {}});
       expect(renderer.callback, 'after the reset the renderer drives a new driver').not.toBe(firstCallback);
     });
 
@@ -288,14 +294,18 @@ describe('FrameLoop', () => {
         cancelled.push(id);
       });
 
-      expect(new FrameLoop(0).subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      const first = new FrameLoop(0);
+      expect(first.subscriptionCount, 'a fresh loop has no subscribers').toBe(0);
+      first.start({[FrameLoop.OnFrame]() {}});
       expect(rafIDs, 'the driver has asked for a frame').toHaveLength(1);
 
       FrameLoop.resetRAF();
 
       expect(cancelled, 'the pending frame request is cancelled').toEqual([rafIDs[0]]);
 
-      expect(new FrameLoop(0).subscriptionCount).toBe(0);
+      const second = new FrameLoop(0);
+      expect(second.subscriptionCount).toBe(0);
+      second.start({[FrameLoop.OnFrame]() {}});
       expect(rafIDs, 'the next loop builds a new driver').toHaveLength(2);
     });
 
@@ -303,6 +313,125 @@ describe('FrameLoop', () => {
       // no stubs here on purpose: this runs under bare node, where requestAnimationFrame
       // is missing — and that is exactly the environment a test suite calls the reset from
       expect(() => FrameLoop.resetRAF()).not.toThrow();
+    });
+  });
+
+  describe('the shared rAF driver', () => {
+    afterEach(() => {
+      // the module state must not travel from one case into the next; the globals go last,
+      // because the reset above still cancels through them
+      FrameLoop.resetRAF();
+      vi.unstubAllGlobals();
+    });
+
+    /** requestAnimationFrame and cancelAnimationFrame do not exist under node — they have to be put there */
+    function stubAnimationFrame() {
+      const rafIDs: number[] = [];
+      const cancelled: number[] = [];
+      let nextRafID = 100;
+
+      vi.stubGlobal('requestAnimationFrame', () => {
+        nextRafID += 1;
+        rafIDs.push(nextRafID);
+        return nextRafID;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+        cancelled.push(id);
+      });
+
+      return {rafIDs, cancelled};
+    }
+
+    it('stops when the last loop lets go of it', () => {
+      const {rafIDs, cancelled} = stubAnimationFrame();
+
+      const loop = new FrameLoop(0);
+      const target = {[FrameLoop.OnFrame]() {}};
+
+      loop.start(target);
+      expect(rafIDs, 'the driver has asked for a frame').toHaveLength(1);
+
+      loop.stop(target);
+
+      expect(cancelled, 'the pending frame request is cancelled').toEqual([rafIDs[0]]);
+    });
+
+    it('starts again when a loop comes back', () => {
+      const {rafIDs} = stubAnimationFrame();
+
+      const loop = new FrameLoop(0);
+      const target = {[FrameLoop.OnFrame]() {}};
+
+      loop.start(target);
+      loop.stop(target);
+
+      expect(rafIDs, 'the driver has asked for a frame').toHaveLength(1);
+
+      loop.start(target);
+
+      expect(rafIDs, 'the returning loop puts the driver back to work').toHaveLength(2);
+    });
+
+    it('is taken off the renderer when the last loop lets go', () => {
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const target = {[FrameLoop.OnFrame]() {}};
+
+      loop.start(target);
+      expect(renderer.callback, 'the driver drives the renderer').not.toBeNull();
+
+      loop.stop(target);
+
+      expect(renderer.callback, 'the renderer is left alone').toBeNull();
+    });
+
+    it('keeps running while another loop still holds it', () => {
+      const renderer = makeFakeRenderer();
+      const first = new FrameLoop(0, renderer);
+      const second = new FrameLoop(0, renderer);
+
+      const firstTarget = {[FrameLoop.OnFrame]() {}};
+      const secondTarget = {[FrameLoop.OnFrame]() {}};
+
+      first.start(firstTarget);
+      second.start(secondTarget);
+
+      first.stop(firstTarget);
+
+      expect(renderer.callback, 'the second loop still wants frames').not.toBeNull();
+
+      second.stop(secondTarget);
+
+      expect(renderer.callback, 'nobody wants frames any more').toBeNull();
+    });
+
+    it('re-anchors its fps window after a pause', () => {
+      const VSYNC = 1000 / 60;
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {events, target} = subscribe(loop);
+
+      // the first window: an anchoring tick plus 30 at exactly 60Hz
+      for (let i = 0; i < 31; i++) {
+        renderer.tick(1000 + i * VSYNC);
+      }
+
+      expect(events, 'the first window').toHaveLength(31);
+      expect(events[30]!.measuredFps, 'the first sample').toBe(60);
+
+      loop.stop(target);
+
+      // five seconds in which nobody asks for a frame
+      const resumeAt = 1000 + 30 * VSYNC + 5000;
+
+      loop.start(target);
+
+      for (let i = 1; i <= 31; i++) {
+        renderer.tick(resumeAt + i * VSYNC);
+      }
+
+      expect(events, 'the second window').toHaveLength(62);
+      expect(events[61]!.measuredFps, 'the sample after the pause').toBe(60);
     });
   });
 });

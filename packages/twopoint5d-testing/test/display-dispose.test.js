@@ -1,6 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
+import {WebGPURenderer} from 'three/webgpu';
 
 const FIXTURE_ID = 'display-dispose-fixture';
 
@@ -133,11 +134,67 @@ describe('Display — the contract after dispose()', function () {
     expect(display.isDisposed, 'isDisposed').to.equal(true);
     expect(display.renderer, 'renderer').to.equal(undefined);
     expect(display.isRunning, 'isRunning').to.equal(false);
-    expect(display.isWebGPUBackend, 'isWebGPUBackend').to.equal(false);
-    expect(display.isWebGLBackend, 'isWebGLBackend').to.equal(false);
     expect(display.width, 'width').to.equal(width);
     expect(display.height, 'height').to.equal(height);
     expect(display.frameNo, 'frameNo').to.equal(frameNo);
+  });
+
+  it('isWebGPUBackend and isWebGLBackend throw after dispose()', () => {
+    host = makeContainer();
+    display = new Display(host);
+
+    expect(display.isWebGPUBackend, 'isWebGPUBackend while alive').to.be.a('boolean');
+    expect(display.isWebGLBackend, 'isWebGLBackend while alive').to.be.a('boolean');
+
+    display.dispose();
+
+    const readWebGPUBackend = () => display.isWebGPUBackend;
+    const readWebGLBackend = () => display.isWebGLBackend;
+
+    expect(readWebGPUBackend, 'the message names the class and the member').to.throw(/Display#isWebGPUBackend/);
+    expect(readWebGPUBackend, 'the message names the state').to.throw(/disposed/);
+
+    expect(readWebGLBackend, 'the message names the class and the member').to.throw(/Display#isWebGLBackend/);
+    expect(readWebGLBackend, 'the message names the state').to.throw(/disposed/);
+  });
+
+  it('a dispose() before the renderer is ready leaves the frame loop empty', async () => {
+    let rendererIsUp;
+    const rendererUp = new Promise((resolve) => {
+      rendererIsUp = resolve;
+    });
+
+    let releaseInit;
+    const initReleased = new Promise((resolve) => {
+      releaseInit = resolve;
+    });
+
+    host = makeContainer();
+    display = new Display(host, {
+      createRenderer: (params) => {
+        const renderer = new WebGPURenderer({...params});
+        const realInit = renderer.init.bind(renderer);
+        // the display waits on a promise that outlives the real init, so the test can land its
+        // dispose() inside the window the constructor waits in
+        renderer.init = () =>
+          realInit()
+            .then(rendererIsUp)
+            .then(() => initReleased);
+        return renderer;
+      },
+    });
+
+    // the real init has to be through before dispose() falls, or renderer.dispose() would meet a
+    // half-built renderer and this case would prove something other than its name
+    await rendererUp;
+
+    expect(display.frameLoop.subscriptionCount, 'before the display is up').to.equal(0);
+
+    display.dispose();
+    releaseInit();
+    await wait(50);
+
+    expect(display.frameLoop.subscriptionCount, 'after the init promise settles').to.equal(0);
   });
 
   it('a second dispose() throws nothing and emits nothing', () => {
