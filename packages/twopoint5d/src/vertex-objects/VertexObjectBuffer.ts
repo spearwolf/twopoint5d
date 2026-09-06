@@ -60,6 +60,23 @@ export class VertexObjectBuffer {
 
   #released = false;
 
+  /**
+   * Builds a buffer from a vertex-object description, or from another buffer whose layout it
+   * takes over. `buffersData`, when given, is taken over and not copied — whoever keeps the
+   * reference keeps writing into this buffer. A buffer name `buffersData` does not mention gets
+   * a fresh, zeroed array sized for the given capacity and layout. The capacity then comes from
+   * `buffersData.capacity`; `usedCount` belongs to the pool, not the buffer.
+   *
+   * This constructor takes `buffersData.capacity` as given and checks it against nothing. A
+   * `VOBufferPool` carries its own `capacity`, fixed at construction, which does not follow
+   * whatever buffer is later assigned to `pool.buffer` — assigning a buffer built here with a
+   * differing `buffersData.capacity` leaves pool and buffer disagreeing about size, silently.
+   * Use `VOBufferPool#fromBuffersData()` to restore a pool from `toBuffersData()` output: it
+   * reconciles the two and throws on a capacity mismatch instead of leaving one.
+   *
+   * @throws when `source` is the buffer of a disposed pool, which has no data to build a second
+   * buffer from
+   */
   constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
     if (source instanceof VertexObjectBuffer && source.#released) {
       throw new Error(
@@ -89,7 +106,9 @@ export class VertexObjectBuffer {
           itemSize: buffer.itemSize,
           dataType: buffer.dataType,
           usageType: buffer.usageType,
-          typedArray: createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
+          typedArray:
+            buffersData?.buffers[bufferName] ??
+            createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
           serial: 0,
         });
       }

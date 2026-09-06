@@ -165,6 +165,94 @@ describe('VertexObjectBuffer', () => {
     ).toEqual(['bar', 'plah', 'zack']);
   });
 
+  test('a buffer source takes the typed arrays of the buffers data it is handed', () => {
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+      indices: [0, 1, 2, 0, 2, 3],
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+          type: 'float32',
+          usage: 'dynamic',
+        },
+        bar: {
+          size: 1,
+          type: 'float32',
+          usage: 'static',
+        },
+        plah: {
+          components: ['a', 'b', 'c'],
+          type: 'float32',
+          usage: 'static',
+        },
+        zack: {
+          components: ['zick'],
+          type: 'float32',
+          usage: 'static',
+        },
+      },
+    });
+    const source = new VertexObjectBuffer(descriptor, 1);
+    const buffersData = {
+      capacity: 2,
+      usedCount: 1,
+      buffers: {
+        static_float32: new Float32Array(40).fill(7),
+        dynamic_float32: new Float32Array(16).fill(9),
+      },
+    };
+    const vob = new VertexObjectBuffer(source, buffersData);
+
+    expect(vob.capacity).toBe(2);
+    expect(vob.buffers.get('static_float32')!.typedArray).toBe(buffersData.buffers.static_float32);
+    expect(vob.buffers.get('dynamic_float32')!.typedArray).toBe(buffersData.buffers.dynamic_float32);
+  });
+
+  test('a buffer name the buffers data does not mention gets a fresh zeroed array', () => {
+    const descriptor = new VertexObjectDescriptor({
+      vertexCount: 4,
+      indices: [0, 1, 2, 0, 2, 3],
+
+      attributes: {
+        foo: {
+          components: ['x', 'y'],
+          type: 'float32',
+          usage: 'dynamic',
+        },
+        bar: {
+          size: 1,
+          type: 'float32',
+          usage: 'static',
+        },
+        plah: {
+          components: ['a', 'b', 'c'],
+          type: 'float32',
+          usage: 'static',
+        },
+        zack: {
+          components: ['zick'],
+          type: 'float32',
+          usage: 'static',
+        },
+      },
+    });
+    const source = new VertexObjectBuffer(descriptor, 1);
+    const buffersData = {
+      capacity: 2,
+      usedCount: 1,
+      buffers: {
+        dynamic_float32: new Float32Array(16).fill(9),
+      },
+    };
+    const vob = new VertexObjectBuffer(source, buffersData);
+
+    expect(vob.buffers.get('dynamic_float32')!.typedArray).toBe(buffersData.buffers.dynamic_float32);
+    expect(vob.buffers.get('static_float32')!.typedArray).toBeInstanceOf(Float32Array);
+    expect(vob.buffers.get('static_float32')!.typedArray!.length).toBe(40);
+    expect(Array.from(vob.buffers.get('static_float32')!.typedArray!)).toEqual(new Array(40).fill(0));
+  });
+
   test('first vertex-object-buffer initializes the descriptor.voPrototype', () => {
     class VOBase {
       moinMoin() {
