@@ -53,6 +53,14 @@ describe('PanControl2D — the contract after dispose()', () => {
   // Assertion (b) — "does not touch what was handed in" — is about the cursor styles target:
   // the element belongs to the caller, and the case below checks it is left as it was found.
 
+  // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
+  // what the cases below are about: a disposed control ignores keyboard and pointer, hooks
+  // nothing up again through subscribe(), delivers no pan collected before dispose() and
+  // cannot be brought back through its public setters.
+
+  // Assertion (d) — "the second call throws nothing and releases nothing a second time" —
+  // is the case "is safe to call twice" below.
+
   // Assertion (e) — "leaks no signals and no effects" — has no subject: the control creates
   // neither. Its events run through eventize, and the case about a listener from before
   // dispose() is what covers their teardown.

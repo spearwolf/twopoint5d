@@ -77,6 +77,7 @@ describe('TexturedSprites', () => {
   });
 
   describe('dispose()', () => {
+    // (a) a resource the instance built itself is released exactly once
     test('disposes the geometry and the material it created itself', () => {
       const sprites = new TexturedSprites(4);
       const geometryDispose = sandbox.spy(sprites.geometry!, 'dispose');
@@ -88,6 +89,7 @@ describe('TexturedSprites', () => {
       expect(materialDispose.calledOnce).toBe(true);
     });
 
+    // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose a geometry that was handed in', () => {
       const geometry = new TexturedSpritesGeometry(4);
       const geometryDispose = sandbox.spy(geometry, 'dispose');
@@ -138,6 +140,12 @@ describe('TexturedSprites', () => {
       expect(scene.children).toHaveLength(0);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says. The case is proven
+    // one level up, by the test "the convenience API answers nothing once the sprites are
+    // disposed": geometry, material, spritePool and texture answer undefined, createSprite()
+    // answers undefined, and freeSprite() and the texture setter do nothing.
+
+    // (d) the second call throws nothing and releases nothing a second time
     test('is safe to call twice', () => {
       const sprites = new TexturedSprites(4);
       const geometryDispose = sandbox.spy(sprites.geometry!, 'dispose');
@@ -152,6 +160,7 @@ describe('TexturedSprites', () => {
       expect(materialDispose.calledOnce).toBe(true);
     });
 
+    // (e) no signal or effect outlives the instance
     test('does not leak signals or effects', () => {
       const baselineSignals = getSignalsCount();
       const baselineEffects = getEffectsCount();

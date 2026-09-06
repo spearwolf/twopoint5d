@@ -30,6 +30,7 @@ describe('Map2D', () => {
     // (a) has no subject here: a Map2D builds no resource that needs releasing. The tile
     // streamer it creates when the constructor takes its default value holds none either.
 
+    // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose a tile renderer that was handed in', () => {
       const renderer = makeTileRenderer();
       const rendererDispose = sandbox.spy(renderer, 'dispose');
@@ -41,6 +42,7 @@ describe('Map2D', () => {
       expect(rendererDispose.called).toBe(false);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('behaves as documented after dispose()', () => {
       const map = new Map2D();
       const renderer = makeTileRenderer();
@@ -61,6 +63,7 @@ describe('Map2D', () => {
       expect(() => map.update()).not.toThrow();
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('is safe to call twice', () => {
       const map = new Map2D();
       const renderer = makeTileRenderer();

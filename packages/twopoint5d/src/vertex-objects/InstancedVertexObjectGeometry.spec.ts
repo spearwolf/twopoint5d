@@ -127,6 +127,7 @@ describe('InstancedVertexObjectGeometry', () => {
   });
 
   describe('dispose()', () => {
+    // (a) a resource the instance built itself is released exactly once
     test('disposes basePool and instancedPool it built itself', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
 
@@ -187,6 +188,7 @@ describe('InstancedVertexObjectGeometry', () => {
       expect(sharedDispose.called).toBe(false);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('empties all extra-instanced bookkeeping maps', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       geometry.attachInstancedPool('a', extraInstancedDescriptor);
@@ -218,6 +220,41 @@ describe('InstancedVertexObjectGeometry', () => {
 
       expect(extraDispose.called).toBe(false);
     });
+
+    // (d) the second call throws nothing and releases nothing a second time
+    test('is safe to call twice', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+      const baseDispose = sandbox.spy(geometry.basePool!, 'dispose');
+      const instancedDispose = sandbox.spy(geometry.instancedPool!, 'dispose');
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
+
+      expect(() => {
+        geometry.dispose();
+        geometry.dispose();
+      }).not.toThrow();
+
+      expect(baseDispose.calledOnce).toBe(true);
+      expect(instancedDispose.calledOnce).toBe(true);
+      expect(extraDispose.calledOnce).toBe(true);
+    });
+
+    // (b) a resource handed in belongs to the caller and is not touched
+    test('does NOT dispose an instanced pool that was handed in through the constructor', () => {
+      const handedInPool = new VertexObjectPool<VO>(instancedDescriptor, 10);
+      const geometry = new InstancedVertexObjectGeometry(handedInPool, 10, baseDescriptor, 1);
+
+      const instancedDispose = sandbox.spy(handedInPool, 'dispose');
+
+      geometry.dispose();
+
+      expect(instancedDispose.called).toBe(false);
+      expect(handedInPool.isDisposed).toBe(false);
+      expect(geometry.basePool!.isDisposed).toBe(true);
+    });
+
+    // (e) has no subject here: nothing in vertex-objects creates a signal or an effect.
 
     // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
     // slot it took back" — has no subject here: this geometry never calls createVO(). It

@@ -666,6 +666,7 @@ describe('vertex-buffers-geometry-updates', () => {
   });
 
   describe('dispose', () => {
+    // (b) a resource handed in belongs to the caller and is not touched
     test('a pool handed in from outside stays untouched', () => {
       const instancedPool = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
       instancedPool.createVO();
@@ -677,6 +678,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(instancedPool.isDisposed).toBe(false);
     });
 
+    // (a) a resource the instance built itself is released exactly once
     test('a pool the geometry built itself is released', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
       const {instancedPool, basePool} = geometry;
@@ -687,6 +689,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(basePool!.isDisposed).toBe(true);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('the attributes of every released route leave the geometry', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 
@@ -893,6 +896,36 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(owner.pool.isDisposed).toBe(true);
     });
+
+    // (d) the second call throws nothing and releases nothing a second time
+    test('a second dispose() throws nothing and leaves a pool from outside alone', () => {
+      const handedIn = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
+      handedIn.createVO();
+
+      const instanced = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(handedIn, 10, baseDesc, 1);
+      const {basePool} = instanced;
+
+      expect(() => {
+        instanced.dispose();
+        instanced.dispose();
+      }).not.toThrow();
+
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.usedCount).toBe(1);
+      expect(basePool!.isDisposed).toBe(true);
+
+      const plain = new VertexObjectGeometry<MyBaseVO>(baseDesc, 10);
+      const {pool} = plain;
+
+      expect(() => {
+        plain.dispose();
+        plain.dispose();
+      }).not.toThrow();
+
+      expect(pool.isDisposed).toBe(true);
+    });
+
+    // (e) has no subject here: nothing in vertex-objects creates a signal or an effect.
 
     // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
     // slot it took back" — has no subject here: an InstancedVertexObjectGeometry never calls

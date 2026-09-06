@@ -58,6 +58,14 @@ describe('Display — the contract after dispose()', function () {
   // passed to the constructor is the second construction path, but who owns it is not what these
   // tests answer.
 
+  // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
+  // what most of the cases below are: canvas, start(), getEventProps(), isWebGPUBackend
+  // and isWebGLBackend throw, resize(), renderFrame() and stop() are silent, and the
+  // disposed state with the last values it kept stays readable.
+
+  // Assertion (d) — "the second call throws nothing and releases nothing a second time" —
+  // is the case "a second dispose() throws nothing and emits nothing" below.
+
   // Assertion (e) — "leaks no signals and no effects" — has no subject: Display creates neither.
   // Its events run through eventize, and their teardown is covered by the second-dispose case below.
 

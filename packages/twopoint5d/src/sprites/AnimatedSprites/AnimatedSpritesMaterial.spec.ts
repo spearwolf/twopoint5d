@@ -39,6 +39,11 @@ describe('AnimatedSpritesMaterial', () => {
   });
 
   describe('dispose()', () => {
+    // (a) has no subject here: this material builds no resource of its own — the animsMap
+    // arrives through the constructor options or the setter, and the time uniform is a
+    // shader node, not a resource with a dispose().
+
+    // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose an animsMap that was handed in', () => {
       const animsMap = makeAnimsMap();
       const animsMapDispose = sandbox.spy(animsMap, 'dispose');
@@ -57,6 +62,7 @@ describe('AnimatedSpritesMaterial', () => {
       expect(() => material.dispose()).not.toThrow();
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('clears the animsMap reference', () => {
       const animsMap = makeAnimsMap();
       const material = new AnimatedSpritesMaterial({animsMap});
@@ -66,6 +72,7 @@ describe('AnimatedSpritesMaterial', () => {
       expect(material.animsMap).toBeUndefined();
     });
 
+    // (e) no signal or effect outlives the instance
     test('does not leak signals or effects', () => {
       const baselineSignals = getSignalsCount();
       const baselineEffects = getEffectsCount();
@@ -83,6 +90,7 @@ describe('AnimatedSpritesMaterial', () => {
       expect(getEffectsCount()).toBe(baselineEffects);
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('is safe to call twice', () => {
       const animsMap = makeAnimsMap();
       const animsMapDispose = sandbox.spy(animsMap, 'dispose');

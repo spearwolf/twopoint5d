@@ -1,5 +1,5 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
-import {getSignalsCount} from '@spearwolf/signalize';
+import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
@@ -73,6 +73,7 @@ describe('TextureStore', () => {
   });
 
   describe('dispose()', () => {
+    // (a) a resource the instance built itself is released exactly once
     test('dispose() emits OnDispose on store and on each resource exactly once', () => {
       const store = new TextureStore();
       const data: TextureStoreData = {
@@ -111,6 +112,7 @@ describe('TextureStore', () => {
       expect(() => resource.dispose()).not.toThrow();
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('a second dispose() does not emit the dispose event again', () => {
       const store = new TextureStore();
       store.dispose();
@@ -122,6 +124,7 @@ describe('TextureStore', () => {
       expect(disposeAgain).not.toHaveBeenCalled();
     });
 
+    // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose a renderer that was handed to the constructor', () => {
       const rendererDispose = vi.fn();
       const renderer = {getMaxAnisotropy: () => 16, dispose: rendererDispose};
@@ -270,6 +273,27 @@ describe('TextureStore', () => {
       } finally {
         fetchMock.mockRestore();
       }
+    });
+
+    // (e) no signal or effect outlives the instance
+    test('does not leak signals or effects', () => {
+      const baselineSignals = getSignalsCount();
+      const baselineEffects = getEffectsCount();
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      // subscribing is what makes the resource load(), and load() is where the effects come
+      // from; without a renderer there is no texture factory, so the effect reaches no loader
+      store.on('a', 'texture', () => {});
+
+      expect(getSignalsCount()).toBeGreaterThan(baselineSignals);
+      expect(getEffectsCount()).toBeGreaterThan(baselineEffects);
+
+      store.dispose();
+
+      expect(getSignalsCount()).toBe(baselineSignals);
+      expect(getEffectsCount()).toBe(baselineEffects);
     });
 
     // (f) has no subject here: the store takes no slot from a pool and no tile from a

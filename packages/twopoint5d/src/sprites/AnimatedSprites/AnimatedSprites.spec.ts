@@ -17,6 +17,7 @@ describe('AnimatedSprites', () => {
     // (a) has no subject here: this class builds neither its geometry nor its material,
     // so there is no resource of its own it could release.
 
+    // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose the geometry and the material that were handed in', () => {
       const geometry = new AnimatedSpritesGeometry(4);
       const colorMap = new Texture();
@@ -54,6 +55,7 @@ describe('AnimatedSprites', () => {
       material.dispose();
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('gives up the geometry and the material references', () => {
       const geometry = new AnimatedSpritesGeometry(4);
       const material = new AnimatedSpritesMaterial();
@@ -68,6 +70,7 @@ describe('AnimatedSprites', () => {
       material.dispose();
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     test('is safe to call twice', () => {
       const geometry = new AnimatedSpritesGeometry(4);
       const material = new AnimatedSpritesMaterial();

@@ -92,6 +92,27 @@ describe('vertex-objects — dispose', function () {
     return display.renderer.info.memory.attributes;
   }
 
+  // Assertion (a) of the dispose test pattern in
+  // packages/twopoint5d/docs/resource-lifecycle.md — "releases what it built itself" — is
+  // what this file is for. Every geometry below builds its pools from a descriptor, and
+  // the cases watch the gpu buffers behind their attributes reach the renderer's free
+  // list, which no unit test can see.
+
+  // Assertion (b) — "does not touch what was handed in" — has no subject here: no geometry
+  // in these tests is handed a pool, every one of them builds its own.
+
+  // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
+  // covered by the attribute and index checks the cases below carry: a disposed geometry
+  // answers with no attributes and a null index.
+
+  // Assertion (d) — "the second call throws nothing and releases nothing a second time" —
+  // is the case "a second dispose() frees nothing a second time" below. That the call throws
+  // nothing is a unit test; that the renderer's free list does not move again is only visible
+  // here.
+
+  // Assertion (e) — "leaks no signals and no effects" — has no subject: nothing in
+  // vertex-objects creates a signal or an effect.
+
   // Assertion (f) of the dispose test pattern in
   // packages/twopoint5d/docs/resource-lifecycle.md — "gives every slot it took back" — has
   // no subject here: no geometry in these tests takes a vertex object from a foreign pool.
@@ -241,5 +262,25 @@ describe('vertex-objects — dispose', function () {
     expect(display.renderer.info.memory.geometries).to.equal(geometriesBefore - 1);
     expect(Object.keys(geometry.attributes)).to.deep.equal([]);
     expect(geometry.index).to.be.null;
+  });
+
+  it('a second dispose() frees nothing a second time', async function () {
+    const attributesBefore = await attributesBaseline();
+    const geometry = new VertexObjectGeometry(quadDescription, 8);
+    geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+    await renderOnce(new VertexObjects(geometry, new MeshBasicMaterial()));
+
+    const attributesWhileRendered = display.renderer.info.memory.attributes;
+
+    geometry.dispose();
+
+    const attributesAfterFirstDispose = display.renderer.info.memory.attributes;
+
+    expect(() => geometry.dispose()).to.not.throw();
+
+    // the free list moved once and stays where it is
+    expect(attributesAfterFirstDispose).to.not.equal(attributesWhileRendered);
+    expect(attributesAfterFirstDispose).to.equal(attributesBefore);
+    expect(display.renderer.info.memory.attributes).to.equal(attributesAfterFirstDispose);
   });
 });
