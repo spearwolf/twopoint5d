@@ -30,6 +30,12 @@ export class HelpersManager {
     return this.#root;
   }
 
+  /**
+   * Inserts a node and takes it over: {@link removeFromScene} takes it out of the scene graph
+   * again and calls its `dispose()` if it has one. A node that owns a geometry, a material or
+   * a texture therefore has to release it there — `Box3Helper` and `PlaneHelper` of three.js
+   * do, and a bare `THREE.Mesh` has no `dispose()` for the call to reach.
+   */
   add(node: Object3D, addToRoot = false): void {
     const target = addToRoot ? this.root : this.#scene;
     if (target) {
@@ -45,6 +51,10 @@ export class HelpersManager {
     }
   }
 
+  /**
+   * Takes every node this manager added to `scene` out of it, and calls `dispose()` on each one
+   * that has such a method. What a node has to bring for that to be enough stands at {@link add}.
+   */
   removeFromScene(scene: Object3D): void {
     const removeChildren: Object3D[] = [];
     for (const childNode of scene.children) {

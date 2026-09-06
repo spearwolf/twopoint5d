@@ -92,22 +92,27 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   }
 
   /**
-   * Takes the tile factory content out of {@link node} and gives the factory up:
-   * {@link tileFactory} answers `null` afterwards.
+   * Gives every tile this renderer still holds back to the factory with
+   * {@link IMapTileFactory.destroyTile}, takes the factory content out of {@link node} and
+   * gives the factory up: {@link tileFactory} answers `null` afterwards.
    *
-   * Releases nothing — the factory is handed to the constructor and belongs to the caller,
-   * and `IMapTileFactory` has no `dispose()` to call. The tiles this renderer holds are dropped
-   * without a `destroyTile()` for each of them, so whatever the factory set aside for a tile
-   * stays set aside. {@link node} keeps its `Object3D`; the factory has taken its content out of
-   * it. A second call does nothing.
+   * Releases nothing of its own — the factory is handed to the constructor and belongs to the
+   * caller, and `IMapTileFactory` has no `dispose()` to call. A tile is not owned either, it is
+   * borrowed: with `TileSpritesFactory` it is a slot in the `instancedPool` of the geometry, and
+   * a factory that goes on to serve a second renderer gets every one of them back. {@link node}
+   * keeps its `Object3D`; the factory has taken its content out of it. A second call does
+   * nothing.
    */
   dispose(): void {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
+    // a tile is a slot the factory handed out through createTile(); giving it back is the
+    // other half of that call, and clearTiles() is the one place in this class that does it
+    this.clearTiles();
+
     tileFactory.removeFromNode(this.node);
     this.tileFactory = null;
-    this.#tiles.clear();
     this.#dataSerial = 0;
     this.#updateDataSerial = -1;
   }

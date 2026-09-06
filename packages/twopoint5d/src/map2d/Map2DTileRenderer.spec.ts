@@ -35,6 +35,7 @@ describe('Map2DTileRenderer', () => {
     // (a) has no subject here: this renderer builds no resource that needs releasing — its
     // `node` is a plain Object3D and the tile factory arrives through the constructor.
 
+    // (b) the tile factory arrives through the constructor and belongs to the caller
     test('does NOT release the tile factory that was handed in', () => {
       const tileFactory = makeTileFactory();
       const renderer = new Map2DTileRenderer(tileFactory);
@@ -48,6 +49,7 @@ describe('Map2DTileRenderer', () => {
       expect(tileFactory.createTile).toBeTypeOf('function');
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
     test('behaves as documented after dispose()', () => {
       const tileFactory = makeTileFactory();
       const renderer = new Map2DTileRenderer(tileFactory);
@@ -84,10 +86,14 @@ describe('Map2DTileRenderer', () => {
       expect(renderer.node.position.toArray()).toEqual([1, 2, 3]);
     });
 
+    // (d) the second call throws nothing and gives nothing back a second time
     test('is safe to call twice', () => {
       const tileFactory = makeTileFactory();
       const removeFromNode = sandbox.spy(tileFactory, 'removeFromNode');
+      const destroyTile = sandbox.spy(tileFactory, 'destroyTile');
       const renderer = new Map2DTileRenderer(tileFactory);
+
+      renderer.addTile(new Map2DTileCoords(0, 0));
 
       expect(() => {
         renderer.dispose();
@@ -95,8 +101,25 @@ describe('Map2DTileRenderer', () => {
       }).not.toThrow();
 
       expect(removeFromNode.calledOnce).toBe(true);
+      expect(destroyTile.calledOnce).toBe(true);
     });
 
     // (e) has no subject here: this renderer creates neither signals nor effects.
+
+    // (f) every tile is a slot borrowed from the factory and goes back
+    test('gives every tile it holds back to the factory', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const destroyTile = sandbox.spy(tileFactory, 'destroyTile');
+
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.addTile(new Map2DTileCoords(1, 0));
+      renderer.endUpdatingTiles();
+
+      renderer.dispose();
+
+      expect(destroyTile.callCount).toBe(2);
+      expect(destroyTile.getCalls().map((call) => (call.args[0] as FakeTile).coords.id)).toEqual(['y0x0', 'y0x1']);
+    });
   });
 });

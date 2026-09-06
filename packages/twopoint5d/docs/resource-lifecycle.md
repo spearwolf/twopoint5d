@@ -51,6 +51,22 @@ belongs to the caller. The flag exists so that a pool shared between several
 geometries can be attached explicitly without any of them claiming it. Read it as a
 sharing declaration, not as a template for new APIs.
 
+**What was borrowed is given back, even though it was never owned.**
+
+A slot taken from a pool and a tile taken from a factory are not resources this instance
+owns — but they are resources it holds, and nobody else can reach them. Every acquiring call
+has a releasing counterpart, and `dispose()` is the last place the pairing can still be
+honoured: `createVO()` ↔ `freeVO()`, [`IMapTileFactory.createTile()`](../src/map2d/types.ts)
+↔ `destroyTile()`. Giving back is not releasing — the pool or the factory stays the owner and
+decides what becomes of the slot, the holder only says that it is done with it.
+[`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) hands every tile it still
+holds back before it lets the factory go, so a factory that goes on to serve a second renderer
+gets the slots of the first one back. Assertion (f) of section 8 is the test for it.
+
+An instance that passes what it took straight out to the caller has nothing to give back:
+`TexturedSprites#createSprite()` hands the sprite over, and whoever asked for it calls
+`freeSprite()`.
+
 ## 3. Idempotence
 
 **`dispose()` may be called any number of times.**
@@ -238,8 +254,8 @@ rendered, and the next frame would fail deep inside the renderer.
 
 ## 7. Checklist for a new `dispose()`
 
-1. Release every resource this instance created itself, and touch none that was
-   handed in.
+1. Release every resource this instance created itself, give back every slot it took from a
+   pool or a factory, and touch nothing else that was handed in.
 2. Make `dispose()` idempotent — by a flag, or by construction as in section 3.
 3. Emit the dispose event, then remove the listeners with `off(this)`.
 4. Call `SignalGroup.delete(this)` for the signal side — after your own release, and
@@ -261,9 +277,10 @@ methods of the object under test; `vi.spyOn` is for globals such as `fetch` or
 
 `Thing` is the class under test. Every other name in the skeleton is a placeholder:
 `descriptor` for whatever the constructor takes, `makeResource()` for a resource handed
-in from outside, `item` for the argument of a mutating method, and `resource` /
-`requiredMember` / `release()` for the three kinds of member from section 4. Fill them
-in for your module.
+in from outside, `item` for the argument of a mutating method, `makePool()` for the pool
+or the factory a slot is taken from together with its releasing call `freeItem()`, and
+`resource` / `requiredMember` / `release()` for the three kinds of member from section 4.
+Fill them in for your module.
 
 ```ts
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
@@ -340,6 +357,19 @@ describe('Thing', () => {
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
     });
+
+    // (f) every slot taken from a pool or a factory goes back, and each one once
+    test('gives every slot it took back', () => {
+      const pool = makePool();
+      const thing = new Thing(pool);
+      const freeItem = sandbox.spy(pool, 'freeItem');
+
+      thing.take(item);
+
+      thing.dispose();
+
+      expect(freeItem.calledOnceWithExactly(item)).toBe(true);
+    });
   });
 });
 ```
@@ -347,6 +377,13 @@ describe('Thing', () => {
 Assertion (e) measures the counters **before** the instance is constructed and
 expects the same values after `dispose()`; the two `toBeGreaterThan` checks in
 between prove the test would notice if the class stopped creating signals at all.
+
+Assertion (f) is the one case where the spy has to sit on something the instance does not
+own — the pool or the factory keeps its slot, it only learns that this holder is done with
+it. Take the instance through the calls that hand slots out first, then dispose it, and
+assert on the releasing call, not on a `dispose()` of the pool: what was borrowed is given
+back, and giving back is not releasing. The rule behind it stands at the end of section 2.
+A class that hands every slot it takes straight out to its caller has no subject here.
 
 Where `dispose()` decides what happens to GPU buffers, the unit test cannot see the
 result. Add a browser test in `packages/twopoint5d-testing/` as well, and run it with

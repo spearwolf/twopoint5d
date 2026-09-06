@@ -1,4 +1,4 @@
-import type {Box3, Object3D} from 'three/webgpu';
+import type {Box3, ColorRepresentation, Object3D} from 'three/webgpu';
 import {Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
 import {expectDefined} from '../utils/expectDefined.js';
 import type {CameraBasedVisibility} from './CameraBasedVisibility.js';
@@ -17,6 +17,26 @@ interface TileBox {
   distanceToCamera?: number;
   map2dTile?: IMap2DTileCoords;
   primary?: boolean;
+}
+
+/**
+ * A solid box marking a point in the scene, in the shape the three.js helpers have: it owns
+ * the geometry and the material it is built from and releases both in {@link dispose}. That
+ * is what {@link HelpersManager.add} asks of a node handed to it.
+ */
+class PointHelper extends Mesh<BoxGeometry, MeshBasicMaterial> {
+  constructor(size: number, color: ColorRepresentation) {
+    super(new BoxGeometry(size, size, size), new MeshBasicMaterial({color}));
+  }
+
+  dispose(): void {
+    // a mesh whose geometry slot is empty cannot be rendered, so it leaves the scene graph
+    // before it gives geometry and material up, rather than asking the caller for that order
+    this.removeFromParent();
+
+    this.geometry.dispose();
+    this.material.dispose();
+  }
 }
 
 export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
@@ -116,7 +136,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   }
 
   private addPointHelper(point: Vector3, addToRoot = true, size = 10, color = 0x20f040) {
-    const poiBox = new Mesh(new BoxGeometry(size, size, size), new MeshBasicMaterial({color}));
+    const poiBox = new PointHelper(size, color);
     poiBox.position.copy(point);
     this.#helpers.add(poiBox, addToRoot);
   }
