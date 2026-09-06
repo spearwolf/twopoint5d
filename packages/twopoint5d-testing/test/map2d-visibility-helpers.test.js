@@ -177,4 +177,40 @@ describe('map2d — visibility helper nodes', function () {
     }
     expect(boxSignature(after), 'the boxes moved with the map').to.not.equal(signature);
   });
+
+  it('a scene the helpers were never handed leaves their nodes alone', async function () {
+    const {map2d, visibility} = makeMap(camera);
+    scene.add(map2d);
+
+    const helpers = new CameraBasedVisibilityHelpers(visibility);
+    helpers.add(map2d);
+    helpers.show = true;
+
+    await frame(map2d, helpers);
+    await frame(map2d, helpers);
+
+    const before = helperNodes(scene, map2d);
+    expect(before.length, 'helper nodes after the warm-up frames').to.be.greaterThan(0);
+
+    // the set was handed `map2d`, and the scene above it is a different one
+    helpers.remove(scene);
+
+    // node by node and not `deep.equal`: identity is the question here, and a failing
+    // `deep.equal` would serialize both arrays of scene graph nodes — parents, geometries,
+    // typed arrays and all — to build a diff nobody can read
+    const untouched = helperNodes(scene, map2d);
+    expect(untouched.length, 'nothing was taken out').to.equal(before.length);
+    for (let i = 0; i < before.length; ++i) {
+      expect(untouched[i], `helper node ${i} is still there`).to.equal(before[i]);
+    }
+
+    map2d.centerX = 1024;
+    await frame(map2d, helpers);
+
+    const after = helperNodes(scene, map2d);
+    expect(after.length, 'and no second set was built on top').to.equal(before.length);
+    for (let i = 0; i < before.length; ++i) {
+      expect(after[i], `helper node ${i} survived`).to.equal(before[i]);
+    }
+  });
 });

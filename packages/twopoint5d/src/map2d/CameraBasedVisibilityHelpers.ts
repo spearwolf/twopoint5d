@@ -1,5 +1,6 @@
 import type {ColorRepresentation, LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
+import {Dependencies} from '../utils/Dependencies.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
@@ -60,6 +61,19 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
   // The `serial` of the visibility the current set was built from. -1 means: nothing built.
   #builtSerial = -1;
+
+  // The public fields of this class shape the set that gets built, so a set built from other
+  // values is out of date just as a set built from an older visibility is. `cloneable` keeps a
+  // copy of each color, which catches a color written in place as well as one assigned.
+  readonly #knobs = new Dependencies([
+    'maxDebugHelpers',
+    'tileBoxHelperExpand',
+    'frustumBoxHelperExpand',
+    Dependencies.cloneable<Color>('frustumBoxHelperColor'),
+    Dependencies.cloneable<Color>('frustumBoxPrimaryHelperColor'),
+    Dependencies.cloneable<Color>('tileBoxHelperColor'),
+    Dependencies.cloneable<Color>('tileBoxPrimaryHelperColor'),
+  ]);
 
   constructor(public readonly cameraBasedVisibility: CameraBasedVisibility) {}
 
@@ -227,16 +241,47 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.releasePools();
   }
 
+  /**
+   * Takes the whole set down and gives the nodes it holds up. Its nodes sit in the scene
+   * {@link add} was given and in the root above it, and they only ever come down together —
+   * so that scene is the one to hand over here, and a call naming another is turned away:
+   * taking the set down by halves would leave the pools pointing at released nodes.
+   *
+   * The scene stays named and {@link show} stays on, so this takes the current nodes down and
+   * not the set as such: the next {@link update} builds the same set again, out of fresh nodes.
+   * Whoever wants it to stay down turns {@link show} off.
+   */
   remove(scene: Object3D): void {
-    this.#helpers.removeFromScene(scene);
+    if (this.#helpers.scene !== scene) return;
+    this.#helpers.remove();
     this.releasePools();
   }
 
+  /**
+   * Builds the set the visibility currently describes, unless exactly that set already stands.
+   * A pass finds nothing to do as long as the visibility hands back the same tile set and none
+   * of the public fields of this class has moved since the last build. A value written into one
+   * of those fields is in the picture with the next pass.
+   */
   update(): void {
     if (!this.#show) return;
     // the manager refuses a node it cannot place, so nothing is built until there is a scene
     if (this.#helpers.scene == null) return;
-    if (this.#builtSerial === this.cameraBasedVisibility.serial) return;
+
+    // asked on every pass and before the gate, never behind a `&&`: the state it keeps has to
+    // follow every value written to those fields, not only the ones that fall on a pass that
+    // rebuilds anyway
+    const knobsChanged = this.#knobs.changed({
+      maxDebugHelpers: this.maxDebugHelpers,
+      tileBoxHelperExpand: this.tileBoxHelperExpand,
+      frustumBoxHelperExpand: this.frustumBoxHelperExpand,
+      frustumBoxHelperColor: this.frustumBoxHelperColor,
+      frustumBoxPrimaryHelperColor: this.frustumBoxPrimaryHelperColor,
+      tileBoxHelperColor: this.tileBoxHelperColor,
+      tileBoxPrimaryHelperColor: this.tileBoxPrimaryHelperColor,
+    });
+
+    if (!knobsChanged && this.#builtSerial === this.cameraBasedVisibility.serial) return;
 
     this.#builtSerial = this.cameraBasedVisibility.serial;
     this.createHelpers();

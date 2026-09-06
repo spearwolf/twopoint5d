@@ -101,15 +101,23 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     Dependencies.cloneable<Matrix4>('cameraProjectionMatrix'),
   ]);
 
+  /**
+   * The tiles of the last recomputation that met the plane, sorted by their distance to the
+   * camera. A recomputation in which the camera looks past the plane reports an empty tile set
+   * and leaves this list standing as it is.
+   */
   readonly visibles: TileBox[] = [];
   #visibleTiles?: IMap2DVisibleTiles;
   #serial = 0;
 
   /**
-   * Counts how often this visibility has rebuilt its state from the camera. It moves with every
-   * recomputation — `visibles`, the plane and the plane coordinates are new afterwards — and
-   * stands still while the cached tile set is handed back. Whoever mirrors that state compares
-   * the value it last saw instead of the state itself.
+   * Counts how often this visibility has recomputed its state from the camera. It moves with
+   * every recomputation and stands still while the cached tile set is handed back; whoever
+   * carries derived state along compares the value it last saw instead of the state itself.
+   *
+   * A step says that the camera was evaluated again, not that every field carries a new value:
+   * `planeWorld`, `planeOrigin` and `pointOnPlane` follow every step, `visibles` and
+   * `planeCoords2D` only a step in which the camera met the plane.
    */
   get serial(): number {
     return this.#serial;

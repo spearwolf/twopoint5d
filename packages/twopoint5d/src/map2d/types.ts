@@ -150,9 +150,28 @@ export interface IMap2DVisibilitor {
   ): IMap2DVisibleTiles | undefined;
 }
 
+/**
+ * The debug helpers of a visibilitor: nodes that show what the visibilitor computed, put into
+ * a scene of the caller's choosing.
+ */
 export interface IMap2DVisibilitorHelpers {
+  /** Names the scene the helper nodes go into. */
   add(scene: Object3D): void;
+
+  /**
+   * Takes the helper nodes out of the scene they were put into. The scene to hand over is the
+   * one {@link add} was given; only for that one is the set guaranteed to come down whole.
+   *
+   * Any other scene is the caller's mistake and an implementation answers it as it sees fit —
+   * it may leave everything standing, and it may take its set down out of the scene it was
+   * actually given, whole or in part. Whoever holds a reference to a helper node therefore
+   * keeps track of which scene the set was handed to.
+   */
   remove(scene: Object3D): void;
+
+  /** Brings the helper nodes up to the state the visibilitor currently describes. */
   update(): void;
+
+  /** Whether the helper nodes are built at all. */
   show: boolean;
 }
