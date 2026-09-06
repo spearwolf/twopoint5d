@@ -52,7 +52,8 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
     this.#helpers.remove();
 
-    if (this.#viewRect) {
+    // the manager refuses a node it cannot place: no scene, no helper
+    if (this.#viewRect && this.#helpers.scene != null) {
       const helper = new Box3Helper(this.#viewRect, this.viewRectHelperColor);
       this.#helpers.add(helper);
     }

@@ -35,14 +35,21 @@ export class HelpersManager {
    * again and calls its `dispose()` if it has one. A node that owns a geometry, a material or
    * a texture therefore has to release it there — `Box3Helper` and `PlaneHelper` of three.js
    * do, and a bare `THREE.Mesh` has no `dispose()` for the call to reach.
+   *
+   * A manager without a {@link scene} has nowhere to put the node and no way to take it down
+   * again, so it refuses the handover with an error instead of accepting a node it would drop.
+   * Whoever builds nodes for a manager that may not have one asks {@link scene} first.
    */
   add(node: Object3D, addToRoot = false): void {
     const target = addToRoot ? this.root : this.#scene;
-    if (target) {
-      node.userData['isHelper'] = true;
-      node.userData['createdBy'] = this.uuid;
-      target.add(node);
+
+    if (target == null) {
+      throw new Error('HelpersManager#add() has no scene to add to: set HelpersManager#scene before handing a node over');
     }
+
+    node.userData['isHelper'] = true;
+    node.userData['createdBy'] = this.uuid;
+    target.add(node);
   }
 
   remove() {

@@ -53,7 +53,8 @@ export class Canvas2DStage {
 
   /**
    * The texture the canvas content is drawn from. The stage owns whatever sits in this field:
-   * `render()` releases it as it builds the next one, and so does {@link dispose}.
+   * `render()` releases it once its successor sits on the sprite material, and so does
+   * {@link dispose}.
    */
   texture?: Texture;
 
@@ -116,10 +117,6 @@ export class Canvas2DStage {
   }
 
   private makeTexture(): Texture {
-    if (this.texture) {
-      this.texture.dispose();
-    }
-
     this.#textureFactory ||= new TextureFactory(this.renderer, ['nearest', 'flipy', 'srgb']);
 
     this.texture = this.#textureFactory.create(this.canvas);
@@ -129,9 +126,15 @@ export class Canvas2DStage {
 
   private updateTexture() {
     if (this.needsUpdate) {
+      const previous = this.texture;
+
       this.sprite.material.map = this.makeTexture();
       this.sprite.material.needsUpdate = true;
       this.needsUpdate = false;
+
+      // the material points at the successor before the predecessor falls: nothing ever reads
+      // a texture that is already released
+      previous?.dispose();
     }
   }
 

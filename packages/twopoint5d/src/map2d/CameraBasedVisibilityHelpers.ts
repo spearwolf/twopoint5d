@@ -72,6 +72,10 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   }
 
   private createHelpers() {
+    // the manager refuses a node it cannot place, so nothing is built until there is a scene to
+    // build it into — the first update() after add(scene) puts the whole set in
+    if (this.#helpers.scene == null) return;
+
     this.createPlaneHelpers();
     this.createTileHelpers(this.cammeraBasedVisibility.visibles);
 

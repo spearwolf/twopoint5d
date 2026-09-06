@@ -87,4 +87,19 @@ describe('CameraBasedVisibilityHelpers', () => {
       expect(node.material!).toHaveBeenCalledTimes(1);
     }
   });
+
+  test('builds no helper while no scene has been handed over', () => {
+    const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+    expect(() => {
+      helpers.show = true;
+      helpers.update();
+    }, 'a helper set with nowhere to go is not built').not.toThrow();
+
+    const scene = new Object3D();
+    helpers.add(scene);
+    helpers.update();
+
+    expect(scene.children, 'and the scene gets the full set once it is there').toHaveLength(5);
+  });
 });

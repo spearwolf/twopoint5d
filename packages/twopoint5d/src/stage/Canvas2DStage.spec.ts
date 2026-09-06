@@ -51,6 +51,32 @@ describe('Canvas2DStage', () => {
     expect(rendered, 'no event follows the dispose').not.toHaveBeenCalled();
   });
 
+  test('puts the new texture in place before it releases the one it replaces', () => {
+    const stage = makeStage();
+
+    stage.needsUpdate = true;
+    stage.render();
+
+    const first = stage.texture!;
+    let mapAtRelease: unknown;
+    let fieldAtRelease: unknown;
+
+    // calls through: the question is when the release happens, not whether it happens
+    const releaseFirst = first.dispose.bind(first);
+    sandbox.stub(first, 'dispose').callsFake(() => {
+      mapAtRelease = stage.sprite.material.map;
+      fieldAtRelease = stage.texture;
+      releaseFirst();
+    });
+
+    stage.needsUpdate = true;
+    stage.render();
+
+    expect(stage.texture, 'the factory built a second texture').not.toBe(first);
+    expect(mapAtRelease, 'the material had already moved on').toBe(stage.texture);
+    expect(fieldAtRelease, 'and so had the field').toBe(stage.texture);
+  });
+
   describe('dispose()', () => {
     // (a) a resource the instance built itself is released exactly once
     test('disposes the material, both textures and the stage renderer it created itself', () => {
