@@ -44,7 +44,7 @@ fast and need the canonical idioms.
 | `Display` | Owns the canvas + `WebGPURenderer`, drives the frame loop, emits resize/render events. Source of truth for size + time. |
 | `Stage2D` | Holds a `THREE.Scene` and a camera derived from an `IProjection`. Implements `IStage + IRenderable + IPassProvider`. |
 | `StageRenderer` | Container for stages. Implements `IStage + IRenderable + IPassProvider` so it can be nested. Optional clearing policy and `RenderPipeline` post-processing. |
-| `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. `dispose()` releases everything it built itself — the sprite material, its textures and its `StageRenderer`. |
+| `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. `dispose()` releases the sprite material, its `StageRenderer` and every texture that sat in its `texture` field, whoever assigned it. |
 | `ClearStage` | Marker stage that emits `renderer.clear(...)` between siblings (depth-only by default). |
 | `RootRenderPipeline` | `RenderPipeline` subclass with a built-in additive composition (`p0.add(p1).add(p2)…`). Assign as `StageRenderer.pipeline` to skip `buildOutputNode` for the common "compose every stage" case. |
 
@@ -437,7 +437,8 @@ new StageRenderer(host).add(stage);
 - `Canvas2DStage.dispose()` releases the sprite material, the textures behind it and its
   `StageRenderer`, and leaves the `WebGPURenderer` and a canvas handed to the constructor
   alone. The sprite geometry is shared by every `THREE.Sprite` of the module and stays.
-- `Display.dispose()` releases the renderer + canvas.
+- `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
+  handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline` or an `outputRenderTarget` assigned from outside.
 

@@ -21,6 +21,16 @@ method — belongs to the caller. It is not disposed, not cleared, not modified.
 hands a resource in, disposes it. Who hands a resource out while still owning it,
 stays its owner: returning a pool from a getter does not transfer it.
 
+A class may take a resource over, but only where the receiving side says so in its own
+TSDoc — at the constructor parameter, at the field, at the method that accepts it. Without
+that promise in writing, the rule above holds unchanged.
+[`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its constructor
+receives and releases it in `dispose()`;
+[`Canvas2DStage`](../src/stage/Canvas2DStage.ts) takes over every texture that ends up in
+its `texture` field, whether it was assigned from outside or built by the stage itself. A
+take-over that is not written down where the resource arrives is a bug, not a case this
+paragraph forgot.
+
 The reference implementation is
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts). Its constructor
 builds a pool only when it was given a descriptor, and marks exactly that pool:
@@ -262,7 +272,8 @@ rendered, and the next frame would fail deep inside the renderer.
 ## 7. Checklist for a new `dispose()`
 
 1. Release every resource this instance created itself, give back every slot it took from a
-   pool or a factory, and touch nothing else that was handed in.
+   pool or a factory, and touch nothing else that was handed in — unless the place that
+   accepts it promises the take-over in its own TSDoc, as section 2 requires.
 2. Make `dispose()` idempotent — by a flag, or by construction as in section 3.
 3. Emit the dispose event, then remove the listeners with `off(this)`.
 4. Call `SignalGroup.delete(this)` for the signal side — after your own release, and
@@ -380,6 +391,12 @@ describe('Thing', () => {
   });
 });
 ```
+
+A class that promises a take-over under the rule of section 2 turns assertion (b) around:
+it asserts that `dispose()` releases the resource it was handed exactly once, and the test
+name says so. `Display` with a `WebGPURenderer` at the constructor is that case; it sits in
+`packages/twopoint5d-testing/test/display-adopt-renderer.test.js`, because a
+`WebGPURenderer` needs a real browser.
 
 Assertion (e) measures the counters **before** the instance is constructed and
 expects the same values after `dispose()`; the two `toBeGreaterThan` checks in

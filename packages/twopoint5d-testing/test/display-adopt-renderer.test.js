@@ -47,4 +47,23 @@ describe('Display — the constructor that adopts a renderer', function () {
 
     expect(display.frameNo, 'frames rendered').to.be.greaterThan(0);
   });
+
+  it('releases the renderer it was handed', async () => {
+    display = new Display(renderer);
+
+    // the constructor waits on renderer.init(); a dispose() dropped into that window would prove
+    // something other than the name of this case
+    await display.start();
+
+    let disposeCalls = 0;
+    const realDispose = renderer.dispose.bind(renderer);
+    renderer.dispose = () => {
+      disposeCalls++;
+      realDispose();
+    };
+
+    display.dispose();
+
+    expect(disposeCalls, 'calls to renderer.dispose()').to.equal(1);
+  });
 });

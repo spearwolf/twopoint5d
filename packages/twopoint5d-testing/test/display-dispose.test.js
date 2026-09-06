@@ -54,9 +54,9 @@ describe('Display — the contract after dispose()', function () {
   // three.js clean up after itself; what proves the release are the backend resources, and this
   // test cannot see them. What it can see, and what this file is about, is the contract afterwards.
 
-  // Assertion (b) — "does not touch what was handed in" — has no subject either. A WebGPURenderer
-  // passed to the constructor is the second construction path, but who owns it is not what these
-  // tests answer.
+  // Assertion (b) — "does not touch what was handed in" — is turned around for a Display: a
+  // WebGPURenderer passed to the constructor is adopted and released with the display. That case
+  // needs a renderer of its own and lives in display-adopt-renderer.test.js.
 
   // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
   // what most of the cases below are: canvas, start(), getEventProps(), isWebGPUBackend
