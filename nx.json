@@ -73,5 +73,6 @@
         "externalDependencies": ["vitest", "@vitest/coverage-v8"]
       }
     ]
-  }
+  },
+  "analytics": false
 }
