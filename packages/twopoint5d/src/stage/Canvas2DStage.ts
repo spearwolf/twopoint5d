@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off} from '@spearwolf/eventize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
 import {TextureFactory} from '../texture/TextureFactory.js';
@@ -22,7 +22,7 @@ export class Canvas2DStage {
   }
 
   set fit(value: Canvas2DStageFitType) {
-    if (this.#fit === value) return;
+    if (this.#disposed || this.#fit === value) return;
     this.#fit = value;
     this.projection.viewSpecs.fit = value;
     this.stage.updateProjection(true);
@@ -47,7 +47,16 @@ export class Canvas2DStage {
 
   readonly sprite: Sprite;
 
+  // the material starts out with a blank texture, and the first updateTexture() swaps it for the
+  // one the factory built — after that this field is all that still points at it
+  #placeholderTexture: Texture;
+
+  /**
+   * The texture the canvas content is drawn from. The stage owns whatever sits in this field:
+   * `render()` releases it as it builds the next one, and so does {@link dispose}.
+   */
   texture?: Texture;
+
   #textureFactory?: TextureFactory;
 
   /**
@@ -96,7 +105,9 @@ export class Canvas2DStage {
     this.stage = new Stage2D(this.projection);
     this.stageRenderer.add(this.stage);
 
-    const material = new SpriteMaterial({map: new Texture()});
+    this.#placeholderTexture = new Texture();
+
+    const material = new SpriteMaterial({map: this.#placeholderTexture});
     this.sprite = new Sprite(material);
 
     this.sprite.scale.set(this.width, this.height, 1);
@@ -125,11 +136,14 @@ export class Canvas2DStage {
   }
 
   setContainerSize(width: number, height: number) {
+    if (this.#disposed) return;
+
     this.stage.resize(width, height);
   }
 
   setCanvasSize(width: number, height: number) {
-    if (this.width === width && this.height === height) return;
+    // the canvas may have been handed in, and a disposed stage does not write to it
+    if (this.#disposed || (this.width === width && this.height === height)) return;
 
     this.canvas.width = width;
     this.canvas.height = height;
@@ -144,6 +158,8 @@ export class Canvas2DStage {
   }
 
   render() {
+    if (this.#disposed) return;
+
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
       this.dispatchEvent('resize');
 
@@ -160,5 +176,49 @@ export class Canvas2DStage {
 
   private dispatchEvent(eventName: string) {
     emit(this, eventName, this);
+  }
+
+  #disposed = false;
+
+  /** `true` once {@link dispose} has run. */
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
+  /**
+   * Release the three.js resources this stage built for itself: the sprite material, both
+   * textures that ever sat behind it and the {@link StageRenderer}. The sprite leaves the scene
+   * before its material goes, so no frame reaches a sprite without one. {@link texture} is the
+   * one field the stage owns whoever wrote it — a texture assigned there from outside is
+   * released here as well.
+   *
+   * The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are
+   * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares
+   * one geometry across every sprite of the module; it is not this stage's to release.
+   *
+   * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
+   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do
+   * nothing. `canvas`, `renderer`, `projection`, `stage`, `scene`, `sprite`, `stageRenderer`,
+   * `width`, `height` and `needsUpdate` keep the values the stage was left with. A `dispose`
+   * event goes out to every subscriber before this stage stops listening; no event follows it.
+   */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+
+    // the listeners are still attached here: this event is what tells them to let go
+    this.dispatchEvent('dispose');
+    off(this);
+
+    // out of the scene graph before the material goes — a sprite without one cannot be drawn
+    this.sprite.removeFromParent();
+
+    this.sprite.material.dispose();
+    this.#placeholderTexture.dispose();
+    this.texture?.dispose();
+    this.texture = undefined;
+    this.#textureFactory = undefined;
+
+    this.stageRenderer.dispose();
   }
 }

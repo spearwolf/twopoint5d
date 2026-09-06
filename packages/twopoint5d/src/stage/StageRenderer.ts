@@ -23,6 +23,12 @@ const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProv
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
+// one message for every member that refuses to answer once the renderer is gone, so the class
+// and the state are always in the text a caller reads out of a foreign stack
+function disposedError(member: string): Error {
+  return new Error(`StageRenderer#${member} is not available: this renderer has been disposed`);
+}
+
 export interface StageItem {
   stage: IStage & IRenderable;
 
@@ -194,12 +200,18 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #removeFromParent(): void {
-    if (this.#parent == null) return;
+    const parent = this.#parent;
+    if (parent == null) return;
+
+    // cleared before the event goes out and before the parent hears about it: a remove()
+    // coming back in from the other side finds nothing left to detach, and the recursion
+    // between the two halves stops after one pass
+    this.#parent = undefined;
 
     emit(this, OnRemoveFromParent);
 
-    if (this.#parent instanceof StageRenderer) {
-      this.#parent.remove(this);
+    if (parent instanceof StageRenderer) {
+      parent.remove(this);
     }
   }
 
@@ -286,14 +298,27 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   // Pipeline / RenderTarget integration — see "Post-processing" in ./README.md
   // ---------------------------------------------------------------------------
 
+  #pipeline?: RenderPipeline;
+
   /**
    * Optional `THREE.RenderPipeline` running between the stages and the
    * output. Without `buildOutputNode`, the stages render into an internal
    * pass-target whose texture is sampled by the pipeline. With
    * `buildOutputNode`, the pipeline runs a user-defined TSL graph composed
    * from each stage's pass node.
+   *
+   * The pipeline is handed in and stays the caller's. A disposed renderer
+   * answers `undefined` here and takes no new one: like `parent`, `add()` and
+   * `attach()`, the write is a silent no-op.
    */
-  pipeline?: RenderPipeline;
+  get pipeline(): RenderPipeline | undefined {
+    return this.#pipeline;
+  }
+
+  set pipeline(pipeline: RenderPipeline | undefined) {
+    if (this.#disposed) return;
+    this.#pipeline = pipeline;
+  }
 
   /**
    * Optional `RenderTarget` to which this renderer's final output is written.
@@ -332,6 +357,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * current target. This is the {@link IRenderable} method.
    */
   renderTo(renderer: WebGPURenderer): void {
+    // nothing left to draw and nothing left to draw into: a disposed renderer holds no
+    // stage, and the target belongs to the caller — clearing it here would be work on
+    // something this renderer let go of
+    if (this.#disposed) return;
+
     if (isWebGLRenderer(renderer)) {
       throw new TypeError('The WebGLRenderer renderer is not supported anymore');
     }
@@ -470,6 +500,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * The parent is responsible for ensuring the texture is up-to-date before
    * the pipeline runs (`StageRenderer` does that automatically for nested
    * `StageRenderer` children).
+   *
+   * A disposed renderer throws here instead of building a fresh pass-target
+   * that nothing would release again.
    */
   asPassNode(renderer: WebGPURenderer): Node {
     const rt = this.#ensureAsPassNodeRT(renderer);
@@ -481,6 +514,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #ensureAsPassNodeRT(renderer: WebGPURenderer): RenderTarget {
+    if (this.#disposed) {
+      // the guard sits here and not in asPassNode(): a parent pre-renders a nested child
+      // through this method directly, and a child added with add() never learned who holds it
+      throw disposedError('asPassNode()');
+    }
     return (this.#asPassNodeRT = this.#ensureRT(this.#asPassNodeRT, renderer));
   }
 
@@ -541,9 +579,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `setClearColor()` and the clear fields still take values, and `invalidateOutputNode()`
    * still marks the output node for a rebuild that never comes. `outputRenderTarget`,
    * `buildOutputNode`, `name` and `renderOrder` keep the values the renderer was left with.
-   * Two calls still build a `RenderTarget` on demand: `asPassNode()`, and `renderTo()` after
-   * a fresh `pipeline` was assigned post-dispose. Either way, a disposed renderer has no
-   * `dispose()` left to free it with.
+   *
+   * No `RenderTarget` is built after this call: `renderTo()` and `updateFrame()` do nothing,
+   * `asPassNode()` throws an error naming the class and the state, and a write to `pipeline`
+   * falls through.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -558,14 +597,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // #removeFromParent() is what emits OnRemoveFromParent, and that event is what makes the
     // host subscriptions from #addToHost() unsubscribe.
     this.#removeFromParent();
-    this.#parent = undefined;
 
     this.#internalRT?.dispose();
     this.#internalRT = undefined;
     this.#asPassNodeRT?.dispose();
     this.#asPassNodeRT = undefined;
 
-    this.pipeline = undefined;
+    this.#pipeline = undefined;
 
     // last: the events above still have to reach the listeners that act on them
     off(this);
@@ -657,6 +695,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Remove a stage. Returns `this` for chaining. Emits `OnStageRemoved`.
+   *
+   * A removed child `StageRenderer` answers `undefined` as its `parent`
+   * afterwards and gets its `OnRemoveFromParent`.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);
@@ -665,6 +706,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#orderedStages = undefined;
       this.#outputDirty = true;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
+      if (stage instanceof StageRenderer && stage.parent === this) {
+        // the child still names this renderer as its holder; letting go is a move both
+        // sides make, whichever of them started it
+        stage.#removeFromParent();
+      }
     }
     return this;
   }

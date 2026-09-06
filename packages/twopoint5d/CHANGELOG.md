@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
 - add `StageRenderer#isDisposed`: `true` once `dispose()` has run, so a caller holding a renderer it did not create has a question it can ask
+- add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, both textures that ever sat behind it and the `StageRenderer` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 
 ### Changed
 
@@ -67,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
 - `VOBufferPool#toBuffersData()` and `#fromBuffersData()` throw on a disposed pool, with a message naming the class, the method and the state. The return type of `toBuffersData()` promises the buffers of a live pool, and a disposed one has none to answer with; `fromBuffersData()` turns away a capacity it cannot serve, as it already does for a capacity that does not match its own. `VertexObjectPool` inherits both
 - the rAF driver every `FrameLoop` of the module shares runs exactly as long as at least one `FrameLoop` has subscribers, and it picks its work back up by itself when one comes back. A `FrameLoop` without subscribers asks for no frames, and the fps measurement anchors a fresh window on the tick that resumes it
+- a disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws an error naming the class and the state instead of handing out a node backed by a target nothing would release again, `renderTo()` does nothing — it neither draws nor clears the caller's target — and a write to `pipeline` falls through, so the getter keeps answering `undefined`. `pipeline` is an accessor pair on the prototype now; reading and writing it on a live renderer is unchanged
+- `StageRenderer#remove()` clears both sides of the relation: a removed child `StageRenderer` answers `undefined` as its `parent` afterwards and gets its `OnRemoveFromParent`, exactly as a `parent = undefined` on the child would do. A listener reading `renderer.parent` from that event sees `undefined` — the event says the child has been removed
 
 ### Removed
 
@@ -945,6 +948,49 @@ pipeline.dispose(); // built by the caller, released by the caller
 ```
 
 A renderer without a pipeline needs no change.
+
+#### A disposed child leaves its holder before it goes
+
+`StageRenderer#asPassNode()` throws once `dispose()` has run: the node it returns promises a
+pass-target, and a disposed renderer builds none. The direct call is the visible half. The half
+that slips through without a compile error is a **live** parent with `buildOutputNode` or a
+`RootRenderPipeline`: it asks every nested child for its pass node once per frame, so a child
+disposed while it is still in the parent's stage list turns every frame of that parent into a
+throw.
+
+A child that came in through `child.parent = parent` takes itself off the list as it is
+disposed. A child added with `parent.add(child)` never learned who holds it — that one has to be
+removed by hand, and `parent.remove(child)` now clears the child's `parent` as well.
+
+**Before**
+
+```ts
+const parent = new StageRenderer(display);
+parent.pipeline = pipeline;
+parent.buildOutputNode = (passes) => passes[0]!;
+
+const child = new StageRenderer();
+parent.add(child);
+
+child.dispose(); // the child is still a stage of the parent
+```
+
+**After**
+
+```ts
+const parent = new StageRenderer(display);
+parent.pipeline = pipeline;
+parent.buildOutputNode = (passes) => passes[0]!;
+
+const child = new StageRenderer();
+parent.add(child);
+
+parent.remove(child); // added with add(), so it has to be taken off by hand
+child.dispose();
+```
+
+A parent without `buildOutputNode` and without a `RootRenderPipeline` asks for no pass node and
+needs no change — though a child left in its stage list is dead weight either way.
 
 ## [0.21.2] - 2026-06-19
 

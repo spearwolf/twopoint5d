@@ -324,6 +324,19 @@ describe('StageRenderer', () => {
       sr.detach();
       expect(removed).toHaveBeenCalledTimes(1);
     });
+
+    it('remove() clears the parent of the child it lets go', () => {
+      const parent = new StageRenderer();
+      const child = new StageRenderer(parent);
+      const removed = vi.fn();
+      on(child, OnRemoveFromParent, removed);
+
+      parent.remove(child);
+
+      expect(parent.hasStage(child)).toBe(false);
+      expect(child.parent, 'the child let go of its holder as well').toBeUndefined();
+      expect(removed, 'and it said so exactly once').toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -710,6 +723,11 @@ describe('StageRenderer', () => {
 
       expect(sr.add(fakeStage('late'))).toBe(sr);
       expect(sr.stages, 'stages after add()').toEqual([]);
+
+      // and no new pipeline either: renderTo() has nothing left to drive it with
+      sr.pipeline = makePipelineMock() as any;
+      expect(sr.pipeline, 'pipeline after a write').toBeUndefined();
+      expect(() => sr.renderTo(renderer as any), 'renderTo() on a disposed renderer').not.toThrow();
     });
 
     // (d) the second call throws nothing and releases nothing a second time
@@ -730,6 +748,49 @@ describe('StageRenderer', () => {
 
       expect(rtDispose.callCount).toBe(1);
       expect(pipeline.dispose).not.toHaveBeenCalled();
+    });
+
+    it('throws instead of building a pass target after dispose()', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.dispose();
+
+      expect(() => sr.asPassNode(renderer as any)).toThrow(/StageRenderer#asPassNode\(\) is not available/);
+    });
+
+    it('does not pre-render a disposed child into a fresh pass target', () => {
+      const parent = new StageRenderer();
+      parent.resize(50, 50);
+      const child = new StageRenderer();
+      // add() alone: the child never learns who holds it, so its dispose() leaves it in the list
+      parent.add(child);
+      child.dispose();
+      parent.pipeline = makePipelineMock() as any;
+      parent.buildOutputNode = (passes) => passes[0]!;
+
+      expect(() => parent.renderTo(renderer as any)).toThrow(/StageRenderer#asPassNode\(\) is not available/);
+    });
+
+    it('leaves the renderer alone after dispose()', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.setClearColor(null, 0);
+      sr.dispose();
+
+      sr.renderTo(renderer as any);
+
+      expect(renderer.clear, 'the target belongs to the caller').not.toHaveBeenCalled();
+    });
+
+    it('takes no pipeline after dispose()', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      sr.dispose();
+
+      sr.pipeline = makePipelineMock() as any;
+      sr.renderTo(renderer as any);
+
+      expect(sr.pipeline).toBeUndefined();
     });
 
     // (e) has no subject here: this renderer creates neither signals nor effects.
