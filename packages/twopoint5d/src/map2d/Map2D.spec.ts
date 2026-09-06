@@ -77,5 +77,9 @@ describe('Map2D', () => {
     });
 
     // (e) has no subject here: a Map2D creates neither signals nor effects.
+
+    // (f) has no subject here: a Map2D takes no slot from a pool and no tile from a factory.
+    // The tile renderers it holds arrive through addTileRenderer() and belong to the caller;
+    // the tiles live one layer further down, in the renderers themselves.
   });
 });

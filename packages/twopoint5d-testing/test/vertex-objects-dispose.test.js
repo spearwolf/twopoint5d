@@ -92,6 +92,12 @@ describe('vertex-objects — dispose', function () {
     return display.renderer.info.memory.attributes;
   }
 
+  // Assertion (f) of the dispose test pattern in
+  // packages/twopoint5d/docs/resource-lifecycle.md — "gives every slot it took back" — has
+  // no subject here: no geometry in these tests takes a vertex object from a foreign pool.
+  // The slots the cases below speak of are three.js attribute slots, which a route claims
+  // on the geometry, not slots lent out by a pool.
+
   it('a rendered geometry disposes and gives up its slots', async function () {
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);

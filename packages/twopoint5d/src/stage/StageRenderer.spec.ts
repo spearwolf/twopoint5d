@@ -794,5 +794,9 @@ describe('StageRenderer', () => {
     });
 
     // (e) has no subject here: this renderer creates neither signals nor effects.
+
+    // (f) has no subject here: this renderer takes no slot from a pool and no tile from a
+    // factory. The stages arrive through add() and stay the caller's; the render targets are
+    // its own, and case (a) covers them.
   });
 });

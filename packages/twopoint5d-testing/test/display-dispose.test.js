@@ -61,6 +61,9 @@ describe('Display — the contract after dispose()', function () {
   // Assertion (e) — "leaks no signals and no effects" — has no subject: Display creates neither.
   // Its events run through eventize, and their teardown is covered by the second-dispose case below.
 
+  // Assertion (f) — "gives every slot it took back" — has no subject: a Display takes no
+  // slot from a pool and no tile from a factory.
+
   it('canvas throws after dispose()', () => {
     host = makeContainer();
     display = new Display(host);

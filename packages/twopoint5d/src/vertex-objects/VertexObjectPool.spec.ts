@@ -900,5 +900,8 @@ describe('VertexObjectPool', () => {
     });
 
     // (e) has no subject here: neither pool creates a signal or an effect.
+
+    // (f) has no subject here: both classes under test are the pool others take slots from,
+    // not a holder that borrows one.
   });
 });

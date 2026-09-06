@@ -85,5 +85,8 @@ describe('TileSpritesMaterial', () => {
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
     });
+
+    // (f) has no subject here: this material takes no slot from a pool and no tile from a
+    // factory. The colorMap it is handed is the only resource it ever touches.
   });
 });

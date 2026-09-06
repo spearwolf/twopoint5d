@@ -893,6 +893,11 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(owner.pool.isDisposed).toBe(true);
     });
+
+    // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
+    // slot it took back" — has no subject here: an InstancedVertexObjectGeometry never calls
+    // createVO(). The slots elsewhere in this file are three.js attribute slots, which a
+    // route claims on the geometry, not slots lent out by a pool.
   });
 
   describe('attachInstancedPool()', () => {

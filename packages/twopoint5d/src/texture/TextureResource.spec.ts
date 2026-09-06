@@ -206,6 +206,10 @@ describe('TextureResource', () => {
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
     });
+
+    // (f) has no subject here: TextureFactory#create() builds a new Texture and keeps no
+    // record of it — there is no call that would give one back. The texture a resource
+    // materializes is its own, and case (a) covers its release.
   });
 
   describe('load()', () => {

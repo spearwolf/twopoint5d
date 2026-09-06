@@ -216,6 +216,11 @@ describe('InstancedVertexObjectGeometry', () => {
 
       expect(extraDispose.called).toBe(false);
     });
+
+    // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
+    // slot it took back" — has no subject here: this geometry never calls createVO(). It
+    // holds pools, not vertex objects: a pool it built itself is released, and one handed in
+    // stays the caller's together with every slot the caller took from it.
   });
 
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {

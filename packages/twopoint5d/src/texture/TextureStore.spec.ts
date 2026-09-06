@@ -271,6 +271,10 @@ describe('TextureStore', () => {
         fetchMock.mockRestore();
       }
     });
+
+    // (f) has no subject here: the store takes no slot from a pool and no tile from a
+    // factory. The resources it keeps are its own, and its shared TextureFactory builds
+    // textures rather than lending them — nothing it hands out is ever given back.
   });
 
   describe('defaultTextureClasses as signal (§4.6)', () => {

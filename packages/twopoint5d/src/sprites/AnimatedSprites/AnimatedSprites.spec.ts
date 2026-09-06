@@ -84,5 +84,8 @@ describe('AnimatedSprites', () => {
 
     // (e) has no subject here either: this class creates no signals and no effects. The ones
     // the handed-in material creates are the material's to tear down, not this mesh's.
+
+    // (f) has no subject here: this mesh takes no slot from a pool. The sprite pool belongs
+    // to the geometry it was handed, and this class never draws from it.
   });
 });

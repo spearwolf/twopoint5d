@@ -227,5 +227,8 @@ describe('FixedFrameLoop', () => {
     });
 
     // (e) has no subject here: this loop creates neither signals nor effects.
+
+    // (f) has no subject here: this loop borrows nothing — no pool hands it a slot and no
+    // factory hands it a tile.
   });
 });

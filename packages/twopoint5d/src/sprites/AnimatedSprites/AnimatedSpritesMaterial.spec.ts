@@ -99,6 +99,11 @@ describe('AnimatedSpritesMaterial', () => {
 
       animsMap.dispose();
     });
+
+    // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
+    // slot it took back" — has no subject here: this material takes no slot from a pool and
+    // no tile from a factory. The animsMap it holds arrives through the constructor or the
+    // setter.
   });
 
   describe('an animsMap without an image', () => {

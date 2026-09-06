@@ -168,5 +168,13 @@ describe('TexturedSprites', () => {
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
     });
+
+    // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
+    // slot it took back" — has no subject here, although this is the class that looks like it
+    // should: createSprite() takes a slot from the sprite pool and hands it straight to the
+    // caller, keeping no record of it. Giving it back is freeSprite(), and that call is the
+    // caller's to make. Where this mesh built the geometry itself, dispose() releases the
+    // whole pool with it; where a geometry was handed in, the pool and every slot taken from
+    // it stay the caller's.
   });
 });
