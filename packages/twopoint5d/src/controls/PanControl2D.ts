@@ -134,11 +134,22 @@ export class PanControl2D extends InputControlBase {
     this.keyboardDisabled = readOption(options, 'disableKeyboard', false);
   }
 
+  /** The cursor css style this control shows while panning. */
   get cursorPanStyle(): string {
     return this.#cursorPanStyle;
   }
 
+  /**
+   * Set the cursor css style shown while panning.
+   *
+   * On a disposed control the write is refused and the getter keeps its last value: the style
+   * rule behind it is shared by every control of the module.
+   */
   set cursorPanStyle(value: string) {
+    // the rule is installed under one name for the whole module and shared by every control
+    // of it — a disposed control does not get to rewrite what the living ones are showing
+    if (this.isDisposed) return;
+
     if (this.#cursorPanStyle !== value) {
       this.#cursorPanStyle = value;
       this.#cursorPanClass = this.#installCursorPanStyleRules();
@@ -362,8 +373,42 @@ export class PanControl2D extends InputControlBase {
     }
   };
 
-  dispose(): void {
-    this.destroyAllListeners();
+  /**
+   * Take every listener off `document`, give the cursor styles target back the way it was
+   * found and drop the pan that was collected but never delivered.
+   *
+   * The `state` object and the `cursorStylesTarget` element were handed in and stay the
+   * caller's: the state keeps the values the last {@link update} wrote, and the element keeps
+   * everything but the cursor class this control put on it.
+   *
+   * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
+   * reaches this control any more. {@link update} still moves {@link panView} by the speed
+   * fields a caller sets by hand — what it no longer delivers is a pan from a drag before the
+   * call. A write to {@link cursorPanStyle} is refused: it would rewrite a style rule every
+   * control of the module shares. `pixelsPerSecond`, `mouseButton`, `keyCodes`,
+   * `keyboardDisabled`, `pointerDisabled`, `panView` and the four `speed…` fields still take
+   * values, they just drive nothing. A control that was hiding the cursor emits one last
+   * `restoreCursor` while its subscribers can still hear it; after that every listener on this
+   * control goes with it, and a further `dispose()` does nothing.
+   */
+  override dispose(): void {
+    if (this.isDisposed) return;
+
+    // first: with the listeners off document, no pointer event can refill the state the
+    // lines below give up
+    super.dispose();
+
+    // the class sits on an element that belongs to the caller, and it comes off here. Only
+    // from YES: that is the one state in which it was added and a hideCursor went out, and
+    // the class name is shared across the module — restoring from MAYBE would take the class
+    // off a target another control is still hiding behind.
+    if (this.#hideCursorState === HideCursorState.YES) {
+      this.#restoreCursorStyle();
+    }
+
+    this.#pointersDown.clear();
+
+    // last: the restoreCursor above still has to reach the listeners that act on it
     off(this);
   }
 }

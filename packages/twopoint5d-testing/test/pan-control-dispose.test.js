@@ -50,13 +50,15 @@ describe('PanControl2D — the contract after dispose()', () => {
   // neither is a resource with a dispose() to spy on, and the listeners are what the cases
   // below observe through their effect.
 
-  // Assertion (b) — "does not touch what was handed in" — has no subject either. What the
-  // constructor takes is a `state` object and a cursor target element, not a resource that
-  // would need releasing.
+  // Assertion (b) — "does not touch what was handed in" — is about the cursor styles target:
+  // the element belongs to the caller, and the case below checks it is left as it was found.
 
   // Assertion (e) — "leaks no signals and no effects" — has no subject: the control creates
   // neither. Its events run through eventize, and the case about a listener from before
   // dispose() is what covers their teardown.
+
+  // Assertion (f) — "gives every slot it took back" — has no subject: the control takes no
+  // slot from a pool or a factory, the pointer states in `#pointersDown` are its own objects.
 
   it('reacts to keyboard and pointer while it is alive', () => {
     control = new PanControl2D({state: makeState()});
@@ -137,6 +139,56 @@ describe('PanControl2D — the contract after dispose()', () => {
 
     expect(control.panView.y, 'panView.y still moves').to.be.lessThan(0);
     expect(updates, 'after dispose()').to.equal(1);
+  });
+
+  it('leaves the cursor styles target as it found it', () => {
+    const target = document.createElement('div');
+    control = new PanControl2D({state: makeState(), cursorStylesTarget: target});
+
+    pointer('pointerdown', {x: 10, y: 10});
+    pointer('pointermove', {x: 30, y: 10});
+    expect(target.classList.length, 'the cursor class while panning').to.equal(1);
+
+    control.dispose();
+
+    expect(target.classList.length, 'after dispose()').to.equal(0);
+  });
+
+  it('delivers no pan collected before dispose()', () => {
+    control = new PanControl2D({state: makeState()});
+
+    pointer('pointerdown', {x: 10, y: 10});
+    pointer('pointermove', {x: 30, y: 10});
+    control.dispose();
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(0);
+    expect(control.panView.y, 'panView.y').to.equal(0);
+  });
+
+  it('cannot be brought back through its public setters', () => {
+    control = new PanControl2D({state: makeState()});
+
+    control.dispose();
+
+    // the way that needs no subscribe() call at all: both setters re-register, and a write
+    // to isActive is what would hook the list back onto document
+    control.pointerDisabled = false;
+    control.keyboardDisabled = false;
+    control.isActive = true;
+
+    expect(control.isDisposed, 'isDisposed').to.equal(true);
+    expect(control.isActive, 'isActive').to.equal(false);
+
+    pointer('pointerdown', {x: 10, y: 10});
+    pointer('pointermove', {x: 30, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(0);
+
+    key('keydown', KEY_EAST);
+    expect(control.speedEast, 'speedEast').to.equal(0);
+    key('keyup', KEY_EAST);
   });
 
   it('is safe to call twice', () => {
