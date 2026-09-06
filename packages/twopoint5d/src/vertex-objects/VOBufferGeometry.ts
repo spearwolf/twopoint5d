@@ -62,6 +62,10 @@ export class VOBufferGeometry extends BufferGeometry {
    * so nothing keeps the typed arrays alive through this geometry any more. A pool this
    * geometry created itself is disposed with it; a pool that was handed in belongs to the
    * caller and is left exactly as it is.
+   *
+   * After this call the geometry holds no route, no buffer and no pool of its own any more.
+   * What stays behind belongs to the attributes that are still there: their serials from the
+   * last `update()`, plus `#firstAutoTouch`.
    */
   override dispose(): void {
     // the renderer reads the attributes of this geometry once more while it handles the

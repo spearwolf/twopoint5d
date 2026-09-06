@@ -138,9 +138,12 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   /**
    * Whether this vertex object reads and writes through the buffer of this pool.
    *
-   * `false` on a disposed pool, which has unlinked every vertex object it handed out.
+   * `false` on a disposed pool, whatever a vertex object points at: a pool that has given up
+   * its buffers holds none of them any more, and putting one back afterwards does not change
+   * that.
    */
   containsVO(vo: VO): boolean {
+    if (this.isDisposed) return false;
     return VOUtils.isBuffer(vo, this.buffer);
   }
 

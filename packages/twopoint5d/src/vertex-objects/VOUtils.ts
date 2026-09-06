@@ -30,6 +30,13 @@ export class VOUtils {
     return vo[voBuffer] != null;
   }
 
+  /**
+   * Links a vertex object to a buffer, or to nothing.
+   *
+   * The buffer is taken as it comes: this says nothing about the pool behind it. A disposed
+   * pool does not take a vertex object back through this call — its `containsVO()` answers
+   * `false` whatever the object points at.
+   */
   static setBuffer(vo: VO, buffer: VertexObjectBuffer | undefined): VO {
     vo[voBuffer] = buffer;
     return vo;

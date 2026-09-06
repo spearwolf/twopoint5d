@@ -21,9 +21,21 @@ export class VOBufferPool {
    * The same {@link VertexObjectBuffer} once {@link dispose} has run, but one without data: it
    * holds no `typedArray` and no entry in `buffers` any more, and every method of it that would
    * read or write through an array throws.
+   *
+   * A write falls through on a disposed pool: a pool that has given up its buffers takes no
+   * fresh one, and the getter goes on answering the buffer the pool was disposed with.
    */
-  buffer: VertexObjectBuffer;
+  get buffer(): VertexObjectBuffer {
+    return this.#buffer;
+  }
 
+  set buffer(buffer: VertexObjectBuffer) {
+    // a disposed pool that took a fresh buffer would let vertex objects work on it again
+    if (this.#disposed) return;
+    this.#buffer = buffer;
+  }
+
+  #buffer: VertexObjectBuffer;
   #usedCount = 0;
   #disposed = false;
   #geometryAttachments = 0;
@@ -33,12 +45,12 @@ export class VOBufferPool {
     if (typeof capacityOrData === 'number') {
       const capacity = capacityOrData;
       this.capacity = capacity;
-      this.buffer = new VertexObjectBuffer(this.descriptor, capacity);
+      this.#buffer = new VertexObjectBuffer(this.descriptor, capacity);
     } else {
       const buffersData = capacityOrData;
       this.capacity = buffersData.capacity;
       // the buffer is built from the given data rather than sized from a capacity
-      this.buffer = new VertexObjectBuffer(this.descriptor, buffersData);
+      this.#buffer = new VertexObjectBuffer(this.descriptor, buffersData);
       this.usedCount = buffersData.usedCount;
     }
   }
@@ -49,12 +61,13 @@ export class VOBufferPool {
   }
 
   /**
-   * Takes every value, on a disposed pool as well — {@link dispose} writes through this setter
-   * itself. A value written there buys nothing: the pool has no buffers left, and
-   * {@link VertexObjectPool#createVO} and {@link VertexObjectPool#getVO} answer `undefined`
-   * whatever it says.
+   * Takes every value a live pool can hold, clamped to `0` … {@link capacity}.
+   *
+   * A write falls through on a disposed pool, which has no slot left to count: the getter
+   * goes on answering `0`.
    */
   set usedCount(value: number) {
+    if (this.#disposed) return;
     this.#usedCount = Math.max(0, Math.min(value, this.capacity));
   }
 
@@ -127,7 +140,9 @@ export class VOBufferPool {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.usedCount = 0;
+    // straight to the field: the setter turns a disposed pool away, and this is the write
+    // that makes it one
+    this.#usedCount = 0;
     this.buffer.release();
   }
 

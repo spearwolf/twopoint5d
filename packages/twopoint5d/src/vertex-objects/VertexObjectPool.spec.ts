@@ -3,6 +3,7 @@ import {beforeEach, describe, expect, test} from 'vitest';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex} from './constants.js';
@@ -921,11 +922,67 @@ describe('VertexObjectPool', () => {
       pool.createVO();
       pool.dispose();
 
-      // the setter takes every value, on a disposed pool as well — nothing may come out of it
+      // the write falls through, and even a count that came through must not produce a vertex object
       pool.usedCount = 3;
 
       expect(pool.getVO(0)).toBeUndefined();
       expect(pool.getVO(2)).toBeUndefined();
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: a write to buffer falls through on a disposed pool', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+      const spent = pool.buffer;
+
+      pool.dispose();
+
+      pool.buffer = new VertexObjectBuffer(pool.descriptor, 10);
+
+      expect(pool.buffer, 'a disposed pool keeps the buffer it was disposed with').toBe(spent);
+      expect(pool.buffer.buffers.size).toBe(0);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: a write to usedCount falls through on a disposed pool, and clear() stays a no-op', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2]});
+      expect(pool.usedCount).toBe(2);
+
+      pool.dispose();
+      expect(pool.usedCount).toBe(0);
+
+      pool.usedCount = 3;
+      expect(pool.usedCount, 'a disposed pool takes no count').toBe(0);
+
+      expect(() => pool.clear()).not.toThrow();
+      expect(pool.usedCount).toBe(0);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VertexObjectPool: containsVO() answers false on a disposed pool, whatever the vertex object points at', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+      const vo = pool.createVO()!;
+
+      pool.dispose();
+
+      VOUtils.setBuffer(vo, pool.buffer);
+
+      expect(pool.containsVO(vo)).toBe(false);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VertexObjectPool: freeVO() stays a no-op on a disposed pool', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+      const vo = pool.createVO()!;
+
+      pool.dispose();
+
+      VOUtils.setBuffer(vo, pool.buffer);
+
+      expect(() => pool.freeVO(vo)).not.toThrow();
+      expect(pool.usedCount).toBe(0);
+      expect(VOUtils.getBuffer(vo), 'freeVO() did not touch the vertex object').toBe(pool.buffer);
     });
 
     // (e) has no subject here: neither pool creates a signal or an effect.
