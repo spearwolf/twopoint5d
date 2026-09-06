@@ -848,6 +848,57 @@ describe('VertexObjectPool', () => {
       expect(write, 'the message names the state').toThrow(/disposed/);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: createFromAttributes() refuses a disposed pool', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+
+      pool.dispose();
+
+      const create = () => pool.createFromAttributes({bar: [1, 1, 1, 1]});
+      expect(create, 'the message names the class and the method').toThrow(/VOBufferPool#createFromAttributes\(\)/);
+      expect(create, 'the message names the state').toThrow(/disposed/);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: availableCount is zero after dispose()', () => {
+      const pool = new VOBufferPool(descriptor, 10);
+
+      expect(pool.availableCount).toBe(10);
+
+      pool.dispose();
+
+      expect(pool.availableCount).toBe(0);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VertexObjectPool: createVO() answers nothing after dispose() and hands out no slot', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      pool.createVO();
+      pool.dispose();
+
+      expect(pool.createVO()).toBeUndefined();
+      expect(pool.usedCount, 'a refused slot is not counted').toBe(0);
+      expect(pool.availableCount).toBe(0);
+      expect(pool.getVO(0), 'nothing landed in the index either').toBeUndefined();
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VertexObjectPool: resize() refuses a disposed pool and leaves it dead', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      pool.createVO();
+      pool.dispose();
+
+      const grow = () => pool.resize(20);
+      expect(grow, 'the message names the class and the method').toThrow(/VertexObjectPool#resize\(\)/);
+      expect(grow, 'the message names the state').toThrow(/disposed/);
+
+      expect(pool.capacity, 'the capacity is untouched').toBe(10);
+      expect(pool.buffer.buffers.size, 'no buffers were built for a dead pool').toBe(0);
+      expect(pool.isDisposed).toBe(true);
+    });
+
     // (e) has no subject here: neither pool creates a signal or an effect.
   });
 });

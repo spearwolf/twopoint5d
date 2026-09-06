@@ -6,6 +6,12 @@ import {createVertexObject} from './createVertexObject.js';
 import {voBuffer} from './constants.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
+// one message for every method that refuses to work once the pool is gone, so the class, the
+// method and the state are always in the text a caller reads out of a foreign stack
+function disposedError(method: string): Error {
+  return new Error(`VertexObjectPool#${method} is not available: this pool has been disposed`);
+}
+
 export class VertexObjectPool<VOType> extends VOBufferPool {
   // a slot is empty until a vertex object materializes in it, and empty again once one is freed
   #voIndex: Array<(VOType & VO) | undefined>;
@@ -26,12 +32,20 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * method throws for every capacity but the one the pool already has — resizing to the
    * current capacity leaves the buffers alone and is therefore allowed.
    *
+   * Throws on a disposed pool, which has no buffers left to size. The method already turns
+   * away a capacity it cannot serve, and a resize that allocated fresh buffers would put a
+   * disposed pool back into service.
+   *
    * If the new capacity is larger, the pool will be able to hold more vertex objects.
    * If it is smaller, every vertex object from the new capacity onwards is unlinked from its
    * buffer — any further read or write on such a vertex object fails. The `usedCount` is
    * capped at the new capacity.
    */
   resize(capacity: number): void {
+    if (this.isDisposed) {
+      throw disposedError('resize()');
+    }
+
     if (capacity < 0 || !Number.isInteger(capacity)) {
       throw new Error('Capacity must be a non-negative integer');
     }
@@ -98,7 +112,15 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     this.usedCount = Math.min(this.usedCount, capacity);
   }
 
+  /**
+   * Takes the next free slot of this pool and answers the vertex object sitting in it.
+   *
+   * Answers `undefined` once `usedCount` has reached `capacity`, and on a disposed pool,
+   * which has no slot to give: the declared type admits absence, and a caller has to
+   * handle it either way. A refused slot is not counted — `usedCount` stays where it is.
+   */
   createVO(): (VOType & VO) | undefined {
+    if (this.isDisposed) return undefined;
     if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;
       const vo = this.#createVO(idx);
