@@ -3,6 +3,8 @@ import {afterEach, describe, expect, test} from 'vitest';
 
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
+import type {VO} from './types.js';
 
 describe('VertexObjectGeometry', () => {
   const descriptor = new VertexObjectDescriptor({
@@ -82,5 +84,16 @@ describe('VertexObjectGeometry', () => {
     expect(touchBuffers.getCall(0).args[0]).toMatchObject({dynamic: true});
     expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('static', true);
     expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
+  });
+
+  describe('a pool that has been disposed', () => {
+    test('the constructor refuses it', () => {
+      const pool = new VertexObjectPool<VO>(descriptor, 10);
+      pool.dispose();
+
+      const build = () => new VertexObjectGeometry(pool, 10);
+      expect(build, 'the message names the class').toThrow(/VOBufferGeometry/);
+      expect(build, 'the message names the state').toThrow(/disposed/);
+    });
   });
 });

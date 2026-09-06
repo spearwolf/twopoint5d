@@ -9,9 +9,19 @@ function disposedError(method: string): Error {
 }
 
 export class VOBufferPool {
+  /** What this pool is built from; it goes on saying so once {@link dispose} has run. */
   readonly descriptor: VertexObjectDescriptor;
+
+  /** How many vertex objects this pool was sized for; it goes on saying so once {@link dispose} has run. */
   readonly capacity: number;
 
+  /**
+   * The buffer every vertex object of this pool reads and writes through.
+   *
+   * The same {@link VertexObjectBuffer} once {@link dispose} has run, but one without data: it
+   * holds no `typedArray` and no entry in `buffers` any more, and every method of it that would
+   * read or write through an array throws.
+   */
   buffer: VertexObjectBuffer;
 
   #usedCount = 0;
@@ -33,10 +43,17 @@ export class VOBufferPool {
     }
   }
 
+  /** How many slots of this pool are taken; `0` once {@link dispose} has run, which resets the count itself. */
   get usedCount(): number {
     return this.#usedCount;
   }
 
+  /**
+   * Takes every value, on a disposed pool as well — {@link dispose} writes through this setter
+   * itself. A value written there buys nothing: the pool has no buffers left, and
+   * {@link VertexObjectPool#createVO} and {@link VertexObjectPool#getVO} answer `undefined`
+   * whatever it says.
+   */
   set usedCount(value: number) {
     this.#usedCount = Math.max(0, Math.min(value, this.capacity));
   }
@@ -51,18 +68,23 @@ export class VOBufferPool {
     return this.#disposed ? 0 : this.capacity - this.#usedCount;
   }
 
+  /** `true` once {@link dispose} has run; a pool never comes back to life. */
   get isDisposed(): boolean {
     return this.#disposed;
   }
 
   /**
-   * True while at least one geometry has built `THREE.BufferAttribute`s on top of
-   * this pool's buffers. While this holds, {@link VertexObjectPool#resize} refuses
-   * every change of capacity; only a `resize()` to the capacity the pool already
-   * has still goes through, because it leaves the buffers alone.
+   * True while at least one geometry has built `THREE.BufferAttribute`s on top of this
+   * pool's buffers. While this holds, {@link VertexObjectPool#resize} refuses every change
+   * of capacity; only a `resize()` to the capacity the pool already has still goes through,
+   * because it leaves the buffers alone.
+   *
+   * `false` once {@link dispose} has run: a disposed pool has no buffers left for a geometry
+   * to read, whether or not one still holds it. The bookkeeping underneath is left as it is,
+   * so a geometry that gives the pool up afterwards still counts down correctly.
    */
   get isAttachedToGeometry(): boolean {
-    return this.#geometryAttachments > 0;
+    return !this.#disposed && this.#geometryAttachments > 0;
   }
 
   /** @internal */
@@ -77,6 +99,10 @@ export class VOBufferPool {
     }
   }
 
+  /**
+   * Resets `usedCount` to `0` and releases nothing. On a disposed pool it is a no-op without
+   * effect — the count is already `0` and stays there.
+   */
   clear(): void {
     this.usedCount = 0;
   }
@@ -85,7 +111,7 @@ export class VOBufferPool {
    * Releases the underlying typed-array memory of this pool eagerly.
    *
    * In contrast to {@link clear} (which only resets `usedCount` to `0`), this
-   * method drops every reference to the typed-arrays held by `pool.buffer.buffers`
+   * method has `pool.buffer` give up every typed array it holds and empty its buffer map,
    * so the underlying `ArrayBuffer`s can be reclaimed by the garbage collector
    * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
    * the array reference. After `dispose()` the pool is **dead**: any further
@@ -102,10 +128,7 @@ export class VOBufferPool {
     if (this.#disposed) return;
     this.#disposed = true;
     this.usedCount = 0;
-    for (const buffer of this.buffer.buffers.values()) {
-      buffer.typedArray = undefined;
-    }
-    this.buffer.buffers.clear();
+    this.buffer.release();
   }
 
   /**

@@ -140,6 +140,13 @@ A pending promise is not allowed to survive either. Anything a caller is still
 awaiting when `dispose()` runs — a texture request, a load — is rejected as part of
 `dispose()`, not left hanging.
 
+The same rule points outwards. A constructor or a method that is handed an instance
+someone has already disposed refuses it, with an error that names the call and the state,
+rather than building something on a resource that is gone. What it would build otherwise
+looks alive to its caller and does nothing at all —
+[`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) over a disposed pool is a
+geometry with no attributes, and nothing about it says so until a frame comes out empty.
+
 Whichever of the three a member picks, its TSDoc says so.
 
 ## 5. Signals, effects and events

@@ -22,7 +22,19 @@ export class VOBufferGeometry extends BufferGeometry {
   readonly #slots = new GeometryAttributeSlots();
   readonly #ownedPools = new Set<VOBufferPool>();
 
+  /**
+   * @throws when the pool handed in has been disposed and holds no buffers to build attributes
+   *   on. The message names the class and the state, and no geometry comes into being.
+   */
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
+    // before super(), so that a geometry which cannot get its attributes never comes into being
+    if (source instanceof VOBufferPool && source.isDisposed) {
+      throw new Error(
+        'VOBufferGeometry: the pool handed to the constructor has been disposed and holds no buffers ' +
+          'to build attributes on. Build the geometry while the pool is alive, or hand it a live pool.',
+      );
+    }
+
     super();
     this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
     this.name = 'VOBufferGeometry';

@@ -445,4 +445,129 @@ describe('VertexObjectBuffer', () => {
     // prettier-ignore
     expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar']!)).toEqual([100, 101, 102, 103]);
   });
+
+  describe('after the pool has been disposed', () => {
+    const makeDescriptor = () =>
+      new VertexObjectDescriptor({
+        vertexCount: 4,
+
+        attributes: {
+          foo: {
+            components: ['x', 'y'],
+            type: 'float32',
+          },
+          bar: {
+            size: 1,
+            type: 'float32',
+            usage: 'dynamic',
+          },
+        },
+      });
+
+    /** The buffer of a pool that has given up its typed arrays, still reachable through `pool.buffer`. */
+    const releasedBuffer = (): VertexObjectBuffer => {
+      const pool = new VertexObjectPool<VO>(makeDescriptor(), 2);
+      const {buffer} = pool;
+      pool.dispose();
+      return buffer;
+    };
+
+    test('copy() from a released buffer throws', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(), 2);
+      const source = releasedBuffer();
+
+      const run = () => target.copy(source);
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copy\(\)/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('copy() from a buffer of another description says so instead', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(), 2);
+      const other = new VertexObjectBuffer(
+        new VertexObjectDescriptor({vertexCount: 4, attributes: {elsewhere: {size: 1, bufferName: 'elsewhere'}}}),
+        2,
+      );
+
+      const run = () => target.copy(other);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        /VertexObjectBuffer#copy\(\) finds no buffer named "\w+"/,
+      );
+      expect(run, 'two descriptions that drifted apart are not the released state').not.toThrow(/disposed/);
+    });
+
+    test('copyArray() throws', () => {
+      const buffer = releasedBuffer();
+
+      const run = () => buffer.copyArray(new Float32Array(8), 'dynamic_float32');
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copyArray\(\)/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('copyArray() with an unknown buffer name says so instead', () => {
+      const buffer = new VertexObjectBuffer(makeDescriptor(), 2);
+
+      const run = () => buffer.copyArray(new Float32Array(8), 'nowhere');
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        /VertexObjectBuffer#copyArray\(\).*"nowhere"/,
+      );
+      expect(run, 'a typo is not the released state').not.toThrow(/disposed/);
+    });
+
+    test('copyAttributes() throws', () => {
+      const buffer = releasedBuffer();
+
+      const run = () => buffer.copyAttributes({bar: [1, 2, 3, 4]});
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copyAttributes\(\)/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('toAttributeArrays() throws', () => {
+      const buffer = releasedBuffer();
+
+      const run = () => buffer.toAttributeArrays(['bar']);
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#toAttributeArrays\(\)/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('the constructor refuses a released buffer as its source', () => {
+      const source = releasedBuffer();
+
+      const run = () => new VertexObjectBuffer(source, 2);
+      expect(run, 'the message names the class').toThrow(/VertexObjectBuffer/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('clone() throws', () => {
+      const buffer = releasedBuffer();
+
+      const run = () => buffer.clone();
+      expect(run, 'the message names the class').toThrow(/VertexObjectBuffer/);
+      expect(run, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('copyWithin() and touch() do nothing', () => {
+      const buffer = releasedBuffer();
+
+      expect(() => buffer.copyWithin(0, 1, 2)).not.toThrow();
+      expect(() => buffer.touch()).not.toThrow();
+    });
+
+    test('the read-only fields go on saying what this buffer was', () => {
+      const pool = new VertexObjectPool<VO>(makeDescriptor(), 2);
+      const {buffer} = pool;
+
+      const {descriptor, capacity, attributeNames} = buffer;
+      const bufferAttributeNames = Array.from(buffer.bufferAttributes.keys()).sort();
+      const bufferNames = Array.from(buffer.bufferNameAttributes.keys()).sort();
+
+      pool.dispose();
+
+      expect(buffer.descriptor).toBe(descriptor);
+      expect(buffer.capacity).toBe(capacity);
+      expect(buffer.attributeNames).toEqual(attributeNames);
+      expect(Array.from(buffer.bufferAttributes.keys()).sort()).toEqual(bufferAttributeNames);
+      expect(Array.from(buffer.bufferNameAttributes.keys()).sort()).toEqual(bufferNames);
+      expect(buffer.buffers.size, 'the data is gone, the description of it is not').toBe(0);
+    });
+  });
 });

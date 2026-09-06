@@ -899,6 +899,35 @@ describe('VertexObjectPool', () => {
       expect(pool.isDisposed).toBe(true);
     });
 
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VOBufferPool: isAttachedToGeometry is false after dispose()', () => {
+      const pool = new VertexObjectPool<VO>(descriptor, 10);
+      const geometry = new VertexObjectGeometry(pool, 10);
+
+      expect(pool.isAttachedToGeometry).toBe(true);
+
+      pool.dispose();
+
+      expect(pool.isAttachedToGeometry, 'a disposed pool has no buffers left for a geometry to read').toBe(false);
+
+      // the geometry gives the pool up afterwards without complaint
+      expect(() => geometry.dispose()).not.toThrow();
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    test('VertexObjectPool: getVO() answers nothing after usedCount was written on a disposed pool', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 5);
+
+      pool.createVO();
+      pool.dispose();
+
+      // the setter takes every value, on a disposed pool as well — nothing may come out of it
+      pool.usedCount = 3;
+
+      expect(pool.getVO(0)).toBeUndefined();
+      expect(pool.getVO(2)).toBeUndefined();
+    });
+
     // (e) has no subject here: neither pool creates a signal or an effect.
 
     // (f) has no subject here: both classes under test are the pool others take slots from,

@@ -16,6 +16,11 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   // a slot is empty until a vertex object materializes in it, and empty again once one is freed
   #voIndex: Array<(VOType & VO) | undefined>;
 
+  /**
+   * Called for every vertex object this pool materializes. The hook stays where it is once
+   * {@link VOBufferPool#dispose} has run and is never called again — neither {@link createVO}
+   * nor {@link getVO} builds a vertex object on a disposed pool.
+   */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
@@ -130,6 +135,11 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     return undefined;
   }
 
+  /**
+   * Whether this vertex object reads and writes through the buffer of this pool.
+   *
+   * `false` on a disposed pool, which has unlinked every vertex object it handed out.
+   */
   containsVO(vo: VO): boolean {
     return VOUtils.isBuffer(vo, this.buffer);
   }
@@ -154,6 +164,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   /**
    * The fastest variant is when the VO was the last one created,
    * otherwise the underlying buffer(s) have to be recopied internally.
+   *
+   * A silent no-op on a disposed pool, which turns every vertex object away through
+   * {@link containsVO}.
    */
   freeVO(vo: VO): void {
     if (!this.containsVO(vo)) return;
@@ -180,7 +193,17 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     VOUtils.clearBuffer(vo);
   }
 
+  /**
+   * The vertex object sitting in the slot `idx`, materialized on first access for a slot that
+   * was filled through {@link VOBufferPool#createFromAttributes}.
+   *
+   * Answers `undefined` for a slot nothing has taken, and on a disposed pool, which has no
+   * index left to look in: the declared type admits absence, and the index went with
+   * {@link VOBufferPool#dispose}.
+   */
   getVO(idx: number): (VOType & VO) | undefined {
+    if (this.isDisposed) return undefined;
+
     let vo = this.#voIndex[idx];
     if (vo == null && idx < this.usedCount) {
       vo = this.#createVO(idx);

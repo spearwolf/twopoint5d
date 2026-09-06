@@ -3,6 +3,8 @@ import {afterEach, describe, expect, test} from 'vitest';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectPool} from './VertexObjectPool.js';
+import type {VO} from './types.js';
 
 describe('InstancedVertexObjectGeometry', () => {
   const baseDescriptor = new VertexObjectDescriptor({
@@ -241,5 +243,69 @@ describe('InstancedVertexObjectGeometry', () => {
     });
     expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('static', true);
     expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
+  });
+
+  describe('a pool that has been disposed', () => {
+    test('the constructor refuses it as the instanced source', () => {
+      const instancedPool = new VertexObjectPool<VO>(instancedDescriptor, 10);
+      instancedPool.dispose();
+
+      const build = () => new InstancedVertexObjectGeometry(instancedPool, 10, baseDescriptor, 1);
+      expect(build, 'the message names the class').toThrow(/InstancedVOBufferGeometry/);
+      expect(build, 'the message names which of the two sources it is about').toThrow(/instanced/);
+      expect(build, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('the constructor refuses it as the base source', () => {
+      const basePool = new VertexObjectPool<VO>(baseDescriptor, 1);
+      basePool.dispose();
+
+      const build = () => new InstancedVertexObjectGeometry(instancedDescriptor, 10, basePool, 1);
+      expect(build, 'the message names the class').toThrow(/InstancedVOBufferGeometry/);
+      expect(build, 'the message names which of the two sources it is about').toThrow(/base/);
+      expect(build, 'the message names the state').toThrow(/disposed/);
+    });
+
+    test('attachInstancedPool() refuses it and leaves the geometry exactly as it was', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const extraPool = new VertexObjectPool<VO>(extraInstancedDescriptor, 2);
+      extraPool.dispose();
+
+      const attributesBefore = Object.keys(geometry.attributes).sort();
+
+      const attach = () => geometry.attachInstancedPool('extraPool', extraPool);
+      expect(attach, 'the message names the call').toThrow(/InstancedVOBufferGeometry#attachInstancedPool\("extraPool"\)/);
+      expect(attach, 'the message names the state').toThrow(/disposed/);
+
+      expect(Object.keys(geometry.attributes).sort()).toEqual(attributesBefore);
+      expect(geometry.extraInstancedPools.size).toBe(0);
+      expect(geometry.extraInstancedBuffers.size).toBe(0);
+      expect(geometry.extraInstancedBufferSerials.size).toBe(0);
+
+      // a pool the geometry had taken on would be released with it
+      const extraDispose = sandbox.spy(extraPool, 'dispose');
+      geometry.dispose();
+      expect(extraDispose.called, "the refused pool is not one of the geometry's own").toBe(false);
+    });
+
+    test('attachInstancedPool() refuses it under a name that is taken and leaves that route whole', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const livePool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+      const deadPool = new VertexObjectPool<VO>(secondExtraInstancedDescriptor, 2);
+      deadPool.dispose();
+
+      const attach = () => geometry.attachInstancedPool('extraPool', deadPool);
+      expect(attach, 'the message names the call').toThrow(/InstancedVOBufferGeometry#attachInstancedPool\("extraPool"\)/);
+      expect(attach, 'the message names the state').toThrow(/disposed/);
+
+      expect(geometry.extraInstancedPools.get('extraPool')).toBe(livePool);
+      expect(geometry.extraInstancedBuffers.get('extraPool')!.get('extraBuffer')!.array).toBe(
+        livePool.buffer.buffers.get('extraBuffer')!.typedArray,
+      );
+      expect(geometry.getAttribute('extra')).toBeDefined();
+      expect(livePool.isAttachedToGeometry, 'the route that holds the name still reads the pool').toBe(true);
+      expect(livePool.isDisposed).toBe(false);
+    });
   });
 });

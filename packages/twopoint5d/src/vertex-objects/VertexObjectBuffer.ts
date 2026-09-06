@@ -23,22 +23,51 @@ export interface AttributeBuffer {
   serial: number;
 }
 
+// one message for every method that refuses to work once the pool behind this buffer has
+// given up its typed arrays, so the class, the method and the state are always in the text
+// a caller reads out of a foreign stack
+function releasedError(method: string): Error {
+  return new Error(`VertexObjectBuffer#${method} is not available: the pool behind this buffer has been disposed`);
+}
+
 export class VertexObjectBuffer {
+  /** The description this buffer was built from; it stays what it is once the pool behind this buffer is disposed. */
   readonly descriptor: VertexObjectDescriptor;
+
+  /** How many vertex objects this buffer was sized for; it stays what it is once the pool behind this buffer is disposed. */
   readonly capacity: number;
 
-  /** the names are always sorted the same way */
+  /**
+   * the names are always sorted the same way; they stay what they are once the pool behind
+   * this buffer is disposed
+   */
   readonly attributeNames: readonly string[];
 
+  /** Empty once the pool behind this buffer is disposed — the data is gone, the description of it is not. */
   readonly buffers: Map<string, AttributeBuffer>;
 
-  /** map attribute name to buffer-attribute info */
+  /**
+   * map attribute name to buffer-attribute info; it stays what it is once the pool behind this
+   * buffer is disposed
+   */
   readonly bufferAttributes: Map<string, AttributeBufferLayout>;
 
-  /** buffer name -> list of buffer attributes */
+  /**
+   * buffer name -> list of buffer attributes; it stays what it is once the pool behind this
+   * buffer is disposed
+   */
   readonly bufferNameAttributes: Map<string, AttributeBufferLayout[]>;
 
+  #released = false;
+
   constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
+    if (source instanceof VertexObjectBuffer && source.#released) {
+      throw new Error(
+        'VertexObjectBuffer: the source buffer holds no typed array any more — the pool behind it has been disposed. ' +
+          'Copy the buffer before the pool is disposed, or build a new one from the descriptor.',
+      );
+    }
+
     let buffersData: VertexObjectBuffersData | undefined;
     if (typeof capacityOrBuffersData === 'number') {
       this.capacity = capacityOrBuffersData;
@@ -127,28 +156,56 @@ export class VertexObjectBuffer {
 
   /**
    * Both objects should use the same vertex-object-description
+   *
+   * Throws when `other` is the buffer of a disposed pool, which has no data to read, and for a
+   * buffer of this one that `other` does not have. Copying into the buffer of a disposed pool
+   * does nothing — there is nothing left to write to.
    */
   copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
     for (const buf of this.buffers.values()) {
-      buf.typedArray!.set(
-        other.buffers.get(buf.bufferName)!.typedArray!,
-        targetObjectOffset * this.descriptor.vertexCount * buf.itemSize,
-      );
+      const source = other.buffers.get(buf.bufferName);
+      if (source == null) {
+        // a name without a buffer means two different things, and a caller whose two buffers
+        // were built from different descriptions should not be sent looking for a dispose()
+        throw other.#released
+          ? releasedError('copy()')
+          : new Error(
+              `VertexObjectBuffer#copy() finds no buffer named "${buf.bufferName}" in the source: ` +
+                'both buffers have to be built from the same vertex object description',
+            );
+      }
+      buf.typedArray!.set(source.typedArray!, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
       buf.serial++;
     }
     return this;
   }
 
+  /**
+   * Throws on the buffer of a disposed pool: the copy goes through the constructor, which has
+   * no data to build a second buffer from.
+   */
   clone(): VertexObjectBuffer {
     return new VertexObjectBuffer(this, this.capacity).copy(this);
   }
 
+  /**
+   * Throws on the buffer of a disposed pool, which has no array to write into, and for a
+   * buffer name this buffer does not know.
+   */
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
-    const buf = this.buffers.get(bufferName)!;
+    const buf = this.buffers.get(bufferName);
+    if (buf == null) {
+      // a name without a buffer means two different things, and a caller who mistyped one
+      // should not be sent looking for a dispose() that never happened
+      throw this.#released
+        ? releasedError('copyArray()')
+        : new Error(`VertexObjectBuffer#copyArray() does not know a buffer named "${bufferName}"`);
+    }
     buf.typedArray!.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
     buf.serial++;
   }
 
+  /** Does nothing on the buffer of a disposed pool, which has no array left to move data within. */
   copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
     const {vertexCount} = this.descriptor;
     for (const buf of this.buffers.values()) {
@@ -161,13 +218,18 @@ export class VertexObjectBuffer {
     }
   }
 
+  /** Throws on the buffer of a disposed pool, which has no array to write into. */
   copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
     let copiedObjCount = 0;
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);
       if (attr) {
         let attrObjCount = 0;
-        const buffer = this.buffers.get(attr.bufferName)!;
+        // the attribute has a layout but its buffer is gone: the pool behind this buffer let go
+        const buffer = this.buffers.get(attr.bufferName);
+        if (buffer == null) {
+          throw releasedError('copyAttributes()');
+        }
         const typedArray = buffer.typedArray!;
         const {vertexCount} = this.descriptor;
         const attrSize = this.descriptor.getAttribute(attrName)!.size;
@@ -194,6 +256,7 @@ export class VertexObjectBuffer {
     return copiedObjCount;
   }
 
+  /** Throws on the buffer of a disposed pool, which has no array to read from. */
   toAttributeArrays(attributeNames: string[], startIndex = 0, endIndex = this.capacity): Record<string, TypedArray | undefined> {
     return Object.fromEntries(
       // the explicit tuple type picks the typed `Object.fromEntries()` overload; without it
@@ -201,7 +264,11 @@ export class VertexObjectBuffer {
       attributeNames.map((attrName): [string, TypedArray | undefined] => {
         const attr = this.bufferAttributes.get(attrName);
         if (attr) {
-          const buffer = this.buffers.get(attr.bufferName)!;
+          // the attribute has a layout but its buffer is gone: the pool behind this buffer let go
+          const buffer = this.buffers.get(attr.bufferName);
+          if (buffer == null) {
+            throw releasedError('toAttributeArrays()');
+          }
           const typedArray = buffer.typedArray!;
           const {vertexCount} = this.descriptor;
           const attrSize = this.descriptor.getAttribute(attrName)!.size;
@@ -225,9 +292,29 @@ export class VertexObjectBuffer {
     );
   }
 
+  /** Does nothing on the buffer of a disposed pool, which has no buffer left to mark. */
   touch(): void {
     for (const buffer of this.buffers.values()) {
       buffer.serial++;
     }
+  }
+
+  /**
+   * Give up the typed array of every buffer and empty the buffer map.
+   *
+   * Called by the pool that owns this buffer as part of its `dispose()`. Afterwards the
+   * buffer keeps saying what it was — `descriptor`, `capacity`, `attributeNames`,
+   * `bufferAttributes` and `bufferNameAttributes` are untouched — but it holds no data:
+   * every method that would read or write through a typed array refuses, and the two that
+   * have nothing left to do go on doing nothing.
+   *
+   * @internal
+   */
+  release(): void {
+    for (const buffer of this.buffers.values()) {
+      buffer.typedArray = undefined;
+    }
+    this.buffers.clear();
+    this.#released = true;
   }
 }

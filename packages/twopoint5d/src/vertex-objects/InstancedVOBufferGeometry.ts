@@ -66,6 +66,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * attribute, and {@link attachInstancedPool} refuses that name afterwards. Until this
    * constructor returns, no attribute of this geometry has reached the renderer, so one that is
    * displaced here holds no gpu buffer — which is exactly what makes it safe to displace it.
+   *
+   * @throws when the instanced pool or the base pool handed in has been disposed and holds no
+   *   buffers to build attributes on. The message names the class, which of the two it is about
+   *   and the state, and no geometry comes into being.
    */
   constructor(
     ...args:
@@ -77,6 +81,20 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
           number?,
         ]
   ) {
+    // before super(), so that a geometry which cannot get its attributes never comes into being
+    if (args[0] instanceof VOBufferPool && args[0].isDisposed) {
+      throw new Error(
+        'InstancedVOBufferGeometry: the instanced pool handed to the constructor has been disposed and holds no ' +
+          'buffers to build attributes on. Build the geometry while the pool is alive, or hand it a live pool.',
+      );
+    }
+    if (!(args[2] instanceof BufferGeometry) && args[2] instanceof VOBufferPool && args[2].isDisposed) {
+      throw new Error(
+        'InstancedVOBufferGeometry: the base pool handed to the constructor has been disposed and holds no ' +
+          'buffers to build attributes on. Build the geometry while the pool is alive, or hand it a live pool.',
+      );
+    }
+
     super();
 
     this.name = 'InstancedVOBufferGeometry';
@@ -161,6 +179,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * @throws when an attribute of `pool` would take an attribute slot that this geometry has
    *   already had an attribute in. The message names the call and every slot it is about, and
    *   the geometry is left exactly as it was.
+   * @throws when `pool` has been disposed and holds no buffers to build attributes on. The route
+   *   that holds `name` at the time keeps every attribute it has.
    */
   attachInstancedPool<VOType = unknown>(
     name: string,
@@ -185,6 +205,15 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       extraPool = new VertexObjectPool(descriptor, this.instancedPool.capacity) as VertexObjectPool<VOType>;
     } else {
       extraPool = pool;
+    }
+
+    // a pool without buffers claims no attribute slot, so the guard below would let it through
+    // and the route would come up empty
+    if (extraPool.isDisposed) {
+      throw new Error(
+        `InstancedVOBufferGeometry#attachInstancedPool("${name}"): this pool has been disposed and holds no ` +
+          'buffers to build attributes on. Attach a live pool, or leave the name free.',
+      );
     }
 
     // three.js frees a gpu buffer only through the dispose event of the geometry, and there
@@ -285,9 +314,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#autoTouchBuffers = undefined;
 
     // a pool reaches a second route of this geometry only when it puts nothing into a slot: a
-    // descriptor that declares no attributes, or a pool that was disposed before it was attached.
-    // Its last route decides — releasing it while the geometry still counts an attachment would
-    // leave a dead pool under a live route
+    // descriptor that declares no attributes. Its last route decides — releasing it while the
+    // geometry still counts an attachment would leave a dead pool under a live route
     if (pool != null && !this.#attachments.holds(pool)) {
       // nothing of this geometry reaches the pool from here on, so it stops counting as one of
       // its own — a pool that survives its detach is a pool from outside when it comes back

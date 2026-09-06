@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through
+- add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
 - export 31 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes`, `FrameBasedAnimationsTimingData` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
@@ -68,10 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
 - `VOBufferPool#toBuffersData()` and `#fromBuffersData()` throw on a disposed pool, with a message naming the class, the method and the state. The return type of `toBuffersData()` promises the buffers of a live pool, and a disposed one has none to answer with; `fromBuffersData()` turns away a capacity it cannot serve, as it already does for a capacity that does not match its own. `VertexObjectPool` inherits both
-- a disposed `VOBufferPool` hands out nothing and cannot be brought back into service: `createFromAttributes()` and `VertexObjectPool#resize()` throw with a message naming the class, the method and the state, `VertexObjectPool#createVO()` answers `undefined` without counting the refused slot, and `availableCount` is `0`. The object count of `createFromAttributes()` cannot tell a spent pool from a full one, and a `resize()` that allocated fresh buffers would put a disposed pool back to work — both refuse instead. `clear()`, `freeVO()` and `getVO()` go on doing nothing, and `capacity`, `descriptor` and `usedCount` keep saying what this pool is
+- a disposed `VOBufferPool` hands out nothing and cannot be brought back into service: `createFromAttributes()` and `VertexObjectPool#resize()` throw with a message naming the class, the method and the state, `VertexObjectPool#createVO()` answers `undefined` without counting the refused slot, and `availableCount` is `0`. The object count of `createFromAttributes()` cannot tell a spent pool from a full one, and a `resize()` that allocated fresh buffers would put a disposed pool back to work — both refuse instead. `VertexObjectPool#getVO()` answers `undefined` for every index, whatever `usedCount` says at the time, `clear()` and `freeVO()` go on doing nothing, and `capacity`, `descriptor` and `usedCount` keep saying what this pool is
 - the rAF driver every `FrameLoop` of the module shares runs exactly as long as at least one `FrameLoop` has subscribers, and it picks its work back up by itself when one comes back. A `FrameLoop` without subscribers asks for no frames, and the fps measurement anchors a fresh window on the tick that resumes it
 - a disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws an error naming the class and the state instead of handing out a node backed by a target nothing would release again, `renderTo()` does nothing — it neither draws nor clears the caller's target — and a write to `pipeline` falls through, so the getter keeps answering `undefined`. `pipeline` is an accessor pair on the prototype now; reading and writing it on a live renderer is unchanged
 - `StageRenderer#remove()` clears both sides of the relation: a removed child `StageRenderer` answers `undefined` as its `parent` afterwards and gets its `OnRemoveFromParent`, exactly as a `parent = undefined` on the child would do. A listener reading `renderer.parent` from that event sees `undefined` — the event says the child has been removed
+- the `VertexObjectBuffer` behind a disposed pool says which state it is in: `copy()` from it, `copyArray()`, `copyAttributes()` and `toAttributeArrays()` throw an error naming the class, the method and the state instead of a `TypeError` from somewhere inside, and `clone()` and the constructor refuse it as a source rather than answering a second buffer without data. `copyWithin()` and `touch()` do nothing, and `descriptor`, `capacity`, `attributeNames`, `bufferAttributes` and `bufferNameAttributes` go on saying what this buffer was. `copyArray()` with a buffer name the buffer does not know says exactly that, so a typo is not read as a dispose
+- a disposed pool is turned away at the door: the `VOBufferGeometry` and `InstancedVOBufferGeometry` constructors and `InstancedVOBufferGeometry#attachInstancedPool()` throw when they are handed one, with a message naming the call and the state. A pool without buffers gives a route no attributes, and a geometry built over one draws nothing while looking like any other
 
 ### Removed
 
@@ -996,6 +998,34 @@ child.dispose();
 
 A parent without `buildOutputNode` and without a `RootRenderPipeline` asks for no pass node and
 needs no change — though a child left in its stage list is dead weight either way.
+
+#### A geometry is built while its pool is alive
+
+The `VOBufferGeometry` and `InstancedVOBufferGeometry` constructors and
+`InstancedVOBufferGeometry#attachInstancedPool()` throw for a pool that has been disposed. Such a
+geometry had no attributes and drew nothing, and nothing about it said so — now the error names the
+call and the state at the place the geometry is built.
+
+**Before**
+
+```ts
+const pool = new VertexObjectPool(descriptor, 1000);
+pool.dispose();
+
+const geometry = new VertexObjectGeometry(pool, 1000); // no attributes, draws nothing
+scene.add(new THREE.Mesh(geometry, material));
+```
+
+**After**
+
+```ts
+const pool = new VertexObjectPool(descriptor, 1000);
+
+const geometry = new VertexObjectGeometry(pool, 1000);
+scene.add(new THREE.Mesh(geometry, material));
+
+// the pool goes when nothing reads it any more
+```
 
 ## [0.21.2] - 2026-06-19
 
