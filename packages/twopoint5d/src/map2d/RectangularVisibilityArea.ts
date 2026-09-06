@@ -1,5 +1,6 @@
 import type {Matrix4} from 'three/webgpu';
 import {Vector2, Vector3} from 'three/webgpu';
+import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
@@ -9,9 +10,29 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;
   #height = 0;
 
+  /**
+   * Forces the next {@link computeVisibleTiles} to compute a fresh tile set instead of handing
+   * back the previous one. The `width` and `height` setters raise it, and anyone who changed
+   * something this area cannot see may raise it too. `computeVisibleTiles()` puts it back to
+   * `false` as it recomputes, so one `true` buys exactly one recomputation.
+   */
   needsUpdate = true;
 
   #tileCreated?: Uint8Array;
+
+  readonly #deps = new Dependencies([
+    'centerX',
+    'centerY',
+    Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
+    Dependencies.cloneable<Matrix4>('matrixWorld'),
+  ]);
+
+  #visibleTiles?: IMap2DVisibleTiles;
+
+  // Per-call scratch — reused across calls, handed out in the result. See IMap2DVisibleTiles.
+  readonly #fullViewArea = new AABB2();
+  readonly #offset = new Vector2();
+  readonly #translate = new Vector3();
 
   constructor(width = 320, height = 240) {
     this.width = width;
@@ -50,6 +71,20 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       return undefined;
     }
 
+    // always ask, even when needsUpdate already forces the recompute: changed() is what keeps
+    // the snapshot current, and a snapshot left behind reports a change on the next call
+    const depsChanged = this.#deps.changed({centerX, centerY, map2dTileCoords, matrixWorld});
+
+    if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null) {
+      this.#visibleTiles.createTiles = undefined;
+      this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;
+      this.#visibleTiles.removeTiles = undefined;
+      this.#visibleTiles.changed = false;
+      return this.#visibleTiles;
+    }
+
+    this.needsUpdate = false;
+
     const {width, height} = this;
 
     const halfWidth = width / 2;
@@ -59,7 +94,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     const top = centerY - halfHeight;
 
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(left, top, width, height);
-    const fullViewArea = AABB2.from(tileCoords);
+    const fullViewArea = AABB2.from(tileCoords, this.#fullViewArea);
 
     const removeTiles: IMap2DTileCoords[] = [];
     const reuseTiles: IMap2DTileCoords[] = [];
@@ -102,16 +137,19 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       }
     }
 
-    const offset = new Vector2(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
-    const translate = new Vector3().setFromMatrixPosition(matrixWorld);
+    const offset = this.#offset.set(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
+    const translate = this.#translate.setFromMatrixPosition(matrixWorld);
 
-    return {
+    this.#visibleTiles = {
       tiles: reuseTiles.concat(createTiles),
       offset,
       translate,
       removeTiles,
       createTiles,
       reuseTiles,
+      changed: true,
     };
+
+    return this.#visibleTiles;
   }
 }

@@ -50,8 +50,17 @@ export interface IMap2DTileRenderer {
 
   /**
    * Start the update cycle for the tiles.
+   *
+   * `position` is read during the call and not kept by the caller's side of the contract:
+   * the streamer hands over an instance it reuses, so a renderer that wants the value
+   * afterwards copies it.
+   *
+   * `tilesChanged` says whether the tile coordinates of this cycle can differ from the last
+   * one's. On `false` a renderer may leave the data of a tile it already holds untouched. It
+   * still has to take on a tile it does not know yet, and it says nothing about the tiles
+   * that arrive through {@link addTile} and {@link removeTile}. Left out, it counts as `true`.
    */
-  beginUpdatingTiles(position: Vector3): void;
+  beginUpdatingTiles(position: Vector3, tilesChanged?: boolean): void;
 
   /**
    * Add a tile to the renderer.
@@ -60,8 +69,14 @@ export interface IMap2DTileRenderer {
   addTile(tileCoords: IMap2DTileCoords): void;
 
   /**
-   * Reuse means that the tile has already been added to the renderer.
-   * During the current update cycle, the tile is reused.
+   * Carry a tile over into the current update cycle.
+   *
+   * Reuse is what the caller sees: the tile was part of the previous cycle as well. It is no
+   * promise that the renderer still holds it — {@link clearTiles} empties a renderer without
+   * the caller giving up its own tile list. A tile that is unknown here is therefore taken on
+   * as {@link addTile} would take it on, and only a tile the renderer already holds falls under
+   * the `tilesChanged` rule of {@link beginUpdatingTiles}.
+   *
    * Is called during the update cycle.
    */
   reuseTile(tileCoords: IMap2DTileCoords): void;
@@ -86,19 +101,45 @@ export interface IMap2DTileRenderer {
   dispose(): void;
 }
 
+/**
+ * The tiles a visibilitor has found, together with the placement of the tile grid they belong to.
+ *
+ * The result is valid until the next {@link IMap2DVisibilitor.computeVisibleTiles} of the same
+ * visibilitor. After that call every field may carry other values, and the object handed back
+ * may be this very one.
+ */
 export interface IMap2DVisibleTiles {
   tiles: IMap2DTileCoords[];
 
+  /**
+   * An instance the visibilitor reuses. Whoever needs the value beyond the call copies or
+   * clones it; whoever keeps the instance keeps a value that moves underneath them.
+   */
   offset?: Vector2;
+
+  /**
+   * An instance the visibilitor reuses. Whoever needs the value beyond the call copies or
+   * clones it; whoever keeps the instance keeps a value that moves underneath them.
+   */
   translate?: Vector3;
 
   removeTiles?: IMap2DTileCoords[];
   reuseTiles?: IMap2DTileCoords[];
   createTiles?: IMap2DTileCoords[];
+
+  /**
+   * `false` says that this result carries the same tiles, in the same order, with the same
+   * view coordinates as the result of the previous call. A consumer may then leave the data
+   * of a tile it already holds alone. Left out, it counts as `true`.
+   */
+  changed?: boolean;
 }
 
 /**
  * The visibilitor decides which tiles are visible.
+ *
+ * An instance keeps the state of its last call and therefore serves exactly one
+ * `Map2DTileStreamer`.
  */
 export interface IMap2DVisibilitor {
   computeVisibleTiles(

@@ -258,6 +258,41 @@ describe('CameraBasedVisibility', () => {
         expect(v, `tile box for ${v.id} is a fresh slot`).not.toBe(warmBoxes.get(v.id));
       }
     });
+
+    test('marks a freshly computed result as changed and a cached one as unchanged', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      expect(first.changed, 'first frame').toBe(true);
+
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+      expect(second.changed, 'second frame, nothing moved').toBe(false);
+
+      const third = visibility.computeVisibleTiles(second.tiles, [400, 0], tileCoords, matrixWorld)!;
+      expect(third.changed, 'third frame, center moved').toBe(true);
+    });
+
+    test('a changed depth invalidates the cached tile set', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      visibility.depth = 200;
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(second).not.toBe(first);
+      expect(second.changed).toBe(true);
+    });
+
+    test('a changed lookAtCenter invalidates the cached tile set', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      visibility.lookAtCenter = true;
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(second).not.toBe(first);
+      expect(second.changed).toBe(true);
+    });
   });
 
   describe('frustumBoxScale', () => {

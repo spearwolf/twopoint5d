@@ -88,8 +88,13 @@ export class Dependencies {
         return false;
       }
 
-      if (curValue !== nextValue && callbacks?.equals?.(curValue, nextValue) === false) {
-        return false;
+      if (curValue !== nextValue) {
+        // identity has already failed here; a dependency declared without an `equals` has
+        // nothing else to judge by, so the difference stands
+        const equals = callbacks?.equals;
+        if (equals == null || equals(curValue, nextValue) === false) {
+          return false;
+        }
       }
     }
 

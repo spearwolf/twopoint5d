@@ -31,6 +31,80 @@ describe('Map2DTileRenderer', () => {
     sandbox.restore();
   });
 
+  describe('the tilesChanged signal', () => {
+    test('a reused tile is left alone while the signal says nothing changed', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      expect(updateTile.called, 'updateTile()').toBe(false);
+      expect(update.called, 'factory.update()').toBe(false);
+    });
+
+    test('a tile the renderer does not know is created even while the signal says nothing changed', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      expect(createTile.calledOnce, 'createTile()').toBe(true);
+      expect(update.calledOnce, 'factory.update()').toBe(true);
+    });
+
+    test('a reused tile is written again once the signal says something changed', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.reuseTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      expect(updateTile.calledOnce, 'updateTile()').toBe(true);
+      expect(update.calledOnce, 'factory.update()').toBe(true);
+    });
+
+    test('a cycle that does not say counts as changed', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3());
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+
+      renderer.beginUpdatingTiles(new Vector3());
+      renderer.reuseTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      expect(updateTile.calledOnce).toBe(true);
+    });
+  });
+
   describe('dispose()', () => {
     // (a) has no subject here: this renderer builds no resource that needs releasing — its
     // `node` is a plain Object3D and the tile factory arrives through the constructor.

@@ -8,6 +8,12 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   #dataSerial = 0;
   #updateDataSerial = -1;
 
+  /**
+   * What the current update cycle was told about its tiles. `true` until a
+   * {@link beginUpdatingTiles} says otherwise, so a `reuseTile()` outside a cycle writes.
+   */
+  #tilesChanged = true;
+
   readonly node = new Object3D();
 
   /**
@@ -26,11 +32,12 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     tileFactory.addToNode(this.node);
   }
 
-  beginUpdatingTiles(position: Vector3): void {
+  beginUpdatingTiles(position: Vector3, tilesChanged = true): void {
     // this one never reaches the factory, but moving the node of a spent renderer is a
     // mutation all the same
     if (this.tileFactory === null) return;
 
+    this.#tilesChanged = tilesChanged;
     this.node.position.copy(position);
   }
 
@@ -52,6 +59,10 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
 
     const tile = this.#tiles.get(tileCoords.id);
     if (tile) {
+      // same tiles as last cycle: what updateTile() would write is already in the buffer, and
+      // raising the serial for it costs a full attribute upload in endUpdatingTiles()
+      if (!this.#tilesChanged) return;
+
       tileFactory.updateTile(tile, tileCoords);
       ++this.#dataSerial;
     } else {
@@ -115,5 +126,6 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     this.tileFactory = null;
     this.#dataSerial = 0;
     this.#updateDataSerial = -1;
+    this.#tilesChanged = true;
   }
 }

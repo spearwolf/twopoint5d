@@ -21,6 +21,19 @@ describe('Dependencies', () => {
     expect(deps.equals({a: 1, b: 'foo'})).toBe(true);
   });
 
+  test('a dependency without an equality callback reports a change of its value', () => {
+    const deps = new Dependencies(['a', 'b']);
+
+    deps.update({a: 1, b: 'foo'});
+
+    expect(deps.equals({a: 2, b: 'foo'}), 'a moved from 1 to 2').toBe(false);
+    expect(deps.equals({a: 1, b: 'bar'}), 'b moved from foo to bar').toBe(false);
+    expect(deps.equals({a: 1, b: 'foo'}), 'nothing moved').toBe(true);
+
+    expect(deps.changed({a: 2, b: 'foo'})).toBe(true);
+    expect(deps.changed({a: 2, b: 'foo'})).toBe(false);
+  });
+
   test('equals with equality callback', () => {
     const deps = new Dependencies([
       ['a', (a: number, b: number) => a === b],

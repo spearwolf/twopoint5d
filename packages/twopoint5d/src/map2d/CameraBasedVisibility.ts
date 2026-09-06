@@ -180,6 +180,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         this.#visibleTiles.createTiles = undefined;
         this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;
         this.#visibleTiles.removeTiles = undefined;
+        this.#visibleTiles.changed = false;
       }
       return this.#visibleTiles;
     }
@@ -203,7 +204,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.planeWorld.coplanarPoint(this.planeOrigin);
 
     if (pointOnPlane3D == null) {
-      this.#visibleTiles = previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles} : undefined;
+      this.#visibleTiles = previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles, changed: true} : undefined;
       return this.#visibleTiles;
     }
 
@@ -380,6 +381,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       removeTiles,
       offset: this.#scratchOffset,
       translate,
+      changed: true,
     };
   }
 

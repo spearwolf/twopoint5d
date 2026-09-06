@@ -1,5 +1,5 @@
 import type {Object3D} from 'three/webgpu';
-import {Vector2, Vector3} from 'three/webgpu';
+import {Vector3} from 'three/webgpu';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
@@ -58,6 +58,9 @@ export class Map2DTileStreamer {
   tiles: IMap2DTileCoords[] = [];
   renderers: Set<IMap2DTileRenderer> = new Set();
 
+  // Per-frame scratch — handed to beginUpdatingTiles(), which reads it during the call.
+  readonly #position = new Vector3();
+
   constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
     this.#tileCoords = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
@@ -77,7 +80,9 @@ export class Map2DTileStreamer {
       for (const tileRenderer of this.renderers) {
         tileRenderer.clearTiles();
       }
-      this.tiles.length = 0;
+      // a new list, not `length = 0`: the visibilitor holds this very array as the tile set of
+      // its last result, and its cache path hands that result back untouched by previousTiles
+      this.tiles = [];
       this.#clearTilesOnNextUpdate = false;
     }
 
@@ -93,24 +98,20 @@ export class Map2DTileStreamer {
     if (visible) {
       this.tiles = visible?.tiles;
 
-      const offset = visible.offset ?? new Vector2();
-      const translate = visible.translate ?? new Vector3();
-      const position = new Vector3(offset.x + translate.x, translate.y, offset.y + translate.z);
+      const offset = visible.offset;
+      const translate = visible.translate;
+      const position = this.#position.set(
+        (offset?.x ?? 0) + (translate?.x ?? 0),
+        translate?.y ?? 0,
+        (offset?.y ?? 0) + (translate?.z ?? 0),
+      );
 
       for (const tileRenderer of this.renderers) {
-        tileRenderer.beginUpdatingTiles(position);
+        tileRenderer.beginUpdatingTiles(position, visible.changed ?? true);
 
-        visible.removeTiles?.forEach((tile) => {
-          tileRenderer.removeTile(tile);
-        });
-
-        visible.createTiles?.forEach((tile) => {
-          tileRenderer.addTile(tile);
-        });
-
-        visible.reuseTiles?.forEach((tile) => {
-          tileRenderer.reuseTile(tile);
-        });
+        if (visible.removeTiles) for (const tile of visible.removeTiles) tileRenderer.removeTile(tile);
+        if (visible.createTiles) for (const tile of visible.createTiles) tileRenderer.addTile(tile);
+        if (visible.reuseTiles) for (const tile of visible.reuseTiles) tileRenderer.reuseTile(tile);
 
         tileRenderer.endUpdatingTiles();
       }
