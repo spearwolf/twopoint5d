@@ -272,8 +272,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.width = width;
     this.height = height;
 
-    if (this.#internalRT) this.#internalRT.setSize(Math.max(1, width), Math.max(1, height));
-    if (this.#asPassNodeRT) this.#asPassNodeRT.setSize(Math.max(1, width), Math.max(1, height));
+    if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);
+    if (this.#asPassNodeRT) this.#resizeRenderTarget(this.#asPassNodeRT);
 
     for (const stage of this.stages) {
       this.resizeStage(stage, width, height);
@@ -345,6 +345,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #asPassNodeRT?: RenderTarget;
   /** Marks `pipeline.outputNode` as needing a rebuild (after stage list changes). */
   #outputDirty = true;
+
+  /**
+   * Pixel ratio of the renderer that last built or measured a `RenderTarget` here. `resize()`
+   * has no renderer to ask; it sizes the targets from this value, and the next `#ensureRT()`
+   * corrects them if the renderer has moved to a different ratio in the meantime.
+   */
+  #pixelRatio = 1;
 
   /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it. */
   invalidateOutputNode(): void {
@@ -522,16 +529,25 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return (this.#asPassNodeRT = this.#ensureRT(this.#asPassNodeRT, renderer));
   }
 
-  #ensureRT(rt: RenderTarget | undefined, renderer: WebGPURenderer): RenderTarget {
-    const pixelRatio = renderer.getPixelRatio?.() ?? 1;
-    const w = Math.max(1, Math.floor(this.width * pixelRatio));
-    const h = Math.max(1, Math.floor(this.height * pixelRatio));
-    if (!rt) {
-      return new RenderTarget(w, h);
-    }
+  /** Size a `RenderTarget` has to have, in device pixels, for the current `width`/`height`. */
+  #renderTargetSize(): [width: number, height: number] {
+    return [Math.max(1, Math.floor(this.width * this.#pixelRatio)), Math.max(1, Math.floor(this.height * this.#pixelRatio))];
+  }
+
+  #resizeRenderTarget(rt: RenderTarget): void {
+    const [w, h] = this.#renderTargetSize();
     if (rt.width !== w || rt.height !== h) {
       rt.setSize(w, h);
     }
+  }
+
+  #ensureRT(rt: RenderTarget | undefined, renderer: WebGPURenderer): RenderTarget {
+    this.#pixelRatio = renderer.getPixelRatio?.() ?? 1;
+    if (!rt) {
+      const [w, h] = this.#renderTargetSize();
+      return new RenderTarget(w, h);
+    }
+    this.#resizeRenderTarget(rt);
     return rt;
   }
 

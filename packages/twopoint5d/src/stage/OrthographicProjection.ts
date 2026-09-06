@@ -3,7 +3,6 @@ import {OrthographicCamera, Vector2} from 'three/webgpu';
 import {expectDefined} from '../utils/expectDefined.js';
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
-import {asFitIntoRectangleSpecs} from './asFitIntoRectangleSpecs.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
@@ -34,7 +33,7 @@ export class OrthographicProjection implements IProjection {
   }
 
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(new Vector2(width, height), asFitIntoRectangleSpecs(this.viewSpecs), this.#viewRect);
+    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
 
     this.#halfWidth = this.#viewRect.width / 2;
     this.#halfHeight = this.#viewRect.height / 2;

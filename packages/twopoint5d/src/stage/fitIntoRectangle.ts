@@ -175,49 +175,64 @@ export function calculateAnchorOffset(
  * const offset = calculateAnchorOffset(rect, view, specs.anchorPosition);
  * ```
  *
+ * The spec is a partial spec: every field may be missing. For `contain` and `cover`, a side
+ * that is missing or set to `0` means the caller does not constrain that side; the other side
+ * then drives the aspect ratio. Where no shape matches — no `pixelZoom`, no `fit`, or
+ * `contain`/`cover` without either dimension — the dimensions in `target` are left as they are,
+ * and `fitIntoRectangle()` hands back the target vector it was given, untouched. `minPixelZoom`
+ * and `maxPixelZoom` still apply afterwards and can override that: on a fresh `Vector2` the
+ * width is `0`, so the ratio is `Infinity` and a `maxPixelZoom` always kicks in.
+ *
  * @param rect - The container dimensions as a Vector2
  * @param specs - The fit specifications
  * @param target - Optional target Vector2 to store the result
  * @returns The calculated view dimensions as a Vector2
  */
-export function fitIntoRectangle(rect: Vector2, specs: FitIntoRectangleSpecs, target: Vector2 = new Vector2()): Vector2 {
-  if ('pixelZoom' in specs) {
+export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleSpecs>, target: Vector2 = new Vector2()): Vector2 {
+  const pixelZoom = 'pixelZoom' in specs && specs.pixelZoom != null ? specs.pixelZoom : undefined;
+
+  if (pixelZoom != null) {
     // ---------------------------------------------------------------
     // pixelZoom
     // ---------------------------------------------------------------
-    target.copy(rect).divideScalar(specs.pixelZoom);
+    target.copy(rect).divideScalar(pixelZoom);
   } else if (specs.fit === 'fill') {
     // ---------------------------------------------------------------
-    // fix
+    // fill
     // ---------------------------------------------------------------
     target.copy(rect);
   } else if (specs.fit === 'contain' || specs.fit === 'cover') {
     // ---------------------------------------------------------------
     // contain & cover
     // ---------------------------------------------------------------
-    if ('width' in specs && specs.width !== 0 && (!('height' in specs) || specs.height === 0)) {
+    // a side that is missing, undefined or 0 is a side the caller does not constrain
+    const width = 'width' in specs && specs.width != null ? specs.width : 0;
+    const height = 'height' in specs && specs.height != null ? specs.height : 0;
+
+    if (width !== 0 && height === 0) {
       // --- we have a width and no height
-      target.width = specs.width as number;
-      target.height = rect.height * (specs.width / rect.width);
-    } else if ((!('width' in specs) || specs.width === 0) && 'height' in specs && specs.height !== 0) {
+      target.width = width;
+      target.height = rect.height * (width / rect.width);
+    } else if (width === 0 && height !== 0) {
       // --- we have no width but a height
-      target.width = rect.width * (specs.height / rect.height);
-      target.height = specs.height;
-    } else if ('width' in specs && specs.width !== 0 && 'height' in specs && specs.height !== 0) {
+      target.width = rect.width * (height / rect.height);
+      target.height = height;
+    } else if (width !== 0 && height !== 0) {
       // --- we have a width and a height
       const rectRatio = rect.width / rect.height;
-      const specsRatio = specs.width / specs.height;
+      const specsRatio = width / height;
       const isContain = specs.fit === 'contain';
       if ((isContain && rectRatio > specsRatio) || (!isContain && rectRatio < specsRatio)) {
-        target.width = rect.width * (specs.height / rect.height);
-        target.height = specs.height;
+        target.width = rect.width * (height / rect.height);
+        target.height = height;
       } else if ((isContain && rectRatio < specsRatio) || (!isContain && rectRatio > specsRatio)) {
-        target.width = specs.width;
-        target.height = rect.height * (specs.width / rect.width);
+        target.width = width;
+        target.height = rect.height * (width / rect.width);
       } else {
-        target.set(specs.width, specs.height);
+        target.set(width, height);
       }
     }
+
     if (specs.minPixelZoom != null && rect.width / target.width < specs.minPixelZoom) {
       target.copy(rect).divideScalar(specs.minPixelZoom);
     } else if (specs.maxPixelZoom != null && rect.width / target.width > specs.maxPixelZoom) {

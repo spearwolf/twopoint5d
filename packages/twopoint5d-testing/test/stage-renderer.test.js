@@ -167,4 +167,24 @@ describe('StageRenderer — integration with Display', () => {
     // detached: no further renders driven by the display
     expect(renders).to.equal(beforeDetach);
   });
+
+  it('sizes its pass target in device pixels, before and after a resize', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    await display.start();
+
+    display.renderer.setPixelRatio(2);
+    expect(display.renderer.getPixelRatio(), 'pixel ratio the renderer reports').to.equal(2);
+
+    const sr = new StageRenderer();
+    sr.resize(100, 50);
+
+    const passNode = sr.asPassNode(display.renderer);
+    expect([passNode.value.image.width, passNode.value.image.height]).to.deep.equal([200, 100]);
+
+    sr.resize(300, 150);
+    expect([passNode.value.image.width, passNode.value.image.height]).to.deep.equal([600, 300]);
+
+    sr.dispose();
+  });
 });

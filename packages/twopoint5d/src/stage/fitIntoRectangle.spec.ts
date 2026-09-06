@@ -190,3 +190,27 @@ describe('calculateAnchorOffset', () => {
     expect(offset.y).toBe(-100);
   });
 });
+
+it('an empty spec leaves the target untouched', () => {
+  const target = new Vector2(11, 22);
+  expect(fitIntoRectangle(new Vector2(640, 400), {}, target)).toBe(target);
+  expect([target.width, target.height]).toEqual([11, 22]);
+});
+
+it('a contain spec without width or height leaves the view dimensions to the clamp', () => {
+  const target = new Vector2();
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', maxPixelZoom: 2}, target);
+  expect([target.width, target.height]).toEqual([320, 200]);
+});
+
+it('a contain spec without width, height and clamp leaves the target untouched', () => {
+  const target = new Vector2(11, 22);
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'contain'}, target);
+  expect([target.width, target.height]).toEqual([11, 22]);
+});
+
+it('a width of 0 means "this side is not constrained"', () => {
+  const target = new Vector2();
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 0, height: 100}, target);
+  expect([target.width, target.height]).toEqual([160, 100]);
+});

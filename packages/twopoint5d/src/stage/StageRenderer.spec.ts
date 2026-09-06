@@ -445,6 +445,43 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(rtDuringPipeline).toBe(outRT);
     });
+
+    it('the internal target keeps its device-pixel size when resize() moves it', () => {
+      renderer.getPixelRatio.mockReturnValue(2);
+      const sr = new StageRenderer();
+      sr.resize(100, 50);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+
+      let rt: any;
+      stage.renderTo.mockImplementation(() => {
+        rt = renderer.__renderTarget;
+      });
+      sr.renderTo(renderer as any);
+
+      expect([rt.width, rt.height], 'built in device pixels').toEqual([200, 100]);
+
+      sr.resize(300, 150);
+      expect([rt.width, rt.height], 'resized in device pixels').toEqual([600, 300]);
+    });
+
+    it('a fractional css size reaches the internal target as whole device pixels', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 50);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+
+      let rt: any;
+      stage.renderTo.mockImplementation(() => {
+        rt = renderer.__renderTarget;
+      });
+      sr.renderTo(renderer as any);
+
+      sr.resize(100.5, 50.5);
+      expect([rt.width, rt.height]).toEqual([100, 50]);
+    });
   });
 
   describe('asPassNode + buildOutputNode (§6.2 / §6.3)', () => {
