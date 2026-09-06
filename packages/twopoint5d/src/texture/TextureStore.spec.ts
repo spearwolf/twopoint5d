@@ -1,12 +1,27 @@
-import {getSubscriptionCount, on} from '@spearwolf/eventize';
+import {getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
-import {ImageLoader} from 'three/webgpu';
+import {ImageLoader, LinearFilter, type WebGPURenderer} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
+import {TextureFactory} from './TextureFactory.js';
 import {TextureStore, TextureStoreEvents} from './TextureStore.js';
 import type {TextureStoreData} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+// the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer enough
+const rendererStub = {getMaxAnisotropy: () => 16} as unknown as WebGPURenderer;
+
+// a promise that never settles would run into the vitest timeout instead of failing; this races it
+// against a short timer so a still-waiting promise reports itself as 'pending' in milliseconds
+const settleWithin = <T>(promise: Promise<T>, ms = 50) =>
+  Promise.race([
+    promise.then(
+      (value) => value,
+      (error: unknown) => error,
+    ),
+    new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), ms)),
+  ]);
 
 describe('TextureStore', () => {
   test('create', () => {
@@ -1033,6 +1048,73 @@ describe('TextureStore', () => {
       } finally {
         fetchMock.mockRestore();
       }
+    });
+
+    test('rejects when the fetch fails', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
+      try {
+        const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+        expect(settled).toBeInstanceOf(Error);
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+
+    test('rejects when the response is not json', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not-json'));
+      try {
+        const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+        expect(settled).toBeInstanceOf(Error);
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+  });
+
+  describe('item texture classes beat the store defaults', () => {
+    test('the item filter class wins over the store default', async () => {
+      const store = new TextureStore();
+      store.defaultTextureClasses = ['nearest'];
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png', texture: ['linear']}}});
+
+      const resource = await store.whenResource('a');
+
+      expect(resource.textureClasses).toEqual(['nearest', 'linear']);
+      expect(new TextureFactory(rendererStub, []).getOptions(resource.textureClasses!).magFilter).toBe(LinearFilter);
+    });
+
+    test('the item flipY class wins over the store default', async () => {
+      const store = new TextureStore();
+      store.defaultTextureClasses = ['no-flipy'];
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png', texture: ['flipy']}}});
+
+      const resource = await store.whenResource('a');
+
+      expect(resource.textureClasses).toEqual(['no-flipy', 'flipy']);
+      expect(new TextureFactory(rendererStub, []).getOptions(resource.textureClasses!).flipY).toBe(true);
+    });
+  });
+
+  describe('unsubscribe() leaves the retained ready value alone', () => {
+    test('the store still carries a retained ready event', () => {
+      const store = new TextureStore();
+      const unsubscribe = store.on('a', 'texture', () => {});
+      store.parse({defaultTextureClasses: [], items: {}});
+
+      unsubscribe();
+
+      expect(getRetainedEventNames(store)).toContain(TextureStoreEvents.Ready);
+    });
+
+    test('a whenReady() asked afterwards is answered', async () => {
+      const store = new TextureStore();
+      const unsubscribe = store.on('a', 'texture', () => {});
+      store.parse({defaultTextureClasses: [], items: {}});
+
+      unsubscribe();
+
+      const settled = await settleWithin(store.whenReady().then(() => 'ready' as const));
+      expect(settled).toBe('ready');
     });
   });
 

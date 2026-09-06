@@ -67,10 +67,14 @@ const OnResource = TextureStoreEvents.Resource;
 const OnDispose = TextureStoreEvents.Dispose;
 const OnError = TextureStoreEvents.Error;
 
+// The store defaults come first and an item's own classes last: two equally broad
+// classes writing the same option are decided by their order, so the item has the
+// last word. A duplicate keeps its last position for the same reason.
 const joinTextureClasses = (...classes: Array<TextureOptionClasses[] | undefined>): TextureOptionClasses[] | undefined => {
   const all = classes.filter((c) => c != null);
   if (all.length) {
-    return Array.from(new Set(all.flat()).values());
+    const flat = all.flat();
+    return flat.filter((className, index) => flat.lastIndexOf(className) === index);
   }
   return undefined;
 };
@@ -82,6 +86,10 @@ const noResourceError = (id: string): Error =>
 
 // one message for every promise that is cut short, naming the class and the state
 const disposedError = (what: string): Error => new Error(`[TextureStore] ${what} was cancelled: this store has been disposed`);
+
+// one message for a load that never got as far as a parse, naming the step that failed
+const loadFailedError = (source: string, url: string | URL, cause: unknown): Error =>
+  new Error(`[TextureStore] load("${String(url)}") failed at the ${source} step`, {cause});
 
 const cmpDefaultClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
   if (a === b) return true;
@@ -111,10 +119,43 @@ export interface TextureStoreParseOptions {
 export interface TextureStore extends EventizedObject {}
 
 export class TextureStore {
+  /**
+   * Build a store, fetch texture store data from `url` and resolve once it has parsed.
+   *
+   * A `fetch` that fails, a response that is no JSON and a `parse()` that throws all reject
+   * the returned promise; the store built for the attempt is disposed by then.
+   */
   static async load(url: string | URL): Promise<TextureStore> {
     const store = new TextureStore();
+
+    let unsubscribeFromError: (() => void) | undefined;
+    const whenFailed = new Promise<never>((_resolve, reject) => {
+      unsubscribeFromError = once(
+        store,
+        OnError,
+        ({source, url: failedUrl, error}: {source: string; url: string | URL; error: unknown}) => {
+          reject(loadFailedError(source, failedUrl, error));
+        },
+      );
+    });
+
     store.load(url);
-    return store.whenReady();
+
+    try {
+      // the loser of this race is not left as an unhandled rejection: Promise.race attaches a
+      // handler to every entry, so the discarded whenReady() promise counts as handled
+      await Promise.race([store.whenReady(), whenFailed]);
+    } catch (error) {
+      // disposing from inside the error listener would tear the store down in the middle of
+      // the delivery, and the rejection whenReady() throws for a disposed store could cover
+      // the real cause up; here the race is long decided
+      store.dispose();
+      throw error;
+    } finally {
+      unsubscribeFromError?.();
+    }
+
+    return store;
   }
 
   #defaultTextureClasses = createSignal<TextureOptionClasses[]>([], {compare: cmpDefaultClasses, attach: this});
@@ -315,7 +356,7 @@ export class TextureStore {
       for (const [id, item] of Object.entries(data.items)) {
         let resource: TextureResource | undefined = this.#resources.get(id);
 
-        const textureClasses = joinTextureClasses(item.texture, this.defaultTextureClasses);
+        const textureClasses = joinTextureClasses(this.defaultTextureClasses, item.texture);
 
         if (item.tileSet) {
           if (resource) {
@@ -420,6 +461,10 @@ export class TextureStore {
 
     const unsubscribeFromSubType: (() => void)[] = [];
     let unsubscribeFromResource: undefined | (() => void);
+    // assigned below, once the handlers they release exist; `unsubscribe` closes over them
+    // and reads them only when it runs, which is never before that point
+    let unsubscribeFromDispose: (() => void) | undefined = undefined;
+    let unsubscribeFromReady: (() => void) | undefined = undefined;
 
     let isActiveSubscription = true;
 
@@ -433,8 +478,10 @@ export class TextureStore {
       values?.clear();
       unsubscribeFromResource?.();
       clearSubTypeSubscriptions();
-      off(this, OnDispose, unsubscribe);
-      off(this, OnReady, onReadyHandler);
+      // the handle releases exactly this subscription; off(this, OnReady, …) would take the
+      // store's retained ready value with it and leave every later subscriber waiting
+      unsubscribeFromDispose?.();
+      unsubscribeFromReady?.();
     };
 
     const onReadyHandler = () => {
@@ -479,8 +526,8 @@ export class TextureStore {
       }
     };
 
-    once(this, OnDispose, unsubscribe);
-    once(this, OnReady, onReadyHandler);
+    unsubscribeFromDispose = once(this, OnDispose, unsubscribe);
+    unsubscribeFromReady = once(this, OnReady, onReadyHandler);
 
     return unsubscribe;
   }
