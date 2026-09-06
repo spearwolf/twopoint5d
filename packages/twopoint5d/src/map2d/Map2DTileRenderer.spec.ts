@@ -193,7 +193,7 @@ describe('Map2DTileRenderer', () => {
       renderer.dispose();
 
       expect(destroyTile.callCount).toBe(2);
-      expect(destroyTile.getCalls().map((call) => (call.args[0] as FakeTile).coords.id)).toEqual(['y0x0', 'y0x1']);
+      expect(destroyTile.getCalls().map((call) => (call.args[0] as FakeTile).coords.id)).toEqual(['0,0', '1,0']);
     });
   });
 });

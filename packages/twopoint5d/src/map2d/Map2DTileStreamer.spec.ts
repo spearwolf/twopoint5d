@@ -183,7 +183,7 @@ describe('Map2DTileStreamer', () => {
       streamer.update(node); // clears, and must bring them back
 
       expect(renderer.cleared).toBe(1);
-      expect(renderer.added.map((t) => t.id)).toEqual(['y0x0', 'y0x1', 'y0x0', 'y0x1']);
+      expect(renderer.added.map((t) => t.id)).toEqual(['0,0', '1,0', '0,0', '1,0']);
     });
   });
 });

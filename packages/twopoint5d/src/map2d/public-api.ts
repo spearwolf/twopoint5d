@@ -11,6 +11,7 @@ export * from './Map2DTileStreamer.js';
 export * from './RectangularVisibilityArea.js';
 export * from './RectangularVisibilityAreaHelpers.js';
 export * from './RepeatingTilesProvider.js';
+export * from './tileKeys.js';
 export * from './TileSprites/descriptors.js';
 export * from './TileSprites/TileSprites.js';
 export * from './TileSprites/TileSpritesFactory.js';

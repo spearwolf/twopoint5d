@@ -67,7 +67,7 @@ describe('CameraBasedVisibility', () => {
       // looking at the origin, the ground-projection tile at (0,0) (or its neighbours)
       // must be in the result.
       const tileIds = ids(result!.tiles);
-      expect(tileIds).toContain('y0x0');
+      expect(tileIds).toContain('0,0');
     });
 
     test('returns undefined on a fresh instance when the camera direction is parallel to the plane and there are no previousTiles', () => {
@@ -155,10 +155,10 @@ describe('CameraBasedVisibility', () => {
 
       expect(visibility.visibles.length).toEqual(result.tiles.length);
       for (const v of visibility.visibles) {
-        expect(v.frustumBox, `frustumBox set on ${v.id}`).toBeDefined();
-        expect(v.box, `box set on ${v.id}`).toBeDefined();
-        expect(v.centerWorld, `centerWorld set on ${v.id}`).toBeInstanceOf(Vector3);
-        expect(v.map2dTile, `map2dTile set on ${v.id}`).toBeDefined();
+        expect(v.frustumBox, `frustumBox set on ${v.x},${v.y}`).toBeDefined();
+        expect(v.box, `box set on ${v.x},${v.y}`).toBeDefined();
+        expect(v.centerWorld, `centerWorld set on ${v.x},${v.y}`).toBeInstanceOf(Vector3);
+        expect(v.map2dTile, `map2dTile set on ${v.x},${v.y}`).toBeDefined();
         expect(typeof v.distanceToCamera).toBe('number');
       }
       const primaries = visibility.visibles.filter((v) => v.primary === true);
@@ -169,7 +169,7 @@ describe('CameraBasedVisibility', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
       const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
 
-      const tile00 = result.tiles.find((t) => t.id === 'y0x0');
+      const tile00 = result.tiles.find((t) => t.id === '0,0');
       expect(tile00).toBeDefined();
       expect(tile00!.view.left).toBe(0);
       expect(tile00!.view.top).toBe(0);
@@ -206,8 +206,8 @@ describe('CameraBasedVisibility', () => {
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       const warmIds = first.tiles.map((t) => t.id).sort();
       const warmTileBoxes = new Map(visibility.visibles.map((v) => [v.id, v]));
-      const warmFrustumBoxes = new Map<string, Box3>();
-      const warmCenterWorlds = new Map<string, Vector3>();
+      const warmFrustumBoxes = new Map<number, Box3>();
+      const warmCenterWorlds = new Map<number, Vector3>();
       for (const v of visibility.visibles) {
         warmFrustumBoxes.set(v.id, v.frustumBox!);
         warmCenterWorlds.set(v.id, v.centerWorld!);
@@ -222,9 +222,9 @@ describe('CameraBasedVisibility', () => {
 
       // Same tile set ⇒ same pooled TileBox objects, same Box3 / Vector3 instances.
       for (const v of visibility.visibles) {
-        expect(warmTileBoxes.get(v.id), `tile box for ${v.id} is the pooled instance`).toBe(v);
-        expect(warmFrustumBoxes.get(v.id), `frustumBox for ${v.id} is reused`).toBe(v.frustumBox);
-        expect(warmCenterWorlds.get(v.id), `centerWorld for ${v.id} is reused`).toBe(v.centerWorld);
+        expect(warmTileBoxes.get(v.id), `tile box for ${v.x},${v.y} is the pooled instance`).toBe(v);
+        expect(warmFrustumBoxes.get(v.id), `frustumBox for ${v.x},${v.y} is reused`).toBe(v.frustumBox);
+        expect(warmCenterWorlds.get(v.id), `centerWorld for ${v.x},${v.y} is reused`).toBe(v.centerWorld);
       }
     });
 
@@ -242,7 +242,7 @@ describe('CameraBasedVisibility', () => {
       const third = visibility.computeVisibleTiles(second.tiles, [8000, 0], tileCoords, matrixWorld)!;
 
       for (const v of visibility.visibles) {
-        expect(warmBoxes.has(v.id), `tile ${v.id} of the far frame is none of the warm-up tiles`).toBe(false);
+        expect(warmBoxes.has(v.id), `tile ${v.x},${v.y} of the far frame is none of the warm-up tiles`).toBe(false);
       }
 
       // Back to where the warm-up frame was: the slots it used are gone, so the same tile
@@ -255,7 +255,7 @@ describe('CameraBasedVisibility', () => {
       ).toBe(true);
 
       for (const v of visibility.visibles) {
-        expect(v, `tile box for ${v.id} is a fresh slot`).not.toBe(warmBoxes.get(v.id));
+        expect(v, `tile box for ${v.x},${v.y} is a fresh slot`).not.toBe(warmBoxes.get(v.id));
       }
     });
 

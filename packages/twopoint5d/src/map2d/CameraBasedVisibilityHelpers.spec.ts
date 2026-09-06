@@ -18,6 +18,7 @@ function makeVisibility(): CameraBasedVisibility {
     map2dTileCoords: new Map2DTileCoordsUtil(),
     matrixWorld: new Matrix4(),
     planeCoords2D: new Vector2(),
+    serial: 0,
   } as unknown as CameraBasedVisibility;
 }
 
@@ -69,22 +70,48 @@ describe('CameraBasedVisibilityHelpers', () => {
     }
   });
 
-  test('releases the helper nodes an update replaces', () => {
+  test('an update finds nothing to do while the visibility stands still', () => {
     const scene = new Object3D();
     const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
 
     helpers.add(scene);
     helpers.show = true;
 
+    const nodes = [...scene.children];
     const released = spyOnReleases(scene);
 
     helpers.update();
 
-    expect(scene.children).toHaveLength(5);
-
+    expect(scene.children, 'the same nodes, in the same order').toEqual(nodes);
     for (const node of released) {
-      expect(node.geometry!).toHaveBeenCalledTimes(1);
-      expect(node.material!).toHaveBeenCalledTimes(1);
+      expect(node.geometry!).toHaveBeenCalledTimes(0);
+      expect(node.material!).toHaveBeenCalledTimes(0);
+    }
+  });
+
+  test('an update after a recomputation writes into the nodes it already has', () => {
+    const scene = new Object3D();
+    const visibility = makeVisibility();
+    const helpers = new CameraBasedVisibilityHelpers(visibility);
+
+    helpers.add(scene);
+    helpers.show = true;
+
+    const nodes = [...scene.children];
+    const released = spyOnReleases(scene);
+
+    visibility.pointOnPlane!.set(5, 0, 7);
+    (visibility as unknown as {serial: number}).serial += 1;
+    helpers.update();
+
+    expect(scene.children, 'the same nodes, in the same order').toEqual(nodes);
+    expect(
+      scene.children.some((node) => node.type === 'Mesh' && node.position.equals(new Vector3(5, 0, 7))),
+      'and the point helper followed the point it marks',
+    ).toBe(true);
+    for (const node of released) {
+      expect(node.geometry!).toHaveBeenCalledTimes(0);
+      expect(node.material!).toHaveBeenCalledTimes(0);
     }
   });
 

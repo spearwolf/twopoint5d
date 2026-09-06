@@ -4,10 +4,15 @@ import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
+import {packTileCoords} from './tileKeys.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
 export interface TileBox {
-  id: string;
+  /**
+   * The packed key of the tile coordinate, as `packTileCoords(x, y)` returns it. Whoever needs
+   * a readable designation of the tile takes `x` and `y`.
+   */
+  id: number;
   x: number;
   y: number;
   coords?: TilesWithinCoords;
@@ -32,8 +37,6 @@ const NEIGHBOR_DX_DY: ReadonlyArray<readonly [number, number]> = [
   [1, 1],
   [-1, 1],
 ];
-
-const toBoxId = (x: number, y: number) => `${x},${y}`;
 
 const setAABB2 = (target: AABB2, {top, left, width, height}: TilesWithinCoords): AABB2 => target.set(left, top, width, height);
 
@@ -100,17 +103,29 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   readonly visibles: TileBox[] = [];
   #visibleTiles?: IMap2DVisibleTiles;
+  #serial = 0;
+
+  /**
+   * Counts how often this visibility has rebuilt its state from the camera. It moves with every
+   * recomputation — `visibles`, the plane and the plane coordinates are new afterwards — and
+   * stands still while the cached tile set is handed back. Whoever mirrors that state compares
+   * the value it last saw instead of the state itself.
+   */
+  get serial(): number {
+    return this.#serial;
+  }
 
   // Per-frame scratch buffers — reused across calls to keep GC pressure low.
-  readonly #visitedIds = new Set<string>();
+  readonly #visitedIds = new Set<number>();
   readonly #nextStack: TileBox[] = [];
-  readonly #previousTilesById = new Map<string, IMap2DTileCoords>();
+  readonly #previousTilesById = new Map<number, IMap2DTileCoords>();
 
-  // Pool of TileBox slots keyed by `${x},${y}`. Each slot owns its Box3/Vector3/Map2DTileCoords
-  // shells so subsequent frames can mutate them in place instead of allocating new ones.
+  // Pool of TileBox slots keyed by `packTileCoords()`. Each slot owns its Box3/Vector3/
+  // Map2DTileCoords shells so subsequent frames can mutate them in place instead of allocating
+  // new ones.
   // It holds the tiles of the last recomputation that found the map plane, and no others: a frame
   // in which the camera looks past the plane computes no tiles and leaves the pool as it stands.
-  readonly #tileBoxPool = new Map<string, TileBox>();
+  readonly #tileBoxPool = new Map<number, TileBox>();
 
   // Snapshot of the tile-grid parameters that drive `tile.coords`. When any of these change
   // we invalidate the per-slot `coords` caches so the next frame recomputes them.
@@ -185,6 +200,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return this.#visibleTiles;
     }
 
+    this.#serial += 1;
+
     this.invalidateTileCoordsCacheIfChanged();
 
     this.matrixWorld.copy(matrixWorld);
@@ -242,7 +259,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private acquireTileBox(x: number, y: number, primary: boolean): TileBox {
-    const id = toBoxId(x, y);
+    const id = packTileCoords(x, y);
     let tile = this.#tileBoxPool.get(id);
     if (tile === undefined) {
       tile = {id, x, y, primary};
@@ -264,7 +281,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     for (let i = 0; i < previousTiles.length; ++i) {
       // The loop bound is `previousTiles.length`.
       const previousTile = previousTiles[i]!;
-      this.#previousTilesById.set(previousTile.id, previousTile);
+      this.#previousTilesById.set(packTileCoords(previousTile.x, previousTile.y), previousTile);
     }
 
     // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
@@ -330,9 +347,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         }
         setAABB2(tile.map2dTile.view, tile.coords);
 
-        const previous = this.#previousTilesById.get(tile.map2dTile.id);
+        const previous = this.#previousTilesById.get(tile.id);
         if (previous !== undefined) {
-          this.#previousTilesById.delete(tile.map2dTile.id);
+          this.#previousTilesById.delete(tile.id);
           reuseTiles.push(tile.map2dTile);
         } else {
           createTiles.push(tile.map2dTile);
@@ -343,7 +360,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
           const [dx, dy] = NEIGHBOR_DX_DY[i]!;
           const tx = tile.coords.tileLeft + dx;
           const ty = tile.coords.tileTop + dy;
-          if (!this.#visitedIds.has(toBoxId(tx, ty))) {
+          if (!this.#visitedIds.has(packTileCoords(tx, ty))) {
             this.#nextStack.push(this.acquireTileBox(tx, ty, false));
           }
         }
@@ -353,7 +370,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // The pool exists to let the next frame mutate the same shells instead of allocating
     // new ones — that pays off only for a slot the next frame comes back to. A slot that
     // was not visited this time keeps a Box3, a Vector3 and a Map2DTileCoords alive for a
-    // tile the camera has left behind, so it goes. Both sets are keyed by `toBoxId()`.
+    // tile the camera has left behind, so it goes. Both sets are keyed by `packTileCoords()`.
     for (const id of this.#tileBoxPool.keys()) {
       if (!this.#visitedIds.has(id)) {
         this.#tileBoxPool.delete(id);

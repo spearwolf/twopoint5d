@@ -4,7 +4,7 @@ import {Map2DTileCoords} from './Map2DTileCoords.js';
 describe('Map2DTileCoords', () => {
   test('id', () => {
     const tile = new Map2DTileCoords(0, 0);
-    expect(tile.id).toBe('y0x0');
+    expect(tile.id).toBe('0,0');
   });
   test('x, y', () => {
     const tile = new Map2DTileCoords(8, 16);

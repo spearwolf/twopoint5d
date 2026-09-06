@@ -1,12 +1,18 @@
 import type {AABB2} from './AABB2.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import {tileKey} from './tileKeys.js';
 
 export type Map2DSpatialHashGridKeyType = string;
 
 export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
+  /**
+   * The bucket key of the tile at these coordinates: the shared tile key, the same string the
+   * `id` of a `Map2DTileCoords` carries. A tile that comes out of a visibilitor looks itself up
+   * in the grid without any conversion.
+   */
   static getKey(x: number, y: number): Map2DSpatialHashGridKeyType {
-    return `${x};${y}`;
+    return tileKey(x, y);
   }
 
   #tiles: Map<Map2DSpatialHashGridKeyType, Set<Renderable>>;
@@ -23,13 +29,13 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
       const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
-          const tileKey = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
-          let tileSet = this.#tiles.get(tileKey);
+          const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
+          let tileSet = this.#tiles.get(key);
           if (tileSet) {
             tileSet.add(renderable);
           } else {
             tileSet = new Set<Renderable>();
-            this.#tiles.set(tileKey, tileSet);
+            this.#tiles.set(key, tileSet);
           }
           tileSet.add(renderable);
         }
@@ -44,12 +50,12 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
       const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
-          const tileKey = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
-          const tileSet = this.#tiles.get(tileKey);
+          const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
+          const tileSet = this.#tiles.get(key);
           if (tileSet) {
             tileSet.delete(renderable);
             if (tileSet.size === 0) {
-              this.#tiles.delete(tileKey);
+              this.#tiles.delete(key);
             }
           }
         }
@@ -81,7 +87,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   getTile(tileX: number, tileY: number): Set<Renderable> | undefined {
-    const tileKey = Map2DSpatialHashGrid.getKey(tileX, tileY);
-    return this.#tiles.get(tileKey);
+    const key = Map2DSpatialHashGrid.getKey(tileX, tileY);
+    return this.#tiles.get(key);
   }
 }
