@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add `CameraBasedVisibility#pointsOnPlane`: the points where the probe rays of the view frustum met the map plane, in probe order. It is empty for a recomputation in which the camera looked past the plane, and its first entry is the point `pointOnPlane` carries. The `Vector3`s belong to the visibility and are written again on the next recomputation. `CameraBasedVisibilityHelpers` marks each of them, the first one as before and the further ones smaller and in blue
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
@@ -22,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `CameraBasedVisibility` looks for the map plane along nine rays through the view frustum instead of one: its center, the middle of its bottom, left, right and top edge, and its four corners, tested in that order. As long as the camera looks at the plane the center ray finds it first and the result is the one it produced alone; when the center of the view points past the plane — a camera tilted up at the horizon, one that has the ground in the lower half of its picture only — the tiles that are in the view are found instead of nothing at all. Only a view frustum that meets the plane with none of the nine rays reports no tiles. The `far` value of the camera still limits how far along a ray the plane is looked for; each ray now starts at the near plane
+- perf `CameraBasedVisibility#computeVisibleTiles()`: when three or more rays meet the plane, every tile within the convex hull of the tiles they met goes into the visible set without being held against the view frustum, and the tile-by-tile search runs from the border of that area outwards. The area where a frustum meets a plane is convex, so each of those tiles reaches into the view — the tile set is the one the search alone arrives at, and the frustum tests it would have spent on the inside of the area are saved. Fewer than three rays span no area, and everything is searched as before
+- `TileBox#primary` marks the tiles of every probe ray that met the plane instead of the tiles under the center of the view alone — per ray the tile its point fell into together with the ones a rectangle of one tile size around that point reaches, as before. A tile marked this way keeps the mark even when the search reaches it again as the neighbour of another tile, which it did not before: of the tiles under the center of the view usually only one kept it
 - upgrade the `@spearwolf/eventize` peer dependency to `^6.2.0` (was `^5.0.0`) and `@spearwolf/signalize` to `^1.0.0` (was `^0.30.0`) — both are major releases, and `signalize@1.0.0` requires `eventize@^6.0.0`, so the two only move together
 - `TexturedSpritesMaterial` and `TileSpritesMaterial` now pass the TSL node type to `attribute()` explicitly (`attribute<'vec3'>(…)` instead of `attribute(…)`); the stricter `createSignal()` overloads no longer accept the untyped `AttributeNode<unknown>` these calls returned. No runtime change — the shader attributes were already used at these types
 - `TexturedSpritesMaterial#dispose()` and `TileSpritesMaterial#dispose()` call `SignalGroup.delete()` instead of the deprecated `SignalGroup.destroy()`, which now prints a deprecation notice once per process
@@ -81,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix the tile coordinates `CameraBasedVisibility` computes for a map whose `xOffset` or `yOffset` lies outside the first tile: the view rectangle of a tile, the box it is tested with and the tiles the search walks on to are the ones of the tile coordinate they belong to. The query these are derived from was handed a coordinate without the map offset while it reads one with it, which shifted every tile of such a map by `floor(-offset / tileSize)` tiles against the tile coordinate it was found under. An offset within the first tile — the usual `-tileSize / 2` among them — was and is unaffected
 - fix `VertexObjectPool#freeVO()`: the vacated slot is cleared on both the last-index and the swap path, so a freed index holds no vertex object — `getVO()` on it returns `undefined` and the internal index keeps nothing alive
 - fix `VertexObjectPool#freeVO()`: the swap path tolerates an index slot that `createFromAttributes()` raised `usedCount` past without materializing a vertex object
 - fix `VertexObjectPool#resize()`: shrinking unlinks every vertex object from the new capacity onwards, so a later read or write on one of them fails loudly
@@ -115,6 +120,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the moment `Canvas2DStage` releases the texture it replaces: the successor sits on the sprite material before the predecessor falls, so neither the material nor a read of `Canvas2DStage#texture` ever reaches a texture that is already disposed
 
 ### Migration Guide
+
+#### `TileBox#primary` marks every tile the view frustum meets the plane in
+
+`CameraBasedVisibility` tests nine rays through the view frustum against the map plane, and `primary` marks the tiles they met — up to nine places on the map, rather than the one under the center of the view.
+
+**Before**
+
+```ts
+// the tile under the center of the view, and its neighbours
+const underTheCamera = visibility.visibles.filter((tile) => tile.primary);
+```
+
+**After**
+
+```ts
+// the tile under the center of the view: the first probe ray is the center one
+const [centerPoint] = visibility.pointsOnPlane;
+```
+
+Whoever wants the tiles the view frustum meets the plane in — all of them — keeps reading `primary`.
 
 #### A disposed display refuses to be used
 

@@ -121,6 +121,14 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
       this.placePointHelper(this.cameraBasedVisibility.pointOnPlane, 10, 0xc0c0c0);
     }
 
+    // the further points the probe rays of the view frustum found — the first of them is the
+    // one `pointOnPlane` carries, and that one is already marked
+    const pointsOnPlane = this.cameraBasedVisibility.pointsOnPlane;
+    for (let i = 1; i < pointsOnPlane.length; ++i) {
+      // The loop bound is `pointsOnPlane.length`.
+      this.placePointHelper(pointsOnPlane[i]!, 6, 0x20c0ff);
+    }
+
     this.placePointHelper(this.cameraBasedVisibility.planeOrigin, 5, 0x406090);
 
     const uOrigin = this.makePointOnPlane(new Vector2());

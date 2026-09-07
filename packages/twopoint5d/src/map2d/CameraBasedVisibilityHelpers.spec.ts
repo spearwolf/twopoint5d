@@ -21,10 +21,11 @@ function makeTileBox(x: number, y: number, primary: boolean): TileBox {
   };
 }
 
-function makeVisibility(visibles: TileBox[] = []): CameraBasedVisibility {
+function makeVisibility(visibles: TileBox[] = [], pointsOnPlane: Vector3[] = []): CameraBasedVisibility {
   return {
     planeWorld: new Plane(new Vector3(0, 1, 0), 0),
     pointOnPlane: new Vector3(1, 0, 1),
+    pointsOnPlane,
     planeOrigin: new Vector3(),
     visibles,
     map2dTileCoords: new Map2DTileCoordsUtil(),
@@ -134,6 +135,28 @@ describe('CameraBasedVisibilityHelpers', () => {
       expect(node.geometry!).toHaveBeenCalledTimes(0);
       expect(node.material!).toHaveBeenCalledTimes(0);
     }
+  });
+
+  test('marks every point the probe rays of the view frustum found', () => {
+    const scene = new Object3D();
+    const helpers = new CameraBasedVisibilityHelpers(
+      makeVisibility([], [new Vector3(1, 0, 1), new Vector3(9, 0, 3), new Vector3(-4, 0, 7)]),
+    );
+
+    helpers.add(scene);
+    helpers.show = true;
+
+    // the five nodes of a single point on the plane, and one more per further point
+    expect(scene.children).toHaveLength(7);
+
+    const marked = scene.children.filter((node) => node.type === 'Mesh').map((node) => node.position.toArray());
+
+    expect(marked, 'the points of the second and the third ray are marked as well').toEqual(
+      expect.arrayContaining([
+        [9, 0, 3],
+        [-4, 0, 7],
+      ]),
+    );
   });
 
   test('builds no helper while no scene has been handed over', () => {
