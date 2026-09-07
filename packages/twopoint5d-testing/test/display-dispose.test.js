@@ -49,10 +49,12 @@ describe('Display — the contract after dispose()', function () {
     host = undefined;
   });
 
-  // Assertion (a) of the dispose test pattern — "releases what it built itself" — has no subject
-  // here. A Display does build its own renderer, but spying on renderer.dispose() only watches
-  // three.js clean up after itself; what proves the release are the backend resources, and this
-  // test cannot see them. What it can see, and what this file is about, is the contract afterwards.
+  // Assertion (a) of the dispose test pattern — "releases what it built itself" — is the DOM side
+  // here: the two cases below watch the container the display built come out of the host again,
+  // and the canvas it was handed stay where the caller put it. The GPU side has no subject:
+  // spying on renderer.dispose() only watches three.js clean up after itself, and what proves the
+  // release are the backend resources, which this test cannot see. What it can see, and what the
+  // rest of this file is about, is the contract afterwards.
 
   // Assertion (b) — "does not touch what was handed in" — is turned around for a Display: a
   // WebGPURenderer passed to the constructor is adopted and released with the display. That case
@@ -71,6 +73,28 @@ describe('Display — the contract after dispose()', function () {
 
   // Assertion (f) — "gives every slot it took back" — has no subject: a Display takes no
   // slot from a pool and no tile from a factory.
+
+  it('takes the container it built out of the host', () => {
+    host = makeContainer();
+    display = new Display(host);
+
+    expect(host.children.length, 'the host while the display is alive').to.equal(1);
+
+    display.dispose();
+
+    expect(host.children.length, 'the host after dispose()').to.equal(0);
+  });
+
+  it('leaves a canvas that was handed in where it stands', () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+
+    display = new Display(canvas);
+    display.dispose();
+
+    expect(canvas.parentNode, 'the canvas the caller put into the document').to.equal(host);
+  });
 
   it('canvas throws after dispose()', () => {
     host = makeContainer();

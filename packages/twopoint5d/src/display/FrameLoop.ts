@@ -5,8 +5,8 @@ export interface ISetAnimationLoop {
   setAnimationLoop(callback: ((now: number) => unknown) | null): unknown;
 }
 
-export const OnRAF = Symbol.for('onRAF');
-const OnFrame = Symbol.for('onFrame');
+export const OnRAF = Symbol.for('twopoint5d:FrameLoop.OnRAF');
+const OnFrame = Symbol.for('twopoint5d:FrameLoop.OnFrame');
 
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 const MEASURE_COLLECTION_SIZE = 10;
@@ -109,7 +109,10 @@ class RAF {
       cancelAnimationFrame(this.#rafID);
     }
     this.#rafID = 0;
+    // the anchor and the samples are one state: a window that has to be anchored again has no
+    // samples to average, or the first fresh sample would be mixed with the rate from before
     this.#needsMeasureAnchor = true;
+    this.measuredFpsCollection.length = 0;
   }
 
   measureFps(now: number) {

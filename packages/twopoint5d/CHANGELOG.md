@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `StageRenderer#isDisposed`: `true` once `dispose()` has run, so a caller holding a renderer it did not create has a question it can ask
 - add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, both textures that ever sat behind it and the `StageRenderer` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add `InputControlBase#dispose()` and `InputControlBase#isDisposed`: `dispose()` takes every listener the control put on a host back off again — the hosts themselves are handed in and stay the caller's — and puts the control out of service. Afterwards `isDisposed` is `true`, `isActive` is `false`, and the control cannot be brought back: `subscribe()`, a write of `true` to `isActive` and every `addEventListener()` of a subclass do nothing. `destroyAllListeners()` is unaffected and stays what it is, a reset after which a control takes listeners again. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- add the `coordsTarget` option and the `PanControl2D#coordsTarget` field: the element every pointer position is measured against, through its `getBoundingClientRect()`. It defaults to the `cursorStylesTarget`, and with that to `document.body`. A canvas inside a shadow root belongs here, because the browser retargets `event.target` onto the shadow host there
+- add the `error` event of `Display`, the `Display#onError()` shorthand and the exported `OnDisplayError` constant: a renderer that does not come up reports the reason through it. The event is retained, so a listener attached after the failure — the normal case, since the constructor returns before the renderer is ready — is told about it as well
 
 ### Changed
 
@@ -78,6 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer#remove()` clears both sides of the relation: a removed child `StageRenderer` answers `undefined` as its `parent` afterwards and gets its `OnRemoveFromParent`, exactly as a `parent = undefined` on the child would do. A listener reading `renderer.parent` from that event sees `undefined` — the event says the child has been removed
 - the `VertexObjectBuffer` behind a disposed pool says which state it is in: `copy()` from it, `copyArray()`, `copyAttributes()` and `toAttributeArrays()` throw an error naming the class, the method and the state instead of a `TypeError` from somewhere inside, and `clone()` and the constructor refuse it as a source rather than answering a second buffer without data. `copyWithin()` and `touch()` do nothing, and `descriptor`, `capacity`, `attributeNames`, `bufferAttributes` and `bufferNameAttributes` go on saying what this buffer was. `copyArray()` with a buffer name the buffer does not know says exactly that, so a typo is not read as a dispose
 - a disposed pool is turned away at the door: the `VOBufferGeometry` and `InstancedVOBufferGeometry` constructors and `InstancedVOBufferGeometry#attachInstancedPool()` throw when they are handed one, with a message naming the call and the state. A pool without buffers gives a route no attributes, and a geometry built over one draws nothing while looking like any other
+- `FrameLoop.OnFrame` and the exported `OnRAF` are `Symbol.for('twopoint5d:FrameLoop.OnFrame')` and `Symbol.for('twopoint5d:FrameLoop.OnRAF')`: the keys carry the library namespace, so no other code in the realm reaches the same channel by asking the symbol registry for a name as common as `onFrame`. Code that subscribes through the exported constants needs no change; code that rebuilds the key from its string does — see the migration guide
+- a `createRenderer` callback receives only renderer options in its `params`: `maxFps`, `resizeTo`, `resizeToElement`, `resizeToAttributeEl`, `styleSheetRoot` and `createRenderer` stay with the display. `CreateRendererParameters` names none of them
+- `PanControl2D` emits `restoreCursor` for a cursor it hid, and takes the cursor class off the target then. A pointer moving over the page with no button down passes through without an event
 
 ### Removed
 
@@ -118,6 +123,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `PanControl2D#dispose()`: the cursor class comes off the `cursorStylesTarget` element the caller handed in, and the pan collected from a drag that was still running is dropped instead of being delivered by the next `update()`. A control that was hiding the cursor emits one last `restoreCursor` event on the way out, while its subscribers can still hear it. A write to `cursorPanStyle` on a disposed control does nothing rather than rewriting the cursor rule every control of the module shares
 - fix the helper nodes `CameraBasedVisibilityHelpers` and `RectangularVisibilityAreaHelpers` build before a scene has been handed to them: switching the helpers on, or updating them, builds nothing while there is no scene to put the nodes into, so a set of `Box3Helper`s, `PlaneHelper`s and point helpers that no scene shows and nothing releases again is never created. The first `update()` after `add(scene)` puts the whole set in
 - fix the moment `Canvas2DStage` releases the texture it replaces: the successor sits on the sprite material before the predecessor falls, so neither the material nor a read of `Canvas2DStage#texture` ever reaches a texture that is already disposed
+- fix `Display#dispose()`: a container the display created inside a host element comes out of the DOM with the canvas in it, so a host that carries one display after another collects no dead canvas per cycle. A canvas or a renderer handed to the constructor keeps its place — it belongs to the caller
+- fix the `Display` constructor for a first argument that is neither an HTML element nor a `WebGPURenderer`: it throws a `TypeError` naming what it takes, the same one a `WebGLRenderer` gets, instead of failing inside the renderer initialization with a message about a property of `undefined`
+- fix a renderer that fails to initialize: the display emits its `error` event with the reason instead of leaving an unhandled rejection behind. `Display#start()` still rejects with the same error
+- fix the fps `FrameLoop` measures after a pause: the first sample of the new measurement window is reported on its own, without the samples from before the pause averaged into it
+- fix the coordinates `PanControl2D` measures a drag with: they are taken against `coordsTarget`, which stays the same element throughout the drag. Measuring against the element under the pointer moves the reference rectangle mid-drag as the pointer crosses other elements, and a shadow root retargets it onto the host on top of that
+- fix `PanControl2D#pointerDisabled`: switching the pointer off drops the pan collected up to that moment instead of holding it back and delivering it in one jump when the pointer is switched on again
+- fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
 
 ### Migration Guide
 
@@ -1050,6 +1062,34 @@ const geometry = new VertexObjectGeometry(pool, 1000);
 scene.add(new THREE.Mesh(geometry, material));
 
 // the pool goes when nothing reads it any more
+```
+
+#### The event keys of `FrameLoop` carry the library namespace
+
+The symbols are exported; take them from the module instead of building them from their name.
+
+**Before**
+
+```ts
+const OnFrame = Symbol.for('onFrame');
+
+display.frameLoop.start({
+  [OnFrame]({now, deltaTime}) {
+    // ...
+  },
+});
+```
+
+**After**
+
+```ts
+import {FrameLoop} from '@spearwolf/twopoint5d';
+
+display.frameLoop.start({
+  [FrameLoop.OnFrame]({now, deltaTime}) {
+    // ...
+  },
+});
 ```
 
 ## [0.21.2] - 2026-06-19

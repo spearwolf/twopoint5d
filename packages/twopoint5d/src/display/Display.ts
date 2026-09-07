@@ -12,6 +12,7 @@ import {
 import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,
+  OnDisplayError,
   OnDisplayInit,
   OnDisplayPause,
   OnDisplayRenderFrame,
@@ -62,9 +63,13 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    wires up `document.visibilitychange` so the loop pauses while the tab is
  *    hidden.
  * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
- *    (once), `OnDisplayStart` and begins emitting `OnDisplayRenderFrame`.
+ *    (once), `OnDisplayStart` and begins emitting `OnDisplayRenderFrame`. A
+ *    renderer that fails to initialize fires `OnDisplayError` instead, and
+ *    `start()` rejects with the same error.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
- *    releases the renderer.
+ *    releases the renderer. A container this display created inside a host
+ *    element comes out of the DOM with the canvas in it; a canvas or a
+ *    renderer handed to the constructor keeps its place in the document.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
  *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
@@ -77,7 +82,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
  *    {@link Display.deltaTime} keep their last value, {@link Display.pixelRatio}
  *    keeps reading the window and {@link Display.isRunning} is `false`. No further
- *    event is emitted, and a listener attached afterwards receives nothing — not
+ *    event is emitted — no `OnDisplayRenderFrame`, no `OnDisplayResize`, no
+ *    `OnDisplayError` — and a listener attached afterwards receives nothing, not
  *    even a retained value.
  *
  * ## Resize model
@@ -350,6 +356,11 @@ export class Display {
 
   readonly #waitForRenderer: Promise<WebGPURenderer>;
 
+  // The container this display created inside a host element, and the canvas in it. Set only on
+  // that construction path, because that is the only one on which they are this display's to give
+  // back — see dispose().
+  #ownContainer?: HTMLDivElement;
+
   /**
    * Create a display around a canvas, around a container element that gets a canvas of its own,
    * or around a `WebGPURenderer` that is already built.
@@ -363,12 +374,17 @@ export class Display {
    */
   constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
-    retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize]);
+    retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize, OnDisplayError]);
 
     this.#chronometer.stop();
 
-    this.resizeToCallback = options?.resizeTo;
-    this.styleSheetRoot = options?.styleSheetRoot ?? document.head;
+    // the display-owned keys come off the options here, so what is left is exactly what a
+    // WebGPURenderer takes — everything below reads its options from these constants
+    const {maxFps, resizeTo, resizeToElement, resizeToAttributeEl, styleSheetRoot, createRenderer, ...rendererOptions} =
+      options ?? {};
+
+    this.resizeToCallback = resizeTo;
+    this.styleSheetRoot = styleSheetRoot ?? document.head;
 
     if (isWebGLRenderer(domElementOrRenderer)) {
       // eslint-disable-next-line no-console
@@ -400,11 +416,15 @@ export class Display {
 
         canvas = document.createElement('canvas');
         container.appendChild(canvas);
+
+        // only what was built here: a canvas that arrived as an argument, and the domElement of a
+        // renderer that arrived as one, belong to the caller and stay where they are
+        this.#ownContainer = container;
       }
       this.resizeToElement = domElementOrRenderer;
 
-      const createRenderer =
-        options?.createRenderer ??
+      const makeRenderer =
+        createRenderer ??
         ((params: CreateRendererParameters) => {
           return new WebGPURenderer({
             // TODO check if this is still needed
@@ -412,34 +432,46 @@ export class Display {
           });
         });
 
-      this.renderer = createRenderer({
+      this.renderer = makeRenderer({
         canvas,
         stencil: false,
         alpha: true,
         antialias: true,
         powerPreference: 'high-performance',
-        ...options,
+        ...rendererOptions,
       } as CreateRendererParameters);
+    } else {
+      // every wrong first argument gets the same answer, whatever it is: without this a null
+      // would die inside init() with a TypeError that names neither this constructor nor what
+      // it takes
+      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument!');
     }
 
     // Both construction paths end with a renderer and both have to wait for the same promise.
     // One assignment, so a path that gets added later cannot leave the field empty.
     this.#waitForRenderer = this.renderer!.init();
 
-    this.frameLoop = new FrameLoop(options?.maxFps ?? 0, this.renderer);
+    this.frameLoop = new FrameLoop(maxFps ?? 0, this.renderer);
 
     const {domElement: canvas} = this.renderer!;
     Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;', this.styleSheetRoot);
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
-    this.resizeToElement = options?.resizeToElement ?? this.resizeToElement;
-    this.resizeToAttributeEl = options?.resizeToAttributeEl ?? canvas;
+    this.resizeToElement = resizeToElement ?? this.resizeToElement;
+    this.resizeToAttributeEl = resizeToAttributeEl ?? canvas;
 
     this.resize();
 
     on(this.#stateMachine, {
       [DisplayStateMachine.Init]: async () => {
-        await this.#waitForRenderer;
+        // emit() discards the promise this callback returns, so a rejected initialization would
+        // pass nobody on its way out of here
+        try {
+          await this.#waitForRenderer;
+        } catch (error) {
+          emit(this, OnDisplayError, error, this);
+          return;
+        }
         this.#emit(OnDisplayInit);
       },
 
@@ -476,13 +508,19 @@ export class Display {
       onDocVisibilityChange();
     }
 
-    this.#waitForRenderer.then(() => {
-      // a dispose() inside this await would otherwise put the display back into the subscriber
-      // list of the loop, where it stays until the page goes
-      if (this.#disposed) return;
+    this.#waitForRenderer
+      .then(() => {
+        // a dispose() inside this await would otherwise put the display back into the subscriber
+        // list of the loop, where it stays until the page goes
+        if (this.#disposed) return;
 
-      this.frameLoop.start(this);
-    });
+        this.frameLoop.start(this);
+      })
+      .catch((error) => {
+        // a renderer that never comes up is what the caller has to hear about; left here it
+        // would be an unhandled rejection and the display would simply stay dark
+        emit(this, OnDisplayError, error, this);
+      });
   }
 
   /**
@@ -748,12 +786,10 @@ export class Display {
 
     this.resize();
 
-    // Guarantee one OnDisplayResize event on the first rendered frame so
-    // listeners attached before `start()` always receive an initial size,
-    // even when nothing changed since the constructor's resize() call —
-    // but skip it if resize() above already emitted, to avoid the
-    // double-emit that previously happened on every first frame whose
-    // measured size differed from the constructor measurement.
+    // Exactly one OnDisplayResize goes out on the first rendered frame: either
+    // resize() above emitted it because the measured size differs from the
+    // constructor measurement, or this line does. Listeners attached before
+    // start() get their initial size either way.
     if (this.isFirstFrame && !this.#didEmitResize) this.#emit(OnDisplayResize);
 
     this.#emit(OnDisplayRenderFrame);
@@ -807,6 +843,10 @@ export class Display {
     off(this);
     this.renderer?.dispose();
     delete this.renderer;
+    // after renderer.dispose(), so the renderer still finds its canvas while it releases the
+    // context; removing the container takes the canvas inside it along
+    this.#ownContainer?.remove();
+    this.#ownContainer = undefined;
   }
 
   /**
@@ -867,6 +907,15 @@ export class Display {
         resolve(props);
       });
     });
+
+  /**
+   * Subscribes `listener` to the `error` event: the renderer of this display did not come up,
+   * and no frame is going to follow.
+   *
+   * The event is retained, so a listener attached after the failure is told about it too.
+   */
+  readonly onError = (listener: (error: unknown, display: Display) => unknown): UnsubscribeFunc =>
+    on(this, OnDisplayError, listener);
 
   readonly onInit = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayInit, listener);
   readonly onStart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayStart, listener);

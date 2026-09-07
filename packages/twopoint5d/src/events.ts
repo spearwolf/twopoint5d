@@ -14,6 +14,7 @@ export const OnDisplayStart = 'start';
 export const OnDisplayRestart = 'restart';
 export const OnDisplayPause = 'pause';
 export const OnDisplayDispose = 'dispose';
+export const OnDisplayError = 'error';
 
 export interface IOnDisplayResize {
   [OnDisplayResize](props: DisplayEventProps): void;
@@ -41,6 +42,10 @@ export interface IOnDisplayPause {
 
 export interface IOnDisplayDispose {
   [OnDisplayDispose](display: Display): void;
+}
+
+export interface IOnDisplayError {
+  [OnDisplayError](error: unknown, display: Display): void;
 }
 
 // ------------------------------------------------------------

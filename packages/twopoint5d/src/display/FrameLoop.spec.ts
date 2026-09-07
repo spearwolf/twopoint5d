@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {FrameLoop} from './FrameLoop.js';
+import {FrameLoop, OnRAF} from './FrameLoop.js';
 
 interface FrameProps {
   now: number;
@@ -286,6 +286,13 @@ describe('FrameLoop', () => {
     expect(loop.subscriptionCount).toBe(0);
   });
 
+  it('carries its event keys under a namespaced symbol', () => {
+    // Symbol.for() reaches into the realm-wide registry: a key such as 'onFrame' is handed to
+    // every other library that asks for the same name, and their listeners meet in one channel
+    expect(FrameLoop.OnFrame).toBe(Symbol.for('twopoint5d:FrameLoop.OnFrame'));
+    expect(OnRAF).toBe(Symbol.for('twopoint5d:FrameLoop.OnRAF'));
+  });
+
   describe('resetRAF()', () => {
     afterEach(() => {
       // the module state must not travel from one case into the next; the globals go last,
@@ -470,6 +477,36 @@ describe('FrameLoop', () => {
 
       expect(events, 'the second window').toHaveLength(62);
       expect(events[61]!.measuredFps, 'the sample after the pause').toBe(60);
+    });
+
+    it('measures the rate after a pause without the samples from before it', () => {
+      const VSYNC_60 = 1000 / 60;
+      const VSYNC_30 = 1000 / 30;
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {events, target} = subscribe(loop);
+
+      // ten full windows at 60Hz, so the fps collection is filled to its limit: only a full
+      // collection is averaged, and only then does a stale sample show up in the result
+      const anchorAt = 1000;
+      for (let i = 0; i <= 300; i++) {
+        renderer.tick(anchorAt + i * VSYNC_60);
+      }
+
+      expect(events[300]!.measuredFps, 'the rate before the pause').toBe(60);
+
+      loop.stop(target);
+
+      // five seconds in which nobody asks for a frame, and a different rate afterwards
+      const resumeAt = anchorAt + 300 * VSYNC_60 + 5000;
+
+      loop.start(target);
+
+      for (let i = 1; i <= 31; i++) {
+        renderer.tick(resumeAt + i * VSYNC_30);
+      }
+
+      expect(events.at(-1)!.measuredFps, 'the first sample after the pause').toBe(30);
     });
   });
 });

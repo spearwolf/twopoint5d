@@ -62,6 +62,18 @@ export interface PanControl2DOptions {
   cursorStylesTarget?: HTMLElement;
 
   /**
+   * The element pointer coordinates are measured against: the control subtracts the
+   * `getBoundingClientRect()` of this element from every pointer position. Default is the
+   * `cursorStylesTarget`, and with that `document.body`.
+   *
+   * What matters for a pan is that the rectangle stays the same throughout a drag — the pan is
+   * a difference of two measurements, and a fixed offset cancels out. Name the canvas here when
+   * it sits in a shadow root: the browser retargets `event.target` onto the shadow host there,
+   * and a canvas is not its host.
+   */
+  coordsTarget?: HTMLElement;
+
+  /**
    * The root the cursor style rule is installed in. Default is `document.head`.
    *
    * A rule only reaches the elements of the root it sits in, so a control whose
@@ -125,6 +137,14 @@ export class PanControl2D extends InputControlBase {
   mouseButton: number;
   keyCodes: [number, number, number, number];
 
+  /**
+   * The element pointer coordinates are measured against. Can be swapped at runtime; the next
+   * pointer event is measured against the new one.
+   *
+   * @see {@link PanControl2DOptions.coordsTarget}
+   */
+  coordsTarget?: HTMLElement;
+
   #pointerDisabled = false;
   #keyboardDisabled = false;
 
@@ -142,6 +162,7 @@ export class PanControl2D extends InputControlBase {
 
     this.cursorPanStyle = readOption(options, 'cursorPanStyle', 'none');
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
+    this.coordsTarget = readOption(options, 'coordsTarget', this.#cursorStylesTarget);
 
     this.mouseButton = readOption(options, 'mouseButton', 1);
     this.keyCodes = readOption(options, 'keyCodes', [87, 83, 65, 68]);
@@ -219,6 +240,10 @@ export class PanControl2D extends InputControlBase {
       this.removeEventListener(document, POINTERDOWN, this.#onPointerDown);
       this.removeEventListener(document, POINTERUP, this.#onPointerUp);
       this.removeEventListener(document, POINTERMOVE, this.#onPointerMove);
+
+      // a pan that nobody may deliver is dropped here, not kept: without this it waits for the
+      // next update() after the pointer is switched back on and lands in one jump
+      this.#pointersDown.clear();
     }
   }
 
@@ -242,14 +267,14 @@ export class PanControl2D extends InputControlBase {
       this.panView.y -= panY / pixelRatio;
     }
 
-    if (!this.#keyboardDisabled || !this.#pointerDisabled) {
-      if (this.#isFirstPanViewUpdate || prevX !== this.panView.x || prevY !== this.panView.y) {
-        emit(this, 'update', {x: this.panView.x, y: this.panView.y});
-      }
+    // the movement decides, not the input source: the speed fields move the view whether a
+    // pointer and a keyboard reach this control or not
+    if (this.#isFirstPanViewUpdate || prevX !== this.panView.x || prevY !== this.panView.y) {
+      emit(this, 'update', {x: this.panView.x, y: this.panView.y});
+    }
 
-      if (this.#isFirstPanViewUpdate) {
-        this.#isFirstPanViewUpdate = false;
-      }
+    if (this.#isFirstPanViewUpdate) {
+      this.#isFirstPanViewUpdate = false;
     }
   }
 
@@ -311,7 +336,16 @@ export class PanControl2D extends InputControlBase {
   };
 
   #restoreCursorStyle() {
+    // Only YES has a cursor to restore: that is the one state in which the class went onto the
+    // target and a hideCursor went out. From MAYBE the state is taken back and nothing else
+    // happens, and from NO there is nothing to take back — every pointer move over the page
+    // passes here, and each one would otherwise report a restore of a cursor nobody hid.
+    const wasHidden = this.#hideCursorState === HideCursorState.YES;
+
     this.#hideCursorState = HideCursorState.NO;
+
+    if (!wasHidden) return;
+
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
@@ -346,7 +380,14 @@ export class PanControl2D extends InputControlBase {
 
   #toRelativeCoords(event: PointerEvent): {x: number; y: number} {
     const {clientX, clientY} = event;
-    const {left, top} = (event.target as HTMLElement).getBoundingClientRect();
+
+    // without a target the client coordinates are the reference, and they are as stable a one
+    // as any rectangle: the pan is a difference, and the offset cancels out either way
+    if (this.coordsTarget == null) {
+      return {x: clientX, y: clientY};
+    }
+
+    const {left, top} = this.coordsTarget.getBoundingClientRect();
 
     return {
       x: clientX - left,

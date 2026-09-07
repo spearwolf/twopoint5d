@@ -8,8 +8,8 @@ const KEY_SOUTH = 83;
 const KEY_WEST = 65;
 const KEY_EAST = 68;
 
-// the control listens on `document`; a pointer event is dispatched on `document.body` so that
-// `event.target` is an element the class can measure against
+// the control listens on `document`, so a pointer event dispatched on `document.body` bubbles up
+// to it
 function pointer(type, {x = 0, y = 0, buttons = 1} = {}) {
   document.body.dispatchEvent(
     new PointerEvent(type, {

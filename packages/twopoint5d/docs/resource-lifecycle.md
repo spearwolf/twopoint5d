@@ -165,6 +165,10 @@ dispose(): void {
   off(this);
   this.renderer?.dispose();
   delete this.renderer;
+  // after renderer.dispose(), so the renderer still finds its canvas while it releases the
+  // context; removing the container takes the canvas inside it along
+  this.#ownContainer?.remove();
+  this.#ownContainer = undefined;
 }
 ```
 
