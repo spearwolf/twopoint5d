@@ -36,6 +36,14 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', {vars: 'all', args: 'after-used', argsIgnorePattern: '^_'}],
       '@typescript-eslint/no-unsafe-declaration-merging': 0,
       '@typescript-eslint/no-this-alias': 0,
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: ':matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration)[source.value=/\\.ts$/]',
+          message:
+            'Relative imports carry the .js suffix (NodeNext) — a .ts suffix is written unchanged into the published .d.ts.',
+        },
+      ],
     },
   },
   {

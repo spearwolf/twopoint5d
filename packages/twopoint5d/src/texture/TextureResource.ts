@@ -9,7 +9,7 @@ import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
-import type {FrameBasedAnimationsData, FrameBasedAnimationsDataByTileCount, FrameBasedAnimationsDataMap} from './types.ts';
+import type {FrameBasedAnimationsData, FrameBasedAnimationsDataMap} from './types.js';
 
 /**
  * Extracts timing options from frame-based animation data.
@@ -24,6 +24,19 @@ const getTimingOptions = (data: FrameBasedAnimationsData): AnimationTimingOption
     return {duration: data.duration};
   }
   throw new Error('Either duration or frameRate must be provided in animation data');
+};
+
+type FrameBasedAnimationsDataShape = 'frameNameQuery' | 'tileIds' | 'firstTileId';
+
+/**
+ * Which of the three forms of animation data this entry carries, or `undefined` for an
+ * entry that carries none of them.
+ */
+const animationDataShape = (data: FrameBasedAnimationsData): FrameBasedAnimationsDataShape | undefined => {
+  if ('frameNameQuery' in data) return 'frameNameQuery';
+  if ('tileIds' in data) return 'tileIds';
+  if ('firstTileId' in data) return 'firstTileId';
+  return undefined;
 };
 
 export type TextureResourceType = 'image' | 'atlas' | 'tileset';
@@ -50,7 +63,9 @@ export const TextureResourceSubtypes = {
  * The per-subtype events (`imageCoords`, `atlas`, `tileSet`, `texture`,
  * `frameBasedAnimations`) are retained — late subscribers see the latest value.
  *
- * `error` carries `{source: 'image'|'atlas', url, error}`.
+ * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, and
+ * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry whose
+ * data does not fit this kind of resource — that entry is skipped.
  * `dispose` fires once at the start of `dispose()`.
  */
 export const TextureResourceEvents = {
@@ -70,42 +85,92 @@ const cmpTexClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionCl
   return `${a?.join() ?? ''}` === `${b?.join() ?? ''}`;
 };
 
-const cmpTexCoords = (a: TextureCoords | undefined, b: TextureCoords | undefined): boolean => {
-  if (a === b) {
-    return true;
+// Compares every own enumerable field of both objects, so a field added to TextureCoords
+// or TileSetOptions is part of the comparison the day it appears. The two key sets are
+// unioned because an optional field that was never assigned is not an own key under
+// `useDefineForClassFields: false` — `TextureCoords#parent` is exactly that case.
+const cmpShallow = <T extends object>(a: T | undefined, b: T | undefined): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if ((a as Record<string, unknown>)[key] !== (b as Record<string, unknown>)[key]) return false;
   }
-  if (a && b) {
-    return (
-      a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height && a.flip === b.flip && a.parent === b.parent
-    );
-  }
-  return false;
-};
-
-const cmpTileSetOptions = (a: TileSetOptions | undefined, b: TileSetOptions | undefined): boolean => {
-  if (a === b) {
-    return true;
-  }
-  if (a && b) {
-    return (
-      a.tileWidth === b.tileWidth &&
-      a.tileHeight === b.tileHeight &&
-      a.margin === b.margin &&
-      a.spacing === b.spacing &&
-      a.padding === b.padding &&
-      a.tileCount === b.tileCount &&
-      a.firstId === b.firstId
-    );
-  }
-  return false;
+  return true;
 };
 
 const OnDispose = TextureResourceEvents.Dispose;
 const OnError = TextureResourceEvents.Error;
 
+// Everything derived from an image runs before the bridges that carry the values out as
+// events, which have no priority and sit at 0. The image effect writes the coordinates and
+// the texture in one batch, so by the time a subscriber is called for the texture, the
+// atlas or the tile set built from the same image is on the resource. Without a priority
+// the flush would fall back to the order the effects were queued in — the order of three
+// lines inside one callback, which no one reading them would take for a promise.
+const DERIVED_FROM_IMAGE_PRIORITY = 100;
+
+// An animation entry that carries the data of another kind of resource is skipped, and
+// this is what says so: a tile range on an atlas, a frame name query on a tile set, or an
+// entry that names no frames at all.
+const wrongAnimationDataError = (resource: TextureResource, animation: string, shape: string | undefined) => ({
+  source: 'frameBasedAnimations',
+  id: resource.id,
+  animation,
+  error: new Error(
+    `[TextureResource] animation "${animation}" of resource "${resource.id}" carries ${shape ?? 'no known'} data, which a "${resource.type}" resource cannot use`,
+  ),
+});
+
+// Only the shape of resource a property belongs to carries the signal behind it. Without
+// this the write would go nowhere and the getter next to it would keep answering
+// `undefined`, leaving the caller with no sign that the value never arrived.
+const wrongShapeError = (resource: TextureResource, property: string): TypeError => {
+  const article = /^[aeiou]/.test(resource.type) ? 'an' : 'a';
+  return new TypeError(`TextureResource "${resource.id}" is ${article} "${resource.type}" resource and has no "${property}"`);
+};
+
+// An atlas resource takes the name of its image from its json. Writing that name from
+// outside would put the texture on one file while the atlas keeps describing another, and
+// nothing would ever bring the two back together: the json still names what it named, so
+// the atlas effect finds no reason to publish again and no error is raised either.
+const derivedImageUrlError = (resource: TextureResource): TypeError =>
+  new TypeError(
+    `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead`,
+  );
+
+interface TextureImageSource {
+  acquire(url: string): Promise<HTMLImageElement>;
+  release(url: string): void;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureResource extends EventizedObject {}
 
+/**
+ * A single entry of a `TextureStore`: an image, a tile set or a texture atlas,
+ * turned into a `Texture` and whatever else its shape brings with it.
+ *
+ * The properties fall into two groups.
+ *
+ * **Input** — write these to say what the resource is made of: `imageUrl`, `atlasUrl`,
+ * `atlasJson`, `overrideImageUrl`, `tileSetOptions`, `frameBasedAnimationsData`,
+ * `textureClasses`, `textureFactory` and `renderer`. `atlasJson` is both: an atlas
+ * resource with an `atlasUrl` fetches the JSON and writes it here itself.
+ *
+ * **Output** — read-only, produced by the effects {@link TextureResource.load} registers:
+ * `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations`. Each of them is
+ * also an event of the same name, retained, so a subscriber that arrives late still sees
+ * the current value.
+ *
+ * `atlasUrl`, `atlasJson`, `overrideImageUrl` and `tileSetOptions` belong to one shape of
+ * resource each. Writing one on a resource of another shape throws a `TypeError`.
+ *
+ * `imageUrl` changes sides with the shape: an image and a tile set are told which file to
+ * load, an atlas takes that name from `overrideImageUrl ?? atlasJson.meta.image` and reads
+ * as output. Writing it on an atlas resource throws a `TypeError` — `overrideImageUrl` is
+ * the way to send one to another image, and it keeps the atlas and the texture together.
+ */
 export class TextureResource {
   static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): TextureResource {
     const resource = new TextureResource(id, 'image');
@@ -130,7 +195,7 @@ export class TextureResource {
     batch(() => {
       resource.imageUrl = imageUrl;
       resource.#tileSetOptions = createSignal<TileSetOptions | undefined>(tileSetOptions, {
-        compare: cmpTileSetOptions,
+        compare: cmpShallow,
         attach: resource,
       });
       resource.#tileSet = createSignal(undefined, {attach: resource});
@@ -175,7 +240,15 @@ export class TextureResource {
 
   #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
   #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
-  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpTexCoords, attach: this});
+  #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpShallow, attach: this});
+
+  // the image url the published `imageCoords` and `texture` were built from, written in the
+  // same batch as both of them. The atlas effect holds it against the image its json names,
+  // so an atlas and the texture beside it never describe two different files. A signal and
+  // not a plain field, because it is what tells that effect to try again: two images of the
+  // same size leave `imageCoords` unchanged, and a run the guard skipped would never be
+  // taken up again
+  #imageUrlOfCoords = createSignal<string | undefined>(undefined, {attach: this});
 
   #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
   #texture = createSignal<Texture | undefined>(undefined, {attach: this});
@@ -186,15 +259,20 @@ export class TextureResource {
 
   refCount: number = 0;
 
-  // Every getter of this class answers `undefined` once dispose() has run; the setters
-  // need no guard of their own. Once dispose() has returned, SignalGroup.delete(this) has
-  // taken the change bridges and the effects down, so nothing reads what a write would
-  // still put into a signal.
+  // Every getter of this class answers `undefined` once dispose() has run. A setter needs
+  // no guard against a write that arrives too late: once dispose() has returned,
+  // SignalGroup.delete(this) has taken the change bridges and the effects down, so nothing
+  // reads what such a write would still put into a signal. The setters that are tied to one
+  // shape of resource check the flag all the same — they throw on the wrong shape, and a
+  // disposed resource has to stay silent.
   get imageUrl(): string | undefined {
     return this.#disposed ? undefined : this.#imageUrl.value;
   }
 
   set imageUrl(val: string | undefined) {
+    if (this.#disposed) return;
+    // input on an image and a tile set, output on an atlas: there the atlas effect derives it
+    if (this.type === 'atlas') throw derivedImageUrlError(this);
     this.#imageUrl.set(val);
   }
 
@@ -202,16 +280,14 @@ export class TextureResource {
     return this.#disposed ? undefined : this.#imageCoords.value;
   }
 
-  set imageCoords(val: TextureCoords | undefined) {
-    this.#imageCoords.set(val);
-  }
-
   get atlasUrl(): string | undefined {
     return this.#disposed ? undefined : this.#atlasUrl?.value;
   }
 
   set atlasUrl(value: string | undefined) {
-    this.#atlasUrl?.set(value);
+    if (this.#disposed) return;
+    if (!this.#atlasUrl) throw wrongShapeError(this, 'atlasUrl');
+    this.#atlasUrl.set(value);
   }
 
   get atlasJson(): TexturePackerJsonData | undefined {
@@ -219,7 +295,9 @@ export class TextureResource {
   }
 
   set atlasJson(value: TexturePackerJsonData | undefined) {
-    this.#atlasJson?.set(value);
+    if (this.#disposed) return;
+    if (!this.#atlasJson) throw wrongShapeError(this, 'atlasJson');
+    this.#atlasJson.set(value);
   }
 
   get overrideImageUrl(): string | undefined {
@@ -227,15 +305,13 @@ export class TextureResource {
   }
 
   set overrideImageUrl(value: string | undefined) {
-    this.#overrideImageUrl?.set(value);
+    if (this.#disposed) return;
+    if (!this.#overrideImageUrl) throw wrongShapeError(this, 'overrideImageUrl');
+    this.#overrideImageUrl.set(value);
   }
 
   get atlas(): TextureAtlas | undefined {
     return this.#disposed ? undefined : this.#atlas?.value;
-  }
-
-  set atlas(value: TextureAtlas | undefined) {
-    this.#atlas?.set(value);
   }
 
   get tileSetOptions(): TileSetOptions | undefined {
@@ -243,23 +319,17 @@ export class TextureResource {
   }
 
   set tileSetOptions(value: TileSetOptions | undefined) {
-    this.#tileSetOptions?.set(value);
+    if (this.#disposed) return;
+    if (!this.#tileSetOptions) throw wrongShapeError(this, 'tileSetOptions');
+    this.#tileSetOptions.set(value);
   }
 
   get tileSet(): TileSet | undefined {
     return this.#disposed ? undefined : this.#tileSet?.value;
   }
 
-  set tileSet(value: TileSet | undefined) {
-    this.#tileSet?.set(value);
-  }
-
   get frameBasedAnimations(): FrameBasedAnimations | undefined {
     return this.#disposed ? undefined : this.#frameBasedAnimations.value;
-  }
-
-  set frameBasedAnimations(value: FrameBasedAnimations | undefined) {
-    this.#frameBasedAnimations.set(value);
   }
 
   get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
@@ -290,7 +360,7 @@ export class TextureResource {
   }
 
   /**
-   * The texture of this resource, or `undefined` while none has been built or assigned.
+   * The texture this resource built from its image, or `undefined` while there is none.
    *
    * Answers `undefined` once {@link TextureResource.dispose} has run.
    */
@@ -299,13 +369,16 @@ export class TextureResource {
   }
 
   /**
-   * A texture assigned here belongs to the caller: this resource publishes it, but never
-   * releases it — neither when the next texture replaces it nor in
-   * {@link TextureResource.dispose}.
+   * How this resource fetches its image. The store it belongs to injects its shared,
+   * de-duplicating loader here; a resource on its own falls back to a plain `ImageLoader`.
+   *
+   * `acquire()` and `release()` are paired: every run of the image effect acquires once and
+   * releases in its cleanup, which is what lets the store drop a cached image once no
+   * resource wants it any more.
+   *
+   * @internal
    */
-  set texture(value: Texture | undefined) {
-    this.#texture.set(value);
-  }
+  imageLoader?: TextureImageSource;
 
   get renderer(): WebGPURenderer | undefined {
     return this.#disposed ? undefined : this.#renderer.value;
@@ -315,8 +388,9 @@ export class TextureResource {
     this.#renderer.set(value);
   }
 
-  // the texture this resource built for itself and therefore owns; a texture assigned
-  // through the public setter never lands here and is never released by this class
+  // the texture that is currently published on the signal, and therefore the one this
+  // resource owns: every texture that reaches the signal was built here, and is released
+  // here once its successor has taken its place
   #ownTexture?: Texture;
 
   #load = false;
@@ -334,14 +408,14 @@ export class TextureResource {
   /**
    * Release this resource.
    *
-   * Disposes the texture this resource built for itself. A texture that came in through
-   * the {@link TextureResource.texture} setter belongs to the caller and is left alone,
-   * as are the atlas, the tile set and the texture factory.
+   * Disposes the texture of this resource — it was built here, so it is released here.
+   * The atlas, the tile set and the texture factory are left alone.
    *
    * Afterwards every getter of this resource answers `undefined`, while
    * {@link TextureResource.id} and {@link TextureResource.type} still say which resource
    * this was. A write to any setter, a {@link TextureResource.load} and a second
-   * `dispose()` do nothing.
+   * `dispose()` do nothing — a setter that would throw on the shape of this resource
+   * stays silent as well.
    */
   dispose() {
     if (this.#disposed) return;
@@ -366,7 +440,11 @@ export class TextureResource {
 
   /**
    * Register the effects that turn the data of this resource into an atlas, a tile set
-   * and a texture. Calling it more than once registers them once.
+   * and a texture, and return `this`. Calling it more than once registers them once.
+   *
+   * It fetches nothing by itself: the effects do that, once the resource has what they
+   * read. The two `TextureStore` methods of the same name do the fetching — the instance
+   * method into an existing store, the static one into a store it builds for the attempt.
    *
    * On a disposed resource this does nothing — no effect and no signal is created — and
    * returns `this`.
@@ -414,15 +492,22 @@ export class TextureResource {
           let aborted = false;
           let texture: Texture | undefined;
 
-          new ImageLoader()
-            .loadAsync(url)
+          // read once and used for both halves of the pair, so a field that is reassigned
+          // between the two cannot make this run release what it never acquired
+          const source = this.imageLoader;
+
+          (source ? source.acquire(url) : new ImageLoader().loadAsync(url))
             .then((image) => {
               if (aborted) return;
               texture = factory.create(image, ...(classes ?? []));
               texture.name = this.id;
+              // one batch: the three values reach their effects together, and the higher
+              // priority of everything derived from the image — the atlas among it — puts
+              // those runs ahead of the bridge that carries the texture out
               batch(() => {
-                this.imageCoords = new TextureCoords(0, 0, image.width, image.height);
-                this.texture = texture;
+                this.#imageUrlOfCoords.set(url);
+                this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
+                this.#texture.set(texture);
               });
               // the predecessor stayed alive while it was still the published value; now that
               // the successor is on the signal, no reader can reach the old one any more
@@ -440,6 +525,7 @@ export class TextureResource {
             // that replaces it, or by dispose() — freeing it here would leave the signal
             // pointing at a texture that is already gone
             aborted = true;
+            source?.release(url);
           };
         },
         {attach: this},
@@ -449,31 +535,41 @@ export class TextureResource {
         // A tileset resource creates these signals in the same batch() that received the value the guard just read.
         const tileSetOptionsSignal = this.#tileSetOptions!;
         const tileSetSignal = this.#tileSet!;
+        const atlasSignal = this.#atlas!;
 
         createEffect(
           () => {
             if (this.imageCoords && this.tileSetOptions) {
-              this.tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
-              this.atlas = this.tileSet.atlas;
+              const tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
+              tileSetSignal.set(tileSet);
+              atlasSignal.set(tileSet.atlas);
             }
           },
           [this.#imageCoords, tileSetOptionsSignal],
-          {attach: this},
+          {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
         );
 
         createEffect(
           () => {
-            if (this.tileSet && this.frameBasedAnimationsData) {
-              this.frameBasedAnimations = new FrameBasedAnimations();
+            const tileSet = this.tileSet;
+            if (tileSet && this.frameBasedAnimationsData) {
+              // published as one finished object: a subscriber that reads it in the change
+              // callback would otherwise see an animation set that is still filling up
+              const animations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
+                const shape = animationDataShape(data);
+                if (shape !== 'tileIds' && shape !== 'firstTileId') {
+                  emit(this, OnError, wrongAnimationDataError(this, name, shape));
+                  continue;
+                }
                 const timing = getTimingOptions(data);
                 if ('tileIds' in data) {
-                  this.frameBasedAnimations.add(name, timing, this.tileSet, data.tileIds);
-                } else {
-                  const _data = data as FrameBasedAnimationsDataByTileCount;
-                  this.frameBasedAnimations.add(name, timing, this.tileSet, _data.firstTileId, _data.tileCount);
+                  animations.add(name, timing, tileSet, data.tileIds);
+                } else if ('firstTileId' in data) {
+                  animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
                 }
               }
+              this.#frameBasedAnimations.set(animations);
             }
           },
           [tileSetSignal, this.#frameBasedAnimationsData],
@@ -497,6 +593,18 @@ export class TextureResource {
             (async () => {
               try {
                 const response = await fetch(atlasUrl, {signal: ac.signal});
+                if (aborted) return;
+                if (!response.ok) {
+                  // an error response with a JSON body would otherwise pass for an atlas, and
+                  // the first read of `meta.image` would throw inside an effect
+                  emit(this, OnError, {
+                    source: 'atlas',
+                    url: atlasUrl,
+                    status: response.status,
+                    error: new Error(`[TextureResource] fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`),
+                  });
+                  return;
+                }
                 const atlasJson = await response.json();
                 if (aborted) return;
                 this.atlasJson = atlasJson;
@@ -517,7 +625,9 @@ export class TextureResource {
         createEffect(
           () => {
             if (this.atlasJson) {
-              this.imageUrl = this.overrideImageUrl ?? this.atlasJson.meta.image;
+              // straight onto the signal: on this shape of resource `imageUrl` is what the
+              // json says, and the setter that guards that turns a write away
+              this.#imageUrl.set(this.overrideImageUrl ?? this.atlasJson.meta.image);
             }
           },
           [atlasJsonSignal, overrideImageUrlSignal],
@@ -526,25 +636,38 @@ export class TextureResource {
 
         createEffect(
           () => {
-            if (this.atlasJson && this.imageCoords) {
-              const [atlas] = TexturePackerJson.parse(this.atlasJson, this.imageCoords);
-              this.atlas = atlas;
+            const atlasJson = this.atlasJson;
+            const imageCoords = this.imageCoords;
+            if (atlasJson && imageCoords) {
+              // an atlas describes the image its json names. While the image effect is still
+              // on its way to that image, the atlas of the one before stays published — it is
+              // not cleared, because a subscriber would get an `undefined` where the event
+              // type promises a TextureAtlas. The run this skips is taken up again as soon as
+              // the image arrives: that is what `#imageUrlOfCoords` sits in the dependencies
+              // for
+              if (this.#imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
+              const [atlas] = TexturePackerJson.parse(atlasJson, imageCoords);
+              atlasSignal.set(atlas);
             }
           },
-          [atlasJsonSignal, this.#imageCoords],
-          {attach: this},
+          [atlasJsonSignal, this.#imageCoords, this.#imageUrlOfCoords],
+          {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
         );
 
         createEffect(
           () => {
-            if (this.atlas && this.frameBasedAnimationsData) {
-              this.frameBasedAnimations = new FrameBasedAnimations();
+            const atlas = this.atlas;
+            if (atlas && this.frameBasedAnimationsData) {
+              const animations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
                 if ('frameNameQuery' in data) {
                   const timing = getTimingOptions(data);
-                  this.frameBasedAnimations.add(name, timing, this.atlas, data.frameNameQuery);
+                  animations.add(name, timing, atlas, data.frameNameQuery);
+                } else {
+                  emit(this, OnError, wrongAnimationDataError(this, name, animationDataShape(data)));
                 }
               }
+              this.#frameBasedAnimations.set(animations);
             }
           },
           [atlasSignal, this.#frameBasedAnimationsData],

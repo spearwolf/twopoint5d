@@ -80,9 +80,9 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     const store = new TextureStore(renderer);
 
-    on(store, 'error', ({source, url, error}) => {
+    on(store, 'error', ({source, url, id, error}) => {
       // eslint-disable-next-line no-console
-      console.error(`[animated-sprites] TextureStore ${source} failed for ${url}`, error);
+      console.error(`[animated-sprites] TextureStore ${source} failed for ${url ?? id}`, error);
     });
 
     store.load(assetsUrl('nobingers.json'));

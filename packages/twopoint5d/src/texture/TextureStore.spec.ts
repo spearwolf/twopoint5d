@@ -1,4 +1,4 @@
-import {getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
+import {emit, getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, type WebGPURenderer} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
@@ -516,6 +516,97 @@ describe('TextureStore', () => {
         fetchMock.mockRestore();
       }
     });
+
+    test("TextureStore.load() emits 'error' on a response that answers with a status", async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}', {status: 404}));
+      try {
+        const store = new TextureStore();
+        const errorHandler = vi.fn();
+        const readyHandler = vi.fn();
+        on(store, 'error', errorHandler);
+        on(store, 'ready', readyHandler);
+        store.load('http://example.test/missing.json');
+        await flushMicrotasks();
+        await flushMicrotasks();
+        expect(errorHandler).toHaveBeenCalledTimes(1);
+        const event = errorHandler.mock.calls[0]![0];
+        expect(event.source).toBe('fetch');
+        expect(event.status).toBe(404);
+        expect(readyHandler).not.toHaveBeenCalled();
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+  });
+
+  describe('load() answers as a promise', () => {
+    test('resolves with the store once the attempt is over', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+      try {
+        const store = new TextureStore();
+
+        const resolved = await store.load('http://example.test/data.json');
+
+        expect(resolved).toBe(store);
+        expect(await store.whenResource('a')).toBeInstanceOf(TextureResource);
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+
+    test('an attempt that failed resolves as well, and the reason arrives as an error event', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
+      try {
+        const store = new TextureStore();
+        const errorHandler = vi.fn();
+        on(store, 'error', errorHandler);
+
+        const settled = await settleWithin(store.load('http://example.test/bad.json'));
+
+        expect(settled).toBe(store);
+        expect(errorHandler).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+
+    test('on a disposed store it resolves right away and fetches nothing', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+      try {
+        const store = new TextureStore();
+        store.dispose();
+
+        expect(await store.load('http://example.test/data.json')).toBe(store);
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+  });
+
+  describe('a subtype without a value is not delivered', () => {
+    test('the single-type path keeps an undefined away from the callback', async () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      const resource = await store.whenResource('a');
+      const calls: unknown[] = [];
+      store.on('a', 'texture', (texture) => {
+        calls.push(texture);
+      });
+
+      // what a signal that is cleared and notifies leaves on the event
+      emit(resource, 'texture', undefined);
+
+      expect(calls).toEqual([]);
+
+      const texture = {name: 'a'};
+      emit(resource, 'texture', texture);
+
+      expect(calls).toEqual([texture]);
+
+      store.dispose();
+    });
   });
 
   describe('whenResource() / abortable get()', () => {
@@ -765,6 +856,46 @@ describe('TextureStore', () => {
     // store whether or not the promise cleaned up after itself, so a count taken around it
     // says nothing about this teardown. The exit itself is covered by "rejects a get()
     // promise that is still pending" in the dispose() block.
+  });
+
+  describe('parse() validates before it writes', () => {
+    test('an item that names no source is reported', () => {
+      const store = new TextureStore();
+      const errors: Array<{source: string; id: string; error: Error}> = [];
+      on(store, 'error', (payload: {source: string; id: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      store.parse({defaultTextureClasses: [], items: {ghost: {}}});
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('parse');
+      expect(errors[0]!.id).toBe('ghost');
+    });
+
+    test('a type conflict leaves every resource of the run untouched', async () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}, b: {imageUrl: 'b.png'}}});
+
+      const a = await store.whenResource('a');
+
+      let readyCount = 0;
+      on(store, 'ready', () => {
+        readyCount++;
+      });
+      // the ready event is retained, so subscribing replays the parse that has already run
+      readyCount = 0;
+
+      expect(() =>
+        store.parse({
+          defaultTextureClasses: [],
+          items: {a: {imageUrl: 'a2.png'}, b: {tileSet: {tileWidth: 8, tileHeight: 8}}},
+        }),
+      ).toThrow();
+
+      expect(a.imageUrl).toBe('a.png');
+      expect(readyCount).toBe(0);
+    });
   });
 
   describe('parse() update path', () => {
@@ -1020,6 +1151,239 @@ describe('TextureStore', () => {
       expect(resource.texture).toBeUndefined();
 
       loadSpy.mockRestore();
+    });
+  });
+
+  describe('an image is fetched once for every resource that names it', () => {
+    const stubImage = () => ({width: 4, height: 4}) as unknown as HTMLImageElement;
+
+    test('two resources that name the same image share one fetch and keep their own texture', async () => {
+      const loadSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
+
+      const store = new TextureStore(rendererStub);
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'shared.png'}, b: {imageUrl: 'shared.png'}}});
+
+      const textures: unknown[] = [];
+      store.on('a', 'texture', (texture) => {
+        textures.push(texture);
+      });
+      store.on('b', 'texture', (texture) => {
+        textures.push(texture);
+      });
+
+      await flushMicrotasks();
+
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+      expect(textures).toHaveLength(2);
+      expect(textures[0]).not.toBe(textures[1]);
+
+      store.dispose();
+      loadSpy.mockRestore();
+    });
+
+    test('the image is fetched again once no resource wants it any more', async () => {
+      const loadSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
+
+      const store = new TextureStore(rendererStub);
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'shared.png'}, b: {imageUrl: 'shared.png'}}});
+
+      const unsubscribeA = store.on('a', 'texture', () => {});
+      const unsubscribeB = store.on('b', 'texture', () => {});
+      await flushMicrotasks();
+
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+
+      unsubscribeA();
+      unsubscribeB();
+      expect(store.clearUnused()).toBe(2);
+
+      store.parse({defaultTextureClasses: [], items: {c: {imageUrl: 'shared.png'}}});
+      store.on('c', 'texture', () => {});
+      await flushMicrotasks();
+
+      expect(loadSpy).toHaveBeenCalledTimes(2);
+
+      store.dispose();
+      loadSpy.mockRestore();
+    });
+  });
+
+  describe('an atlas and the texture next to it belong to the same image', () => {
+    test('every tuple a subscriber is called with carries an atlas and a texture of one image', async () => {
+      const atlasJson = {
+        frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
+        meta: {image: 'first.png', size: {w: 100, h: 50}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+
+      let resolveFirst!: (img: unknown) => void;
+      let resolveSecond!: (img: unknown) => void;
+      const firstP = new Promise<unknown>((r) => {
+        resolveFirst = r;
+      });
+      const secondP = new Promise<unknown>((r) => {
+        resolveSecond = r;
+      });
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementationOnce(() => firstP as Promise<HTMLImageElement>)
+        .mockImplementationOnce(() => secondP as Promise<HTMLImageElement>);
+
+      // the width of the image the texture was built from is what makes a texture
+      // recognizable here; the atlas carries the same width through its frame coordinates
+      const factory = {
+        create(img: {width: number; height: number}) {
+          return {width: img.width, name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+
+      const resource = await store.whenResource('a');
+      resource.textureFactory = factory as never;
+
+      const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
+      store.on('a', ['atlas', 'texture'], ([atlas, texture]) => {
+        tuples.push({
+          atlasWidth: atlas.frame('f0')?.coords.root?.width,
+          textureWidth: (texture as unknown as {width: number}).width,
+        });
+      });
+
+      await flushMicrotasks();
+      resolveFirst({width: 100, height: 50});
+      await flushMicrotasks();
+
+      resource.overrideImageUrl = 'second.png';
+      resolveSecond({width: 200, height: 100});
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(tuples.length).toBeGreaterThan(0);
+      for (const tuple of tuples) {
+        expect(tuple.atlasWidth).toBe(tuple.textureWidth);
+      }
+      // and the pair the subscriber ends up with is the second image
+      expect(tuples.at(-1)).toEqual({atlasWidth: 200, textureWidth: 200});
+
+      store.dispose();
+      loadSpy.mockRestore();
+      fetchMock.mockRestore();
+    });
+
+    test('an atlas resource refuses to be pointed at another image directly', async () => {
+      const atlasJson = {
+        frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
+        meta: {image: 'first.png', size: {w: 100, h: 50}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+
+      const sizeOfImage: Record<string, {width: number; height: number}> = {
+        'first.png': {width: 100, height: 50},
+        'other.png': {width: 200, height: 80},
+      };
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({...sizeOfImage[url]}) as unknown as HTMLImageElement);
+
+      const factory = {
+        create(img: {width: number}) {
+          return {width: img.width, name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+
+      const resource = await store.whenResource('a');
+      resource.textureFactory = factory as never;
+
+      const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
+      store.on('a', ['atlas', 'texture'], ([atlas, texture]) => {
+        tuples.push({
+          atlasWidth: atlas.frame('f0')?.coords.root?.width,
+          textureWidth: (texture as unknown as {width: number}).width,
+        });
+      });
+
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      // the image of an atlas resource is the one its json names — naming another one here
+      // would leave the atlas describing a file the texture is not made of, and no later
+      // json would ever bring the two back together
+      expect(() => {
+        resource.imageUrl = 'other.png';
+      }).toThrow(TypeError);
+
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(tuples.length).toBeGreaterThan(0);
+      for (const tuple of tuples) {
+        expect(tuple.atlasWidth).toBe(tuple.textureWidth);
+      }
+      expect(tuples.at(-1)).toEqual({atlasWidth: 100, textureWidth: 100});
+
+      store.dispose();
+      loadSpy.mockRestore();
+      fetchMock.mockRestore();
+    });
+
+    test('an atlas that swaps its json for one over another image of the same size follows it', async () => {
+      const atlasesByUrl: Record<string, unknown> = {
+        'a1.json': {frames: {f1: {frame: {x: 0, y: 0, w: 10, h: 10}}}, meta: {image: 'first.png', size: {w: 100, h: 50}}},
+        'a2.json': {frames: {f2: {frame: {x: 0, y: 0, w: 10, h: 10}}}, meta: {image: 'second.png', size: {w: 100, h: 50}}},
+      };
+      // both images measure the same, so the coordinates built from them compare equal and
+      // the frame name is what says which json — and with it which image — an atlas is from
+      const imageOfFrame: Record<string, string> = {f1: 'first.png', f2: 'second.png'};
+
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async (input) => new Response(JSON.stringify(atlasesByUrl[String(input)])));
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({width: 100, height: 50, url}) as unknown as HTMLImageElement);
+
+      const factory = {
+        create(img: {url: string}) {
+          return {image: img.url, name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'a1.json'}}});
+
+      const resource = await store.whenResource('a');
+      resource.textureFactory = factory as never;
+
+      const tuples: Array<{atlasImage: string | undefined; textureImage: string}> = [];
+      store.on('a', ['atlas', 'texture'], ([atlas, texture]) => {
+        const [frameName] = atlas.frameNames();
+        tuples.push({
+          atlasImage: imageOfFrame[String(frameName)],
+          textureImage: (texture as unknown as {image: string}).image,
+        });
+      });
+
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      resource.atlasUrl = 'a2.json';
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(tuples.length).toBeGreaterThan(0);
+      for (const tuple of tuples) {
+        expect(tuple.atlasImage).toBe(tuple.textureImage);
+      }
+      expect(tuples.at(-1)).toEqual({atlasImage: 'second.png', textureImage: 'second.png'});
+
+      store.dispose();
+      loadSpy.mockRestore();
+      fetchMock.mockRestore();
     });
   });
 

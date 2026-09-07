@@ -138,24 +138,18 @@ describe('TextureResource', () => {
     });
 
     // (b) a resource handed in belongs to the caller and is not touched
-    test('does NOT dispose a texture that was handed in', () => {
-      const foreign: StubTexture = {
-        tag: 'foreign',
-        name: '',
-        disposed: false,
-        dispose() {
-          this.disposed = true;
-        },
-      };
-      const textureDispose = sandbox.spy(foreign, 'dispose');
+    test('does NOT dispose the texture factory it was handed', () => {
+      const {factory} = makeTextureFactory();
+      const disposableFactory = Object.assign(factory as object, {dispose() {}});
+      const factoryDispose = sandbox.spy(disposableFactory, 'dispose');
 
       const resource = TextureResource.fromImage('handed-in', 'handed-in.png');
       resource.load();
-      resource.texture = foreign as unknown as Texture;
+      resource.textureFactory = disposableFactory as never;
 
       resource.dispose();
 
-      expect(textureDispose.called).toBe(false);
+      expect(factoryDispose.called).toBe(false);
     });
 
     // (c) every public member behaves after dispose() as its TSDoc says.
@@ -173,7 +167,7 @@ describe('TextureResource', () => {
       expect(resource.imageCoords).toBeUndefined();
       expect(resource.textureFactory).toBeUndefined();
       expect(() => {
-        resource.texture = undefined;
+        resource.imageUrl = undefined;
       }).not.toThrow();
     });
 
@@ -210,6 +204,144 @@ describe('TextureResource', () => {
     // (f) has no subject here: TextureFactory#create() builds a new Texture and keeps no
     // record of it — there is no call that would give one back. The texture a resource
     // materializes is its own, and case (a) covers its release.
+  });
+
+  describe('frame based animations', () => {
+    test('a tileset resource reports animation data it cannot use', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        walk: {duration: 1, frameNameQuery: 'walk.*'},
+      });
+      resource.load();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.id).toBe('tiles');
+      expect(errors[0]!.animation).toBe('walk');
+
+      // an animation that was registered answers with its id; a name that never made it in
+      // has no entry to read one from
+      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow();
+
+      resource.dispose();
+    });
+
+    test('an atlas resource reports animation data it cannot use', async () => {
+      const atlasJson = {
+        frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
+        walk: {duration: 1, tileIds: [1, 2]},
+      });
+      resource.load();
+
+      const errors: Array<{source: string; animation: string}> = [];
+      on(resource, 'error', (payload: {source: string; animation: string}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.animation).toBe('walk');
+      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+  });
+
+  describe('atlas fetch', () => {
+    test('a response that answers with a status is reported instead of parsed', async () => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{"frames":{},"meta":{"image":"x.png","size":{"w":1,"h":1}}}', {status: 500}));
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: Array<{source: string; url: string; status?: number}> = [];
+      on(resource, 'error', (payload: {source: string; url: string; status?: number}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('atlas');
+      expect(errors[0]!.url).toBe('atlas.json');
+      expect(errors[0]!.status).toBe(500);
+      expect(resource.atlasJson).toBeUndefined();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+  });
+
+  describe('setters on the wrong shape', () => {
+    test('an image resource refuses tileSetOptions', () => {
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      expect(() => {
+        resource.tileSetOptions = {tileWidth: 16};
+      }).toThrow(TypeError);
+      expect(resource.tileSetOptions).toBeUndefined();
+
+      resource.dispose();
+    });
+
+    test('a tileset resource refuses an atlasUrl', () => {
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
+
+      expect(() => {
+        resource.atlasUrl = 'x.json';
+      }).toThrow(TypeError);
+      expect(resource.atlasUrl).toBeUndefined();
+
+      resource.dispose();
+    });
+
+    test('an atlas resource refuses a write to imageUrl', () => {
+      const resource = TextureResource.fromAtlas('deco', 'deco.json');
+
+      expect(() => {
+        resource.imageUrl = 'other.png';
+      }).toThrow(TypeError);
+      expect(resource.imageUrl).toBeUndefined();
+
+      resource.dispose();
+    });
+
+    test('a disposed resource swallows the write instead of throwing', () => {
+      const resource = TextureResource.fromImage('gone', 'gone.png');
+      resource.dispose();
+
+      expect(() => {
+        resource.tileSetOptions = {tileWidth: 16};
+      }).not.toThrow();
+    });
   });
 
   describe('load()', () => {

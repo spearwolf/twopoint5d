@@ -22,9 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `InputControlBase#dispose()` and `InputControlBase#isDisposed`: `dispose()` takes every listener the control put on a host back off again — the hosts themselves are handed in and stay the caller's — and puts the control out of service. Afterwards `isDisposed` is `true`, `isActive` is `false`, and the control cannot be brought back: `subscribe()`, a write of `true` to `isActive` and every `addEventListener()` of a subclass do nothing. `destroyAllListeners()` is unaffected and stays what it is, a reset after which a control takes listeners again. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add the `coordsTarget` option and the `PanControl2D#coordsTarget` field: the element every pointer position is measured against, through its `getBoundingClientRect()`. It defaults to the `cursorStylesTarget`, and with that to `document.body`. A canvas inside a shadow root belongs here, because the browser retargets `event.target` onto the shadow host there
 - add the `error` event of `Display`, the `Display#onError()` shorthand and the exported `OnDisplayError` constant: a renderer that does not come up reports the reason through it. The event is retained, so a listener attached after the failure — the normal case, since the constructor returns before the renderer is ready — is told about it as well
+- add a shared image cache to `TextureStore`: resources that name the same `imageUrl` are served by one fetch for as long as at least one of them wants it. What is shared is the image and not the texture — every resource applies its own texture classes and owns the `Texture` it built. The entry goes as the last resource lets go of it, so a resource created afterwards fetches the image again, and a load that failed is not kept either
 
 ### Changed
 
+- `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` of `TextureResource` are read-only. They are what the effects of `TextureResource#load()` produce out of the values that were written to the resource; the class documentation says which properties are input and which are output
+- `TextureResource#atlasUrl`, `#atlasJson`, `#overrideImageUrl` and `#tileSetOptions` belong to one kind of resource each and throw a `TypeError` naming resource, kind and property when they are written on another kind. On a disposed resource a write to any of them still does nothing
+- `TextureResource#imageUrl` is input on an image and a tile set resource and output on an atlas resource, where it follows `overrideImageUrl ?? atlasJson.meta.image`. A write on an atlas resource throws a `TypeError` that names the resource and points at `overrideImageUrl` — the way to send such a resource to another image without leaving its atlas behind on the one before. On a disposed resource the write does nothing, as with every other setter
+- change the return type of `TextureStore#load()` to `Promise<TextureStore>`. It resolves with the store once the attempt is over and never rejects: every failure along the way goes out as an `error` event. Resolving says the attempt is done, not that it worked — `whenReady()` is what answers that
+- `TextureStore#on()` delivers only values that are there: a subtype that is cleared and announces it does not reach the callback, and for several subtypes the callback waits until each of them has a value again. `TextureStore#get()` inherits this and cannot resolve with an `undefined` where its type promises a value. For several subtypes the callback is called once per tuple: the values that belong together change in one go, and a tuple in which every value is the one the last call carried is not delivered again
+- both fetch paths check the status of the response before they parse it: `TextureStore#load()` for the catalog and the atlas effect of `TextureResource` for the atlas json. A response that answers with a status becomes an `error` event carrying the new `status` field — `source: 'fetch'` at the store, `source: 'atlas'` at the resource
+- `TextureStore#parse()` holds every item against what is already there before it writes the first one. Items whose type conflicts with an existing resource are collected and reported in one error that is thrown before anything is written or emitted, so a parse either runs whole or not at all. An item that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl` builds no resource and says so through an `error` event with `source: 'parse'` and its `id`; the static `TextureStore.load()` rejects on it
+- an animation entry of a `TextureResource` whose data does not fit the kind of resource — a frame name query on a tile set, a tile range or tile ids on an atlas, an entry that names no frames at all — is skipped and reported through an `error` event with `{source: 'frameBasedAnimations', id, animation, error}`
+- an atlas and the texture beside it always describe the same image: the atlas effect of a `TextureResource` publishes only when the coordinates it builds on belong to the image its json names, the effects that derive from an image run at a higher priority than the bridges that carry the values out as events, and a subscriber of `TextureStore#on(id, ['atlas', 'texture'], …)` is called with values read off the resource rather than with the last value each event carried. While an atlas resource is on its way to another image the atlas of the one before stays published — it is never cleared, because the event promises a `TextureAtlas`
 - `CameraBasedVisibility` looks for the map plane along nine rays through the view frustum instead of one: its center, the middle of its bottom, left, right and top edge, and its four corners, tested in that order. As long as the camera looks at the plane the center ray finds it first and the result is the one it produced alone; when the center of the view points past the plane — a camera tilted up at the horizon, one that has the ground in the lower half of its picture only — the tiles that are in the view are found instead of nothing at all. Only a view frustum that meets the plane with none of the nine rays reports no tiles. The `far` value of the camera still limits how far along a ray the plane is looked for; each ray now starts at the near plane
 - perf `CameraBasedVisibility#computeVisibleTiles()`: when three or more rays meet the plane, every tile within the convex hull of the tiles they met goes into the visible set without being held against the view frustum, and the tile-by-tile search runs from the border of that area outwards. The area where a frustum meets a plane is convex, so each of those tiles reaches into the view — the tile set is the one the search alone arrives at, and the frustum tests it would have spent on the inside of the area are saved. Fewer than three rays span no area, and everything is searched as before
 - `TileBox#primary` marks the tiles of every probe ray that met the plane instead of the tiles under the center of the view alone — per ray the tile its point fell into together with the ones a rectangle of one tile size around that point reaches, as before. A tile marked this way keeps the mark even when the search reaches it again as the neighbour of another tile, which it did not before: of the tiles under the center of the view usually only one kept it
@@ -68,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
-- `TextureResource#dispose()` releases the texture the resource built for itself. A texture assigned through the `texture` setter belongs to the caller and is left alone. Afterwards every getter of the resource answers `undefined`, while `id` and `type` still say which resource this was, and a write to a setter, a `load()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `TextureResource#dispose()` releases the texture the resource built for itself. Afterwards every getter of the resource answers `undefined`, while `id` and `type` still say which resource this was, and a write to a setter, a `load()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller. That dispose event is also the last event the store emits; afterwards `renderer` and `textureFactory` answer `undefined`, `parse()`, `load()`, `on()`, `onResource()` and a write to `renderer` do nothing, and `defaultTextureClasses` keeps its last value — a configuration array is no resource, and the answer stays right
 - an attribute slot of an `InstancedVOBufferGeometry` belongs to one route for the whole life of the geometry: `attachInstancedPool()` throws when an attribute of the pool would take a slot this geometry has already had an attribute in, and the geometry is left exactly as it was. The message names the call and the slots it is about. The base route, the instanced route and the attributes copied from a `BufferGeometry` handed to the constructor may still share a name — until the constructor returns, no attribute of the geometry has reached the renderer. Handing the same pool back under the name it already has changes nothing: every attribute stays where it is, and an `autoDispose` passed along with it still takes effect
 - `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
@@ -90,6 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix the published type declaration of `texture/TextureResource`: it imported `./types.ts` with the suffix of the source instead of `./types.js`, an extension that does not exist in the package
 - fix the tile coordinates `CameraBasedVisibility` computes for a map whose `xOffset` or `yOffset` lies outside the first tile: the view rectangle of a tile, the box it is tested with and the tiles the search walks on to are the ones of the tile coordinate they belong to. The query these are derived from was handed a coordinate without the map offset while it reads one with it, which shifted every tile of such a map by `floor(-offset / tileSize)` tiles against the tile coordinate it was found under. An offset within the first tile — the usual `-tileSize / 2` among them — was and is unaffected
 - fix `VertexObjectPool#freeVO()`: the vacated slot is cleared on both the last-index and the swap path, so a freed index holds no vertex object — `getVO()` on it returns `undefined` and the internal index keeps nothing alive
 - fix `VertexObjectPool#freeVO()`: the swap path tolerates an index slot that `createFromAttributes()` raised `usedCount` past without materializing a vertex object
@@ -132,6 +143,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
 
 ### Migration Guide
+
+#### The derived values of `TextureResource` are read-only
+
+`imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` have no setters any
+more; the effects of `load()` produce them. A texture built elsewhere is handed to a resource
+through the `TextureFactory` that builds it.
+
+**Before**
+
+```ts
+resource.texture = myTexture; // overwritten by the next effect run, and never released
+```
+
+**After**
+
+```ts
+resource.textureFactory = myFactory; // the resource builds — and owns — its texture
+```
+
+#### A setter that does not fit the kind of a resource throws
+
+**Before**
+
+```ts
+const resource = TextureResource.fromImage('hero', 'hero.png');
+resource.tileSetOptions = {tileWidth: 16}; // swallowed, getter keeps answering undefined
+```
+
+**After**
+
+```ts
+const resource = TextureResource.fromTileSet('hero', 'hero.png', {tileWidth: 16});
+resource.tileSetOptions = {tileWidth: 32}; // a tileset resource takes it
+```
+
+#### An atlas resource takes its image from its json
+
+`imageUrl` is what an atlas resource *reports*, not what it is told. `overrideImageUrl` is
+the input that moves such a resource to another image, and it moves the atlas along with the
+texture.
+
+**Before**
+
+```ts
+const resource = await store.whenResource('hero');
+resource.imageUrl = 'hero@2x.png'; // texture follows, atlas keeps describing the old file
+```
+
+**After**
+
+```ts
+const resource = await store.whenResource('hero');
+resource.overrideImageUrl = 'hero@2x.png'; // atlas and texture move together
+```
+
+#### `TextureStore#load()` returns a promise
+
+The store is no longer the return value, so a call that went on chaining needs the store
+itself.
+
+**Before**
+
+```ts
+store.load(url).parse(moreData);
+```
+
+**After**
+
+```ts
+store.load(url);
+store.parse(moreData);
+```
+
+Both lines stand for themselves: the fetch is on its way, and `moreData` is parsed right
+away. Put an `await` in front of the load where the second parse should wait for the first.
 
 #### `TileBox#primary` marks every tile the view frustum meets the plane in
 
