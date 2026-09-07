@@ -189,6 +189,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly #previousTilesById = new Map<number, IMap2DTileCoords>();
   readonly #withinHull: TileBox[] = [];
 
+  // The tiles the probe rays of the current recomputation met, keyed by `packTileCoords()` —
+  // what `TileBox#primary` is read from.
+  readonly #probeTileIds = new Set<number>();
+
   // Pool of TileBox slots keyed by `packTileCoords()`. Each slot owns its Box3/Vector3/
   // Map2DTileCoords shells so subsequent frames can mutate them in place instead of allocating
   // new ones.
@@ -363,16 +367,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.pointsOnPlane.length;
   }
 
-  private acquireTileBox(x: number, y: number, primary: boolean): TileBox {
+  private acquireTileBox(x: number, y: number): TileBox {
     const id = packTileCoords(x, y);
     let tile = this.#tileBoxPool.get(id);
     if (tile === undefined) {
-      tile = {id, x, y, primary};
+      tile = {id, x, y};
       this.#tileBoxPool.set(id, tile);
-    } else if (primary) {
-      // never the other way round: a tile a probe ray met stays a primary one, no matter that
-      // the search reaches it again as the neighbour of another tile
-      tile.primary = true;
     }
     return tile;
   }
@@ -382,12 +382,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#visitedIds.clear();
     this.#nextStack.length = 0;
     this.#withinHull.length = 0;
+    this.#probeTileIds.clear();
     this.visibles.length = 0;
-
-    // `primary` is a statement about this recomputation, and the pool outlives it.
-    for (const tile of this.#tileBoxPool.values()) {
-      tile.primary = false;
-    }
 
     // Index previousTiles by id for O(1) reuse lookups (replaces the original O(n²) splice loop).
     this.#previousTilesById.clear();
@@ -424,7 +420,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       );
       for (let ty = 0; ty < around.rows; ty++) {
         for (let tx = 0; tx < around.columns; tx++) {
-          this.#nextStack.push(this.acquireTileBox(around.tileLeft + tx, around.tileTop + ty, true));
+          const tile = this.acquireTileBox(around.tileLeft + tx, around.tileTop + ty);
+          this.#probeTileIds.add(tile.id);
+          this.#nextStack.push(tile);
         }
       }
     }
@@ -463,6 +461,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       if (!this.#visitedIds.has(id)) {
         this.#tileBoxPool.delete(id);
       }
+    }
+
+    // `primary` is a statement about this recomputation and the pool outlives it, so it is
+    // written here rather than kept up to date while the search runs: a tile that is not in the
+    // visible set is not handed out, and one that comes back into it gets its answer here.
+    for (let i = 0; i < this.visibles.length; ++i) {
+      // The loop bound is `this.visibles.length`.
+      const tile = this.visibles[i]!;
+      tile.primary = this.#probeTileIds.has(tile.id);
     }
 
     this.visibles.sort(sortByDistance);
@@ -521,7 +528,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       const id = packTileCoords(x, y);
       if (this.#visitedIds.has(id)) return;
       this.#visitedIds.add(id);
-      this.#withinHull.push(this.acquireTileBox(x, y, false));
+      this.#withinHull.push(this.acquireTileBox(x, y));
     });
   }
 
@@ -581,7 +588,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       const tx = tile.x + dx;
       const ty = tile.y + dy;
       if (!this.#visitedIds.has(packTileCoords(tx, ty))) {
-        this.#nextStack.push(this.acquireTileBox(tx, ty, false));
+        this.#nextStack.push(this.acquireTileBox(tx, ty));
       }
     }
   }

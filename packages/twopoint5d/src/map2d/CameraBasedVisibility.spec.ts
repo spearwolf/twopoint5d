@@ -67,13 +67,29 @@ function makeFrustum(camera: PerspectiveCamera | OrthographicCamera): Frustum {
 }
 
 /**
- * The tiles the probe rays met, as `x,y`. With an identity `matrixWorld` and a center point of
- * `[0, 0]` a point on the plane is at its own x/z, so the tile grid can be asked directly.
+ * The tiles the probe rays met, as `x,y`. With an identity `matrixWorld` a point on the plane is
+ * at its own x/z, and the center point moves the tile grid under it — which is the whole of what
+ * the visibility does with it, so the grid can be asked directly.
  */
-function probeTileIds(visibility: CameraBasedVisibility, tileCoords: Map2DTileCoordsUtil): string[] {
+function probeTileIds(
+  visibility: CameraBasedVisibility,
+  tileCoords: Map2DTileCoordsUtil,
+  [centerX, centerY]: [number, number] = [0, 0],
+): string[] {
   return visibility.pointsOnPlane.map((point) => {
-    const [tileLeft, tileTop] = tileCoords.getTileCoords(point.x, point.z, 0, 0);
+    const [tileLeft, tileTop] = tileCoords.getTileCoords(point.x + centerX, point.z + centerY, 0, 0);
     return `${tileLeft},${tileTop}`;
+  });
+}
+
+/**
+ * Whether a tile can carry the primary mark: the seed rectangle of one tile size around a probe
+ * point reaches the tile the point falls into and up to three of its neighbours.
+ */
+function isNextToAProbe(tile: {x: number; y: number}, probes: readonly string[]): boolean {
+  return probes.some((id) => {
+    const [x, y] = id.split(',').map(Number) as [number, number];
+    return Math.abs(tile.x - x) <= 1 && Math.abs(tile.y - y) <= 1;
   });
 }
 
@@ -431,21 +447,39 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
+    test('takes the primary mark off a pooled tile that no ray of the next recomputation met', () => {
+      const visibility = new CameraBasedVisibility(makeTiltedCamera());
+      const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+
+      const first = visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld)!;
+      const wasPrimary = new Set(visibility.visibles.filter((tile) => tile.primary).map((tile) => `${tile.x},${tile.y}`));
+      expect(wasPrimary.size).toBeGreaterThan(0);
+
+      // move the map by three tiles: far enough for the rays to land somewhere else entirely, and
+      // near enough for the tiles they met before to stay visible on their pooled `TileBox`
+      const center: [number, number] = [3 * 256, 0];
+      visibility.computeVisibleTiles(first.tiles, center, mapCoords, matrixWorld);
+
+      const probes = probeTileIds(visibility, mapCoords, center);
+      const carriedOver = visibility.visibles.filter(
+        (tile) => wasPrimary.has(`${tile.x},${tile.y}`) && !isNextToAProbe(tile, probes),
+      );
+
+      expect(carriedOver.length, 'tiles that were primary before and are still visible').toBeGreaterThan(0);
+      for (const tile of carriedOver) {
+        expect(tile.primary, `tile ${tile.x},${tile.y} no longer carries the mark`).toBe(false);
+      }
+    });
+
     test('leaves no tile marked as primary that no ray met', () => {
       const visibility = new CameraBasedVisibility(makeTiltedCamera());
       const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
       visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld);
 
-      // a primary tile is one a ray met, or one of its eight neighbours — the search picks those
-      // up with the tile itself
       const probes = probeTileIds(visibility, mapCoords);
       for (const tile of visibility.visibles) {
         if (!tile.primary) continue;
-        const isNeighbourOfAProbe = probes.some((id) => {
-          const [x, y] = id.split(',').map(Number) as [number, number];
-          return Math.abs(tile.x - x) <= 1 && Math.abs(tile.y - y) <= 1;
-        });
-        expect(isNeighbourOfAProbe, `tile ${tile.x},${tile.y} is marked primary`).toBe(true);
+        expect(isNextToAProbe(tile, probes), `tile ${tile.x},${tile.y} is marked primary`).toBe(true);
       }
     });
   });
