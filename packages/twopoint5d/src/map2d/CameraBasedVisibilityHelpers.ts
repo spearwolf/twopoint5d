@@ -34,6 +34,11 @@ class PointHelper extends Mesh<BoxGeometry, MeshBasicMaterial> {
 export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   #show = false;
 
+  /**
+   * How many frustum box helpers are built for tiles no probe ray met directly. The frustum
+   * boxes of the primary tiles and the tile boxes are not meant: those follow the number of
+   * visible tiles.
+   */
   maxDebugHelpers = 9;
 
   tileBoxHelperExpand = -0.01;
@@ -151,11 +156,16 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
       );
     });
 
+    // counted rather than read off the loop index: `maxDebugHelpers` is a number of helpers, and
+    // the index says how many tiles the walk has passed
+    let debugHelpers = 0;
+
     for (let i = 0; i < visibles.length; ++i) {
       // The loop bound is `visibles.length`.
       const tile = visibles[i]!;
 
-      if (!tile.primary && i < this.maxDebugHelpers) {
+      if (!tile.primary && debugHelpers < this.maxDebugHelpers) {
+        debugHelpers += 1;
         this.placeFrustumBoxHelper(
           expectDefined(tile.frustumBox, `the frustum box of tile ${tile.x},${tile.y}`),
           this.frustumBoxHelperExpand,

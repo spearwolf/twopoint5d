@@ -105,6 +105,76 @@ describe('Map2DTileRenderer', () => {
     });
   });
 
+  describe('a tile the factory refuses', () => {
+    function makeDecliningFactory(): IMapTileFactory<FakeTile> {
+      return {
+        ...makeTileFactory(),
+        createTile(_tileCoords: IMap2DTileCoords): FakeTile | undefined {
+          return undefined;
+        },
+      };
+    }
+
+    test('is not asked for again in the cycles that follow', () => {
+      const tileFactory = makeDecliningFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+
+      renderer.addTile(tileCoords);
+      renderer.reuseTile(tileCoords);
+      renderer.reuseTile(tileCoords);
+      renderer.reuseTile(tileCoords);
+
+      expect(createTile.callCount, 'createTile()').toBe(1);
+    });
+
+    test('is asked for again once it was removed', () => {
+      const tileFactory = makeDecliningFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+
+      renderer.addTile(tileCoords);
+      renderer.removeTile(tileCoords);
+      renderer.reuseTile(tileCoords);
+
+      expect(createTile.callCount, 'createTile()').toBe(2);
+    });
+  });
+
+  describe('clearTiles()', () => {
+    test('an empty renderer forces no upload', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      // the first cycle brings the serial gate in step with the empty renderer
+      renderer.endUpdatingTiles();
+
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.clearTiles();
+      renderer.endUpdatingTiles();
+
+      expect(update.called, 'factory.update()').toBe(false);
+    });
+
+    test('a renderer holding a tile uploads', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.clearTiles();
+      renderer.endUpdatingTiles();
+
+      expect(update.calledOnce, 'factory.update()').toBe(true);
+    });
+  });
+
   describe('dispose()', () => {
     // (a) has no subject here: this renderer builds no resource that needs releasing — its
     // `node` is a plain Object3D and the tile factory arrives through the constructor.

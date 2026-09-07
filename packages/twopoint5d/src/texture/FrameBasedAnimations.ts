@@ -187,6 +187,7 @@ export class FrameBasedAnimations {
         .frameNames(frameNameQuery)
         .filter((name) => typeof name === 'string')
         .sort(FRAME_NAME_ORDER.compare);
+      // every name here came out of `frameNames()` of this very atlas, so it is registered there
       frames = frameNames.map((frameName) => atlas.frame(frameName)!.coords);
     } else if (args[2] instanceof TileSet) {
       const tileSet = args[2];

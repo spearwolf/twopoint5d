@@ -153,6 +153,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   readonly #deps = new Dependencies([
     'depth',
+    'frustumBoxScale',
     'lookAtCenter',
     Dependencies.cloneable<Vector2>('centerPoint2D'),
     Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
@@ -164,7 +165,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   /**
    * The tiles of the last recomputation that met the plane, sorted by their distance to the
    * camera. A recomputation in which the camera looks past the plane reports an empty tile set
-   * and leaves this list standing as it is.
+   * and empties this list along with it.
    */
   readonly visibles: TileBox[] = [];
   #visibleTiles?: IMap2DVisibleTiles;
@@ -176,8 +177,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * carries derived state along compares the value it last saw instead of the state itself.
    *
    * A step says that the camera was evaluated again, not that every field carries a new value:
-   * `planeWorld`, `planeOrigin`, `pointOnPlane` and `pointsOnPlane` follow every step,
-   * `visibles` and `planeCoords2D` only a step in which the camera met the plane.
+   * `planeWorld`, `planeOrigin`, `pointOnPlane`, `pointsOnPlane` and `visibles` follow every
+   * step, `planeCoords2D` only a step in which the camera met the plane.
    */
   get serial(): number {
     return this.#serial;
@@ -200,9 +201,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // in which the camera looks past the plane computes no tiles and leaves the pool as it stands.
   readonly #tileBoxPool = new Map<number, TileBox>();
 
-  // Snapshot of the tile-grid parameters that drive `tile.coords`. When any of these change
-  // we invalidate the per-slot `coords` caches so the next frame recomputes them.
+  // Snapshot of the tile-grid parameters that drive `tile.coords`. It answers whether the grid
+  // of the current run differs from the one before — the question `acceptTile()` hangs on — and
+  // when it does, the per-slot `coords` caches and the `map2dTile` shells of the pool are
+  // released, so the next run builds both against the new grid.
   #cachedTileCoords: Map2DTileCoordsUtil | undefined;
+
+  // Whether the current recomputation runs on a different tile grid than the one before it.
+  // `map2dTileCoords` arrives as a parameter and this visibility is public: whoever drives it
+  // without a tile streamer can hand it a new grid at any time, and the answer decides whether
+  // the tiles of the run before may be handed back for reuse.
+  #tileGridChanged = false;
 
   // Hot-path scratch instances — kept on the class to share across frames.
   readonly #scratchTranslate = new Vector3();
@@ -227,6 +236,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     return this.#deps.changed({
       depth: this.depth,
+      frustumBoxScale: this.frustumBoxScale,
       lookAtCenter: this.lookAtCenter,
       centerPoint2D: this.#centerPoint2D,
       map2dTileCoords: this.map2dTileCoords,
@@ -236,22 +246,46 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     });
   }
 
-  private invalidateTileCoordsCacheIfChanged(): void {
+  /**
+   * Takes over the current tile grid and answers whether it differs from the one the last
+   * recomputation ran on. A first run has nothing to compare against and answers `false`.
+   */
+  private takeOverTileCoords(): boolean {
     const current = this.map2dTileCoords;
-    if (this.#cachedTileCoords && this.#cachedTileCoords.equals(current)) return;
 
-    if (this.#cachedTileCoords) {
-      this.#cachedTileCoords.copy(current);
-    } else {
+    if (this.#cachedTileCoords == null) {
       this.#cachedTileCoords = current.clone();
+      return false;
     }
 
-    // Tile geometry parameters changed → cached `coords` on each pool slot is stale.
+    if (this.#cachedTileCoords.equals(current)) return false;
+
+    this.#cachedTileCoords.copy(current);
+
+    // Tile geometry parameters changed → cached `coords` on each pool slot is stale, and so is
+    // its `map2dTile`: the caller still holds that shell as a tile of the old grid and gets it
+    // back in `removeTiles`, so this run writes the new grid into a fresh one instead of under
+    // the caller's feet.
     for (const tile of this.#tileBoxPool.values()) {
       tile.coords = undefined;
+      tile.map2dTile = undefined;
     }
+
+    return true;
   }
 
+  /**
+   * Returns the tiles that the camera frustum covers on the `map2dTileCoords` grid around
+   * `centerPoint`, split into the tiles to create and to reuse, with the tiles of
+   * `previousTiles` that fall out as `removeTiles`. Without a camera, and whenever the frustum
+   * meets the plane on no tile while `previousTiles` is empty, the result is `undefined` and
+   * the caller keeps what it holds.
+   *
+   * Hands a tile of `previousTiles` back for reuse only while the tile grid stands: on a grid
+   * other than the one of the previous call those tiles go into `removeTiles`, because their
+   * indices belong to a grid this one cannot place. A first call has no earlier grid to hold
+   * against and takes `previousTiles` as belonging to the grid it is given.
+   */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
     [centerX, centerY]: [number, number],
@@ -280,7 +314,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.#serial += 1;
 
-    this.invalidateTileCoordsCacheIfChanged();
+    this.#tileGridChanged = this.takeOverTileCoords();
 
     this.matrixWorld.copy(matrixWorld);
     this.#matrixWorldInverse.copy(matrixWorld).invert();
@@ -300,6 +334,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.planeWorld.coplanarPoint(this.planeOrigin);
 
     if (hitCount === 0) {
+      // `findVisibleTiles()`, which is where the list is otherwise emptied, is not reached on
+      // this way out — and `visibles` is public: the visibility helpers read it and would go on
+      // drawing tile boxes for a view that no longer exists
+      this.visibles.length = 0;
       this.#visibleTiles = previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles, changed: true} : undefined;
       return this.#visibleTiles;
     }
@@ -572,7 +610,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
     setAABB2(tile.map2dTile.view, coords);
 
-    const previous = this.#previousTilesById.get(tile.id);
+    // A tile of another grid carries the same `(x, y)` id for a different piece of the map, and
+    // reuse is what keeps its quadSize and texCoords: the renderer's `updateTile()` writes the
+    // position and nothing else. Leaving it in `#previousTilesById` sends it out as `remove`,
+    // and the map is rebuilt in the grid it is now drawn in.
+    const previous = this.#tileGridChanged ? undefined : this.#previousTilesById.get(tile.id);
     if (previous !== undefined) {
       this.#previousTilesById.delete(tile.id);
       reuseTiles.push(tile.map2dTile);

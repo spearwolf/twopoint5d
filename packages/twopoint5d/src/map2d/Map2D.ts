@@ -118,7 +118,12 @@ export class Map2D extends Group {
   }
 
   update(): void {
-    this.updateMatrixWorld();
+    // this node's `matrixWorld` is left to the streamer, which brings it in order with
+    // `updateWorldMatrix(true, false)` — walking the parent chain up first — on every update in
+    // which it has a visibilitor and a tile renderer to lay out tiles for. An update that is missing
+    // either of the two touches no matrix at all, and nothing here needs one: the renderer nodes
+    // are placed in `beginUpdatingTiles()`, which that update does not reach either, and the
+    // three.js renderer brings the scene graph up to date before it draws.
     this.#tileStreamer.update(this);
   }
 

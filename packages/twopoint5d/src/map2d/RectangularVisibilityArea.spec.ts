@@ -123,5 +123,18 @@ describe('RectangularVisibilityArea', () => {
 
       expect(ids(second.tiles)).toEqual(ids(second.reuseTiles!.concat(second.createTiles!)));
     });
+
+    test('a tile of another grid is removed instead of reused', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      expect(first.tiles.length).toBeGreaterThan(0);
+
+      const otherGrid = new Map2DTileCoordsUtil(50, 50);
+      const second = area.computeVisibleTiles(first.tiles, [0, 0], otherGrid, matrixWorld)!;
+
+      expect(second.reuseTiles, 'nothing of the old grid is kept').toHaveLength(0);
+      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(ids(first.tiles));
+      expect(ids(second.tiles), 'the new grid is covered once').toEqual([...new Set(ids(second.tiles))]);
+    });
   });
 });

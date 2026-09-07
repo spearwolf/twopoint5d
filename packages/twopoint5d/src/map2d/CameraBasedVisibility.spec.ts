@@ -158,6 +158,18 @@ describe('CameraBasedVisibility', () => {
       expect(result!.removeTiles).toBe(previous);
     });
 
+    test('empties visibles when the camera turns away from the plane', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      expect(visibility.visibles.length, 'the camera saw the plane').toBeGreaterThan(0);
+
+      visibility.camera = makeOrthoCameraLookingHorizontally();
+      visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld);
+
+      expect(visibility.visibles, 'nothing is left to draw').toHaveLength(0);
+    });
+
     test('caches the previous result when dependencies have not changed', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 
@@ -281,8 +293,9 @@ describe('CameraBasedVisibility', () => {
         warmCenterWorlds.set(v.id, v.centerWorld!);
       }
 
-      // Force a re-compute by changing matrixWorld (translate by 0 still bumps the equality
-      // gate via a fresh Matrix4 instance), then change it back to recover the same tile set.
+      // Force a re-compute by changing matrixWorld — the gate compares by value, so it is the
+      // translation of 0.0001 that breaks it, not the fresh instance — then change it back to
+      // recover the same tile set.
       visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, new Matrix4().makeTranslation(0, 0, 0.0001));
       const refreshed = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, new Matrix4())!;
       const refreshedIds = refreshed.tiles.map((t) => t.id).sort();
@@ -360,6 +373,26 @@ describe('CameraBasedVisibility', () => {
 
       expect(second).not.toBe(first);
       expect(second.changed).toBe(true);
+    });
+
+    test('a tile of another grid is removed instead of reused', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      expect(first.tiles.length).toBeGreaterThan(0);
+
+      // half the tile size, so the ids of the two grids overlap: `0,0` names a tile in both,
+      // and it is a different piece of the map in each
+      const otherGrid = new Map2DTileCoordsUtil(50, 50);
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], otherGrid, matrixWorld)!;
+
+      expect(second.reuseTiles ?? [], 'nothing of the old grid is kept').toHaveLength(0);
+      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(ids(first.tiles));
+
+      const ofTheOldGrid = new Set<unknown>(first.tiles);
+      for (const tile of second.tiles) {
+        expect(ofTheOldGrid.has(tile), `tile ${tile.id} of the new grid is an object of its own`).toBe(false);
+      }
     });
   });
 
@@ -549,6 +582,21 @@ describe('CameraBasedVisibility', () => {
   describe('frustumBoxScale', () => {
     test('defaults to 1.1', () => {
       expect(new CameraBasedVisibility().frustumBoxScale).toBeCloseTo(1.1);
+    });
+
+    test('a new value recomputes without the camera having moved', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      const tileCoords = new Map2DTileCoordsUtil(100, 100);
+      const matrixWorld = new Matrix4();
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const serialAfterFirst = visibility.serial;
+
+      visibility.frustumBoxScale = 3;
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(second.changed, 'the result says it is new').toBe(true);
+      expect(visibility.serial, 'the camera was evaluated again').toBe(serialAfterFirst + 1);
     });
   });
 

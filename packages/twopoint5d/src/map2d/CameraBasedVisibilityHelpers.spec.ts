@@ -44,6 +44,16 @@ function boxHelperColors(scene: Object3D): string[] {
   return boxHelpers(scene).map((helper) => (helper.material as LineBasicMaterial).color.getHexString());
 }
 
+/**
+ * The frustum box helpers on show for tiles no probe ray met directly — what `maxDebugHelpers`
+ * limits. They are told apart by `frustumBoxHelperColor`, the one colour only they carry.
+ */
+function debugFrustumBoxes(scene: Object3D): Box3Helper[] {
+  return boxHelpers(scene).filter(
+    (helper) => helper.visible && (helper.material as LineBasicMaterial).color.getHexString() === '777777',
+  );
+}
+
 function spyOnReleases(scene: Object3D) {
   return scene.children.map((node) => {
     const geometry = (node as unknown as {geometry?: BufferGeometry}).geometry;
@@ -188,6 +198,26 @@ describe('CameraBasedVisibilityHelpers', () => {
     helpers.update();
 
     expect(boxHelperColors(scene), 'the tile box of the plain tile followed').toEqual(['ffffff', 'ff0066', '777777', '00ff00']);
+  });
+
+  test('maxDebugHelpers counts the frustum boxes that were built, not the tiles walked past', () => {
+    const scene = new Object3D();
+    const visibles = [
+      makeTileBox(0, 0, true),
+      makeTileBox(1, 0, true),
+      makeTileBox(2, 0, false),
+      makeTileBox(3, 0, false),
+      makeTileBox(4, 0, false),
+    ];
+    const helpers = new CameraBasedVisibilityHelpers(makeVisibility(visibles));
+    helpers.maxDebugHelpers = 2;
+
+    helpers.add(scene);
+    helpers.show = true;
+
+    // the two primary tiles stand where a bound read off the loop index would have been spent on
+    // them, and three plain tiles stand where the number itself has to hold
+    expect(debugFrustumBoxes(scene), 'two of the three plain tiles got their frustum box').toHaveLength(2);
   });
 
   test('maxDebugHelpers reaches the next update', () => {

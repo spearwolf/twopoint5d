@@ -61,6 +61,9 @@ export class HelpersManager {
   /**
    * Takes every node this manager added to `scene` out of it, and calls `dispose()` on each one
    * that has such a method. What a node has to bring for that to be enough stands at {@link add}.
+   *
+   * Besides the scene handed over, {@link root} is always cleared as well: the nodes of this
+   * manager sit in both and only ever come down together.
    */
   removeFromScene(scene: Object3D): void {
     const removeChildren: Object3D[] = [];

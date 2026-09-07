@@ -185,5 +185,46 @@ describe('Map2DTileStreamer', () => {
       expect(renderer.cleared).toBe(1);
       expect(renderer.added.map((t) => t.id)).toEqual(['0,0', '1,0', '0,0', '1,0']);
     });
+
+    test('a changed tile grid builds the tiles again', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
+
+      const node = new Object3D();
+      streamer.update(node); // creates both
+
+      streamer.tileWidth = 200;
+      streamer.update(node);
+
+      expect(renderer.cleared, 'the renderer was cleared').toBe(1);
+      expect(
+        renderer.added.map((t) => t.id),
+        'the tiles came back',
+      ).toEqual(['0,0', '1,0', '0,0', '1,0']);
+    });
+
+    test('the same tile grid written again costs nothing', () => {
+      const streamer = new Map2DTileStreamer(100, 100, 10, 20);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
+
+      const node = new Object3D();
+      streamer.update(node);
+
+      streamer.tileWidth = 100;
+      streamer.tileHeight = 100;
+      streamer.xOffset = 10;
+      streamer.yOffset = 20;
+      streamer.update(node);
+
+      expect(renderer.cleared, 'nothing was cleared').toBe(0);
+      expect(
+        renderer.added.map((t) => t.id),
+        'no tile was built twice',
+      ).toEqual(['0,0', '1,0']);
+    });
   });
 });

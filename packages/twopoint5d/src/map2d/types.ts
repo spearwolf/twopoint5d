@@ -142,6 +142,19 @@ export interface IMap2DVisibleTiles {
  * `Map2DTileStreamer`.
  */
 export interface IMap2DVisibilitor {
+  /**
+   * Returns the tiles that cover the visible area around `centerPoint` on the `tileCoords` grid,
+   * held against `previousTiles` and split into the tiles to create and to reuse, with the tiles
+   * of `previousTiles` that fall out as `removeTiles`.
+   * `undefined` says the visibilitor has no answer for this call and leaves the caller with what
+   * it holds.
+   *
+   * A tile of `previousTiles` comes back for reuse only while the grid stands: its indices belong
+   * to the grid it was computed on, and another grid cannot place them. So on a `tileCoords` grid
+   * other than the one of the previous call, an implementation puts those tiles into
+   * `removeTiles`. A first call has no earlier grid to hold against and takes `previousTiles` as
+   * belonging to the grid it is given.
+   */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
     centerPoint: [number, number],

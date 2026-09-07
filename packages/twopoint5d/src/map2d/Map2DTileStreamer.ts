@@ -27,8 +27,14 @@ export class Map2DTileStreamer {
     return this.#tileCoords.tileWidth;
   }
 
+  // A grid change costs the tiles: a tile is recognised by its id `(x, y)` and comes back as a
+  // reuse, but `IMapTileFactory#updateTile()` writes only its position — its size and its texture
+  // coordinates would go on describing the grid it was built in. The four setters below
+  // therefore clear, and each of them only when the value really moves.
   set tileWidth(width: number) {
+    if (this.#tileCoords.tileWidth === width) return;
     this.#tileCoords.tileWidth = width;
+    this.clearTiles();
   }
 
   get tileHeight(): number {
@@ -36,7 +42,9 @@ export class Map2DTileStreamer {
   }
 
   set tileHeight(height: number) {
+    if (this.#tileCoords.tileHeight === height) return;
     this.#tileCoords.tileHeight = height;
+    this.clearTiles();
   }
 
   get xOffset(): number {
@@ -44,7 +52,9 @@ export class Map2DTileStreamer {
   }
 
   set xOffset(offset: number) {
+    if (this.#tileCoords.xOffset === offset) return;
     this.#tileCoords.xOffset = offset;
+    this.clearTiles();
   }
 
   get yOffset(): number {
@@ -52,7 +62,9 @@ export class Map2DTileStreamer {
   }
 
   set yOffset(offset: number) {
+    if (this.#tileCoords.yOffset === offset) return;
     this.#tileCoords.yOffset = offset;
+    this.clearTiles();
   }
 
   tiles: IMap2DTileCoords[] = [];
@@ -96,7 +108,7 @@ export class Map2DTileStreamer {
     );
 
     if (visible) {
-      this.tiles = visible?.tiles;
+      this.tiles = visible.tiles;
 
       const offset = visible.offset;
       const translate = visible.translate;

@@ -71,6 +71,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       return undefined;
     }
 
+    // asked before changed() writes the new state over it: the answer is what the previous call
+    // was given, and `Dependencies` hands out its own clone
+    const storedTileCoords = this.#deps.value('map2dTileCoords') as Map2DTileCoordsUtil | undefined;
+
+    // a tile of another grid carries indices this grid cannot place: `tile.x - tileLeft` lands
+    // outside the occupancy array — or, worse, inside it on the wrong cell, where it marks a
+    // place as taken that nothing covers
+    const tileGridChanged = storedTileCoords != null && !storedTileCoords.equals(map2dTileCoords);
+
     // always ask, even when needsUpdate already forces the recompute: changed() is what keeps
     // the snapshot current, and a snapshot left behind reports a change on the next call
     const depsChanged = this.#deps.changed({centerX, centerY, map2dTileCoords, matrixWorld});
@@ -110,7 +119,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
 
     previousTiles.forEach((tile) => {
-      if (fullViewArea.isIntersecting(tile.view)) {
+      if (!tileGridChanged && fullViewArea.isIntersecting(tile.view)) {
         reuseTiles.push(tile);
         const tx = tile.x - tileCoords.tileLeft;
         const ty = tile.y - tileCoords.tileTop;

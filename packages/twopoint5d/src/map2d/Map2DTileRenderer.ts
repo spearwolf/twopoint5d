@@ -5,6 +5,12 @@ import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './type
 export class Map2DTileRenderer implements IMap2DTileRenderer {
   readonly #tiles = new Map<string, unknown>();
 
+  // The tile coordinates the factory answered `createTile()` with nothing for. Its answer for a
+  // coordinate stands until `removeTile()` takes that coordinate out or `clearTiles()` empties
+  // the renderer — those two are what puts the question back; asking again in between costs the
+  // tile data provider one lookup per frame and per hole in the map.
+  readonly #declined = new Set<string>();
+
   #dataSerial = 0;
   #updateDataSerial = -1;
 
@@ -46,7 +52,10 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     if (tileFactory === null) return;
 
     const tile = tileFactory.createTile(tileCoords);
-    if (tile == null) return;
+    if (tile == null) {
+      this.#declined.add(tileCoords.id);
+      return;
+    }
 
     this.#tiles.set(tileCoords.id, tile);
 
@@ -65,7 +74,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
 
       tileFactory.updateTile(tile, tileCoords);
       ++this.#dataSerial;
-    } else {
+    } else if (!this.#declined.has(tileCoords.id)) {
       this.addTile(tileCoords);
     }
   }
@@ -73,6 +82,10 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   removeTile(tileCoords: IMap2DTileCoords): void {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
+
+    // whoever takes a tile out asks about it afresh next time: without this the set grows with
+    // every coordinate ever refused and binds memory to the size of the map instead of the view
+    this.#declined.delete(tileCoords.id);
 
     const tile = this.#tiles.get(tileCoords.id);
     if (tile) {
@@ -86,11 +99,18 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
+    const hadTiles = this.#tiles.size > 0;
+
     for (const tile of this.#tiles.values()) {
       tileFactory.destroyTile(tile);
     }
     this.#tiles.clear();
-    ++this.#dataSerial;
+    this.#declined.clear();
+
+    // the serial gate in endUpdatingTiles() exists to keep the attribute buffers off the bus
+    // when nothing was written — and a clear that found nothing wrote nothing. The emptied
+    // `#declined` alone is no reason either: a refused tile never sat in a buffer.
+    if (hadTiles) ++this.#dataSerial;
   }
 
   endUpdatingTiles(): void {

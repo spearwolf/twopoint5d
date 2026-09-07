@@ -53,7 +53,7 @@ export class DataIdsChunk2D extends DataChunk2D {
     if (this.#uint32Data == null) {
       this.#uint32Data = this.prepareData();
     }
-    return this.#uint32Data!;
+    return this.#uint32Data;
   }
 
   protected readDataIdAtLocal(x: number, y: number): number | undefined {

@@ -27,10 +27,6 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
     node.remove(this.tileSprites);
   }
 
-  freeTileSprite(sprite: TileSprite): void {
-    this.tileSprites.geometry?.instancedPool.freeVO(sprite);
-  }
-
   createTile(tileCoords: IMap2DTileCoords): TileSprite | undefined {
     const tileDataProvider = expectDefined(this.tileDataProvider, 'the tile data provider of this factory');
     const tileDataId = tileDataProvider.getTileIdAt(tileCoords.x, tileCoords.y);

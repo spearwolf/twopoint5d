@@ -101,10 +101,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameLoop.OnFrame` and the exported `OnRAF` are `Symbol.for('twopoint5d:FrameLoop.OnFrame')` and `Symbol.for('twopoint5d:FrameLoop.OnRAF')`: the keys carry the library namespace, so no other code in the realm reaches the same channel by asking the symbol registry for a name as common as `onFrame`. Code that subscribes through the exported constants needs no change; code that rebuilds the key from its string does — see the migration guide
 - a `createRenderer` callback receives only renderer options in its `params`: `maxFps`, `resizeTo`, `resizeToElement`, `resizeToAttributeEl`, `styleSheetRoot` and `createRenderer` stay with the display. `CreateRendererParameters` names none of them
 - `PanControl2D` emits `restoreCursor` for a cursor it hid, and takes the cursor class off the target then. A pointer moving over the page with no button down passes through without an event
+- a value written to `Map2DTileStreamer#tileWidth`, `#tileHeight`, `#xOffset` or `#yOffset`, and with it to the same four properties of `Map2D`, builds the tiles again: the next `update()` clears every renderer and lets the visibilitor lay out the whole set in the new grid. A tile is recognised by its `(x, y)` id and would otherwise come back as a reuse, where `IMapTileFactory#updateTile()` writes only its position — the sprite would go on showing the size and the texture coordinates of the grid it was built in. Writing the value a property already holds costs nothing
+- `RectangularVisibilityArea#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
+- `CameraBasedVisibility#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before, and lays the new grid out on tile objects of its own. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
+- `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which reports `changed: true` and raises `serial`, instead of waiting for the camera to move
+- `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
+- `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
+- perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
+- perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
+- perf `Map2D#update()` leaves the world matrix to the tile streamer, which brings it up to date with `updateWorldMatrix(true, false)` — the parent chain first — on every update that has a visibilitor and a tile renderer to lay out tiles for. An update that is missing either of the two touches no matrix, and the three.js renderer brings the scene graph up to date before it draws
 
 ### Removed
 
 - remove `VertexObjectPool#onDestroyVO`: `freeVO()` and `dispose()` release a vertex object without firing a callback. `onCreateVO` is unchanged
+- remove `TileSpritesFactory#freeTileSprite()`: `destroyTile()` gives a tile sprite back to the pool, and is the call `IMapTileFactory` names
 
 ### Fixed
 
@@ -151,6 +161,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
 
 ### Migration Guide
+
+#### `TileSpritesFactory#freeTileSprite()` is gone
+
+**Before**
+
+```ts
+factory.freeTileSprite(sprite);
+```
+
+**After**
+
+```ts
+factory.destroyTile(sprite);
+```
 
 #### A frame name in a `TextureAtlas` is taken only once
 
