@@ -1,97 +1,88 @@
-# Agent Project Context: `twopoint5d`
+# AGENTS.md
 
-This document provides a comprehensive overview of the `twopoint5d` project to accelerate AI-assisted development. It serves as the primary knowledge source for any agent working on this project.
+`twopoint5d` is a TypeScript toolkit for 2.5D rendering with three.js — lots of 2D
+sprites and billboards in a 3D scene. It is not a three.js wrapper; it adds features to
+existing three.js projects. Nx + pnpm workspaces monorepo, ESM only.
 
-## 1. Project Overview
+This file is the agent context for the whole repo. It holds what you would otherwise
+have to dig for. Everything else is in the linked docs, read them when the task needs
+them.
 
-`twopoint5d` is a TypeScript library for 2.5D rendering in HTML5 Canvas, built on **three.js**. "2.5D" refers to rendering 2D graphics (sprites, billboards) in a 3D environment to create depth.
+## Projects
 
-It is **not** a framework wrapping three.js, but a toolkit to add specific 2.5D features to existing three.js projects.
+| Path | Role |
+| --- | --- |
+| `packages/twopoint5d` | the published library `@spearwolf/twopoint5d` — almost all work happens here |
+| `packages/twopoint5d-testing` | browser/WebGL integration tests, kept out of the library so it stays Vitest-only |
+| `apps/lookbook` | Astro showcase and de-facto live documentation |
 
-Structure: **Monorepo** with **NX** and **pnpm Workspaces**.
+Nx tags select projects in the root scripts: `twopoint5d` (library + browser harness),
+`ci` (Vitest suite), `browser` (Playwright suite), `app` (lookbook). A project without
+tags silently drops out of every `--projects=tag:…` run.
 
-**CRITICAL:**
-- Ignore all files excluded by `.gitignore`.
-- Focus ONLY on `packages/` and `apps/`.
+The repo root also carries large generated files — `audit.html`, `remediation-plan.md`.
+Do not read them unless the task is about them.
 
----
+## Commands
 
-## 2. Workflow & Key Commands
+All from the repo root. Node ≥24, pnpm ≥10.22 (`engines` in `package.json`).
 
-Run all commands from the project root.
+- `pnpm install`
+- `pnpm lint` — ESLint + `prettier --check`; `pnpm format` writes the Prettier changes
+- `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
+- `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
+  `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
+- one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
+- `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
+  the lookbook's `.ts` and `.astro` files
+- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
+- `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
+  checkPkgTypes, checkNameableTypes, lintPkg, test:ci, test:browser. Run it before
+  committing.
 
-Node and pnpm versions come from `engines` in `package.json`; `.nvmrc` and `mise.toml` carry the same numbers for version managers.
+Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
+explicit instruction.
 
--   **Install:** `pnpm install`
--   **Lint:** `pnpm lint` (ESLint and Prettier for workspace; `pnpm format` writes the Prettier changes)
--   **Build:** `pnpm build` (All packages/apps). Single: `nx build <project>` (e.g., `twopoint5d`).
--   **Test:** `pnpm test` (Runs all: `vitest` unit tests & `@web/test-runner` browser tests).
--   **Start Demos:**
-    -   `pnpm lookbook` (Astro demo app @ `http://localhost:4321/lookbook`)
--   **CI Check:** `pnpm run ci` (clean, lint, build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, then the vitest and browser suites). **Run before committing.**
+## Rules you cannot read off the code
 
----
+- **Public surface.** `packages/twopoint5d/src/index.ts` re-exports each module's
+  `public-api.ts`. Anything not re-exported there is internal, and a new public symbol
+  is not published until you add it to its module's `public-api.ts`.
+- **Imports.** Relative imports carry the `.js` suffix (NodeNext) even though the
+  sources are `.ts`. Types use `import type` — lint enforces it.
+- **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
+  `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
+  Bump them there, never in an individual `package.json`. They are peer dependencies of
+  the library.
+- **Publishing** happens from the generated `dist/`, never from
+  `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
+  the published package.
+- **`dispose()` and ownership** follow
+  [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md). They
+  are binding, not advisory.
+- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and
+  `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
+  change to rendering or GPU-buffer code needs both.
+- **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+  Code, comments and docs are written in English.
 
-## 3. Monorepo Structure
+## Working on the library
 
--   `packages/twopoint5d`: **Core Library.** Logic, classes, shaders. Main dev work here.
--   `packages/twopoint5d-testing`: **Browser Integration Tests.** Ensures visual correctness.
--   `apps/lookbook`: **Demo App (Astro).** Visual showcase for testing changes live.
+Read a module's sources whole instead of grepping symbol by symbol. The modules are
+small enough for it — `map2d` is the largest at roughly 3.4k lines, most stay under 2k,
+and `cat src/<module>/*.ts` is one cheap call. The pooled-buffer, signal and ownership
+plumbing only makes sense in one piece; assembling it from grep hits is how wrong
+assumptions get in.
 
----
+`@spearwolf/eventize` and `@spearwolf/signalize` are used heavily. The `using-eventize`
+and `using-signalize` skills carry the semantics that differ from other event and
+signal libraries.
 
-## 4. Architecture (`packages/twopoint5d/src`)
+## Deeper docs
 
-Modular architecture designed for high performance via direct GPU communication.
-
-### 4.1. Core Concepts
--   **Vertex Objects (VO):** Performance core. Batches data for similar objects (sprites) into single `BufferGeometry` instances to minimize CPU overhead.
--   **Display & Stage:** `Display` wraps three.js renderer/loop. `Stage` is a 2D scene with projection. `StageRenderer` composes multiple stages.
--   **Texture Management:** `TextureAtlas`/`TileSet` manage spritesheets. `TextureStore` caches resources.
-
-### 4.2. Module Structure
--   `vertex-objects/`: **Low-level.** Manages GPU data, `VertexObjectPool`, `VOBufferGeometry`. Foundation layer.
--   `sprites/`: **Rendering.** `TexturedSprites`, `AnimatedSprites`, `TileSprites`. Uses specific `ShaderMaterial`s.
--   `display/`: **Loop.** `Display` (renderer), `Chronometer` (time), `FrameLoop`.
--   `stage/`: **Scene.** `Stage2D`, `StageRenderer`, Projections (`Orthographic`, `Parallax`).
--   `texture/`: **Assets.** `TextureAtlas`, `TileSet`, `TextureStore`.
--   `map2d/`: **Tiled Integration.** `Map2D` (holds streamer and renderers), `Map2DTileStreamer`, `Map2DTileRenderer`, `CameraBasedVisibility` (culling).
--   `controls/`: **Input.** `PanControl2D`.
--   `utils/`: **Helpers.**
-
----
-
-## 5. Tech Stack
-
--   **Lang:** TypeScript
--   **Pkg Mgr:** pnpm (workspaces)
--   **Repo:** NX
--   **Tests:** Vitest (Unit), @web/test-runner (Integration)
--   **Lint/Format:** ESLint, Prettier
--   **Apps:** Astro (Lookbook)
-
----
-
-## 6. Conventions
-
--   **Style:** Follow existing TypeScript style. Strong typing.
--   **Docs:** TSDoc for public APIs.
--   **Tests:** Unit tests for logic, Browser tests for visuals.
--   **Commits:** [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
--   **Resource lifecycle:** `dispose()` and ownership follow [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md).
-
----
-
-## 7. Publishing
-
-Controlled by scripts in `scripts/`. **Do not run without explicit instruction.**
-
-## 8. Documentation Guidelines
-
--   **Language:** English.
--   **Format:** Markdown.
--   **Style:** Simple, clear, technical.
-
-## 9. Development Workflow
-
--   When testing `packages/twopoint5d`, consider adding integration tests to `twopoint5d-testing`.
+- [Library architecture](packages/twopoint5d/docs/architecture.md) — layers, the
+  vertex-object core, what each module owns
+- [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — `dispose()` and ownership
+- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — `Display` + `Stage2D` + `StageRenderer` idioms
+- [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
+  publish pipeline, the CI gate
