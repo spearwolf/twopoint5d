@@ -1,6 +1,8 @@
 import type {Box3} from 'three/webgpu';
-import {Matrix4, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
-import {beforeEach, describe, expect, test} from 'vitest';
+import {Euler, Frustum, Matrix4, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
+import type {MockInstance} from 'vitest';
+import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
+import type {TileBox} from './CameraBasedVisibility.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DVisibleTiles} from './types.js';
@@ -23,6 +25,72 @@ function makeOrthoCameraLookingHorizontally(): OrthographicCamera {
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;
+}
+
+function makeCameraLookingOverThePlane(): PerspectiveCamera {
+  // Above the XZ-plane and tilted upwards by 26.5°: the center of the view frustum points into
+  // the sky and never meets the plane, while its lower half still reaches the ground.
+  const camera = new PerspectiveCamera(90, 1, 0.1, 500);
+  camera.position.set(0, 100, 0);
+  camera.lookAt(0, 150, 100);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+function makeCameraTouchingThePlaneWithOneCorner(): PerspectiveCamera {
+  // Tilted up steeply and rolled by 45°, so that of the nine probe rays only the one through
+  // the lowest corner of the view frustum still reaches the plane.
+  const camera = new PerspectiveCamera(90, 1, 0.1, 500);
+  camera.position.set(0, 100, 0);
+  camera.rotation.copy(new Euler((48 * Math.PI) / 180, 0, Math.PI / 4, 'YXZ'));
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+function makeTiltedCamera(): PerspectiveCamera {
+  // Looks down at the plane from behind and above, the way a map is usually watched: the lower
+  // half of the frustum lands on the ground in front of the camera, the upper half runs out to
+  // the horizon.
+  const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
+  camera.position.set(0, 350, 500);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+/** The camera frustum of the visibility, built the second time and from the outside. */
+function makeFrustum(camera: PerspectiveCamera | OrthographicCamera): Frustum {
+  return new Frustum().setFromProjectionMatrix(new Matrix4().copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
+}
+
+/**
+ * The tiles the probe rays met, as `x,y`. With an identity `matrixWorld` a point on the plane is
+ * at its own x/z, and the center point moves the tile grid under it — which is the whole of what
+ * the visibility does with it, so the grid can be asked directly.
+ */
+function probeTileIds(
+  visibility: CameraBasedVisibility,
+  tileCoords: Map2DTileCoordsUtil,
+  [centerX, centerY]: [number, number] = [0, 0],
+): string[] {
+  return visibility.pointsOnPlane.map((point) => {
+    const [tileLeft, tileTop] = tileCoords.getTileCoords(point.x + centerX, point.z + centerY, 0, 0);
+    return `${tileLeft},${tileTop}`;
+  });
+}
+
+/**
+ * Whether a tile can carry the primary mark: the seed rectangle of one tile size around a probe
+ * point reaches the tile the point falls into and up to three of its neighbours.
+ */
+function isNextToAProbe(tile: {x: number; y: number}, probes: readonly string[]): boolean {
+  return probes.some((id) => {
+    const [x, y] = id.split(',').map(Number) as [number, number];
+    return Math.abs(tile.x - x) <= 1 && Math.abs(tile.y - y) <= 1;
+  });
 }
 
 function ids(tiles: {id: string}[] | undefined): string[] {
@@ -292,6 +360,189 @@ describe('CameraBasedVisibility', () => {
 
       expect(second).not.toBe(first);
       expect(second.changed).toBe(true);
+    });
+  });
+
+  describe('the probe rays through the view frustum', () => {
+    let tileCoords: Map2DTileCoordsUtil;
+    let matrixWorld: Matrix4;
+
+    beforeEach(() => {
+      tileCoords = new Map2DTileCoordsUtil(100, 100);
+      matrixWorld = new Matrix4();
+    });
+
+    test('reports one point per ray that met the plane, the first of them as pointOnPlane', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      // a camera looking straight down meets the plane with all nine of them
+      expect(visibility.pointsOnPlane).toHaveLength(9);
+
+      for (const point of visibility.pointsOnPlane) {
+        expect(point.y, `${point.toArray()} lies on the plane`).toBeCloseTo(0);
+      }
+
+      // the center ray comes first, and that is the point the plane coordinates are taken from.
+      // `lookAt()` nudges a camera whose up vector runs along its view direction, so the point
+      // lands next to the origin instead of on it
+      expect(visibility.pointsOnPlane[0]!.x).toBeCloseTo(0, 1);
+      expect(visibility.pointsOnPlane[0]!.z).toBeCloseTo(0, 1);
+      expect(visibility.pointOnPlane!.equals(visibility.pointsOnPlane[0]!)).toBe(true);
+
+      // and the rays through the edges and corners reach further out than the center one
+      const reach = Math.max(...visibility.pointsOnPlane.map((point) => Math.abs(point.x)));
+      expect(reach).toBeGreaterThan(50);
+    });
+
+    test('finds the plane along the lower half of the frustum when the center of the view points past it', () => {
+      const camera = makeCameraLookingOverThePlane();
+
+      // the ray the visibility used to rely on runs upwards and never meets the plane
+      const centerRay = new Vector3(0, 0, -1).unproject(camera).sub(camera.position);
+      expect(centerRay.y, 'the center of the view points into the sky').toBeGreaterThan(0);
+
+      const visibility = new CameraBasedVisibility(camera);
+      const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(result, 'the plane is in the view, so there are tiles').toBeDefined();
+      expect(result!.tiles.length).toBeGreaterThan(0);
+      expect(visibility.pointsOnPlane.length).toBeGreaterThan(0);
+      expect(visibility.pointOnPlane, 'and a point on the plane to go with them').not.toBeNull();
+
+      // the rays that found it are the ones through the lower half of the frustum, in front of
+      // the camera
+      for (const point of visibility.pointsOnPlane) {
+        expect(point.z, `${point.toArray()} lies in front of the camera`).toBeGreaterThan(0);
+      }
+    });
+
+    test('finds the plane when a single corner of the frustum reaches it', () => {
+      const visibility = new CameraBasedVisibility(makeCameraTouchingThePlaneWithOneCorner());
+      const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(visibility.pointsOnPlane.length, 'too few rays to span an area').toBeLessThan(3);
+      expect(visibility.pointsOnPlane.length).toBeGreaterThan(0);
+
+      // fewer than three rays fill nothing in — the search runs from the tiles they met, and
+      // finds the sliver of the plane that hangs into the view
+      expect(result).toBeDefined();
+      expect(result!.tiles.length).toBeGreaterThan(0);
+      expect(ids(result!.tiles)).toEqual(expect.arrayContaining(probeTileIds(visibility, tileCoords)));
+    });
+
+    test('takes every tile a ray met into the visible set and marks it as primary', () => {
+      const visibility = new CameraBasedVisibility(makeTiltedCamera());
+      const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+      const result = visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld)!;
+
+      const probes = probeTileIds(visibility, mapCoords);
+      expect(probes.length).toBeGreaterThan(2);
+
+      const primaries = new Set(visibility.visibles.filter((tile) => tile.primary).map((tile) => `${tile.x},${tile.y}`));
+
+      for (const id of probes) {
+        expect(ids(result.tiles), `tile ${id} is visible`).toContain(id);
+        expect(primaries.has(id), `tile ${id} is a primary one`).toBe(true);
+      }
+    });
+
+    test('takes the primary mark off a pooled tile that no ray of the next recomputation met', () => {
+      const visibility = new CameraBasedVisibility(makeTiltedCamera());
+      const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+
+      const first = visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld)!;
+      const wasPrimary = new Set(visibility.visibles.filter((tile) => tile.primary).map((tile) => `${tile.x},${tile.y}`));
+      expect(wasPrimary.size).toBeGreaterThan(0);
+
+      // move the map by three tiles: far enough for the rays to land somewhere else entirely, and
+      // near enough for the tiles they met before to stay visible on their pooled `TileBox`
+      const center: [number, number] = [3 * 256, 0];
+      visibility.computeVisibleTiles(first.tiles, center, mapCoords, matrixWorld);
+
+      const probes = probeTileIds(visibility, mapCoords, center);
+      const carriedOver = visibility.visibles.filter(
+        (tile) => wasPrimary.has(`${tile.x},${tile.y}`) && !isNextToAProbe(tile, probes),
+      );
+
+      expect(carriedOver.length, 'tiles that were primary before and are still visible').toBeGreaterThan(0);
+      for (const tile of carriedOver) {
+        expect(tile.primary, `tile ${tile.x},${tile.y} no longer carries the mark`).toBe(false);
+      }
+    });
+
+    test('leaves no tile marked as primary that no ray met', () => {
+      const visibility = new CameraBasedVisibility(makeTiltedCamera());
+      const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+      visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld);
+
+      const probes = probeTileIds(visibility, mapCoords);
+      for (const tile of visibility.visibles) {
+        if (!tile.primary) continue;
+        expect(isNextToAProbe(tile, probes), `tile ${tile.x},${tile.y} is marked primary`).toBe(true);
+      }
+    });
+  });
+
+  describe('the tiles between three or more probe rays', () => {
+    let matrixWorld: Matrix4;
+    let mapCoords: Map2DTileCoordsUtil;
+    let camera: PerspectiveCamera;
+    let visibility: CameraBasedVisibility;
+    let intersectsBox: MockInstance<Frustum['intersectsBox']>;
+
+    /** The tiles that went into the visible set without being held against the frustum. */
+    function untestedVisibles(): TileBox[] {
+      const tested = new Set<Box3>(intersectsBox.mock.calls.map(([box]) => box));
+      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox!));
+    }
+
+    beforeEach(() => {
+      matrixWorld = new Matrix4();
+      mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+      camera = makeTiltedCamera();
+      visibility = new CameraBasedVisibility(camera);
+      intersectsBox = vi.spyOn(Frustum.prototype, 'intersectsBox');
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    test('go into the visible set without being tested against the frustum', () => {
+      const result = visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld)!;
+
+      const untested = untestedVisibles();
+
+      expect(untested.length, 'the rays span an area, and its tiles are taken as they are').toBeGreaterThan(0);
+      expect(untested.length, 'the tiles beyond it are still tested one by one').toBeLessThan(result.tiles.length);
+    });
+
+    test('would every one of them have passed the test', () => {
+      visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld);
+
+      const frustum = makeFrustum(camera);
+
+      for (const tile of untestedVisibles()) {
+        expect(frustum.intersectsBox(tile.frustumBox!), `tile ${tile.x},${tile.y} is in the view frustum`).toBe(true);
+      }
+    });
+
+    test('lie within the tiles the rays met', () => {
+      visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld);
+
+      const probes = probeTileIds(visibility, mapCoords).map((id) => id.split(',').map(Number) as [number, number]);
+      const left = Math.min(...probes.map(([x]) => x));
+      const right = Math.max(...probes.map(([x]) => x));
+      const top = Math.min(...probes.map(([, y]) => y));
+      const bottom = Math.max(...probes.map(([, y]) => y));
+
+      for (const tile of untestedVisibles()) {
+        expect(tile.x, `x of ${tile.x},${tile.y}`).toBeGreaterThanOrEqual(left);
+        expect(tile.x, `x of ${tile.x},${tile.y}`).toBeLessThanOrEqual(right);
+        expect(tile.y, `y of ${tile.x},${tile.y}`).toBeGreaterThanOrEqual(top);
+        expect(tile.y, `y of ${tile.x},${tile.y}`).toBeLessThanOrEqual(bottom);
+      }
     });
   });
 
