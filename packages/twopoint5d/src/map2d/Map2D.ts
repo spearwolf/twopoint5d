@@ -12,27 +12,33 @@ export class Map2D extends Group {
   }
 
   set tileStreamer(streamer: Map2DTileStreamer) {
-    if (this.#tileStreamer !== streamer) {
-      if (this.#renderers.size > 0) {
-        if (this.#tileStreamer) {
-          for (const renderer of this.#renderers) {
-            this.#tileStreamer.removeTileRenderer(renderer);
-          }
-        }
-      }
+    if (this.#tileStreamer === streamer) return;
 
-      this.#tileStreamer = streamer;
+    const previous = this.#tileStreamer;
 
-      if (this.#visibilitor) {
-        this.#tileStreamer.visibilitor = this.#visibilitor;
-      }
-
-      if (this.#tileStreamer) {
-        for (const renderer of this.#renderers) {
-          this.#tileStreamer.addTileRenderer(renderer);
-        }
-      }
+    for (const renderer of this.#renderers) {
+      previous.removeTileRenderer(renderer);
     }
+
+    this.#tileStreamer = streamer;
+
+    // the view center belongs to the map: whoever set it through Map2D reads it back through
+    // Map2D, whichever streamer carries it underneath
+    streamer.centerX = previous.centerX;
+    streamer.centerY = previous.centerY;
+
+    if (this.#visibilitor) {
+      streamer.visibilitor = this.#visibilitor;
+    }
+
+    for (const renderer of this.#renderers) {
+      streamer.addTileRenderer(renderer);
+    }
+
+    // the renderers hold the tiles of the streamer that left, and the one taking over starts with
+    // an empty tile list: without this every one of those tiles comes back as a createTile and
+    // overwrites its map entry, and the tile it replaces never reaches destroyTile()
+    streamer.clearTiles();
   }
 
   get visibilitor(): IMap2DVisibilitor | undefined {
@@ -40,12 +46,9 @@ export class Map2D extends Group {
   }
 
   set visibilitor(v: IMap2DVisibilitor) {
-    if (this.#visibilitor !== v) {
-      this.#visibilitor = v;
-      if (this.#tileStreamer != null) {
-        this.#tileStreamer.visibilitor = v;
-      }
-    }
+    if (this.#visibilitor === v) return;
+    this.#visibilitor = v;
+    this.#tileStreamer.visibilitor = v;
   }
 
   get centerX(): number {

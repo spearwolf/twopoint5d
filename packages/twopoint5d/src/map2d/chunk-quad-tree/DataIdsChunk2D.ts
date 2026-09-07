@@ -41,9 +41,7 @@ export class DataIdsChunk2D extends DataChunk2D {
       // - https://github.com/nodeca/pako
       // - ... ?
 
-      // eslint-disable-next-line no-console
-      console.error('[Data2DChunk] compression feature is not yet implemented', {compression, data});
-      throw new Error('compression is not yet implemented');
+      throw new Error(`DataIdsChunk2D: the compression "${compression}" is not supported`);
     }
 
     return base64toUint32Arr(data);
@@ -57,7 +55,12 @@ export class DataIdsChunk2D extends DataChunk2D {
   }
 
   protected readDataIdAtLocal(x: number, y: number): number | undefined {
-    return this.uint32Arr[y * this.data.width + x];
+    const {width, height} = this.data;
+    // `y * width + x` folds a coordinate from outside into the neighbouring row and lands on a
+    // valid-looking id there, so the index is held against both axes rather than against the
+    // length of the array alone
+    if (x < 0 || x >= width || y < 0 || y >= height) return undefined;
+    return this.uint32Arr[y * width + x];
   }
 
   /**

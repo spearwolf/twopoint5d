@@ -31,9 +31,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
         for (let x = 0; x < tileColumns; x++) {
           const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
           let tileSet = this.#tiles.get(key);
-          if (tileSet) {
-            tileSet.add(renderable);
-          } else {
+          if (tileSet == null) {
             tileSet = new Set<Renderable>();
             this.#tiles.set(key, tileSet);
           }

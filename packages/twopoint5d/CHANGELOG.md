@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which reports `changed: true` and raises `serial`, instead of waiting for the camera to move
 - `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
 - `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
+- `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
+- `Map2D#tileStreamer` hands the view center over to the streamer that takes over — `centerX` and `centerY` read the same values afterwards as before — and has the tiles built again: the renderers of the map are cleared on the next `update()` and the streamer taking over lays out the whole set. The tile grid stays with the streamer that carries it, `tileWidth`, `tileHeight`, `xOffset` and `yOffset` among it
+- `DataIdsChunk2D#prepareData()` names the compression it cannot handle in the error it throws and writes nothing to the console: the caller reads the reason off the error, in a message that cannot be silenced away
 - perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
 - perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
 - perf `Map2D#update()` leaves the world matrix to the tile streamer, which brings it up to date with `updateWorldMatrix(true, false)` — the parent chain first — on every update that has a visibilitor and a tile renderer to lay out tiles for. An update that is missing either of the two touches no matrix, and the three.js renderer brings the scene graph up to date before it draws
@@ -159,6 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the coordinates `PanControl2D` measures a drag with: they are taken against `coordsTarget`, which stays the same element throughout the drag. Measuring against the element under the pointer moves the reference rectangle mid-drag as the pointer crosses other elements, and a shadow root retargets it onto the host on top of that
 - fix `PanControl2D#pointerDisabled`: switching the pointer off drops the pan collected up to that moment instead of holding it back and delivering it in one jump when the pointer is switched on again
 - fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
+- fix `RepeatingTilesProvider#getTileIdAt()` on a pattern without cells — the default pattern among them: it answers with `0`, the value `getTileIdsWithin()` fills such a pattern with, instead of computing an index through a modulo by zero and returning an `undefined` under a signature that promises a `number`
+- fix `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` for a coordinate outside the chunk: both hold it against the width and the height of the chunk and answer with `undefined`. An `x` past either edge folded into the neighbouring row and answered with a foreign id that looked valid
 
 ### Migration Guide
 
@@ -1280,6 +1285,31 @@ display.frameLoop.start({
   },
 });
 ```
+
+#### A tile id pattern is rectangular
+
+**Before**
+
+```ts
+// the width came from the first row, the shorter row below answered with undefined
+const provider = new RepeatingTilesProvider([
+  [1, 2, 3],
+  [4, 5],
+]);
+```
+
+**After**
+
+```ts
+// every row carries the length of the first one
+const provider = new RepeatingTilesProvider([
+  [1, 2, 3],
+  [4, 5, 0],
+]);
+```
+
+A pattern without a row — `[]` through the `tileIds` setter — is refused as well. The empty
+pattern of a provider built without arguments is `[[]]`: one row, no column.
 
 ## [0.21.2] - 2026-06-19
 

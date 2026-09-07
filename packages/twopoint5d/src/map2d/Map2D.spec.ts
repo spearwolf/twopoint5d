@@ -4,7 +4,8 @@ import {Group, Object3D} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {Map2D} from './Map2D.js';
-import type {IMap2DTileCoords, IMap2DTileRenderer} from './types.js';
+import {Map2DTileStreamer} from './Map2DTileStreamer.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
 function makeTileRenderer(): IMap2DTileRenderer {
   return {
@@ -19,11 +20,50 @@ function makeTileRenderer(): IMap2DTileRenderer {
   };
 }
 
+// answers every call with an empty tile set, which is enough to let Map2DTileStreamer#update()
+// walk through its whole body
+function makeVisibilitor(): IMap2DVisibilitor {
+  return {
+    computeVisibleTiles() {
+      return {tiles: [], createTiles: [], reuseTiles: [], removeTiles: []};
+    },
+  };
+}
+
 describe('Map2D', () => {
   const sandbox = createSandbox();
 
   afterEach(() => {
     sandbox.restore();
+  });
+
+  describe('tileStreamer', () => {
+    test('hands the view center to the streamer that takes over', () => {
+      const map = new Map2D();
+
+      map.centerX = 100;
+      map.centerY = -50;
+
+      map.tileStreamer = new Map2DTileStreamer();
+
+      expect(map.centerX).toBe(100);
+      expect(map.centerY).toBe(-50);
+    });
+
+    test('builds the tiles again when another streamer takes over', () => {
+      const map = new Map2D();
+      const renderer = makeTileRenderer();
+      const clearTiles = sandbox.spy(renderer, 'clearTiles');
+
+      map.addTileRenderer(renderer);
+
+      map.tileStreamer = new Map2DTileStreamer();
+      map.visibilitor = makeVisibilitor();
+
+      map.update();
+
+      expect(clearTiles.calledOnce).toBe(true);
+    });
   });
 
   describe('dispose()', () => {

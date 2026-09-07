@@ -16,8 +16,9 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   #tileIds!: number[][];
 
   // `#rows` and `#cols` are taken from the very array that is indexed below, in the `tileIds`
-  // setter. Every index into `#tileIds` therefore passes through `% #rows` / `% #cols` or
-  // through a range check against them first, and cannot point past the pattern.
+  // setter, which lets a pattern in only when every row of it has the length of the first one.
+  // Every index into `#tileIds` therefore passes through `% #rows` / `% #cols` or through a
+  // range check against them first, and cannot point past the pattern.
   #rows = 0;
   #cols = 0;
 
@@ -26,11 +27,23 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   }
 
   set tileIds(tileIds: number[][]) {
+    // the whole pattern is checked before the first field is written: a refused pattern leaves
+    // the provider with the one it had rather than half of a new one
+    const rows = tileIds.length;
+    if (rows === 0) {
+      throw new Error('RepeatingTilesProvider: a tile id pattern needs at least one row');
+    }
+    const cols = tileIds[0]!.length;
+    for (let row = 1; row < rows; row++) {
+      if (tileIds[row]!.length !== cols) {
+        throw new Error(
+          `RepeatingTilesProvider: every row of a tile id pattern has the same length, but row ${row} has ${tileIds[row]!.length} instead of ${cols}`,
+        );
+      }
+    }
     this.#tileIds = tileIds;
-    this.#rows = tileIds.length;
-    // Every pattern the constructor builds carries at least one row — it substitutes `[[]]` for a
-    // missing one. An empty array assigned through this setter fails on this line.
-    this.#cols = tileIds[0]!.length;
+    this.#rows = rows;
+    this.#cols = cols;
   }
 
   constructor(tileIds?: RepeatingTilesPatternType, limitToAxis: LimitToAxisType = 'none') {
@@ -50,6 +63,10 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   }
 
   getTileIdAt(col: number, row: number): number {
+    // the guard `getTileIdsWithin()` opens with: a pattern without cells has no id to answer
+    // with, and the `% 0` below would turn the index into NaN
+    if (this.#cols === 0 || this.#rows === 0) return 0;
+
     switch (this.limitToAxis) {
       case 'vertical':
         if (col >= 0 && col < this.#cols) {

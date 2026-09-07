@@ -37,8 +37,34 @@ describe('RepeatingTilesProvider', () => {
       expect(new RepeatingTilesProvider(1, 'horizontal').limitToAxis).toBe('horizontal');
       expect(new RepeatingTilesProvider(1, 'vertical').limitToAxis).toBe('vertical');
     });
+    test('rejects a pattern whose rows are not all the same length', () => {
+      expect(() => new RepeatingTilesProvider([[1, 2], [3]])).toThrow(/row 1/);
+
+      const tiles = new RepeatingTilesProvider([
+        [1, 2],
+        [3, 4],
+      ]);
+      expect(() => {
+        tiles.tileIds = [[1, 2], [3]];
+      }).toThrow(/row 1/);
+      expect(tiles.tileIds).toEqual([
+        [1, 2],
+        [3, 4],
+      ]);
+    });
   });
   describe('getTileIdAt()', () => {
+    test('answers with 0 on a pattern that has no columns', () => {
+      expect(new RepeatingTilesProvider().getTileIdAt(0, 0)).toBe(0);
+      expect(new RepeatingTilesProvider().getTileIdAt(3, 7)).toBe(0);
+      expect(new RepeatingTilesProvider().getTileIdAt(-3, -7)).toBe(0);
+
+      expect(new RepeatingTilesProvider(undefined, 'horizontal').getTileIdAt(0, 0)).toBe(0);
+      expect(new RepeatingTilesProvider(undefined, 'horizontal').getTileIdAt(3, 7)).toBe(0);
+      expect(new RepeatingTilesProvider(undefined, 'horizontal').getTileIdAt(-3, -7)).toBe(0);
+
+      expect(new RepeatingTilesProvider(undefined, 'vertical').getTileIdAt(0, 0)).toBe(0);
+    });
     test('vertical', () => {
       expect(
         new RepeatingTilesProvider(
