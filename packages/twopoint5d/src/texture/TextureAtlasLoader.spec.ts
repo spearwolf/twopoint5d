@@ -31,6 +31,11 @@ const atlasJsonWithoutImage = {
   meta: {size: {w: 16, h: 16}},
 };
 
+const atlasJsonNamingAnImage = {
+  frames: {'walk.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+  meta: {image: 'from-json.png', size: {w: 16, h: 16}},
+};
+
 describe('TextureAtlasLoader', () => {
   test('a response that is no texture atlas json is reported with its url', async () => {
     const imageLoad = vi.fn();
@@ -78,5 +83,46 @@ describe('TextureAtlasLoader', () => {
     await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/"atlas\.json" names no image/);
 
     expect(imageLoad).not.toHaveBeenCalled();
+  });
+
+  test('an atlas json whose frames carry no coordinates is refused', async () => {
+    const imageLoad = imageLoaderAnswering();
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering({frames: {'walk.1': {}}, meta: {size: {w: 16, h: 16}}}),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json', undefined, {overrideImageUrl: 'sprites.png'})).rejects.toThrow(
+      /is no texture atlas json/,
+    );
+
+    expect(imageLoad).not.toHaveBeenCalled();
+  });
+
+  test('an atlas json whose meta names no size is refused', async () => {
+    const imageLoad = imageLoaderAnswering();
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering({frames: {}, meta: {size: {}}}),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json', undefined, {overrideImageUrl: 'sprites.png'})).rejects.toThrow(
+      /is no texture atlas json/,
+    );
+
+    expect(imageLoad).not.toHaveBeenCalled();
+  });
+
+  test('an overrideImageUrl outranks the image the json names', async () => {
+    const imageLoad = imageLoaderAnswering();
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJsonNamingAnImage),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    const {meta} = await loader.loadAsync('atlas.json', undefined, {overrideImageUrl: 'sprites.png'});
+
+    expect(imageLoad.mock.calls[0]![0]).toBe('sprites.png');
+    expect(meta.image).toBe('sprites.png');
   });
 });

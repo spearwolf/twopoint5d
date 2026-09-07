@@ -380,6 +380,65 @@ describe('TextureResource', () => {
     });
   });
 
+  describe('what a subscriber sees', () => {
+    test('a tile set is on the resource by the time the imageCoords event arrives', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
+      resource.load();
+
+      const seen: Array<{tileSet: unknown; atlas: unknown}> = [];
+      on(resource, 'imageCoords', () => {
+        // read off the resource, not out of the payload: the question is what is already
+        // there when this bridge fires, and the priority of the derived effects is what
+        // answers it
+        seen.push({tileSet: resource.tileSet, atlas: resource.atlas});
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]!.tileSet).toBeDefined();
+      expect(seen[0]!.atlas).toBeDefined();
+
+      resource.dispose();
+    });
+
+    test('an atlas is on the resource by the time the imageCoords event arrives', async () => {
+      const atlasJson = {
+        frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      resource.load();
+
+      const seen: unknown[] = [];
+      on(resource, 'imageCoords', () => {
+        seen.push(resource.atlas);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toBeDefined();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+  });
+
   describe('atlas fetch', () => {
     test('a response that answers with a status is reported instead of parsed', async () => {
       const fetchMock = vi

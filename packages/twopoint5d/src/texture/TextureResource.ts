@@ -63,8 +63,10 @@ export const TextureResourceSubtypes = {
  * The per-subtype events (`imageCoords`, `atlas`, `tileSet`, `texture`,
  * `frameBasedAnimations`) are retained — late subscribers see the latest value.
  *
- * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, and
- * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
+ * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, with a
+ * `status: number` beside it when the atlas request answered with a status instead of a body —
+ * an image that does not load comes out of the loader promise and has no status to name. It
+ * carries `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data does not fit this kind of resource, and one whose data does not
  * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
  * Every other entry of the same map is registered all the same.
@@ -110,6 +112,11 @@ const OnError = TextureResourceEvents.Error;
 // atlas or the tile set built from the same image is on the resource. Without a priority
 // the flush would fall back to the order the effects were queued in — the order of three
 // lines inside one callback, which no one reading them would take for a promise.
+// The tile set effect is the one the suite can tell apart: it hangs off `#imageCoords`
+// alone and is registered after the bridge that carries the coordinates out, so without
+// the priority the bridge goes first. The atlas effect also reads `#imageUrlOfCoords`,
+// the first write of the batch, which queues it ahead of every bridge on its own — its
+// priority is what keeps the promise once those three lines are ever reordered.
 const DERIVED_FROM_IMAGE_PRIORITY = 100;
 
 // An animation entry that carries the data of another kind of resource is skipped, and

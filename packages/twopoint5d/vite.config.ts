@@ -7,6 +7,10 @@ export default defineConfig({
     // glob — compiled output under `dist/` carries the same specs as `.js` and must
     // not be collected along with them.
     include: ['src/**/*.spec.ts'],
+    // Every `vi.spyOn` is taken back when its test ends. A spy that outlives the test that
+    // installed it lies over every following test of the same file, and a test that measures
+    // an order silently stops measuring anything.
+    restoreMocks: true,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
