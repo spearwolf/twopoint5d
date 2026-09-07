@@ -424,6 +424,9 @@ new StageRenderer(host).add(stage);
 
 ## Resource lifecycle
 
+What this layer does on top of the general rules in
+[docs/resource-lifecycle.md](../../docs/resource-lifecycle.md):
+
 - Internal `RenderTarget`s are created lazily on first render and resized
   in `resize(width, height)`.
 - `StageRenderer.dispose()` releases both internal RTs, and nothing else. It also

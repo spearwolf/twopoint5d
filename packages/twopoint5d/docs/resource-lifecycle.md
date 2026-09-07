@@ -1,39 +1,28 @@
 # Resource lifecycle: `dispose()` and ownership
 
-These are the rules for releasing resources in `@spearwolf/twopoint5d`. They are
-binding: a `dispose()` that does not follow them is a bug, not a variation.
+Binding rules for every class in this package that has a `dispose()`, and for every new
+one that gets one — geometries, materials, meshes, pools, renderers, stores, display.
+A `dispose()` that breaks them is a bug, not a variation. Section 7 is the checklist,
+section 8 the tests to ship with it.
 
-## 1. Scope
-
-These rules apply to every class in this package that has a `dispose()` method, and to
-every new module that gets one. That covers geometries, materials,
-meshes, pools, renderers, stores and the display layer alike. Where a layer needs
-more detail than the general rule gives, it documents it next to its own code — the
-[stage layer cheat-sheet](../src/stage/README.md) does that for the renderer and its
-render targets.
-
-## 2. Ownership
+## 1. Ownership
 
 **`dispose()` releases what the instance created itself, and nothing else.**
 
-A resource that was handed in — through the constructor, a setter or an attach
-method — belongs to the caller. It is not disposed, not cleared, not modified. Who
-hands a resource in, disposes it. Who hands a resource out while still owning it,
-stays its owner: returning a pool from a getter does not transfer it.
+A resource handed in — through the constructor, a setter or an attach method — belongs
+to the caller: not disposed, not cleared, not modified. Handing a resource out does not
+transfer it either; returning a pool from a getter keeps you the owner.
 
-A class may take a resource over, but only where the receiving side says so in its own
-TSDoc — at the constructor parameter, at the field, at the method that accepts it. Without
-that promise in writing, the rule above holds unchanged.
-[`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its constructor
-receives and releases it in `dispose()`;
-[`Canvas2DStage`](../src/stage/Canvas2DStage.ts) takes over every texture that ends up in
-its `texture` field, whether it was assigned from outside or built by the stage itself. A
-take-over that is not written down where the resource arrives is a bug, not a case this
-paragraph forgot.
+**A take-over counts only where the receiving side promises it in its own TSDoc** — at
+the constructor parameter, at the field, at the method that accepts the resource. Two
+exist today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its
+constructor receives, and [`Canvas2DStage`](../src/stage/Canvas2DStage.ts) takes over
+every texture that lands in its `texture` field, assigned from outside or built
+in-house. An undocumented take-over is a bug.
 
-The reference implementation is
-[`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts). Its constructor
-builds a pool only when it was given a descriptor, and marks exactly that pool:
+Reference implementation —
+[`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and
+asks the bookkeeping instead of guessing:
 
 ```ts
 this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
@@ -42,48 +31,38 @@ if (!(source instanceof VOBufferPool)) {
 }
 ```
 
-`dispose()` then asks the bookkeeping instead of guessing:
-
 ```ts
 if (this.#ownedPools.has(this.pool)) {
   this.pool.dispose();
 }
 ```
 
-Do not introduce a new take-over flag. The rule already answers the question, and a
-flag turns an invariant into an option that every caller has to reason about.
-
-[`InstancedVOBufferGeometry#attachInstancedPool(name, pool, {autoDispose})`](../src/vertex-objects/InstancedVOBufferGeometry.ts)
-is the one flag that exists, and it is not an exception to the rule: its default
-value asks precisely what the rule asks — did this geometry build the pool itself? A
-descriptor handed in becomes a pool owned here, a `VertexObjectPool` handed in
-belongs to the caller. The flag exists so that a pool shared between several
-geometries can be attached explicitly without any of them claiming it. Read it as a
-sharing declaration, not as a template for new APIs.
+Do not add a take-over flag to a new API — the rule already answers the question. The
+one that exists,
+[`InstancedVOBufferGeometry#attachInstancedPool(name, pool, {autoDispose})`](../src/vertex-objects/InstancedVOBufferGeometry.ts),
+defaults to exactly what the rule asks and lets a pool shared between several geometries
+be attached without any of them claiming it. A sharing declaration, not a template.
 
 **What was borrowed is given back, even though it was never owned.**
 
-A slot taken from a pool and a tile taken from a factory are not resources this instance
-owns — but they are resources it holds, and nobody else can reach them. Every acquiring call
-has a releasing counterpart, and `dispose()` is the last place the pairing can still be
-honoured: `createVO()` ↔ `freeVO()`, [`IMapTileFactory.createTile()`](../src/map2d/types.ts)
-↔ `destroyTile()`. Giving back is not releasing — the pool or the factory stays the owner and
-decides what becomes of the slot, the holder only says that it is done with it.
-[`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) hands every tile it still
-holds back before it lets the factory go, so a factory that goes on to serve a second renderer
-gets the slots of the first one back. Assertion (f) of section 8 is the test for it.
+Slots taken from a pool and tiles taken from a factory are held, not owned, and nobody
+else can reach them. Every acquiring call has a releasing counterpart, and `dispose()`
+is the last place to honour the pairing: `createVO()` ↔ `freeVO()`,
+[`IMapTileFactory.createTile()`](../src/map2d/types.ts) ↔ `destroyTile()`. Giving back
+is not releasing — the pool or the factory stays the owner.
+[`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) hands every tile back
+before it lets the factory go, so a factory serving a second renderer gets the slots of
+the first one back. Assertion (f) in section 8 tests it.
 
-An instance that passes what it took straight out to the caller has nothing to give back:
-`TexturedSprites#createSprite()` hands the sprite over, and whoever asked for it calls
-`freeSprite()`.
+An instance that passes what it took straight out to its caller has nothing to give
+back: `TexturedSprites#createSprite()` hands the sprite over, and whoever asked for it
+calls `freeSprite()`.
 
-## 3. Idempotence
+## 2. Idempotence
 
-**`dispose()` may be called any number of times.**
-
-The second call releases nothing a second time and it does not throw. Guard with a
-private flag and return early, the way
-[`VOBufferPool.dispose()`](../src/vertex-objects/VOBufferPool.ts) does:
+**`dispose()` may be called any number of times** — the second call releases nothing
+again and does not throw. Default shape, as in
+[`VOBufferPool.dispose()`](../src/vertex-objects/VOBufferPool.ts):
 
 ```ts
 dispose(): void {
@@ -93,22 +72,17 @@ dispose(): void {
 }
 ```
 
-The flag is the default shape and the safe answer whenever a step would do real work
-twice. A `dispose()` in which every single step runs empty on the second call needs
-none: a reference that has been given up makes the optional call behind it fall
-through, `removeFromParent()` checks for a missing parent, `SignalGroup.delete()` and
-a repeated `set(undefined)` change nothing, and `Material.dispose()` reaches nobody the
-second time because its `dispose` event is what makes the renderer's listeners unsubscribe
-themselves. Such a method satisfies this rule by
-construction — but only if that is shown rather than claimed, which is what assertion
-(d) of section 8 is for: a second call throws nothing and releases nothing again. A third shape
-guards on the state the method itself gives up instead of on a private flag:
+Two other shapes are legitimate. Idempotent by construction, when every step runs empty
+the second time anyway — a reference already given up, `removeFromParent()` with no
+parent, `SignalGroup.delete()`, a repeated `set(undefined)`, `Material.dispose()` whose
+own dispose event already unsubscribed the renderer. And guarded on the state the
+method itself gives up, the way
 [`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) returns early on
-`tileFactory === null`, the public member it clears.
+`tileFactory === null`. Neither is claimed, both are shown by assertion (d).
 
-Where a caller needs to know the state, expose it as a read-only `isDisposed`
-getter. [`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts) and
-[`FixedFrameLoop`](../src/display/FixedFrameLoop.ts) both do:
+Where callers have to branch on the state, expose a read-only getter —
+[`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts) and
+[`FixedFrameLoop`](../src/display/FixedFrameLoop.ts) do. Not boilerplate on every class.
 
 ```ts
 get isDisposed(): boolean {
@@ -116,67 +90,48 @@ get isDisposed(): boolean {
 }
 ```
 
-Add the getter where callers actually have to branch on it, not as boilerplate on
-every class.
+## 3. After `dispose()`
 
-## 4. After `dispose()`
+Every public member of a disposed instance behaves in one of exactly three ways, picked
+by its declared type. Its TSDoc says which.
 
-Every public member of a disposed instance behaves in one of exactly three ways, and
-which one is decided by its type:
-
-1. **A member whose type already admits absence answers `undefined`.** If the
-   declared type is `T | undefined`, `undefined` is a value the caller is required to
-   handle anyway. [`TexturedSprites#texture`](../src/sprites/TexturedSprites/TexturedSprites.ts)
-   is typed `Texture | undefined` and reads through an optional chain, so it answers
-   `undefined` once the material is gone.
-2. **A member whose type claims presence throws.** If the declared type is `T`, do
-   not hand back `undefined` and lie about the type. Throw an `Error` that names the
-   class and the state, so the stack points at the real mistake — using an instance
-   after it was released. [`Display#canvas`](../src/display/Display.ts) is typed
-   `HTMLCanvasElement`, and a read after `dispose()` raises
+1. **Type admits absence → answer `undefined`.** `T | undefined` is a value the caller
+   handles anyway. [`TexturedSprites#texture`](../src/sprites/TexturedSprites/TexturedSprites.ts).
+2. **Type claims presence → throw.** For a declared `T`, do not hand back `undefined`
+   and lie about the type. Throw an `Error` naming class and state, so the stack points
+   at the real mistake. [`Display#canvas`](../src/display/Display.ts) raises
    `Display#canvas is not available: this display has been disposed`.
-3. **A mutating method with nothing left to act on is a silent no-op.**
+3. **Mutating method with nothing left to act on → silent no-op.**
    [`TexturedSprites#freeSprite()`](../src/sprites/TexturedSprites/TexturedSprites.ts)
-   returns a sprite to a pool that no longer exists, and simply does nothing. A method that
-   already turns invalid input away goes on turning it away rather than giving in silently:
-   [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) rejects a capacity
-   that does not match its own, and a disposed pool has none left to match.
+   returns a sprite to a pool that is gone and does nothing. Invalid input is still
+   turned away: [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts)
+   keeps rejecting a mismatched capacity.
 
-What this section rules out has a name: a `TypeError` raised deep inside the class
-because a field quietly became `undefined`. That is none of the three reactions. The
-caller learns nothing from it, and the stack points at the wrong line.
+This rules out the fourth reaction — a `TypeError` from deep inside the class because a
+field quietly became `undefined`, where the caller learns nothing and the stack points at
+the wrong line.
 
-A pending promise is not allowed to survive either. Anything a caller is still
-awaiting when `dispose()` runs — a texture request, a load — is rejected as part of
-`dispose()`, not left hanging.
+A pending promise does not survive either — anything a caller is still awaiting when
+`dispose()` runs is rejected as part of it.
 
-The same rule points outwards. A constructor or a method that is handed an instance
-someone has already disposed refuses it, with an error that names the call and the state,
-rather than building something on a resource that is gone. What it would build otherwise
-looks alive to its caller and does nothing at all —
+The rule points outwards too: a constructor or method handed an already-disposed instance
+refuses it, with an error naming the call and the state. Otherwise it builds something
+that looks alive and does nothing — a
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) over a disposed pool is a
-geometry with no attributes, and nothing about it says so until a frame comes out empty.
+geometry without attributes, and no frame says so until one comes out empty.
 
-Whichever of the three a member picks, its TSDoc says so.
+## 4. Signals, effects and events
 
-## 5. Signals, effects and events
-
-Every signal and every effect an instance creates is attached to that instance, so a
-single call tears them all down. See
+Attach every signal and effect to the instance, so one call tears them all down — see
 [`TexturedSpritesMaterial`](../src/sprites/TexturedSprites/TexturedSpritesMaterial.ts):
 
 ```ts
 #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
-createEffect(
-  () => {
-    // …
-  },
-  {attach: this},
-);
+createEffect(() => {
+  // …
+}, {attach: this});
 ```
-
-and its `dispose()`:
 
 ```ts
 override dispose() {
@@ -190,12 +145,12 @@ override dispose() {
 }
 ```
 
-`SignalGroup.delete(this)` is the entire teardown of the signal side. Do not use
-`SignalGroup.destroy()` — it is deprecated in `@spearwolf/signalize`.
+`SignalGroup.delete(this)` is the entire teardown of the signal side. Never
+`SignalGroup.destroy()` — deprecated in `@spearwolf/signalize`.
 
-On the eventize side, `off(this)` removes every listener. A class others subscribe to
-emits its dispose event **before** it removes its own listeners, otherwise the event
-reaches nobody. [`Display.dispose()`](../src/display/Display.ts):
+On the eventize side `off(this)` removes every listener, and a class others subscribe
+to **emits its dispose event before** that call, or the event reaches nobody. See
+[`Display.dispose()`](../src/display/Display.ts):
 
 ```ts
 dispose(): void {
@@ -213,22 +168,20 @@ dispose(): void {
 }
 ```
 
-**Order rule:** release your own resources **before** the call that tears down the
-signal group. A resource reachable only through a signal is unreachable once that
-signal is destroyed, and releasing it afterwards works only as long as a destroyed
-signal still hands out its last value. Do not depend on that leniency.
+**Order rule:** release your own resources **before** tearing down the signal group. A
+resource reachable only through a signal is unreachable once that signal is destroyed,
+and releasing it afterwards works only as long as a destroyed signal still hands out its
+last value. Do not depend on that.
 
-## 6. three.js interop
+## 5. three.js interop
 
-A class extending `Material`, `BufferGeometry` or `Mesh` overrides `dispose()` and
-calls `super.dispose()`. Where in the method that call goes depends on what the base
-class does.
+A class extending `Material`, `BufferGeometry` or `Mesh` overrides `dispose()` and calls
+`super.dispose()`. Where in the method depends on what the base class does.
 
-**`super.dispose()` first — when it only announces.** `THREE.BufferGeometry.dispose()`
-emits its dispose event, and the renderer reads the attributes one last time while
-handling it. So the call goes out while every slot is still filled.
-[`VOBufferGeometry.dispose()`](../src/vertex-objects/VOBufferGeometry.ts) carries the
-reason at the line itself:
+**First — when `super` only announces.** `THREE.BufferGeometry.dispose()` emits its
+dispose event and the renderer reads the attributes one last time while handling it, so
+the call goes out while every slot is still filled.
+[`VOBufferGeometry.dispose()`](../src/vertex-objects/VOBufferGeometry.ts):
 
 ```ts
 override dispose(): void {
@@ -242,9 +195,8 @@ override dispose(): void {
 }
 ```
 
-**`super.dispose()` last — when it already tears down.** A material base class that
-calls `SignalGroup.delete(this)` destroys the signals an owned resource hangs from, so
-that resource has to be released first:
+**Last — when `super` already tears down.** A material base class that calls
+`SignalGroup.delete(this)` destroys the signals an owned resource hangs from:
 
 ```ts
 override dispose(): void {
@@ -256,49 +208,43 @@ override dispose(): void {
 ```
 
 [`AnimatedSpritesMaterial.dispose()`](../src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts)
-is ordered this way for the same reason: it clears its `animsMap` reference — a texture that
-belongs to the caller and is therefore not released — while the signal holding it is still
-live, and only then calls `super.dispose()`.
+is ordered this way to clear its `animsMap` reference — a caller-owned texture, so not
+released — while the signal holding it is still live.
 
-The single rule behind both, and the only one worth memorising: **release nothing
-whose access path the `super` call has already cut, and take away nothing the `super`
-call is still going to read.**
+The one rule behind both: **release nothing whose access path the `super` call has
+already cut, and take away nothing the `super` call is still going to read.**
 
-A `Mesh` that gives up its geometry or its material in `dispose()` takes itself out of the
-scene graph first, via `removeFromParent()`, rather than demanding the right order from the
-caller. That holds whether or not it owned them: a mesh with an empty geometry slot cannot be
-rendered, and the next frame would fail deep inside the renderer.
+A `Mesh` that gives up its geometry or material calls `removeFromParent()` first, owned
+or not, rather than demanding the right order from the caller — a mesh with an empty
+geometry slot cannot be rendered, and the next frame would fail inside the renderer.
 
-## 7. Checklist for a new `dispose()`
+## 6. Checklist for a new `dispose()`
 
-1. Release every resource this instance created itself, give back every slot it took from a
-   pool or a factory, and touch nothing else that was handed in — unless the place that
-   accepts it promises the take-over in its own TSDoc, as section 2 requires.
-2. Make `dispose()` idempotent — by a flag, or by construction as in section 3.
-3. Emit the dispose event, then remove the listeners with `off(this)`.
-4. Call `SignalGroup.delete(this)` for the signal side — after your own release, and
-   never `SignalGroup.destroy()`.
-5. Place `super.dispose()` first or last by the rule in section 6, and write the
-   reason as a comment at the call.
-6. Decide the behaviour of every public member after `dispose()` by the type rule in
-   section 4, and state it in that member's TSDoc.
-7. Reject every promise still pending.
-8. Expose `isDisposed` where callers have to branch on the state.
-9. Ship the tests from section 8.
+1. Release every resource this instance created itself, give back every slot it took
+   from a pool or a factory, and touch nothing handed in — unless the place that accepts
+   it promises the take-over in its own TSDoc (section 1).
+2. Make it idempotent — by flag, or by construction (section 2).
+3. Emit the dispose event, then `off(this)`.
+4. `SignalGroup.delete(this)` after your own release; never `SignalGroup.destroy()`.
+5. Place `super.dispose()` first or last by the rule in section 5, with the reason as a
+   comment at the call.
+6. Decide every public member's post-dispose behaviour by the type rule in section 3 and
+   state it in that member's TSDoc.
+7. Reject every pending promise.
+8. Expose `isDisposed` where callers have to branch on it.
+9. Ship the tests from section 7.
 
-## 8. The dispose test pattern
+## 7. The dispose test pattern
 
-A unit test lives next to its source as `*.spec.ts` and runs under Vitest. Use
-`createSandbox()` from `sinon` with `afterEach(() => sandbox.restore())` for spies on
-methods of the object under test; `vi.spyOn` is for globals such as `fetch` or
-`console`.
+Unit tests live next to the source as `*.spec.ts` under Vitest. Spies on the object
+under test use `createSandbox()` from `sinon` with `afterEach(() => sandbox.restore())`;
+`vi.spyOn` is for globals such as `fetch` or `console`.
 
-`Thing` is the class under test. Every other name in the skeleton is a placeholder:
-`descriptor` for whatever the constructor takes, `makeResource()` for a resource handed
-in from outside, `item` for the argument of a mutating method, `makePool()` for the pool
-or the factory a slot is taken from together with its releasing call `freeItem()`, and
-`resource` / `requiredMember` / `release()` for the three kinds of member from section 4.
-Fill them in for your module.
+`Thing` is the class under test; every other name is a placeholder to fill in —
+`descriptor` for what the constructor takes, `makeResource()` for a resource handed in,
+`item` for a mutating method's argument, `makePool()` plus `freeItem()` for the pool or
+factory a slot comes from, and `resource` / `requiredMember` / `release()` for the three
+member kinds of section 3.
 
 ```ts
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
@@ -392,23 +338,19 @@ describe('Thing', () => {
 });
 ```
 
-A class that promises a take-over under the rule of section 2 turns assertion (b) around:
-it asserts that `dispose()` releases the resource it was handed exactly once, and the test
-name says so. `Display` with a `WebGPURenderer` at the constructor is that case; it sits in
-`packages/twopoint5d-testing/test/display-adopt-renderer.test.js`, because a
-`WebGPURenderer` needs a real browser.
+Notes on the assertions:
 
-Assertion (e) measures the counters **before** the instance is constructed and
-expects the same values after `dispose()`; the two `toBeGreaterThan` checks in
-between prove the test would notice if the class stopped creating signals at all.
+- **(b) inverts** for a class that promises a take-over under section 1: it asserts the
+  handed-in resource is released exactly once, and the test name says so. `Display` with
+  a `WebGPURenderer` is that case, and its test sits in
+  `packages/twopoint5d-testing/test/display-adopt-renderer.test.js` because a
+  `WebGPURenderer` needs a real browser.
+- **(e)** takes the baseline before construction; the two `toBeGreaterThan` checks prove
+  the test would notice if the class stopped creating signals altogether.
+- **(f)** is the one spy on something the instance does not own. Take the instance
+  through the calls that hand slots out, then dispose it, and assert on the releasing
+  call — not on a `dispose()` of the pool. A class that passes every slot straight to its
+  caller has no subject here.
 
-Assertion (f) is the one case where the spy has to sit on something the instance does not
-own — the pool or the factory keeps its slot, it only learns that this holder is done with
-it. Take the instance through the calls that hand slots out first, then dispose it, and
-assert on the releasing call, not on a `dispose()` of the pool: what was borrowed is given
-back, and giving back is not releasing. The rule behind it stands at the end of section 2.
-A class that hands every slot it takes straight out to its caller has no subject here.
-
-Where `dispose()` decides what happens to GPU buffers, the unit test cannot see the
-result. Add a browser test in `packages/twopoint5d-testing/` as well, and run it with
-`pnpm test:browser`.
+Where `dispose()` decides what happens to GPU buffers, a unit test cannot see the
+result. Add a browser test in `packages/twopoint5d-testing/` and run `pnpm test:browser`.

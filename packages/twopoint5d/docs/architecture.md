@@ -4,6 +4,12 @@ How the library is put together, which layer may know about which, and where the
 non-obvious mechanics sit. Read this before adding a feature or moving code between
 modules. Day-to-day commands and repo rules are in the root `AGENTS.md`.
 
+Two companion docs carry the rules this one only points at:
+[**resource-lifecycle.md**](./resource-lifecycle.md) — binding for anything with a
+`dispose()`, see section 3 — and the
+[**stage layer cheat-sheet**](../src/stage/README.md) for `Display` + `Stage2D` +
+`StageRenderer` idioms.
+
 ## 1. The public surface
 
 `src/index.ts` re-exports one `public-api.ts` per module, plus `src/events.ts`. That
@@ -99,10 +105,18 @@ query.
 
 ## 3. Resource lifecycle
 
-`dispose()` and ownership follow [the resource lifecycle rules](./resource-lifecycle.md).
-They are binding: a `dispose()` that does not follow them is a bug, not a variation.
-Short version — an instance releases what it created itself and nothing that was handed
-to it.
+**Writing or changing a `dispose()` means reading
+[resource-lifecycle.md](./resource-lifecycle.md) first.** The rules there are binding —
+a `dispose()` that breaks them is a bug, not a variation — and they answer:
+
+- who owns what, and when a take-over is allowed at all (an instance releases what it
+  created itself, nothing handed in, unless its own TSDoc promises otherwise);
+- why a borrowed pool slot or factory tile still has to be given back;
+- how to make `dispose()` idempotent, and how to prove it;
+- what every public member does after `dispose()` — answer `undefined`, throw, or no-op,
+  decided by its declared type;
+- the teardown order for signals, eventize listeners, and `super.dispose()`;
+- the checklist and the six test assertions to ship with a new `dispose()`.
 
 ## 4. Events and reactivity
 
