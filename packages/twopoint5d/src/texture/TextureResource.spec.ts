@@ -5,6 +5,7 @@ import {ImageLoader, type Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {TextureResource} from './TextureResource.js';
+import type {FrameBasedAnimationsDataMap} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -267,6 +268,112 @@ describe('TextureResource', () => {
       expect(errors[0]!.source).toBe('frameBasedAnimations');
       expect(errors[0]!.animation).toBe('walk');
       expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('an animation entry without a duration and without a frameRate is skipped and reported', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        // the animation data of a store comes out of json, where neither of the two timing
+        // fields has to be there
+        walk: {tileIds: [1, 2]},
+        idle: {duration: 1, tileIds: [3, 4]},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.load();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.id).toBe('tiles');
+      expect(errors[0]!.animation).toBe('walk');
+
+      // the entry beside it is registered all the same
+      expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
+
+      resource.dispose();
+    });
+
+    test('an animation entry with a frameRate of 0 is skipped and reported', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        walk: {frameRate: 0, tileIds: [1, 2]},
+        idle: {frameRate: 2, tileIds: [3, 4]},
+      });
+      resource.load();
+
+      const errors: Array<{source: string; animation: string}> = [];
+      on(resource, 'error', (payload: {source: string; animation: string}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.animation).toBe('walk');
+
+      expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
+
+      resource.dispose();
+    });
+
+    test('an atlas animation entry whose timing does not carry is skipped and reported', async () => {
+      const atlasJson = {
+        frames: {
+          walk_1: {frame: {x: 0, y: 0, w: 8, h: 8}},
+          walk_2: {frame: {x: 8, y: 0, w: 8, h: 8}},
+          idle_1: {frame: {x: 0, y: 8, w: 8, h: 8}},
+        },
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
+        // the animation data of a store comes out of json, where neither of the two timing
+        // fields has to be there
+        walk: {frameNameQuery: 'walk_.*'},
+        idle: {duration: 1, frameNameQuery: 'idle_.*'},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.load();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.id).toBe('sprites');
+      expect(errors[0]!.animation).toBe('walk');
+
+      // the entry beside it is registered all the same
+      expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
 
       resource.dispose();
       fetchMock.mockRestore();

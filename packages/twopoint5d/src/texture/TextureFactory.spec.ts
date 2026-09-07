@@ -1,5 +1,13 @@
-import {LinearFilter, LinearSRGBColorSpace, NearestFilter, SRGBColorSpace, Texture, type WebGPURenderer} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {
+  LinearFilter,
+  LinearSRGBColorSpace,
+  NearestFilter,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
+  type WebGPURenderer,
+} from 'three/webgpu';
+import {describe, expect, test, vi} from 'vitest';
 import {TextureFactory} from './TextureFactory.js';
 
 // the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer enough
@@ -84,6 +92,44 @@ describe('TextureFactory', () => {
 
     test("['no-anisotrophy','anisotrophy-4'] ends on anisotrophy-4", () => {
       expect(getOptions(['no-anisotrophy', 'anisotrophy-4']).anisotrophy).toBe(4);
+    });
+  });
+
+  describe('a load that fails reaches the caller', () => {
+    test('loadAsync rejects and applies the texture classes to what it got', async () => {
+      const loadAsync = vi.spyOn(TextureLoader.prototype, 'loadAsync').mockResolvedValue(new Texture());
+      const factory = new TextureFactory(16, []);
+
+      const texture = await factory.loadAsync('sprite.png', ['nearest']);
+
+      expect(loadAsync).toHaveBeenCalledWith('sprite.png');
+      expect(texture.magFilter).toBe(NearestFilter);
+
+      loadAsync.mockRejectedValue(new Error('404'));
+
+      await expect(factory.loadAsync('missing.png')).rejects.toThrow('404');
+
+      loadAsync.mockRestore();
+    });
+
+    test('load passes onError through and still applies the texture classes', () => {
+      const failure = new Error('404');
+      const load = vi.spyOn(TextureLoader.prototype, 'load').mockImplementation((_url, onLoad, _onProgress, onError) => {
+        // the loader types what it hands out as the texture of an image element
+        const texture = new Texture<HTMLImageElement>();
+        onLoad?.(texture);
+        onError?.(failure);
+        return texture;
+      });
+      const factory = new TextureFactory(16, []);
+
+      const onError = vi.fn();
+      const texture = factory.load('sprite.png', {onError}, 'nearest');
+
+      expect(onError).toHaveBeenCalledWith(failure);
+      expect(texture.magFilter).toBe(NearestFilter);
+
+      load.mockRestore();
     });
   });
 

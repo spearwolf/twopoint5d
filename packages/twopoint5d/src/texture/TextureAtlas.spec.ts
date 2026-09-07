@@ -89,6 +89,20 @@ describe('TextureAtlas', () => {
       });
       expect(atlas.frameId(Bar)).toBe(frameId1);
     });
+    test('a name that is already taken is refused', () => {
+      const atlas = new TextureAtlas();
+      const texCoords0 = new TextureCoords();
+      const texCoords1 = new TextureCoords();
+
+      atlas.add('foo', texCoords0);
+
+      expect(() => {
+        atlas.add('foo', texCoords1);
+      }).toThrow(/foo/);
+
+      expect(atlas.size).toBe(1);
+      expect(atlas.frame('foo')!.coords).toBe(texCoords0);
+    });
   });
   describe('frameNames', () => {
     test('with regexp', () => {

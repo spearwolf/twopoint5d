@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
-- export 31 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes`, `FrameBasedAnimationsTimingData` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
+- export 30 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
 - add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
@@ -22,10 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `InputControlBase#dispose()` and `InputControlBase#isDisposed`: `dispose()` takes every listener the control put on a host back off again — the hosts themselves are handed in and stay the caller's — and puts the control out of service. Afterwards `isDisposed` is `true`, `isActive` is `false`, and the control cannot be brought back: `subscribe()`, a write of `true` to `isActive` and every `addEventListener()` of a subclass do nothing. `destroyAllListeners()` is unaffected and stays what it is, a reset after which a control takes listeners again. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add the `coordsTarget` option and the `PanControl2D#coordsTarget` field: the element every pointer position is measured against, through its `getBoundingClientRect()`. It defaults to the `cursorStylesTarget`, and with that to `document.body`. A canvas inside a shadow root belongs here, because the browser retargets `event.target` onto the shadow host there
 - add the `error` event of `Display`, the `Display#onError()` shorthand and the exported `OnDisplayError` constant: a renderer that does not come up reports the reason through it. The event is retained, so a listener attached after the failure — the normal case, since the constructor returns before the renderer is ready — is told about it as well
+- add `TextureFactory#loadAsync()` and the `TextureLoadOptions` object `TextureFactory#load()` takes in front of its texture classes. `loadAsync(url, textureClasses?)` gives back the promise of the three.js loader and applies the classes to the texture it resolves with, so a load that fails rejects. `load(url, {onError}, ...classNames)` reports the same failure through the callback it is given; without options it is the call it always was. The options carry that one callback: three.js reports no progress for a texture load, because `TextureLoader` passes the progress callback on to `ImageLoader`, which never calls it
+- add `FrameBasedAnimations#hasAnimation()`: whether an animation is registered under a name. It is the question to ask before `animId()` when the name comes from outside
+- add a `RegExp` form to the `frameNameQuery` of `FrameBasedAnimations#add()`: beside a string pattern it takes a regular expression — both forms `TextureAtlas#frameNames()` accepts, and both narrow the animation to the frames whose names match
 - add a shared image cache to `TextureStore`: resources that name the same `imageUrl` are served by one fetch for as long as at least one of them wants it. What is shared is the image and not the texture — every resource applies its own texture classes and owns the `Texture` it built. The entry goes as the last resource lets go of it, so a resource created afterwards fetches the image again, and a load that failed is not kept either
 
 ### Changed
 
+- `TextureAtlas#add()` refuses a frame name that is already taken and throws an error naming it; the atlas keeps the frame it registered under that name, and the refused frame is not added. A name belongs to exactly one frame, as it already did in `FrameBasedAnimations#add()`
+- an animation built from a `TextureAtlas` takes the frames carrying a string name, in the order a numeric collation of those names puts them: `walk.2` runs before `walk.10`, so a sequence numbered without padding plays as it reads. Names that collation ranks equal — `walk.01` beside `walk.1` — keep the order the atlas registered them in. Frames registered under a symbol stay out — a symbol has no place in an ordered sequence, and an atlas that holds one can be turned into an animation as a whole
+- `FrameBasedAnimations#animId()` throws an error naming the animation that is missing. The id goes straight into a typed vertex-object buffer, where an absent value would quietly become `NaN` and the sprite reading it would go invisible; `hasAnimation()` is the way to test a name first
+- an animation entry of a `TextureResource` whose timing does not let the animation be built — neither `duration` nor `frameRate`, or a `frameRate` of 0 — is skipped and reported through the same `error` event as an entry of the wrong shape, with `{source: 'frameBasedAnimations', id, animation, error}`. Every other entry of the map is registered all the same
+- `TextureAtlasLoader` checks the response of an atlas url against the shape of a texture packer json before it reads it. A response that is none reaches the error callback — and `loadAsync()` rejects — with a message naming the url, and no image is fetched for it. The image url is a question of its own: a json that names none is refused the same way, unless an `overrideImageUrl` says where the image is. The `meta` handed to the caller names the image the texture was built from, so `meta.image` carries the `overrideImageUrl` wherever one was given
 - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` of `TextureResource` are read-only. They are what the effects of `TextureResource#load()` produce out of the values that were written to the resource; the class documentation says which properties are input and which are output
 - `TextureResource#atlasUrl`, `#atlasJson`, `#overrideImageUrl` and `#tileSetOptions` belong to one kind of resource each and throw a `TypeError` naming resource, kind and property when they are written on another kind. On a disposed resource a write to any of them still does nothing
 - `TextureResource#imageUrl` is input on an image and a tile set resource and output on an atlas resource, where it follows `overrideImageUrl ?? atlasJson.meta.image`. A write on an atlas resource throws a `TypeError` that names the resource and points at `overrideImageUrl` — the way to send such a resource to another image without leaving its atlas behind on the one before. On a disposed resource the write does nothing, as with every other setter
@@ -143,6 +151,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
 
 ### Migration Guide
+
+#### A frame name in a `TextureAtlas` is taken only once
+
+**Before**
+
+```ts
+atlas.add('hero', coordsA);
+atlas.add('hero', coordsB); // the name moves to the second frame, the first one is orphaned
+```
+
+**After**
+
+```ts
+if (atlas.frameId('hero') == null) {
+  atlas.add('hero', coordsB);
+}
+```
+
+#### The frames of an atlas animation run in numeric order
+
+**Before**
+
+```ts
+// the frames arrive as a lexicographic sort leaves them: walk.1, walk.10, walk.2
+animations.add('walk', {frameRate: 10}, atlas, 'walk.');
+```
+
+**After**
+
+```ts
+// a number inside a name counts as a number: walk.1, walk.2, walk.10
+animations.add('walk', {frameRate: 10}, atlas, 'walk.');
+```
+
+An atlas whose frame names were chosen to make a lexicographic sort come out right — padded to
+`walk.01`, or numbered so that no sequence ever passes 9 — can drop that compensation: padded names
+order the same way, and the unpadded ones now do too. Nothing throws over this: an animation built
+around the other order simply plays in a different one.
+
+#### `FrameBasedAnimations#animId()` throws on a name it does not know
+
+**Before**
+
+```ts
+const id = animations.animId(nameFromUserData); // TypeError on undefined
+```
+
+**After**
+
+```ts
+const id = animations.hasAnimation(nameFromUserData) ? animations.animId(nameFromUserData) : fallbackId;
+```
+
+#### The `meta` of a loaded atlas names the image that was loaded
+
+**Before**
+
+```ts
+const {meta} = await loader.loadAsync('atlas.json', undefined, {overrideImageUrl: 'sprites.png'});
+meta.image; // the url the json names
+```
+
+**After**
+
+```ts
+const {meta} = await loader.loadAsync('atlas.json', undefined, {overrideImageUrl: 'sprites.png'});
+meta.image; // 'sprites.png' — the image behind the texture
+```
+
+A caller that needs the url out of the json reads it from the json; what the atlas data reports is
+the image its texture came from.
 
 #### The derived values of `TextureResource` are read-only
 

@@ -6,15 +6,34 @@ import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaDat
 
 export interface TextureAtlasData extends TextureImage {
   atlas: TextureAtlas;
+  /** The meta block of the atlas json, with `image` naming the image url the texture was loaded from. */
   meta: TexturePackerMetaData;
 }
 
 export interface TextureAtlasLoadOptions {
+  /** The image url to load, instead of the one the atlas json names. */
   overrideImageUrl?: string;
 }
 
 export type TextureAtlasLoadCallback = (textureData: TextureAtlasData) => void;
 export type TextureAtlasLoadErrorCallback = ((err: unknown) => void) | undefined;
+
+// The atlas json as it arrives from a url: everything a texture packer json carries, except that
+// the image url may be missing — an `overrideImageUrl` answers for it just as well. Once the url
+// is resolved the response becomes a full `TexturePackerJsonData`.
+type AtlasJsonResponse = Omit<TexturePackerJsonData, 'meta'> & {
+  meta: Omit<TexturePackerMetaData, 'image'> & {image?: string};
+};
+
+// `setResponseType('json')` hands the callback a parsed object, and what that object carries is
+// whatever the url answered with — so it is checked before it is read. Every property the check
+// lets through is one the loader and its callers may rely on afterwards.
+const isAtlasJsonResponse = (value: unknown): value is AtlasJsonResponse => {
+  if (typeof value !== 'object' || value == null) return false;
+  const {frames, meta} = value as Partial<AtlasJsonResponse>;
+  if (typeof frames !== 'object' || frames == null) return false;
+  return typeof meta === 'object' && meta != null && typeof meta.size === 'object' && meta.size != null;
+};
 
 const makeFileLoader = () => {
   const loader = new FileLoader();
@@ -40,14 +59,32 @@ export class TextureAtlasLoader {
   ): void {
     this.fileLoader.load(
       url,
-      (jsonData: any) => {
-        const imageUrl = options?.overrideImageUrl ?? (jsonData as TexturePackerJsonData).meta.image;
+      // the guard needs an `unknown` to work on: `FileLoader#load` declares its callback as
+      // `(data: string | ArrayBuffer)`, and narrowing that declaration leaves an intersection with
+      // `string` standing, out of which no object can be built
+      (jsonData: unknown) => {
+        if (!isAtlasJsonResponse(jsonData)) {
+          onErrorCallback?.(new Error(`TextureAtlasLoader: the response of "${url}" is no texture atlas json`));
+          return;
+        }
+
+        const imageUrl = options?.overrideImageUrl ?? jsonData.meta.image;
+        if (typeof imageUrl !== 'string') {
+          onErrorCallback?.(
+            new Error(`TextureAtlasLoader: the response of "${url}" names no image and no overrideImageUrl was given`),
+          );
+          return;
+        }
+
+        // the resolved url goes into the json, so the `meta` handed to the caller names the image
+        // the texture was built from, whether the json or an override picked it
+        const atlasJson: TexturePackerJsonData = {...jsonData, meta: {...jsonData.meta, image: imageUrl}};
 
         this.textureImageLoader.load(
           imageUrl,
           textureClasses ?? [],
           ({texture, imgEl, texCoords}) => {
-            const [atlas, meta] = TexturePackerJson.parse(jsonData, texCoords);
+            const [atlas, meta] = TexturePackerJson.parse(atlasJson, texCoords);
 
             onLoadCallback({atlas, meta, texture, imgEl, texCoords});
           },

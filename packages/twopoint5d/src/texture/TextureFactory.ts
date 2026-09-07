@@ -12,6 +12,11 @@ import {
 
 import type {TextureSource} from './types.js';
 
+/** How a {@link TextureFactory.load} reports a load that failed. */
+export interface TextureLoadOptions {
+  onError?: (err: unknown) => void;
+}
+
 export interface TextureOptions {
   magFilter: TextureFilter;
   minFilter: TextureFilter;
@@ -175,9 +180,41 @@ export class TextureFactory {
     return texture;
   }
 
-  load(url: string, ...classNames: Array<TextureOptionClasses>): Texture {
-    return this.textureLoader.load(url, (texture) => {
-      this.update(texture, ...classNames);
-    });
+  /**
+   * The texture at `url`. It comes back empty and fills itself in once the image is there;
+   * the texture classes are applied at that moment.
+   *
+   * A load that fails reaches the caller only through `options.onError` — pass one, or use
+   * {@link TextureFactory.loadAsync}, where the failure cannot be missed.
+   */
+  load(url: string, ...classNames: Array<TextureOptionClasses>): Texture;
+  load(url: string, options: TextureLoadOptions, ...classNames: Array<TextureOptionClasses>): Texture;
+  load(url: string, ...args: [TextureLoadOptions?, ...Array<TextureOptionClasses>] | Array<TextureOptionClasses>): Texture {
+    // the two forms are told apart at the first argument: a class name is a string literal,
+    // the options are an object. Same trick as `isNamedTextureAtlasArgs` in TextureAtlas
+    const hasOptions = typeof args[0] === 'object' && args[0] != null;
+    const options = hasOptions ? (args[0] as TextureLoadOptions) : undefined;
+    const classNames = (hasOptions ? args.slice(1) : args) as Array<TextureOptionClasses>;
+
+    return this.textureLoader.load(
+      url,
+      (texture) => {
+        this.update(texture, ...classNames);
+      },
+      // the third parameter of the three.js loader is a progress callback that a texture load
+      // never calls — `TextureLoader` hands it to `ImageLoader`, which has no progress to
+      // report. There is nothing to offer here, so nothing is promised
+      undefined,
+      options?.onError,
+    );
+  }
+
+  /**
+   * The texture at `url`, with the texture classes applied once it is there.
+   * A load that fails rejects — the error cannot be missed, which is the difference to
+   * `load()`, where it has to be asked for through `onError`.
+   */
+  loadAsync(url: string, textureClasses?: Array<TextureOptionClasses>): Promise<Texture> {
+    return this.textureLoader.loadAsync(url).then((texture) => this.update(texture, ...(textureClasses ?? [])));
   }
 }

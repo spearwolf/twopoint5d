@@ -64,8 +64,10 @@ export const TextureResourceSubtypes = {
  * `frameBasedAnimations`) are retained — late subscribers see the latest value.
  *
  * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, and
- * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry whose
- * data does not fit this kind of resource — that entry is skipped.
+ * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
+ * skipped: one whose data does not fit this kind of resource, and one whose data does not
+ * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
+ * Every other entry of the same map is registered all the same.
  * `dispose` fires once at the start of `dispose()`.
  */
 export const TextureResourceEvents = {
@@ -562,11 +564,18 @@ export class TextureResource {
                   emit(this, OnError, wrongAnimationDataError(this, name, shape));
                   continue;
                 }
-                const timing = getTimingOptions(data);
-                if ('tileIds' in data) {
-                  animations.add(name, timing, tileSet, data.tileIds);
-                } else if ('firstTileId' in data) {
-                  animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
+                try {
+                  const timing = getTimingOptions(data);
+                  if ('tileIds' in data) {
+                    animations.add(name, timing, tileSet, data.tileIds);
+                  } else if ('firstTileId' in data) {
+                    animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
+                  }
+                } catch (error) {
+                  // One bad entry skips itself. Without this the throw leaves the effect through the
+                  // global error channel of signalize, no animation of the whole map is registered,
+                  // and the caller is told nothing.
+                  emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
                 }
               }
               this.#frameBasedAnimations.set(animations);
@@ -661,8 +670,15 @@ export class TextureResource {
               const animations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
                 if ('frameNameQuery' in data) {
-                  const timing = getTimingOptions(data);
-                  animations.add(name, timing, atlas, data.frameNameQuery);
+                  try {
+                    const timing = getTimingOptions(data);
+                    animations.add(name, timing, atlas, data.frameNameQuery);
+                  } catch (error) {
+                    // One bad entry skips itself. Without this the throw leaves the effect through the
+                    // global error channel of signalize, no animation of the whole map is registered,
+                    // and the caller is told nothing.
+                    emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+                  }
                 } else {
                   emit(this, OnError, wrongAnimationDataError(this, name, animationDataShape(data)));
                 }

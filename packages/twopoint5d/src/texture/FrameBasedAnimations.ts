@@ -18,8 +18,20 @@ export interface BakeTextureOptions {
 }
 
 /**
- * Options for specifying animation timing.
- * Use either `duration` (total animation time in seconds) or `frameRate` (frames per second), but not both.
+ * Timing options for frame-based animations.
+ * Provide exactly one of the following:
+ * - `duration`: Total animation time in seconds (e.g., 1.0 for 1 second)
+ * - `frameRate`: Frames per second (e.g., 10 for 10 FPS). Must be greater than 0.
+ *
+ * When `frameRate` is used, the duration is automatically calculated as:
+ * `duration = frameCount / frameRate`
+ *
+ * @example
+ * // Using duration (animation takes 0.5 seconds total)
+ * { duration: 0.5 }
+ *
+ * // Using frameRate (10 frames at 20 fps = 0.5 seconds)
+ * { frameRate: 20 }
  */
 export type AnimationTimingOptions = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
 
@@ -56,6 +68,8 @@ const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: nu
   }
   throw new Error('Either duration or frameRate must be provided');
 };
+
+const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
 
@@ -109,10 +123,30 @@ export class FrameBasedAnimations {
   // NOTE we can not just use animations.keys() here, because we need a consistent name <-> id mapping
   #names: AnimName[] = [];
 
+  /**
+   * Register an animation and return its id.
+   *
+   * The frames come from an array of `TextureCoords`, from a `TileSet` — by tile ids or by
+   * a range — or from a `TextureAtlas`.
+   *
+   * Out of an atlas only the frames carrying a string name go into the animation, and they
+   * run in the order a numeric collation puts their names in: `walk.2` before `walk.10`.
+   * Names that collation ranks equal — `walk.01` beside `walk.1` — keep the order the atlas
+   * registered them in. A `frameNameQuery`, a pattern as a string or as a `RegExp`, narrows
+   * the set to the names it matches.
+   *
+   * A name is registered once; a second animation under the same name is refused with an
+   * error. Without a name the animation is reachable through the id alone.
+   */
   add(
     ...args:
       | [name: AnimName | undefined, timing: number | AnimationTimingOptions, texCoords: TextureCoords[]]
-      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, atlas: TextureAtlas, frameNameQuery?: string]
+      | [
+          name: AnimName | undefined,
+          timing: number | AnimationTimingOptions,
+          atlas: TextureAtlas,
+          frameNameQuery?: string | RegExp,
+        ]
       | [
           name: AnimName | undefined,
           timing: number | AnimationTimingOptions,
@@ -138,7 +172,21 @@ export class FrameBasedAnimations {
       frames = args[2];
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
-      const frameNames = atlas.frameNames(args[3] as any).sort();
+      // both forms of a query reach the atlas: `frameNames()` takes a pattern as a string or
+      // as a RegExp, and letting one of them fall away would quietly widen the animation to
+      // every frame of the atlas
+      const frameNameQuery = typeof args[3] === 'string' || args[3] instanceof RegExp ? args[3] : undefined;
+      // Only string names go into an animation: a frame registered under a symbol has no
+      // place in an ordered sequence, and the default comparator of Array#sort() converts
+      // every value to a string, which throws on a symbol.
+      // The collator orders "walk.2" before "walk.10"; the frames of an animation are a
+      // sequence, and a plain lexicographic order breaks it for every name that carries an
+      // unpadded number. Names it ranks equal keep the order the atlas registered them in,
+      // because Array#sort() is stable.
+      const frameNames = atlas
+        .frameNames(frameNameQuery)
+        .filter((name) => typeof name === 'string')
+        .sort(FRAME_NAME_ORDER.compare);
       frames = frameNames.map((frameName) => atlas.frame(frameName)!.coords);
     } else if (args[2] instanceof TileSet) {
       const tileSet = args[2];
@@ -172,8 +220,23 @@ export class FrameBasedAnimations {
     return id;
   }
 
+  /**
+   * The id of a registered animation. A name that was never registered is an error,
+   * not an absent value: the id goes straight into a typed vertex-object buffer, where
+   * an `undefined` would quietly become `NaN`. Ask `hasAnimation()` first when the name
+   * comes from outside.
+   */
   animId(name: AnimName): number {
-    return this.#animations.get(name)!.id;
+    const anim = this.#animations.get(name);
+    if (anim == null) {
+      throw new Error(`FrameBasedAnimations: there is no animation named "${name.toString()}"`);
+    }
+    return anim.id;
+  }
+
+  /** Whether an animation is registered under this name. */
+  hasAnimation(name: AnimName): boolean {
+    return this.#animations.has(name);
   }
 
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {

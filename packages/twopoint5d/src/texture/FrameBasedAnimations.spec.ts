@@ -105,6 +105,62 @@ describe('FrameBasedAnimations', () => {
       expect(id).toBe(0);
       expect(animations.animId('all')).toBe(0);
     });
+
+    test('a frame registered under a symbol stays out of the animation', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+
+      atlas.add('frame_001', new TextureCoords(0, 0, 32, 32));
+      atlas.add(AnimSymbol, new TextureCoords(32, 0, 32, 32));
+      atlas.add('frame_002', new TextureCoords(64, 0, 32, 32));
+
+      const id = animations.add('all', 1.0, atlas);
+
+      expect(id).toBe(0);
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      expect(buffer[0]).toBe(2); // frames.length
+    });
+
+    test('frame names carrying a number are ordered by that number', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+
+      // a parent is what gives the three frames distinguishable texture coordinates: without
+      // one, `s` is measured against nothing and every frame answers 0
+      const sheet = new TextureCoords(0, 0, 128, 32);
+      const first = new TextureCoords(sheet, 0, 0, 32, 32);
+      const second = new TextureCoords(sheet, 32, 0, 32, 32);
+      const tenth = new TextureCoords(sheet, 64, 0, 32, 32);
+
+      // added out of order, so a comparator that keeps the insertion order cannot pass
+      atlas.add('walk.10', tenth);
+      atlas.add('walk.1', first);
+      atlas.add('walk.2', second);
+
+      animations.add('walk', 1.0, atlas, 'walk\\..*');
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      const frameOffset = buffer[2]! * 4;
+      const xOf = (frameIdx: number) => buffer[frameOffset + frameIdx * 4]!;
+
+      expect(buffer[0]).toBe(3); // frames.length
+      expect([xOf(0), xOf(1), xOf(2)]).toEqual([first.s, second.s, tenth.s]);
+    });
+
+    test('a frame name query narrows the animation as a RegExp just as it does as a string', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+
+      atlas.add('walk_1', new TextureCoords(0, 0, 32, 32));
+      atlas.add('walk_2', new TextureCoords(32, 0, 32, 32));
+      atlas.add('idle_1', new TextureCoords(64, 0, 32, 32));
+
+      animations.add('walk', 1.0, atlas, /walk_/);
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      expect(buffer[0]).toBe(2); // frames.length
+    });
   });
 
   describe('add with TileSet', () => {
@@ -174,6 +230,16 @@ describe('FrameBasedAnimations', () => {
       animations.add(AnimSymbol, 1.0, frames);
 
       expect(animations.animId(AnimSymbol)).toBe(0);
+    });
+
+    test('a name that was never registered is an error naming that name', () => {
+      const animations = new FrameBasedAnimations();
+
+      animations.add('walk', 1.0, [new TextureCoords(0, 0, 32, 32)]);
+
+      expect(() => animations.animId('nope')).toThrow(/nope/);
+      expect(animations.hasAnimation('nope')).toBe(false);
+      expect(animations.hasAnimation('walk')).toBe(true);
     });
   });
 

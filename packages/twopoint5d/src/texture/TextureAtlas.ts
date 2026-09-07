@@ -25,10 +25,19 @@ export class TextureAtlas {
   /**
    * returns the frame id.
    * the frame id starts at 0 and increases by 1 each time you add another frame.
+   *
+   * A name belongs to exactly one frame: a second frame offered under a name that is
+   * already taken is refused with an error, and the atlas is left as it was.
    */
   add(...args: TextureAtlasArgs | NamedTextureAtlasArgs): number {
     const id = this.#frames.length;
     if (isNamedTextureAtlasArgs(args)) {
+      // checked before the push, so a refused frame leaves no half of itself behind
+      if (this.#frameNames.has(args[0])) {
+        // `toString()` and not an interpolation: a name can be a symbol, and interpolating
+        // one throws in place of the message it was supposed to carry
+        throw new Error(`TextureAtlas: the frame name "${args[0].toString()}" is already taken`);
+      }
       this.#frameNames.set(args[0], id);
       this.#frames.push({coords: args[1], data: args[2]});
     } else {
