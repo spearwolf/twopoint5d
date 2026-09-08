@@ -4,6 +4,7 @@ import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
+import {isAtlasJsonResponse} from './isAtlasJsonResponse.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -65,8 +66,15 @@ export const TextureResourceSubtypes = {
  *
  * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, with a
  * `status: number` beside it when the atlas request answered with a status instead of a body —
- * an image that does not load comes out of the loader promise and has no status to name. It
- * carries `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
+ * an image that does not load comes out of the loader promise and has no status to name. The
+ * same `source: 'atlas'` also carries `{url, error}` with no `status` for a fetch that
+ * succeeded but answered with something that is not a texture atlas json, or with one that
+ * names no image and was given no `overrideImageUrl` to fall back on — the response was a 200,
+ * so there is no status to name. It
+ * carries `{source: 'texture', id, error}` for a failure behind an image that loaded
+ * successfully — texture creation, or any value derived from it, such as an atlas or a tile
+ * set — with no `url`, since none has failed. It carries
+ * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data does not fit this kind of resource, and one whose data does not
  * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
  * Every other entry of the same map is registered all the same.
@@ -506,27 +514,41 @@ export class TextureResource {
           const source = this.imageLoader;
 
           (source ? source.acquire(url) : new ImageLoader().loadAsync(url))
-            .then((image) => {
-              if (aborted) return;
-              texture = factory.create(image, ...(classes ?? []));
-              texture.name = this.id;
-              // one batch: the three values reach their effects together, and the higher
-              // priority of everything derived from the image — the atlas among it — puts
-              // those runs ahead of the bridge that carries the texture out
-              batch(() => {
-                this.#imageUrlOfCoords.set(url);
-                this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
-                this.#texture.set(texture);
-              });
-              // the predecessor stayed alive while it was still the published value; now that
-              // the successor is on the signal, no reader can reach the old one any more
-              const previous = this.#ownTexture;
-              this.#ownTexture = texture;
-              previous?.dispose();
-            })
+            .then(
+              (image) => {
+                if (aborted) return;
+                texture = factory.create(image, ...(classes ?? []));
+                texture.name = this.id;
+                // one batch: the three values reach their effects together, and the higher
+                // priority of everything derived from the image — the atlas among it — puts
+                // those runs ahead of the bridge that carries the texture out
+                batch(() => {
+                  this.#imageUrlOfCoords.set(url);
+                  this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
+                  this.#texture.set(texture);
+                });
+                // the predecessor stayed alive while it was still the published value; now that
+                // the successor is on the signal, no reader can reach the old one any more
+                const previous = this.#ownTexture;
+                this.#ownTexture = texture;
+                previous?.dispose();
+              },
+              (error) => {
+                // the second parameter of .then() sees exactly the rejection of the image load
+                // this promise wraps — the one case an `{source: 'image', url}` describes
+                if (aborted) return;
+                emit(this, OnError, {source: 'image', url, error});
+              },
+            )
             .catch((error) => {
+              // signalize propagates inline: an effect that throws inside the batch() above —
+              // texture creation, or any of the atlas/tileSet/frameBasedAnimations effects it
+              // derives — is isolated and its error is rethrown to the writer once delivery
+              // ends, several at once as an AggregateError. The writer here is the batch()
+              // itself, so it surfaces here, long after the image fetch has already succeeded —
+              // there is no failed url to name, so this reports the resource instead
               if (aborted) return;
-              emit(this, OnError, {source: 'image', url, error});
+              emit(this, OnError, {source: 'texture', id: this.id, error});
             });
 
           return () => {
@@ -611,8 +633,9 @@ export class TextureResource {
                 const response = await fetch(atlasUrl, {signal: ac.signal});
                 if (aborted) return;
                 if (!response.ok) {
-                  // an error response with a JSON body would otherwise pass for an atlas, and
-                  // the first read of `meta.image` would throw inside an effect
+                  // without this check, a 4xx/5xx body that happens to satisfy
+                  // isAtlasJsonResponse below would be taken for a valid atlas, and the status
+                  // this branch reports would be lost
                   emit(this, OnError, {
                     source: 'atlas',
                     url: atlasUrl,
@@ -623,7 +646,33 @@ export class TextureResource {
                 }
                 const atlasJson = await response.json();
                 if (aborted) return;
-                this.atlasJson = atlasJson;
+
+                if (!isAtlasJsonResponse(atlasJson)) {
+                  emit(this, OnError, {
+                    source: 'atlas',
+                    url: atlasUrl,
+                    error: new Error(`[TextureResource] the response of "${atlasUrl}" is no texture atlas json`),
+                  });
+                  return;
+                }
+
+                const imageUrl = this.overrideImageUrl ?? atlasJson.meta.image;
+                if (typeof imageUrl !== 'string') {
+                  emit(this, OnError, {
+                    source: 'atlas',
+                    url: atlasUrl,
+                    error: new Error(
+                      `[TextureResource] the response of "${atlasUrl}" names no image and no overrideImageUrl was given`,
+                    ),
+                  });
+                  return;
+                }
+
+                // the resolved url goes into the json, mirroring `TextureAtlasLoader`: the
+                // `atlasJson` getter is typed as `TexturePackerJsonData`, whose `meta.image` is a
+                // `string`, so the resolved url has to land in the json itself rather than in a
+                // cast that would let the getter lie
+                this.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: imageUrl}};
               } catch (error) {
                 if (aborted) return;
                 emit(this, OnError, {source: 'atlas', url: atlasUrl, error});

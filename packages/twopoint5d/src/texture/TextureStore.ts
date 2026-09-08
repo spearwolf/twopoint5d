@@ -54,7 +54,7 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  * - `Error`: fires with `{source: 'fetch'|'parse', url?, id?, status?, error}`.
  *   `fetch` covers a request that failed and a response that answered with a status;
  *   `parse` a body that is no JSON, a `parse()` that threw, and an item that names no
- *   source. The `atlas` and `image` failures of a resource are emitted by
+ *   source. The `atlas`, `image` and `texture` failures of a resource are emitted by
  *   `TextureResource` and are subscribed there.
  */
 export const TextureStoreEvents = {

@@ -1,13 +1,9 @@
 import {FileLoader} from 'three/webgpu';
+import {isAtlasJsonResponse} from './isAtlasJsonResponse.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';
-import {
-  TexturePackerJson,
-  type TexturePackerFrameData,
-  type TexturePackerJsonData,
-  type TexturePackerMetaData,
-} from './TexturePackerJson.js';
+import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaData} from './TexturePackerJson.js';
 
 export interface TextureAtlasData extends TextureImage {
   atlas: TextureAtlas;
@@ -22,33 +18,6 @@ export interface TextureAtlasLoadOptions {
 
 export type TextureAtlasLoadCallback = (textureData: TextureAtlasData) => void;
 export type TextureAtlasLoadErrorCallback = ((err: unknown) => void) | undefined;
-
-// The atlas json as it arrives from a url: everything a texture packer json carries, except that
-// the image url may be missing — an `overrideImageUrl` answers for it just as well. Once the url
-// is resolved the response becomes a full `TexturePackerJsonData`.
-type AtlasJsonResponse = Omit<TexturePackerJsonData, 'meta'> & {
-  meta: Omit<TexturePackerMetaData, 'image'> & {image?: string};
-};
-
-// `setResponseType('json')` hands the callback a parsed object, and what that object carries is
-// whatever the url answered with — so it is checked before it is read. Every property the check
-// lets through is one the loader and its callers may rely on afterwards.
-const isFrameData = (value: unknown): value is TexturePackerFrameData => {
-  if (typeof value !== 'object' || value == null) return false;
-  const {frame} = value as Partial<TexturePackerFrameData>;
-  if (typeof frame !== 'object' || frame == null) return false;
-  return typeof frame.x === 'number' && typeof frame.y === 'number' && typeof frame.w === 'number' && typeof frame.h === 'number';
-};
-
-const isAtlasJsonResponse = (value: unknown): value is AtlasJsonResponse => {
-  if (typeof value !== 'object' || value == null) return false;
-  const {frames, meta} = value as Partial<AtlasJsonResponse>;
-  if (typeof frames !== 'object' || frames == null) return false;
-  if (!Object.values(frames).every(isFrameData)) return false;
-  if (typeof meta !== 'object' || meta == null) return false;
-  const {size} = meta;
-  return typeof size === 'object' && size != null && typeof size.w === 'number' && typeof size.h === 'number';
-};
 
 const makeFileLoader = () => {
   const loader = new FileLoader();
@@ -99,8 +68,18 @@ export class TextureAtlasLoader {
           imageUrl,
           textureClasses ?? [],
           ({texture, imgEl, texCoords}) => {
-            const [atlas, meta] = TexturePackerJson.parse(atlasJson, texCoords);
+            // this callback runs inside the `load` event of the image, a path with no way
+            // back into the promise `loadAsync()` wraps around `load()` — a throw here would
+            // leave that promise pending forever, so it is turned into a call instead
+            let parsed: ReturnType<typeof TexturePackerJson.parse>;
+            try {
+              parsed = TexturePackerJson.parse(atlasJson, texCoords);
+            } catch (error) {
+              onErrorCallback?.(error);
+              return;
+            }
 
+            const [atlas, meta] = parsed;
             onLoadCallback({atlas, meta, texture, imgEl, texCoords});
           },
           onErrorCallback,

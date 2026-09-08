@@ -4,6 +4,7 @@ import {TextureAtlasLoader} from './TextureAtlasLoader.js';
 import {TextureCoords} from './TextureCoords.js';
 import type {TextureImageLoadCallback, TextureImageLoader} from './TextureImageLoader.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
+import {TexturePackerJson} from './TexturePackerJson.js';
 import type {TextureSource} from './types.js';
 
 // the loader asks its file loader for exactly one thing — the parsed json of a url — so a
@@ -124,5 +125,35 @@ describe('TextureAtlasLoader', () => {
 
     expect(imageLoad.mock.calls[0]![0]).toBe('sprites.png');
     expect(meta.image).toBe('sprites.png');
+  });
+
+  test('a parse that throws rejects instead of leaving the promise open', async () => {
+    // the real `TextureImageLoader` calls back from the `load` event of an `Image`, a task
+    // queued outside the synchronous call stack this test is set up in — `queueMicrotask`
+    // reproduces that boundary. Without it a throw from the mocked `parse()` would unwind
+    // synchronously through `this.load(...)` and land in the `new Promise((resolve, reject) =>
+    // ...)` executor above `loadAsync()`, which the JS engine itself turns into a rejection —
+    // masking the very bug this test is for
+    const imageLoad = vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
+      queueMicrotask(() =>
+        onLoad({
+          texture: {} as Texture,
+          imgEl: {} as TextureSource,
+          texCoords: new TextureCoords(0, 0, 16, 16),
+        }),
+      );
+    });
+    const parseSpy = vi.spyOn(TexturePackerJson, 'parse').mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJsonNamingAnImage),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/boom/);
+
+    parseSpy.mockRestore();
   });
 });

@@ -5,6 +5,7 @@ import {ImageLoader, type Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {TextureResource} from './TextureResource.js';
+import {TexturePackerJson} from './TexturePackerJson.js';
 import type {FrameBasedAnimationsDataMap} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -462,6 +463,144 @@ describe('TextureResource', () => {
       expect(resource.atlasJson).toBeUndefined();
 
       resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('a 200 response that is no atlas json is reported instead of set', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({hello: 'world'})));
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: Array<{source: string; url: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; url: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('atlas');
+      expect(errors[0]!.url).toBe('atlas.json');
+      expect(errors[0]!.error.message).toMatch(/is no texture atlas json/);
+      expect(resource.atlasJson).toBeUndefined();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('an atlas json that names no image and has no override is reported', async () => {
+      const atlasJson = {
+        frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: Array<{source: string}> = [];
+      on(resource, 'error', (payload: {source: string}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('atlas');
+      expect(resource.imageUrl).toBeUndefined();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('an atlas json without an image loads with an overrideImageUrl', async () => {
+      const atlasJson = {
+        frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      const loadAsyncSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(0);
+      expect(resource.atlasJson?.meta.image).toBe('override.png');
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+      fetchMock.mockRestore();
+    });
+  });
+
+  describe('error sources', () => {
+    test('an image load that rejects is reported as an image failure', async () => {
+      const loadError = new Error('boom');
+      const loadAsyncSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => Promise.reject(loadError));
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      const errors: Array<{source: string; url?: string; error?: unknown}> = [];
+      on(resource, 'error', (payload: {source: string; url?: string; error?: unknown}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('image');
+      expect(errors[0]!.url).toBe('hero.png');
+      expect(errors[0]!.error).toBe(loadError);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('a failure behind a loaded image is not reported as an image failure', async () => {
+      const atlasJson = {
+        frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      const loadAsyncSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+      const parseSpy = vi.spyOn(TexturePackerJson, 'parse').mockImplementation(() => {
+        throw new Error('boom');
+      });
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: Array<{source: string; id?: string; url?: string}> = [];
+      on(resource, 'error', (payload: {source: string; id?: string; url?: string}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors.some((e) => e.source === 'image')).toBe(false);
+      expect(errors.some((e) => e.source === 'texture' && e.id === 'sprites')).toBe(true);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+      parseSpy.mockRestore();
       fetchMock.mockRestore();
     });
   });
