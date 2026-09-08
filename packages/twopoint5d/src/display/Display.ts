@@ -432,14 +432,22 @@ export class Display {
           });
         });
 
-      this.renderer = makeRenderer({
-        canvas,
-        stencil: false,
-        alpha: true,
-        antialias: true,
-        powerPreference: 'high-performance',
-        ...rendererOptions,
-      } as CreateRendererParameters);
+      try {
+        this.renderer = makeRenderer({
+          canvas,
+          stencil: false,
+          alpha: true,
+          antialias: true,
+          powerPreference: 'high-performance',
+          ...rendererOptions,
+        } as CreateRendererParameters);
+      } catch (error) {
+        // the container went into the host a few lines up, and a constructor that throws leaves
+        // no instance behind whose dispose() could take it back out again
+        this.#ownContainer?.remove();
+        this.#ownContainer = undefined;
+        throw error;
+      }
     } else {
       // every wrong first argument gets the same answer, whatever it is: without this a null
       // would die inside init() with a TypeError that names neither this constructor nor what

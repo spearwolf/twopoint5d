@@ -97,4 +97,21 @@ describe('Display — what the constructor accepts and what it reports', functio
 
     expect(reportedLate, 'the error a subscriber attaching after the failure is told about').to.equal(initFailed);
   });
+
+  it('takes the container it built back out of the host when the renderer cannot be built', () => {
+    const rendererFailed = new Error('the renderer could not be built');
+
+    host = makeContainer();
+
+    expect(() => {
+      display = new Display(host, {
+        createRenderer: () => {
+          throw rendererFailed;
+        },
+      });
+    }, 'the constructor').to.throw(rendererFailed.constructor, rendererFailed.message);
+    display = undefined;
+
+    expect(host.children.length, 'children left in the host').to.equal(0);
+  });
 });

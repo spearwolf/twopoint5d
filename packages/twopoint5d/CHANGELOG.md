@@ -170,6 +170,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `update` event of `PanControl2D`: it goes out whenever `update()` moved the `panView`, including a control with both input sources switched off whose `speed…` fields were set by hand
 - fix `RepeatingTilesProvider#getTileIdAt()` on a pattern without cells — the default pattern among them: it answers with `0`, the value `getTileIdsWithin()` fills such a pattern with, instead of computing an index through a modulo by zero and returning an `undefined` under a signature that promises a `number`
 - fix `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` for a coordinate outside the chunk: both hold it against the width and the height of the chunk and answer with `undefined`. An `x` past either edge folded into the neighbouring row and answered with a foreign id that looked valid
+- fix `PanControl2D#keyboardDisabled`, `#pointerDisabled` and `unsubscribe()`: each of these ways gives back what the input sources are holding — the keys currently pushing a `speed…` field, the pan collected in a drag and a hidden cursor. A `speed…` value a caller wrote by hand is left as it is and keeps moving `panView`
+- fix the `Display` constructor: a renderer that fails to build after the constructor has put its own container into the host element takes that container back out before the error reaches the caller. A canvas or a container handed to the constructor is left where it is
 
 ### Migration Guide
 

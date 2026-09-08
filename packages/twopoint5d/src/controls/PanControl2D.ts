@@ -53,6 +53,8 @@ const POINTERUP = 'pointerup';
 const POINTERDOWN = 'pointerdown';
 const POINTERMOVE = 'pointermove';
 
+type KeyedSpeedField = 'speedNorth' | 'speedSouth' | 'speedEast' | 'speedWest';
+
 export interface PanControl2DOptions {
   state?: PanViewState;
 
@@ -126,6 +128,10 @@ export class PanControl2D extends InputControlBase {
   speedWest = 0;
 
   #pointersDown: Map<number, PanInternalState> = new Map();
+
+  // the field name a key currently holds up, not the key that raised it — keyCodes is public
+  // and writable, and what a key held down gives back is the field it moved
+  #keyedSpeeds = new Set<KeyedSpeedField>();
 
   // Assigned in the constructor through the `cursorPanStyle` setter.
   #cursorPanStyle!: string;
@@ -223,6 +229,9 @@ export class PanControl2D extends InputControlBase {
     } else {
       this.removeEventListener(document, KEYDOWN, this.#onKeyDown);
       this.removeEventListener(document, KEYUP, this.#onKeyUp);
+
+      // the keyup that would release a held key's speed field reaches this control no longer
+      this.#releaseKeyedSpeeds();
     }
   }
 
@@ -244,7 +253,28 @@ export class PanControl2D extends InputControlBase {
       // a pan that nobody may deliver is dropped here, not kept: without this it waits for the
       // next update() after the pointer is switched back on and lands in one jump
       this.#pointersDown.clear();
+
+      // the pointerup that would restore the cursor style reaches this control no longer
+      this.#restoreCursorStyle();
     }
+  }
+
+  /**
+   * Take every listener off `document` and give back what the input sources are holding:
+   * the pan collected in a drag, the keys still down and a hidden cursor.
+   *
+   * None of it can come back through an event any more — a `pointerup` and a `keyup` reach a
+   * control that is no longer listening, and without this the view would keep moving by a key
+   * nobody is pressing. A speed field a caller wrote by hand is not touched: {@link update}
+   * moves the view by those whether an input source reaches this control or not.
+   */
+  override unsubscribe(): void {
+    // first: with the listeners off document, no event can refill what the lines below give up
+    super.unsubscribe();
+
+    this.#pointersDown.clear();
+    this.#releaseKeyedSpeeds();
+    this.#restoreCursorStyle();
   }
 
   /**
@@ -395,40 +425,40 @@ export class PanControl2D extends InputControlBase {
     };
   }
 
-  #onKeyDown = ({keyCode}: KeyboardEvent): void => {
-    const {pixelsPerSecond} = this;
-
+  #speedFieldFor(keyCode: number): KeyedSpeedField | undefined {
     switch (keyCode) {
-      case this.keyCodes[0]: // 87: // W
-        this.speedNorth = pixelsPerSecond;
-        break;
-      case this.keyCodes[1]: // 83: // S
-        this.speedSouth = pixelsPerSecond;
-        break;
-      case this.keyCodes[2]: // 65: // A
-        this.speedWest = pixelsPerSecond;
-        break;
-      case this.keyCodes[3]: // 68: // D
-        this.speedEast = pixelsPerSecond;
-        break;
+      case this.keyCodes[0]:
+        return 'speedNorth';
+      case this.keyCodes[1]:
+        return 'speedSouth';
+      case this.keyCodes[2]:
+        return 'speedWest';
+      case this.keyCodes[3]:
+        return 'speedEast';
+      default:
+        return undefined;
     }
+  }
+
+  #releaseKeyedSpeeds(): void {
+    for (const field of this.#keyedSpeeds) {
+      this[field] = 0;
+    }
+    this.#keyedSpeeds.clear();
+  }
+
+  #onKeyDown = ({keyCode}: KeyboardEvent): void => {
+    const field = this.#speedFieldFor(keyCode);
+    if (field == null) return;
+    this[field] = this.pixelsPerSecond;
+    this.#keyedSpeeds.add(field);
   };
 
   #onKeyUp = ({keyCode}: KeyboardEvent): void => {
-    switch (keyCode) {
-      case this.keyCodes[0]: // 87: // W
-        this.speedNorth = 0;
-        break;
-      case this.keyCodes[1]: // 83: // S
-        this.speedSouth = 0;
-        break;
-      case this.keyCodes[2]: // 65: // A
-        this.speedWest = 0;
-        break;
-      case this.keyCodes[3]: // 68: // D
-        this.speedEast = 0;
-        break;
-    }
+    const field = this.#speedFieldFor(keyCode);
+    if (field == null) return;
+    this[field] = 0;
+    this.#keyedSpeeds.delete(field);
   };
 
   /**
@@ -441,9 +471,10 @@ export class PanControl2D extends InputControlBase {
    *
    * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
    * reaches this control any more. {@link update} still moves {@link panView} by the speed
-   * fields a caller sets by hand — what it no longer delivers is a pan from a drag before the
-   * call. A write to {@link cursorPanStyle} is refused: it would rewrite a style rule every
-   * control writing into the same {@link PanControl2DOptions.styleSheetRoot} shares.
+   * fields a caller sets by hand, and by a key that was still held down when `dispose()` ran
+   * gives its field back — what it no longer delivers is a pan from a drag before the call. A
+   * write to {@link cursorPanStyle} is refused: it would rewrite a style rule every control
+   * writing into the same {@link PanControl2DOptions.styleSheetRoot} shares.
    * `pixelsPerSecond`, `mouseButton`, `keyCodes`, `keyboardDisabled`, `pointerDisabled`,
    * `panView` and the four `speed…` fields still take values, they just drive nothing. A
    * control that was hiding the cursor emits one last `restoreCursor` while its subscribers
@@ -453,19 +484,10 @@ export class PanControl2D extends InputControlBase {
   override dispose(): void {
     if (this.isDisposed) return;
 
-    // first: with the listeners off document, no pointer event can refill the state the
-    // lines below give up
+    // super.dispose() takes the listeners off and, through unsubscribe(), hands back what the
+    // input sources were holding — while the listeners of this control are still attached, so
+    // the restoreCursor that goes out on the way still reaches them
     super.dispose();
-
-    // the class sits on an element that belongs to the caller, and it comes off here. Only
-    // from YES: that is the one state in which it was added and a hideCursor went out, and
-    // the class name is shared across the module — restoring from MAYBE would take the class
-    // off a target another control is still hiding behind.
-    if (this.#hideCursorState === HideCursorState.YES) {
-      this.#restoreCursorStyle();
-    }
-
-    this.#pointersDown.clear();
 
     // last: the restoreCursor above still has to reach the listeners that act on it
     off(this);
