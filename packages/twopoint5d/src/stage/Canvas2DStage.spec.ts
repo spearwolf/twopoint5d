@@ -51,6 +51,14 @@ describe('Canvas2DStage', () => {
     expect(rendered, 'no event follows the dispose').not.toHaveBeenCalled();
   });
 
+  test('carries a canvas resize into the specs its projection reads', () => {
+    const stage = makeStage();
+
+    stage.setCanvasSize(128, 96);
+
+    expect(stage.projection.viewSpecs).toMatchObject({fit: 'contain', width: 128, height: 96});
+  });
+
   test('puts the new texture in place before it releases the one it replaces', () => {
     const stage = makeStage();
 

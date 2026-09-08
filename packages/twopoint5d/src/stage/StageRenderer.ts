@@ -171,7 +171,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return this.#renderOrder;
   }
 
-  #renderOrderArray?: string[] = [];
+  #renderOrderArray?: string[];
 
   get renderOrderArray(): string[] {
     if (!this.#renderOrderArray) {

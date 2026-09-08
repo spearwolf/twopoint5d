@@ -67,7 +67,7 @@ describe('RootRenderPipeline.buildOutputNode', () => {
   });
 
   it('throws when called with an empty array', () => {
-    expect(() => RootRenderPipeline.buildOutputNode([])).toThrowError(/no passes/);
+    expect(() => RootRenderPipeline.buildOutputNode([])).toThrow(/no passes/);
   });
 });
 

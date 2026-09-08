@@ -191,6 +191,11 @@ describe('StageRenderer', () => {
   });
 
   describe('rendering', () => {
+    it('answers the render order as an array on the first read', () => {
+      const sr = new StageRenderer();
+      expect(sr.renderOrderArray).toEqual(['*']);
+    });
+
     it('delegates to each stage.renderTo() in renderOrder', () => {
       const sr = new StageRenderer();
       const a = fakeStage('a');
@@ -493,7 +498,7 @@ describe('StageRenderer', () => {
       const {Stage2D} = await import('./Stage2D.js');
       const {ParallaxProjection} = await import('./ParallaxProjection.js');
       const stage = new Stage2D();
-      expect(() => stage.asPassNode(renderer as any)).toThrowError(/no scene or camera/);
+      expect(() => stage.asPassNode(renderer as any)).toThrow(/no scene or camera/);
       stage.projection = new ParallaxProjection('xy|bottom-left');
       expect(() => stage.asPassNode(renderer as any)).not.toThrow();
     });
@@ -621,7 +626,7 @@ describe('StageRenderer', () => {
       sr.add(fakeStage('bare'));
       sr.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
       sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
-      expect(() => sr.renderTo(renderer as any)).toThrowError(/asPassNode/);
+      expect(() => sr.renderTo(renderer as any)).toThrow(/asPassNode/);
     });
 
     it('nested StageRenderer is pre-rendered into its asPassNode-RT before parent pipeline runs', () => {

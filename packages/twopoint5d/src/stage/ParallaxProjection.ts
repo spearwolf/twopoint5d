@@ -29,7 +29,7 @@ export class ParallaxProjection implements IProjection {
   #aspect!: number;
   #fovy!: number;
 
-  constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: ParallaxProjectionSpecs) {
+  constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: Partial<ParallaxProjectionSpecs>) {
     this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
     this.viewSpecs = specs ?? {};
   }

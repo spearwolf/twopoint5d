@@ -8,6 +8,14 @@ import {StageRenderer} from './StageRenderer.js';
 
 export type Canvas2DStageFitType = 'contain' | 'cover';
 
+/**
+ * The view specs a `Canvas2DStage` drives: a `contain`/`cover` fit with both sides given.
+ * That is one arm of the `FitIntoRectangleSpecs` union, and writing `width` and `height`
+ * through the union itself is not possible — its `pixelZoom` arm carries neither. The stage
+ * holds the object it hands to its projection, so both read the same specs.
+ */
+type Canvas2DViewSpecs = {fit: Canvas2DStageFitType; width: number; height: number};
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Canvas2DStage extends EventizedObject {}
 
@@ -24,7 +32,7 @@ export class Canvas2DStage {
   set fit(value: Canvas2DStageFitType) {
     if (this.#disposed || this.#fit === value) return;
     this.#fit = value;
-    this.projection.viewSpecs.fit = value;
+    this.#viewSpecs.fit = value;
     this.stage.updateProjection(true);
   }
 
@@ -68,6 +76,8 @@ export class Canvas2DStage {
   #lastWidth = 0;
   #lastHeight = 0;
 
+  #viewSpecs: Canvas2DViewSpecs;
+
   constructor(
     renderer: WebGPURenderer,
     ...args:
@@ -97,11 +107,9 @@ export class Canvas2DStage {
       this.canvas = canvas;
     }
 
-    this.projection = new OrthographicProjection('xy|bottom-left', {
-      width: this.width,
-      height: this.height,
-      fit: this.#fit as any,
-    });
+    this.#viewSpecs = {width: this.width, height: this.height, fit: this.#fit};
+
+    this.projection = new OrthographicProjection('xy|bottom-left', this.#viewSpecs);
 
     this.stage = new Stage2D(this.projection);
     this.stageRenderer.add(this.stage);
@@ -153,9 +161,8 @@ export class Canvas2DStage {
 
     this.sprite.scale.set(width, height, 1);
 
-    const viewSpecs = this.projection.viewSpecs as any;
-    viewSpecs.width = width;
-    viewSpecs.height = height;
+    this.#viewSpecs.width = width;
+    this.#viewSpecs.height = height;
 
     this.stage.updateProjection(true);
   }
