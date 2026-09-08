@@ -80,9 +80,4 @@ export class ProjectionPlane {
     target.add(this.up.clone().setLength(y));
     return target;
   }
-
-  // getPlaneCoords(pointIn: Vector3, target?: Vector2): Vector2 {
-  //   const pointOnPlane = this.plane.projectPoint(pointIn, new Vector3());
-  //   return target;
-  // }
 }

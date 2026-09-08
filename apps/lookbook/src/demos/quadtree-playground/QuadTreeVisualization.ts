@@ -50,11 +50,6 @@ export class QuadTreeVisualization {
 
     this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-    // for (const chunk of root.findChunks(new AABB2(0, 0, width, height))) {
-    //   this.ctx.fillStyle = 'rgba(255, 0, 66, 0.5)';
-    //   this.ctx.fillRect(chunk.left, chunk.top, chunk.right - chunk.left, chunk.bottom - chunk.top);
-    // }
-
     const stats = {
       leafs: 0,
       noLeafs: 0,

@@ -123,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - remove `VertexObjectPool#onDestroyVO`: `freeVO()` and `dispose()` release a vertex object without firing a callback. `onCreateVO` is unchanged
 - remove `TileSpritesFactory#freeTileSprite()`: `destroyTile()` gives a tile sprite back to the pool, and is the call `IMapTileFactory` names
+- remove the `DependencyProp` type: `DependencyDeclaration<Shape>` is the type the `Dependencies` constructor takes, and it holds the name of an entry against the shape wherever it can read it
 
 ### Fixed
 
@@ -171,6 +172,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` for a coordinate outside the chunk: both hold it against the width and the height of the chunk and answer with `undefined`. An `x` past either edge folded into the neighbouring row and answered with a foreign id that looked valid
 
 ### Migration Guide
+
+#### `DependencyProp` is gone
+
+**Before**
+
+```ts
+const props: DependencyProp[] = ['centerX', ['matrixWorld', equalsMatrix4]];
+```
+
+**After**
+
+```ts
+const props: DependencyDeclaration<{centerX: number; matrixWorld: Matrix4}>[] = [
+  'centerX',
+  ['matrixWorld', equalsMatrix4],
+];
+```
+
+`DependencyDeclaration<Shape>` takes the same three forms and holds the name of
+an entry against the shape wherever it can read it.
 
 #### `Dependencies#value()` answers in the type of its shape
 

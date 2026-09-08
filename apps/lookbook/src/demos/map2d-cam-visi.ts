@@ -40,9 +40,6 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     map2d.visibilitor = cameraBasedVisibility;
 
-    // const rectVisiAreaHelpers = new RectangularVisibilityAreaHelpers(rectVisiArea);
-    // rectVisiAreaHelpers.add(map2d);
-
     map2d.centerX = 0;
     map2d.centerY = 0;
 
@@ -102,10 +99,6 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       map2d.centerX = panControl.panView.x;
       map2d.centerY = panControl.panView.y;
       map2d.update();
-
-      // tileSprites.update();
-
-      // rectVisiAreaHelpers.update();
     });
 
     // ------------------------------------------------------

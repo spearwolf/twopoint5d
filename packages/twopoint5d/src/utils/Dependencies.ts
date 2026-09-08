@@ -11,14 +11,6 @@ export interface DependencyCallbacks<T = any> {
 }
 
 /**
- * The three forms a single declaration entry can take, with no shape to hold them against: any
- * string passes as a name here. {@link DependencyDeclaration} is the type the `Dependencies`
- * constructor takes, and it holds the name of an entry against the shape wherever it can read it.
- */
-export type DependencyProp<T = any> =
-  DependencyKey | [name: DependencyKey, equals: EqualityCallback<T>] | [name: DependencyKey, callbacks: DependencyCallbacks];
-
-/**
  * The keys a `Dependencies` watches, and the type of the value behind each of them. Any object
  * type describes one — a named `interface` as much as a `type` alias or an inline literal.
  */

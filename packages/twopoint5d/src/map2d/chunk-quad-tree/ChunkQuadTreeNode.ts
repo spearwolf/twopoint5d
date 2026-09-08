@@ -296,30 +296,4 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
     return child === null ? chunks : chunks.concat(child.findChunksAt(x, y));
   }
-
-  // toDebugJson(): object | string {
-  //   if (this.isLeaf) {
-  //     return this.chunks.map((chunk) => chunk.rawData).join(', ');
-  //   }
-  //   const out: any = {
-  //     _originX: this.originX,
-  //     _originY: this.originY,
-  //   };
-  //   if (this.chunks.length) {
-  //     out._chunks = this.chunks.map((chunk) => chunk.rawData).join(', ');
-  //   }
-  //   if (this.nodes.northEast) {
-  //     out.NorthEast = this.nodes.northEast.toDebugJson();
-  //   }
-  //   if (this.nodes.northWest) {
-  //     out.NorthWest = this.nodes.northWest.toDebugJson();
-  //   }
-  //   if (this.nodes.southEast) {
-  //     out.SouthEast = this.nodes.southEast.toDebugJson();
-  //   }
-  //   if (this.nodes.southWest) {
-  //     out.SouthWest = this.nodes.southWest.toDebugJson();
-  //   }
-  //   return out;
-  // }
 }

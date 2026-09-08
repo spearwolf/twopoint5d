@@ -82,7 +82,6 @@ describe('ChunkQuadTreeNode', () => {
 
     it('subdivide()', () => {
       node.subdivide();
-      // console.log('QuadTree', JSON.stringify(node.toDebugJson(), null, 2));
     });
 
     it('root is NOT a leaf', () => {
@@ -142,7 +141,6 @@ describe('ChunkQuadTreeNode', () => {
 
     it('subdivide()', () => {
       node.subdivide();
-      // console.log('QuadTree', JSON.stringify(node.toDebugJson(), null, 2));
     });
 
     it('root is NOT a leaf', () => {
