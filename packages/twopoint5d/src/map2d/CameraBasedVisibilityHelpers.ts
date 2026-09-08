@@ -70,7 +70,15 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   // The public fields of this class shape the set that gets built, so a set built from other
   // values is out of date just as a set built from an older visibility is. `cloneable` keeps a
   // copy of each color, which catches a color written in place as well as one assigned.
-  readonly #knobs = new Dependencies([
+  readonly #knobs = new Dependencies<{
+    maxDebugHelpers: number;
+    tileBoxHelperExpand: number;
+    frustumBoxHelperExpand: number;
+    frustumBoxHelperColor: Color;
+    frustumBoxPrimaryHelperColor: Color;
+    tileBoxHelperColor: Color;
+    tileBoxPrimaryHelperColor: Color;
+  }>([
     'maxDebugHelpers',
     'tileBoxHelperExpand',
     'frustumBoxHelperExpand',

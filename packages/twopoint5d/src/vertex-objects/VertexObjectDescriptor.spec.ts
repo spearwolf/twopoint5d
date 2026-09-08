@@ -1,5 +1,6 @@
 import {describe, expect, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 describe('VertexObjectDescriptor', () => {
@@ -88,5 +89,29 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.bufferNames.values())).toEqual(['static_float32', 'dynamic_float32']);
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar')!.name).toBe('bar');
+  });
+
+  describe('the vertex object prototype', () => {
+    const makeDescriptorWithPrototype = () => {
+      const descriptor = new VertexObjectDescriptor({
+        attributes: {
+          foo: {
+            components: ['x', 'y'],
+            type: 'float32',
+            usage: 'static',
+          },
+        },
+      });
+      // the first buffer built on a descriptor is what builds its prototype
+      new VertexObjectBuffer(descriptor, 1);
+      return descriptor;
+    };
+
+    test('is not an enumerable property of the descriptor', () => {
+      const descriptor = makeDescriptorWithPrototype();
+
+      expect(descriptor.voPrototype, 'the buffer has built it').toBeDefined();
+      expect(Object.keys(descriptor)).not.toContain('voPrototype');
+    });
   });
 });

@@ -78,8 +78,35 @@ describe('Dependencies', () => {
     expect(deps.equals({a: 2, b: 'fooXXX', c: 23})).toBe(true);
   });
 
+  test('a key nobody declared does not reach the state', () => {
+    const deps = new Dependencies(['centerX', 'centerY']);
+
+    deps.update({centerX: 1, centerY: 2, cnterX: 99});
+
+    expect(deps.value('cnterX'), 'a typo is never compared, so it is never kept').toBeUndefined();
+    expect(deps.value('centerX')).toBe(1);
+    expect(deps.value('centerY')).toBe(2);
+  });
+
+  test('a declaration that spells out its key is held against the shape', () => {
+    type Knobs = {centerX: number};
+
+    // The whole assurance is a type, so it is the compiler that has to answer here: each
+    // directive below goes red the moment its line stops being an error.
+    expect(new Dependencies<Knobs>(['centerX'])).toBeDefined();
+
+    // @ts-expect-error a bare name has to be one of the shape
+    expect(new Dependencies<Knobs>(['cnterX'])).toBeDefined();
+
+    // @ts-expect-error a pair written out with its name has to be one of the shape
+    expect(new Dependencies<Knobs>([['cnterX', (a: number, b: number) => a === b]])).toBeDefined();
+
+    // @ts-expect-error the same for a pair that brings its callbacks as an object
+    expect(new Dependencies<Knobs>([['cnterX', {equals: (a: number, b: number) => a === b}]])).toBeDefined();
+  });
+
   test('copy and clone', () => {
-    const deps = new Dependencies([Dependencies.cloneable<Vector2>('v')]);
+    const deps = new Dependencies<{v: Vector2}>([Dependencies.cloneable<Vector2>('v')]);
 
     expect(deps.changed({v: new Vector2()})).toBe(true);
     expect(deps.changed({v: new Vector2()})).toBe(false);
@@ -94,7 +121,7 @@ describe('Dependencies', () => {
     expect(deps.changed(vDeps)).toBe(true);
 
     expect(v.equals(new Vector2(2, 3))).toBe(true);
-    expect(deps.value('v').equals(new Vector2(2, 3))).toBe(true);
+    expect(deps.value('v')!.equals(new Vector2(2, 3))).toBe(true);
     expect(deps.value('v')).not.toBe(v);
 
     expect(deps.changed({v: null})).toBe(true);

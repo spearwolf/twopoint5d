@@ -151,7 +151,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   map2dTileCoords = new Map2DTileCoordsUtil();
 
-  readonly #deps = new Dependencies([
+  readonly #deps = new Dependencies<{
+    depth: number;
+    frustumBoxScale: number;
+    lookAtCenter: boolean;
+    centerPoint2D: Vector2;
+    map2dTileCoords: Map2DTileCoordsUtil;
+    matrixWorld: Matrix4;
+    cameraMatrixWorld: Matrix4;
+    cameraProjectionMatrix: Matrix4;
+  }>([
     'depth',
     'frustumBoxScale',
     'lookAtCenter',

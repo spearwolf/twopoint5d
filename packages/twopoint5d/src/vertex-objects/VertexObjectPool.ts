@@ -105,13 +105,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
     this.#voIndex = newVoIndex;
 
-    // Update capacity (readonly field needs to be redefined)
-    Object.defineProperty(this, 'capacity', {
-      value: capacity,
-      writable: false,
-      enumerable: true,
-      configurable: true,
-    });
+    this.setCapacity(capacity);
 
     // Adjust usedCount if necessary
     this.usedCount = Math.min(this.usedCount, capacity);

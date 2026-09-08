@@ -10,8 +10,7 @@ import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {attributeNamesOf} from './attributeNamesOf.js';
-import {initializeAttributes} from './initializeAttributes.js';
-import {initializeInstancedAttributes} from './initializeInstancedAttributes.js';
+import {initializeAttributes, initializeInstancedAttributes} from './initializeAttributes.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
@@ -489,19 +488,29 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    */
   touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void {
     const attrNames: string[] = [];
-    let buffers: TouchBuffersType | TouchInstancedBuffersType | undefined = undefined;
-    args.forEach((arg) => {
+    let flat: TouchBuffersType | undefined;
+    let routed: TouchInstancedBuffersType | undefined;
+
+    for (const arg of args) {
       if (typeof arg === 'string') {
         attrNames.push(arg);
+      } else if ('base' in arg || 'instanced' in arg) {
+        // merged per route, not across them: a second {base: …} would otherwise replace the
+        // first one whole instead of adding to it
+        routed = {base: {...routed?.base, ...arg.base}, instanced: {...routed?.instanced, ...arg.instanced}};
       } else {
-        buffers = {...buffers, ...arg};
+        flat = {...flat, ...arg};
       }
-    });
+    }
+
     if (attrNames.length) {
       this.touchAttributes(...attrNames);
     }
-    if (buffers) {
-      this.touchBuffers(buffers);
+    if (flat) {
+      this.touchBuffers(flat);
+    }
+    if (routed) {
+      this.touchBuffers(routed);
     }
   }
 

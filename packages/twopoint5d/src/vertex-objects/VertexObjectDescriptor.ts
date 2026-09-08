@@ -10,8 +10,27 @@ export class VertexObjectDescriptor {
   readonly basePrototype?: object | null | undefined;
   readonly methods?: object | null | undefined;
 
-  voPrototype!: object; // lazy initialization!!
-  // is initialized by the first VertexObjectBuffer that uses this descriptor => createVertexObjectPrototype()
+  #voPrototype?: object;
+
+  /**
+   * The prototype every vertex object of this descriptor is created from. The first
+   * {@link VertexObjectBuffer} built on this descriptor builds it and assigns it here; before
+   * that there is none, and the declared type says otherwise because every caller reaches this
+   * through a buffer that has already built it.
+   *
+   * It is read through an accessor rather than held in a field so that it stays off the
+   * enumerable surface of the descriptor. The attribute accessors on that prototype read
+   * through a buffer the prototype itself does not have, so anything that walks a descriptor
+   * property by property — a test runner rendering a failed assertion, for one — would die on
+   * the first of them instead of showing what it set out to show.
+   */
+  get voPrototype(): object {
+    return this.#voPrototype!;
+  }
+
+  set voPrototype(prototype: object) {
+    this.#voPrototype = prototype;
+  }
 
   constructor(description: VertexObjectDescription) {
     this.description = description;

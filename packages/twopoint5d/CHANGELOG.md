@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `FrameBasedAnimations#hasAnimation()`: whether an animation is registered under a name. It is the question to ask before `animId()` when the name comes from outside
 - add a `RegExp` form to the `frameNameQuery` of `FrameBasedAnimations#add()`: beside a string pattern it takes a regular expression — both forms `TextureAtlas#frameNames()` accepts, and both narrow the animation to the frames whose names match
 - add a shared image cache to `TextureStore`: resources that name the same `imageUrl` are served by one fetch for as long as at least one of them wants it. What is shared is the image and not the texture — every resource applies its own texture classes and owns the `Texture` it built. The entry goes as the last resource lets go of it, so a resource created afterwards fetches the image again, and a load that failed is not kept either
+- export `DependencyShape`, `DependencyValues` and `DependencyDeclaration`: the three types around the `Dependencies` type parameter. `DependencyShape` is the constraint a shape satisfies — any object type does, a named `interface` as much as a `type` alias. `DependencyValues<Shape>` is what `update()`, `equals()` and `changed()` take: every key of the shape optional, and each free to carry `null`. `DependencyDeclaration<Shape>` is one entry of the list the constructor takes, and the type to write a declaration list down with wherever it does not go into the constructor call inline
 
 ### Changed
 
@@ -113,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
 - perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
 - perf `Map2D#update()` leaves the world matrix to the tile streamer, which brings it up to date with `updateWorldMatrix(true, false)` — the parent chain first — on every update that has a visibilitor and a tile renderer to lay out tiles for. An update that is missing either of the two touches no matrix, and the three.js renderer brings the scene graph up to date before it draws
+- `Dependencies` is generic over the shape it watches: `update()`, `equals()` and `changed()` take the keys of that shape, and `value()` answers in the type the shape gives a key instead of `any`. A declaration whose callbacks are not complete — a bare name, and a name paired with an `equals` or with callbacks missing `clone` or `copy` — has to name one of the shape, so a typo in the declaration list does not compile; a pair that brings all three callbacks, `Dependencies.cloneable()` among them, is not held against the shape, and its name goes unchecked. A key nobody declared is no longer written into the state — it was never compared and never reported as changed, so it only made the state look like it watched something it does not
+- `InstancedVOBufferGeometry#touch()` applies both argument forms when they are mixed in one call: usage types named without a route reach the buffers of every route, and a `{base, instanced}` argument reaches the routes it names
+- `VOBufferPool#capacity` is a getter over a private field, and `VertexObjectDescriptor#voPrototype` an accessor — neither stands as an own property on the instance, and `capacity` is written only through the pool that owns it
 
 ### Removed
 
@@ -166,6 +170,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` for a coordinate outside the chunk: both hold it against the width and the height of the chunk and answer with `undefined`. An `x` past either edge folded into the neighbouring row and answered with a foreign id that looked valid
 
 ### Migration Guide
+
+#### `Dependencies#value()` answers in the type of its shape
+
+**Before**
+
+```ts
+const deps = new Dependencies(['centerX', Dependencies.cloneable<Matrix4>('matrixWorld')]);
+const matrix = deps.value('matrixWorld'); // any
+```
+
+**After**
+
+```ts
+const deps = new Dependencies<{centerX: number; matrixWorld: Matrix4}>([
+  'centerX',
+  Dependencies.cloneable<Matrix4>('matrixWorld'),
+]);
+const matrix = deps.value('matrixWorld'); // Matrix4 | undefined
+```
+
+Without a type argument the shape is `Record<string, unknown>` and `value()` answers `unknown`,
+which no longer flows into a typed variable on its own. Name the shape to get the value typed;
+the `| undefined` is the state of a key nothing has written yet.
 
 #### `TileSpritesFactory#freeTileSprite()` is gone
 

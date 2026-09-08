@@ -20,7 +20,12 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   #tileCreated?: Uint8Array;
 
-  readonly #deps = new Dependencies([
+  readonly #deps = new Dependencies<{
+    centerX: number;
+    centerY: number;
+    map2dTileCoords: Map2DTileCoordsUtil;
+    matrixWorld: Matrix4;
+  }>([
     'centerX',
     'centerY',
     Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
@@ -73,7 +78,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     // asked before changed() writes the new state over it: the answer is what the previous call
     // was given, and `Dependencies` hands out its own clone
-    const storedTileCoords = this.#deps.value('map2dTileCoords') as Map2DTileCoordsUtil | undefined;
+    const storedTileCoords = this.#deps.value('map2dTileCoords');
 
     // a tile of another grid carries indices this grid cannot place: `tile.x - tileLeft` lands
     // outside the occupancy array — or, worse, inside it on the wrong cell, where it marks a

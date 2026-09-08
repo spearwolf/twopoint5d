@@ -282,6 +282,26 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
   });
 
+  test('touch() applies both argument forms when they are mixed in one call', () => {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor);
+
+    const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
+
+    geometry.touch({static: true}, {instanced: {dynamic: true}});
+
+    expect(touchBuffers.callCount, 'the flat form and the routed form each get their own call').toBe(2);
+
+    const calls = touchBuffers.getCalls().map((call) => call.args[0]);
+
+    expect(calls, 'the usage types named without a route reach touchBuffers()').toContainEqual({static: true});
+    expect(
+      calls.find((arg) => arg != null && 'instanced' in arg),
+      'the routed form reaches it as it was given',
+    ).toMatchObject({
+      instanced: {dynamic: true},
+    });
+  });
+
   describe('a pool that has been disposed', () => {
     test('the constructor refuses it as the instanced source', () => {
       const instancedPool = new VertexObjectPool<VO>(instancedDescriptor, 10);

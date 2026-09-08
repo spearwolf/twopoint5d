@@ -1,5 +1,11 @@
-import type {BufferGeometry} from 'three/webgpu';
-import {BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
+import type {BufferGeometry, TypedArray as ThreeTypedArray} from 'three/webgpu';
+import {
+  BufferAttribute,
+  InstancedBufferAttribute,
+  InstancedInterleavedBuffer,
+  InterleavedBuffer,
+  InterleavedBufferAttribute,
+} from 'three/webgpu';
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
@@ -7,15 +13,26 @@ import {createIndicesArray} from './createIndicesArray.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
-export function initializeAttributes(
+/**
+ * What separates a plain attribute route from an instanced one: the two three.js
+ * constructors, and whether the route also carries the index of the geometry.
+ */
+interface AttributeBuilders {
+  interleavedBuffer(array: ThreeTypedArray, itemSize: number): InterleavedBuffer;
+  bufferAttribute(array: ThreeTypedArray, itemSize: number, normalized: boolean): BufferAttribute;
+  ownsIndex: boolean;
+}
+
+function initializeRoute(
   geometry: BufferGeometry,
   pool: VOBufferPool,
   buffers: AttributeRoute,
   bufferSerials: Map<string, number>,
   slots: GeometryAttributeSlots,
+  builders: AttributeBuilders,
 ): void {
   const {descriptor, capacity} = pool;
-  if (descriptor.hasIndices) {
+  if (builders.ownsIndex && descriptor.hasIndices) {
     const {indices} = descriptor;
     const bufAttr = new BufferAttribute(createIndicesArray(indices, capacity), 1);
     geometry.setIndex(bufAttr);
@@ -29,7 +46,7 @@ export function initializeAttributes(
       `the attributes of buffer "${buffer.bufferName}"`,
     );
     if (attributes.length > 1) {
-      const interleavedBuffer = new InterleavedBuffer(asThreeTypedArray(buffer.typedArray!), buffer.itemSize);
+      const interleavedBuffer = builders.interleavedBuffer(asThreeTypedArray(buffer.typedArray!), buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);
       bufferSerials.set(buffer.bufferName, buffer.serial);
@@ -49,7 +66,7 @@ export function initializeAttributes(
         descriptor.attributes.get(bufAttr.attributeName),
         `the descriptor of attribute "${bufAttr.attributeName}"`,
       );
-      const attr = new BufferAttribute(asThreeTypedArray(buffer.typedArray!), buffer.itemSize, attrDesc.normalizedData);
+      const attr = builders.bufferAttribute(asThreeTypedArray(buffer.typedArray!), buffer.itemSize, attrDesc.normalizedData);
       attr.setUsage(toDrawUsage(buffer.usageType));
       attr.name = bufAttr.attributeName;
       buffers.set(buffer.bufferName, attr);
@@ -58,4 +75,35 @@ export function initializeAttributes(
       slots.claim(attrDesc.name, buffers, pool, attr);
     }
   }
+}
+
+export function initializeAttributes(
+  geometry: BufferGeometry,
+  pool: VOBufferPool,
+  buffers: AttributeRoute,
+  bufferSerials: Map<string, number>,
+  slots: GeometryAttributeSlots,
+): void {
+  initializeRoute(geometry, pool, buffers, bufferSerials, slots, {
+    interleavedBuffer: (array, itemSize) => new InterleavedBuffer(array, itemSize),
+    bufferAttribute: (array, itemSize, normalized) => new BufferAttribute(array, itemSize, normalized),
+    ownsIndex: true,
+  });
+}
+
+export function initializeInstancedAttributes(
+  geometry: BufferGeometry,
+  pool: VOBufferPool,
+  buffers: AttributeRoute,
+  bufferSerials: Map<string, number>,
+  slots: GeometryAttributeSlots,
+): void {
+  // every instanced attribute advances once per mesh of the descriptor
+  const meshPerAttribute = pool.descriptor.meshCount;
+  initializeRoute(geometry, pool, buffers, bufferSerials, slots, {
+    interleavedBuffer: (array, itemSize) => new InstancedInterleavedBuffer(array, itemSize, meshPerAttribute),
+    bufferAttribute: (array, itemSize, normalized) => new InstancedBufferAttribute(array, itemSize, normalized, meshPerAttribute),
+    // the index of an instanced geometry comes from its base route, never from this one
+    ownsIndex: false,
+  });
 }

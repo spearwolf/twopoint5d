@@ -12,8 +12,23 @@ export class VOBufferPool {
   /** What this pool is built from; it goes on saying so once {@link dispose} has run. */
   readonly descriptor: VertexObjectDescriptor;
 
+  #capacity: number;
+
   /** How many vertex objects this pool was sized for; it goes on saying so once {@link dispose} has run. */
-  readonly capacity: number;
+  get capacity(): number {
+    return this.#capacity;
+  }
+
+  /**
+   * Writes the capacity this pool reports. Only {@link VertexObjectPool#resize} has any business
+   * here, and only after it has built the buffers for the new size — everything that reads
+   * `capacity` reads it as the size of the buffers behind it.
+   *
+   * @internal
+   */
+  protected setCapacity(capacity: number): void {
+    this.#capacity = capacity;
+  }
 
   /**
    * The buffer every vertex object of this pool reads and writes through.
@@ -44,11 +59,11 @@ export class VOBufferPool {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
     if (typeof capacityOrData === 'number') {
       const capacity = capacityOrData;
-      this.capacity = capacity;
+      this.#capacity = capacity;
       this.#buffer = new VertexObjectBuffer(this.descriptor, capacity);
     } else {
       const buffersData = capacityOrData;
-      this.capacity = buffersData.capacity;
+      this.#capacity = buffersData.capacity;
       // the buffer is built from the given data rather than sized from a capacity
       this.#buffer = new VertexObjectBuffer(this.descriptor, buffersData);
       this.usedCount = buffersData.usedCount;
