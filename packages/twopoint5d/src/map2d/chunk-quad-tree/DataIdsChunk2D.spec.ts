@@ -1,4 +1,4 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 
 import {DataIdsChunk2D} from './DataIdsChunk2D.js';
 
@@ -26,9 +26,13 @@ describe('DataIdsChunk2D', () => {
     expect(chunk.readDataIdAt(12, 21)).toBe(7);
   });
 
-  test('names the compression it cannot handle', () => {
+  test('names the compression it cannot handle and reports it by throwing alone', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const chunk = new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, data: 'AAAAAA==', compression: 'gzip'});
 
     expect(() => chunk.readDataIdAt(0, 0)).toThrow(/gzip/);
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

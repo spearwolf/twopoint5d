@@ -90,6 +90,30 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   }
 
   /**
+   * Writes one row of `target` with the pattern row `patternRow`, repeated horizontally
+   * from tile column `left` onwards.
+   */
+  #writePatternRow(target: Uint32Array, targetRowOffset: number, patternRow: number, left: number, width: number): void {
+    const row = this.#tileIds[patternRow]!;
+
+    if (this.#cols === 1) {
+      target.fill(row[0]!, targetRowOffset, targetRowOffset + width);
+      return;
+    }
+
+    let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
+    let x = 0;
+
+    while (x < width) {
+      const piece = row.slice(col, col + width - x);
+      target.set(piece, targetRowOffset + x);
+      x += piece.length;
+      // the next piece picks up at the pattern column right after the one just written
+      col = (col + piece.length) % this.#cols;
+    }
+  }
+
+  /**
    * Please bear in mind that all coordinates are given in _tile space_
    * - therefore only integer numbers should be used here
    */
@@ -142,18 +166,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
             const patternRow = y + top;
             const targetRowOffset = y * width;
             if (patternRow < this.#rows) {
-              if (this.#cols === 1) {
-                target.fill(this.tileIds[patternRow]![0]!, targetRowOffset, targetRowOffset + width);
-              } else {
-                let x = 0;
-                let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
-                while (x < width) {
-                  const tiles = this.tileIds[patternRow]!.slice(col, col + width - x);
-                  target.set(tiles, targetRowOffset + x);
-                  x += tiles.length;
-                  col = (col + x) % this.#cols;
-                }
-              }
+              this.#writePatternRow(target, targetRowOffset, patternRow, left, width);
             } else {
               target.fill(0, targetRowOffset);
               break;
@@ -170,18 +183,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
           for (let y = 0; y < height; y++) {
             const patternRow = (y + topOffset) % this.#rows;
             const targetRowOffset = y * width;
-            if (this.#cols === 1) {
-              target.fill(this.tileIds[patternRow]![0]!, targetRowOffset, targetRowOffset + width);
-            } else {
-              let x = 0;
-              let col = (left < 0 ? left + Math.ceil(-left / this.#cols) * this.#cols : left) % this.#cols;
-              while (x < width) {
-                const tiles = this.tileIds[patternRow]!.slice(col, col + width - x);
-                target.set(tiles, targetRowOffset + x);
-                x += tiles.length;
-                col = (col + x) % this.#cols;
-              }
-            }
+            this.#writePatternRow(target, targetRowOffset, patternRow, left, width);
           }
         }
         break;

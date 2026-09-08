@@ -362,6 +362,13 @@ describe('RepeatingTilesProvider', () => {
       });
     });
     describe('horizontal', () => {
+      test('repeats a pattern that does not end on the target edge', () => {
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([1, 2, 3], 'horizontal').getTileIdsWithin(1, 0, 10, 1, new Uint32Array(10).fill(666)),
+          ),
+        ).toEqual([2, 3, 1, 2, 3, 1, 2, 3, 1, 2]);
+      });
       test('top outside', () => {
         // prettier-ignore
         expect(
@@ -598,6 +605,25 @@ describe('RepeatingTilesProvider', () => {
       });
     });
     describe('none', () => {
+      test('repeats a pattern that does not end on the target edge', () => {
+        expect(
+          Array.from(new RepeatingTilesProvider([1, 2, 3]).getTileIdsWithin(1, 0, 10, 1, new Uint32Array(10).fill(666))),
+        ).toEqual([2, 3, 1, 2, 3, 1, 2, 3, 1, 2]);
+      });
+      test('repeats every row of a multi-row pattern the same way', () => {
+        // prettier-ignore
+        expect(
+          Array.from(
+            new RepeatingTilesProvider([
+              [1, 2, 3],
+              [4, 5, 6],
+            ]).getTileIdsWithin(1, 0, 8, 2, new Uint32Array(16).fill(666)),
+          ),
+        ).toEqual([
+          2, 3, 1, 2, 3, 1, 2, 3,
+          5, 6, 4, 5, 6, 4, 5, 6,
+        ]);
+      });
       test('1x1 pattern', () => {
         // prettier-ignore
         expect(
