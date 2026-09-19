@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, retain} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, retain, retainClear} from '@spearwolf/eventize';
 import type {Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
@@ -75,7 +75,9 @@ export const TextureResourceSubtypes = {
  * is cleared again — the response was a 200, so there is no status to name. It
  * carries `{source: 'texture', id, error}` for a failure behind an image that loaded
  * successfully — texture creation, or any value derived from it, such as an atlas or a tile
- * set — with no `url`, since none has failed. It carries
+ * set — with no `url`, since none has failed. A tile set that `TileSet` refuses is reported
+ * here whether the image arrives or the `tileSetOptions` change; the write that changed them
+ * does not throw. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data is no object or does not fit this kind of resource, and one whose data does not
  * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
@@ -180,7 +182,10 @@ export interface TextureResource extends EventizedObject {}
  * **Output** — read-only, produced by the effects {@link TextureResource.load} registers:
  * `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations`. Each of them is
  * also an event of the same name, retained, so a subscriber that arrives late still sees
- * the current value.
+ * the current value. A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations`
+ * back while its `tileSetOptions` are cleared or refused by `TileSet`: the getters answer
+ * `undefined`, and rather than announcing `undefined` the retained events are cleared, so a
+ * subscriber that arrives later waits for the next value.
  *
  * `atlasUrl`, `atlasJson`, `overrideImageUrl` and `tileSetOptions` belong to one shape of
  * resource each. Writing one on a resource of another shape throws a `TypeError`.
@@ -485,27 +490,27 @@ export class TextureResource {
     if (!this.#load) {
       this.#load = true;
 
+      // A value that is taken back is not announced: a subscriber would get an `undefined`
+      // where the event promises a value. The retained event is cleared instead, so a
+      // subscriber that arrives later waits for the next value rather than being handed
+      // the one that was taken back.
+      const publish = <T>(signal: Signal<T | undefined> | undefined, event: TextureResourceSubType) => {
+        signal?.onChange((value) => {
+          if (value === undefined) {
+            retainClear(this, event);
+          } else {
+            emit(this, event, value);
+          }
+        });
+      };
+
       // these bridges end with the signals they read: the signals are attached to this
       // resource, and SignalGroup.delete(this) in dispose() destroys them
-      this.#imageCoords.onChange((value) => {
-        emit(this, 'imageCoords', value);
-      });
-
-      this.#atlas?.onChange((value) => {
-        emit(this, 'atlas', value);
-      });
-
-      this.#tileSet?.onChange((value) => {
-        emit(this, 'tileSet', value);
-      });
-
-      this.#frameBasedAnimations.onChange((value) => {
-        emit(this, 'frameBasedAnimations', value);
-      });
-
-      this.#texture.onChange((value) => {
-        emit(this, 'texture', value);
-      });
+      publish(this.#imageCoords, 'imageCoords');
+      publish(this.#atlas, 'atlas');
+      publish(this.#tileSet, 'tileSet');
+      publish(this.#frameBasedAnimations, 'frameBasedAnimations');
+      publish(this.#texture, 'texture');
 
       // auto-tracking effect (no static deps) so it autoruns at registration
       // — load() is typically called AFTER `textureFactory` and `imageUrl` are
@@ -555,8 +560,8 @@ export class TextureResource {
             )
             .catch((error) => {
               // signalize propagates inline: an effect that throws inside the batch() above —
-              // texture creation, or any of the atlas/tileSet/frameBasedAnimations effects it
-              // derives — is isolated and its error is rethrown to the writer once delivery
+              // texture creation, or an effect derived from the image that throws, the atlas
+              // effect — is isolated and its error is rethrown to the writer once delivery
               // ends, several at once as an AggregateError. The writer here is the batch()
               // itself, so it surfaces here, long after the image fetch has already succeeded —
               // there is no failed url to name, so this reports the resource instead
@@ -583,10 +588,40 @@ export class TextureResource {
 
         createEffect(
           () => {
-            if (this.imageCoords && this.tileSetOptions) {
-              const tileSet = new TileSet(this.imageCoords, this.tileSetOptions);
+            const imageCoords = this.imageCoords;
+            if (!imageCoords) return;
+            const options = this.tileSetOptions;
+
+            let tileSet: TileSet | undefined;
+            let refusal: {error: unknown} | undefined;
+            if (options) {
+              try {
+                tileSet = new TileSet(imageCoords, options);
+              } catch (error) {
+                refusal = {error};
+              }
+            }
+
+            if (tileSet) {
               tileSetSignal.set(tileSet);
               atlasSignal.set(tileSet.atlas);
+              return;
+            }
+
+            // Nothing on the resource may have been built from options other than the current
+            // ones, so without a tile set from the current options the tile set, its atlas and
+            // the animations built on it are taken back — the animations here as well, because
+            // inside a batch the animation effect runs after this one and an error listener
+            // reading the resource would still find them. A refusal is reported here instead of
+            // thrown: thrown, it would reach whoever wrote the options — a setter, a
+            // `TextureStore#parse()` cut short before its ready event — or the image effect,
+            // whose batch would then skip handing over the texture.
+            tileSetSignal.set(undefined);
+            atlasSignal.set(undefined);
+            this.#frameBasedAnimations.set(undefined);
+
+            if (refusal) {
+              emit(this, OnError, {source: 'texture', id: this.id, error: refusal.error});
             }
           },
           [this.#imageCoords, tileSetOptionsSignal],

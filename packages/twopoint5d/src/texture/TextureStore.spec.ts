@@ -1369,6 +1369,63 @@ describe('TextureStore', () => {
       fetchMock.mockRestore();
     });
 
+    test('a parse that refuses the tile set options of a loaded resource reports it and completes', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 64, height: 64}) as unknown as HTMLImageElement);
+      const factory = {
+        create() {
+          return {name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({
+        defaultTextureClasses: [],
+        items: {t: {imageUrl: 'tiles.png', tileSet: {tileWidth: 16, tileHeight: 16}}},
+      });
+      const unsubscribe = store.on('t', 'tileSet', () => {});
+
+      const resource = await store.whenResource('t');
+      resource.textureFactory = factory as never;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.tileSet).toBeDefined();
+
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+      let readyCount = 0;
+      on(store, TextureStoreEvents.Ready, () => {
+        readyCount++;
+      });
+      expect(readyCount).toBe(1);
+
+      expect(() => {
+        store.parse({
+          defaultTextureClasses: [],
+          items: {t: {imageUrl: 'tiles.png', tileSet: {tileWidth: 0, tileHeight: 16, tileCount: 4}}},
+        });
+      }).not.toThrow();
+      await flushMicrotasks();
+
+      expect(readyCount).toBe(2);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'texture', id: 't'});
+      expect(resource.tileSet).toBeUndefined();
+
+      const lateSpy = vi.fn();
+      const unsubscribeLate = store.on('t', 'tileSet', lateSpy);
+      await flushMicrotasks();
+
+      expect(lateSpy).not.toHaveBeenCalled();
+
+      unsubscribeLate();
+      unsubscribe();
+      store.dispose();
+      loadSpy.mockRestore();
+    });
+
     test('an atlas that swaps its json for one over another image of the same size follows it', async () => {
       const atlasesByUrl: Record<string, unknown> = {
         'a1.json': {frames: {f1: {frame: {x: 0, y: 0, w: 10, h: 10}}}, meta: {image: 'first.png', size: {w: 100, h: 50}}},

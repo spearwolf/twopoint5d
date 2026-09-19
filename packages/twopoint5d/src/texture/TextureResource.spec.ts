@@ -804,6 +804,162 @@ describe('TextureResource', () => {
     });
   });
 
+  describe('tile set options that are refused', () => {
+    const validOptions = {tileWidth: 16, tileHeight: 16};
+    // a tileCount keeps the layout finite whatever the tile width
+    const refusedOptions = {tileWidth: 0, tileHeight: 16, tileCount: 4};
+    const animationsData: FrameBasedAnimationsDataMap = {walk: {duration: 1, firstTileId: 1, tileCount: 2}};
+
+    const stubImage = () =>
+      vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement);
+
+    // a tile set resource with valid options, loaded until tile set, atlas and animations stand
+    const loadedResource = async () => {
+      stubImage();
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', validOptions, undefined, animationsData);
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(resource.tileSet).toBeDefined();
+      expect(resource.atlas).toBeDefined();
+      expect(resource.frameBasedAnimations).toBeDefined();
+
+      return {resource};
+    };
+
+    // the write does not throw once a refusal is reported instead; the guard keeps the tests
+    // that follow it reaching their own assertions either way
+    const refuse = (resource: TextureResource) => {
+      try {
+        resource.tileSetOptions = refusedOptions;
+      } catch {
+        // the tests that care whether the write throws do not use this
+      }
+    };
+
+    test('options that are refused take the tile set, the atlas and the animations back', async () => {
+      const {resource} = await loadedResource();
+
+      const errors: unknown[] = [];
+      const seenInListener: Array<{tileSet: unknown; atlas: unknown; animations: unknown}> = [];
+      on(resource, 'error', (payload: unknown) => {
+        errors.push(payload);
+        seenInListener.push({tileSet: resource.tileSet, atlas: resource.atlas, animations: resource.frameBasedAnimations});
+      });
+
+      expect(() => {
+        resource.tileSetOptions = refusedOptions;
+      }).not.toThrow();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'texture', id: 'tiles'});
+      expect((errors[0] as {error: unknown}).error).toBeInstanceOf(RangeError);
+      expect(seenInListener).toEqual([{tileSet: undefined, atlas: undefined, animations: undefined}]);
+      expect(resource.tileSet).toBeUndefined();
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.frameBasedAnimations).toBeUndefined();
+
+      resource.dispose();
+    });
+
+    test('a subscriber that arrives after the refusal is handed nothing built from other options', async () => {
+      const {resource} = await loadedResource();
+
+      refuse(resource);
+
+      const tileSetSpy = vi.fn();
+      const atlasSpy = vi.fn();
+      const animationsSpy = vi.fn();
+      on(resource, 'tileSet', tileSetSpy);
+      on(resource, 'atlas', atlasSpy);
+      on(resource, 'frameBasedAnimations', animationsSpy);
+
+      expect(tileSetSpy).not.toHaveBeenCalled();
+      expect(atlasSpy).not.toHaveBeenCalled();
+      expect(animationsSpy).not.toHaveBeenCalled();
+
+      resource.dispose();
+    });
+
+    test('a subscriber is never handed undefined when a tile set is taken back', async () => {
+      const {resource} = await loadedResource();
+
+      const delivered: unknown[] = [];
+      on(resource, 'tileSet', (value: unknown) => delivered.push(value));
+      on(resource, 'atlas', (value: unknown) => delivered.push(value));
+      on(resource, 'frameBasedAnimations', (value: unknown) => delivered.push(value));
+      const before = delivered.length;
+      expect(before).toBe(3);
+
+      refuse(resource);
+
+      expect(delivered).toHaveLength(before);
+      expect(delivered.every((value) => value !== undefined)).toBe(true);
+
+      resource.dispose();
+    });
+
+    test('options that work again bring a tile set, an atlas and animations back', async () => {
+      const {resource} = await loadedResource();
+
+      const tileSets: Array<{tileWidth: number}> = [];
+      on(resource, 'tileSet', (tileSet: {tileWidth: number}) => tileSets.push(tileSet));
+
+      refuse(resource);
+      resource.tileSetOptions = {tileWidth: 32, tileHeight: 32};
+
+      expect(resource.tileSet).toBeDefined();
+      expect(resource.tileSet!.tileWidth).toBe(32);
+      expect(resource.atlas).toBeDefined();
+      expect(resource.frameBasedAnimations).toBeDefined();
+      expect(tileSets.at(-1)?.tileWidth).toBe(32);
+
+      resource.dispose();
+    });
+
+    test('options that are cleared take the tile set, the atlas and the animations back', async () => {
+      const {resource} = await loadedResource();
+
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+
+      resource.tileSetOptions = undefined;
+
+      expect(resource.tileSet).toBeUndefined();
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      expect(errors).toHaveLength(0);
+
+      const tileSetSpy = vi.fn();
+      on(resource, 'tileSet', tileSetSpy);
+      expect(tileSetSpy).not.toHaveBeenCalled();
+
+      resource.dispose();
+    });
+
+    test('a tile set refused on the first image leaves the texture to the resource', async () => {
+      stubImage();
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', refusedOptions);
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(resource.texture).toBeDefined();
+      expect(textures).toHaveLength(1);
+
+      resource.dispose();
+
+      expect(textures[0]!.disposed).toBe(true);
+    });
+  });
+
   describe('setters on the wrong shape', () => {
     test('an image resource refuses tileSetOptions', () => {
       const resource = TextureResource.fromImage('hero', 'hero.png');
