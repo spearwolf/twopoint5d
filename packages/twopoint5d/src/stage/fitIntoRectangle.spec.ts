@@ -214,3 +214,19 @@ it('a width of 0 means "this side is not constrained"', () => {
   fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 0, height: 100}, target);
   expect([target.width, target.height]).toEqual([160, 100]);
 });
+
+it('contain and cover give a 0×0 view for a rect without area', () => {
+  const rects = [new Vector2(0, 0), new Vector2(0, 600), new Vector2(800, 0)];
+  const specs = [
+    {fit: 'contain', width: 640},
+    {fit: 'cover', height: 480},
+    {fit: 'contain', width: 640, height: 480, maxPixelZoom: 2},
+  ] as const;
+  for (const rect of rects) {
+    for (const spec of specs) {
+      const target = new Vector2(11, 22);
+      fitIntoRectangle(rect, spec, target);
+      expect([target.width, target.height], `${JSON.stringify(spec)} in ${rect.width}×${rect.height}`).toEqual([0, 0]);
+    }
+  }
+});

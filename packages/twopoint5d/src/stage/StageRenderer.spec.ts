@@ -1,12 +1,14 @@
 import {createSandbox} from 'sinon';
-import {Color, RenderTarget} from 'three/webgpu';
+import {Color, PerspectiveCamera, RenderTarget} from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
+import {ParallaxProjection} from './ParallaxProjection.js';
+import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
-import {on} from '@spearwolf/eventize';
+import {getSubscriptionCount, on} from '@spearwolf/eventize';
 
 interface RendererMock {
   autoClear: boolean;
@@ -232,6 +234,78 @@ describe('StageRenderer', () => {
       expect(order[0]!).toBeLessThan(order[1]!);
       expect(order[1]!).toBeLessThan(order[2]!);
     });
+
+    it('restores autoClear when a stage throws', () => {
+      renderer.autoClear = true;
+      const sr = new StageRenderer();
+      const stage = fakeStage('s');
+      stage.renderTo.mockImplementation(() => {
+        throw new Error('stage failed');
+      });
+      sr.add(stage);
+      expect(() => sr.renderTo(renderer as any)).toThrow('stage failed');
+      expect(renderer.autoClear).toBe(true);
+    });
+
+    it('restores autoClear and the render target when a stage throws in the pipeline path', () => {
+      renderer.autoClear = true;
+      const before = {tag: 'screen'};
+      renderer.__renderTarget = before;
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      stage.renderTo.mockImplementation(() => {
+        throw new Error('stage failed');
+      });
+      sr.add(stage);
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      expect(() => sr.renderTo(renderer as any)).toThrow('stage failed');
+      expect(renderer.autoClear).toBe(true);
+      expect(renderer.__renderTarget).toBe(before);
+    });
+
+    it('renders every stage of a listed name, in the order they were added', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const sr = new StageRenderer();
+      const a = fakeStage('a');
+      const a2 = fakeStage('a');
+      const b = fakeStage('b');
+      sr.add(a).add(a2).add(b);
+      sr.renderOrder = 'b,a';
+      sr.renderTo(renderer as any);
+      warn.mockRestore();
+
+      for (const s of [a, a2, b]) expect(s.renderTo).toHaveBeenCalledTimes(1);
+      const order = [b, a, a2].map((s) => s.renderTo.mock.invocationCallOrder[0]!);
+      expect(order[0]).toBeLessThan(order[1]!);
+      expect(order[1]).toBeLessThan(order[2]!);
+    });
+
+    it('places a name or wildcard listed twice once', () => {
+      const sr = new StageRenderer();
+      const stages = [fakeStage('a'), fakeStage('b'), fakeStage('c')];
+      for (const stage of stages) sr.add(stage);
+      sr.renderOrder = 'a,*,a,*';
+      sr.renderTo(renderer as any);
+      for (const stage of stages) expect(stage.renderTo, stage.name).toHaveBeenCalledTimes(1);
+    });
+
+    it('sorts a stage renamed after add() under its new name', () => {
+      const sr = new StageRenderer();
+      const a = fakeStage('a');
+      const b = fakeStage('b');
+      sr.add(a).add(b);
+      sr.renderOrder = 'b,c';
+      sr.renderTo(renderer as any);
+      expect(a.renderTo).not.toHaveBeenCalled();
+      expect(b.renderTo).toHaveBeenCalledTimes(1);
+
+      a.name = 'c';
+      sr.renderTo(renderer as any);
+      expect(a.renderTo).toHaveBeenCalledTimes(1);
+      expect(b.renderTo).toHaveBeenCalledTimes(2);
+      expect(b.renderTo.mock.invocationCallOrder[1]!).toBeLessThan(a.renderTo.mock.invocationCallOrder[0]!);
+    });
   });
 
   describe('add / remove', () => {
@@ -262,6 +336,16 @@ describe('StageRenderer', () => {
       sr.renderOrder = 'a,b';
       sr.add(fakeStage('a'));
       sr.add(fakeStage('a'));
+      expect(warn).toHaveBeenCalledTimes(1);
+      warn.mockRestore();
+    });
+
+    it('warns about a shared name when renderOrder is set after the stages', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const sr = new StageRenderer();
+      sr.add(fakeStage('a'));
+      sr.add(fakeStage('a'));
+      sr.renderOrder = 'a,b';
       expect(warn).toHaveBeenCalledTimes(1);
       warn.mockRestore();
     });
@@ -431,6 +515,63 @@ describe('StageRenderer', () => {
       expect(pipeline.needsUpdate).toBe(true);
     });
 
+    it('replacing the pipeline rebuilds the output node', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('s'));
+      sr.pipeline = makePipelineMock() as any;
+      sr.renderTo(renderer as any);
+
+      const next = makePipelineMock();
+      sr.pipeline = next as any;
+      sr.renderTo(renderer as any);
+
+      expect(next.outputNode).toBeDefined();
+      expect(next.needsUpdate).toBe(true);
+      expect(next.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('assigning the same pipeline again keeps the output node', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('s'));
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+      const firstNode = pipeline.outputNode;
+      pipeline.needsUpdate = false;
+
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+
+      expect(pipeline.outputNode).toBe(firstNode);
+      expect(pipeline.needsUpdate).toBe(false);
+    });
+
+    it('assigning buildOutputNode after the first frame switches mode', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const passNode = {isNode: true, label: 's', type: 'pass'};
+      sr.add({...fakeStage('s'), asPassNode: vi.fn(() => passNode)} as any);
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+
+      const composed = {isNode: true, label: 'composed'};
+      const buildOutputNode = vi.fn(() => composed);
+      sr.buildOutputNode = buildOutputNode as any;
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(buildOutputNode.mock.calls[0]).toEqual([[passNode]]);
+      expect(pipeline.outputNode).toBe(composed);
+
+      sr.buildOutputNode = undefined;
+      pipeline.needsUpdate = false;
+      sr.renderTo(renderer as any);
+      expect(pipeline.outputNode).not.toBe(composed);
+      expect(pipeline.needsUpdate).toBe(true);
+    });
+
     it('runs pipeline into outputRenderTarget when set', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
@@ -494,13 +635,99 @@ describe('StageRenderer', () => {
       return {isNode: true, label, type: 'pass'} as any;
     }
 
-    it('Stage2D.asPassNode requires a camera (throws without projection)', async () => {
-      const {Stage2D} = await import('./Stage2D.js');
-      const {ParallaxProjection} = await import('./ParallaxProjection.js');
+    it('Stage2D.asPassNode requires a camera: none before the first resize() with an area', () => {
       const stage = new Stage2D();
       expect(() => stage.asPassNode(renderer as any)).toThrow(/no scene or camera/);
       stage.projection = new ParallaxProjection('xy|bottom-left');
-      expect(() => stage.asPassNode(renderer as any)).not.toThrow();
+      expect(() => stage.asPassNode(renderer as any), 'a projection alone').toThrow(/no scene or camera/);
+      stage.resize(100, 100);
+      expect(() => stage.asPassNode(renderer as any), 'after resize(100, 100)').not.toThrow();
+    });
+
+    function makeComposedSetup() {
+      const sr = new StageRenderer();
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      sr.add(stage);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      sr.pipeline = pipeline as any;
+      return {sr, stage, buildOutputNode, pipeline};
+    }
+
+    it('swapping the projection of a Stage2D after the first render rebuilds with a new pass node', () => {
+      const {sr, stage, buildOutputNode} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 50});
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      const firstPass = buildOutputNode.mock.calls[0]![0][0];
+      const secondPass = buildOutputNode.mock.calls[1]![0][0];
+      expect(secondPass).not.toBe(firstPass);
+      expect(secondPass.camera).toBe(stage.camera);
+    });
+
+    it('assigning a camera to a Stage2D rebuilds the output node', () => {
+      const {sr, stage, buildOutputNode} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.renderTo(renderer as any);
+
+      const camera = new PerspectiveCamera();
+      stage.camera = camera;
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode.mock.calls[1]![0][0].camera).toBe(camera);
+    });
+
+    it('remove() stops listening to the camera of a stage', () => {
+      const sr = new StageRenderer();
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left'));
+      const before = getSubscriptionCount(stage);
+
+      sr.add(stage);
+      expect(getSubscriptionCount(stage), 'after add()').toBeGreaterThan(before);
+
+      sr.remove(stage);
+      expect(getSubscriptionCount(stage), 'after remove()').toBe(before);
+    });
+
+    it('a composing renderer draws nothing while it is 0×0', () => {
+      const {sr, buildOutputNode, pipeline} = makeComposedSetup();
+      expect(() => sr.renderTo(renderer as any)).not.toThrow();
+      expect(buildOutputNode).not.toHaveBeenCalled();
+      expect(pipeline.render).not.toHaveBeenCalled();
+
+      sr.resize(100, 100);
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('a renamed stage rebuilds the output node', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const passA = fakePassNode('a');
+      const passB = fakePassNode('b');
+      const stageA = {...fakeStage('a'), asPassNode: vi.fn(() => passA)};
+      const stageB = {...fakeStage('b'), asPassNode: vi.fn(() => passB)};
+      sr.add(stageA as any).add(stageB as any);
+      sr.renderOrder = 'b,a';
+      const buildOutputNode = vi.fn((nodes: unknown[]) => nodes[0]);
+      sr.buildOutputNode = buildOutputNode as any;
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode.mock.calls[0]![0]).toEqual([passB, passA]);
+
+      stageA.name = 'b';
+      stageB.name = 'a';
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode.mock.calls[1]![0]).toEqual([passA, passB]);
     });
 
     it('buildOutputNode receives a pass node per stage (default renderOrder = "*", insertion order)', () => {

@@ -20,7 +20,7 @@ function makeCanvas(width = 32, height = 16) {
   return {width, height} as unknown as HTMLCanvasElement;
 }
 
-// without a setCanvasSize() the Stage2D has no camera and renderTo() falls through inside it, so
+// without a setContainerSize() the Stage2D has no camera and renderTo() falls through inside it, so
 // render() runs to the end under node without three.js ever drawing
 function makeStage() {
   return new Canvas2DStage(makeRenderer(), makeCanvas());

@@ -29,9 +29,16 @@ export class ParallaxProjection implements IProjection {
   #aspect!: number;
   #fovy!: number;
 
+  /**
+   * @param projectionPlane - The plane the camera looks at.
+   * @param specs - How the view fits into the container. Defaults to `{fit: 'fill'}`: one view
+   * unit per container pixel.
+   */
   constructor(projectionPlane?: ProjectionPlane | ProjectionPlaneDescription, specs?: Partial<ParallaxProjectionSpecs>) {
     this.projectionPlane = projectionPlane != null ? ProjectionPlane.get(projectionPlane) : undefined;
-    this.viewSpecs = specs ?? {};
+    // without specs the view is the container itself; specs handed in stay the caller's object,
+    // so a later write to them reaches the next updateViewRect()
+    this.viewSpecs = specs ?? {fit: 'fill'};
   }
 
   updateViewRect(width: number, height: number): void {

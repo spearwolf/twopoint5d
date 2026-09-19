@@ -21,10 +21,17 @@ describe('OrthographicProjection', () => {
       expect(projection.projectionPlane).toBeDefined();
     });
 
-    it('starts from an empty spec when built without one', () => {
+    it('fills the container when built without specs', () => {
       const projection = new OrthographicProjection();
-      expect(projection.viewSpecs).toEqual({});
-      expect(() => projection.updateViewRect(800, 600)).not.toThrow();
+      expect(projection.viewSpecs).toEqual({fit: 'fill'});
+      projection.updateViewRect(800, 600);
+      expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
+
+      const withPlane = new OrthographicProjection('xy|bottom-left');
+      withPlane.updateViewRect(800, 600);
+      const camera = withPlane.createCamera();
+      expect(camera.right - camera.left).toBe(800);
+      expect(camera.top - camera.bottom).toBe(600);
     });
   });
 

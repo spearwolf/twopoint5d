@@ -15,6 +15,8 @@ import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 
+const FRAMES_WITHOUT_CAMERA_BEFORE_WARNING = 100;
+
 /**
  * A 2D stage has a scene with 3D objects and a 2D projection.
  * The camera is automatically generated based on the projection.
@@ -79,7 +81,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   set projection(projection: IProjection | undefined) {
     if (this.#projection !== projection) {
       this.#projection = projection;
-      this.#cameraFromProjection = undefined;
+      // the camera of the previous projection goes first, announced as the camera it was;
+      // updateProjection() then announces the new one, if the container has an area for it
+      this.#updateCamera(() => {
+        this.#cameraFromProjection = undefined;
+      });
       this.updateProjection(true);
     }
   }
@@ -88,14 +94,14 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   #cameraUserOverride?: Camera;
 
   /**
-   * A camera is automatically created based on the projection and is available after the first call of the `resize()` method.
+   * The camera this stage renders with. The projection creates one on the first `resize()`
+   * whose width and height are both above 0; until then, and on a stage without a projection,
+   * it is `undefined`: `renderTo()` draws nothing and `asPassNode()` throws.
    *
-   * Alternatively, you can simply set your own camera.
+   * A camera assigned here takes precedence over the projection's. Assigning `undefined` hands
+   * back to the projection's camera, created on the spot if the container already has an area.
    *
-   * This will then take precedence over the automatically created camera.
-   *
-   * If the camera is manually set back to `null | undefined`, the next call of `resize()`
-   * will create (or reuse) the camera (created by the projection) as described above.
+   * Every change of the camera emits `OnStageAfterCameraChanged` with the camera it replaced.
    */
   get camera(): Camera | undefined {
     return this.#cameraUserOverride ?? this.#cameraFromProjection;
@@ -103,6 +109,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   set camera(camera: Camera | undefined) {
     this.#updateCamera(() => void (this.#cameraUserOverride = camera));
+    // without an override the projection's camera takes over, created now if there is none yet
+    if (this.camera == null) this.updateProjection(true);
   }
 
   #updateCamera = (updateCallback: () => void) => {
@@ -146,6 +154,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   }
 
   #updateProjection = (width: number, height: number): void => {
+    // a container without area has no aspect ratio to fit a view into: the stage keeps the
+    // camera and the size it has, and creates neither before the first resize() with an area
+    if (width === 0 || height === 0) return;
+
     this.needsUpdate = false;
 
     this.projection!.updateViewRect(width, height);
@@ -177,17 +189,18 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   isFirstFrame = true;
 
-  #noCameraErrorCount = 0;
+  #framesWithoutCamera = 0;
+  #warnedNoCamera = false;
 
   updateFrame(now: number, deltaTime: number, frameNo: number): void {
     const {scene, camera} = this;
 
     if (scene == null || camera == null) {
-      if (!camera && ++this.#noCameraErrorCount === 100) {
-        this.#noCameraErrorCount = -1000;
+      if (!camera && !this.#warnedNoCamera && ++this.#framesWithoutCamera >= FRAMES_WITHOUT_CAMERA_BEFORE_WARNING) {
+        this.#warnedNoCamera = true;
         // eslint-disable-next-line no-console
         console.warn(
-          'Stage2D has no camera and therefore cannot be rendered! normally this only happens if you forget to call the resize() method ..',
+          `Stage2D has had no camera for ${FRAMES_WITHOUT_CAMERA_BEFORE_WARNING} frames and renders nothing: the projection creates one on the first resize() with a width and a height above 0, or assign your own to stage.camera`,
         );
       }
       return;
@@ -210,7 +223,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   /**
    * Render this stage's scene with its camera. No-op until both are present
-   * (i.e. until the first `resize()` has created the camera from the projection).
+   * (i.e. until the first `resize()` with an area has created the camera from the projection).
    */
   renderTo(renderer: WebGPURenderer): void {
     if (this.scene && this.camera) {
@@ -220,7 +233,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   /**
    * Return a TSL `pass(scene, camera)` node for use inside a parent
-   * `RenderPipeline`. Requires `camera` (i.e. at least one `resize()`).
+   * `RenderPipeline`. Requires `camera` — a `resize()` with an area, or an assigned camera.
    */
   asPassNode(_renderer: WebGPURenderer): Node {
     if (!this.scene || !this.camera) {

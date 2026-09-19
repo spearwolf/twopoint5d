@@ -1,12 +1,12 @@
-import {emit, type EventizedObject, eventize, off, once} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {Color, type Node, RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
-import {expectDefined} from '../utils/expectDefined.js';
 import {
   OnAddToParent,
   OnRemoveFromParent,
   OnStageAdded,
+  OnStageAfterCameraChanged,
   OnStageRemoved,
   type StageAddedProps,
   type StageRemovedProps,
@@ -144,13 +144,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   #renderOrder = '*';
   #orderedStages?: StageItem[];
+  #orderedStageNames: string[] = [];
 
   /**
    * A comma separated list of stage names (see `IStage#name`) or `'*'` for
    * all other stages which are not listed explicitly.
    *
-   * Stage `name`s must be unique within this renderer for the sort to be
-   * deterministic — otherwise the warning emitted by {@link add} kicks in.
+   * Stages sharing a listed name render together at that position, in the
+   * order they were added; while `renderOrder` is not `'*'`, {@link add} and
+   * every write here warn about a shared name. A name or `'*'` listed twice
+   * counts at its first position. A stage renamed after `add()` is sorted
+   * under its new name from the next frame on.
    */
   set renderOrder(order: string | undefined) {
     order = order || '*';
@@ -159,6 +163,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#renderOrderArray = undefined;
       this.#orderedStages = undefined;
       this.#outputDirty = true;
+      this.#warnAboutSharedNames(this.stages.map((item) => item.stage.name));
       this.onRenderOrderChanged();
     }
   }
@@ -309,7 +314,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * The pipeline is handed in and stays the caller's. A disposed renderer
    * answers `undefined` here and takes no new one: like `parent`, `add()` and
-   * `attach()`, the write is a silent no-op.
+   * `attach()`, the write is a silent no-op. Assigning a different pipeline
+   * gives it this renderer's `outputNode` on the next render.
    */
   get pipeline(): RenderPipeline | undefined {
     return this.#pipeline;
@@ -317,7 +323,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   set pipeline(pipeline: RenderPipeline | undefined) {
     if (this.#disposed) return;
-    this.#pipeline = pipeline;
+    if (this.#pipeline !== pipeline) {
+      this.#pipeline = pipeline;
+      // a pipeline arrives with an outputNode of its own; the next render writes this renderer's into it
+      this.#outputDirty = true;
+    }
   }
 
   /**
@@ -328,6 +338,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   outputRenderTarget?: RenderTarget;
 
+  #buildOutputNode?: StageRendererBuildOutputNode;
+
   /**
    * Optional TSL-composition hook. When set together with {@link pipeline},
    * the renderer collects an `asPassNode()` from each stage and feeds the
@@ -336,14 +348,30 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * Without `buildOutputNode` but with `pipeline`, the renderer falls back
    * to "render stages into an internal target, sample as `texture()`".
+   *
+   * Assigning or clearing it switches between the two pipeline modes; the
+   * output node is rebuilt on the next render. While this renderer's `width`
+   * or `height` is 0, the composed mode draws nothing.
    */
-  buildOutputNode?: StageRendererBuildOutputNode;
+  get buildOutputNode(): StageRendererBuildOutputNode | undefined {
+    return this.#buildOutputNode;
+  }
+
+  set buildOutputNode(buildOutputNode: StageRendererBuildOutputNode | undefined) {
+    if (this.#buildOutputNode !== buildOutputNode) {
+      this.#buildOutputNode = buildOutputNode;
+      this.#outputDirty = true;
+    }
+  }
 
   /** Internal RT used in Mode C (pipeline without buildOutputNode). */
   #internalRT?: RenderTarget;
   /** Internal RT used when a parent calls `asPassNode()` on this renderer. */
   #asPassNodeRT?: RenderTarget;
-  /** Marks `pipeline.outputNode` as needing a rebuild (after stage list changes). */
+  /**
+   * Marks `pipeline.outputNode` as needing a rebuild: the stages, their order or names, the
+   * pipeline, `buildOutputNode` or the camera of a stage changed.
+   */
   #outputDirty = true;
 
   /**
@@ -409,10 +437,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const wasPreviouslyAutoClear = renderer.autoClear;
     if (this.clear) this.#applyClear(renderer);
     renderer.autoClear = false;
-    for (const stageItem of this.orderedStages) {
-      this.renderStage(stageItem, renderer);
+    try {
+      for (const stageItem of this.orderedStages) {
+        this.renderStage(stageItem, renderer);
+      }
+    } finally {
+      renderer.autoClear = wasPreviouslyAutoClear;
     }
-    renderer.autoClear = wasPreviouslyAutoClear;
   }
 
   /**
@@ -430,8 +461,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#clearForInternalRT(renderer);
       const wasPreviouslyAutoClear = renderer.autoClear;
       renderer.autoClear = false;
-      for (const stageItem of this.orderedStages) this.renderStage(stageItem, renderer);
-      renderer.autoClear = wasPreviouslyAutoClear;
+      try {
+        for (const stageItem of this.orderedStages) this.renderStage(stageItem, renderer);
+      } finally {
+        renderer.autoClear = wasPreviouslyAutoClear;
+      }
     } finally {
       renderer.setRenderTarget(prev);
     }
@@ -464,6 +498,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * pipeline with `buildOutputNode(passes)` as `outputNode`.
    */
   #renderPipelineComposed(renderer: WebGPURenderer): void {
+    // the stages take their camera from the first resize() with an area, and a Stage2D has no
+    // pass node to give before that: while this renderer is 0×0 there is nothing to compose
+    if (this.width === 0 || this.height === 0) return;
+
     for (const stageItem of this.orderedStages) {
       const stage = stageItem.stage;
       if (stage instanceof StageRenderer) {
@@ -588,7 +626,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `updateFrame()` and `renderTo()` have no stage left to drive. A write to `parent`,
    * `attach()`, `detach()`, `add()`, `remove()` and a further `dispose()` do nothing.
    * Every listener on this renderer goes with it, including the `OnStageAdded` and
-   * `OnStageRemoved` subscriptions a caller placed on it.
+   * `OnStageRemoved` subscriptions a caller placed on it, and so do the camera listeners it
+   * placed on its stages (through `remove()`).
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
@@ -630,7 +669,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   get orderedStages(): StageItem[] {
-    if (this.#orderedStages) return this.#orderedStages;
+    if (this.#orderedStages) {
+      // a stage name is a plain mutable field: the cache holds the names it was built from and
+      // rebuilds when one of them moved
+      if (this.#hasOrderedStageNames()) return this.#orderedStages;
+      // a renamed stage can move to another position, and the pass nodes follow the order
+      this.#outputDirty = true;
+    }
 
     const renderOrder = this.renderOrderArray;
 
@@ -638,35 +683,76 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       return this.stages;
     }
 
-    const explicitlyNamedStages = new Map<string, StageItem>();
-    const otherStages = this.stages.slice();
+    const listed = new Set(renderOrder.filter((name) => name !== '*'));
+    const byName = new Map<string, StageItem[]>();
+    const rest: StageItem[] = [];
 
-    renderOrder.forEach((name) => {
-      if (name !== '*') {
-        const index = otherStages.findIndex((stage) => stage.stage.name === name);
-        if (index !== -1) {
-          const stage = expectDefined(otherStages.splice(index, 1)[0], `the stage named "${name}"`);
-          explicitlyNamedStages.set(name, stage);
+    for (const item of this.stages) {
+      const {name} = item.stage;
+      if (listed.has(name)) {
+        const items = byName.get(name);
+        if (items) {
+          items.push(item);
+        } else {
+          byName.set(name, [item]);
         }
+      } else {
+        rest.push(item);
       }
-    });
+    }
 
-    const orderedStages = renderOrder
-      .map((name) => {
-        if (name === '*') {
-          return otherStages;
+    // a name or '*' listed twice counts at its first position, so every stage is placed once
+    const orderedStages: StageItem[] = [];
+    const placed = new Set<string>();
+    let restPlaced = false;
+
+    for (const name of renderOrder) {
+      if (name === '*') {
+        if (!restPlaced) {
+          restPlaced = true;
+          orderedStages.push(...rest);
         }
-        return explicitlyNamedStages.get(name);
-      })
-      .flat()
-      .filter(Boolean) as StageItem[];
-
-    explicitlyNamedStages.clear();
+      } else if (!placed.has(name)) {
+        placed.add(name);
+        const items = byName.get(name);
+        if (items) orderedStages.push(...items);
+      }
+    }
 
     this.#orderedStages = orderedStages;
+    this.#orderedStageNames = this.stages.map((item) => item.stage.name);
 
     return orderedStages;
   }
+
+  #hasOrderedStageNames(): boolean {
+    const names = this.#orderedStageNames;
+    if (names.length !== this.stages.length) return false;
+    for (let i = 0; i < names.length; i++) {
+      if (names[i] !== this.stages[i]!.stage.name) return false;
+    }
+    return true;
+  }
+
+  #warnAboutSharedNames(names: Iterable<string>): void {
+    if (this.#renderOrder === '*') return;
+
+    for (const name of new Set(names)) {
+      let count = 0;
+      for (const item of this.stages) {
+        if (item.stage.name === name) count++;
+      }
+      if (count > 1) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `StageRenderer: ${count} stages are named ${JSON.stringify(name)} and renderOrder=${JSON.stringify(this.#renderOrder)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
+        );
+      }
+    }
+  }
+
+  /** Unsubscribe handle of the `OnStageAfterCameraChanged` listener on each eventized stage. */
+  #cameraSubscriptions = new Map<IStage, () => void>();
 
   #getIndex(stage: IStage): number {
     return this.stages.findIndex((item) => item.stage === stage);
@@ -680,29 +766,34 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Add a stage. The stage must implement both {@link IStage} and
    * {@link IRenderable}. Returns `this` for chaining.
    *
-   * Emits `OnStageAdded`. Warns when `renderOrder` is set and another stage
-   * already uses the same `name` — sort order is ambiguous in that case.
+   * Emits `OnStageAdded`. Warns while `renderOrder` is not `'*'` and another
+   * stage already carries the same `name`.
+   *
+   * On an eventized stage — every `Stage2D` — it listens for
+   * `OnStageAfterCameraChanged` and rebuilds the output node on the next
+   * render; `remove()` stops listening.
    */
   add(stage: IStage & IRenderable): this {
     if (this.#disposed) return this;
 
     if (!this.hasStage(stage)) {
-      if (this.#renderOrder !== '*' && this.stages.some((item) => item.stage.name === stage.name)) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `StageRenderer: a stage named ${JSON.stringify(stage.name)} is already present and renderOrder=${JSON.stringify(
-            this.#renderOrder,
-          )} cannot disambiguate. Set unique names on your stages.`,
-        );
-      }
       const si: StageItem = {
         stage,
         width: 0,
         height: 0,
       };
       this.stages.push(si);
+      this.#warnAboutSharedNames([stage.name]);
       this.#orderedStages = undefined;
       this.#outputDirty = true;
+      if (isEventized(stage)) {
+        // a pass node keeps the camera it was built with: a stage that announces a new camera
+        // needs a new pass node, and with it a new output node
+        this.#cameraSubscriptions.set(
+          stage,
+          on(stage, OnStageAfterCameraChanged, () => this.invalidateOutputNode()),
+        );
+      }
       this.resizeStage(si, this.width, this.height);
       emit(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
     }
@@ -713,12 +804,15 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Remove a stage. Returns `this` for chaining. Emits `OnStageRemoved`.
    *
    * A removed child `StageRenderer` answers `undefined` as its `parent`
-   * afterwards and gets its `OnRemoveFromParent`.
+   * afterwards and gets its `OnRemoveFromParent`. Stops listening for the
+   * stage's camera changes.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);
+      this.#cameraSubscriptions.get(stage)?.();
+      this.#cameraSubscriptions.delete(stage);
       this.#orderedStages = undefined;
       this.#outputDirty = true;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);

@@ -87,8 +87,75 @@ describe('StageRenderer — pipeline integration', () => {
     await display.nextFrame();
     await display.nextFrame();
 
-    expect(buildCalls).to.equal(1, 'buildOutputNode should be invoked only when stage list changes');
+    expect(buildCalls).to.equal(1, 'buildOutputNode runs once while nothing it composes changes');
     expect(lastPasses).to.have.length(1);
+  });
+
+  it('Mode D: swapping the stage projection after the first frame rebuilds the output node through the new camera', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
+    sr.pipeline = new RenderPipeline(display.renderer);
+
+    let buildCalls = 0;
+    let lastPasses;
+    sr.buildOutputNode = (passes) => {
+      buildCalls += 1;
+      lastPasses = passes;
+      return passes[0];
+    };
+
+    await display.start();
+    await display.nextFrame();
+    await display.nextFrame();
+
+    expect(buildCalls).to.equal(1);
+
+    stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 160});
+    await display.nextFrame();
+
+    expect(buildCalls, 'the new camera needs a new pass node').to.equal(2);
+    expect(lastPasses[0].camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
+  });
+
+  it('Mode C: a replaced pipeline takes over the output', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#0f0')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#102030'), 1).add(stage);
+    const first = new RenderPipeline(display.renderer);
+    sr.pipeline = first;
+
+    await display.start();
+    await display.nextFrame();
+    await display.nextFrame();
+
+    const next = new RenderPipeline(display.renderer);
+    // a fresh pipeline carries a placeholder output of its own
+    const placeholder = next.outputNode;
+    let runs = 0;
+    const origRender = next.render.bind(next);
+    next.render = (...a) => {
+      runs += 1;
+      return origRender(...a);
+    };
+    sr.pipeline = next;
+
+    await display.nextFrame();
+
+    expect(next.outputNode).to.exist;
+    expect(next.outputNode, 'the replaced pipeline carries the output node of the renderer').to.not.equal(placeholder);
+    expect(runs).to.be.greaterThan(0);
+
+    // both pipelines belong to this test: the renderer lets go first, then they are released
+    sr.dispose();
+    first.dispose();
+    next.dispose();
   });
 
   it('dispose() drops the pipeline reference and leaves the pipeline itself to its owner', async () => {

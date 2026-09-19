@@ -121,6 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VOBufferPool#capacity` is a getter over a private field, and `VertexObjectDescriptor#voPrototype` an accessor — neither stands as an own property on the instance, and `capacity` is written only through the pool that owns it
 - `TextureResource` checks the response of an `atlasUrl` fetch against the shape of a texture packer json, the same way `TextureAtlasLoader` already does, before it reads it: a 200 response that is none, or one that names no image and gives no `overrideImageUrl` to fall back on, is reported through the `error` event with `source: 'atlas'` instead of being read
 - `TextureAtlasLoader#loadAsync()` rejects when `TexturePackerJson.parse()` throws, instead of leaving its promise pending forever — the throw happens inside the `load` event of the image, a path the promise otherwise never hears from
+- `Stage2D` creates its camera on the first `resize()` whose width and height are both above 0. Until then `camera` is `undefined`, `renderTo()` draws nothing and `asPassNode()` throws; a `resize()` to a width or a height of 0 keeps the camera, `width` and `height` the stage has, so `OnStageResize` never carries `NaN`
+- a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is 0
+- `fitIntoRectangle()` gives a 0×0 view for `contain` and `cover` when the rectangle has a width or a height of 0; `minPixelZoom` and `maxPixelZoom` do not apply to it
+- `OrthographicProjection` and `ParallaxProjection` built without specs start from `{fit: 'fill'}`: the view is the container, one view unit per container pixel. Specs handed in stay the caller's object
+- `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
+- `StageRenderer` warns about stages sharing a name on every write to `renderOrder` as well as on `add()`, while `renderOrder` is not `'*'`
+- `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
 
 ### Removed
 
@@ -146,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `AnimatedSpritesMaterial` crashing when constructed with, or assigned, an `animsMap` texture whose image has not loaded yet; it falls back to the neutral texture coordinates until an `AnimatedSpritesMaterial#touchAnimsMap()` call picks up the loaded image
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
-- fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds an empty object from construction on, the shape `ParallaxProjection` starts from as well
+- fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds `{fit: 'fill'}` from construction on, the default `ParallaxProjection` starts from as well
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 - fix `Display#canvas` after `dispose()`: it answers with `Display#canvas is not available: this display has been disposed` instead of a `TypeError` about a property of `undefined`
 - fix `Display#nextFrame()`: a promise still pending when `dispose()` runs is rejected, instead of waiting for a frame that is never rendered again
@@ -176,6 +183,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `PanControl2D#keyboardDisabled`, `#pointerDisabled` and `unsubscribe()`: each of these ways gives back what the input sources are holding — the keys currently pushing a `speed…` field, the pan collected in a drag and a hidden cursor. A `speed…` value a caller wrote by hand is left as it is and keeps moving `panView`
 - fix the `Display` constructor: a renderer that fails to build after the constructor has put its own container into the host element takes that container back out before the error reaches the caller. A canvas or a container handed to the constructor is left where it is
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a rectangle whose left edge falls inside the pattern and that spans more than two pieces of it: the pattern is carried on by the length of the piece just written, so every repetition after the second picks up at the column that follows it. This is the `'horizontal'` and the `'none'` axis limit; `'vertical'` does not repeat along this axis
+- fix `StageRenderer#pipeline` and `StageRenderer#buildOutputNode`: assigning a different pipeline, or assigning or clearing `buildOutputNode`, rebuilds `pipeline.outputNode` on the next render, so the new pipeline draws the stages and not its placeholder output
+- fix `StageRenderer` with pass nodes: a stage that changes its camera — `Stage2D#projection` or `Stage2D#camera` assigned — gets a new pass node on the next render. The renderer listens for `OnStageAfterCameraChanged` on every eventized stage it holds and stops on `remove()`
+- fix `StageRenderer#renderTo()`: `renderer.autoClear` is restored when a stage throws, in the plain mode and in the pipeline mode
+- fix `StageRenderer#renderOrder`: every stage of a listed name renders at that position, in the order the stages were added; a name or `*` listed twice places its stages once; a stage renamed after `add()` is sorted under its new name from the next frame on
+- fix `Stage2D#camera`: assigning `undefined` hands back to the projection's camera on the spot, created then if the container already has an area
+- fix `Stage2D`: `OnStageAfterCameraChanged` goes out on every change of the camera with the camera it replaced, a change of `projection` included
 
 ### Migration Guide
 
@@ -1365,6 +1378,31 @@ const provider = new RepeatingTilesProvider([
 
 A pattern without a row — `[]` through the `tileIds` setter — is refused as well. The empty
 pattern of a provider built without arguments is `[[]]`: one row, no column.
+
+#### A `Stage2D` has a camera after the first `resize()` with an area
+
+`new Stage2D(projection)` creates no camera. The projection creates one on the first `resize()`
+whose width and height are both above 0; a `StageRenderer` with a host does that when the
+display reports its size. Code that reads `stage.camera` right after construction, or calls
+`asPassNode()` before that `resize()`, finds `undefined` and a throw.
+
+**Before**
+
+```ts
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+stage.camera!.position.z = 500;
+```
+
+**After**
+
+```ts
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+stage.resize(800, 600); // or wait for OnStageAfterCameraChanged / OnStageResize
+stage.camera!.position.z = 500;
+```
+
+A camera assigned to `stage.camera` is used from the moment it is assigned, with or without a
+`resize()`.
 
 ## [0.21.2] - 2026-06-19
 

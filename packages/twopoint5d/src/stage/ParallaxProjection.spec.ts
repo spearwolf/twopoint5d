@@ -20,6 +20,19 @@ describe('ParallaxProjection', () => {
       expect(projection.viewSpecs).toBeDefined();
       expect(projection.projectionPlane).toBeDefined();
     });
+
+    it('fills the container when built without specs', () => {
+      const projection = new ParallaxProjection();
+      expect(projection.viewSpecs).toEqual({fit: 'fill'});
+      projection.updateViewRect(800, 600);
+      expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
+
+      const withPlane = new ParallaxProjection('xy|bottom-left');
+      withPlane.updateViewRect(800, 600);
+      const camera = withPlane.createCamera();
+      expect(camera.aspect).toBeCloseTo(800 / 600);
+      expect(Number.isFinite(camera.fov)).toBe(true);
+    });
   });
 
   it('updateViewRect + getViewRect', () => {

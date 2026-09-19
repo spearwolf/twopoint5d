@@ -154,8 +154,12 @@ for "everything not listed":
 root.renderOrder = 'background,world,*,ui';
 ```
 
-If multiple stages share a `name` and `renderOrder` is non-default, `add()`
-emits a `console.warn` — give your stages unique names when sorting matters.
+Stages sharing a listed name render together at that position, in the order
+they were added. While `renderOrder` is not `'*'`, `add()` and every write to
+`renderOrder` emit a `console.warn` about a shared name — give your stages
+unique names when sorting matters. A name or `*` listed twice counts at its
+first position. A stage renamed after `add()` is sorted under its new name
+from the next frame on.
 
 ---
 
@@ -280,8 +284,11 @@ sr.buildOutputNode = ([scenePass]) => {
   the parent automatically pre-renders the child into that RT before the
   pipeline runs.
 
-`buildOutputNode` is only invoked when the stage list changes (or you call
-`invalidateOutputNode()` explicitly).
+`buildOutputNode` runs again on the next render after the stages,
+`renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
+after a stage announced a new camera through `OnStageAfterCameraChanged`
+(every `Stage2D` does), or after `invalidateOutputNode()`. While the renderer
+is 0×0 the composed mode draws nothing.
 
 ### Shortcut: `RootRenderPipeline` — additive composition out of the box
 
@@ -397,7 +404,9 @@ On `StageRenderer`:
 
 On `Stage2D`:
 
-- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`, `OnStageAfterCameraChanged`.
+- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`.
+- `OnStageAfterCameraChanged` — emitted on every camera change with the replaced camera; a
+  `StageRenderer` listens to it on each stage it holds.
 
 All event names are exported from `@spearwolf/twopoint5d`.
 
@@ -453,10 +462,13 @@ What this layer does on top of the general rules in
 - **Double frame loop**: passing `display` to the constructor *and* calling
   `renderTo` from your own handler renders every frame twice. Pick one.
 - **Stage with no camera yet**: `Stage2D#renderTo` is a no-op until the
-  first `resize()` triggers camera creation (or you assign your own).
-  `Stage2D#asPassNode` throws in that state.
-- **Non-unique stage names + `renderOrder`**: the sort is ambiguous. The
-  renderer warns once on `add()`; rename your stages.
+  first `resize()` with a width and a height above 0 creates the camera (or
+  you assign your own). `Stage2D#asPassNode` throws in that state, and a
+  `StageRenderer` composing pass nodes draws nothing while it is 0×0.
+- **Non-unique stage names + `renderOrder`**: stages sharing a name render
+  at that name's position in the order they were added. The renderer warns
+  on `add()` and on every write to `renderOrder`; give your stages unique
+  names when the order between them matters.
 - **Mid-frame state on the WebGPU renderer**: `StageRenderer.renderTo()`
   restores `autoClear`, clear color and clear alpha to what it found
   on entry — but only if it actually performed a clear.

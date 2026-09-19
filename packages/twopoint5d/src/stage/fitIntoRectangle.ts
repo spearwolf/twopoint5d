@@ -181,7 +181,9 @@ export function calculateAnchorOffset(
  * `contain`/`cover` without either dimension — the dimensions in `target` are left as they are,
  * and `fitIntoRectangle()` hands back the target vector it was given, untouched. `minPixelZoom`
  * and `maxPixelZoom` still apply afterwards and can override that: on a fresh `Vector2` the
- * width is `0`, so the ratio is `Infinity` and a `maxPixelZoom` always kicks in.
+ * width is `0`, so the ratio is `Infinity` and a `maxPixelZoom` always kicks in. For `contain`
+ * and `cover`, a `rect` with a width or a height of 0 gives a 0×0 view, and `minPixelZoom` and
+ * `maxPixelZoom` do not apply to it.
  *
  * @param rect - The container dimensions as a Vector2
  * @param specs - The fit specifications
@@ -205,6 +207,12 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
     // ---------------------------------------------------------------
     // contain & cover
     // ---------------------------------------------------------------
+    if (rect.width === 0 || rect.height === 0) {
+      // a container without area has no aspect ratio to keep, so the view has no area either
+      target.set(0, 0);
+      return target;
+    }
+
     // a side that is missing, undefined or 0 is a side the caller does not constrain
     const width = 'width' in specs && specs.width != null ? specs.width : 0;
     const height = 'height' in specs && specs.height != null ? specs.height : 0;
