@@ -45,6 +45,38 @@ describe('unpick', () => {
     expect(Reflect.ownKeys(result)).toEqual(['a']);
   });
 
+  test('keeps an own "__proto__" key as a data property and leaves the prototype alone', () => {
+    const source: Record<string, unknown> = JSON.parse('{"__proto__": {"polluted": 1}, "a": 2}');
+    const result = unpick(source)!;
+
+    expect(Reflect.ownKeys(result)).toEqual(['__proto__', 'a']);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(result, '__proto__')).toEqual({
+      value: {polluted: 1},
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    expect('polluted' in result).toBe(false);
+  });
+
+  test.each([null, 5, 'x'])('keeps an own "__proto__" key whose value is %s', (value) => {
+    const source: Record<string, unknown> = JSON.parse(`{"__proto__": ${JSON.stringify(value)}, "a": 2}`);
+    const result = unpick(source)!;
+
+    expect(Reflect.ownKeys(result)).toEqual(['__proto__', 'a']);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(result, '__proto__')?.value).toBe(value);
+  });
+
+  test('drops an own "__proto__" key it is asked to remove', () => {
+    const source: Record<string, unknown> = JSON.parse('{"__proto__": {"polluted": 1}, "a": 2}');
+    const result = unpick(source, '__proto__')!;
+
+    expect(Reflect.ownKeys(result)).toEqual(['a']);
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+  });
+
   test('return undefined if object is not defined', () => {
     expect(unpick(undefined)).toBeUndefined();
     expect(unpick(undefined as any, 'foo', 'bar')).toBeUndefined();
