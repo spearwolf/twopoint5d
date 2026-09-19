@@ -64,9 +64,6 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
 
   readonly #props: [DependencyKey, DependencyCallbacks<any> | undefined][];
 
-  /** Every declared key, with its callbacks or with `undefined` for one declared as a bare name. */
-  readonly #declared: Map<DependencyKey, DependencyCallbacks<any> | undefined> = new Map();
-
   readonly #state = new Map<DependencyKey, unknown>();
 
   /**
@@ -87,32 +84,30 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
         if (typeof p[1] === 'function') {
           const [name, equals] = p;
           const callbacks: DependencyCallbacks = {equals};
-          this.#declared.set(name, callbacks);
           return [name, callbacks];
         } else {
-          this.#declared.set(p[0], p[1]);
           return p as [DependencyKey, DependencyCallbacks];
         }
       } else {
-        this.#declared.set(p, undefined);
         return [p, undefined];
       }
     });
   }
 
   /**
-   * Writes the given values into the state, taking only the keys this `Dependencies` was
-   * declared with. A key that carries `clone` and `copy` is kept as a copy of its own, so a
-   * value written in place afterwards does not move the state along with it.
+   * Writes the given values into the state, one for every key this `Dependencies` was declared
+   * with. A declared key the argument leaves out is written as absent — the same reading
+   * {@link equals} gives it — and a key nobody declared is not written at all. A key that
+   * carries `clone` and `copy` is kept as a copy of its own, so a value written in place
+   * afterwards does not move the state along with it.
    */
   update(nextProps: DependencyValues<Shape>): void {
-    for (const [name, value] of Object.entries(nextProps)) {
-      // a key nobody declared is never compared in equals(), so keeping it would only make the
-      // state look like it watches something it does not — a caller's typo stays invisible
-      // exactly as long as the value sits there looking right
-      if (!this.#declared.has(name)) continue;
+    for (const [name, callbacks] of this.#props) {
+      // every declared key is written, one the argument leaves out as absent: equals() reads a
+      // missing key as absent, and a state that kept an earlier value for it would answer
+      // every later call as a change
+      const value = (nextProps as Record<DependencyKey, unknown>)[name];
 
-      const callbacks = this.#declared.get(name);
       if (callbacks != null) {
         const {clone, copy} = callbacks;
         if (value != null && clone != null && copy != null) {

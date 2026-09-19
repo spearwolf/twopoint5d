@@ -38,6 +38,22 @@ describe('AnimatedSpritesMaterial', () => {
     material.dispose();
   });
 
+  test('takes the animation time from its options', () => {
+    const material = new AnimatedSpritesMaterial({time: 1.5});
+
+    expect(material.time).toBe(1.5);
+
+    material.dispose();
+  });
+
+  test('starts the animation time at 0 without one', () => {
+    const material = new AnimatedSpritesMaterial();
+
+    expect(material.time).toBe(0);
+
+    material.dispose();
+  });
+
   describe('dispose()', () => {
     // (a) has no subject here: this material builds no resource of its own — the animsMap
     // arrives through the constructor options or the setter, and the time uniform is a

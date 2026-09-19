@@ -15,4 +15,26 @@ describe('isPowerOf2', () => {
     expect(isPowerOf2(11)).toBe(false);
     expect(isPowerOf2(2047)).toBe(false);
   });
+
+  it('the powers of two a double holds beyond 32 bits', () => {
+    expect(isPowerOf2(2 ** 31)).toBe(true);
+    expect(isPowerOf2(2 ** 32)).toBe(true);
+    expect(isPowerOf2(2 ** 53)).toBe(true);
+    expect(isPowerOf2(2 ** 1023)).toBe(true);
+  });
+
+  it('no other number beyond 32 bits', () => {
+    expect(isPowerOf2(2 ** 32 + 1)).toBe(false);
+    expect(isPowerOf2(3 * 2 ** 32)).toBe(false);
+    expect(isPowerOf2(2 ** 50 + 2)).toBe(false);
+  });
+
+  it('no fraction, no negative number and nothing that is not finite', () => {
+    expect(isPowerOf2(2.5)).toBe(false);
+    expect(isPowerOf2(0.5)).toBe(false);
+    expect(isPowerOf2(-2)).toBe(false);
+    expect(isPowerOf2(-(2 ** 31))).toBe(false);
+    expect(isPowerOf2(Infinity)).toBe(false);
+    expect(isPowerOf2(NaN)).toBe(false);
+  });
 });

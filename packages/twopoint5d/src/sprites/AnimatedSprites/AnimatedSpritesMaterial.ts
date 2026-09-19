@@ -6,6 +6,7 @@ import {texCoordsFromIndex} from '../node-utils.js';
 
 export interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
   animsMap?: Texture;
+  /** The animation time the material starts at, in seconds. Default is `0`. */
   time?: number;
 }
 
@@ -47,6 +48,8 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
   constructor(options?: AnimatedSpritesMaterialParameters) {
     super(options);
+
+    if (options?.time != null) this.time = options.time;
 
     this.animsMap = options?.animsMap;
 

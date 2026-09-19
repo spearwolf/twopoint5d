@@ -222,6 +222,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a `resize-to` value that is not a valid CSS selector: it is reported once via `console.warn` and falls back to `resizeToElement` or the canvas, like a selector that finds nothing
 - fix the `Display.MaxResolution` warning: it names the canvas size that was requested, before the clamp, and goes out once when either side exceeds the limit
 - fix the pointer handling of `PanControl2D`: a `pointercancel` ends a drag and drops what it collected, a `pointerdown` always anchors at its own position, a released pointer delivers the movement up to its release with the next `update()`, and a mouse drag ends where its pan button goes up, also while another button stays down
+- fix `Dependencies#update()`: it writes every key the `Dependencies` was declared with, and a declared key the argument leaves out as absent — the reading `equals()` gives a missing key. `changed()` with a key left out reports the change once, and the call after it answers `false`
+- fix `findNextPowerOf2()` and `isPowerOf2()` for every number a double holds: `findNextPowerOf2()` answers the smallest power of two that is at least its argument, `1` for everything up to `1`, `Infinity` above `2 ** 1023` and `NaN` for `NaN`; `isPowerOf2()` answers `true` for the integer powers of two from `1` to `2 ** 1023` and `false` for every fraction, negative number, `Infinity` and `NaN`
+- fix `unpick()`: it keeps every enumerable symbol key it is not asked to remove, as it keeps the string keys
+- fix `AnimatedSpritesMaterial`: the `time` option of the constructor sets the animation time the material starts at
 
 ### Migration Guide
 
@@ -1558,6 +1562,24 @@ new PanControl2D({keyCodes: [38, 40, 37, 39]});
 
 ```ts
 new PanControl2D({keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']});
+```
+
+#### `Dependencies#update()` writes every declared key
+
+`update()` writes a value for every key the `Dependencies` was declared with; a key the
+argument leaves out is written as absent. Code that writes only some keys passes the others
+along.
+
+**Before**
+
+```ts
+deps.update({centerX: 1});
+```
+
+**After**
+
+```ts
+deps.update({centerX: 1, centerY: deps.value('centerY')});
 ```
 
 ## [0.21.2] - 2026-06-19

@@ -128,4 +128,38 @@ describe('Dependencies', () => {
     expect(deps.changed({v: undefined})).toBe(false);
     expect(deps.changed({})).toBe(false);
   });
+
+  test('a key left out of changed() is reported as a change once, not on every call', () => {
+    const deps = new Dependencies(['a', 'b']);
+
+    deps.update({a: 1, b: 'x'});
+
+    expect(deps.changed({a: 2}), 'a moved and b went absent').toBe(true);
+    expect(deps.changed({a: 2}), 'nothing moved since').toBe(false);
+    expect(deps.value('b')).toBeUndefined();
+  });
+
+  test('update() writes a declared key it is not given as absent', () => {
+    const deps = new Dependencies(['a', 'b']);
+
+    deps.update({a: 1, b: 'x'});
+    deps.update({a: 1});
+
+    expect(deps.value('b')).toBeUndefined();
+    expect(deps.equals({a: 1})).toBe(true);
+  });
+
+  test('a cloneable key left out goes absent and takes a clone again when it comes back', () => {
+    const deps = new Dependencies<{v: Vector2}>([Dependencies.cloneable<Vector2>('v')]);
+
+    expect(deps.changed({v: new Vector2(1, 2)})).toBe(true);
+    expect(deps.changed({})).toBe(true);
+    expect(deps.changed({})).toBe(false);
+    expect(deps.value('v')).toBeUndefined();
+
+    const v = new Vector2(3, 4);
+    expect(deps.changed({v})).toBe(true);
+    expect(deps.value('v')).not.toBe(v);
+    expect(deps.value('v')!.equals(v)).toBe(true);
+  });
 });
