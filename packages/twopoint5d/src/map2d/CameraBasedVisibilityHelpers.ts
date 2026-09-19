@@ -261,6 +261,11 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     ).applyMatrix4(this.cameraBasedVisibility.matrixWorld);
   }
 
+  /**
+   * Names the scene the helper nodes go into. The scene named here is the map node: the tile
+   * boxes are in its local space and go into it, while the plane, the points and the frustum
+   * boxes are in world space and go into the root above it.
+   */
   add(scene: Object3D): void {
     if (this.#helpers.scene === scene) return;
     this.#helpers.scene = scene;

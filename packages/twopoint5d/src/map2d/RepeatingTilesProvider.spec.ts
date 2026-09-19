@@ -193,6 +193,52 @@ describe('RepeatingTilesProvider', () => {
       const tiles = provider.getTileIdsWithin(0, 0, 10, 5, target);
       expect(tiles).toBe(target);
     });
+    describe('agrees with getTileIdAt()', () => {
+      const patterns = [
+        [
+          [1, 2, 3, 4],
+          [5, 6, 7, 8],
+        ],
+        [[1, 2, 3]],
+        [[1], [2], [3]],
+        [[9]],
+      ];
+
+      test.each(['vertical', 'horizontal', 'none'] as const)('%s', (limitToAxis) => {
+        // every cell of every rectangle is held against the single-cell lookup; what differs, or
+        // throws, is collected, so a failure names the rectangle instead of drowning in expects
+        const mismatches: string[] = [];
+        for (const pattern of patterns) {
+          const provider = new RepeatingTilesProvider(pattern, limitToAxis);
+          for (let left = -6; left <= 6; left++) {
+            for (let top = -4; top <= 4; top++) {
+              for (let width = 1; width <= 9; width++) {
+                for (let height = 1; height <= 4; height++) {
+                  const where = `${JSON.stringify(pattern)}, ${left}, ${top}, ${width}, ${height}`;
+                  let ids: Uint32Array;
+                  try {
+                    ids = provider.getTileIdsWithin(left, top, width, height);
+                  } catch (error) {
+                    mismatches.push(`${where}: ${(error as Error).message}`);
+                    continue;
+                  }
+                  cells: for (let j = 0; j < height; j++) {
+                    for (let i = 0; i < width; i++) {
+                      const expected = provider.getTileIdAt(left + i, top + j);
+                      if (ids[j * width + i] !== expected) {
+                        mismatches.push(`${where}: cell (${i}, ${j}) is ${ids[j * width + i]} instead of ${expected}`);
+                        break cells;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        expect(mismatches).toEqual([]);
+      });
+    });
     describe('vertical', () => {
       test('right outside', () => {
         // prettier-ignore
@@ -358,6 +404,30 @@ describe('RepeatingTilesProvider', () => {
         ).toEqual([
           0, 0, 9,
           0, 0, 13,
+        ]);
+      });
+      test('starts at the pattern column of a left edge inside the pattern', () => {
+        const provider = new RepeatingTilesProvider([1, 2, 3, 4], 'vertical');
+        expect(Array.from(provider.getTileIdsWithin(1, 0, 3, 1))).toEqual([2, 3, 4]);
+        expect(Array.from(provider.getTileIdsWithin(2, 0, 2, 1))).toEqual([3, 4]);
+      });
+      test('fills with 0 past the right edge of the pattern for a left edge inside it', () => {
+        const provider = new RepeatingTilesProvider(
+          [
+            [1, 2, 3, 4],
+            [5, 6, 7, 8],
+          ],
+          'vertical',
+        );
+        // prettier-ignore
+        expect(Array.from(provider.getTileIdsWithin(1, 0, 3, 2))).toEqual([
+          2, 3, 4,
+          6, 7, 8,
+        ]);
+        // prettier-ignore
+        expect(Array.from(provider.getTileIdsWithin(2, 1, 4, 2))).toEqual([
+          7, 8, 0, 0,
+          3, 4, 0, 0,
         ]);
       });
     });

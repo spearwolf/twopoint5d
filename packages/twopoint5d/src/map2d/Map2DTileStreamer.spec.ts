@@ -1,5 +1,4 @@
-import type {Vector3} from 'three/webgpu';
-import {Object3D} from 'three/webgpu';
+import {Object3D, Vector2, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
@@ -12,12 +11,12 @@ interface RecordingRenderer extends IMap2DTileRenderer {
   reused: IMap2DTileCoords[];
   removed: IMap2DTileCoords[];
   cleared: number;
+  /** The ids of the tiles the renderer holds right now. */
+  held: Set<string>;
 }
 
 /** Writes down what the streamer asks of a renderer, and takes on tiles the way the real one does. */
 function makeRecordingRenderer(): RecordingRenderer {
-  const known = new Set<string>();
-
   return {
     node: new Object3D(),
     positions: [],
@@ -26,28 +25,29 @@ function makeRecordingRenderer(): RecordingRenderer {
     reused: [],
     removed: [],
     cleared: 0,
+    held: new Set<string>(),
 
     beginUpdatingTiles(position: Vector3, tilesChanged?: boolean) {
       this.positions.push(position);
       this.tilesChangedFlags.push(tilesChanged);
     },
     addTile(coords: IMap2DTileCoords) {
-      known.add(coords.id);
+      this.held.add(coords.id);
       this.added.push(coords);
     },
     reuseTile(coords: IMap2DTileCoords) {
-      if (known.has(coords.id)) {
+      if (this.held.has(coords.id)) {
         this.reused.push(coords);
       } else {
         this.addTile(coords);
       }
     },
     removeTile(coords: IMap2DTileCoords) {
-      known.delete(coords.id);
+      this.held.delete(coords.id);
       this.removed.push(coords);
     },
     clearTiles() {
-      known.clear();
+      this.held.clear();
       this.cleared++;
     },
     endUpdatingTiles() {},
@@ -225,6 +225,62 @@ describe('Map2DTileStreamer', () => {
         renderer.added.map((t) => t.id),
         'no tile was built twice',
       ).toEqual(['0,0', '1,0']);
+    });
+
+    test('places the renderers at the offset of the visibilitor, in the space of the node it is handed', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = {
+        computeVisibleTiles: () => ({
+          tiles: [tileA],
+          createTiles: [tileA],
+          offset: new Vector2(-60, -45),
+          translate: new Vector3(7, 3, 11),
+        }),
+      };
+
+      streamer.update(new Object3D());
+
+      expect(renderer.positions[0]!.toArray()).toEqual([-60, 0, -45]);
+    });
+
+    test('a visibilitor that takes over from another one gets the tiles built again', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      const a = makeCachingVisibilitor([tileA]);
+      const b = makeCachingVisibilitor([tileA, tileB]);
+
+      const node = new Object3D();
+      streamer.visibilitor = a;
+      streamer.update(node);
+      streamer.visibilitor = b;
+      streamer.update(node);
+      // a answers from its cache and knows nothing of the tile b added
+      streamer.visibilitor = a;
+      streamer.update(node);
+
+      expect([...renderer.held]).toEqual(['0,0']);
+    });
+
+    test('assigning the visibilitor it already holds costs nothing', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      const a = makeCachingVisibilitor([tileA]);
+
+      const node = new Object3D();
+      streamer.visibilitor = a;
+      streamer.update(node);
+      streamer.visibilitor = a;
+      streamer.update(node);
+
+      expect(renderer.cleared, 'nothing was cleared').toBe(0);
+      expect(
+        renderer.added.map((t) => t.id),
+        'no tile was built twice',
+      ).toEqual(['0,0']);
     });
   });
 });

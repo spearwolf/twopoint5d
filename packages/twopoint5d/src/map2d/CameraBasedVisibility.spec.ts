@@ -600,6 +600,52 @@ describe('CameraBasedVisibility', () => {
     });
   });
 
+  describe('a map away from the origin', () => {
+    // the tilted camera of `makeTiltedCamera()`, moved and turned along with the map by `matrix`
+    const makeCameraFor = (matrix: Matrix4): PerspectiveCamera => {
+      const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
+      camera.position.copy(new Vector3(0, 350, 500).applyMatrix4(matrix));
+      camera.lookAt(new Vector3(0, 0, 0).applyMatrix4(matrix));
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      return camera;
+    };
+
+    const sortedTileIds = (matrix: Matrix4): string[] => {
+      const visibility = new CameraBasedVisibility(makeCameraFor(matrix));
+      const result = visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(256, 256, -128, -128), matrix);
+      return result!.tiles.map((tile) => tile.id).sort();
+    };
+
+    test('puts every visible tile where the map draws it', () => {
+      const matrix = new Matrix4().makeTranslation(5000, 0, 0);
+      const visibility = new CameraBasedVisibility(makeCameraFor(matrix));
+
+      visibility.computeVisibleTiles([], [100, 50], new Map2DTileCoordsUtil(256, 256, -128, -128), matrix);
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+      const center = new Vector3();
+      for (const tile of visibility.visibles) {
+        const local = new Vector3(tile.x * 256 + 128 - 128 - 100, 0, tile.y * 256 + 128 - 128 - 50);
+        const where = `tile ${tile.x},${tile.y}`;
+        expect(tile.centerWorld!.distanceTo(local.clone().applyMatrix4(matrix)), where).toBeLessThan(1e-6);
+        expect(tile.box!.getCenter(center).distanceTo(local), where).toBeLessThan(1e-6);
+        expect(tile.frustumBox!.containsPoint(tile.centerWorld!), where).toBe(true);
+      }
+    });
+
+    test('finds the same tiles for a map and a camera moved together', () => {
+      expect(sortedTileIds(new Matrix4().makeTranslation(5000, 0, 0))).toEqual(sortedTileIds(new Matrix4()));
+    });
+
+    test('finds the same tiles for a map and a camera moved and turned together', () => {
+      // a quarter turn about Y, because the world AABB of a box turned that way is exact — at
+      // any other angle it grows, and the frustum test lets more tiles through at the edge
+      const matrix = new Matrix4().makeTranslation(5000, 0, 300).multiply(new Matrix4().makeRotationY(Math.PI / 2));
+      expect(sortedTileIds(matrix)).toEqual(sortedTileIds(new Matrix4()));
+    });
+  });
+
   describe('IMap2DVisibilitor interface', () => {
     test('is implemented (computeVisibleTiles function exposed)', () => {
       const visibility = new CameraBasedVisibility();

@@ -135,18 +135,19 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
           target.fill(0);
         } else {
           // === inside ===
-          const leftOffset = -left;
-          let tilesRowOffset = top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
+          // the columns the rectangle shares with the pattern — left and right of them the
+          // pattern does not repeat along this axis, and there is nothing but 0
+          const overlapStart = Math.max(left, 0);
+          const overlapEnd = Math.min(right, this.#cols - 1);
+          const targetStart = overlapStart - left;
+          const targetEnd = targetStart + overlapEnd - overlapStart + 1;
+          let patternRow = top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
           for (let y = 0; y < height; y++) {
-            const tiles = this.tileIds[tilesRowOffset++ % this.#rows]!.slice(0, width - leftOffset);
+            const row = this.#tileIds[patternRow++ % this.#rows]!;
             const rowOffset = y * width;
-            if (leftOffset > 0) {
-              target.fill(0, rowOffset, rowOffset + leftOffset);
-            }
-            target.set(tiles, rowOffset + leftOffset);
-            const lastCol = rowOffset + width;
-            const tilesCount = tiles.length;
-            target.fill(0, rowOffset + leftOffset + tilesCount, lastCol);
+            target.fill(0, rowOffset, rowOffset + targetStart);
+            target.set(row.slice(overlapStart, overlapEnd + 1), rowOffset + targetStart);
+            target.fill(0, rowOffset + targetEnd, rowOffset + width);
           }
         }
         break;

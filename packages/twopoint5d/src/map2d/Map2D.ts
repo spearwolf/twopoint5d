@@ -5,7 +5,6 @@ import type {IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 export class Map2D extends Group {
   #renderers: Set<IMap2DTileRenderer> = new Set();
   #tileStreamer: Map2DTileStreamer;
-  #visibilitor?: IMap2DVisibilitor;
 
   get tileStreamer(): Map2DTileStreamer {
     return this.#tileStreamer;
@@ -27,8 +26,11 @@ export class Map2D extends Group {
     streamer.centerX = previous.centerX;
     streamer.centerY = previous.centerY;
 
-    if (this.#visibilitor) {
-      streamer.visibilitor = this.#visibilitor;
+    // the visibilitor goes with the map as the view center does; a streamer taking over from one
+    // that had none keeps the visibilitor it brings along
+    const visibilitor = previous.visibilitor;
+    if (visibilitor) {
+      streamer.visibilitor = visibilitor;
     }
 
     for (const renderer of this.#renderers) {
@@ -41,13 +43,15 @@ export class Map2D extends Group {
     streamer.clearTiles();
   }
 
+  /**
+   * The visibilitor of the tile streamer underneath. Assigning one hands it to the streamer,
+   * which has the tiles built again when it replaces another one.
+   */
   get visibilitor(): IMap2DVisibilitor | undefined {
-    return this.#visibilitor;
+    return this.#tileStreamer.visibilitor;
   }
 
   set visibilitor(v: IMap2DVisibilitor) {
-    if (this.#visibilitor === v) return;
-    this.#visibilitor = v;
     this.#tileStreamer.visibilitor = v;
   }
 

@@ -17,7 +17,28 @@ export class Map2DTileStreamer {
   centerX = 0;
   centerY = 0;
 
-  visibilitor?: IMap2DVisibilitor;
+  #visibilitor?: IMap2DVisibilitor;
+
+  /**
+   * The visibilitor that decides which tiles are visible.
+   *
+   * A visibilitor answers from the state of its own last call and holds the tile list it is
+   * handed against that state — the tiles another visibilitor laid out are no ground for its
+   * answer. Replacing a visibilitor, with another one or with `undefined`, therefore clears the
+   * tiles as a change of the tile grid does: the next {@link update} empties every renderer and
+   * the visibilitor then in place lays out the whole set. The first visibilitor, and the one
+   * already held, cost nothing.
+   */
+  get visibilitor(): IMap2DVisibilitor | undefined {
+    return this.#visibilitor;
+  }
+
+  set visibilitor(visibilitor: IMap2DVisibilitor | undefined) {
+    if (this.#visibilitor === visibilitor) return;
+    const previous = this.#visibilitor;
+    this.#visibilitor = visibilitor;
+    if (previous != null) this.clearTiles();
+  }
 
   #tileCoords: Map2DTileCoordsUtil;
 
@@ -85,8 +106,15 @@ export class Map2DTileStreamer {
     this.renderers.delete(renderer);
   }
 
+  /**
+   * Lays out the tiles the visibilitor finds around the view center in every tile renderer.
+   *
+   * `node` is the node the tile renderer nodes are children of — `Map2D` hands itself over. Its
+   * world matrix goes to the visibilitor, and the renderer nodes are placed in its local space.
+   */
   update(node: Object3D): void {
-    if (this.renderers.size === 0 || this.visibilitor == null) return;
+    const visibilitor = this.#visibilitor;
+    if (this.renderers.size === 0 || visibilitor == null) return;
 
     if (this.#clearTilesOnNextUpdate) {
       for (const tileRenderer of this.renderers) {
@@ -100,23 +128,15 @@ export class Map2DTileStreamer {
 
     node.updateWorldMatrix(true, false);
 
-    const visible = this.visibilitor.computeVisibleTiles(
-      this.tiles,
-      [this.centerX, this.centerY],
-      this.#tileCoords,
-      node.matrixWorld,
-    );
+    const visible = visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords, node.matrixWorld);
 
     if (visible) {
       this.tiles = visible.tiles;
 
+      // the renderer nodes are children of `node` — Map2D adds them to itself — so they are placed
+      // in its local space, and its own world matrix carries them into the world
       const offset = visible.offset;
-      const translate = visible.translate;
-      const position = this.#position.set(
-        (offset?.x ?? 0) + (translate?.x ?? 0),
-        translate?.y ?? 0,
-        (offset?.y ?? 0) + (translate?.z ?? 0),
-      );
+      const position = this.#position.set(offset?.x ?? 0, 0, offset?.y ?? 0);
 
       for (const tileRenderer of this.renderers) {
         tileRenderer.beginUpdatingTiles(position, visible.changed ?? true);

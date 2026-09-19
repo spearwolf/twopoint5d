@@ -51,9 +51,9 @@ export interface IMap2DTileRenderer {
   /**
    * Start the update cycle for the tiles.
    *
-   * `position` is read during the call and not kept by the caller's side of the contract:
-   * the streamer hands over an instance it reuses, so a renderer that wants the value
-   * afterwards copies it.
+   * `position` is in the local space of the map node, the parent of {@link node}. It is read
+   * during the call and not kept by the caller's side of the contract: the streamer hands over
+   * an instance it reuses, so a renderer that wants the value afterwards copies it.
    *
    * `tilesChanged` says whether the tile coordinates of this cycle can differ from the last
    * one's. On `false` a renderer may leave the data of a tile it already holds untouched. It
@@ -112,12 +112,19 @@ export interface IMap2DVisibleTiles {
   tiles: IMap2DTileCoords[];
 
   /**
+   * Where the origin of the tile grid lies in the local space of the map node, on its XZ plane:
+   * `x` along X, `y` along Z. `Map2DTileStreamer` places the tile renderer nodes there.
+   *
    * An instance the visibilitor reuses. Whoever needs the value beyond the call copies or
    * clones it; whoever keeps the instance keeps a value that moves underneath them.
    */
   offset?: Vector2;
 
   /**
+   * The world position of the map node, the translation of the `matrixWorld` the visibilitor
+   * was given. It is informational: the tile renderer nodes are children of the map node and
+   * take on its whole transform, so nothing adds it to their position.
+   *
    * An instance the visibilitor reuses. Whoever needs the value beyond the call copies or
    * clones it; whoever keeps the instance keeps a value that moves underneath them.
    */

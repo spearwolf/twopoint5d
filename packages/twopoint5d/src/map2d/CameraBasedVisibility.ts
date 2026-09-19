@@ -17,8 +17,11 @@ export interface TileBox {
   x: number;
   y: number;
   coords?: TilesWithinCoords;
+  /** The box of the tile in the local space of the map node, where the tile renderers draw it. */
   box?: Box3;
+  /** The box the view frustum is tested against, in world space, scaled by `frustumBoxScale`. */
   frustumBox?: Box3;
+  /** The center of the tile in world space. */
   centerWorld?: Vector3;
   distanceToCamera?: number;
   map2dTile?: IMap2DTileCoords;
@@ -447,10 +450,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     const translate = this.#scratchTranslate.setFromMatrixPosition(this.matrixWorld);
 
+    // the tile boxes are built in the local space of the map node, where the renderers draw the
+    // tiles; `matrixWorld` takes them into world space once, where the frustum is tested
     this.#tileBoxMatrix.makeTranslation(
-      this.map2dTileCoords.xOffset - this.#centerPoint2D.x + translate.x,
-      translate.y,
-      this.map2dTileCoords.yOffset - this.#centerPoint2D.y + translate.z,
+      this.map2dTileCoords.xOffset - this.#centerPoint2D.x,
+      0,
+      this.map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
 
     // The tiles the probe rays met are where the search starts. Per ray that is the tile its

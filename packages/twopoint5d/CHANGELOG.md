@@ -128,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
 - `StageRenderer` warns about stages sharing a name on every write to `renderOrder` as well as on `add()`, while `renderOrder` is not `'*'`
 - `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
+- `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
 
 ### Removed
 
@@ -189,8 +190,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `StageRenderer#renderOrder`: every stage of a listed name renders at that position, in the order the stages were added; a name or `*` listed twice places its stages once; a stage renamed after `add()` is sorted under its new name from the next frame on
 - fix `Stage2D#camera`: assigning `undefined` hands back to the projection's camera on the spot, created then if the container already has an area
 - fix `Stage2D`: `OnStageAfterCameraChanged` goes out on every change of the camera with the camera it replaced, a change of `projection` included
+- fix `RepeatingTilesProvider#getTileIdsWithin()` with the `'vertical'` axis limit for a rectangle whose left edge falls inside the pattern: each row starts at the pattern column of that edge and holds `0` right of the pattern — the values `getTileIdAt()` answers for those cells. The call threw a `RangeError`
+- fix `Map2D` away from the world origin or under a moved parent: the tiles are drawn and culled in the local space of the map, and its world transform applies once. The tile renderer nodes were shifted by the world position of the map a second time — a map at `(t, 0, 0)` drew its tiles at `2t` — and `CameraBasedVisibility` tested boxes shifted the same way against the frustum. `Map2DTileStreamer` hands the renderers the `offset` of the visibilitor as their position; `IMap2DVisibleTiles#translate` is still filled and names the world position of the map node, but goes into no position. `TileBox#box` is in the local space of the map, so the tile box helpers of `CameraBasedVisibilityHelpers` belong into the map node (`helpers.add(map2d)`)
+- fix `Map2D#visibilitor` and `Map2DTileStreamer#visibilitor`: a visibilitor that replaces another one has the tiles built again — the next `update()` clears every renderer and the visibilitor in place lays out the whole set. After switching from A to B and back to A, the tiles B had added stayed drawn in the renderers. `Map2D#visibilitor` reads and writes the visibilitor of its streamer; the first visibilitor, and the one already held, cost nothing
 
 ### Migration Guide
+
+#### `Map2DTileStreamer#update()` places the renderer nodes in the local space of its node
+
+The position handed to `IMap2DTileRenderer#beginUpdatingTiles()` is the `offset` of the visibilitor, in the local space of the node given to `update()`; nothing adds the world position of that node to it. `Map2D` adds the renderer nodes to itself and needs no change. A streamer driven directly needs its renderer nodes to be children of the node it is updated with.
+
+**Before**
+
+```ts
+scene.add(renderer.node);
+streamer.update(mapNode); // node placed at mapNode's world position + offset
+```
+
+**After**
+
+```ts
+mapNode.add(renderer.node);
+streamer.update(mapNode); // node placed at offset, carried into the world by mapNode
+```
 
 #### `DependencyProp` is gone
 
