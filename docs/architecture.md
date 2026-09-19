@@ -76,7 +76,10 @@ default or the named catalog in `pnpm-workspace.yaml`; `workspace:` from the
 `package.json` of the package it names (`workspace:^` and `workspace:~` keep their
 operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is). If a
 `catalog:` or `workspace:` specifier is left in the manifest afterwards, the build
-fails — npm installs neither protocol. `scripts/makeBanner.mjs` builds the version
+fails — npm installs neither protocol. Since `dist/` is what gets
+published, `main`, `module`, `types` and every target in `exports` lose a leading
+`dist/` or `./dist/`; a `dist/` further inside a path is part of the name and
+stays. `scripts/makeBanner.mjs` builds the version
 banner.
 
 The logic of both scripts lives in `scripts/makePackageJson/` and

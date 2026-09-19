@@ -3,6 +3,7 @@ import path from 'path';
 import {fileURLToPath} from 'url';
 import YAML from 'yaml';
 import {findUnpublishableSpecifiers} from './makePackageJson/findUnpublishableSpecifiers.mjs';
+import {removeDistPathPrefix} from './makePackageJson/removeDistPathPrefix.mjs';
 import {resolveDependencies} from './makePackageJson/resolveDependencies.mjs';
 
 const workspaceRoot = path.resolve(fileURLToPath(import.meta.url), '../../');
@@ -28,7 +29,7 @@ const outPackageJson = {
   ...inPackageJson,
 };
 
-[[outPackageJson, ['main', 'module', 'types']], [outPackageJson.exports]].forEach(removeDistPathPrefix);
+removeDistPathPrefix(outPackageJson);
 
 const context = {workspaceRoot, pnpmWorkspaceConfig, sharedDependencies, referencedFrom: inPackageJson.name};
 
@@ -59,30 +60,3 @@ if (unpublishable.length > 0) {
 const releasePackageJsonPath = path.resolve(projectRoot, 'dist/package.json');
 console.log('Write to', releasePackageJsonPath);
 fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
-
-// --------------------------------------------------------------------------------------------
-
-function removeDistPathPrefix([section, keys]) {
-  if (keys) {
-    keys.forEach((key) => {
-      removePathPrefixAt(section, key);
-    });
-  } else {
-    const replaceAllPropValues = (obj) => {
-      Object.keys(obj).forEach((key) => {
-        if (typeof obj[key] === 'string') {
-          removePathPrefixAt(obj, key);
-        } else if (typeof obj[key] === 'object') {
-          replaceAllPropValues(obj[key]);
-        }
-      });
-    };
-    replaceAllPropValues(section);
-  }
-}
-
-function removePathPrefixAt(section, key, prefix = 'dist/') {
-  if (section[key]) {
-    section[key] = section[key].replace(prefix, '');
-  }
-}
