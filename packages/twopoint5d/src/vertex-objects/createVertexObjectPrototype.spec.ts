@@ -2,6 +2,27 @@ import {describe, expect, test} from 'vitest';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 describe('the generated attribute accessors', () => {
+  test('an attribute declared without a getter gets none', () => {
+    const pool = new VertexObjectPool({vertexCount: 1, attributes: {color: {components: ['r', 'g'], getter: false}}}, 1);
+    const names = Object.getOwnPropertyNames(pool.descriptor.voPrototype);
+
+    expect(names).not.toContain('undefined');
+    expect(names).not.toContain('getColor');
+    expect(names).toEqual(expect.arrayContaining(['setColor', 'r', 'g']));
+  });
+
+  test('a component named like its attribute gets its accessor', () => {
+    const pool = new VertexObjectPool<{foo: number; getFoo: () => ArrayLike<number>}>(
+      {vertexCount: 1, attributes: {foo: {components: ['foo', 'bar']}}},
+      1,
+    );
+    const vo = pool.createVO()!;
+
+    vo.foo = 3;
+
+    expect(vo.getFoo()[0]).toBe(3);
+  });
+
   test('a multi-component setter takes a typed array', () => {
     const pool = new VertexObjectPool<{
       setPos: (...args: number[] | [ArrayLike<number>]) => void;

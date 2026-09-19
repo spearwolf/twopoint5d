@@ -141,6 +141,19 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     return VOUtils.isBuffer(vo, this.buffer);
   }
 
+  /** @internal */
+  protected override onUsedCountShrunk(from: number, to: number): void {
+    for (let i = to; i < from; i++) {
+      const vo = this.#voIndex[i];
+      // only a slot that holds a vertex object is written: resize() calls the setter after it has
+      // swapped in an index of the new capacity, and a write beyond that would lengthen the array
+      if (vo != null) {
+        VOUtils.clearBuffer(vo);
+        this.#voIndex[i] = undefined;
+      }
+    }
+  }
+
   /**
    * In addition to {@link VOBufferPool#dispose}, this also unlinks the buffer
    * reference from every still-tracked vertex object and drops the internal
@@ -194,15 +207,16 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * The vertex object sitting in the slot `idx`, materialized on first access for a slot that
    * was filled through {@link VOBufferPool#createFromAttributes}.
    *
-   * Answers `undefined` for a slot nothing has taken, and on a disposed pool, which has no
-   * index left to look in: the declared type admits absence, and the index went with
-   * {@link VOBufferPool#dispose}.
+   * Answers `undefined` for an index that is not an integer in `0` … `usedCount - 1`, and on a
+   * disposed pool, which has no index left to look in: the declared type admits absence, and
+   * the index went with {@link VOBufferPool#dispose}.
    */
   getVO(idx: number): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= this.usedCount) return undefined;
 
     let vo = this.#voIndex[idx];
-    if (vo == null && idx < this.usedCount) {
+    if (vo == null) {
       vo = this.#createVO(idx);
       this.#voIndex[idx] = vo;
     }

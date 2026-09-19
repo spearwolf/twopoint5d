@@ -1,3 +1,4 @@
+import {checkBufferArray} from './checkBufferArray.js';
 import {createTypedArray} from './createTypedArray.js';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
 import type {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types.js';
@@ -74,6 +75,10 @@ export class VertexObjectBuffer {
    * Use `VOBufferPool#fromBuffersData()` to restore a pool from `toBuffersData()` output: it
    * reconciles the two and throws on a capacity mismatch instead of leaving one.
    *
+   * Every array in `buffersData` has to be the typed array of its buffer's data type and hold
+   * exactly `capacity × vertexCount × itemSize` elements; otherwise the constructor throws a
+   * `TypeError` or a `RangeError` that names the buffer.
+   *
    * @throws when `source` is the buffer of a disposed pool, which has no data to build a second
    * buffer from
    */
@@ -106,9 +111,7 @@ export class VertexObjectBuffer {
           itemSize: buffer.itemSize,
           dataType: buffer.dataType,
           usageType: buffer.usageType,
-          typedArray:
-            buffersData?.buffers[bufferName] ??
-            createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
+          typedArray: this.#takeOrCreateArray(buffersData, bufferName, buffer.dataType, buffer.itemSize),
           serial: 0,
         });
       }
@@ -150,9 +153,7 @@ export class VertexObjectBuffer {
       for (const buffer of forming.values()) {
         this.buffers.set(buffer.bufferName, {
           ...buffer,
-          typedArray:
-            buffersData?.buffers[buffer.bufferName] ??
-            createTypedArray(buffer.dataType, this.capacity * this.descriptor.vertexCount * buffer.itemSize),
+          typedArray: this.#takeOrCreateArray(buffersData, buffer.bufferName, buffer.dataType, buffer.itemSize),
         });
       }
 
@@ -171,6 +172,22 @@ export class VertexObjectBuffer {
     if (!this.descriptor.voPrototype) {
       this.descriptor.voPrototype = createVertexObjectPrototype(this);
     }
+  }
+
+  // an array from buffersData is taken over by reference, so it has to fit the layout exactly
+  #takeOrCreateArray(
+    buffersData: VertexObjectBuffersData | undefined,
+    bufferName: string,
+    dataType: VertexAttributeDataType,
+    itemSize: number,
+  ): TypedArray {
+    const length = this.capacity * this.descriptor.vertexCount * itemSize;
+    const array = buffersData?.buffers[bufferName];
+    if (array == null) {
+      return createTypedArray(dataType, length);
+    }
+    checkBufferArray('VertexObjectBuffer', bufferName, array, dataType, length, 'exact');
+    return array;
   }
 
   /**

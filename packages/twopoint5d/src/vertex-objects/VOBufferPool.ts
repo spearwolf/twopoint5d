@@ -1,5 +1,6 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {checkBufferArray} from './checkBufferArray.js';
 import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 // one message for every method that refuses to work once the pool is gone, so the class, the
@@ -31,6 +32,16 @@ export class VOBufferPool {
   }
 
   /**
+   * Called by the `usedCount` setter once the count has gone down from `_from` to `_to`: the
+   * slots `_to` … `_from - 1` hold no vertex object in use any more. Never called while the
+   * constructor runs — the count only rises there, before a subclass has its own fields — and
+   * never on a disposed pool.
+   *
+   * @internal
+   */
+  protected onUsedCountShrunk(_from: number, _to: number): void {}
+
+  /**
    * The buffer every vertex object of this pool reads and writes through.
    *
    * The same {@link VertexObjectBuffer} once {@link dispose} has run, but one without data: it
@@ -57,13 +68,16 @@ export class VOBufferPool {
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
+    const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
+    if (capacity < 0 || !Number.isInteger(capacity)) {
+      throw new Error('Capacity must be a non-negative integer');
+    }
     if (typeof capacityOrData === 'number') {
-      const capacity = capacityOrData;
       this.#capacity = capacity;
       this.#buffer = new VertexObjectBuffer(this.descriptor, capacity);
     } else {
       const buffersData = capacityOrData;
-      this.#capacity = buffersData.capacity;
+      this.#capacity = capacity;
       // the buffer is built from the given data rather than sized from a capacity
       this.#buffer = new VertexObjectBuffer(this.descriptor, buffersData);
       this.usedCount = buffersData.usedCount;
@@ -76,14 +90,28 @@ export class VOBufferPool {
   }
 
   /**
-   * Takes every value a live pool can hold, clamped to `0` … {@link capacity}.
+   * Takes every integer, clamped to `0` … {@link capacity}; `Infinity` and `-Infinity` are
+   * clamped the same way. Throws a `RangeError` for `NaN` and for a fraction, which name no
+   * slot — on a disposed pool as well.
+   *
+   * A lower value gives up the slots above it: on a {@link VertexObjectPool} every vertex object
+   * sitting in one of them is let go of, as {@link VertexObjectPool#freeVO} would, and every
+   * further read or write through it fails. The data in the buffer stays where it is.
    *
    * A write falls through on a disposed pool, which has no slot left to count: the getter
    * goes on answering `0`.
    */
   set usedCount(value: number) {
+    // ±Infinity is clamped like any other value out of range; a fraction or NaN names no slot
+    if (Number.isNaN(value) || (Number.isFinite(value) && !Number.isInteger(value))) {
+      throw new RangeError(`VOBufferPool#usedCount must be an integer, got ${value}`);
+    }
     if (this.#disposed) return;
+    const previous = this.#usedCount;
     this.#usedCount = Math.max(0, Math.min(value, this.capacity));
+    if (this.#usedCount < previous) {
+      this.onUsedCountShrunk(previous, this.#usedCount);
+    }
   }
 
   /**
@@ -128,8 +156,10 @@ export class VOBufferPool {
   }
 
   /**
-   * Resets `usedCount` to `0` and releases nothing. On a disposed pool it is a no-op without
-   * effect — the count is already `0` and stays there.
+   * Sets `usedCount` to `0`. The buffers keep their data and their memory. On a
+   * {@link VertexObjectPool} every vertex object handed out so far is let go of, as the
+   * `usedCount` setter describes. On a disposed pool it is a no-op without effect — the count
+   * is already `0` and stays there.
    */
   clear(): void {
     this.usedCount = 0;
@@ -138,7 +168,7 @@ export class VOBufferPool {
   /**
    * Releases the underlying typed-array memory of this pool eagerly.
    *
-   * In contrast to {@link clear} (which only resets `usedCount` to `0`), this
+   * In contrast to {@link clear} (which sets `usedCount` to `0` and frees no memory), this
    * method has `pool.buffer` give up every typed array it holds and empty its buffer map,
    * so the underlying `ArrayBuffer`s can be reclaimed by the garbage collector
    * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
@@ -207,6 +237,11 @@ export class VOBufferPool {
    * mismatched capacity as it is, and a silent no-op here would let a caller believe the data
    * arrived.
    *
+   * Every array has to be the typed array of its buffer's data type (`TypeError` otherwise) and
+   * may hold at most `capacity × vertexCount × itemSize` elements (`RangeError` otherwise). A
+   * buffer name the layout does not know is skipped. An array or a `usedCount` that breaks a
+   * rule throws before anything about the pool has changed.
+   *
    * @param copyTypedArrays By default, the typed-array references are simply shared (zero-copy) if possible.
    *                        But if `copyTypedArrays` is set to `true` or the typed-array from the input is smaller
    *                        than the current array from the buffer then the data is copied.
@@ -217,6 +252,20 @@ export class VOBufferPool {
     }
     if (buffersData.capacity !== this.capacity) {
       throw new Error('Invalid buffersData capacity');
+    }
+    // every array is checked before the first write, so a payload that fails leaves the pool as it was
+    for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {
+      const buffer = this.buffer.buffers.get(bufferName);
+      if (buffer) {
+        checkBufferArray(
+          'VOBufferPool#fromBuffersData()',
+          bufferName,
+          typedArray,
+          buffer.dataType,
+          this.capacity * this.descriptor.vertexCount * buffer.itemSize,
+          'at-most',
+        );
+      }
     }
     this.usedCount = buffersData.usedCount;
     for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {

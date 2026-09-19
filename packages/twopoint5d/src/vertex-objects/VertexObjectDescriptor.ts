@@ -1,5 +1,8 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import type {VertexObjectDescription} from './types.js';
+import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
+
+const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
 export class VertexObjectDescriptor {
   readonly description: VertexObjectDescription;
@@ -32,6 +35,23 @@ export class VertexObjectDescriptor {
     this.#voPrototype = prototype;
   }
 
+  /**
+   * Reads the description and checks that its layout can hold it. The first rule that fails
+   * throws:
+   *
+   * 1. `vertexCount`, when given, is a positive integer (`RangeError`)
+   * 2. `meshCount`, when given, is a positive integer (`RangeError`)
+   * 3. every attribute has a size of at least 1 — a positive integer `size`, or at least one
+   *    component (`RangeError`)
+   * 4. an attribute that declares both `size` and `components` has no more components than its
+   *    size; fewer pad the attribute to its size (`RangeError`)
+   * 5. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
+   * 6. no two attributes, components or methods give the vertex object the same property name
+   *    (`Error`)
+   *
+   * @throws when the description breaks one of the rules above; the message names the rule,
+   * the attribute where there is one, and the value received
+   */
   constructor(description: VertexObjectDescription) {
     this.description = description;
     this.attributes = new Map();
@@ -43,6 +63,50 @@ export class VertexObjectDescriptor {
     });
     this.basePrototype = description.basePrototype;
     this.methods = description.methods;
+    this.#validate();
+  }
+
+  // a malformed description would otherwise show up frames later as wrong pixels, far from here
+  #validate(): void {
+    const {vertexCount, meshCount} = this.description;
+    if (vertexCount != null && !isPositiveInteger(vertexCount)) {
+      throw new RangeError(`VertexObjectDescriptor: vertexCount must be a positive integer, got ${vertexCount}`);
+    }
+    if (meshCount != null && !isPositiveInteger(meshCount)) {
+      throw new RangeError(`VertexObjectDescriptor: meshCount must be a positive integer, got ${meshCount}`);
+    }
+
+    for (const attr of this.attributes.values()) {
+      if (!isPositiveInteger(attr.size)) {
+        throw new RangeError(
+          `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${attr.size}`,
+        );
+      }
+      // the raw description, because the descriptor answers `size` from either field
+      const raw = this.description.attributes[attr.name] as {size?: number; components?: string[]};
+      if (raw.size != null && raw.components != null && raw.components.length > raw.size) {
+        throw new RangeError(
+          `VertexObjectDescriptor: attribute "${attr.name}" declares ${raw.components.length} components for a size of ${raw.size}`,
+        );
+      }
+    }
+
+    this.indices.forEach((index, position) => {
+      if (!Number.isInteger(index) || index < 0 || index >= this.vertexCount) {
+        throw new RangeError(
+          `VertexObjectDescriptor: index ${index} at position ${position} must be an integer in 0 … ${this.vertexCount - 1}`,
+        );
+      }
+    });
+
+    const origins = new Map<string, string>();
+    for (const {name, origin} of vertexObjectPropertyNames(this.attributes.values(), this.vertexCount, this.methods)) {
+      const first = origins.get(name);
+      if (first != null) {
+        throw new Error(`VertexObjectDescriptor: the vertex object property "${name}" comes from both ${first} and ${origin}`);
+      }
+      origins.set(name, origin);
+    }
   }
 
   /** Returns `vertexCount` or `1` */

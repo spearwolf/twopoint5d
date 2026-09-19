@@ -145,4 +145,27 @@ describe('vertex-objects — gpu upload', function () {
       1, 1, 1, 10, 10, 10, 20, 20, 20, 30, 30, 30,
     ]);
   });
+
+  it('an object whose indices leave a vertex unused is drawn from its own vertices', async function () {
+    // four vertices per object, of which the indices name three: the second object starts at vertex 4
+    const description = {
+      vertexCount: 4,
+      indices: [0, 1, 2],
+      attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
+    };
+    const geometry = new VertexObjectGeometry(description, 2);
+    const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
+    scene.add(mesh);
+
+    geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 9, 9, 9]);
+    geometry.pool.createVO().setPosition([2, 0, 0, 3, 0, 0, 3, 1, 0, 9, 9, 9]);
+
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const indices = Array.from(new Uint32Array(await display.renderer.getArrayBufferAsync(geometry.index)));
+
+    expect(indices.slice(0, 6)).to.deep.equal([0, 1, 2, 4, 5, 6]);
+  });
 });

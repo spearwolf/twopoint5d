@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import {describe, expect, test} from 'vitest';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
@@ -657,5 +658,71 @@ describe('VertexObjectBuffer', () => {
       expect(Array.from(buffer.bufferNameAttributes.keys()).sort()).toEqual(bufferNames);
       expect(buffer.buffers.size, 'the data is gone, the description of it is not').toBe(0);
     });
+  });
+
+  describe('buffers data that does not fit the layout', () => {
+    // two buffers of different element types: float32 with an item size of 2, uint32 with 1
+    const makeDescriptor = () =>
+      new VertexObjectDescriptor({
+        vertexCount: 2,
+        attributes: {
+          pos: {components: ['x', 'y'], type: 'float32'},
+          id: {size: 1, type: 'uint32'},
+        },
+      });
+
+    const capacity = 3;
+    const floatLength = capacity * 2 * 2;
+    const uintLength = capacity * 2 * 1;
+
+    const buffersData = (buffers: Record<string, unknown>) => ({capacity, usedCount: 0, buffers}) as never;
+
+    const branches = [
+      ['from a descriptor', () => makeDescriptor()],
+      ['from a source buffer', () => new VertexObjectBuffer(makeDescriptor(), capacity)],
+    ] as const;
+
+    for (const [branch, makeSource] of branches) {
+      describe(branch, () => {
+        test('refuses an array of another type', () => {
+          const build = () => new VertexObjectBuffer(makeSource(), buffersData({static_float32: new Uint32Array(floatLength)}));
+
+          expect(build).toThrow(TypeError);
+          expect(build).toThrow(
+            /VertexObjectBuffer: buffer "static_float32" holds float32 data and takes a Float32Array, got Uint32Array/,
+          );
+          expect(() => new VertexObjectBuffer(makeSource(), buffersData({static_uint32: [1, 2, 3, 4, 5, 6]}))).toThrow(
+            /takes a Uint32Array, got Array/,
+          );
+        });
+
+        test('refuses an array shorter than the layout', () => {
+          const build = () => new VertexObjectBuffer(makeSource(), buffersData({static_uint32: new Uint32Array(uintLength - 1)}));
+
+          expect(build).toThrow(RangeError);
+          expect(build).toThrow(/buffer "static_uint32" takes exactly 6 elements .*, got 5/);
+        });
+
+        test('refuses an array longer than the layout', () => {
+          const build = () =>
+            new VertexObjectBuffer(makeSource(), buffersData({static_float32: new Float32Array(floatLength + 1)}));
+
+          expect(build).toThrow(RangeError);
+          expect(build).toThrow(/buffer "static_float32" takes exactly 12 elements/);
+        });
+
+        test('takes a typed array from another realm', () => {
+          const foreign = vm.runInNewContext(`new Float32Array(${floatLength})`) as Float32Array;
+          expect(foreign instanceof Float32Array, 'the array really comes from another realm').toBe(false);
+
+          const buffer = new VertexObjectBuffer(makeSource(), buffersData({static_float32: foreign}));
+
+          expect(buffer.buffers.get('static_float32')!.typedArray).toBe(foreign);
+          expect(buffer.buffers.get('static_uint32')!.typedArray, 'a buffer not named gets a fresh array').toHaveLength(
+            uintLength,
+          );
+        });
+      });
+    }
   });
 });

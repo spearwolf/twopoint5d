@@ -523,6 +523,170 @@ describe('VertexObjectPool', () => {
       expect(pool.usedCount).toBe(4);
       expect(pool.availableCount).toBe(0);
     });
+
+    test('usedCount refuses NaN and a fraction', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.usedCount = 3;
+
+      expect(() => (pool.usedCount = NaN)).toThrow(RangeError);
+      expect(() => (pool.usedCount = 1.5)).toThrow(/VOBufferPool#usedCount must be an integer, got 1.5/);
+      expect(pool.usedCount, 'the count stays where it was').toBe(3);
+
+      pool.dispose();
+
+      expect(() => (pool.usedCount = NaN), 'a disposed pool turns invalid input away all the same').toThrow(RangeError);
+      expect(pool.usedCount).toBe(0);
+    });
+
+    test('usedCount clamps Infinity to the capacity and -Infinity to 0', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      pool.usedCount = Infinity;
+      expect(pool.usedCount).toBe(10);
+
+      pool.usedCount = -Infinity;
+      expect(pool.usedCount).toBe(0);
+    });
+  });
+
+  describe('a count that goes down', () => {
+    test('clear() lets go of every vertex object it handed out', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
+
+      pool.clear();
+
+      const live = pool.createVO()!;
+      pool.freeVO(vo1);
+
+      expect(VOUtils.getIndex(live), 'the live vertex object keeps its slot').toBe(0);
+      expect(pool.usedCount).toBe(1);
+      expect(pool.containsVO(vo0)).toBe(false);
+      expect(pool.containsVO(vo1)).toBe(false);
+      expect(pool.containsVO(vo2)).toBe(false);
+      expect(VOUtils.hasBuffer(vo0)).toBe(false);
+      expect(pool.getVO(0)).toBe(live);
+    });
+
+    test('a lower usedCount lets go of the vertex objects above it', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
+      vo0.x0 = 1;
+      vo1.x0 = 2;
+      vo2.x0 = 3;
+
+      pool.usedCount = 1;
+
+      expect(pool.containsVO(vo0)).toBe(true);
+      expect(pool.containsVO(vo1)).toBe(false);
+      expect(pool.containsVO(vo2)).toBe(false);
+
+      pool.usedCount = 3;
+
+      const again = pool.getVO(1)!;
+      expect(again, 'the slot gets a vertex object of its own').not.toBe(vo1);
+      expect(again.x0, 'the data stays in the buffer').toBe(2);
+      expect(pool.getVO(2)!.x0).toBe(3);
+    });
+
+    test('fromBuffersData() with a lower usedCount lets go of the vertex objects above it', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      const vo2 = pool.createVO()!;
+
+      pool.fromBuffersData({...pool.toBuffersData(), usedCount: 1});
+
+      expect(pool.usedCount).toBe(1);
+      expect(pool.containsVO(vo0)).toBe(true);
+      expect(pool.containsVO(vo1)).toBe(false);
+      expect(pool.containsVO(vo2)).toBe(false);
+    });
+
+    test('a count that goes up keeps every vertex object', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+
+      pool.usedCount = 5;
+
+      expect(pool.containsVO(vo0)).toBe(true);
+      expect(pool.containsVO(vo1)).toBe(true);
+      expect(pool.getVO(1)).toBe(vo1);
+    });
+  });
+
+  describe('getVO()', () => {
+    test('answers undefined for an index that names no used slot', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.usedCount = 2;
+
+      expect(pool.getVO(-1)).toBeUndefined();
+      expect(pool.getVO(0.5)).toBeUndefined();
+      expect(pool.getVO(NaN)).toBeUndefined();
+      expect(pool.getVO(pool.usedCount)).toBeUndefined();
+
+      pool.usedCount = 0;
+      const vo = pool.createVO()!;
+
+      expect(VOUtils.getIndex(vo), 'getVO(-1) left no stray entry behind').toBe(0);
+      expect(pool.usedCount).toBe(1);
+    });
+  });
+
+  describe('input the layout cannot hold', () => {
+    test('a pool refuses a capacity that is not a non-negative integer', () => {
+      const message = 'Capacity must be a non-negative integer';
+
+      expect(() => new VertexObjectPool(descriptor, 1.5)).toThrow(message);
+      expect(() => new VertexObjectPool(descriptor, -1)).toThrow(message);
+      expect(() => new VertexObjectPool(descriptor, NaN)).toThrow(message);
+
+      const buffersData = new VertexObjectPool(descriptor, 2).toBuffersData();
+      expect(() => new VertexObjectPool(descriptor, {...buffersData, capacity: 1.5})).toThrow(message);
+    });
+
+    test('fromBuffersData() refuses an array of another type and leaves the pool as it was', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+      pool.usedCount = 2;
+      const before = pool.buffer.buffers.get('dynamic_float32')!.typedArray;
+      const buffersData = new VertexObjectPool(descriptor, 4).toBuffersData();
+
+      const write = () =>
+        pool.fromBuffersData({
+          ...buffersData,
+          usedCount: 3,
+          buffers: {...buffersData.buffers, dynamic_float32: new Uint32Array(4 * 4 * 3)},
+        });
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow(/"dynamic_float32"/);
+      expect(pool.usedCount).toBe(2);
+      expect(pool.buffer.buffers.get('dynamic_float32')!.typedArray).toBe(before);
+    });
+
+    test('fromBuffersData() refuses an array longer than the layout and leaves the pool as it was', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+      pool.usedCount = 2;
+      const before = pool.buffer.buffers.get('static_float32')!.typedArray;
+      const buffersData = new VertexObjectPool(descriptor, 4).toBuffersData();
+
+      const write = () =>
+        pool.fromBuffersData({
+          ...buffersData,
+          usedCount: 3,
+          buffers: {...buffersData.buffers, static_float32: new Float32Array(4 * 4 * 4 + 1)},
+        });
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow(/"static_float32" takes at most 64 elements/);
+      expect(pool.usedCount).toBe(2);
+      expect(pool.buffer.buffers.get('static_float32')!.typedArray).toBe(before);
+    });
   });
 
   describe('geometry attachments', () => {

@@ -67,6 +67,15 @@ describe('VertexObjectGeometry', () => {
     ]);
   });
 
+  test('a description whose indices leave a vertex unused draws every object from its own vertices', () => {
+    const geometry = new VertexObjectGeometry(
+      {vertexCount: 4, indices: [0, 1, 2], attributes: {position: {components: ['x', 'y', 'z']}}},
+      2,
+    );
+
+    expect(Array.from(geometry.index!.array)).toEqual([0, 1, 2, 4, 5, 6]);
+  });
+
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {
     const capacity = 10;
     const geometry = new VertexObjectGeometry(descriptor, capacity);

@@ -34,7 +34,7 @@ function initializeRoute(
   const {descriptor, capacity} = pool;
   if (builders.ownsIndex && descriptor.hasIndices) {
     const {indices} = descriptor;
-    const bufAttr = new BufferAttribute(createIndicesArray(indices, capacity), 1);
+    const bufAttr = new BufferAttribute(createIndicesArray(indices, capacity, descriptor.vertexCount), 1);
     geometry.setIndex(bufAttr);
   }
   // a buffer reached through a live pool holds its typed array

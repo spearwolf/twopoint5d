@@ -100,20 +100,25 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
         },
       ]);
     } else {
-      methods.push([
-        attr.getterName,
-        {
-          enumerable: true,
-          value: makeAttributeValuesGetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
-        },
-      ]);
-      methods.push([
-        attr.setterName,
-        {
-          enumerable: true,
-          value: makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
-        },
-      ]);
+      // `getter: false` / `setter: false` leave the name undefined: the attribute gets no accessor
+      if (attr.getterName != null) {
+        methods.push([
+          attr.getterName,
+          {
+            enumerable: true,
+            value: makeAttributeValuesGetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+          },
+        ]);
+      }
+      if (attr.setterName != null) {
+        methods.push([
+          attr.setterName,
+          {
+            enumerable: true,
+            value: makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+          },
+        ]);
+      }
     }
 
     if (attr.hasComponents) {
@@ -121,7 +126,9 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
         for (let vertexIndex = 0; vertexIndex < descriptor.vertexCount; vertexIndex++) {
           const instanceOffset = descriptor.vertexCount * buf.itemSize;
           const attrOffset = vertexIndex * buf.itemSize + bufAttr.offset + componentIndex;
-          if (descriptor.vertexCount > 1 || component !== attr.name) {
+          // a component is skipped only where it coincides with the attribute accessor above: one
+          // vertex, size 1 and the same name address the very same slot
+          if (descriptor.vertexCount > 1 || attr.size > 1 || component !== attr.name) {
             methods.push([
               `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
               {

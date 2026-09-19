@@ -2,6 +2,11 @@ import {describe, expect, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescription} from './types.js';
+import {TileBaseSpriteDescriptor, TileSpriteDescriptor} from '../map2d/TileSprites/descriptors.js';
+import {AnimatedSpriteDescriptor} from '../sprites/AnimatedSprites/AnimatedSprite.js';
+import {BaseSpriteDescriptor} from '../sprites/BaseSprite.js';
+import {TexturedSpriteDescriptor} from '../sprites/TexturedSprites/TexturedSprite.js';
 
 describe('VertexObjectDescriptor', () => {
   test('construct with vertexCount and indices', () => {
@@ -112,6 +117,107 @@ describe('VertexObjectDescriptor', () => {
 
       expect(descriptor.voPrototype, 'the buffer has built it').toBeDefined();
       expect(Object.keys(descriptor)).not.toContain('voPrototype');
+    });
+  });
+
+  describe('refuses a description the layout cannot hold', () => {
+    const build = (description: VertexObjectDescription) => () => new VertexObjectDescriptor(description);
+    const pos = {components: ['x', 'y']};
+
+    test('a vertexCount that is not a positive integer', () => {
+      for (const vertexCount of [0, 1.5, -1]) {
+        expect(build({vertexCount, attributes: {pos}})).toThrow(RangeError);
+      }
+      expect(build({vertexCount: 0, attributes: {pos}})).toThrow(
+        'VertexObjectDescriptor: vertexCount must be a positive integer, got 0',
+      );
+    });
+
+    test('a meshCount that is not a positive integer', () => {
+      expect(build({meshCount: 0, attributes: {pos}})).toThrow(
+        'VertexObjectDescriptor: meshCount must be a positive integer, got 0',
+      );
+    });
+
+    test('an attribute without components', () => {
+      expect(build({attributes: {pos: {components: []}}})).toThrow(
+        'VertexObjectDescriptor: attribute "pos" needs a size of at least 1 (a positive integer size or at least one component), got 0',
+      );
+    });
+
+    test('an attribute with a size of 0', () => {
+      expect(build({attributes: {pos: {size: 0}}})).toThrow(RangeError);
+    });
+
+    test('an attribute with a fractional size', () => {
+      expect(build({attributes: {pos: {size: 1.5}}})).toThrow(/attribute "pos" needs a size of at least 1 .*, got 1.5/);
+    });
+
+    test('an attribute with more components than its size', () => {
+      expect(build({attributes: {pos: {size: 1, components: ['a', 'b', 'c']} as never}})).toThrow(
+        'VertexObjectDescriptor: attribute "pos" declares 3 components for a size of 1',
+      );
+    });
+
+    test('an index beyond the last vertex', () => {
+      expect(build({vertexCount: 4, indices: [0, 1, 4], attributes: {pos}})).toThrow(
+        'VertexObjectDescriptor: index 4 at position 2 must be an integer in 0 … 3',
+      );
+    });
+
+    test('a negative index', () => {
+      expect(build({vertexCount: 4, indices: [-1, 1, 2], attributes: {pos}})).toThrow(/index -1 at position 0/);
+    });
+
+    test('a fractional index', () => {
+      expect(build({vertexCount: 4, indices: [0, 1.5, 2], attributes: {pos}})).toThrow(/index 1.5 at position 1/);
+    });
+
+    test('two attributes that both declare a component x', () => {
+      expect(build({attributes: {pos: {components: ['x', 'y']}, offset: {components: ['x', 'z']}}})).toThrow(
+        'VertexObjectDescriptor: the vertex object property "x" comes from both attribute "pos" and attribute "offset"',
+      );
+    });
+
+    test('one attribute that declares a component twice', () => {
+      expect(build({attributes: {pos: {components: ['x', 'x']}}})).toThrow(
+        /property "x" comes from both attribute "pos" and attribute "pos"/,
+      );
+    });
+
+    test('a method named like a generated accessor', () => {
+      expect(build({attributes: {pos}, methods: {setPos() {}}})).toThrow(
+        'VertexObjectDescriptor: the vertex object property "setPos" comes from both attribute "pos" and methods',
+      );
+    });
+  });
+
+  describe('takes every description the layout can hold', () => {
+    test('the sprite and tile descriptions of the library', () => {
+      for (const description of [
+        BaseSpriteDescriptor,
+        TexturedSpriteDescriptor,
+        AnimatedSpriteDescriptor,
+        TileBaseSpriteDescriptor,
+        TileSpriteDescriptor,
+      ]) {
+        expect(() => new VertexObjectDescriptor(description)).not.toThrow();
+      }
+    });
+
+    test('two attributes declared without a getter', () => {
+      expect(
+        () =>
+          new VertexObjectDescriptor({
+            attributes: {pos: {components: ['x', 'y'], getter: false}, color: {components: ['r', 'g'], getter: false}},
+          }),
+      ).not.toThrow();
+    });
+
+    test('an attribute with fewer components than its size', () => {
+      expect(
+        () => new VertexObjectDescriptor({attributes: {pos: {size: 4, components: ['x', 'y', 'z']} as never}}),
+      ).not.toThrow();
     });
   });
 });

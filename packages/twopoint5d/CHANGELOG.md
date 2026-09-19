@@ -129,6 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer` warns about stages sharing a name only while `renderOrder` lists that name, on `add()` and on every write to `renderOrder`. An order that lists no name — `'*'`, `'*,*'`, `' * '` — never warns
 - `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
+- `new VertexObjectDescriptor()` refuses a malformed description, and with it every pool and geometry built from one. It throws a `RangeError` for a `vertexCount` or `meshCount` that is no positive integer, for an attribute whose size is no positive integer (`components: []`, `size: 0`, `size: 1.5`), for an attribute that declares both `size` and more `components` than that size, and for an index that is no integer in `0` … `vertexCount - 1`; it throws an `Error` for two attributes, components or `methods` that give the vertex object the same property name. Fewer `components` than `size` pad the attribute and are taken
+- `VertexObjectBuffer` and `VOBufferPool#fromBuffersData()` check every array of `buffersData` against the buffer it is meant for: a typed array of another element type throws a `TypeError`, a length that does not fit a `RangeError`, both naming the buffer. The constructor takes an array by reference and asks for exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most that many and copies a shorter array. A typed array from a worker or another realm is taken. `fromBuffersData()` checks every array before it changes anything about the pool
+- the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more
+- `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
 
 ### Removed
 
@@ -197,6 +201,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureResource` animation data: an entry that is no object (`null`, a number, a string) is skipped and reported with `source: 'frameBasedAnimations'`, and the other entries of the same map are registered
 - fix an atlas `TextureResource` whose `overrideImageUrl` is cleared, directly or by a `parse()` without it: it loads the image its json names again; a json that names none is reported as an `error` with `source: 'atlas'`
 - fix `PowerOf2ImageLoader`, `TextureImageLoader` and `TileSetLoader`: a throw in the `load` event of the image goes to the error callback, so `loadAsync()` rejects; a missing 2d context is reported as an error, and a texture that was already built is disposed
+- fix the index buffer of a `VertexObjectGeometry`: the indices of object `i` start at `i × vertexCount`, also for a description whose `indices` leave a vertex unused (`vertexCount: 4, indices: [0, 1, 2]`)
+- fix `VertexObjectPool#clear()` and a lower `usedCount`, `fromBuffersData()` included: every vertex object in a slot the count gives up is let go of, as `freeVO()` does. A vertex object created afterwards shares its slot with none of them, and freeing one of them leaves the live objects where they are
+- fix `VertexObjectPool#getVO()`: it answers `undefined` for an index that is no integer in `0` … `usedCount - 1` — a negative or fractional index builds no vertex object
+- fix `getter: false` and `setter: false` on an attribute: the vertex object gets no accessor for it
+- fix a component named like its attribute (`foo: {components: ['foo', 'bar']}` with one vertex): it gets its accessor
 
 ### Migration Guide
 
@@ -1429,6 +1438,94 @@ stage.camera!.position.z = 500;
 
 A camera assigned to `stage.camera` is used from the moment it is assigned, with or without a
 `resize()`.
+
+#### A vertex object description is checked when its descriptor is built
+
+`new VertexObjectDescriptor(description)` — and every `VertexObjectPool`, `VOBufferPool` and
+geometry handed a description — throws for a description whose layout cannot hold it. A
+description that collides two property names has to rename one of them.
+
+**Before**
+
+```ts
+new VertexObjectPool(
+  {
+    attributes: {
+      position: {components: ['x', 'y']},
+      offset: {components: ['x', 'z']}, // `x` of position is unreachable
+    },
+  },
+  100,
+);
+```
+
+**After**
+
+```ts
+new VertexObjectPool(
+  {
+    attributes: {
+      position: {components: ['x', 'y']},
+      offset: {components: ['offsetX', 'offsetZ']},
+    },
+  },
+  100,
+);
+```
+
+The same goes for a `methods` key that matches a generated accessor (`setPosition`), and for
+an attribute declared with `components: []` or `size: 0`. An index has to name a vertex of the
+object: `indices` of a description with `vertexCount: 4` lie in `0` … `3`.
+
+#### A lower `usedCount` lets go of the vertex objects above it
+
+`VertexObjectPool#clear()`, an assignment to `usedCount` below its value and a
+`fromBuffersData()` with a lower `usedCount` let go of every vertex object in the slots that
+are given up; every read or write through one of them fails. The data in the buffer stays. Code
+that keeps a slot across such a step holds its index and asks the pool for a vertex object once
+the count covers the slot again.
+
+**Before**
+
+```ts
+const sprite = pool.createVO()!;
+pool.clear();
+pool.usedCount = 1;
+sprite.x = 10;
+```
+
+**After**
+
+```ts
+const index = VOUtils.getIndex(pool.createVO()!);
+pool.clear();
+pool.usedCount = 1;
+pool.getVO(index)!.x = 10;
+```
+
+`usedCount` takes integers only; `NaN` and a fraction throw a `RangeError`.
+
+#### Buffers data has to fit the layout it is handed to
+
+`new VertexObjectBuffer(source, buffersData)`, `new VOBufferPool(descriptor, buffersData)` and
+`VOBufferPool#fromBuffersData()` throw for an array of another element type (`TypeError`) or of
+a length the layout cannot hold (`RangeError`). The constructors take an array by reference and
+need exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most
+that many. `toBuffersData()` of a pool built from the same description produces arrays that fit.
+
+**Before**
+
+```ts
+pool.fromBuffersData({capacity, usedCount, buffers: {static_uint32: new Float32Array(data)}});
+```
+
+**After**
+
+```ts
+pool.fromBuffersData({capacity, usedCount, buffers: {static_uint32: Uint32Array.from(data)}});
+```
+
+A capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or more.
 
 ## [0.21.2] - 2026-06-19
 
