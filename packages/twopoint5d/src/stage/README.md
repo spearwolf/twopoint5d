@@ -155,11 +155,11 @@ root.renderOrder = 'background,world,*,ui';
 ```
 
 Stages sharing a listed name render together at that position, in the order
-they were added. While `renderOrder` is not `'*'`, `add()` and every write to
-`renderOrder` emit a `console.warn` about a shared name — give your stages
-unique names when sorting matters. A name or `*` listed twice counts at its
-first position. A stage renamed after `add()` is sorted under its new name
-from the next frame on.
+they were added, and `add()` and every write to `renderOrder` emit a
+`console.warn` about that name — give your stages unique names when sorting
+matters. A shared name that `renderOrder` does not list draws no warning. A
+name or `*` listed twice counts at its first position. A stage renamed after
+`add()` is sorted under its new name from the next frame on.
 
 ---
 
@@ -465,10 +465,11 @@ What this layer does on top of the general rules in
   first `resize()` with a width and a height above 0 creates the camera (or
   you assign your own). `Stage2D#asPassNode` throws in that state, and a
   `StageRenderer` composing pass nodes draws nothing while it is 0×0.
-- **Non-unique stage names + `renderOrder`**: stages sharing a name render
-  at that name's position in the order they were added. The renderer warns
-  on `add()` and on every write to `renderOrder`; give your stages unique
-  names when the order between them matters.
+- **Non-unique stage names + `renderOrder`**: stages sharing a name that
+  `renderOrder` lists render at that name's position in the order they were
+  added. The renderer warns about such a name on `add()` and on every write
+  to `renderOrder`; give your stages unique names when the order between
+  them matters.
 - **Mid-frame state on the WebGPU renderer**: `StageRenderer.renderTo()`
   restores `autoClear`, clear color and clear alpha to what it found
   on entry — but only if it actually performed a clear.

@@ -126,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `fitIntoRectangle()` gives a 0×0 view for `contain` and `cover` when the rectangle has a width or a height of 0; `minPixelZoom` and `maxPixelZoom` do not apply to it
 - `OrthographicProjection` and `ParallaxProjection` built without specs start from `{fit: 'fill'}`: the view is the container, one view unit per container pixel. Specs handed in stay the caller's object
 - `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
-- `StageRenderer` warns about stages sharing a name on every write to `renderOrder` as well as on `add()`, while `renderOrder` is not `'*'`
+- `StageRenderer` warns about stages sharing a name only while `renderOrder` lists that name, on `add()` and on every write to `renderOrder`. An order that lists no name — `'*'`, `'*,*'`, `' * '` — never warns
 - `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
 

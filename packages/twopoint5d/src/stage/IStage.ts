@@ -6,8 +6,11 @@
  */
 export interface IStage {
   /**
-   * Sort key for {@link StageRenderer.renderOrder}. Should be unique within a
-   * single `StageRenderer`, otherwise `renderOrder` cannot disambiguate.
+   * Sort key for {@link StageRenderer.renderOrder}. Stages sharing a name that
+   * `renderOrder` lists render together at its position, in the order they
+   * were added, and the `StageRenderer` warns about them; a stage needs a name
+   * of its own to get a position of its own. A stage renamed after `add()` is
+   * sorted under its new name from the next frame on.
    */
   name: string;
 

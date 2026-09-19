@@ -151,10 +151,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * all other stages which are not listed explicitly.
    *
    * Stages sharing a listed name render together at that position, in the
-   * order they were added; while `renderOrder` is not `'*'`, {@link add} and
-   * every write here warn about a shared name. A name or `'*'` listed twice
-   * counts at its first position. A stage renamed after `add()` is sorted
-   * under its new name from the next frame on.
+   * order they were added, and {@link add} and every write here warn about
+   * that name; a shared name that is not listed draws no warning. A name or
+   * `'*'` listed twice counts at its first position. A stage renamed after
+   * `add()` is sorted under its new name from the next frame on.
    */
   set renderOrder(order: string | undefined) {
     order = order || '*';
@@ -186,6 +186,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         .filter(Boolean);
     }
     return this.#renderOrderArray;
+  }
+
+  /** The names `renderOrder` places explicitly: every entry of {@link renderOrderArray} except `'*'`. */
+  #listedNames(): Set<string> {
+    return new Set(this.renderOrderArray.filter((name) => name !== '*'));
   }
 
   get parent(): StageRendererParentType | undefined {
@@ -683,7 +688,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       return this.stages;
     }
 
-    const listed = new Set(renderOrder.filter((name) => name !== '*'));
+    const listed = this.#listedNames();
     const byName = new Map<string, StageItem[]>();
     const rest: StageItem[] = [];
 
@@ -735,9 +740,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #warnAboutSharedNames(names: Iterable<string>): void {
-    if (this.#renderOrder === '*') return;
+    // only a name that renderOrder lists has to be told apart: stages under any other name go
+    // with the rest behind '*', or are not drawn at all, whatever they are called
+    const listed = this.#listedNames();
 
     for (const name of new Set(names)) {
+      if (!listed.has(name)) continue;
       let count = 0;
       for (const item of this.stages) {
         if (item.stage.name === name) count++;
@@ -766,8 +774,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Add a stage. The stage must implement both {@link IStage} and
    * {@link IRenderable}. Returns `this` for chaining.
    *
-   * Emits `OnStageAdded`. Warns while `renderOrder` is not `'*'` and another
-   * stage already carries the same `name`.
+   * Emits `OnStageAdded`. Warns when {@link renderOrder} lists the stage's
+   * `name` and another stage already carries it.
    *
    * On an eventized stage — every `Stage2D` — it listens for
    * `OnStageAfterCameraChanged` and rebuilds the output node on the next

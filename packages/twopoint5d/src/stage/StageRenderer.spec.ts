@@ -350,6 +350,40 @@ describe('StageRenderer', () => {
       warn.mockRestore();
     });
 
+    it('does not warn about a shared name while renderOrder lists no name', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      for (const order of ['*,*', ' * ', ',']) {
+        const early = new StageRenderer();
+        early.renderOrder = order;
+        early.add(fakeStage('a')).add(fakeStage('a'));
+
+        const late = new StageRenderer();
+        late.add(fakeStage('a')).add(fakeStage('a'));
+        late.renderOrder = order;
+      }
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('does not warn about a shared name that renderOrder does not list', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const sr = new StageRenderer();
+      sr.renderOrder = 'ui,*';
+      sr.add(fakeStage('ui')).add(fakeStage('bg')).add(fakeStage('bg'));
+      sr.renderOrder = 'ui';
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('warns about a shared name that renderOrder lists between blanks', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const sr = new StageRenderer();
+      sr.renderOrder = ' a , * ';
+      sr.add(fakeStage('a')).add(fakeStage('a'));
+      expect(warn).toHaveBeenCalledTimes(1);
+      warn.mockRestore();
+    });
+
     it('does NOT warn on duplicate name when renderOrder is default "*"', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const sr = new StageRenderer();
