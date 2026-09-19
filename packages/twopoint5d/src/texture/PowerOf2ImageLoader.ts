@@ -29,25 +29,42 @@ export class PowerOf2ImageLoader {
     this.imageLoader.load(
       url,
       (img: HTMLImageElement) => {
-        if (!isPowerOf2(img.width) || !isPowerOf2(img.height)) {
-          const width = findNextPowerOf2(img.width);
-          const height = findNextPowerOf2(img.height);
+        // this callback runs inside the `load` event of the image, a path with no way back into
+        // the promise `loadAsync()` wraps around `load()` — a throw here would leave that promise
+        // pending forever, so it is turned into a call of `onErrorCallback`. The call of `onLoadCallback` stays
+        // outside: a throw of the caller's own callback is no failure of the load
+        let result: ImageWithTexCoords;
+        try {
+          if (!isPowerOf2(img.width) || !isPowerOf2(img.height)) {
+            const width = findNextPowerOf2(img.width);
+            const height = findNextPowerOf2(img.height);
 
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext('2d')!.drawImage(img, 0, 0);
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
 
-          const imgTexCoords = new TextureCoords(0, 0, width, height);
-          const texCoords = new TextureCoords(imgTexCoords, 0, 0, img.width, img.height);
+            const context = canvas.getContext('2d');
+            if (!context) {
+              throw new Error(`PowerOf2ImageLoader: no 2d context to pad "${url}" to a power of 2`);
+            }
+            context.drawImage(img, 0, 0);
 
-          onLoadCallback({imgEl: canvas, texCoords});
-        } else {
-          onLoadCallback({
-            imgEl: img,
-            texCoords: new TextureCoords(0, 0, img.width, img.height),
-          });
+            const imgTexCoords = new TextureCoords(0, 0, width, height);
+            const texCoords = new TextureCoords(imgTexCoords, 0, 0, img.width, img.height);
+
+            result = {imgEl: canvas, texCoords};
+          } else {
+            result = {
+              imgEl: img,
+              texCoords: new TextureCoords(0, 0, img.width, img.height),
+            };
+          }
+        } catch (error) {
+          onErrorCallback?.(error);
+          return;
         }
+
+        onLoadCallback(result);
       },
       undefined,
       onErrorCallback,

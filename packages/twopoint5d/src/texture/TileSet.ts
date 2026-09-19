@@ -30,17 +30,31 @@ import {TextureCoords} from './TextureCoords.js';
 const rand = (max: number) => (Math.random() * max) | 0;
 
 export interface TileSetOptions {
+  /** The width of one tile — a finite number above 0. Defaults to the width of the `baseCoords`. */
   tileWidth?: number;
+  /** The height of one tile — a finite number above 0. Defaults to the height of the `baseCoords`. */
   tileHeight?: number;
 
+  /** The space around the whole grid of tiles — a finite number of 0 or more. Defaults to 0. */
   margin?: number;
+  /** The space between two neighbouring tiles — a finite number of 0 or more. Defaults to 0. */
   spacing?: number;
+  /** The space around each tile inside its cell — a finite number of 0 or more. Defaults to 0. */
   padding?: number;
 
+  /** How many tiles the set holds — a whole number of 1 or more. Defaults to as many tiles as fit into the image. */
   tileCount?: number;
 
   firstId?: number;
 }
+
+const describeValue = (value: unknown): string => (typeof value === 'string' ? `"${value}"` : String(value));
+
+const assertOption = (valid: boolean, name: string, rule: string, value: unknown): void => {
+  if (!valid) {
+    throw new RangeError(`[TileSet] ${name} must be ${rule}, got ${describeValue(value)}`);
+  }
+};
 
 /**
  * The [[TileSet]] maps _tileIds_ to _frameIds_.
@@ -59,6 +73,11 @@ export class TileSet {
    */
   firstFrameId = -1;
 
+  /**
+   * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
+   * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
+   * of 1 or more, or if the width or height of the `baseCoords` is not finite.
+   */
   constructor(...args: [TextureAtlas, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
       const [atlas, baseCoords, options] = args as [TextureAtlas, TextureCoords, TileSetOptions];
@@ -143,6 +162,29 @@ export class TileSet {
     const {width: baseWidth, height: baseHeight} = this.baseCoords;
 
     const {padding, margin, spacing, tileCountLimit} = this;
+
+    // The layout loop ends only if every step moves forward and the image bounds are finite. The
+    // values come unchecked out of catalog json (`TextureStore.parse()` → `TextureResource.fromTileSet()`
+    // → `new TileSet()` inside an effect), and one that does not hold would freeze the page
+    // synchronously — so they are refused before the loop starts.
+    assertOption(Number.isFinite(baseWidth), 'baseCoords.width', 'a finite number', baseWidth);
+    assertOption(Number.isFinite(baseHeight), 'baseCoords.height', 'a finite number', baseHeight);
+    assertOption(Number.isFinite(this.tileWidth) && this.tileWidth > 0, 'tileWidth', 'a finite number above 0', this.tileWidth);
+    assertOption(
+      Number.isFinite(this.tileHeight) && this.tileHeight > 0,
+      'tileHeight',
+      'a finite number above 0',
+      this.tileHeight,
+    );
+    assertOption(Number.isFinite(margin) && margin >= 0, 'margin', 'a finite number of 0 or more', margin);
+    assertOption(Number.isFinite(padding) && padding >= 0, 'padding', 'a finite number of 0 or more', padding);
+    assertOption(Number.isFinite(spacing) && spacing >= 0, 'spacing', 'a finite number of 0 or more', spacing);
+    assertOption(
+      tileCountLimit === Infinity || (Number.isInteger(tileCountLimit) && tileCountLimit >= 1),
+      'tileCount',
+      'a whole number of 1 or more',
+      tileCountLimit,
+    );
 
     const tileOuterWidth = this.tileWidth + (padding << 1);
     const tileOuterHeight = this.tileHeight + (padding << 1);

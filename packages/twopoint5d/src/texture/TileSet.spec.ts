@@ -60,6 +60,64 @@ describe('TileSet', () => {
     });
   });
 
+  describe('degenerate options', () => {
+    const base = new TextureCoords(0, 0, 64, 64);
+
+    test.each([
+      ['a tileWidth of 0', {tileWidth: 0, tileHeight: 16, tileCount: 8}, /tileWidth/],
+      ['a negative tileWidth', {tileWidth: -16, tileHeight: 16, tileCount: 8}, /tileWidth/],
+      ['a tileHeight of 0', {tileWidth: 16, tileHeight: 0, tileCount: 8}, /tileHeight/],
+      ['a tileWidth of NaN', {tileWidth: NaN, tileHeight: 16, tileCount: 8}, /tileWidth/],
+      // the catalog json carries what it carries: a string would be concatenated, not added
+      ['a tileWidth that is a string', {tileWidth: '16' as unknown as number, tileHeight: 16, tileCount: 8}, /tileWidth.*"16"/],
+      ['a negative margin', {tileWidth: 16, tileHeight: 16, margin: -1}, /margin/],
+      ['a negative padding', {tileWidth: 16, tileHeight: 16, padding: -1}, /padding/],
+      ['a negative spacing', {tileWidth: 16, tileHeight: 16, spacing: -1}, /spacing/],
+      ['a tileCount of 0', {tileWidth: 16, tileHeight: 16, tileCount: 0}, /tileCount/],
+      ['a tileCount that is no whole number', {tileWidth: 16, tileHeight: 16, tileCount: 2.5}, /tileCount/],
+    ])('%s is refused', (_name, options, message) => {
+      expect(() => new TileSet(base, options)).toThrow(RangeError);
+      expect(() => new TileSet(base, options)).toThrow(message);
+    });
+
+    test('a baseCoords width that is not finite is refused', () => {
+      const options = {tileWidth: 16, tileHeight: 16, tileCount: 4};
+
+      expect(() => new TileSet(new TextureCoords(0, 0, NaN, 64), options)).toThrow(RangeError);
+      expect(() => new TileSet(new TextureCoords(0, 0, NaN, 64), options)).toThrow(/baseCoords\.width/);
+    });
+
+    // without a tileCount the layout loop has nothing but the step to end it
+    test('a tileWidth of 0 without a tileCount is refused', () => {
+      expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(RangeError);
+    });
+
+    test('a tileHeight of 0 without a tileCount is refused', () => {
+      expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 0})).toThrow(RangeError);
+    });
+
+    test('a baseCoords of 0 x 0 without options is refused', () => {
+      expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(RangeError);
+    });
+
+    test('a tile wider than the image still ends the layout', () => {
+      const tiles = new TileSet(base, {tileWidth: 100, tileHeight: 16});
+
+      expect(tiles.tileCount).toBe(4);
+      expect(tiles.frame(1).coords).toMatchObject({x: 0, y: 0, width: 100, height: 16});
+      expect(tiles.frame(4).coords.y).toBe(48);
+    });
+
+    // the shape of the tile set of the textured-sprites demo of the lookbook: the tile does
+    // not fit inside the margin, yet the first tile is always laid
+    test('a single tile that does not fit inside the margin is laid all the same', () => {
+      const tiles = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256, margin: 1});
+
+      expect(tiles.tileCount).toBe(1);
+      expect(tiles.frame(1).coords).toMatchObject({x: 1, y: 1});
+    });
+  });
+
   describe('frameId() wrap-around arithmetic', () => {
     const tiles = new TileSet(new TextureCoords(0, 0, 128, 256), {
       margin: 1,

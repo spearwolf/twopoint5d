@@ -274,6 +274,77 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
+    test('a tileset resource skips an animation entry that is no object', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        // the catalog json carries what it carries
+        walk: null,
+        run: {duration: 1, tileIds: [1, 2]},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.load();
+
+      const errors: Array<{source: string; id: string; animation?: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation?: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.animation).toBe('walk');
+      expect(errors.some((e) => e.source === 'texture')).toBe(false);
+
+      expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+
+      resource.dispose();
+    });
+
+    test('an atlas resource skips an animation entry that is no object', async () => {
+      const atlasJson = {
+        frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
+        // the catalog json carries what it carries
+        walk: null,
+        run: {duration: 1, frameNameQuery: 'idle.*'},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.load();
+
+      const errors: Array<{source: string; id?: string; animation?: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id?: string; animation?: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('frameBasedAnimations');
+      expect(errors[0]!.animation).toBe('walk');
+      expect(errors.some((e) => e.source === 'texture')).toBe(false);
+
+      expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
     test('an animation entry without a duration and without a frameRate is skipped and reported', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
@@ -543,6 +614,108 @@ describe('TextureResource', () => {
       loadAsyncSpy.mockRestore();
       fetchMock.mockRestore();
     });
+
+    describe('an overrideImageUrl that is cleared again', () => {
+      const atlasJson = {
+        frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+
+      test('clearing the overrideImageUrl gives the image back to the one the json names', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+        const loadAsyncSpy = vi
+          .spyOn(ImageLoader.prototype, 'loadAsync')
+          .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+        const {factory} = makeTextureFactory();
+
+        const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
+        resource.load();
+        resource.textureFactory = factory;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(resource.imageUrl).toBe('override.png');
+
+        resource.overrideImageUrl = undefined;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(resource.imageUrl).toBe('atlas.png');
+        expect(resource.atlasJson?.meta.image).toBe('atlas.png');
+        expect(loadAsyncSpy).toHaveBeenLastCalledWith('atlas.png');
+
+        resource.dispose();
+        loadAsyncSpy.mockRestore();
+        fetchMock.mockRestore();
+      });
+
+      test('a json without an image reports an override that is cleared again', async () => {
+        const fetchMock = vi
+          .spyOn(globalThis, 'fetch')
+          .mockResolvedValue(new Response(JSON.stringify({frames: atlasJson.frames, meta: {size: atlasJson.meta.size}})));
+        const loadAsyncSpy = vi
+          .spyOn(ImageLoader.prototype, 'loadAsync')
+          .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+        const {factory} = makeTextureFactory();
+
+        const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
+        const errors: Array<{source: string; url?: string}> = [];
+        on(resource, 'error', (payload: {source: string; url?: string}) => {
+          errors.push(payload);
+        });
+
+        resource.load();
+        resource.textureFactory = factory;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(errors).toHaveLength(0);
+        expect(resource.imageUrl).toBe('override.png');
+
+        resource.overrideImageUrl = undefined;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0]!.source).toBe('atlas');
+        expect(errors[0]!.url).toBe('atlas.json');
+        expect(resource.imageUrl).toBe('override.png');
+
+        resource.dispose();
+        loadAsyncSpy.mockRestore();
+        fetchMock.mockRestore();
+      });
+
+      test('a json written from outside stays when the override changes', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+        const loadAsyncSpy = vi
+          .spyOn(ImageLoader.prototype, 'loadAsync')
+          .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+        const {factory} = makeTextureFactory();
+
+        const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
+        resource.load();
+        resource.textureFactory = factory;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        const own = {
+          frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+          meta: {image: 'own.png', size: {w: 16, h: 16}},
+        };
+        resource.atlasJson = own;
+        resource.overrideImageUrl = undefined;
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(resource.atlasJson).toBe(own);
+        expect(resource.imageUrl).toBe('own.png');
+
+        resource.dispose();
+        loadAsyncSpy.mockRestore();
+        fetchMock.mockRestore();
+      });
+    });
   });
 
   describe('error sources', () => {
@@ -602,6 +775,32 @@ describe('TextureResource', () => {
       loadAsyncSpy.mockRestore();
       parseSpy.mockRestore();
       fetchMock.mockRestore();
+    });
+
+    test('a tile set that is refused is reported as a texture failure', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      // a tileCount keeps the layout finite whatever the tile width
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 0, tileHeight: 16, tileCount: 4});
+      const errors: Array<{source: string; id?: string; error?: unknown}> = [];
+      on(resource, 'error', (payload: {source: string; id?: string; error?: unknown}) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('texture');
+      expect(errors[0]!.id).toBe('tiles');
+      expect(errors[0]!.error).toBeInstanceOf(RangeError);
+      expect(resource.tileSet).toBeUndefined();
+
+      resource.dispose();
     });
   });
 

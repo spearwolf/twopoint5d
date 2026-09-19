@@ -4,7 +4,7 @@ import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
-import {isAtlasJsonResponse} from './isAtlasJsonResponse.js';
+import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -31,9 +31,11 @@ type FrameBasedAnimationsDataShape = 'frameNameQuery' | 'tileIds' | 'firstTileId
 
 /**
  * Which of the three forms of animation data this entry carries, or `undefined` for an
- * entry that carries none of them.
+ * entry that carries none of them. An entry that is no object — `null`, a number, a string
+ * out of the catalog json — carries none of them either.
  */
-const animationDataShape = (data: FrameBasedAnimationsData): FrameBasedAnimationsDataShape | undefined => {
+const animationDataShape = (data: unknown): FrameBasedAnimationsDataShape | undefined => {
+  if (typeof data !== 'object' || data === null) return undefined;
   if ('frameNameQuery' in data) return 'frameNameQuery';
   if ('tileIds' in data) return 'tileIds';
   if ('firstTileId' in data) return 'firstTileId';
@@ -69,13 +71,13 @@ export const TextureResourceSubtypes = {
  * an image that does not load comes out of the loader promise and has no status to name. The
  * same `source: 'atlas'` also carries `{url, error}` with no `status` for a fetch that
  * succeeded but answered with something that is not a texture atlas json, or with one that
- * names no image and was given no `overrideImageUrl` to fall back on — the response was a 200,
- * so there is no status to name. It
+ * names no image and was given no `overrideImageUrl` to fall back on, or whose `overrideImageUrl`
+ * is cleared again — the response was a 200, so there is no status to name. It
  * carries `{source: 'texture', id, error}` for a failure behind an image that loaded
  * successfully — texture creation, or any value derived from it, such as an atlas or a tile
  * set — with no `url`, since none has failed. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
- * skipped: one whose data does not fit this kind of resource, and one whose data does not
+ * skipped: one whose data is no object or does not fit this kind of resource, and one whose data does not
  * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
  * Every other entry of the same map is registered all the same.
  * `dispose` fires once at the start of `dispose()`.
@@ -236,6 +238,7 @@ export class TextureResource {
     batch(() => {
       resource.#atlasUrl = createSignal<string | undefined>(atlasUrl, {attach: resource});
       resource.#atlasJson = createSignal(undefined, {attach: resource});
+      resource.#fetchedAtlasJson = createSignal<AtlasJsonResponse | undefined>(undefined, {attach: resource});
       resource.#atlas = createSignal(undefined, {attach: resource});
       resource.#overrideImageUrl = createSignal<string | undefined>(overrideImageUrl, {attach: resource});
       resource.textureClasses = textureClasses?.slice();
@@ -247,6 +250,8 @@ export class TextureResource {
 
   #atlasUrl?: Signal<string | undefined>;
   #atlasJson?: Signal<TexturePackerJsonData | undefined>;
+  // the json as `atlasUrl` delivered it, without the image url resolved into it
+  #fetchedAtlasJson?: Signal<AtlasJsonResponse | undefined>;
   #overrideImageUrl?: Signal<string | undefined>;
   #atlas?: Signal<TextureAtlas | undefined>;
   #tileSetOptions?: Signal<TileSetOptions | undefined>;
@@ -307,6 +312,11 @@ export class TextureResource {
     this.#atlasUrl.set(value);
   }
 
+  /**
+   * The atlas json of an atlas resource. For a json fetched from `atlasUrl`, `meta.image` names
+   * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
+   * json names otherwise. A json written from outside replaces the fetched one.
+   */
   get atlasJson(): TexturePackerJsonData | undefined {
     return this.#disposed ? undefined : this.#atlasJson?.value;
   }
@@ -314,6 +324,9 @@ export class TextureResource {
   set atlasJson(value: TexturePackerJsonData | undefined) {
     if (this.#disposed) return;
     if (!this.#atlasJson) throw wrongShapeError(this, 'atlasJson');
+    // a json written from outside replaces the fetched one: a later change of the
+    // `overrideImageUrl` must not bring the fetched json back in its place
+    this.#fetchedAtlasJson?.set(undefined);
     this.#atlasJson.set(value);
   }
 
@@ -619,6 +632,7 @@ export class TextureResource {
         // An atlas resource creates these signals in the same batch() that received the value the guard just read.
         const atlasUrlSignal = this.#atlasUrl!;
         const atlasJsonSignal = this.#atlasJson!;
+        const fetchedAtlasJsonSignal = this.#fetchedAtlasJson!;
         const overrideImageUrlSignal = this.#overrideImageUrl!;
         const atlasSignal = this.#atlas!;
 
@@ -656,23 +670,7 @@ export class TextureResource {
                   return;
                 }
 
-                const imageUrl = this.overrideImageUrl ?? atlasJson.meta.image;
-                if (typeof imageUrl !== 'string') {
-                  emit(this, OnError, {
-                    source: 'atlas',
-                    url: atlasUrl,
-                    error: new Error(
-                      `[TextureResource] the response of "${atlasUrl}" names no image and no overrideImageUrl was given`,
-                    ),
-                  });
-                  return;
-                }
-
-                // the resolved url goes into the json, mirroring `TextureAtlasLoader`: the
-                // `atlasJson` getter is typed as `TexturePackerJsonData`, whose `meta.image` is a
-                // `string`, so the resolved url has to land in the json itself rather than in a
-                // cast that would let the getter lie
-                this.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: imageUrl}};
+                fetchedAtlasJsonSignal.set(atlasJson);
               } catch (error) {
                 if (aborted) return;
                 emit(this, OnError, {source: 'atlas', url: atlasUrl, error});
@@ -684,6 +682,35 @@ export class TextureResource {
             };
           },
           [atlasUrlSignal],
+          {attach: this},
+        );
+
+        createEffect(
+          () => {
+            const fetched = fetchedAtlasJsonSignal.value;
+            if (!fetched) return;
+            const imageUrl = this.overrideImageUrl ?? fetched.meta.image;
+            if (typeof imageUrl !== 'string') {
+              // the json that is published stays as it was: a subscriber would get an `undefined`
+              // where the event type promises a value
+              emit(this, OnError, {
+                source: 'atlas',
+                url: this.atlasUrl,
+                error: new Error(
+                  `[TextureResource] the response of "${this.atlasUrl}" names no image and no overrideImageUrl was given`,
+                ),
+              });
+              return;
+            }
+            // the resolved url goes into the published json, mirroring `TextureAtlasLoader`: `atlasJson`
+            // is typed as `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url
+            // has to land in the json itself rather than in a cast that would let the getter lie. The json
+            // as it came stays in `#fetchedAtlasJson`, so an override that is cleared again gives the image
+            // back to the one the json names. Written straight onto the signal, because the public setter
+            // treats a write as a json from outside and drops the fetched one
+            atlasJsonSignal.set({...fetched, meta: {...fetched.meta, image: imageUrl}});
+          },
+          [fetchedAtlasJsonSignal, overrideImageUrlSignal],
           {attach: this},
         );
 
@@ -725,18 +752,21 @@ export class TextureResource {
             if (atlas && this.frameBasedAnimationsData) {
               const animations = new FrameBasedAnimations();
               for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
-                if ('frameNameQuery' in data) {
-                  try {
-                    const timing = getTimingOptions(data);
+                const shape = animationDataShape(data);
+                if (shape !== 'frameNameQuery') {
+                  emit(this, OnError, wrongAnimationDataError(this, name, shape));
+                  continue;
+                }
+                try {
+                  const timing = getTimingOptions(data);
+                  if ('frameNameQuery' in data) {
                     animations.add(name, timing, atlas, data.frameNameQuery);
-                  } catch (error) {
-                    // One bad entry skips itself. Without this the throw leaves the effect through the
-                    // global error channel of signalize, no animation of the whole map is registered,
-                    // and the caller is told nothing.
-                    emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
                   }
-                } else {
-                  emit(this, OnError, wrongAnimationDataError(this, name, animationDataShape(data)));
+                } catch (error) {
+                  // One bad entry skips itself. Without this the throw leaves the effect through the
+                  // global error channel of signalize, no animation of the whole map is registered,
+                  // and the caller is told nothing.
+                  emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
                 }
               }
               this.#frameBasedAnimations.set(animations);

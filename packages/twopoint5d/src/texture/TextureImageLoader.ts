@@ -34,8 +34,20 @@ export class TextureImageLoader {
     this.imageLoader.load(
       url,
       (imageData) => {
-        const texture = new Texture(imageData.imgEl);
-        this.textureFactory.update(texture, ...(textureClasses ?? []));
+        // this callback runs inside the `load` event of the image, a path with no way back into
+        // the promise `loadAsync()` wraps around `load()` — a throw here would leave that promise
+        // pending forever, so it is turned into a call of `onErrorCallback`. The call of `onLoadCallback` stays
+        // outside: a throw of the caller's own callback is no failure of the load. The texture was
+        // built here and never handed out, so a failure frees it
+        let texture: Texture | undefined;
+        try {
+          texture = new Texture(imageData.imgEl);
+          this.textureFactory.update(texture, ...(textureClasses ?? []));
+        } catch (error) {
+          texture?.dispose();
+          onErrorCallback?.(error);
+          return;
+        }
 
         onLoadCallback({
           texture,

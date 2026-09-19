@@ -1331,6 +1331,44 @@ describe('TextureStore', () => {
       fetchMock.mockRestore();
     });
 
+    test('a parse without the overrideImageUrl gives the atlas its json image back', async () => {
+      const atlasJson = {
+        frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
+        meta: {image: 'first.png', size: {w: 100, h: 50}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 100, height: 50}) as unknown as HTMLImageElement);
+      const factory = {
+        create() {
+          return {name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json', overrideImageUrl: 'override.png'}}});
+      const unsubscribe = store.on('a', 'texture', () => {});
+
+      const resource = await store.whenResource('a');
+      resource.textureFactory = factory as never;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBe('override.png');
+
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBe('first.png');
+
+      unsubscribe();
+      store.dispose();
+      loadSpy.mockRestore();
+      fetchMock.mockRestore();
+    });
+
     test('an atlas that swaps its json for one over another image of the same size follows it', async () => {
       const atlasesByUrl: Record<string, unknown> = {
         'a1.json': {frames: {f1: {frame: {x: 0, y: 0, w: 10, h: 10}}}, meta: {image: 'first.png', size: {w: 100, h: 50}}},
