@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
 - `new VertexObjectDescriptor()` refuses a malformed description, and with it every pool and geometry built from one. It throws a `RangeError` for a `vertexCount` or `meshCount` that is no positive integer, for an attribute whose size is no positive integer (`components: []`, `size: 0`, `size: 1.5`), for an attribute that declares both `size` and more `components` than that size, and for an index that is no integer in `0` … `vertexCount - 1`; it throws an `Error` for two attributes, components or `methods` that give the vertex object the same property name. Fewer `components` than `size` pad the attribute and are taken
 - `VertexObjectBuffer` and `VOBufferPool#fromBuffersData()` check every array of `buffersData` against the buffer it is meant for: a typed array of another element type throws a `TypeError`, a length that does not fit a `RangeError`, both naming the buffer. The constructor takes an array by reference and asks for exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most that many and copies a shorter array. A typed array from a worker or another realm is taken. `fromBuffersData()` checks every array before it changes anything about the pool
-- the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more
+- the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more; the `VertexObjectBuffer` constructor throws a `RangeError` for such a capacity that names the value and whether it came as `capacity` or as `buffersData.capacity`
 - `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
 - `PanControl2D` recognises its keys by `event.code` against `keys`, so the default keys sit at the WASD position on every keyboard layout
 - a `resize-to` value that selects an element is looked up in the root node of `Display#resizeToAttributeEl` — the document, or the shadow root the element sits in
@@ -1557,7 +1557,7 @@ pool.fromBuffersData({capacity, usedCount, buffers: {static_uint32: new Float32A
 pool.fromBuffersData({capacity, usedCount, buffers: {static_uint32: Uint32Array.from(data)}});
 ```
 
-A capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or more.
+A capacity handed to `new VertexObjectBuffer()`, `new VOBufferPool()` or `new VertexObjectPool()`, given as a number or as `buffersData.capacity`, has to be an integer of 0 or more.
 
 #### `PanControl2D` keys by `KeyboardEvent.code`
 

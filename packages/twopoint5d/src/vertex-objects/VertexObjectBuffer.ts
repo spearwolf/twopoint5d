@@ -68,7 +68,8 @@ export class VertexObjectBuffer {
    * a fresh, zeroed array sized for the given capacity and layout. The capacity then comes from
    * `buffersData.capacity`; `usedCount` belongs to the pool, not the buffer.
    *
-   * This constructor takes `buffersData.capacity` as given and checks it against nothing. A
+   * The capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or
+   * more; beyond that this constructor checks it against nothing. A
    * `VOBufferPool` carries its own `capacity`, fixed at construction, which does not follow
    * whatever buffer is later assigned to `pool.buffer` — assigning a buffer built here with a
    * differing `buffersData.capacity` leaves pool and buffer disagreeing about size, silently.
@@ -81,6 +82,8 @@ export class VertexObjectBuffer {
    *
    * @throws when `source` is the buffer of a disposed pool, which has no data to build a second
    * buffer from
+   * @throws a `RangeError` that names the value when the capacity, given as a number or as
+   * `buffersData.capacity`, is no integer of 0 or more
    */
   constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
     if (source instanceof VertexObjectBuffer && source.#released) {
@@ -90,13 +93,17 @@ export class VertexObjectBuffer {
       );
     }
 
-    let buffersData: VertexObjectBuffersData | undefined;
-    if (typeof capacityOrBuffersData === 'number') {
-      this.capacity = capacityOrBuffersData;
-    } else {
-      buffersData = capacityOrBuffersData;
-      this.capacity = buffersData.capacity;
+    const capacity = typeof capacityOrBuffersData === 'number' ? capacityOrBuffersData : capacityOrBuffersData.capacity;
+
+    // the rule the pools measure a capacity by: a fraction or NaN would yield typed arrays of a
+    // truncated or empty length, and `capacity` would then state something no array holds
+    if (capacity < 0 || !Number.isInteger(capacity)) {
+      const name = typeof capacityOrBuffersData === 'number' ? 'capacity' : 'buffersData.capacity';
+      throw new RangeError(`VertexObjectBuffer: ${name} must be a non-negative integer, got ${String(capacity)}`);
     }
+
+    this.capacity = capacity;
+    const buffersData = typeof capacityOrBuffersData === 'number' ? undefined : capacityOrBuffersData;
 
     if (source instanceof VertexObjectBuffer) {
       this.descriptor = source.descriptor;

@@ -725,4 +725,51 @@ describe('VertexObjectBuffer', () => {
       });
     }
   });
+
+  describe('a capacity that is no integer of 0 or more', () => {
+    const makeDescriptor = () =>
+      new VertexObjectDescriptor({
+        vertexCount: 2,
+        attributes: {
+          pos: {components: ['x', 'y'], type: 'float32'},
+          id: {size: 1, type: 'uint32'},
+        },
+      });
+
+    const branches = [
+      ['from a descriptor', () => makeDescriptor()],
+      ['from a source buffer', () => new VertexObjectBuffer(makeDescriptor(), 3)],
+    ] as const;
+
+    for (const [branch, makeSource] of branches) {
+      describe(branch, () => {
+        test.each([1.5, NaN, -1, Infinity, -Infinity])('refuses a capacity of %s and names it', (capacity) => {
+          const build = () => new VertexObjectBuffer(makeSource(), capacity);
+
+          expect(build).toThrow(RangeError);
+          // a string, not a RegExp: the text of 1.5 holds a dot
+          expect(build).toThrow(`VertexObjectBuffer: capacity must be a non-negative integer, got ${capacity}`);
+        });
+
+        test.each([1.5, NaN, -1, undefined])('refuses a buffersData.capacity of %s and names it', (capacity) => {
+          const build = () => new VertexObjectBuffer(makeSource(), {capacity, usedCount: 0, buffers: {}} as never);
+
+          expect(build).toThrow(RangeError);
+          expect(build).toThrow(
+            `VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got ${String(capacity)}`,
+          );
+        });
+
+        test('takes a capacity of 0', () => {
+          const buffer = new VertexObjectBuffer(makeSource(), 0);
+
+          expect(buffer.capacity).toBe(0);
+          expect(buffer.buffers.size).toBeGreaterThan(0);
+          for (const {typedArray} of buffer.buffers.values()) {
+            expect(typedArray).toHaveLength(0);
+          }
+        });
+      });
+    }
+  });
 });
