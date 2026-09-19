@@ -16,10 +16,15 @@ import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost} from './IStageRendererHost.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
+import type {Stage2D} from './Stage2D.js';
 
 export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
 
 const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProvider)?.asPassNode === 'function';
+
+// recognized by its `isStage2D` flag, so this module needs no runtime import of Stage2D
+const isStage2DWithoutCamera = (s: IStage): boolean =>
+  (s as Partial<Stage2D>).isStage2D === true && (s as Stage2D).camera == null;
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
@@ -503,9 +508,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * pipeline with `buildOutputNode(passes)` as `outputNode`.
    */
   #renderPipelineComposed(renderer: WebGPURenderer): void {
-    // the stages take their camera from the first resize() with an area, and a Stage2D has no
-    // pass node to give before that: while this renderer is 0×0 there is nothing to compose
+    // the stages take their camera from the first resize() with an area whose specs give a view, and
+    // a Stage2D has no pass node to give before that: while this renderer is 0×0, or a Stage2D of
+    // the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
+    // expects one pass per stage, so no stage is left out, and the output node stays dirty until the
+    // first frame in which every Stage2D has a camera.
     if (this.width === 0 || this.height === 0) return;
+    if (this.orderedStages.some(({stage}) => isStage2DWithoutCamera(stage))) return;
 
     for (const stageItem of this.orderedStages) {
       const stage = stageItem.stage;

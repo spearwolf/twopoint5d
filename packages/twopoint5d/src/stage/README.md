@@ -288,7 +288,8 @@ sr.buildOutputNode = ([scenePass]) => {
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
 after a stage announced a new camera through `OnStageAfterCameraChanged`
 (every `Stage2D` does), or after `invalidateOutputNode()`. While the renderer
-is 0×0 the composed mode draws nothing.
+is 0×0, or while a `Stage2D` it composes has no camera yet, the composed mode
+draws nothing.
 
 ### Shortcut: `RootRenderPipeline` — additive composition out of the box
 
@@ -462,9 +463,11 @@ What this layer does on top of the general rules in
 - **Double frame loop**: passing `display` to the constructor *and* calling
   `renderTo` from your own handler renders every frame twice. Pick one.
 - **Stage with no camera yet**: `Stage2D#renderTo` is a no-op until the
-  first `resize()` with a width and a height above 0 creates the camera (or
+  first `resize()` with a width and a height above 0, for which the
+  projection's specs give a view with an area, creates the camera (or
   you assign your own). `Stage2D#asPassNode` throws in that state, and a
-  `StageRenderer` composing pass nodes draws nothing while it is 0×0.
+  `StageRenderer` composing pass nodes draws nothing while it is 0×0 or
+  while one of its `Stage2D`s has no camera.
 - **Non-unique stage names + `renderOrder`**: stages sharing a name that
   `renderOrder` lists render at that name's position in the order they were
   added. The renderer warns about such a name on `add()` and on every write

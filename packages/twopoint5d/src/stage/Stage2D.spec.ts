@@ -1,7 +1,8 @@
 import {on} from '@spearwolf/eventize';
-import {PerspectiveCamera} from 'three/webgpu';
+import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {describe, expect, it, vi} from 'vitest';
 import {OnStageAfterCameraChanged, OnStageResize, type StageResizeProps} from '../events.js';
+import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
 
@@ -27,6 +28,36 @@ describe('Stage2D', () => {
 
     stage.resize(800, 600);
     expect(stage.camera, 'after resize(800, 600)').toBeDefined();
+  });
+
+  it('creates no camera from specs that give no view', () => {
+    for (const projection of [
+      new ParallaxProjection('xy|bottom-left', {}),
+      new OrthographicProjection('xy|bottom-left', {fit: 'contain'}),
+    ]) {
+      const stage = new Stage2D(projection);
+      const onResize = vi.fn();
+      const onCameraChanged = vi.fn();
+      on(stage, OnStageResize, onResize);
+      on(stage, OnStageAfterCameraChanged, onCameraChanged);
+
+      stage.resize(800, 600);
+
+      expect(stage.camera).toBeUndefined();
+      expect([stage.width, stage.height]).toEqual([0, 0]);
+      expect(onResize).not.toHaveBeenCalled();
+      expect(onCameraChanged).not.toHaveBeenCalled();
+    }
+  });
+
+  it('fills the container for a pixelZoom of 0', () => {
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {pixelZoom: 0}));
+    stage.resize(800, 600);
+
+    expect([stage.width, stage.height]).toEqual([800, 600]);
+    const camera = stage.camera as OrthographicCamera;
+    expect(camera).toBeInstanceOf(OrthographicCamera);
+    expect(camera.right - camera.left).toBe(800);
   });
 
   it('never emits OnStageResize with NaN', () => {

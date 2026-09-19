@@ -123,8 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VOBufferPool#capacity` is a getter over a private field, and `VertexObjectDescriptor#voPrototype` an accessor — neither stands as an own property on the instance, and `capacity` is written only through the pool that owns it
 - `TextureResource` checks the response of an `atlasUrl` fetch against the shape of a texture packer json, the same way `TextureAtlasLoader` already does, before it reads it: a 200 response that is none, or one that names no image and gives no `overrideImageUrl` to fall back on, is reported through the `error` event with `source: 'atlas'` instead of being read
 - `TextureAtlasLoader#loadAsync()` rejects when `TexturePackerJson.parse()` throws, instead of leaving its promise pending forever — the throw happens inside the `load` event of the image, a path the promise otherwise never hears from
-- `Stage2D` creates its camera on the first `resize()` whose width and height are both above 0. Until then `camera` is `undefined`, `renderTo()` draws nothing and `asPassNode()` throws; a `resize()` to a width or a height of 0 keeps the camera, `width` and `height` the stage has, so `OnStageResize` never carries `NaN`
-- a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is 0
+- `Stage2D` creates its camera on the first `resize()` whose width and height are both above 0 and for which the projection's specs give a view with an area. Until then `camera` is `undefined`, `renderTo()` draws nothing and `asPassNode()` throws; a `resize()` to a width or a height of 0 keeps the camera, `width` and `height` the stage has, so `OnStageResize` never carries `NaN`
+- a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is 0, or while a `Stage2D` it composes has no camera
 - `fitIntoRectangle()` gives a 0×0 view for `contain` and `cover` when the rectangle has a width or a height of 0; `minPixelZoom` and `maxPixelZoom` do not apply to it
 - `OrthographicProjection` and `ParallaxProjection` built without specs start from `{fit: 'fill'}`: the view is the container, one view unit per container pixel. Specs handed in stay the caller's object
 - `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
@@ -171,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a generated setter to accept a typed array like it accepts a plain array: `b.setPos(a.getPos())` writes the values `a` carries
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 - fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds `{fit: 'fill'}` from construction on, the default `ParallaxProjection` starts from as well
+- fix `fitIntoRectangle()` for spec numbers that are not finite or not above 0: such a `pixelZoom` zooms by 1, so the view is the container, the same as a `Display#pixelZoom` of 0; such a `width` or `height` is a side `contain` and `cover` do not constrain, as `0` is; such a `minPixelZoom` or `maxPixelZoom` does not apply. None of them turns the container into a view that is infinite, negative or `NaN`
+- fix `OrthographicProjection#updateViewRect()` and `ParallaxProjection#updateViewRect()` for a container or a view without area: a width or a height that is not a finite number above 0 leaves the view, the pixel ratio and the camera values of the projection as they are. Specs that give no view with an area keep the last view, while the pixel ratio follows the new container; a projection that has no view yet stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports `[0, 0, 0, 0]`
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 - fix `Display#canvas` after `dispose()`: it answers with `Display#canvas is not available: this display has been disposed` instead of a `TypeError` about a property of `undefined`
 - fix `Display#nextFrame()`: a promise still pending when `dispose()` runs is rejected, instead of waiting for a frame that is never rendered again
@@ -1438,9 +1440,10 @@ pattern of a provider built without arguments is `[[]]`: one row, no column.
 #### A `Stage2D` has a camera after the first `resize()` with an area
 
 `new Stage2D(projection)` creates no camera. The projection creates one on the first `resize()`
-whose width and height are both above 0; a `StageRenderer` with a host does that when the
-display reports its size. Code that reads `stage.camera` right after construction, or calls
-`asPassNode()` before that `resize()`, finds `undefined` and a throw.
+whose width and height are both above 0 and for which its specs give a view with an area; a
+`StageRenderer` with a host does that when the display reports its size. Code that reads
+`stage.camera` right after construction, or calls `asPassNode()` before that `resize()`, finds
+`undefined` and a throw.
 
 **Before**
 

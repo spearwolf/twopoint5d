@@ -742,6 +742,32 @@ describe('StageRenderer', () => {
       expect(pipeline.render).toHaveBeenCalledTimes(1);
     });
 
+    it('a composing renderer draws nothing while a Stage2D of the composition has no camera', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
+      // specs that give no view leave the projection, and so the stage, without a camera
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain'});
+      const withCamera = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      sr.add(withCamera);
+
+      sr.resize(100, 100);
+      expect(stage.camera, 'the stage without a view').toBeUndefined();
+      expect(withCamera.camera, 'the stage with a view').toBeDefined();
+
+      // every frame alike: nothing thrown, nothing composed, nothing drawn
+      for (let frame = 1; frame <= 2; frame++) {
+        expect(() => sr.renderTo(renderer as any), `frame ${frame}`).not.toThrow();
+      }
+      expect(buildOutputNode).not.toHaveBeenCalled();
+      expect(pipeline.render).not.toHaveBeenCalled();
+
+      // the composition is built on the first frame with a camera for every stage
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 50});
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(buildOutputNode.mock.calls[0]![0]).toHaveLength(2);
+      expect(pipeline.render).toHaveBeenCalledTimes(1);
+    });
+
     it('a renamed stage rebuilds the output node', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);

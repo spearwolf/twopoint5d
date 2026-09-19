@@ -1,6 +1,7 @@
 import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
 import {expectDefined} from '../utils/expectDefined.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
@@ -18,7 +19,8 @@ export class ParallaxProjection implements IProjection {
   #viewRect = new Vector2();
   #pixelRatio = new Vector2();
 
-  // The fields below are assigned by `updateViewRect()`; a camera built before that call carries `NaN`.
+  // The fields below are assigned by the first `updateViewRect()` that gives a view with an area;
+  // a camera built before that carries `NaN`.
   #halfHeight!: number;
 
   #near!: number;
@@ -41,8 +43,24 @@ export class ParallaxProjection implements IProjection {
     this.viewSpecs = specs ?? {fit: 'fill'};
   }
 
+  /**
+   * Fits the view into a container of `width` × `height`. A width or a height that is not a finite
+   * number above 0 leaves the projection as it is. Specs that give no view with an area keep the
+   * last view, while the pixel ratio follows the new container; a projection that has no view yet
+   * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
+   * `[0, 0, 0, 0]`.
+   */
   updateViewRect(width: number, height: number): void {
-    fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect);
+    // a container without area has no aspect ratio to fit a view into, and a view without area
+    // none to build a camera from: the projection keeps the view, the pixel ratio and the camera
+    // values it has, the same rule Stage2D follows for its container
+    if (!isPositiveFinite(width) || !isPositiveFinite(height)) return;
+
+    // specs that match no shape leave the target as it is, so it starts out as the current view
+    const viewRect = fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect.clone());
+    if (!isPositiveFinite(viewRect.width) || !isPositiveFinite(viewRect.height)) return;
+
+    this.#viewRect.copy(viewRect);
 
     this.#halfHeight = this.#viewRect.height / 2;
 

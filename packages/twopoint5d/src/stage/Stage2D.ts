@@ -10,6 +10,7 @@ import {
   type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
@@ -95,8 +96,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   /**
    * The camera this stage renders with. The projection creates one on the first `resize()`
-   * whose width and height are both above 0; until then, and on a stage without a projection,
-   * it is `undefined`: `renderTo()` draws nothing and `asPassNode()` throws.
+   * whose width and height are both above 0 and for which its specs give a view with an area;
+   * until then, and on a stage without a projection, it is `undefined`: `renderTo()` draws
+   * nothing and `asPassNode()` throws.
    *
    * A camera assigned here takes precedence over the projection's. Assigning `undefined` hands
    * back to the projection's camera, created on the spot if the container already has an area.
@@ -163,6 +165,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.projection!.updateViewRect(width, height);
     const [w, h] = this.projection!.getViewRect();
 
+    // specs that give no view with an area leave the projection without one: there is nothing to
+    // build a camera from, so the stage keeps the camera and the size it has
+    if (!isPositiveFinite(w) || !isPositiveFinite(h)) return;
+
     const prevWidth = this.#width;
     const prevHeight = this.#height;
 
@@ -200,7 +206,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
         this.#warnedNoCamera = true;
         // eslint-disable-next-line no-console
         console.warn(
-          `Stage2D has had no camera for ${FRAMES_WITHOUT_CAMERA_BEFORE_WARNING} frames and renders nothing: the projection creates one on the first resize() with a width and a height above 0, or assign your own to stage.camera`,
+          `Stage2D has had no camera for ${FRAMES_WITHOUT_CAMERA_BEFORE_WARNING} frames and renders nothing: the projection creates one on the first resize() with a width and a height above 0 for which its specs give a view with an area, or assign your own to stage.camera`,
         );
       }
       return;

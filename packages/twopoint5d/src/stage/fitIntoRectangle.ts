@@ -1,5 +1,7 @@
 import {Vector2} from 'three/webgpu';
 
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+
 /**
  * Represents the horizontal alignment of the view within the container.
  * - `'left'`: Align to the left edge
@@ -176,14 +178,16 @@ export function calculateAnchorOffset(
  * ```
  *
  * The spec is a partial spec: every field may be missing. For `contain` and `cover`, a side
- * that is missing or set to `0` means the caller does not constrain that side; the other side
- * then drives the aspect ratio. Where no shape matches — no `pixelZoom`, no `fit`, or
+ * that is missing, or not a finite number above 0, means the caller does not constrain that side;
+ * the other side then drives the aspect ratio. Where no shape matches — no `pixelZoom`, no `fit`, or
  * `contain`/`cover` without either dimension — the dimensions in `target` are left as they are,
  * and `fitIntoRectangle()` hands back the target vector it was given, untouched. `minPixelZoom`
  * and `maxPixelZoom` still apply afterwards and can override that: on a fresh `Vector2` the
  * width is `0`, so the ratio is `Infinity` and a `maxPixelZoom` always kicks in. For `contain`
  * and `cover`, a `rect` with a width or a height of 0 gives a 0×0 view, and `minPixelZoom` and
- * `maxPixelZoom` do not apply to it.
+ * `maxPixelZoom` do not apply to it. A `pixelZoom` that is not a finite number above 0 zooms by
+ * 1 — the view is the container, as with a `Display#pixelZoom` of 0 —, and a `minPixelZoom` or
+ * `maxPixelZoom` that is not a finite number above 0 does not apply.
  *
  * @param rect - The container dimensions as a Vector2
  * @param specs - The fit specifications
@@ -197,7 +201,8 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
     // ---------------------------------------------------------------
     // pixelZoom
     // ---------------------------------------------------------------
-    target.copy(rect).divideScalar(pixelZoom);
+    // a pixelZoom that is not a finite number above 0 zooms by 1, as a Display#pixelZoom of 0 does
+    target.copy(rect).divideScalar(isPositiveFinite(pixelZoom) ? pixelZoom : 1);
   } else if (specs.fit === 'fill') {
     // ---------------------------------------------------------------
     // fill
@@ -213,9 +218,9 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
       return target;
     }
 
-    // a side that is missing, undefined or 0 is a side the caller does not constrain
-    const width = 'width' in specs && specs.width != null ? specs.width : 0;
-    const height = 'height' in specs && specs.height != null ? specs.height : 0;
+    // a side that is missing, or not a finite number above 0, is a side the caller does not constrain
+    const width = 'width' in specs && isPositiveFinite(specs.width) ? specs.width : 0;
+    const height = 'height' in specs && isPositiveFinite(specs.height) ? specs.height : 0;
 
     if (width !== 0 && height === 0) {
       // --- we have a width and no height
@@ -241,9 +246,9 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
       }
     }
 
-    if (specs.minPixelZoom != null && rect.width / target.width < specs.minPixelZoom) {
+    if (isPositiveFinite(specs.minPixelZoom) && rect.width / target.width < specs.minPixelZoom) {
       target.copy(rect).divideScalar(specs.minPixelZoom);
-    } else if (specs.maxPixelZoom != null && rect.width / target.width > specs.maxPixelZoom) {
+    } else if (isPositiveFinite(specs.maxPixelZoom) && rect.width / target.width > specs.maxPixelZoom) {
       target.copy(rect).divideScalar(specs.maxPixelZoom);
     }
   }

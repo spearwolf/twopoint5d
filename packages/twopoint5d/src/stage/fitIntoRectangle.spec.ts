@@ -230,3 +230,36 @@ it('contain and cover give a 0×0 view for a rect without area', () => {
     }
   }
 });
+
+it.each([0, -2, NaN, Infinity, -Infinity])('a pixelZoom of %s gives the container as the view', (pixelZoom) => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {pixelZoom}, new Vector2());
+  expect([target.width, target.height]).toEqual([800, 600]);
+});
+
+it.each([-640, NaN, Infinity])('a contain width of %s is a side the caller does not constrain', (width) => {
+  const target = new Vector2(11, 22);
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width}, target);
+  expect([target.width, target.height]).toEqual([11, 22]);
+});
+
+it.each([-480, NaN, Infinity])('a cover height of %s is a side the caller does not constrain', (height) => {
+  const target = new Vector2(11, 22);
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'cover', height}, target);
+  expect([target.width, target.height]).toEqual([11, 22]);
+});
+
+it('a contain spec takes the side that is a finite number above 0 when the other is not', () => {
+  const target = new Vector2(11, 22);
+  fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: NaN, height: 100}, target);
+  expect([target.width, target.height]).toEqual([160, 100]);
+});
+
+it.each([0, -2, NaN, Infinity, -Infinity])('a maxPixelZoom of %s does not apply', (maxPixelZoom) => {
+  const target = fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, maxPixelZoom}, new Vector2());
+  expect([target.width, target.height]).toEqual([100, 62.5]);
+});
+
+it.each([0, -2, NaN, Infinity])('a minPixelZoom of %s does not apply', (minPixelZoom) => {
+  const target = fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, minPixelZoom}, new Vector2());
+  expect([target.width, target.height]).toEqual([100, 62.5]);
+});
