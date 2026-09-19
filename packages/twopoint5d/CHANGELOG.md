@@ -151,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove `VertexObjectPool#onDestroyVO`: `freeVO()` and `dispose()` release a vertex object without firing a callback. `onCreateVO` is unchanged
 - remove `TileSpritesFactory#freeTileSprite()`: `destroyTile()` gives a tile sprite back to the pool, and is the call `IMapTileFactory` names
 - remove the `DependencyProp` type: `DependencyDeclaration<Shape>` is the type the `Dependencies` constructor takes, and it holds the name of an entry against the shape wherever it can read it
+- remove the write of the plane coordinates into the first element with the class `map2dCoords` from `CameraBasedVisibilityHelpers`: the helpers read and write no DOM, so they run in a host without one — a worker, Node — as they do in a browser. `CameraBasedVisibility#planeCoords2D` carries those coordinates for a page that wants to show them
 
 ### Fixed
 
@@ -229,6 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `findNextPowerOf2()` and `isPowerOf2()` for every number a double holds: `findNextPowerOf2()` answers the smallest power of two that is at least its argument, `1` for everything up to `1`, `Infinity` above `2 ** 1023` and `NaN` for `NaN`; `isPowerOf2()` answers `true` for the integer powers of two from `1` to `2 ** 1023` and `false` for every fraction, negative number, `Infinity` and `NaN`
 - fix `unpick()`: it keeps every enumerable symbol key it is not asked to remove, as it keeps the string keys
 - fix `AnimatedSpritesMaterial`: the `time` option of the constructor sets the animation time the material starts at
+- fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
 
 ### Migration Guide
 

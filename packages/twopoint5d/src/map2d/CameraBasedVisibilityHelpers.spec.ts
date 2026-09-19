@@ -1,6 +1,6 @@
 import type {BufferGeometry, Box3Helper, LineBasicMaterial, Material} from 'three/webgpu';
 import {Box3, Matrix4, Object3D, Plane, Vector2, Vector3} from 'three/webgpu';
-import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
@@ -67,14 +67,21 @@ function spyOnReleases(scene: Object3D) {
 }
 
 describe('CameraBasedVisibilityHelpers', () => {
-  // createHelpers() writes the plane coordinates into an element of the host document, and this
-  // suite runs without a DOM
-  beforeEach(() => {
-    vi.stubGlobal('document', {querySelector: () => null});
-  });
+  test('builds its set in a host without a document', () => {
+    // this suite runs in Node, and there — as in a worker — no DOM exists
+    expect(typeof document).toBe('undefined');
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    const scene = new Object3D();
+    const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+    helpers.add(scene);
+
+    expect(() => {
+      helpers.show = true;
+    }).not.toThrow();
+
+    // one PlaneHelper and four point helpers
+    expect(scene.children).toHaveLength(5);
   });
 
   test('releases the geometry and the material of every helper node it takes down', () => {

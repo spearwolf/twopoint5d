@@ -10,6 +10,12 @@ export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
  * The tile IDs pattern always starts at (0,0)
  */
 export class RepeatingTilesProvider implements IMap2DTileDataProvider {
+  /**
+   * The axis the pattern repeats along: `'horizontal'` repeats it along the x axis only (outside
+   * its rows every id is `0`), `'vertical'` along the y axis only (outside its columns every id
+   * is `0`), and `'none'` along both. Any other value, which JavaScript can assign, counts as
+   * `'none'`.
+   */
   limitToAxis: LimitToAxisType;
 
   // Assigned in the constructor through the `tileIds` setter, which falls back to an empty pattern.
@@ -176,7 +182,9 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
         }
         break;
 
+      // a value outside LimitToAxisType, which JavaScript can assign, repeats along both axes as in getTileIdAt()
       case 'none':
+      default:
         if (this.#cols === 1 && this.#rows === 1) {
           target.fill(this.tileIds[0]![0]!);
         } else {

@@ -114,13 +114,6 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.updateTileHelpers(this.cameraBasedVisibility.visibles);
 
     this.hideSurplus();
-
-    // TODO remove this!
-    const el = document.querySelector('.map2dCoords');
-    if (el) {
-      el.textContent = this.cameraBasedVisibility.planeCoords2D.toArray().map(Math.round).join(', ');
-    }
-    // ---
   }
 
   private updatePlaneHelpers(): void {

@@ -1,4 +1,5 @@
 import {describe, expect, test} from 'vitest';
+import type {LimitToAxisType} from './RepeatingTilesProvider.js';
 import {RepeatingTilesProvider} from './RepeatingTilesProvider.js';
 
 describe('RepeatingTilesProvider', () => {
@@ -237,6 +238,45 @@ describe('RepeatingTilesProvider', () => {
           }
         }
         expect(mismatches).toEqual([]);
+      });
+    });
+    describe('a limitToAxis outside the type', () => {
+      const pattern = [
+        [1, 2, 3, 4],
+        [5, 6, 7, 8],
+      ];
+
+      // assigned after construction: the default parameter of the constructor would turn
+      // `undefined` into 'none'
+      const makeProvider = (value: unknown) => {
+        const provider = new RepeatingTilesProvider(pattern);
+        provider.limitToAxis = value as LimitToAxisType;
+        return provider;
+      };
+
+      test.each(['diagonal', '', undefined, null])('%j repeats the pattern along both axes, as getTileIdAt() does', (value) => {
+        const provider = makeProvider(value);
+        const reference = new RepeatingTilesProvider(pattern, 'none');
+
+        const ids = provider.getTileIdsWithin(-3, -1, 9, 4);
+
+        expect(Array.from(ids)).toEqual(Array.from(reference.getTileIdsWithin(-3, -1, 9, 4)));
+        for (let j = 0; j < 4; j++) {
+          for (let i = 0; i < 9; i++) {
+            expect(ids[j * 9 + i], `cell (${i}, ${j})`).toBe(provider.getTileIdAt(-3 + i, -1 + j));
+          }
+        }
+      });
+
+      test('writes every cell of a target it is handed, whatever limitToAxis holds', () => {
+        const provider = makeProvider('diagonal');
+        const reference = new RepeatingTilesProvider(pattern, 'none');
+        const target = new Uint32Array(36).fill(99);
+
+        const ids = provider.getTileIdsWithin(-3, -1, 9, 4, target);
+
+        expect(ids).toBe(target);
+        expect(Array.from(ids)).toEqual(Array.from(reference.getTileIdsWithin(-3, -1, 9, 4)));
       });
     });
     describe('vertical', () => {
