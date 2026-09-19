@@ -1,14 +1,33 @@
 import {OrthographicCamera, Vector2} from 'three/webgpu';
 
 import {expectDefined} from '../utils/expectDefined.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
+// the camera values for specs that leave one out or give one no camera can be built from
+const DEFAULT_NEAR = 0.1;
+const DEFAULT_FAR = 100000;
+const DEFAULT_DISTANCE_TO_PROJECTION_PLANE = 100;
+
 export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
+  /**
+   * How far the camera sits from the projection plane. Defaults to `100`; a value that is not a
+   * finite number counts as not given. 0 and negative values are kept.
+   */
   distanceToProjectionPlane?: number;
+  /**
+   * The near plane of the camera. Defaults to `0.1`; a value that is not a finite number counts as
+   * not given. 0 and negative values are kept: an orthographic camera also shows what lies behind
+   * its position.
+   */
   near?: number;
+  /**
+   * The far plane of the camera. Defaults to `100000`; a value that is not a finite number counts
+   * as not given. A `far` that is not above the `near` in effect sends both back to their defaults.
+   */
   far?: number;
 };
 
@@ -46,7 +65,9 @@ export class OrthographicProjection implements IProjection {
    * number above 0 leaves the projection as it is. Specs that give no view with an area keep the
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
-   * `[0, 0, 0, 0]`.
+   * `[0, 0, 0, 0]`. A call that gives a view with an area also takes `near`, `far` and
+   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not given, as
+   * `OrthographicProjectionSpecs` describes.
    */
   updateViewRect(width: number, height: number): void {
     // a container without area has no aspect ratio to fit a view into, and a view without area
@@ -65,10 +86,20 @@ export class OrthographicProjection implements IProjection {
 
     this.#pixelRatio.set(width, height).divide(this.#viewRect);
 
-    this.#near = this.viewSpecs.near ?? 0.1;
-    this.#far = this.viewSpecs.far ?? 100000;
+    // an orthographic camera divides by the depth from near to far; its near and the distance may be
+    // 0 or below, but none of the three may be infinite or NaN
+    const {near, far, distanceToProjectionPlane} = this.viewSpecs;
 
-    this.#distanceToProjectionPlane = this.viewSpecs.distanceToProjectionPlane ?? 100;
+    this.#near = isFiniteNumber(near) ? near : DEFAULT_NEAR;
+    this.#far = isFiniteNumber(far) ? far : DEFAULT_FAR;
+    if (this.#far <= this.#near) {
+      this.#near = DEFAULT_NEAR;
+      this.#far = DEFAULT_FAR;
+    }
+
+    this.#distanceToProjectionPlane = isFiniteNumber(distanceToProjectionPlane)
+      ? distanceToProjectionPlane
+      : DEFAULT_DISTANCE_TO_PROJECTION_PLANE;
   }
 
   getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number] {

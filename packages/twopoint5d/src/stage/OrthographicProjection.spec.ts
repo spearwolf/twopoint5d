@@ -113,4 +113,64 @@ describe('OrthographicProjection', () => {
     projection.updateViewRect(800, 600);
     expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
   });
+
+  describe('camera values from the specs', () => {
+    const plane = 'xy|bottom-left';
+    const view = {fit: 'contain', width: 640} as const;
+
+    const cameraFor = (specs: Partial<OrthographicProjectionSpecs>) => {
+      const projection = new OrthographicProjection(plane, specs);
+      projection.updateViewRect(800, 600);
+      return {projection, camera: projection.createCamera()};
+    };
+
+    it.each([NaN, Infinity, -Infinity])('takes a distanceToProjectionPlane of %s as not given', (distance) => {
+      const {camera} = cameraFor({...view, distanceToProjectionPlane: distance});
+
+      expect(camera.position).toEqual(ProjectionPlane.get(plane).getPointByDistance(100));
+    });
+
+    it.each([0, -100, 300])('keeps a distanceToProjectionPlane of %s', (distance) => {
+      const {camera} = cameraFor({...view, distanceToProjectionPlane: distance});
+
+      expect(camera.position).toEqual(ProjectionPlane.get(plane).getPointByDistance(distance));
+    });
+
+    it.each<Partial<OrthographicProjectionSpecs>>([
+      {near: NaN},
+      {near: Infinity},
+      {near: -Infinity},
+      {far: NaN},
+      {far: Infinity},
+      {near: 10, far: 10},
+      {near: 10, far: 5},
+      {near: 200000},
+    ])('takes a near of $near and a far of $far as 0.1 and 100000', (values) => {
+      const {camera} = cameraFor({...view, ...values});
+
+      expect([camera.near, camera.far]).toEqual([0.1, 100000]);
+      expect(camera.projectionMatrix.elements.every(Number.isFinite)).toBe(true);
+    });
+
+    it.each<Partial<OrthographicProjectionSpecs>>([{near: 0, far: 1000}, {near: -1000, far: 1000}, {far: 50}])(
+      'keeps a near of $near and a far of $far',
+      (values) => {
+        const {camera} = cameraFor({...view, ...values});
+
+        expect([camera.near, camera.far]).toEqual([values.near ?? 0.1, values.far ?? 100000]);
+      },
+    );
+
+    it('gives a camera it updates 0.1 and 100000 once its specs hold a far below the near', () => {
+      const specs: Partial<OrthographicProjectionSpecs> = {...view, near: 1, far: 5000};
+      const {projection, camera} = cameraFor(specs);
+      expect([camera.near, camera.far]).toEqual([1, 5000]);
+
+      specs.far = 0.5;
+      projection.updateViewRect(800, 600);
+      projection.updateCamera(camera);
+
+      expect([camera.near, camera.far]).toEqual([0.1, 100000]);
+    });
+  });
 });
