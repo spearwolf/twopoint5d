@@ -361,7 +361,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * Assigning or clearing it switches between the two pipeline modes; the
    * output node is rebuilt on the next render. While this renderer's `width`
-   * or `height` is 0, the composed mode draws nothing.
+   * or `height` is 0, or while a `Stage2D` it composes has no camera, the
+   * composed mode draws nothing.
    */
   get buildOutputNode(): StageRendererBuildOutputNode | undefined {
     return this.#buildOutputNode;

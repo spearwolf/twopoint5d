@@ -65,10 +65,19 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   #width = 0;
   #height = 0;
 
+  /**
+   * The width of the view the projection gives for the container. `0` while the stage has no
+   * projection, or while its projection has given no view with an area: before the first
+   * `resize()` with an area, for specs that give no view, and after an assignment to
+   * `projection` until the new projection gives one. A `resize()` to a width or a height of 0
+   * keeps the size, as it keeps the camera. `OnStageResize` announces every new view, and none
+   * of the drops to 0.
+   */
   get width(): number {
     return this.#width;
   }
 
+  /** The height of the view the projection gives for the container; `0` whenever {@link width} is. */
   get height(): number {
     return this.#height;
   }
@@ -82,8 +91,12 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   set projection(projection: IProjection | undefined) {
     if (this.#projection !== projection) {
       this.#projection = projection;
-      // the camera of the previous projection goes first, announced as the camera it was;
-      // updateProjection() then announces the new one, if the container has an area for it
+      // the size and the camera of the previous projection go first, the camera announced as the
+      // camera it was: a listener to that change reads no size the stage has no view for.
+      // updateProjection() then gives the view and the camera of the new one, if the container has
+      // an area for it and its specs give a view
+      this.#width = 0;
+      this.#height = 0;
       this.#updateCamera(() => {
         this.#cameraFromProjection = undefined;
       });

@@ -467,7 +467,9 @@ What this layer does on top of the general rules in
   projection's specs give a view with an area, creates the camera (or
   you assign your own). `Stage2D#asPassNode` throws in that state, and a
   `StageRenderer` composing pass nodes draws nothing while it is 0×0 or
-  while one of its `Stage2D`s has no camera.
+  while one of its `Stage2D`s has no camera. Until then its `width` and
+  `height` are 0, and assigning another `projection` — or `undefined` — puts
+  them back to 0 with the camera until the new projection gives a view.
 - **Non-unique stage names + `renderOrder`**: stages sharing a name that
   `renderOrder` lists render at that name's position in the order they were
   added. The renderer warns about such a name on `add()` and on every write

@@ -148,6 +148,100 @@ describe('Stage2D', () => {
     expect(stage.camera).not.toBe(custom);
   });
 
+  describe('size after a change of projection', () => {
+    const createResizedStage = () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      expect([stage.width, stage.height]).toEqual([640, 480]);
+      return stage;
+    };
+
+    it('drops the size of the previous projection for one whose specs give no view', () => {
+      const stage = createResizedStage();
+
+      stage.projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain'});
+
+      expect(stage.camera).toBeUndefined();
+      expect([stage.width, stage.height]).toEqual([0, 0]);
+    });
+
+    it('drops the size together with the projection', () => {
+      const stage = createResizedStage();
+
+      stage.projection = undefined;
+
+      expect(stage.camera).toBeUndefined();
+      expect([stage.width, stage.height]).toEqual([0, 0]);
+    });
+
+    it('drops the size of the projection while it keeps an assigned camera', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      const custom = new PerspectiveCamera();
+      stage.camera = custom;
+      stage.resize(800, 600);
+      expect([stage.width, stage.height]).toEqual([640, 480]);
+
+      stage.projection = undefined;
+
+      expect(stage.camera).toBe(custom);
+      expect([stage.width, stage.height]).toEqual([0, 0]);
+    });
+
+    it('a listener to the camera change reads no size of the projection that went', () => {
+      const stage = createResizedStage();
+      const sizes: [number, number][] = [];
+      on(stage, OnStageAfterCameraChanged, () => sizes.push([stage.width, stage.height]));
+
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+
+      expect(sizes).toEqual([
+        [0, 0],
+        [320, 240],
+      ]);
+    });
+
+    it('announces the first view of a new projection, also at the size of the previous one', () => {
+      const stage = createResizedStage();
+      const onResize = vi.fn();
+      on(stage, OnStageResize, onResize);
+
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+
+      expect(onResize).toHaveBeenCalledTimes(1);
+      expect(onResize).toHaveBeenCalledWith({stage, width: 640, height: 480});
+    });
+
+    it('takes the view of a projection assigned while the container has no area on the next resize() with one', () => {
+      const stage = createResizedStage();
+      stage.resize(0, 600);
+      expect([stage.width, stage.height], 'size after resize(0, 600)').toEqual([640, 480]);
+
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      expect(stage.camera, 'camera after the assignment').toBeUndefined();
+      expect([stage.width, stage.height], 'size after the assignment').toEqual([0, 0]);
+
+      const onResize = vi.fn();
+      on(stage, OnStageResize, onResize);
+      stage.resize(800, 600);
+
+      expect(stage.camera, 'camera after resize(800, 600)').toBeDefined();
+      expect([stage.width, stage.height], 'size after resize(800, 600)').toEqual([320, 240]);
+      expect(onResize).toHaveBeenCalledTimes(1);
+      expect(onResize).toHaveBeenCalledWith({stage, width: 320, height: 240});
+    });
+
+    it('sends no OnStageResize for the drop to no size', () => {
+      const stage = createResizedStage();
+      const onResize = vi.fn();
+      on(stage, OnStageResize, onResize);
+
+      stage.projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain'});
+      stage.projection = undefined;
+
+      expect(onResize).not.toHaveBeenCalled();
+    });
+  });
+
   describe('renderTo (IRenderable)', () => {
     it('is a no-op when there is no camera yet', () => {
       const stage = new Stage2D();
