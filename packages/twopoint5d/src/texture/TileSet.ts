@@ -186,8 +186,8 @@ export class TileSet {
       tileCountLimit,
     );
 
-    const tileOuterWidth = this.tileWidth + (padding << 1);
-    const tileOuterHeight = this.tileHeight + (padding << 1);
+    const tileOuterWidth = this.tileWidth + padding * 2;
+    const tileOuterHeight = this.tileHeight + padding * 2;
 
     let x = margin;
     let y = margin;

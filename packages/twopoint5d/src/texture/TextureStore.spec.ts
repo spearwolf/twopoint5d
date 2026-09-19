@@ -1426,6 +1426,55 @@ describe('TextureStore', () => {
       loadSpy.mockRestore();
     });
 
+    test('a parse() without animation data takes the animations of a known resource back', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 64, height: 64}) as unknown as HTMLImageElement);
+      const factory = {
+        create() {
+          return {name: '', dispose() {}};
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({
+        defaultTextureClasses: [],
+        items: {
+          t: {
+            imageUrl: 'tiles.png',
+            tileSet: {tileWidth: 16, tileHeight: 16},
+            frameBasedAnimations: {walk: {duration: 1, tileIds: [1, 2]}},
+          },
+        },
+      });
+      const unsubscribe = store.on('t', 'frameBasedAnimations', () => {});
+
+      const resource = await store.whenResource('t');
+      resource.textureFactory = factory as never;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.frameBasedAnimations).toBeDefined();
+
+      store.parse({
+        defaultTextureClasses: [],
+        items: {t: {imageUrl: 'tiles.png', tileSet: {tileWidth: 16, tileHeight: 16}}},
+      });
+
+      expect(resource.frameBasedAnimations).toBeUndefined();
+
+      const lateSpy = vi.fn();
+      const unsubscribeLate = store.on('t', 'frameBasedAnimations', lateSpy);
+      await flushMicrotasks();
+
+      expect(lateSpy).not.toHaveBeenCalled();
+
+      unsubscribeLate();
+      unsubscribe();
+      store.dispose();
+      loadSpy.mockRestore();
+    });
+
     test('an atlas that swaps its json for one over another image of the same size follows it', async () => {
       const atlasesByUrl: Record<string, unknown> = {
         'a1.json': {frames: {f1: {frame: {x: 0, y: 0, w: 10, h: 10}}}, meta: {image: 'first.png', size: {w: 100, h: 50}}},

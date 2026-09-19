@@ -60,6 +60,23 @@ describe('TileSet', () => {
     });
   });
 
+  test('a fractional padding steps each tile by twice the padding', () => {
+    const tiles = new TileSet(new TextureCoords(0, 0, 26, 26), {tileWidth: 10, tileHeight: 10, padding: 1.5});
+
+    expect(tiles.tileCount).toBe(4);
+    expect(tiles.frame(1).coords).toMatchObject({x: 1.5, y: 1.5, width: 10, height: 10});
+    expect(tiles.frame(2).coords).toMatchObject({x: 14.5, y: 1.5, width: 10, height: 10});
+    expect(tiles.frame(3).coords).toMatchObject({x: 1.5, y: 14.5, width: 10, height: 10});
+    expect(tiles.frame(4).coords).toMatchObject({x: 14.5, y: 14.5, width: 10, height: 10});
+  });
+
+  test('a fractional padding lays out as many tiles as fit', () => {
+    const tiles = new TileSet(new TextureCoords(0, 0, 100, 10), {tileWidth: 10, tileHeight: 10, padding: 1.5});
+
+    expect(tiles.tileCount).toBe(7);
+    expect(tiles.frame(tiles.lastId).coords.x).toBe(79.5);
+  });
+
   describe('degenerate options', () => {
     const base = new TextureCoords(0, 0, 64, 64);
 

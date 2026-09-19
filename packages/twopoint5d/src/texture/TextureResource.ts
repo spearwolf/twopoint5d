@@ -77,7 +77,8 @@ export const TextureResourceSubtypes = {
  * successfully — texture creation, or any value derived from it, such as an atlas or a tile
  * set — with no `url`, since none has failed. A tile set that `TileSet` refuses is reported
  * here whether the image arrives or the `tileSetOptions` change; the write that changed them
- * does not throw. It carries
+ * does not throw. An `atlasJson` that `TexturePackerJson` cannot read is reported here as soon
+ * as the image it names is there; the write that set it does not throw either. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data is no object or does not fit this kind of resource, and one whose data does not
  * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
@@ -183,9 +184,12 @@ export interface TextureResource extends EventizedObject {}
  * `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations`. Each of them is
  * also an event of the same name, retained, so a subscriber that arrives late still sees
  * the current value. A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations`
- * back while its `tileSetOptions` are cleared or refused by `TileSet`: the getters answer
- * `undefined`, and rather than announcing `undefined` the retained events are cleared, so a
- * subscriber that arrives later waits for the next value.
+ * back while its `tileSetOptions` are cleared or refused by `TileSet`, and an atlas resource
+ * takes its `atlas` and `frameBasedAnimations` back while its `atlasJson` is cleared or cannot
+ * be read — the texture stays in both cases. Every resource takes its `frameBasedAnimations`
+ * back while its `frameBasedAnimationsData` is cleared. The getters answer `undefined`, and
+ * rather than announcing `undefined` the retained events are cleared, so a subscriber that
+ * arrives later waits for the next value.
  *
  * `atlasUrl`, `atlasJson`, `overrideImageUrl` and `tileSetOptions` belong to one shape of
  * resource each. Writing one on a resource of another shape throws a `TypeError`.
@@ -321,6 +325,10 @@ export class TextureResource {
    * The atlas json of an atlas resource. For a json fetched from `atlasUrl`, `meta.image` names
    * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
    * json names otherwise. A json written from outside replaces the fetched one.
+   *
+   * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
+   * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
+   * with `source: 'texture'` once the image it names is there; writing it does not throw.
    */
   get atlasJson(): TexturePackerJsonData | undefined {
     return this.#disposed ? undefined : this.#atlasJson?.value;
@@ -477,6 +485,10 @@ export class TextureResource {
    * Register the effects that turn the data of this resource into an atlas, a tile set
    * and a texture, and return `this`. Calling it more than once registers them once.
    *
+   * Which effects are registered follows the shape of the resource, whatever values it holds
+   * at the call: a `tileSetOptions` or an `atlasUrl` that is empty now and set later still
+   * reaches them.
+   *
    * It fetches nothing by itself: the effects do that, once the resource has what they
    * read. The two `TextureStore` methods of the same name do the fetching — the instance
    * method into an existing store, the static one into a store it builds for the attempt.
@@ -537,19 +549,25 @@ export class TextureResource {
                 if (aborted) return;
                 texture = factory.create(image, ...(classes ?? []));
                 texture.name = this.id;
-                // one batch: the three values reach their effects together, and the higher
-                // priority of everything derived from the image — the atlas among it — puts
-                // those runs ahead of the bridge that carries the texture out
-                batch(() => {
-                  this.#imageUrlOfCoords.set(url);
-                  this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
-                  this.#texture.set(texture);
-                });
-                // the predecessor stayed alive while it was still the published value; now that
-                // the successor is on the signal, no reader can reach the old one any more
+                // The resource owns the texture before it publishes it: a subscriber that throws
+                // inside the batch, or one that disposes this resource, cannot skip the handover
+                // any more — dispose() releases whatever is owned at that moment. The predecessor
+                // stays alive while it is still the published value and is released only after
+                // the batch, once the successor is on the signal and no reader can reach it
                 const previous = this.#ownTexture;
                 this.#ownTexture = texture;
-                previous?.dispose();
+                try {
+                  // one batch: the three values reach their effects together, and the higher
+                  // priority of everything derived from the image — the atlas among it — puts
+                  // those runs ahead of the bridge that carries the texture out
+                  batch(() => {
+                    this.#imageUrlOfCoords.set(url);
+                    this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
+                    this.#texture.set(texture);
+                  });
+                } finally {
+                  previous?.dispose();
+                }
               },
               (error) => {
                 // the second parameter of .then() sees exactly the rejection of the image load
@@ -559,12 +577,12 @@ export class TextureResource {
               },
             )
             .catch((error) => {
-              // signalize propagates inline: an effect that throws inside the batch() above —
-              // texture creation, or an effect derived from the image that throws, the atlas
-              // effect — is isolated and its error is rethrown to the writer once delivery
-              // ends, several at once as an AggregateError. The writer here is the batch()
-              // itself, so it surfaces here, long after the image fetch has already succeeded —
-              // there is no failed url to name, so this reports the resource instead
+              // texture creation that throws lands here, and so does a subscriber of an event
+              // that throws inside the batch() above: signalize propagates inline, isolates the
+              // throw and rethrows it to the writer once delivery ends, several at once as an
+              // AggregateError. The writer here is the batch() itself, so it surfaces here, long
+              // after the image fetch has already succeeded — there is no failed url to name, so
+              // this reports the resource instead
               if (aborted) return;
               emit(this, OnError, {source: 'texture', id: this.id, error});
             });
@@ -580,12 +598,15 @@ export class TextureResource {
         {attach: this},
       );
 
-      if (this.tileSetOptions) {
-        // A tileset resource creates these signals in the same batch() that received the value the guard just read.
-        const tileSetOptionsSignal = this.#tileSetOptions!;
-        const tileSetSignal = this.#tileSet!;
-        const atlasSignal = this.#atlas!;
+      // The shape of the resource decides which effects run, not the values it holds when this is
+      // called: a value that arrives later has to reach them. Only fromTileSet() and fromAtlas()
+      // create the signals of their shape — a resource built directly with `new TextureResource(id,
+      // type)` has none of them and therefore gets none of these effects.
+      const tileSetOptionsSignal = this.#tileSetOptions;
+      const tileSetSignal = this.#tileSet;
+      const tileSetAtlasSignal = this.#atlas;
 
+      if (tileSetOptionsSignal && tileSetSignal && tileSetAtlasSignal) {
         createEffect(
           () => {
             const imageCoords = this.imageCoords;
@@ -604,7 +625,7 @@ export class TextureResource {
 
             if (tileSet) {
               tileSetSignal.set(tileSet);
-              atlasSignal.set(tileSet.atlas);
+              tileSetAtlasSignal.set(tileSet.atlas);
               return;
             }
 
@@ -615,9 +636,9 @@ export class TextureResource {
             // reading the resource would still find them. A refusal is reported here instead of
             // thrown: thrown, it would reach whoever wrote the options — a setter, a
             // `TextureStore#parse()` cut short before its ready event — or the image effect,
-            // whose batch would then skip handing over the texture.
+            // whose load would then end as a texture failure.
             tileSetSignal.set(undefined);
-            atlasSignal.set(undefined);
+            tileSetAtlasSignal.set(undefined);
             this.#frameBasedAnimations.set(undefined);
 
             if (refusal) {
@@ -631,46 +652,51 @@ export class TextureResource {
         createEffect(
           () => {
             const tileSet = this.tileSet;
-            if (tileSet && this.frameBasedAnimationsData) {
-              // published as one finished object: a subscriber that reads it in the change
-              // callback would otherwise see an animation set that is still filling up
-              const animations = new FrameBasedAnimations();
-              for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
-                const shape = animationDataShape(data);
-                if (shape !== 'tileIds' && shape !== 'firstTileId') {
-                  emit(this, OnError, wrongAnimationDataError(this, name, shape));
-                  continue;
-                }
-                try {
-                  const timing = getTimingOptions(data);
-                  if ('tileIds' in data) {
-                    animations.add(name, timing, tileSet, data.tileIds);
-                  } else if ('firstTileId' in data) {
-                    animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
-                  }
-                } catch (error) {
-                  // One bad entry skips itself. Without this the throw leaves the effect through the
-                  // global error channel of signalize, no animation of the whole map is registered,
-                  // and the caller is told nothing.
-                  emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
-                }
-              }
-              this.#frameBasedAnimations.set(animations);
+            const animationsData = this.frameBasedAnimationsData;
+            // animations come only out of the current tile set and the current data; without
+            // either of them they are taken back, which clears the retained event
+            if (!tileSet || !animationsData) {
+              this.#frameBasedAnimations.set(undefined);
+              return;
             }
+            // published as one finished object: a subscriber that reads it in the change
+            // callback would otherwise see an animation set that is still filling up
+            const animations = new FrameBasedAnimations();
+            for (const [name, data] of Object.entries(animationsData)) {
+              const shape = animationDataShape(data);
+              if (shape !== 'tileIds' && shape !== 'firstTileId') {
+                emit(this, OnError, wrongAnimationDataError(this, name, shape));
+                continue;
+              }
+              try {
+                const timing = getTimingOptions(data);
+                if ('tileIds' in data) {
+                  animations.add(name, timing, tileSet, data.tileIds);
+                } else if ('firstTileId' in data) {
+                  animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
+                }
+              } catch (error) {
+                // One bad entry skips itself. Without this the throw leaves the effect through the
+                // global error channel of signalize, no animation of the whole map is registered,
+                // and the caller is told nothing.
+                emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+              }
+            }
+            this.#frameBasedAnimations.set(animations);
           },
           [tileSetSignal, this.#frameBasedAnimationsData],
           {attach: this},
         );
       }
 
-      if (this.atlasUrl) {
-        // An atlas resource creates these signals in the same batch() that received the value the guard just read.
-        const atlasUrlSignal = this.#atlasUrl!;
-        const atlasJsonSignal = this.#atlasJson!;
-        const fetchedAtlasJsonSignal = this.#fetchedAtlasJson!;
-        const overrideImageUrlSignal = this.#overrideImageUrl!;
-        const atlasSignal = this.#atlas!;
+      // guarded by the signals of the shape as well, for the same reason as the tile set above
+      const atlasUrlSignal = this.#atlasUrl;
+      const atlasJsonSignal = this.#atlasJson;
+      const fetchedAtlasJsonSignal = this.#fetchedAtlasJson;
+      const overrideImageUrlSignal = this.#overrideImageUrl;
+      const atlasSignal = this.#atlas;
 
+      if (atlasUrlSignal && atlasJsonSignal && fetchedAtlasJsonSignal && overrideImageUrlSignal && atlasSignal) {
         createEffect(
           () => {
             const atlasUrl = this.atlasUrl;
@@ -764,18 +790,39 @@ export class TextureResource {
         createEffect(
           () => {
             const atlasJson = this.atlasJson;
-            const imageCoords = this.imageCoords;
-            if (atlasJson && imageCoords) {
-              // an atlas describes the image its json names. While the image effect is still
-              // on its way to that image, the atlas of the one before stays published — it is
-              // not cleared, because a subscriber would get an `undefined` where the event
-              // type promises a TextureAtlas. The run this skips is taken up again as soon as
-              // the image arrives: that is what `#imageUrlOfCoords` sits in the dependencies
-              // for
-              if (this.#imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
-              const [atlas] = TexturePackerJson.parse(atlasJson, imageCoords);
-              atlasSignal.set(atlas);
+            // Nothing on the resource may have been built from a json other than the current
+            // one. The animations go back here as well, for the same reason as in the tile set
+            // effect: inside a batch the animation effect runs after this one, and an error
+            // listener reading the resource would still find them. The texture stays.
+            const takeBack = () => {
+              atlasSignal.set(undefined);
+              this.#frameBasedAnimations.set(undefined);
+            };
+            if (!atlasJson) {
+              takeBack();
+              return;
             }
+            const imageCoords = this.imageCoords;
+            if (!imageCoords) return;
+            // an atlas describes the image its json names. While the image effect is still
+            // on its way to that image, the atlas of the one before stays published — it is
+            // not cleared, because a subscriber would get an `undefined` where the event
+            // type promises a TextureAtlas. The run this skips is taken up again as soon as
+            // the image arrives: that is what `#imageUrlOfCoords` sits in the dependencies
+            // for
+            if (this.#imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
+            let atlas: TextureAtlas;
+            try {
+              [atlas] = TexturePackerJson.parse(atlasJson, imageCoords);
+            } catch (error) {
+              // reported instead of thrown: thrown, it would reach whoever wrote the json — the
+              // `atlasJson` setter, a `TextureStore#parse()` — or the image effect, whose load
+              // would then end as a texture failure
+              takeBack();
+              emit(this, OnError, {source: 'texture', id: this.id, error});
+              return;
+            }
+            atlasSignal.set(atlas);
           },
           [atlasJsonSignal, this.#imageCoords, this.#imageUrlOfCoords],
           {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
@@ -784,28 +831,33 @@ export class TextureResource {
         createEffect(
           () => {
             const atlas = this.atlas;
-            if (atlas && this.frameBasedAnimationsData) {
-              const animations = new FrameBasedAnimations();
-              for (const [name, data] of Object.entries(this.frameBasedAnimationsData)) {
-                const shape = animationDataShape(data);
-                if (shape !== 'frameNameQuery') {
-                  emit(this, OnError, wrongAnimationDataError(this, name, shape));
-                  continue;
-                }
-                try {
-                  const timing = getTimingOptions(data);
-                  if ('frameNameQuery' in data) {
-                    animations.add(name, timing, atlas, data.frameNameQuery);
-                  }
-                } catch (error) {
-                  // One bad entry skips itself. Without this the throw leaves the effect through the
-                  // global error channel of signalize, no animation of the whole map is registered,
-                  // and the caller is told nothing.
-                  emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
-                }
-              }
-              this.#frameBasedAnimations.set(animations);
+            const animationsData = this.frameBasedAnimationsData;
+            // animations come only out of the current atlas and the current data; without
+            // either of them they are taken back, which clears the retained event
+            if (!atlas || !animationsData) {
+              this.#frameBasedAnimations.set(undefined);
+              return;
             }
+            const animations = new FrameBasedAnimations();
+            for (const [name, data] of Object.entries(animationsData)) {
+              const shape = animationDataShape(data);
+              if (shape !== 'frameNameQuery') {
+                emit(this, OnError, wrongAnimationDataError(this, name, shape));
+                continue;
+              }
+              try {
+                const timing = getTimingOptions(data);
+                if ('frameNameQuery' in data) {
+                  animations.add(name, timing, atlas, data.frameNameQuery);
+                }
+              } catch (error) {
+                // One bad entry skips itself. Without this the throw leaves the effect through the
+                // global error channel of signalize, no animation of the whole map is registered,
+                // and the caller is told nothing.
+                emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+              }
+            }
+            this.#frameBasedAnimations.set(animations);
           },
           [atlasSignal, this.#frameBasedAnimationsData],
           {attach: this},
