@@ -34,6 +34,31 @@ function nextFrame(display) {
   return display.nextFrame();
 }
 
+// console.warn is swapped for a collector around the code under test; only warnings about
+// resize-to or the resolution limit count, three.js warns on its own in some engines
+function collectWarnings(match) {
+  const original = console.warn;
+  const warnings = [];
+  console.warn = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes(match)) {
+      warnings.push(args);
+    }
+  };
+  return {warnings, restore: () => (console.warn = original)};
+}
+
+function makeSizeRef(root, {id, width, height}) {
+  const el = document.createElement('div');
+  el.id = id;
+  el.style.position = 'absolute';
+  el.style.left = '0';
+  el.style.top = '0';
+  el.style.width = `${width}px`;
+  el.style.height = `${height}px`;
+  root.appendChild(el);
+  return el;
+}
+
 describe('Display — resize behavior', () => {
   /** @type {Display | undefined} */
   let display;
@@ -279,15 +304,119 @@ describe('Display — resize behavior', () => {
   it('clamps oversized dimensions to Display.MaxResolution', async () => {
     host = makeContainer({width: 100, height: 100});
     const oversized = Display.MaxResolution + 4096;
-    display = new Display(host, {
-      resizeTo: () => [oversized, oversized],
-    });
 
-    await display.start();
-    await nextFrame(display);
+    // the warning goes out once per page, and the constructor's resize() is already the first
+    // one past the limit — so the collector is in place before it runs
+    const {warnings, restore} = collectWarnings(String(Display.MaxResolution));
+    try {
+      display = new Display(host, {
+        resizeTo: () => [oversized, oversized],
+      });
+
+      await display.start();
+      await nextFrame(display);
+    } finally {
+      restore();
+    }
 
     expect(display.width).to.equal(Display.MaxResolution);
     expect(display.height).to.equal(Display.MaxResolution);
+
+    expect(warnings.length, 'warnings about the resolution limit').to.equal(1);
+    expect(warnings[0][0]).to.contain(`(${oversized}x${oversized} was requested)`);
+  });
+
+  it('a canvas with a border on top only keeps the full width of its host', async () => {
+    host = makeContainer({width: 320, height: 200});
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.style.boxSizing = 'content-box';
+    canvas.style.padding = '0';
+    canvas.style.border = '0';
+    canvas.style.borderTop = '4px solid black';
+    host.appendChild(canvas);
+
+    display = new Display(canvas, {resizeToElement: host});
+    await display.start();
+    await nextFrame(display);
+
+    expect(display.width).to.equal(320);
+    expect(display.height).to.equal(196);
+  });
+
+  it('an invalid resize-to selector warns once and measures the resizeToElement', async () => {
+    host = makeContainer({width: 320, height: 200});
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.setAttribute('resize-to', '!not-a-selector');
+    host.appendChild(canvas);
+
+    const {warnings, restore} = collectWarnings('resize-to');
+    try {
+      display = new Display(canvas, {resizeToElement: host});
+      await display.start();
+      await nextFrame(display);
+      await nextFrame(display);
+    } finally {
+      restore();
+    }
+
+    expect(display.width).to.equal(320);
+    expect(display.height).to.equal(200);
+    expect(warnings.length, 'warnings about resize-to').to.equal(1);
+  });
+
+  it('a resize-to selector finds its element inside the shadow root the display lives in', async () => {
+    host = makeContainer({width: 800, height: 600});
+    const shadowRoot = host.attachShadow({mode: 'open'});
+
+    const id = `display-resize-shadow-ref-${Math.random().toString(36).slice(2, 8)}`;
+    makeSizeRef(shadowRoot, {id, width: 128, height: 64});
+
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.setAttribute('resize-to', `#${id}`);
+    shadowRoot.appendChild(canvas);
+
+    display = new Display(canvas, {styleSheetRoot: shadowRoot});
+    await display.start();
+    await nextFrame(display);
+
+    expect(display.width).to.equal(128);
+    expect(display.height).to.equal(64);
+  });
+
+  it('a resize-to selector follows its element when it is replaced', async () => {
+    host = makeContainer({width: 800, height: 600});
+
+    const id = `display-resize-replaced-ref-${Math.random().toString(36).slice(2, 8)}`;
+    const first = makeSizeRef(document.body, {id, width: 128, height: 64});
+
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.setAttribute('resize-to', `#${id}`);
+    host.appendChild(canvas);
+
+    display = new Display(canvas);
+
+    let second;
+    try {
+      await display.start();
+      await nextFrame(display);
+
+      expect(display.width).to.equal(128);
+      expect(display.height).to.equal(64);
+
+      first.remove();
+      second = makeSizeRef(document.body, {id, width: 256, height: 32});
+      await nextFrame(display);
+
+      expect(display.width).to.equal(256);
+      expect(display.height).to.equal(32);
+    } finally {
+      first.remove();
+      second?.remove();
+    }
   });
 
   it('runtime swap of resizeToElement is picked up on the next frame', async () => {

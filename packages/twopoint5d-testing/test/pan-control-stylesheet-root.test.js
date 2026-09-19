@@ -1,8 +1,8 @@
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 
-// the control installs its cursor rule under a name shared by the whole module; the class name
-// carries a postfix, so the rule is found by the prefix rather than by a literal selector
+// the control installs its cursor rule under a name of its own for every cursor style; the class
+// name carries a postfix, so the rule is found by the prefix rather than by a literal selector
 function findCursorRule(root) {
   return Array.from(Stylesheets.getGlobalSheet(root).cssRules).find((rule) => rule.selectorText?.startsWith('.PanControl2D-'));
 }

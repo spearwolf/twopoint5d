@@ -2,11 +2,12 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
 
-// the default keyCodes of PanControl2D, in the order the class reads them: W A S D
-const KEY_NORTH = 87;
-const KEY_SOUTH = 83;
-const KEY_WEST = 65;
-const KEY_EAST = 68;
+// the default keys of PanControl2D, in the order the class reads them: up, down, left, right —
+// the KeyboardEvent.code of the keys at the W, S, A and D positions
+const KEY_NORTH = 'KeyW';
+const KEY_SOUTH = 'KeyS';
+const KEY_WEST = 'KeyA';
+const KEY_EAST = 'KeyD';
 
 // the control listens on `document`, so a pointer event dispatched on `document.body` bubbles up
 // to it
@@ -24,8 +25,8 @@ function pointer(type, {x = 0, y = 0, buttons = 1} = {}) {
   );
 }
 
-function key(type, keyCode) {
-  document.dispatchEvent(new KeyboardEvent(type, {keyCode, bubbles: true}));
+function key(type, code) {
+  document.dispatchEvent(new KeyboardEvent(type, {code, bubbles: true}));
 }
 
 function makeState() {

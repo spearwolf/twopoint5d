@@ -25,11 +25,11 @@ export function getVerticalInnerMargin(style: CSSStyleDeclaration): number {
 }
 
 export function getHorizontalInnerMargin(style: CSSStyleDeclaration): number {
-  return getVerticalBorder(style) + getHorizontalPadding(style);
+  return getHorizontalBorder(style) + getHorizontalPadding(style);
 }
 
 export function getContentAreaSize(
-  element: HTMLElement,
+  element: Element,
   style?: CSSStyleDeclaration,
 ): {width: number; height: number; style: CSSStyleDeclaration} {
   style ??= getComputedStyle(element, null);

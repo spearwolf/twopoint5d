@@ -35,7 +35,7 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
     // eslint-disable-next-line no-console
     console.warn(
-      `Oops, the canvas width or height should not bigger than ${Display.MaxResolution} pixels (${w}x${h} was requested).`,
+      `Oops, the canvas width or height should not be bigger than ${Display.MaxResolution} pixels (${w}x${h} was requested).`,
       'If you need more, please set Display.MaxResolution before you create a Display!',
     );
     canvasMaxResolutionWarningWasShown = true;
@@ -109,9 +109,12 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      (`position:fixed; top:0; left:0`). The class is removed when the
  *      attribute changes back to anything else.
  *    - `"self"` → uses the canvas (or {@link Display.resizeToElement}) itself.
- *    - any other non-empty string is treated as a `document.querySelector`
- *      selector; falls back to {@link Display.resizeToElement} or the canvas
- *      if the selector finds nothing.
+ *    - any other non-empty string is a CSS selector, looked up in the root
+ *      node of {@link Display.resizeToAttributeEl} — the document, or the
+ *      shadow root it sits in; falls back to {@link Display.resizeToElement}
+ *      or the canvas if the selector finds nothing. A value that is not a
+ *      valid selector is reported once via `console.warn` and falls back the
+ *      same way.
  * 2. If {@link Display.resizeToCallback} is set, it is called every frame and
  *    its `[width, height]` return value wins over any element-based size
  *    measurement (the `resize-to` attribute still controls the
@@ -195,6 +198,11 @@ export class Display {
 
   #fullscreenCssRules?: string;
   #fullscreenCssRulesMustBeRemoved = false;
+
+  // resize() runs every frame, and the resize-to value almost never changes: the element a
+  // selector found is kept for as long as it still sits in the same root and still matches, so
+  // a frame costs no DOM search. An invalid selector is kept too, so it is reported only once
+  #resizeToSelector?: {value: string; root: Node; element: Element | null; invalid: boolean};
 
   /**
    * The pixelZoom factor is 0 by default and is therefore not used.
@@ -337,7 +345,7 @@ export class Display {
     if (this.#disposed) {
       throw disposedError('isWebGPUBackend');
     }
-    return (this.renderer?.backend as any)?.['isWebGPUBackend'] ?? false;
+    return (this.renderer?.backend as {isWebGPUBackend?: boolean} | undefined)?.isWebGPUBackend ?? false;
   }
 
   /**
@@ -351,7 +359,7 @@ export class Display {
     if (this.#disposed) {
       throw disposedError('isWebGLBackend');
     }
-    return (this.renderer?.backend as any)?.['isWebGLBackend'] ?? false;
+    return (this.renderer?.backend as {isWebGLBackend?: boolean} | undefined)?.isWebGLBackend ?? false;
   }
 
   readonly #waitForRenderer: Promise<WebGPURenderer>;
@@ -640,7 +648,7 @@ export class Display {
 
     const canvasElement = this.canvas;
 
-    let sizeRefElement = this.resizeToElement;
+    let sizeRefElement: Element | undefined = this.resizeToElement;
 
     let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
 
@@ -669,7 +677,7 @@ export class Display {
       } else if (resizeTo === 'self') {
         sizeRefElement = this.resizeToElement ?? canvasElement;
       } else if (resizeTo) {
-        sizeRefElement = (document.querySelector(resizeTo) as HTMLElement) ?? this.resizeToElement ?? canvasElement;
+        sizeRefElement = this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvasElement;
       }
     }
 
@@ -724,13 +732,11 @@ export class Display {
       cssHeight = 0;
     }
 
-    if (wPx > Display.MaxResolution) {
-      wPx = Display.MaxResolution;
+    if (wPx > Display.MaxResolution || hPx > Display.MaxResolution) {
+      // the warning names the size that was asked for, so it goes out before the clamp
       showCanvasMaxResolutionWarning(wPx, hPx);
-    }
-    if (hPx > Display.MaxResolution) {
-      hPx = Display.MaxResolution;
-      showCanvasMaxResolutionWarning(wPx, hPx);
+      wPx = Math.min(wPx, Display.MaxResolution);
+      hPx = Math.min(hPx, Display.MaxResolution);
     }
 
     const {pixelRatio, pixelZoom} = this;
@@ -763,6 +769,35 @@ export class Display {
         this.#didEmitResize = true;
       }
     }
+  }
+
+  #resolveResizeToSelector(value: string): Element | undefined {
+    // the document, the shadow root the attribute element sits in, or the topmost element of a
+    // detached tree — all three can run querySelector
+    const root = this.resizeToAttributeEl.getRootNode() as Node & ParentNode;
+
+    const cached = this.#resizeToSelector;
+    if (cached?.value === value && cached.root === root) {
+      if (cached.invalid) return undefined;
+      if (cached.element != null && cached.element.getRootNode() === root && cached.element.matches(value)) {
+        return cached.element;
+      }
+    }
+
+    let element: Element | null;
+    try {
+      element = root.querySelector(value);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[Display] resize-to="${value}" is not a valid selector; the display falls back to its resizeToElement or the canvas`,
+      );
+      this.#resizeToSelector = {value, root, element: null, invalid: true};
+      return undefined;
+    }
+
+    this.#resizeToSelector = {value, root, element, invalid: false};
+    return element ?? undefined;
   }
 
   [FrameLoop.OnFrame](props: {now: number}): void {

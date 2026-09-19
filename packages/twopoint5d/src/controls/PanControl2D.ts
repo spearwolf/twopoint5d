@@ -52,8 +52,24 @@ const KEYDOWN = 'keydown';
 const POINTERUP = 'pointerup';
 const POINTERDOWN = 'pointerdown';
 const POINTERMOVE = 'pointermove';
+const POINTERCANCEL = 'pointercancel';
 
 type KeyedSpeedField = 'speedNorth' | 'speedSouth' | 'speedEast' | 'speedWest';
+
+const DEFAULT_KEYS = ['KeyW', 'KeyS', 'KeyA', 'KeyD'] as const;
+const DEFAULT_KEY_CODES = [87, 83, 65, 68] as const;
+
+// the speed field each of the four keys drives, in the order keys and keyCodes list them
+const KEYED_SPEED_FIELDS: readonly KeyedSpeedField[] = ['speedNorth', 'speedSouth', 'speedWest', 'speedEast'];
+
+const holdsDefault = (values: readonly unknown[], defaults: readonly unknown[]): boolean =>
+  values.length === defaults.length && values.every((value, index) => value === defaults[index]);
+
+// the rule name is taken from the cursor value, so that controls with different cursors get
+// rules of their own. Every character outside [a-zA-Z0-9-] is written as _<hex>_ — "_" as well —
+// which keeps the encoding injective: url(a.png) and url(a-png) never share a rule
+const cursorRuleName = (cursor: string): string =>
+  `PanControl2D-${cursor.replace(/[^a-zA-Z0-9-]/g, (ch) => `_${ch.charCodeAt(0).toString(16)}_`)}`;
 
 export interface PanControl2DOptions {
   state?: PanViewState;
@@ -102,13 +118,32 @@ export interface PanControl2DOptions {
   mouseButton?: number;
 
   /**
-   * Key codes in this order:
-   * 1. top
-   * 2. bottom
+   * The `KeyboardEvent.code` of the four keys, in this order:
+   * 1. up
+   * 2. down
    * 3. left
    * 4. right
    *
-   * Default is [87, 83, 65, 68] which is the well known _WASD_ layout.
+   * Default is `['KeyW', 'KeyS', 'KeyA', 'KeyD']`: the keys at the _WASD_ position, whatever the
+   * keyboard layout labels them.
+   *
+   * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
+   */
+  keys?: [string, string, string, string];
+
+  /**
+   * Key codes in this order:
+   * 1. up
+   * 2. down
+   * 3. left
+   * 4. right
+   *
+   * Default is `[87, 83, 65, 68]`.
+   *
+   * @deprecated Use {@link PanControl2DOptions.keys}. `KeyboardEvent.keyCode` depends on the
+   * keyboard layout. As long as `keyCodes` holds anything other than `[87, 83, 65, 68]` and
+   * `keys` holds its default, the control compares `event.keyCode` with `keyCodes` instead of
+   * `event.code` with `keys`.
    */
   keyCodes?: [number, number, number, number];
 
@@ -129,8 +164,12 @@ export class PanControl2D extends InputControlBase {
 
   #pointersDown: Map<number, PanInternalState> = new Map();
 
-  // the field name a key currently holds up, not the key that raised it — keyCodes is public
-  // and writable, and what a key held down gives back is the field it moved
+  // the pan a pointer collected before it ended, waiting for the next update() to deliver it
+  #releasedPanX = 0;
+  #releasedPanY = 0;
+
+  // the field name a key currently holds up, not the key that raised it — keys and keyCodes are
+  // public and writable, and what a key held down gives back is the field it moved
   #keyedSpeeds = new Set<KeyedSpeedField>();
 
   // Assigned in the constructor through the `cursorPanStyle` setter.
@@ -141,6 +180,20 @@ export class PanControl2D extends InputControlBase {
   #hideCursorState = HideCursorState.NO;
 
   mouseButton: number;
+
+  /**
+   * The `KeyboardEvent.code` of the keys for up, down, left and right.
+   *
+   * @see {@link PanControl2DOptions.keys}
+   */
+  keys: [string, string, string, string];
+
+  /**
+   * The key codes for up, down, left and right.
+   *
+   * @deprecated Use {@link PanControl2D.keys}. See {@link PanControl2DOptions.keyCodes} for when
+   * these still decide.
+   */
   keyCodes: [number, number, number, number];
 
   /**
@@ -171,7 +224,8 @@ export class PanControl2D extends InputControlBase {
     this.coordsTarget = readOption(options, 'coordsTarget', this.#cursorStylesTarget);
 
     this.mouseButton = readOption(options, 'mouseButton', 1);
-    this.keyCodes = readOption(options, 'keyCodes', [87, 83, 65, 68]);
+    this.keys = readOption(options, 'keys', [...DEFAULT_KEYS] as [string, string, string, string]);
+    this.keyCodes = readOption(options, 'keyCodes', [...DEFAULT_KEY_CODES] as [number, number, number, number]);
 
     this.pointerDisabled = readOption(options, 'disablePointer', false);
     this.keyboardDisabled = readOption(options, 'disableKeyboard', false);
@@ -185,23 +239,38 @@ export class PanControl2D extends InputControlBase {
   /**
    * Set the cursor css style shown while panning.
    *
-   * On a disposed control the write is refused and the getter keeps its last value: the style
-   * rule behind it is shared by every control that writes into the same
-   * {@link PanControl2DOptions.styleSheetRoot}.
+   * Every cursor style has a rule of its own, which controls showing the same style share and
+   * whose css never changes: a write moves only this control onto another rule. Written during
+   * a drag, the new cursor shows at once.
+   *
+   * On a disposed control the write is refused and the getter keeps its last value: a disposed
+   * control installs no more rules into a stylesheet that is not its own, and has no target
+   * left to carry the class.
    */
   set cursorPanStyle(value: string) {
-    // the rule is installed under one name per root and shared by every control writing into
-    // that root — a disposed control does not get to rewrite what the living ones are showing
+    // a disposed control writes no further rules into a stylesheet it does not own
     if (this.isDisposed) return;
 
     if (this.#cursorPanStyle !== value) {
+      const prevClass = this.#cursorPanClass;
+
       this.#cursorPanStyle = value;
       this.#cursorPanClass = this.#installCursorPanStyleRules();
+
+      // the target carries the old class while the cursor is hidden; left there, the restore
+      // would take off the new one and the old one would stay for good
+      const target = this.#cursorStylesTarget;
+      if (this.#hideCursorState === HideCursorState.YES && target && prevClass !== this.#cursorPanClass) {
+        if (prevClass) target.classList.remove(prevClass);
+        target.classList.add(this.#cursorPanClass);
+      }
     }
   }
 
-  #installCursorPanStyleRules = (): string =>
-    Stylesheets.installRule('PanControl2D', `cursor: ${this.#cursorPanStyle || 'auto'}`, this.#styleSheetRoot);
+  #installCursorPanStyleRules = (): string => {
+    const cursor = this.#cursorPanStyle || 'auto';
+    return Stylesheets.installRule(cursorRuleName(cursor), `cursor: ${cursor}`, this.#styleSheetRoot);
+  };
 
   // Assigned in the constructor through the `panView` setter, which substitutes a default for a missing state.
   #panView!: PanViewState;
@@ -245,14 +314,16 @@ export class PanControl2D extends InputControlBase {
       this.addEventListener(document, POINTERDOWN, this.#onPointerDown);
       this.addEventListener(document, POINTERUP, this.#onPointerUp);
       this.addEventListener(document, POINTERMOVE, this.#onPointerMove);
+      this.addEventListener(document, POINTERCANCEL, this.#onPointerCancel);
     } else {
       this.removeEventListener(document, POINTERDOWN, this.#onPointerDown);
       this.removeEventListener(document, POINTERUP, this.#onPointerUp);
       this.removeEventListener(document, POINTERMOVE, this.#onPointerMove);
+      this.removeEventListener(document, POINTERCANCEL, this.#onPointerCancel);
 
       // a pan that nobody may deliver is dropped here, not kept: without this it waits for the
       // next update() after the pointer is switched back on and lands in one jump
-      this.#pointersDown.clear();
+      this.#dropPointers();
 
       // the pointerup that would restore the cursor style reaches this control no longer
       this.#restoreCursorStyle();
@@ -272,7 +343,7 @@ export class PanControl2D extends InputControlBase {
     // first: with the listeners off document, no event can refill what the lines below give up
     super.unsubscribe();
 
-    this.#pointersDown.clear();
+    this.#dropPointers();
     this.#releaseKeyedSpeeds();
     this.#restoreCursorStyle();
   }
@@ -289,7 +360,12 @@ export class PanControl2D extends InputControlBase {
     this.panView.x -= this.speedWest * t;
 
     if (!this.#pointerDisabled) {
-      const {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));
+      let {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));
+
+      panX += this.#releasedPanX;
+      panY += this.#releasedPanY;
+      this.#releasedPanX = 0;
+      this.#releasedPanY = 0;
 
       const pixelRatio = this.panView.pixelRatio || 1;
 
@@ -320,19 +396,18 @@ export class PanControl2D extends InputControlBase {
 
   #onPointerDown = (event: PointerEvent): void => {
     if (this.#isPanPointer(event)) {
-      const pointersDown = this.#pointersDown;
-      if (!pointersDown.has(event.pointerId)) {
-        const {x: lastX, y: lastY} = this.#toRelativeCoords(event);
-        pointersDown.set(event.pointerId, {
-          pointerType: event.pointerType,
+      // an id that is still down missed its end: its old position is no anchor, and whatever it
+      // collected goes with it
+      const {x: lastX, y: lastY} = this.#toRelativeCoords(event);
+      this.#pointersDown.set(event.pointerId, {
+        pointerType: event.pointerType,
 
-          lastX,
-          lastY,
+        lastX,
+        lastY,
 
-          panX: 0,
-          panY: 0,
-        });
-      }
+        panX: 0,
+        panY: 0,
+      });
       if (event.pointerType === MOUSE) {
         if (this.#hideCursorState === HideCursorState.NO) {
           this.#hideCursorState = HideCursorState.MAYBE;
@@ -350,20 +425,50 @@ export class PanControl2D extends InputControlBase {
   }
 
   #onPointerUp = (event: PointerEvent): void => {
-    const pointersDown = this.#pointersDown;
     if (this.#isPanPointer(event)) {
-      const state = pointersDown.get(event.pointerId);
+      const state = this.#pointersDown.get(event.pointerId);
       if (state) {
         this.#updatePanState(event, state);
-        pointersDown.delete(event.pointerId);
+        this.#endPointer(event.pointerId, true);
       }
     }
     if (event.pointerType === MOUSE) {
-      if (!Array.from(pointersDown.values()).find((state) => state.pointerType === MOUSE)) {
-        this.#restoreCursorStyle();
-      }
+      this.#restoreCursorUnlessMouseDown();
     }
   };
+
+  // the browser took the pointer away (a scroll or zoom gesture, a dialog): nobody let go, so
+  // what the drag collected is dropped rather than delivered
+  #onPointerCancel = (event: PointerEvent): void => {
+    this.#endPointer(event.pointerId, false);
+    if (event.pointerType === MOUSE) {
+      this.#restoreCursorUnlessMouseDown();
+    }
+  };
+
+  // a pointer that ends either hands its pan on to the next update() or drops it
+  #endPointer(pointerId: number, keepPan: boolean): void {
+    const state = this.#pointersDown.get(pointerId);
+    if (state == null) return;
+
+    if (keepPan) {
+      this.#releasedPanX += state.panX;
+      this.#releasedPanY += state.panY;
+    }
+    this.#pointersDown.delete(pointerId);
+  }
+
+  #dropPointers(): void {
+    this.#pointersDown.clear();
+    this.#releasedPanX = 0;
+    this.#releasedPanY = 0;
+  }
+
+  #restoreCursorUnlessMouseDown(): void {
+    if (!Array.from(this.#pointersDown.values()).some((state) => state.pointerType === MOUSE)) {
+      this.#restoreCursorStyle();
+    }
+  }
 
   #restoreCursorStyle() {
     // Only YES has a cursor to restore: that is the one state in which the class went onto the
@@ -392,6 +497,12 @@ export class PanControl2D extends InputControlBase {
           this.#hideCursor();
         }
       }
+    }
+    // the pan button went up without a pointerup: released outside the window, or let go while
+    // another button stays down, where the browser reports a pointermove. It ends the pan where
+    // it was let go, so the position of this move does not count
+    if (event.pointerType === MOUSE && (event.buttons & this.mouseButton) === 0) {
+      this.#endPointer(event.pointerId, true);
     }
     if (event.pointerType === MOUSE && event.buttons === 0) {
       this.#restoreCursorStyle();
@@ -425,19 +536,15 @@ export class PanControl2D extends InputControlBase {
     };
   }
 
-  #speedFieldFor(keyCode: number): KeyedSpeedField | undefined {
-    switch (keyCode) {
-      case this.keyCodes[0]:
-        return 'speedNorth';
-      case this.keyCodes[1]:
-        return 'speedSouth';
-      case this.keyCodes[2]:
-        return 'speedWest';
-      case this.keyCodes[3]:
-        return 'speedEast';
-      default:
-        return undefined;
-    }
+  #speedFieldFor(event: KeyboardEvent): KeyedSpeedField | undefined {
+    // keyCodes is deprecated and only decides when a caller set it. That is read off the values,
+    // not a flag: the field is public and holds an array of its own, so a keyCodes[0] = 38
+    // rebinds in place and has to keep working. Whoever sets keys as well gets keys
+    const index =
+      holdsDefault(this.keys, DEFAULT_KEYS) && !holdsDefault(this.keyCodes, DEFAULT_KEY_CODES)
+        ? this.keyCodes.indexOf(event.keyCode)
+        : this.keys.indexOf(event.code);
+    return KEYED_SPEED_FIELDS[index];
   }
 
   #releaseKeyedSpeeds(): void {
@@ -447,15 +554,15 @@ export class PanControl2D extends InputControlBase {
     this.#keyedSpeeds.clear();
   }
 
-  #onKeyDown = ({keyCode}: KeyboardEvent): void => {
-    const field = this.#speedFieldFor(keyCode);
+  #onKeyDown = (event: KeyboardEvent): void => {
+    const field = this.#speedFieldFor(event);
     if (field == null) return;
     this[field] = this.pixelsPerSecond;
     this.#keyedSpeeds.add(field);
   };
 
-  #onKeyUp = ({keyCode}: KeyboardEvent): void => {
-    const field = this.#speedFieldFor(keyCode);
+  #onKeyUp = (event: KeyboardEvent): void => {
+    const field = this.#speedFieldFor(event);
     if (field == null) return;
     this[field] = 0;
     this.#keyedSpeeds.delete(field);
@@ -473,9 +580,9 @@ export class PanControl2D extends InputControlBase {
    * reaches this control any more. {@link update} still moves {@link panView} by the speed
    * fields a caller sets by hand, and by a key that was still held down when `dispose()` ran
    * gives its field back — what it no longer delivers is a pan from a drag before the call. A
-   * write to {@link cursorPanStyle} is refused: it would rewrite a style rule every control
-   * writing into the same {@link PanControl2DOptions.styleSheetRoot} shares.
-   * `pixelsPerSecond`, `mouseButton`, `keyCodes`, `keyboardDisabled`, `pointerDisabled`,
+   * write to {@link cursorPanStyle} is refused: a disposed control installs no more rules into
+   * a stylesheet that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`,
+   * `keyboardDisabled`, `pointerDisabled`,
    * `panView` and the four `speed…` fields still take values, they just drive nothing. A
    * control that was hiding the cursor emits one last `restoreCursor` while its subscribers
    * can still hear it; after that every listener on this control goes with it, and a further

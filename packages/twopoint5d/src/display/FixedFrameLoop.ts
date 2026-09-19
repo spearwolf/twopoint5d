@@ -88,6 +88,7 @@ export class FixedFrameLoop {
 
   #fps: number;
   #fixedDelta: number;
+  #maxStepsPerFrame: number;
   #accumulator = 0;
   #tickTime = 0;
   #tickNo = 0;
@@ -104,10 +105,27 @@ export class FixedFrameLoop {
    * than the next frame can drain. When hit, the leftover accumulator
    * is discarded (sim time stays consistent with the ticks that did
    * run; `alpha` drops back to ~0 on the next frame).
+   *
+   * A value that is not finite or smaller than 1 is ignored, in the
+   * constructor as well as here.
    */
-  maxStepsPerFrame: number;
+  get maxStepsPerFrame(): number {
+    return this.#maxStepsPerFrame;
+  }
 
-  /** Target simulation rate in frames per second. */
+  set maxStepsPerFrame(value: number) {
+    // an unbounded value would take away the very guard this field is, and one below 1 runs no
+    // tick at all while discarding the backlog of every frame
+    if (!Number.isFinite(value) || value < 1) return;
+    this.#maxStepsPerFrame = value;
+  }
+
+  /**
+   * Target simulation rate in frames per second.
+   *
+   * A value that is not finite or not greater than 0 is ignored — in the
+   * constructor as well, where the loop then keeps `DefaultFps`.
+   */
   get fps(): number {
     return this.#fps;
   }
@@ -146,9 +164,14 @@ export class FixedFrameLoop {
     eventize(this);
 
     this.display = display;
-    this.#fps = options?.fps ?? FixedFrameLoop.DefaultFps;
-    this.#fixedDelta = 1 / this.#fps;
-    this.maxStepsPerFrame = options?.maxStepsPerFrame ?? FixedFrameLoop.DefaultMaxStepsPerFrame;
+
+    // the defaults first, then the options through the setters, which refuse a rate the loop
+    // cannot run at
+    this.#fps = FixedFrameLoop.DefaultFps;
+    this.#fixedDelta = 1 / FixedFrameLoop.DefaultFps;
+    this.#maxStepsPerFrame = FixedFrameLoop.DefaultMaxStepsPerFrame;
+    if (options?.fps != null) this.fps = options.fps;
+    if (options?.maxStepsPerFrame != null) this.maxStepsPerFrame = options.maxStepsPerFrame;
 
     on(display, OnDisplayRenderFrame, this as FixedFrameLoop);
     this.#unsubscribeFromDisplayDispose = once(display, OnDisplayDispose, () => this.dispose());
@@ -160,7 +183,7 @@ export class FixedFrameLoop {
     this.#accumulator += props.deltaTime;
 
     let steps = 0;
-    while (this.#accumulator >= this.#fixedDelta && steps < this.maxStepsPerFrame) {
+    while (this.#accumulator >= this.#fixedDelta && steps < this.#maxStepsPerFrame) {
       emit(this, OnTick, {
         fixedDelta: this.#fixedDelta,
         tickTime: this.#tickTime,
@@ -172,7 +195,7 @@ export class FixedFrameLoop {
       steps += 1;
     }
 
-    if (steps >= this.maxStepsPerFrame && this.#accumulator >= this.#fixedDelta) {
+    if (steps >= this.#maxStepsPerFrame && this.#accumulator >= this.#fixedDelta) {
       // Spiral-of-death guard — discard backlog.
       this.#accumulator = 0;
     }
@@ -215,7 +238,7 @@ export class FixedFrameLoop {
    * reached. `display`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left
    * with; nothing behind them was released. {@link reset} and a further `dispose()` do
    * nothing. `fps` and `maxStepsPerFrame` stay writable and keep their values until someone
-   * writes them: a write lands, `fps` recomputes `fixedDelta` with it, and no tick ever
+   * writes them: a write the setter accepts lands, `fps` recomputes `fixedDelta` with it, and no tick ever
    * reads either one again.
    */
   dispose(): void {

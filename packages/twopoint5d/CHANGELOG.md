@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add a shared image cache to `TextureStore`: resources that name the same `imageUrl` are served by one fetch for as long as at least one of them wants it. What is shared is the image and not the texture — every resource applies its own texture classes and owns the `Texture` it built. The entry goes as the last resource lets go of it, so a resource created afterwards fetches the image again, and a load that failed is not kept either
 - export `DependencyShape`, `DependencyValues` and `DependencyDeclaration`: the three types around the `Dependencies` type parameter. `DependencyShape` is the constraint a shape satisfies — any object type does, a named `interface` as much as a `type` alias. `DependencyValues<Shape>` is what `update()`, `equals()` and `changed()` take: every key of the shape optional, and each free to carry `null`. `DependencyDeclaration<Shape>` is one entry of the list the constructor takes, and the type to write a declaration list down with wherever it does not go into the constructor call inline
 - add the `'texture'` value to the `source` field of `TextureResource`'s `error` event: a failure behind an image that already loaded — texture creation itself, or any value derived from it, such as an atlas or a tile set — reports `{source: 'texture', id, error}`, naming the resource instead of a url that never failed
+- add the `keys` option and the `PanControl2D#keys` field: the `KeyboardEvent.code` of the keys for up, down, left and right, `['KeyW', 'KeyS', 'KeyA', 'KeyD']` by default — the keys at the WASD position, whatever the keyboard layout labels them
 
 ### Changed
 
@@ -133,6 +134,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VertexObjectBuffer` and `VOBufferPool#fromBuffersData()` check every array of `buffersData` against the buffer it is meant for: a typed array of another element type throws a `TypeError`, a length that does not fit a `RangeError`, both naming the buffer. The constructor takes an array by reference and asks for exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most that many and copies a shorter array. A typed array from a worker or another realm is taken. `fromBuffersData()` checks every array before it changes anything about the pool
 - the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more
 - `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
+- `PanControl2D` recognises its keys by `event.code` against `keys`, so the default keys sit at the WASD position on every keyboard layout
+- a `resize-to` value that selects an element is looked up in the root node of `Display#resizeToAttributeEl` — the document, or the shadow root the element sits in
+- `FixedFrameLoop` ignores an `fps` or `maxStepsPerFrame` the loop cannot run with, in the constructor as well as in the setters: an `fps` that is not finite or not greater than `0` keeps `DefaultFps`, a `maxStepsPerFrame` that is not finite or smaller than `1` keeps its value. `maxStepsPerFrame` is an accessor pair on the prototype
+- `getContentAreaSize()` takes any `Element`
+- every cursor style of `PanControl2D` has a style rule of its own, so controls with different `cursorPanStyle` in one root each show their own cursor, and a write to `cursorPanStyle` affects only the control written to — during a drag as well
+- the protected `InputControlBase#addEventListener()` and `#removeEventListener()` take a typed callback, `((event: E) => void) | EventListenerObject` with `E extends Event`
+
+### Deprecated
+
+- deprecate the `keyCodes` option and the `PanControl2D#keyCodes` field in favour of `keys`: `KeyboardEvent.keyCode` depends on the keyboard layout. `keyCodes` still decides as long as it holds anything other than `[87, 83, 65, 68]` and `keys` holds its default — a `keyCodes` passed in or rebound in place keeps working, and `keys` wins where both are set
 
 ### Removed
 
@@ -207,6 +218,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VertexObjectPool#getVO()`: it answers `undefined` for an index that is no integer in `0` … `usedCount - 1` — a negative or fractional index builds no vertex object
 - fix `getter: false` and `setter: false` on an attribute: the vertex object gets no accessor for it
 - fix a component named like its attribute (`foo: {components: ['foo', 'bar']}` with one vertex): it gets its accessor
+- fix the horizontal inner margin `getContentAreaSize()` and `Display#resize()` subtract: it is taken from the left and right border and padding, so a canvas or size element with a border on top or bottom only keeps its full width
+- fix a `resize-to` value that is not a valid CSS selector: it is reported once via `console.warn` and falls back to `resizeToElement` or the canvas, like a selector that finds nothing
+- fix the `Display.MaxResolution` warning: it names the canvas size that was requested, before the clamp, and goes out once when either side exceeds the limit
+- fix the pointer handling of `PanControl2D`: a `pointercancel` ends a drag and drops what it collected, a `pointerdown` always anchors at its own position, a released pointer delivers the movement up to its release with the next `update()`, and a mouse drag ends where its pan button goes up, also while another button stays down
 
 ### Migration Guide
 
@@ -1527,6 +1542,23 @@ pool.fromBuffersData({capacity, usedCount, buffers: {static_uint32: Uint32Array.
 ```
 
 A capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or more.
+
+#### `PanControl2D` keys by `KeyboardEvent.code`
+
+`keyCodes` is deprecated. It keeps working, but it follows the keyboard layout; `keys` names the
+physical keys.
+
+**Before**
+
+```ts
+new PanControl2D({keyCodes: [38, 40, 37, 39]});
+```
+
+**After**
+
+```ts
+new PanControl2D({keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']});
+```
 
 ## [0.21.2] - 2026-06-19
 

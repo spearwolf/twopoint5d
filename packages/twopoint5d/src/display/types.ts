@@ -57,7 +57,8 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * or alternatively `"self"`. With `"self"`, the size of the canvas element is used as
    * the display size (this corresponds to the standard behavior if nothing is specified).
    * With `"fullscreen"` or `"window"`, the display element is synchronized with the
-   * window size accordingly.
+   * window size accordingly. Any other value is a CSS selector, looked up in the document or
+   * in the shadow root this element sits in.
    */
   resizeToAttributeEl?: HTMLElement;
 

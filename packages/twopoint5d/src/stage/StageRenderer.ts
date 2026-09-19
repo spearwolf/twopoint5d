@@ -598,7 +598,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const oldClearAlpha = renderer.getClearAlpha();
     let colorWasOverridden = false;
     if (this.#clearColor != null) {
-      renderer.getClearColor(this.#oldClearColor as any);
+      renderer.getClearColor(this.#oldClearColor);
       renderer.setClearColor(this.#clearColor, this.clearAlpha);
       colorWasOverridden = true;
     } else {

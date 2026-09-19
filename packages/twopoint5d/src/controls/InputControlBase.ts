@@ -1,9 +1,10 @@
 import {expectDefined} from '../utils/expectDefined.js';
 
 export class InputControlBase {
-  readonly #listeners: [host: EventTarget, eventName: string, callback: any, passive: boolean][] = [];
+  readonly #listeners: [host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject, passive: boolean][] =
+    [];
 
-  #findListenerIndex = (host: EventTarget, eventName: string, callback: any, passive = true) => {
+  #findListenerIndex = (host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject, passive = true) => {
     return this.#listeners.findIndex(
       (listener) => listener[0] === host && listener[1] === eventName && listener[2] === callback && listener[3] === passive,
     );
@@ -11,22 +12,40 @@ export class InputControlBase {
 
   #active = true;
 
-  protected addEventListener(host: EventTarget, eventName: string, callback: any, passive = true) {
+  protected addEventListener<E extends Event>(
+    host: EventTarget,
+    eventName: string,
+    callback: ((event: E) => void) | EventListenerObject,
+    passive = true,
+  ) {
+    // the caller names the event type the host sends under eventName; the host itself promises
+    // no more than an Event
+    const listener = callback as EventListenerOrEventListenerObject;
+
     // a disposed control takes no new listener. Without this, the public setters of a
     // subclass would refill the list on an instance that is out of service, and the closures
     // and host references in it would stay reachable for as long as anybody holds the control
     if (this.#disposed) return;
 
-    if (this.#findListenerIndex(host, eventName, callback, passive) === -1) {
-      this.#listeners.push([host, eventName, callback, passive]);
+    if (this.#findListenerIndex(host, eventName, listener, passive) === -1) {
+      this.#listeners.push([host, eventName, listener, passive]);
       if (this.#active) {
-        host.addEventListener(eventName, callback, {passive});
+        host.addEventListener(eventName, listener, {passive});
       }
     }
   }
 
-  protected removeEventListener(host: EventTarget, eventName: string, callback: any, passive = true) {
-    const index = this.#findListenerIndex(host, eventName, callback, passive);
+  protected removeEventListener<E extends Event>(
+    host: EventTarget,
+    eventName: string,
+    callback: ((event: E) => void) | EventListenerObject,
+    passive = true,
+  ) {
+    // the caller names the event type the host sends under eventName; the host itself promises
+    // no more than an Event
+    const listener = callback as EventListenerOrEventListenerObject;
+
+    const index = this.#findListenerIndex(host, eventName, listener, passive);
     if (index >= 0) {
       if (this.#active) {
         const [host, eventName, callback] = expectDefined(this.#listeners[index], `the listener at index ${index}`);

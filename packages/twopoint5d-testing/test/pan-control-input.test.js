@@ -18,13 +18,13 @@ function makeBox({left = 0, width = 200, height = 200} = {}) {
 
 // the control listens on `document`, so an event dispatched anywhere in the document reaches it;
 // the element it is dispatched on decides what `event.target` is
-function pointer(target, type, {x = 0, y = 0, buttons = 1} = {}) {
+function pointer(target, type, {x = 0, y = 0, buttons = 1, pointerId = 1, pointerType = 'mouse'} = {}) {
   target.dispatchEvent(
     new PointerEvent(type, {
       bubbles: true,
-      pointerId: 1,
+      pointerId,
       isPrimary: true,
-      pointerType: 'mouse',
+      pointerType,
       buttons,
       clientX: x,
       clientY: y,
@@ -146,5 +146,74 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     expect(restores, 'restoreCursor events after a drag that hid the cursor').to.equal(1);
     expect(box.classList.length, 'the cursor class after the drag').to.equal(0);
+  });
+
+  it('a pointer the browser cancels gives the next drag no head start', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    const touch = {pointerId: 7, pointerType: 'touch'};
+    pointer(box, 'pointerdown', {...touch, x: 10, y: 10});
+    pointer(box, 'pointermove', {...touch, x: 30, y: 10});
+    pointer(box, 'pointercancel', {...touch, x: 30, y: 10});
+
+    pointer(box, 'pointerdown', {...touch, x: 100, y: 10});
+    pointer(box, 'pointermove', {...touch, x: 110, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-10);
+  });
+
+  it('a pointerdown on a pointer that never came up starts where it is', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    pointer(box, 'pointerdown', {x: 10, y: 10});
+    pointer(box, 'pointermove', {x: 30, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x after the first drag').to.equal(-20);
+
+    // the pointerup of the first drag never arrived
+    pointer(box, 'pointerdown', {x: 100, y: 10});
+    pointer(box, 'pointermove', {x: 110, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x after the second drag').to.equal(-30);
+  });
+
+  it('a drag released between two updates delivers its last movement', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    pointer(box, 'pointerdown', {x: 10, y: 10});
+    pointer(box, 'pointermove', {x: 30, y: 10});
+    pointer(box, 'pointerup', {x: 30, y: 10, buttons: 0});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-20);
+  });
+
+  it('a pan button let go during a drag ends the pan where it was let go', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    // the left button pans, the right one joins, the left one lets go: the browser reports the
+    // last step as a pointermove, and the pointerup only comes with the right button
+    pointer(box, 'pointerdown', {x: 10, y: 10, buttons: 1});
+    pointer(box, 'pointermove', {x: 30, y: 10, buttons: 1});
+    pointer(box, 'pointermove', {x: 60, y: 10, buttons: 2});
+    pointer(box, 'pointerup', {x: 90, y: 10, buttons: 0});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-20);
   });
 });

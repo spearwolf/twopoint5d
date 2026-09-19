@@ -134,6 +134,37 @@ describe('FixedFrameLoop', () => {
     expect(sim.fps).toBe(60);
   });
 
+  it.each([0, -60, NaN, Infinity])('the constructor keeps DefaultFps for an fps of %s', (fps) => {
+    const loop = new FixedFrameLoop(makeFakeDisplay(), {fps});
+    const loopTicks: FixedFrameLoopTickProps[] = [];
+    loop.onTick((p) => loopTicks.push(p));
+
+    expect(loop.fps).toBe(60);
+    expect(loop.fixedDelta).toBeCloseTo(1 / 60);
+
+    emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 60));
+    expect(loopTicks).toHaveLength(1);
+  });
+
+  it.each([0, -1, 0.5, NaN, Infinity])('maxStepsPerFrame refuses %s', (value) => {
+    sim.maxStepsPerFrame = value;
+    expect(sim.maxStepsPerFrame).toBe(5);
+
+    emit(display, OnDisplayRenderFrame, makeFrame(0.05));
+    expect(ticks).toHaveLength(3);
+  });
+
+  it('the constructor keeps DefaultMaxStepsPerFrame for a maxStepsPerFrame of 0', () => {
+    const loop = new FixedFrameLoop(makeFakeDisplay(), {maxStepsPerFrame: 0});
+
+    expect(loop.maxStepsPerFrame).toBe(5);
+  });
+
+  it('maxStepsPerFrame takes 1 and above', () => {
+    sim.maxStepsPerFrame = 2;
+    expect(sim.maxStepsPerFrame).toBe(2);
+  });
+
   it('reset() clears accumulator, tickTime, tickNo and alpha', () => {
     emit(display, OnDisplayRenderFrame, makeFrame(0.05));
     expect(sim.tickNo).toBe(3);
