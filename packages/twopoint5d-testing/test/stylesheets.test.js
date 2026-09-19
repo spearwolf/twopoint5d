@@ -79,4 +79,86 @@ describe('Stylesheets', function () {
     expect(findRule(classNameA, rootA), 'the rule inside the first shadow root').to.exist;
     expect(findRule(classNameB, rootB), 'the rule inside the second shadow root').to.exist;
   });
+
+  it('a rule retained twice stays until it is released twice', () => {
+    const root = makeShadowRoot();
+    const name = uniqueName('retained-twice');
+
+    const className = Stylesheets.retainRule(name, 'cursor: pointer;', root);
+    Stylesheets.retainRule(name, 'cursor: pointer;', root);
+
+    Stylesheets.releaseRule(name, root);
+
+    expect(findRule(className, root), 'the rule after the first release').to.exist;
+
+    Stylesheets.releaseRule(name, root);
+
+    expect(findRule(className, root), 'the rule after the second release').to.not.exist;
+    expect(ruleCount(root), 'rules in the sheet').to.equal(0);
+  });
+
+  it('releasing a rule leaves the rules after it in place', () => {
+    const root = makeShadowRoot();
+    const nameA = uniqueName('release-first');
+    const nameB = uniqueName('release-second');
+
+    Stylesheets.retainRule(nameA, 'cursor: pointer;', root);
+    const classNameB = Stylesheets.retainRule(nameB, 'cursor: crosshair;', root);
+
+    Stylesheets.releaseRule(nameA, root);
+
+    expect(ruleCount(root), 'rules in the sheet').to.equal(1);
+    expect(findRule(classNameB, root)?.style.cursor, 'the cursor of the rule that stayed').to.equal('crosshair');
+  });
+
+  it('a rule installRule put there stays after its last release', () => {
+    const root = makeShadowRoot();
+    const name = uniqueName('pinned');
+
+    const className = Stylesheets.installRule(name, 'cursor: pointer;', root);
+    Stylesheets.retainRule(name, 'cursor: pointer;', root);
+    Stylesheets.releaseRule(name, root);
+
+    expect(findRule(className, root), 'the rule after the release').to.exist;
+    expect(ruleCount(root), 'rules in the sheet').to.equal(1);
+  });
+
+  it('a release without a retain changes nothing', () => {
+    const untouchedRoot = makeShadowRoot();
+
+    expect(
+      () => Stylesheets.releaseRule(uniqueName('never-retained'), untouchedRoot),
+      'a release in a root without a sheet',
+    ).to.not.throw();
+    expect(untouchedRoot.querySelector('style'), 'the sheet of a root nothing was written to').to.equal(null);
+
+    const root = makeShadowRoot();
+    const name = uniqueName('released-too-often');
+
+    Stylesheets.retainRule(name, 'cursor: pointer;', root);
+    Stylesheets.releaseRule(name, root);
+
+    expect(() => Stylesheets.releaseRule(name, root), 'the second release').to.not.throw();
+    expect(ruleCount(root), 'rules in the sheet').to.equal(0);
+  });
+
+  it('a retain with a different css rewrites the rule', () => {
+    const root = makeShadowRoot();
+    const name = uniqueName('retain-rewrites');
+
+    Stylesheets.retainRule(name, 'cursor: pointer;', root);
+    const className = Stylesheets.retainRule(name, 'cursor: crosshair;', root);
+
+    expect(ruleCount(root), 'rules in the sheet').to.equal(1);
+    expect(findRule(className, root)?.style.cursor, 'the cursor the sheet carries').to.equal('crosshair');
+  });
+
+  it('retainRule returns the class name installRule returns for the name', () => {
+    const name = uniqueName('same-class-name');
+
+    const retained = Stylesheets.retainRule(name, 'cursor: pointer;');
+    const installed = Stylesheets.installRule(name, 'cursor: pointer;');
+
+    expect(retained).to.equal(installed);
+  });
 });

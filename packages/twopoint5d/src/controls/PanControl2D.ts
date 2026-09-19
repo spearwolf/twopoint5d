@@ -175,6 +175,8 @@ export class PanControl2D extends InputControlBase {
   // Assigned in the constructor through the `cursorPanStyle` setter.
   #cursorPanStyle!: string;
   #cursorPanClass?: string;
+  // the rule this control currently holds at Stylesheets, given back when it moves on or is disposed
+  #cursorPanRuleName?: string;
   #cursorStylesTarget?: HTMLElement;
   #styleSheetRoot: HTMLElement | ShadowRoot;
   #hideCursorState = HideCursorState.NO;
@@ -215,7 +217,7 @@ export class PanControl2D extends InputControlBase {
 
     this.pixelsPerSecond = readOption(options, 'speed', 100);
 
-    // before the cursorPanStyle below: the setter installs the rule, and it has to know by
+    // before the cursorPanStyle below: the setter retains the rule, and it has to know by
     // then which root the rule belongs in
     this.#styleSheetRoot = readOption(options, 'styleSheetRoot', document.head);
 
@@ -240,11 +242,12 @@ export class PanControl2D extends InputControlBase {
    * Set the cursor css style shown while panning.
    *
    * Every cursor style has a rule of its own, which controls showing the same style share and
-   * whose css never changes: a write moves only this control onto another rule. Written during
-   * a drag, the new cursor shows at once.
+   * whose css never changes: a write moves only this control onto another rule. The control gives
+   * the previous rule back, and a rule no living control shows any more leaves the stylesheet.
+   * Written during a drag, the new cursor shows at once.
    *
    * On a disposed control the write is refused and the getter keeps its last value: a disposed
-   * control installs no more rules into a stylesheet that is not its own, and has no target
+   * control retains no more rules from a stylesheet that is not its own, and has no target
    * left to carry the class.
    */
   set cursorPanStyle(value: string) {
@@ -253,9 +256,13 @@ export class PanControl2D extends InputControlBase {
 
     if (this.#cursorPanStyle !== value) {
       const prevClass = this.#cursorPanClass;
+      const prevRuleName = this.#cursorPanRuleName;
 
       this.#cursorPanStyle = value;
-      this.#cursorPanClass = this.#installCursorPanStyleRules();
+
+      const cursor = value || 'auto';
+      this.#cursorPanRuleName = cursorRuleName(cursor);
+      this.#cursorPanClass = Stylesheets.retainRule(this.#cursorPanRuleName, `cursor: ${cursor}`, this.#styleSheetRoot);
 
       // the target carries the old class while the cursor is hidden; left there, the restore
       // would take off the new one and the old one would stay for good
@@ -264,13 +271,14 @@ export class PanControl2D extends InputControlBase {
         if (prevClass) target.classList.remove(prevClass);
         target.classList.add(this.#cursorPanClass);
       }
+
+      // the new rule is taken before the old one is given back: '' and 'auto' share a rule, and
+      // the other way round it would leave the sheet only to be put there again at once
+      if (prevRuleName != null) {
+        Stylesheets.releaseRule(prevRuleName, this.#styleSheetRoot);
+      }
     }
   }
-
-  #installCursorPanStyleRules = (): string => {
-    const cursor = this.#cursorPanStyle || 'auto';
-    return Stylesheets.installRule(cursorRuleName(cursor), `cursor: ${cursor}`, this.#styleSheetRoot);
-  };
 
   // Assigned in the constructor through the `panView` setter, which substitutes a default for a missing state.
   #panView!: PanViewState;
@@ -500,12 +508,11 @@ export class PanControl2D extends InputControlBase {
     }
     // the pan button went up without a pointerup: released outside the window, or let go while
     // another button stays down, where the browser reports a pointermove. It ends the pan where
-    // it was let go, so the position of this move does not count
+    // it was let go, so the position of this move does not count. The cursor goes back with the
+    // pan, as it does for a pointerup — and the case of no button at all runs through here too
     if (event.pointerType === MOUSE && (event.buttons & this.mouseButton) === 0) {
       this.#endPointer(event.pointerId, true);
-    }
-    if (event.pointerType === MOUSE && event.buttons === 0) {
-      this.#restoreCursorStyle();
+      this.#restoreCursorUnlessMouseDown();
     }
   };
 
@@ -570,17 +577,19 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Take every listener off `document`, give the cursor styles target back the way it was
-   * found and drop the pan that was collected but never delivered.
+   * found, give the cursor rule back to the stylesheet and drop the pan that was collected but
+   * never delivered.
    *
    * The `state` object and the `cursorStylesTarget` element were handed in and stay the
    * caller's: the state keeps the values the last {@link update} wrote, and the element keeps
-   * everything but the cursor class this control put on it.
+   * everything but the cursor class this control put on it. The cursor rule stays in the
+   * stylesheet for as long as another control in the same root shows the same cursor style.
    *
    * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
    * reaches this control any more. {@link update} still moves {@link panView} by the speed
    * fields a caller sets by hand, and by a key that was still held down when `dispose()` ran
    * gives its field back — what it no longer delivers is a pan from a drag before the call. A
-   * write to {@link cursorPanStyle} is refused: a disposed control installs no more rules into
+   * write to {@link cursorPanStyle} is refused: a disposed control retains no more rules from
    * a stylesheet that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`,
    * `keyboardDisabled`, `pointerDisabled`,
    * `panView` and the four `speed…` fields still take values, they just drive nothing. A
@@ -595,6 +604,14 @@ export class PanControl2D extends InputControlBase {
     // input sources were holding — while the listeners of this control are still attached, so
     // the restoreCursor that goes out on the way still reaches them
     super.dispose();
+
+    // after super.dispose(): the cursor class is off the target by then (unsubscribe() restores
+    // the cursor), so no element points at a rule that may leave the sheet here. unsubscribe()
+    // keeps the rule, because a control that subscribes again still needs it
+    if (this.#cursorPanRuleName != null) {
+      Stylesheets.releaseRule(this.#cursorPanRuleName, this.#styleSheetRoot);
+      this.#cursorPanRuleName = undefined;
+    }
 
     // last: the restoreCursor above still has to reach the listeners that act on it
     off(this);

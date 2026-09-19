@@ -1,6 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
-import {PanControl2D} from '@spearwolf/twopoint5d';
+import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 
 // the default keys of PanControl2D, in the order the class reads them: up, down, left, right —
 // the KeyboardEvent.code of the keys at the W, S, A and D positions
@@ -66,8 +66,9 @@ describe('PanControl2D — the contract after dispose()', () => {
   // neither. Its events run through eventize, and the case about a listener from before
   // dispose() is what covers their teardown.
 
-  // Assertion (f) — "gives every slot it took back" — has no subject: the control takes no
-  // slot from a pool or a factory, the pointer states in `#pointersDown` are its own objects.
+  // Assertion (f) — "gives every slot it took back" — has as its subject the cursor rule the
+  // control retains from Stylesheets: dispose() gives it back, and only once. The pointer states
+  // in `#pointersDown` are its own objects and have nothing to give back.
 
   it('reacts to keyboard and pointer while it is alive', () => {
     control = new PanControl2D({state: makeState()});
@@ -198,6 +199,28 @@ describe('PanControl2D — the contract after dispose()', () => {
     key('keydown', KEY_EAST);
     expect(control.speedEast, 'speedEast').to.equal(0);
     key('keyup', KEY_EAST);
+  });
+
+  it('gives its cursor rule back, and only once', () => {
+    const release = Stylesheets.releaseRule;
+    const calls = [];
+    Stylesheets.releaseRule = (...args) => {
+      calls.push(args);
+      return release.apply(Stylesheets, args);
+    };
+
+    try {
+      control = new PanControl2D({state: makeState(), cursorPanStyle: 'grabbing'});
+
+      control.dispose();
+      control.dispose();
+    } finally {
+      Stylesheets.releaseRule = release;
+    }
+
+    expect(calls.length, 'releaseRule() calls').to.equal(1);
+    expect(calls[0][0], 'the name of the rule').to.equal('PanControl2D-grabbing');
+    expect(calls[0][1], 'the root of the rule').to.equal(document.head);
   });
 
   it('is safe to call twice', () => {
