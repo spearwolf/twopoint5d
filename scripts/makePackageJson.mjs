@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
 import YAML from 'yaml';
+import {findUnpublishableSpecifiers} from './makePackageJson/findUnpublishableSpecifiers.mjs';
+import {resolveDependencies} from './makePackageJson/resolveDependencies.mjs';
 
 const workspaceRoot = path.resolve(fileURLToPath(import.meta.url), '../../');
 const projectRoot = path.resolve(process.cwd());
@@ -28,9 +30,12 @@ const outPackageJson = {
 
 [[outPackageJson, ['main', 'module', 'types']], [outPackageJson.exports]].forEach(removeDistPathPrefix);
 
-resolveDependencies(outPackageJson.dependencies);
-resolveDependencies(outPackageJson.devDependencies);
-resolveDependencies(outPackageJson.peerDependencies);
+const context = {workspaceRoot, pnpmWorkspaceConfig, sharedDependencies, referencedFrom: inPackageJson.name};
+
+resolveDependencies(outPackageJson.dependencies, context);
+resolveDependencies(outPackageJson.devDependencies, context);
+resolveDependencies(outPackageJson.peerDependencies, context);
+resolveDependencies(outPackageJson.optionalDependencies, context);
 
 for (const [key, value] of Object.entries(packageJsonOverride)) {
   if (value == null) {
@@ -40,54 +45,20 @@ for (const [key, value] of Object.entries(packageJsonOverride)) {
   }
 }
 
+// a manifest that still names a pnpm protocol cannot be installed from npm
+const unpublishable = findUnpublishableSpecifiers(outPackageJson);
+if (unpublishable.length > 0) {
+  for (const {section, name, specifier} of unpublishable) {
+    console.error(
+      `cannot publish ${inPackageJson.name}: ${section}.${name} is "${specifier}", which resolves to no version range`,
+    );
+  }
+  process.exit(1);
+}
+
 const releasePackageJsonPath = path.resolve(projectRoot, 'dist/package.json');
 console.log('Write to', releasePackageJsonPath);
 fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
-
-// --------------------------------------------------------------------------------------------
-
-function resolveDependencies(dependenciesSection) {
-  if (dependenciesSection) {
-    Object.entries(dependenciesSection).forEach(([depName, version]) => {
-      const isCatalog = version.startsWith('catalog:');
-      if (isCatalog || version.startsWith('workspace:') || version === '*') {
-        const pkgVersion = resolvePackageVersion(depName, isCatalog);
-        if (pkgVersion) {
-          dependenciesSection[depName] = pkgVersion;
-        }
-      }
-    });
-  }
-}
-
-function resolvePackageVersion(pkgName, isCatalog) {
-  if (isCatalog) {
-    const pkgVersion = pnpmWorkspaceConfig.catalog[pkgName];
-    if (pkgVersion) {
-      console.log('resolve package version from workspace catalog', pkgName, '->', pkgVersion);
-      return pkgVersion;
-    }
-  }
-
-  const pkgNameWithoutScope = pkgName.replace(/^@[^/]+\//, '');
-  const pkgJsonPath = path.resolve(workspaceRoot, `packages/${pkgNameWithoutScope}/package.json`);
-
-  if (fs.existsSync(pkgJsonPath)) {
-    const pkgJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-    const pkgVersion = `^${pkgJson.version.replace(/-dev$/, '')}`;
-    console.log('resolve package version', pkgName, '->', pkgVersion);
-    return pkgVersion;
-  }
-
-  const pkgVersion = sharedDependencies[pkgName];
-  if (pkgVersion && !pkgVersion.startsWith('workspace:')) {
-    console.log('resolve shared package version', pkgName, '->', pkgVersion);
-    return pkgVersion;
-  }
-
-  console.warn('oops.. workspace package not found:', pkgName, '->', pkgNameWithoutScope, 'referenced from:', inPackageJson.name);
-  return undefined;
-}
 
 // --------------------------------------------------------------------------------------------
 

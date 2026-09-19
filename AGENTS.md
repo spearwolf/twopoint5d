@@ -32,13 +32,15 @@ All from the repo root. Node ≥24, pnpm ≥10.22 (`engines` in `package.json`).
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
+- `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline
+  (`scripts/**/*.test.mjs`); no Nx project owns them, so `pnpm test` does not run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
-  checkPkgTypes, checkNameableTypes, lintPkg, test:ci, test:browser. Run it before
-  committing.
+  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:ci, test:browser. Run
+  it before committing.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.

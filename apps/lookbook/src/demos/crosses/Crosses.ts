@@ -1,5 +1,5 @@
 import {getDescriptorOf, type VO} from '@spearwolf/twopoint5d';
-import {Matrix4, Vector3} from 'three/webgpu';
+import {MathUtils, Matrix4, Vector3} from 'three/webgpu';
 
 export interface Cross extends VO {
   x0: number;
@@ -74,9 +74,8 @@ export class Cross {
       ]);
   }
 
-  rotate(angle: number) {
-    const theta = (angle * 180) / Math.PI;
-    this.transform(new Matrix4().makeRotationZ(theta));
+  rotate(degrees: number) {
+    this.transform(new Matrix4().makeRotationZ(MathUtils.degToRad(degrees)));
   }
 
   translate(x: number, y: number, z = 0) {

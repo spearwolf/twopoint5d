@@ -2,6 +2,7 @@ import {exec, execSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {isNotPublishedError, parsePublishedVersions} from './publishNpmPkg/publishedVersions.mjs';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -27,7 +28,7 @@ if (pkgJson.version.endsWith('-dev')) {
 
 exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
   if (!error) {
-    const versions = JSON.parse(stdout);
+    const versions = parsePublishedVersions(stdout);
     console.log('already published versions: ---');
     console.dir(versions);
 
@@ -37,7 +38,7 @@ exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
     } else {
       publishPackage(packageRoot);
     }
-  } else if (stderr && stderr.toString().includes('npm ERR! code E404')) {
+  } else if (isNotPublishedError(stderr)) {
     console.log('oh it looks like this is the first time to publish the package');
     publishPackage(packageRoot);
   } else {

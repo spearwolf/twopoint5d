@@ -30,6 +30,9 @@ import {description, showSource, title} from './_crosses.json';
   const SIZE = 15;
   const OFFSET = 1.2;
   const OFFSET_Z = -5;
+  // degrees each cross turns against the one in front of it: over its depth a column
+  // turns by almost a quarter turn, the angle after which a cross looks the same again
+  const TWIST = 90 / ROWS;
 
   // the <canvas id="canvas-container"> is written by the markup of this very page
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
@@ -44,7 +47,7 @@ import {description, showSource, title} from './_crosses.json';
         const cross = geometry.pool.createVO()!;
 
         cross.make(SIZE, SIZE, 1 / 8, 1 / 2, OFFSET_Z * j);
-        cross.rotate(i * 45 + j * 0.2);
+        cross.rotate(i * 45 + j * TWIST);
         cross.translate(i * SIZE * OFFSET - ((COLS - 1) * SIZE * OFFSET) / 2, 0);
       }
     }

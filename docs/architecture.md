@@ -48,7 +48,7 @@ the library rebuilds).
 `pnpm run ci` (alias `pnpm cbt`) chains:
 
 ```
-clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:ci → test:browser
+clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:ci → test:browser
 ```
 
 - `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`/`.js`.
@@ -60,6 +60,8 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   `attw` and `publint` resolve such a type structurally and stay quiet, which is
   exactly why this check exists.
 - `lintPkg` runs publint against `dist/`.
+- `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
+  pipeline's helpers (§4).
 
 ## 4. Build and publish pipeline
 
@@ -69,12 +71,22 @@ followed by `scripts/makePackageJson.mjs`.
 `makePackageJson.mjs` synthesizes the publish-time manifest from the source
 `package.json` merged with `package.override.json`. The override file's `null` entries
 strip development-only fields (`scripts`, `devDependencies`, tool configs) from what
-ships, and `catalog:` versions are resolved to real ranges from
-`pnpm-workspace.yaml`. `scripts/makeBanner.mjs` builds the version banner.
+ships. Specifiers are resolved to real ranges: `catalog:` and `catalog:<name>` from the
+default or the named catalog in `pnpm-workspace.yaml`; `workspace:` from the
+`package.json` of the package it names (`workspace:^` and `workspace:~` keep their
+operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is). If a
+`catalog:` or `workspace:` specifier is left in the manifest afterwards, the build
+fails — npm installs neither protocol. `scripts/makeBanner.mjs` builds the version
+banner.
+
+The logic of both scripts lives in `scripts/makePackageJson/` and
+`scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
+wire it up.
 
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
-publishes `dist/`. Never publish from `packages/twopoint5d/` and never run these
+publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a
+first publish. Never publish from `packages/twopoint5d/` and never run these
 scripts without being asked to.
 
 Changes under `scripts/` are changes to the publish pipeline. Treat them accordingly.
@@ -99,6 +111,10 @@ Two runners, deliberately in separate packages:
 - `@web/test-runner` with Playwright Chromium and Firefox in
   `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for
   anything that needs a real GPU context. Its `postinstall` installs the browsers.
+
+The helpers of the publish pipeline run under `node --test` (`pnpm test:scripts`); no
+Nx project owns them. Their specs import only the helper modules, never
+`publishNpmPkg.mjs`, which queries the registry as soon as it loads.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

@@ -60,6 +60,8 @@
       "{projectRoot}/package.json",
       "{projectRoot}/package.override.json",
       "{workspaceRoot}/scripts/makePackageJson.mjs",
+      "{workspaceRoot}/scripts/makePackageJson/*.mjs",
+      "!{workspaceRoot}/scripts/makePackageJson/*.test.mjs",
       "{workspaceRoot}/pnpm-workspace.yaml"
     ],
     "makeBanner": ["{workspaceRoot}/scripts/makeBanner.mjs", "{workspaceRoot}/scripts/makeBanner/*.mjs"],
