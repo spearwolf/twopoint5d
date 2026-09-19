@@ -284,6 +284,16 @@ export class PanControl2D extends InputControlBase {
   #panView!: PanViewState;
   #isFirstPanViewUpdate = true;
 
+  /**
+   * The view state this control moves: {@link update} shifts its `x` and `y` by the speed
+   * fields, the keys and the pointer, and writes them into this very object. Assigning
+   * `undefined` puts a fresh state at `0, 0` in its place.
+   *
+   * The first `update()` after a state is assigned — in the constructor through
+   * `options.state`, or here — emits `update` even when nothing moved, so a listener learns
+   * where the view starts. Assigning the state this control already holds changes nothing:
+   * before that first `update()` the announcement stays due, after it none is added.
+   */
   get panView(): PanViewState {
     return this.#panView;
   }
@@ -291,7 +301,12 @@ export class PanControl2D extends InputControlBase {
   set panView(panView: PanViewState | undefined) {
     const prevPanView = this.#panView;
     this.#panView = panView ?? {x: 0, y: 0, pixelRatio: globalThis.devicePixelRatio ?? 1};
-    this.#isFirstPanViewUpdate = prevPanView !== this.#panView;
+    // a new state makes the next update() announce it; the state already held changes nothing —
+    // assigned again before that update(), it still has to be announced, and only update()
+    // takes the announcement back
+    if (prevPanView !== this.#panView) {
+      this.#isFirstPanViewUpdate = true;
+    }
   }
 
   get keyboardDisabled(): boolean {
@@ -357,6 +372,10 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
+   * Move {@link panView} by what the speed fields, the keys and the pointer collected since
+   * the last call, and emit `update` with the new `x` and `y` when that moved the view — and
+   * on the first call after a state was assigned to {@link panView}, whether it moved or not.
+   *
    * @param t delta time since last `update()` call in seconds
    */
   update(t: number): void {

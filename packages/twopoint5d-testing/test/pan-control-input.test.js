@@ -120,6 +120,68 @@ describe('PanControl2D — what it measures and what it reports', () => {
     expect(updates, 'update events after an update() that moved nothing').to.equal(2);
   });
 
+  it('reports the first update() after a state that is assigned again before it', () => {
+    const state = makeState();
+    control = new PanControl2D({state, disablePointer: true, disableKeyboard: true});
+
+    let updates = 0;
+    let last;
+    on(control, 'update', (props) => {
+      updates += 1;
+      last = props;
+    });
+
+    control.panView = state;
+    control.update(1 / 60);
+
+    expect(updates, 'update events on the first update()').to.equal(1);
+    expect(last).to.deep.equal({x: 0, y: 0});
+
+    control.update(1 / 60);
+
+    expect(updates, 'update events after an update() that moved nothing').to.equal(1);
+  });
+
+  it('reports the first update() after a new state that is assigned twice before it', () => {
+    control = new PanControl2D({state: makeState(), disablePointer: true, disableKeyboard: true});
+
+    let updates = 0;
+    let last;
+    on(control, 'update', (props) => {
+      updates += 1;
+      last = props;
+    });
+
+    control.update(1 / 60);
+    expect(updates, 'update events on the first update()').to.equal(1);
+
+    const next = {x: 5, y: 7, pixelRatio: 1};
+    control.panView = next;
+    control.panView = next;
+    control.update(1 / 60);
+
+    expect(updates, 'update events after the new state').to.equal(2);
+    expect(last).to.deep.equal({x: 5, y: 7});
+  });
+
+  it('reports nothing for the state it holds assigned again after its first update()', () => {
+    const state = makeState();
+    control = new PanControl2D({state, disablePointer: true, disableKeyboard: true});
+
+    let updates = 0;
+    on(control, 'update', () => {
+      updates += 1;
+    });
+
+    control.update(1 / 60);
+    expect(updates, 'update events on the first update()').to.equal(1);
+
+    control.panView = state;
+    control.update(1 / 60);
+
+    expect(updates, 'update events after the same state was assigned again').to.equal(1);
+  });
+
   it('reports restoreCursor only for a cursor it hid', () => {
     const box = makeBox();
     boxes = [box];

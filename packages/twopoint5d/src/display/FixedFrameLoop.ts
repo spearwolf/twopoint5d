@@ -6,6 +6,11 @@ import type {DisplayEventProps} from './types.js';
 const OnTick = Symbol.for('twopoint5d:FixedFrameLoop.OnTick');
 const OnRender = Symbol.for('twopoint5d:FixedFrameLoop.OnRender');
 
+// what a loop starts with when neither its options nor the writable statics give a value it
+// can run with
+const BUILT_IN_FPS = 60;
+const BUILT_IN_MAX_STEPS_PER_FRAME = 5;
+
 export interface FixedFrameLoopTickProps {
   /** Fixed time step in seconds (`1 / fps`). */
   fixedDelta: number;
@@ -81,8 +86,19 @@ export class FixedFrameLoop {
   static OnTick = OnTick;
   static OnRender = OnRender;
 
-  static DefaultFps = 60;
-  static DefaultMaxStepsPerFrame = 5;
+  /**
+   * The rate a loop starts at when its options name none, or one it refuses. Read each time a
+   * loop is built; a value that is not finite or not greater than 0 is ignored there, and the
+   * loop starts at 60.
+   */
+  static DefaultFps = BUILT_IN_FPS;
+
+  /**
+   * The `maxStepsPerFrame` a loop starts with when its options name none, or one it refuses.
+   * Read each time a loop is built; a value that is not finite or smaller than 1 is ignored
+   * there, and the loop starts with 5.
+   */
+  static DefaultMaxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
 
   readonly display: Display;
 
@@ -107,7 +123,8 @@ export class FixedFrameLoop {
    * run; `alpha` drops back to ~0 on the next frame).
    *
    * A value that is not finite or smaller than 1 is ignored, in the
-   * constructor as well as here.
+   * constructor as well as here; the constructor then keeps `DefaultMaxStepsPerFrame`, or 5 when
+   * that is such a value too.
    */
   get maxStepsPerFrame(): number {
     return this.#maxStepsPerFrame;
@@ -124,7 +141,8 @@ export class FixedFrameLoop {
    * Target simulation rate in frames per second.
    *
    * A value that is not finite or not greater than 0 is ignored — in the
-   * constructor as well, where the loop then keeps `DefaultFps`.
+   * constructor as well, where the loop then keeps `DefaultFps`, or 60 when that is such a value
+   * too.
    */
   get fps(): number {
     return this.#fps;
@@ -165,11 +183,13 @@ export class FixedFrameLoop {
 
     this.display = display;
 
-    // the defaults first, then the options through the setters, which refuse a rate the loop
-    // cannot run at
-    this.#fps = FixedFrameLoop.DefaultFps;
-    this.#fixedDelta = 1 / FixedFrameLoop.DefaultFps;
-    this.#maxStepsPerFrame = FixedFrameLoop.DefaultMaxStepsPerFrame;
+    // the built-in values first, then the writable defaults and the options through the setters,
+    // which refuse a rate the loop cannot run at — a default gets the same check as an option
+    this.#fps = BUILT_IN_FPS;
+    this.#fixedDelta = 1 / BUILT_IN_FPS;
+    this.#maxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
+    this.fps = FixedFrameLoop.DefaultFps;
+    this.maxStepsPerFrame = FixedFrameLoop.DefaultMaxStepsPerFrame;
     if (options?.fps != null) this.fps = options.fps;
     if (options?.maxStepsPerFrame != null) this.maxStepsPerFrame = options.maxStepsPerFrame;
 

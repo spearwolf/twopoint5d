@@ -1,5 +1,5 @@
 import {emit, eventize, getSubscribedEventNames, getSubscriptionCount} from '@spearwolf/eventize';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
 import {FixedFrameLoop, type FixedFrameLoopRenderProps, type FixedFrameLoopTickProps} from './FixedFrameLoop.js';
 import type {Display} from './Display.js';
@@ -175,6 +175,72 @@ describe('FixedFrameLoop', () => {
     expect(sim.tickNo).toBe(0);
     expect(sim.tickTime).toBe(0);
     expect(sim.alpha).toBe(0);
+  });
+
+  describe('default statics the loop cannot run with', () => {
+    // the statics are global: a value left behind would spoil every following test of the file
+    const shippedFps = FixedFrameLoop.DefaultFps;
+    const shippedMaxStepsPerFrame = FixedFrameLoop.DefaultMaxStepsPerFrame;
+
+    afterEach(() => {
+      FixedFrameLoop.DefaultFps = shippedFps;
+      FixedFrameLoop.DefaultMaxStepsPerFrame = shippedMaxStepsPerFrame;
+    });
+
+    it.each([0, -60, NaN, Infinity])('ignores a DefaultFps of %s and runs at 60', (fps) => {
+      FixedFrameLoop.DefaultFps = fps;
+      const loop = new FixedFrameLoop(makeFakeDisplay());
+      const loopTicks: FixedFrameLoopTickProps[] = [];
+      loop.onTick((p) => loopTicks.push(p));
+
+      expect(loop.fps).toBe(60);
+      expect(loop.fixedDelta).toBeCloseTo(1 / 60);
+
+      emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 60));
+      expect(loopTicks).toHaveLength(1);
+    });
+
+    it.each([0, -60, NaN, Infinity])('falls back past a DefaultFps of %s to 60 for an fps option it refuses', (fps) => {
+      FixedFrameLoop.DefaultFps = fps;
+      const loop = new FixedFrameLoop(makeFakeDisplay(), {fps: 0});
+
+      expect(loop.fps).toBe(60);
+      expect(loop.fixedDelta).toBeCloseTo(1 / 60);
+    });
+
+    it.each([0, -1, 0.5, NaN, Infinity])('ignores a DefaultMaxStepsPerFrame of %s and takes 5', (value) => {
+      FixedFrameLoop.DefaultMaxStepsPerFrame = value;
+      const loop = new FixedFrameLoop(makeFakeDisplay());
+      const loopTicks: FixedFrameLoopTickProps[] = [];
+      loop.onTick((p) => loopTicks.push(p));
+
+      expect(loop.maxStepsPerFrame).toBe(5);
+
+      emit(loop.display, OnDisplayRenderFrame, makeFrame(1.0));
+      expect(loopTicks).toHaveLength(5);
+    });
+
+    it('falls back past a DefaultMaxStepsPerFrame of 0 to 5 for a maxStepsPerFrame option it refuses', () => {
+      FixedFrameLoop.DefaultMaxStepsPerFrame = 0;
+      const loop = new FixedFrameLoop(makeFakeDisplay(), {maxStepsPerFrame: 0});
+
+      expect(loop.maxStepsPerFrame).toBe(5);
+    });
+
+    it('starts from a DefaultFps and DefaultMaxStepsPerFrame it can run with', () => {
+      FixedFrameLoop.DefaultFps = 30;
+      FixedFrameLoop.DefaultMaxStepsPerFrame = 2;
+
+      const loop = new FixedFrameLoop(makeFakeDisplay());
+      expect(loop.fps).toBe(30);
+      expect(loop.fixedDelta).toBeCloseTo(1 / 30);
+      expect(loop.maxStepsPerFrame).toBe(2);
+
+      // the option wins; an option the setter refuses leaves the default standing
+      const optioned = new FixedFrameLoop(makeFakeDisplay(), {fps: 120, maxStepsPerFrame: 0});
+      expect(optioned.fps).toBe(120);
+      expect(optioned.maxStepsPerFrame).toBe(2);
+    });
   });
 
   describe('dispose()', () => {
