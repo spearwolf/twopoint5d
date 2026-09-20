@@ -10,7 +10,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
     tagCategories.map((category) => (
       <>
         <h3 class="tag-category">{category.name}</h3>
-        <p class="tag-catgeory-description">{category.description}</p>
+        <p class="tag-category-description">{category.description}</p>
         <ul class="tag-cloud-filter">
           {/* the category tag names are filled from the keys of `tags`, so the map holds every one of them */}
           {category.tags.sort().map((tag) => (
@@ -95,7 +95,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
     margin-bottom: 0.5rem;
     color: var(--color-primary);
   }
-  .tag-catgeory-description {
+  .tag-category-description {
     margin-bottom: 0.5rem;
     color: var(--color-primary);
     font-size: var(--tag-font-size);
