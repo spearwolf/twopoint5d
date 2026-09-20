@@ -149,7 +149,7 @@ export class OrthographicProjection implements IProjection {
     camera.updateProjectionMatrix();
   }
 
-  getZoom(_distanceToProjectionPlane: number): number {
+  getZoom(_distanceToCamera: number): number {
     // since this is an orthographic view, the zoom factor is always the same
     return 1;
   }

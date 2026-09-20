@@ -211,11 +211,13 @@ export class Canvas2DStage {
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
    * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do
-   * nothing. `canvas`, `renderer`, `projection`, `scene`, `sprite`, `width`, `height` and
-   * `needsUpdate` keep the values the stage was left with. The `readonly` fields {@link stage}
-   * and {@link stageRenderer} answer with the same instance as before, and both of them report
-   * `isDisposed === true`. A `dispose` event goes out to every subscriber before this stage
-   * stops listening; no event follows it.
+   * nothing. `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the
+   * values the stage was left with. {@link width} and {@link height} read `canvas.width` and
+   * `canvas.height`, so they keep answering with whatever stands at the canvas — including what
+   * the caller sets there later. The `readonly` fields {@link stage} and {@link stageRenderer}
+   * answer with the same instance as before, and both of them report `isDisposed === true`. A
+   * `dispose` event goes out to every subscriber before this stage stops listening; no event
+   * follows it.
    */
   dispose(): void {
     if (this.#disposed) return;

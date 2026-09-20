@@ -40,4 +40,40 @@ describe('HelpersManager', () => {
     expect(node.parent, 'the node is still the callers').toBe(null);
     expect(node.userData['isHelper'], 'and it was not marked either').toBeUndefined();
   });
+
+  test('a scene this manager was never given keeps the nodes in the root', () => {
+    const manager = new HelpersManager();
+    const root = new Object3D();
+    const scene = new Object3D();
+    root.add(scene);
+    const node = new Object3D();
+    const rootNode = new Object3D();
+
+    manager.scene = scene;
+    manager.add(node);
+    manager.add(rootNode, true);
+
+    manager.removeFromScene(new Object3D());
+
+    expect(scene.children, 'the node in the scene this manager holds stays there').toContain(node);
+    expect(root.children, 'and so does the one in the root above it').toContain(rootNode);
+  });
+
+  test('remove() takes the nodes out of the scene and out of the root above it', () => {
+    const manager = new HelpersManager();
+    const root = new Object3D();
+    const scene = new Object3D();
+    root.add(scene);
+    const node = new Object3D();
+    const rootNode = new Object3D();
+
+    manager.scene = scene;
+    manager.add(node);
+    manager.add(rootNode, true);
+
+    manager.remove();
+
+    expect(scene.children).toHaveLength(0);
+    expect(root.children, 'the scene stays a child of the root, the helper node does not').toEqual([scene]);
+  });
 });

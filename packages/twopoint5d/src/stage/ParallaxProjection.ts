@@ -151,20 +151,20 @@ export class ParallaxProjection implements IProjection {
   }
 
   /**
-   * The factor a plane sitting `distanceToProjectionPlane` in front of the camera is carried
-   * along with, measured against the projection plane.
+   * The factor a plane sitting `distanceToCamera` in front of the camera is carried along with,
+   * measured against the projection plane.
    *
    * The field of view of this projection follows the distance `D` at which it puts its own
    * projection plane — `fovy = 2·atan(halfHeight / D)` — so the term comes down to
-   * `1 - distanceToProjectionPlane / D`: `1` at the camera, `0` on the projection plane, negative
-   * behind it, and falling linearly in between.
+   * `1 - distanceToCamera / D`: `1` at the camera, `0` on the projection plane, negative behind
+   * it, and falling linearly in between.
    *
-   * @param distanceToProjectionPlane - How far the plane sits from the camera.
+   * @param distanceToCamera - How far the plane sits from the camera.
    */
-  getZoom(distanceToProjectionPlane: number): number {
-    if (distanceToProjectionPlane === 0) return 1;
+  getZoom(distanceToCamera: number): number {
+    if (distanceToCamera === 0) return 1;
 
-    const d = this.#distanceToProjectionPlane - distanceToProjectionPlane;
+    const d = this.#distanceToProjectionPlane - distanceToCamera;
     return (Math.tan(((this.#fovy / 2) * Math.PI) / 180) * d) / this.#halfHeight;
   }
 }

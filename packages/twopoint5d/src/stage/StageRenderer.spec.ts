@@ -400,6 +400,44 @@ describe('StageRenderer', () => {
       sr.resize(320, 240);
       expect(stage.resize).toHaveBeenLastCalledWith(320, 240);
     });
+
+    it('leaves the renderer the size it had when a stage refuses it', () => {
+      const sr = new StageRenderer();
+      const stage1 = fakeStage('a');
+      const stage2 = fakeStage('b');
+      stage2.resize.mockImplementation(() => {
+        throw new Error('stage refused the size');
+      });
+      sr.add(stage1).add(stage2);
+
+      expect(() => sr.resize(320, 240)).toThrow('stage refused the size');
+
+      expect(sr.width, 'the renderer keeps the size its stages took').toBe(0);
+      expect(sr.height).toBe(0);
+
+      stage2.resize.mockImplementation(() => {});
+      sr.resize(320, 240);
+
+      expect(stage2.resize).toHaveBeenLastCalledWith(320, 240);
+      expect(sr.width).toBe(320);
+      expect(sr.height).toBe(240);
+    });
+
+    it('asks every stage for its size even when one of them refuses', () => {
+      const sr = new StageRenderer();
+      const stage1 = fakeStage('a');
+      const stage2 = fakeStage('b');
+      const stage3 = fakeStage('c');
+      stage2.resize.mockImplementation(() => {
+        throw new Error('stage refused the size');
+      });
+      sr.add(stage1).add(stage2).add(stage3);
+
+      expect(() => sr.resize(320, 240)).toThrow('stage refused the size');
+
+      expect(stage1.resize).toHaveBeenLastCalledWith(320, 240);
+      expect(stage3.resize).toHaveBeenLastCalledWith(320, 240);
+    });
   });
 
   describe('parent / host wiring (3.7)', () => {

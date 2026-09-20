@@ -6,7 +6,7 @@ export interface IProjection {
   getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number];
 
   get projectionPlane(): ProjectionPlane | undefined;
-  getZoom(distanceToProjectionPlane: number): number;
+  getZoom(distanceToCamera: number): number;
 
   createCamera(): Camera;
   updateCamera(camera: Camera): void;

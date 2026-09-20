@@ -52,7 +52,12 @@ export class HelpersManager {
     target.add(node);
   }
 
-  remove() {
+  /**
+   * Takes the nodes of this manager out of the {@link scene} it holds and out of the {@link root}
+   * above it. Without a scene there is nothing to take down and the call does nothing. What
+   * happens to each node on the way out stands at {@link removeFromScene}.
+   */
+  remove(): void {
     if (this.#scene) {
       this.removeFromScene(this.#scene);
     }
@@ -62,8 +67,9 @@ export class HelpersManager {
    * Takes every node this manager added to `scene` out of it, and calls `dispose()` on each one
    * that has such a method. What a node has to bring for that to be enough stands at {@link add}.
    *
-   * Besides the scene handed over, {@link root} is always cleared as well: the nodes of this
-   * manager sit in both and only ever come down together.
+   * The nodes of this manager sit in the {@link scene} it was given and in the {@link root} above
+   * it, and only for that scene do both come down together. Any other scene is searched for the
+   * nodes of this manager and otherwise left alone.
    */
   removeFromScene(scene: Object3D): void {
     const removeChildren: Object3D[] = [];
@@ -76,7 +82,7 @@ export class HelpersManager {
       childNode.removeFromParent();
       (childNode as unknown as {dispose?: () => void}).dispose?.();
     }
-    if (this.root && scene !== this.root) {
+    if (scene === this.#scene && this.root != null && scene !== this.root) {
       this.removeFromScene(this.root);
     }
   }

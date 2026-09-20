@@ -1,7 +1,9 @@
 /* eslint-disable no-console */
+import {once} from '@spearwolf/eventize';
 import {
   Map2D,
   Map2DTileRenderer,
+  OnDisplayDispose,
   PanControl2D,
   RectangularVisibilityArea,
   RectangularVisibilityAreaHelpers,
@@ -119,4 +121,17 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     (window as any).tileRenderer = tileRenderer;
     console.log('tileRenderer', tileRenderer);
+
+    // the display carries the lifetime of everything this demo built, so its end is where they go
+    once(demo, OnDisplayDispose, () => {
+      // in this order: the renderer gives its tile slots back to the factory, the map lets the
+      // renderer go, and only then do the geometry and the material behind those slots fall
+      rectVisiAreaHelpers.dispose();
+      tileRenderer.dispose();
+      map2d.dispose();
+      tileSprites.geometry?.dispose();
+      tileSprites.material?.dispose();
+      texture.dispose();
+      panControl.dispose();
+    });
   });

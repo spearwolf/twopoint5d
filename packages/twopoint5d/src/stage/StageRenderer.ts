@@ -282,25 +282,66 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return this;
   }
 
+  /**
+   * Hands the size to every stage of this renderer. A stage that refuses it does not keep the
+   * others from theirs: each one is asked, and what they threw comes out together once every
+   * stage has had the call — a single error unchanged, several of them as an `AggregateError`.
+   *
+   * While a stage refuses the size, this renderer answers with the size it carried before the
+   * call, and the {@link StageItem} of that stage keeps the size it carried — a stage that took
+   * the new size keeps it, item and all. The very same call therefore goes through again as soon
+   * as the refusing stage fits, and reaches exactly the stages that do not have the size yet.
+   */
   resize(width: number, height: number): void {
     if (this.width === width && this.height === height) return;
+
+    const prevWidth = this.width;
+    const prevHeight = this.height;
 
     this.width = width;
     this.height = height;
 
-    if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);
-    if (this.#asPassNodeRT) this.#resizeRenderTarget(this.#asPassNodeRT);
+    const refused: unknown[] = [];
 
+    try {
+      if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);
+      if (this.#asPassNodeRT) this.#resizeRenderTarget(this.#asPassNodeRT);
+    } catch (error) {
+      refused.push(error);
+    }
+
+    // a stage that refuses the size does not keep the others from theirs: each one is asked,
+    // and what they threw comes out together once every stage has had the call
     for (const stage of this.stages) {
-      this.resizeStage(stage, width, height);
+      try {
+        this.resizeStage(stage, width, height);
+      } catch (error) {
+        refused.push(error);
+      }
+    }
+
+    if (refused.length > 0) {
+      // while a stage refuses the size, this renderer keeps the one it carried into the call, so
+      // the very same call goes through again as soon as that stage fits — written through, it
+      // would fall out of the size guard above and never reach the stage a second time
+      this.width = prevWidth;
+      this.height = prevHeight;
+      throw refused.length === 1
+        ? refused[0]
+        : new AggregateError(
+            refused,
+            `StageRenderer#resize(): ${refused.length} of ${this.stages.length} stages refused the size ${width}x${height}`,
+          );
     }
   }
 
   protected resizeStage(stageItem: StageItem, width: number, height: number): void {
     if (stageItem.width !== width || stageItem.height !== height) {
+      // the size a stage refuses is not the size it shows: the item keeps the one it had, so the
+      // next resize() asks that stage again instead of taking it for done
+      stageItem.stage.resize(width, height);
       stageItem.width = width;
       stageItem.height = height;
-      stageItem.stage.resize(width, height);
     }
   }
 
