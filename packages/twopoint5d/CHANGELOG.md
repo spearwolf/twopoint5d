@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureAtlas#add()` refuses a frame name that is already taken and throws an error naming it; the atlas keeps the frame it registered under that name, and the refused frame is not added. A name belongs to exactly one frame, as it already did in `FrameBasedAnimations#add()`
 - an animation built from a `TextureAtlas` takes the frames carrying a string name, in the order a numeric collation of those names puts them: `walk.2` runs before `walk.10`, so a sequence numbered without padding plays as it reads. Names that collation ranks equal — `walk.01` beside `walk.1` — keep the order the atlas registered them in. Frames registered under a symbol stay out — a symbol has no place in an ordered sequence, and an atlas that holds one can be turned into an animation as a whole
 - `FrameBasedAnimations#animId()` throws an error naming the animation that is missing. The id goes straight into a typed vertex-object buffer, where an absent value would quietly become `NaN` and the sprite reading it would go invisible; `hasAnimation()` is the way to test a name first
-- an animation entry of a `TextureResource` whose timing does not let the animation be built — neither `duration` nor `frameRate`, or a `frameRate` of 0 — is skipped and reported through the same `error` event as an entry of the wrong shape, with `{source: 'frameBasedAnimations', id, animation, error}`. Every other entry of the map is registered all the same
+- an animation entry of a `TextureResource` whose timing does not let the animation be built — neither `duration` nor `frameRate`, or a `frameRate` of 0 — or whose frames come out empty — a `frameNameQuery` that matches nothing, an empty tile range — is skipped and reported through the same `error` event as an entry of the wrong shape, with `{source: 'frameBasedAnimations', id, animation, error}`. Every other entry of the map is registered all the same
 - `TextureAtlasLoader` checks the response of an atlas url against the shape of a texture packer json before it reads it, and it checks as deep as it reads: every frame entry carries a `frame` with four numbers, and `meta.size` carries `w` and `h` as numbers. A response that is none reaches the error callback — and `loadAsync()` rejects — with a message naming the url, and no image is fetched for it. The image url is a question of its own: a json that names none is refused the same way, unless an `overrideImageUrl` says where the image is. The `meta` handed to the caller names the image the texture was built from, so `meta.image` carries the `overrideImageUrl` wherever one was given
 - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` of `TextureResource` are read-only. They are what the effects of `TextureResource#load()` produce out of the values that were written to the resource; the class documentation says which properties are input and which are output
 - `TextureResource#atlasUrl`, `#atlasJson`, `#overrideImageUrl` and `#tileSetOptions` belong to one kind of resource each and throw a `TypeError` naming resource, kind and property when they are written on another kind. On a disposed resource a write to any of them still does nothing
@@ -152,6 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the guard of `FrameBasedAnimations#bakeDataTexture()` against a data texture wider than `FrameBasedAnimations.MaxTextureSize` names the numbers behind the refusal: how many frames in how many animations are registered, how wide the texture they ask for would be, and what the maximum is
 - `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
 - `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own. A projection that has no projection plane refuses the call with an `Error` naming what is missing, as `createCamera()` does: the direction and the position `updateCamera()` writes are read off that plane.
+- `FrameBasedAnimations#add()` refuses an animation that carries no frames — an atlas query that matches none, an empty tile range, an empty frame list — and one whose duration is not a finite number at or above zero. Either of them put a number into the data texture that no shader can play with: a frame count of 0, or a frame time that is negative, infinite or `NaN`. A duration of zero stays what it always was, a still image. Each error names the case and the animation it belongs to, and neither of them spends a name of the auto counter
 
 ### Deprecated
 
@@ -254,8 +255,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the name of an `InstancedVOBufferGeometry` built from a `BufferGeometry`: `name` answers `'InstancedVOBufferGeometry'`, as it does for the other constructor variant, and takes no name from the geometry it was built from
 - fix `RectangularVisibilityAreaHelpers#update()`: it builds its node only while `show` is `true`, and it keeps the node it built. A caller that calls `update()` every frame allocates no line geometry per frame, and a helper that is switched off stays down
 - fix `RectangularVisibilityAreaHelpers#remove(scene)` with a scene the helper was never handed: its node stays where it is
+- fix the texture behind an atlas whose json cannot be read: `TextureAtlasLoader` releases it when `TexturePackerJson.parse()` refuses the json inside the load callback of the image. The texture is built for that atlas alone and reaches no caller on this path — the error callback carries the error, not the texture — so every atlas json that could not be read cost one texture
+- fix `Stage2D#resize()` for a projection that refuses the camera: a `TypeError` out of `updateCamera()` leaves `width`, `height`, `containerWidth`, `containerHeight` and `needsUpdate` the way it found them. A `resize()` on the stage itself therefore goes through with the same numbers as soon as the camera fits — with the container size written along the way, a second `resize()` with those numbers fell out of the size guard and the stage was stuck reporting a view it had never announced. Through a `StageRenderer` that second attempt takes a size the renderer has not seen yet: it writes its own size and that of every stage item before it passes the call down, and takes neither back when a stage throws
 
 ### Migration Guide
+
+#### An animation needs a frame and a duration
+
+`FrameBasedAnimations#add()` refuses an animation that comes out with no frames and one whose duration is not a finite number at or above zero. A `frameNameQuery` that matches nothing, a tile range of zero tiles and an empty frame list used to register an animation of no frames; a negative, infinite or `NaN` duration used to be written as it arrived. Both reached the data texture as numbers a shader cannot play with, and a sprite reading one of them showed nothing without a word.
+
+Where the query comes from data rather than from the source, ask the atlas first. An animation map on a `TextureResource` needs no change: an entry that is refused is skipped and reported as an `error` event with `{source: 'frameBasedAnimations', id, animation, error}`, the way an entry of the wrong shape already was.
+
+**Before**
+
+```ts
+const animations = new FrameBasedAnimations();
+animations.add('walk', 1.0, atlas, queryFromConfig); // → an animation of 0 frames, silently
+animations.add('idle', -1, frames); // → a frame time no shader can play
+```
+
+**After**
+
+```ts
+const animations = new FrameBasedAnimations();
+
+if (atlas.frameNames(queryFromConfig).length > 0) {
+  animations.add('walk', 1.0, atlas, queryFromConfig);
+}
+
+animations.add('idle', 0, frames); // a duration of 0 is a still image, and always was
+```
 
 #### The rectangular visibility helpers follow their own show
 

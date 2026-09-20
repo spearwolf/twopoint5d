@@ -137,7 +137,7 @@ describe('TextureAtlasLoader', () => {
     const imageLoad = vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
       queueMicrotask(() =>
         onLoad({
-          texture: {} as Texture,
+          texture: {dispose() {}} as unknown as Texture,
           imgEl: {} as TextureSource,
           texCoords: new TextureCoords(0, 0, 16, 16),
         }),
@@ -153,6 +153,35 @@ describe('TextureAtlasLoader', () => {
     });
 
     await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/boom/);
+
+    parseSpy.mockRestore();
+  });
+
+  test('a parse that throws releases the texture the image loader handed out', async () => {
+    // the same microtask boundary as the test above: the callback of the image loader runs
+    // outside the call stack this test is set up in
+    const texture = {dispose: vi.fn()} as unknown as Texture;
+    const imageLoad = vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
+      queueMicrotask(() =>
+        onLoad({
+          texture,
+          imgEl: {} as TextureSource,
+          texCoords: new TextureCoords(0, 0, 16, 16),
+        }),
+      );
+    });
+    const parseSpy = vi.spyOn(TexturePackerJson, 'parse').mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJsonNamingAnImage),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/boom/);
+
+    expect(texture.dispose).toHaveBeenCalledTimes(1);
 
     parseSpy.mockRestore();
   });

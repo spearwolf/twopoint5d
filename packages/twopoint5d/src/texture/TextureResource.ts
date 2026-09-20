@@ -80,8 +80,9 @@ export const TextureResourceSubtypes = {
  * does not throw. An `atlasJson` that `TexturePackerJson` cannot read is reported here as soon
  * as the image it names is there; the write that set it does not throw either. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
- * skipped: one whose data is no object or does not fit this kind of resource, and one whose data does not
- * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0.
+ * skipped: one whose data is no object or does not fit this kind of resource, one whose data does not
+ * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0 — and one
+ * whose frames come out empty, a `frameNameQuery` that matches nothing or an empty tile range.
  * Every other entry of the same map is registered all the same.
  * `dispose` fires once at the start of `dispose()`.
  */

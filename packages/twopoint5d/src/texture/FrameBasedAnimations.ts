@@ -26,6 +26,9 @@ export interface BakeTextureOptions {
  * When `frameRate` is used, the duration is automatically calculated as:
  * `duration = frameCount / frameRate`
  *
+ * Whichever way it is reached, the duration is a finite number at or above zero: a duration of
+ * zero is a still image, a negative, infinite or `NaN` duration is refused by `add()`.
+ *
  * @example
  * // Using duration (animation takes 0.5 seconds total)
  * { duration: 0.5 }
@@ -68,6 +71,10 @@ const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: nu
   }
   throw new Error('Either duration or frameRate must be provided');
 };
+
+// the name is what tells one entry of an animation map from the next in an error message, and an
+// add() that was given none has nothing else to be recognized by
+const animNameInError = (name: AnimName | undefined): string => name?.toString() ?? '(no name)';
 
 const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
@@ -139,6 +146,11 @@ export class FrameBasedAnimations {
    * registered them in. A `frameNameQuery`, a pattern as a string or as a `RegExp`, narrows
    * the set to the names it matches.
    *
+   * An animation carries at least one frame and a duration that is a finite number at or above
+   * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
+   * matches nothing among them, and a duration that is negative, `NaN` or infinite are each
+   * refused with an error naming the case.
+   *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
    * stepping over every name already taken — so it is reachable through `animId()` like
@@ -188,7 +200,7 @@ export class FrameBasedAnimations {
       // because Array#sort() is stable.
       const frameNames = atlas
         .frameNames(frameNameQuery)
-        .filter((name) => typeof name === 'string')
+        .filter((frameName) => typeof frameName === 'string')
         .sort(FRAME_NAME_ORDER.compare);
       // every name here came out of `frameNames()` of this very atlas, so it is registered there
       frames = frameNames.map((frameName) => atlas.frame(frameName)!.coords);
@@ -210,8 +222,26 @@ export class FrameBasedAnimations {
     }
 
     const id = this.#names.length;
+
+    // an animation of no frames writes a frame count of 0 into the data texture, which no shader
+    // can read a frame out of. The guard sits behind the branches, because all four of them can
+    // arrive here empty
+    if (frames.length === 0) {
+      throw new Error(
+        `FrameBasedAnimations: add() got no frames for the animation \`${animNameInError(name)}\` — an atlas query without a match, an empty tile range or an empty frame list registers nothing`,
+      );
+    }
+
     const timing = args[1];
     const duration = resolveDuration(timing, frames.length);
+
+    // the duration divides the animation time in the shader: zero is a still image, everything
+    // below it and everything that is no number at all is a configuration error
+    if (!Number.isFinite(duration) || duration < 0) {
+      throw new Error(
+        `FrameBasedAnimations: add() got a duration of ${duration} for the animation \`${animNameInError(name)}\` — a duration is a finite number at or above zero`,
+      );
+    }
 
     // the counter hands out a name only once the animation can be built: an add() that throws
     // spends none, and the names follow the animations that were registered

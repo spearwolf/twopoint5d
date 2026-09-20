@@ -150,7 +150,17 @@ export class ParallaxProjection implements IProjection {
     camera.updateProjectionMatrix();
   }
 
-  // TODO add jsdoc
+  /**
+   * The factor a plane sitting `distanceToProjectionPlane` in front of the camera is carried
+   * along with, measured against the projection plane.
+   *
+   * The field of view of this projection follows the distance `D` at which it puts its own
+   * projection plane — `fovy = 2·atan(halfHeight / D)` — so the term comes down to
+   * `1 - distanceToProjectionPlane / D`: `1` at the camera, `0` on the projection plane, negative
+   * behind it, and falling linearly in between.
+   *
+   * @param distanceToProjectionPlane - How far the plane sits from the camera.
+   */
   getZoom(distanceToProjectionPlane: number): number {
     if (distanceToProjectionPlane === 0) return 1;
 

@@ -72,6 +72,37 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animId('anim_0')).toBe(id);
     });
 
+    test('an empty frame list is refused', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('empty', 1.0, [])).toThrow(/no frames/);
+      expect(animations.hasAnimation('empty')).toBe(false);
+    });
+
+    test('a duration that is negative or no finite number is refused', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      expect(() => animations.add('negative', -1, frames), 'a negative duration').toThrow(/-1/);
+      expect(() => animations.add('not-a-number', {frameRate: NaN}, frames), 'a frameRate of NaN').toThrow(/NaN/);
+      expect(() => animations.add('endless', Infinity, frames), 'a duration of Infinity').toThrow(/Infinity/);
+
+      expect(animations.hasAnimation('negative')).toBe(false);
+      expect(animations.hasAnimation('not-a-number')).toBe(false);
+      expect(animations.hasAnimation('endless')).toBe(false);
+    });
+
+    test('an add refused for its frames spends no name of the counter', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add(undefined, 1.0, [])).toThrow();
+
+      const id = animations.add(undefined, 1.0, [new TextureCoords(0, 0, 32, 32)]);
+
+      expect(id).toBe(0);
+      expect(animations.animId('anim_0')).toBe(id);
+    });
+
     test('add animation with symbol name', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];
@@ -196,6 +227,16 @@ describe('FrameBasedAnimations', () => {
 
       const buffer = animations.bakeDataTexture().image.data as Float32Array;
       expect(buffer[0]).toBe(2); // frames.length
+    });
+
+    test('an atlas query that matches no frame is refused', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+
+      atlas.add('walk_1', new TextureCoords(0, 0, 32, 32));
+
+      expect(() => animations.add('jump', 1.0, atlas, 'jump_.*')).toThrow(/no frames/);
+      expect(animations.hasAnimation('jump')).toBe(false);
     });
   });
 

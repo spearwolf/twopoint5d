@@ -75,6 +75,10 @@ export class TextureAtlasLoader {
             try {
               parsed = TexturePackerJson.parse(atlasJson, texCoords);
             } catch (error) {
+              // the loader holds this texture and hands it out with the atlas beside it: on this
+              // path no atlas is built, nobody else gets to see the texture — `onErrorCallback`
+              // carries the error, not the texture — so it is released here
+              texture.dispose();
               onErrorCallback?.(error);
               return;
             }
@@ -85,10 +89,7 @@ export class TextureAtlasLoader {
           onErrorCallback,
         );
       },
-      (_xhr) => {
-        // TODO add optional onProgressCallback parameter?
-        // console.log(`${(xhr.loaded / xhr.total) * 100}% loaded`);
-      },
+      undefined,
       onErrorCallback,
     );
   }

@@ -171,11 +171,23 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if (this.#disposed) return;
 
     if (containerWidth !== this.#containerWidth || containerHeight !== this.#containerHeight) {
+      const prevContainerWidth = this.#containerWidth;
+      const prevContainerHeight = this.#containerHeight;
+
       this.#containerWidth = containerWidth;
       this.#containerHeight = containerHeight;
 
       if (this.projection) {
-        this.#updateProjection(containerWidth, containerHeight);
+        try {
+          this.#updateProjection(containerWidth, containerHeight);
+        } catch (error) {
+          // the container of a resize the projection refuses is not the container this stage
+          // shows: it keeps the one it had, and the very same size is worth another attempt as
+          // soon as the camera fits — written through, it would fall out of the guard above
+          this.#containerWidth = prevContainerWidth;
+          this.#containerHeight = prevContainerHeight;
+          throw error;
+        }
       }
     }
   }
@@ -194,6 +206,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // first resize() with an area
     if (!isPositiveFinite(width) || !isPositiveFinite(height)) return;
 
+    const prevNeedsUpdate = this.needsUpdate;
     this.needsUpdate = false;
 
     this.projection!.updateViewRect(width, height);
@@ -209,12 +222,21 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.#width = w;
     this.#height = h;
 
-    if (this.camera != null) {
-      this.projection!.updateCamera(this.camera);
-    } else {
-      this.#updateCamera(() => {
-        this.#cameraFromProjection = this.projection!.createCamera();
-      });
+    try {
+      if (this.camera != null) {
+        this.projection!.updateCamera(this.camera);
+      } else {
+        this.#updateCamera(() => {
+          this.#cameraFromProjection = this.projection!.createCamera();
+        });
+      }
+    } catch (error) {
+      // a view no camera was built for or placed with is a view this stage never reached and
+      // never announced: it keeps the size it had, and the update it owes stays owed
+      this.#width = prevWidth;
+      this.#height = prevHeight;
+      this.needsUpdate = prevNeedsUpdate;
+      throw error;
     }
 
     if (prevWidth !== w || prevHeight !== h) {
@@ -358,8 +380,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a
    * write to `scene` goes through and has no effect, since the stage no longer builds a node from
    * it. `name` writes through to `scene.name` as it always does, and so reaches the scene the
-   * caller may have handed in. A `dispose` event goes out to every subscriber before this stage stops listening;
-   * no event follows it.
+   * caller may have handed in. A `dispose` event goes out to every subscriber before this stage
+   * stops listening; no event follows it.
    */
   dispose(): void {
     if (this.#disposed) return;

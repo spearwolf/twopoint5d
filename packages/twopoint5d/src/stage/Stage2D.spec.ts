@@ -186,6 +186,45 @@ describe('Stage2D', () => {
     expect(custom.position.z, 'the distance to the projection plane').toBe(300);
   });
 
+  // a stage that was resized once and then handed a camera its projection cannot place: the
+  // assignment goes through by itself, the next resize() is where the projection says no
+  const createStageWithRefusedCamera = () => {
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+    stage.resize(800, 600);
+    expect([stage.width, stage.height]).toEqual([640, 480]);
+
+    stage.camera = new OrthographicCamera();
+    return stage;
+  };
+
+  it('a resize the projection refuses leaves the stage the size it had', () => {
+    const stage = createStageWithRefusedCamera();
+
+    const onResize = vi.fn();
+    on(stage, OnStageResize, onResize);
+
+    expect(() => stage.resize(1024, 512)).toThrow(TypeError);
+
+    expect([stage.width, stage.height], 'the view of the refused resize was never reached').toEqual([640, 480]);
+    expect([stage.containerWidth, stage.containerHeight], 'the container size of the refused resize').toEqual([800, 600]);
+    expect(onResize).not.toHaveBeenCalled();
+  });
+
+  it('a resize refused once goes through when the camera fits', () => {
+    const stage = createStageWithRefusedCamera();
+    expect(() => stage.resize(1024, 512)).toThrow(TypeError);
+
+    const onResize = vi.fn();
+    on(stage, OnStageResize, onResize);
+
+    stage.camera = new PerspectiveCamera();
+    stage.resize(1024, 512);
+
+    expect(onResize).toHaveBeenCalledTimes(1);
+    expect([stage.width, stage.height]).toEqual([640, 320]);
+    expect([stage.containerWidth, stage.containerHeight]).toEqual([1024, 512]);
+  });
+
   describe('size after a change of projection', () => {
     const createResizedStage = () => {
       const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
