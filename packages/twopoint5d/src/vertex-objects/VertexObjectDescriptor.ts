@@ -82,6 +82,8 @@ export class VertexObjectDescriptor {
           `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${attr.size}`,
         );
       }
+    }
+    for (const attr of this.attributes.values()) {
       // the raw description, because the descriptor answers `size` from either field
       const raw = this.description.attributes[attr.name] as {size?: number; components?: string[]};
       if (raw.size != null && raw.components != null && raw.components.length > raw.size) {

@@ -57,9 +57,10 @@ export class GeometryAttributeSlots {
   /**
    * Take every attribute the geometry already carries as a claim without a pool.
    *
-   * These come from a `BufferGeometry` copied into the geometry: they belong to the caller,
-   * no pool feeds them, and because they are claimed before any route initializes they sit
-   * below every pool claim — so a route that takes such a slot gives it back on release.
+   * These come from a `BufferGeometry` copied into the geometry: `copy()` cloned them, so they
+   * belong to the geometry that holds them, no pool feeds them, and because they are claimed
+   * before any route initializes they sit below every pool claim — so a route that takes such a
+   * slot gives it back on release.
    */
   claimExisting(geometry: BufferGeometry): void {
     for (const [attrName, attr] of Object.entries(geometry.attributes)) {

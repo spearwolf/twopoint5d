@@ -1,6 +1,7 @@
 import type {InstancedBufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {BufferAttribute, BufferGeometry} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
+import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
@@ -637,6 +638,26 @@ describe('vertex-buffers-geometry-updates', () => {
   });
 
   describe('constructed with a BufferGeometry', () => {
+    // the base class, not InstancedVertexObjectGeometry: that one names itself after its super() call
+    test('keeps the name of its class when it is built from a BufferGeometry', () => {
+      const base = new BufferGeometry();
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+
+      const geometry = new InstancedVOBufferGeometry(instancedDesc, 10, base);
+
+      expect(geometry.name).toBe('InstancedVOBufferGeometry');
+    });
+
+    test('takes no name from the geometry it is built from', () => {
+      const base = new BufferGeometry();
+      base.name = 'a geometry of the caller';
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+
+      const geometry = new InstancedVOBufferGeometry(instancedDesc, 10, base);
+
+      expect(geometry.name).toBe('InstancedVOBufferGeometry');
+    });
+
     test('update() leaves the attributes copied from that geometry alone', () => {
       const base = new BufferGeometry();
       base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));

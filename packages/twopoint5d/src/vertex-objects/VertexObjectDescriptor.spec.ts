@@ -153,6 +153,12 @@ describe('VertexObjectDescriptor', () => {
       expect(build({attributes: {pos: {size: 1.5}}})).toThrow(/attribute "pos" needs a size of at least 1 .*, got 1.5/);
     });
 
+    test('the size of a later attribute before the components of an earlier one', () => {
+      expect(build({attributes: {a: {size: 1, components: ['x', 'y']} as never, b: {size: 0}}})).toThrow(
+        /needs a size of at least 1/,
+      );
+    });
+
     test('an attribute with more components than its size', () => {
       expect(build({attributes: {pos: {size: 1, components: ['a', 'b', 'c']} as never}})).toThrow(
         'VertexObjectDescriptor: attribute "pos" declares 3 components for a size of 1',

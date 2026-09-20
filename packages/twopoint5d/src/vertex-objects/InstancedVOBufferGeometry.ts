@@ -96,8 +96,6 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     super();
 
-    this.name = 'InstancedVOBufferGeometry';
-
     const [instancedSource, instancedCapacity] = args;
     this.instancedPool =
       instancedSource instanceof VOBufferPool ? instancedSource : new VOBufferPool(instancedSource, instancedCapacity);
@@ -107,8 +105,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     if (args[2] instanceof BufferGeometry) {
       this.copy(asInstancedCopySource(args[2]));
-      // the attributes that came in with it belong to the caller and are claimed before any
-      // route initializes, so a route that takes such a slot gives it back when it is released
+      // copy() cloned those attributes, so they are this geometry's own and no pool feeds them;
+      // they are claimed before any route initializes, so a route that takes such a slot gives
+      // it back when it is released
       this.#slots.claimExisting(this);
     } else {
       const baseSource = args[2];
@@ -121,6 +120,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       this.#attachments.attach(this.basePool);
       initializeAttributes(this, this.basePool, this.baseBuffers, this.baseBufferSerials, this.#slots);
     }
+
+    // after the copy(): BufferGeometry#copy() takes the name of its source, which is usually the empty string
+    this.name = 'InstancedVOBufferGeometry';
 
     this.#attachments.attach(this.instancedPool);
     initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers, this.instancedBufferSerials, this.#slots);
@@ -352,7 +354,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * The attributes built on the pool buffers leave the geometry and the index is dropped, so
    * nothing keeps the typed arrays alive through this geometry any more. Attributes copied from
-   * a `BufferGeometry` handed to the constructor stay where they are — they belong to the caller.
+   * a `BufferGeometry` handed to the constructor stay where they are: no pool feeds them and
+   * nothing has to take them off. `copy()` cloned them, so they and their typed arrays belong to
+   * this geometry and fall with it, while the geometry they were cloned from stays untouched.
    * A slot that an earlier `detachInstancedPool()` left empty is empty again when this returns.
    *
    * A `basePool` or `instancedPool` this geometry created itself is disposed with it; a pool
@@ -545,8 +549,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       if (this.#serials.get(attrName) === version) continue;
       this.#serials.set(attrName, version);
 
-      // a slot without a pool holds an attribute copied from a `BufferGeometry` the caller
-      // handed to the constructor: it belongs to the caller and is left exactly as it is
+      // a slot without a pool holds an attribute copied from a `BufferGeometry` handed to the
+      // constructor, and there is no pool array behind it that could be pointed at
       const pool = this.#slots.poolOf(attrName);
       if (pool === undefined) continue;
 
