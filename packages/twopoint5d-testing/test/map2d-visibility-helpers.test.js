@@ -5,6 +5,8 @@ import {
   Display,
   Map2D,
   Map2DTileRenderer,
+  RectangularVisibilityArea,
+  RectangularVisibilityAreaHelpers,
   RepeatingTilesProvider,
   TextureCoords,
   TileSet,
@@ -50,6 +52,29 @@ function makeMap(camera) {
   const tileRenderer = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileData));
 
   const visibility = new CameraBasedVisibility(camera);
+
+  const map2d = new Map2D();
+  map2d.tileWidth = 256;
+  map2d.tileHeight = 256;
+  map2d.xOffset = -128;
+  map2d.yOffset = -128;
+  map2d.visibilitor = visibility;
+  map2d.addTileRenderer(tileRenderer);
+
+  return {map2d, visibility};
+}
+
+/** The same map, seen through a visibility area of a fixed size instead of through a camera. */
+function makeRectMap() {
+  const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
+  const tileData = new RepeatingTilesProvider([
+    [1, 2],
+    [3, 4],
+  ]);
+  const tileSprites = new TileSprites(new TileSpritesGeometry(512), new TileSpritesMaterial());
+  const tileRenderer = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileData));
+
+  const visibility = new RectangularVisibilityArea(640, 480);
 
   const map2d = new Map2D();
   map2d.tileWidth = 256;
@@ -246,5 +271,41 @@ describe('map2d — visibility helper nodes', function () {
     await frame(map2d, helpers);
 
     expect(helperNodes(scene, map2d).length, 'and none came back').to.equal(0);
+  });
+
+  it('the rectangular helper keeps its node across frames and takes it down with show', async function () {
+    const {map2d, visibility} = makeRectMap();
+    scene.add(map2d);
+
+    const helpers = new RectangularVisibilityAreaHelpers(visibility);
+    helpers.add(map2d);
+    helpers.show = true;
+
+    await frame(map2d, helpers);
+    await frame(map2d, helpers);
+
+    const before = helperNodes(scene, map2d);
+    expect(before.length, 'helper nodes after the warm-up frames').to.equal(1);
+    const node = before[0];
+    const geometry = node.geometry;
+
+    await frame(map2d, helpers);
+
+    const after = helperNodes(scene, map2d);
+    expect(after.length, 'the number of helper nodes').to.equal(1);
+    expect(after[0], 'the node that stands is the one that stood').to.equal(node);
+    expect(after[0].geometry, 'and it kept its geometry').to.equal(geometry);
+
+    // three.js announces a release through the dispose event of the geometry itself, which is
+    // what a renderer listens to before it drops the buffers behind it
+    let released = false;
+    geometry.addEventListener('dispose', () => {
+      released = true;
+    });
+
+    helpers.show = false;
+
+    expect(helperNodes(scene, map2d).length, 'no helper node is left in the scene graph').to.equal(0);
+    expect(released, 'the geometry of the node was released').to.equal(true);
   });
 });

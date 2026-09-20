@@ -65,6 +65,7 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     const rectVisiAreaHelpers = new RectangularVisibilityAreaHelpers(rectVisiArea);
     rectVisiAreaHelpers.add(map2d);
+    rectVisiAreaHelpers.show = true;
 
     map2d.centerX = 0;
     map2d.centerY = 0;

@@ -243,6 +243,9 @@ describe('Map2DTileStreamer', () => {
       const streamer = new Map2DTileStreamer(100, 100);
       const renderer = makeRecordingRenderer();
       streamer.addTileRenderer(renderer);
+      // the `translate` is not zero on purpose: the streamer places the renderer at `offset`
+      // alone, and the expectation below is what says so — a translate that found its way into
+      // the position would show up in it
       streamer.visibilitor = {
         computeVisibleTiles: () => ({
           tiles: [tileA],

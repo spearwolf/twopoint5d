@@ -34,6 +34,10 @@ describe('RepeatingTilesProvider', () => {
       ]);
       expect(tiles.limitToAxis).toBe('none');
     });
+    test('a shape it does not recognize gets a pattern without cells', () => {
+      expect(new RepeatingTilesProvider([] as number[]).tileIds).toEqual([[]]);
+      expect(new RepeatingTilesProvider(['a'] as unknown as number[]).tileIds).toEqual([[]]);
+    });
     test('with limitToAxis', () => {
       expect(new RepeatingTilesProvider(1, 'horizontal').limitToAxis).toBe('horizontal');
       expect(new RepeatingTilesProvider(1, 'vertical').limitToAxis).toBe('vertical');

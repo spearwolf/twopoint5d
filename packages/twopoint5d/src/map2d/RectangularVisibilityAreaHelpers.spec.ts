@@ -37,6 +37,72 @@ describe('RectangularVisibilityAreaHelpers', () => {
     expect(scene.children, 'and the scene gets its helper once it is there').toHaveLength(1);
   });
 
+  test('builds nothing while show is off', () => {
+    const scene = new Object3D();
+    const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+
+    helpers.add(scene);
+    helpers.update();
+
+    expect(scene.children, 'a helper that is switched off stays down').toHaveLength(0);
+  });
+
+  test('a scene this helper was never handed keeps its node where it is', () => {
+    const sceneA = new Object3D();
+    const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+
+    helpers.add(sceneA);
+    helpers.show = true;
+
+    const node = sceneA.children[0];
+    expect(node, 'the helper stands in the scene it was handed').toBeDefined();
+
+    const released = spyOnReleases(sceneA);
+
+    helpers.remove(new Object3D());
+
+    expect(sceneA.children, 'the node of a scene nobody named is left alone').toEqual([node]);
+    for (const spies of released) {
+      expect(spies.geometry!).not.toHaveBeenCalled();
+      expect(spies.material!).not.toHaveBeenCalled();
+    }
+  });
+
+  test('a second update() writes into the node that stands', () => {
+    const scene = new Object3D();
+    const area = makeArea();
+    const helpers = new RectangularVisibilityAreaHelpers(area);
+
+    helpers.add(scene);
+    helpers.show = true;
+
+    const node = scene.children[0] as unknown as {box: {max: {x: number}}; geometry: unknown};
+    const geometry = node.geometry;
+
+    area.width = 800;
+    helpers.update();
+
+    expect(scene.children, 'no second node came up beside it').toHaveLength(1);
+    expect(scene.children[0], 'the node that stands is the one that gets written').toBe(node);
+    expect((scene.children[0] as unknown as {geometry: unknown}).geometry, 'and it keeps its geometry').toBe(geometry);
+    expect(node.box.max.x, 'the box follows the area').toBe(400);
+  });
+
+  test('switching show back on builds the helper again', () => {
+    const scene = new Object3D();
+    const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+
+    helpers.add(scene);
+    helpers.show = true;
+    expect(scene.children, 'the helper stands').toHaveLength(1);
+
+    helpers.show = false;
+    expect(scene.children, 'and goes down with show').toHaveLength(0);
+
+    helpers.show = true;
+    expect(scene.children, 'and comes back up with it').toHaveLength(1);
+  });
+
   describe('dispose()', () => {
     test('releases the geometry and the material of every node it built', () => {
       const scene = new Object3D();

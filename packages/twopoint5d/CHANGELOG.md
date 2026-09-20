@@ -252,8 +252,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
 - fix `Canvas2DStage#setContainerSize()`: the size goes through the public `stageRenderer`, whose `width` and `height` then hold the container size instead of staying `0`. A `pipeline` set on that renderer gets an internal render target of the container size rather than the 1×1 minimum. The size the renderer already carries is what decides whether anything moves: a call with that size reaches neither a render target nor a stage, so a `Stage2D` that was resized from somewhere else in between keeps the size it was given.
 - fix the name of an `InstancedVOBufferGeometry` built from a `BufferGeometry`: `name` answers `'InstancedVOBufferGeometry'`, as it does for the other constructor variant, and takes no name from the geometry it was built from
+- fix `RectangularVisibilityAreaHelpers#update()`: it builds its node only while `show` is `true`, and it keeps the node it built. A caller that calls `update()` every frame allocates no line geometry per frame, and a helper that is switched off stays down
+- fix `RectangularVisibilityAreaHelpers#remove(scene)` with a scene the helper was never handed: its node stays where it is
 
 ### Migration Guide
+
+#### The rectangular visibility helpers follow their own show
+
+`RectangularVisibilityAreaHelpers#update()` builds its node only while `show` is `true`. A helper that is handed a scene and then updated every frame shows nothing until `show` says so — the same switch `CameraBasedVisibilityHelpers` answers to.
+
+**Before**
+
+```ts
+const helpers = new RectangularVisibilityAreaHelpers(rectVisiArea);
+helpers.add(map2d);
+
+onFrame(() => {
+  map2d.update();
+  helpers.update(); // → a node in the scene, and a fresh line geometry for every frame
+});
+```
+
+**After**
+
+```ts
+const helpers = new RectangularVisibilityAreaHelpers(rectVisiArea);
+helpers.add(map2d);
+helpers.show = true;
+
+onFrame(() => {
+  map2d.update();
+  helpers.update(); // → the node that stands follows the visibility area
+});
+```
 
 #### A projection places the camera it updates
 

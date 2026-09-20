@@ -18,7 +18,8 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    */
   limitToAxis: LimitToAxisType;
 
-  // Assigned in the constructor through the `tileIds` setter, which falls back to an empty pattern.
+  // Every path of the constructor writes this through the `tileIds` setter. The `!` stays
+  // because TypeScript does not count an assignment through a setter as a definite one.
   #tileIds!: number[][];
 
   // `#rows` and `#cols` are taken from the very array that is indexed below, in the `tileIds`
@@ -55,14 +56,13 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
   constructor(tileIds?: RepeatingTilesPatternType, limitToAxis: LimitToAxisType = 'none') {
     if (typeof tileIds === 'number') {
       this.tileIds = [[tileIds]];
-    } else if (Array.isArray(tileIds)) {
-      if (typeof tileIds[0] === 'number') {
-        this.tileIds = [tileIds as number[]];
-      } else if (Array.isArray(tileIds[0]) && typeof tileIds[0][0] === 'number') {
-        this.tileIds = tileIds as number[][];
-      }
-    }
-    if (!this.tileIds) {
+    } else if (Array.isArray(tileIds) && typeof tileIds[0] === 'number') {
+      this.tileIds = [tileIds as number[]];
+    } else if (Array.isArray(tileIds) && Array.isArray(tileIds[0]) && typeof tileIds[0][0] === 'number') {
+      this.tileIds = tileIds as number[][];
+    } else {
+      // anything else — no argument, an empty array, a shape of another kind — is a pattern
+      // without cells, which every lookup answers with 0
       this.tileIds = [[]];
     }
     this.limitToAxis = limitToAxis;
