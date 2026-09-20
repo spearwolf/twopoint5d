@@ -72,7 +72,7 @@ This repository is structured as a monorepo; based on [nx](https://nx.dev/) !
 
 ### 1. Install dependencies
 
-First, you need [node](https://nodejs.org/) v24 or newer and [pnpm](https://pnpm.io/) v10.22 or newer. An `.nvmrc` and a `mise.toml` are checked in, so `nvm use`, `fnm use` or `mise install` picks the right node for you.
+First, you need [node](https://nodejs.org/) `^24.16.0 || >=26.3.0` — a 24.16 or newer, or a 26.3 or newer; the 25.x line is out — and [pnpm](https://pnpm.io/) v10.22 or newer. An `.nvmrc` and a `mise.toml` are checked in, both naming `24`, so `nvm install`, `fnm use --install-if-missing` or `mise install` fetches the newest 24.x for you.
 Install the dependencies with:
 
 ```sh

@@ -105,8 +105,13 @@ them as `"catalog:"`, so a version bump happens in exactly one place and stays
 consistent across library, test harness and lookbook. In the library they are
 `peerDependencies`.
 
-Node and pnpm versions come from `engines` in the root `package.json`; `.nvmrc` and
-`mise.toml` repeat the same numbers for version managers.
+Node and pnpm versions come from `engines` in the root `package.json`: Node
+`^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. `.nvmrc`,
+`mise.toml` and the `node-version` of the CI workflows name a plain `24`. They answer
+which version to install, not which ones are allowed, and none of them understands an
+alternative like `||`; a `24` picks the newest 24.x the tool can get and lands inside
+the range, while a narrower `24.16` would pin the minor line and cut the repo off from
+later 24.x releases.
 
 ## 6. Test surfaces
 

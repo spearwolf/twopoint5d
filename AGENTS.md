@@ -25,7 +25,7 @@ Do not read them unless the task is about them.
 
 ## Commands
 
-All from the repo root. Node ≥24, pnpm ≥10.22 (`engines` in `package.json`).
+All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` — `engines` in `package.json`.
 
 - `pnpm install`
 - `pnpm lint` — ESLint + `prettier --check`; `pnpm format` writes the Prettier changes
