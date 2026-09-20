@@ -49,6 +49,17 @@ describe('resolveDependencies', () => {
     assert.deepEqual(resolve({'@scope/other': 'workspace:^2.0.0'}, {}), {'@scope/other': '^2.0.0'});
   });
 
+  it('a workspace: dependency with a range ships that range even when no package carries the name', () => {
+    const section = resolve({'@scope/missing': 'workspace:^2.0.0'}, {}, {'@scope/missing': '^9.9.9'});
+    assert.deepEqual(section, {'@scope/missing': '^2.0.0'});
+  });
+
+  it('a workspace: specifier whose range is no version range stays as it is', () => {
+    assert.deepEqual(resolve({'@scope/other': 'workspace:../other'}, {}), {'@scope/other': 'workspace:../other'});
+    assert.deepEqual(resolve({'@scope/other': 'workspace:banana'}, {}), {'@scope/other': 'workspace:banana'});
+    assert.deepEqual(resolve({'@scope/other': 'workspace:'}, {}), {'@scope/other': 'workspace:'});
+  });
+
   it('an aliased workspace: dependency stays as it is', () => {
     assert.deepEqual(resolve({bar: 'workspace:@scope/other@*'}, {}), {bar: 'workspace:@scope/other@*'});
   });

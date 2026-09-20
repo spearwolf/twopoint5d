@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {validRange} from 'semver';
 
 /**
  * Replaces the `catalog:`, `workspace:` and `*` specifiers of a dependency section by the
@@ -54,13 +55,33 @@ export function resolvePackageVersion(
     return undefined;
   }
 
+  if (range !== '*' && range !== '^' && range !== '~') {
+    // a spelled-out range names the version it wants; the package under packages/ only
+    // supplies one for `*`, `^` and `~`, so it is not looked up for this one
+    if (range === '' || validRange(range) == null) {
+      // anything else would go into the published manifest as a version range and is none —
+      // the specifier stays and the manifest check refuses it
+      console.warn(
+        'oops.. workspace range is not a version range:',
+        pkgName,
+        '->',
+        specifier,
+        'referenced from:',
+        referencedFrom,
+      );
+      return undefined;
+    }
+    console.log('resolve package version', pkgName, '->', range);
+    return range;
+  }
+
   const pkgNameWithoutScope = pkgName.replace(/^@[^/]+\//, '');
   const pkgJsonPath = path.resolve(workspaceRoot, `packages/${pkgNameWithoutScope}/package.json`);
 
   if (fs.existsSync(pkgJsonPath)) {
     const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
     const version = pkgJson.version.replace(/-dev$/, '');
-    const pkgVersion = range === '*' ? `^${version}` : range === '^' || range === '~' ? `${range}${version}` : range;
+    const pkgVersion = range === '*' ? `^${version}` : `${range}${version}`;
     console.log('resolve package version', pkgName, '->', pkgVersion);
     return pkgVersion;
   }

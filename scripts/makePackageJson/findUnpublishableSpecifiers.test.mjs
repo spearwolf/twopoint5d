@@ -25,4 +25,12 @@ describe('findUnpublishableSpecifiers', () => {
     assert.deepEqual(findUnpublishableSpecifiers(manifest), []);
     assert.deepEqual(findUnpublishableSpecifiers({}), []);
   });
+
+  it('names a path-shaped workspace: specifier the resolution left standing', () => {
+    const manifest = {dependencies: {'@scope/other': 'workspace:../other'}};
+
+    assert.deepEqual(findUnpublishableSpecifiers(manifest), [
+      {section: 'dependencies', name: '@scope/other', specifier: 'workspace:../other'},
+    ]);
+  });
 });

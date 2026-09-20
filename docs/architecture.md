@@ -76,7 +76,8 @@ strip development-only fields (`scripts`, `devDependencies`, tool configs) from 
 ships. Specifiers are resolved to real ranges: `catalog:` and `catalog:<name>` from the
 default or the named catalog in `pnpm-workspace.yaml`; `workspace:` from the
 `package.json` of the package it names (`workspace:^` and `workspace:~` keep their
-operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is). If a
+operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is — but
+only if it is a version range, and anything else leaves the specifier standing). If a
 `catalog:` or `workspace:` specifier is left in the manifest afterwards, the build
 fails — npm installs neither protocol. Since `dist/` is what gets
 published, `main`, `module`, `types` and every target in `exports` lose a leading
