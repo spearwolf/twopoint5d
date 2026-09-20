@@ -149,7 +149,10 @@ export class Canvas2DStage {
   setContainerSize(width: number, height: number) {
     if (this.#disposed) return;
 
-    this.stage.resize(width, height);
+    // the renderer hands the size on to every stage it holds, this one included: its own
+    // width and height then answer the container, and a render target built behind a pipeline
+    // set on it gets that size instead of the 1×1 minimum
+    this.stageRenderer.resize(width, height);
   }
 
   setCanvasSize(width: number, height: number) {

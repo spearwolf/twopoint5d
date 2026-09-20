@@ -1,8 +1,8 @@
-import {PerspectiveCamera} from 'three/webgpu';
+import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {ParallaxProjection, type ParallaxProjectionSpecs} from './ParallaxProjection.js';
-import {ProjectionPlane} from './ProjectionPlane.js';
+import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 
 describe('ParallaxProjection', () => {
   describe('construction', () => {
@@ -92,6 +92,72 @@ describe('ParallaxProjection', () => {
       expect(camera.aspect, `${w}×${h}`).toBeCloseTo(640 / 480);
       expect(camera.fov, `${w}×${h}`).toBe(fov);
     }
+  });
+
+  describe('updateCamera()', () => {
+    const plane = 'xy|bottom-left';
+
+    // 'xy|bottom-left' looks along the default direction of a camera, so it carries no rotation
+    // the orientation tests could tell apart from a camera nobody has turned
+    const tiltedPlane = 'xz|top-left';
+
+    const projectionFor = (specs: Partial<ParallaxProjectionSpecs>, projectionPlane: ProjectionPlaneDescription = plane) => {
+      const projection = new ParallaxProjection(projectionPlane, specs);
+      projection.updateViewRect(800, 600);
+      return projection;
+    };
+
+    it('carries the near and the far of the specs onto a camera it updates', () => {
+      const specs: Partial<ParallaxProjectionSpecs> = {fit: 'contain', width: 640};
+      const projection = projectionFor(specs);
+      const camera = projection.createCamera();
+
+      specs.near = 2;
+      specs.far = 5000;
+      projection.updateViewRect(800, 600);
+      projection.updateCamera(camera);
+
+      expect([camera.near, camera.far]).toEqual([2, 5000]);
+    });
+
+    it('moves a camera it updates to the distance the specs now name', () => {
+      const specs: Partial<ParallaxProjectionSpecs> = {fit: 'contain', width: 640, distanceToProjectionPlane: 300};
+      const projection = projectionFor(specs);
+      const camera = projection.createCamera();
+
+      specs.distanceToProjectionPlane = 150;
+      projection.updateViewRect(800, 600);
+      projection.updateCamera(camera);
+
+      expect(camera.position).toEqual(ProjectionPlane.get(plane).getPointByDistance(150));
+    });
+
+    it('aims a camera it updates at the projection plane', () => {
+      const projection = projectionFor({fit: 'contain', width: 640}, tiltedPlane);
+      const reference = projection.createCamera();
+      const camera = new PerspectiveCamera();
+
+      projection.updateCamera(camera);
+
+      expect(camera.quaternion.toArray()).toEqual(reference.quaternion.toArray());
+    });
+
+    it('leaves the orientation where it is when it updates the same camera twice', () => {
+      const projection = projectionFor({fit: 'contain', width: 640}, tiltedPlane);
+      const camera = projection.createCamera();
+
+      projection.updateCamera(camera);
+      const once = camera.quaternion.toArray();
+      projection.updateCamera(camera);
+
+      expect(camera.quaternion.toArray()).toEqual(once);
+    });
+
+    it('refuses a camera that is no PerspectiveCamera', () => {
+      const projection = projectionFor({fit: 'contain', width: 640});
+
+      expect(() => projection.updateCamera(new OrthographicCamera())).toThrow(TypeError);
+    });
   });
 
   it('has no view before a container with area', () => {

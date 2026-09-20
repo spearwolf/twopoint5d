@@ -85,6 +85,15 @@ describe('Canvas2DStage', () => {
     expect(fieldAtRelease, 'and so had the field').toBe(stage.texture);
   });
 
+  test('drives the stage renderer when the container size is set', () => {
+    const stage = makeStage();
+
+    stage.setContainerSize(320, 240);
+
+    expect([stage.stageRenderer.width, stage.stageRenderer.height]).toEqual([320, 240]);
+    expect([stage.stage.containerWidth, stage.stage.containerHeight]).toEqual([320, 240]);
+  });
+
   describe('dispose()', () => {
     // (a) a resource the instance built itself is released exactly once
     test('disposes the material, both textures and the stage renderer it created itself', () => {

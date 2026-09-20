@@ -151,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameBasedAnimations#add()` gives an animation added without a name one of its own — `anim_0`, `anim_1`, and so on, stepping over every name already registered. It goes into the same lookup as a name the caller picked, so `hasAnimation()` and `animId()` reach such an animation like any other. A caller who hands out names of that shape themselves meets the usual "must be unique" error when they ask for one the counter has already spent
 - the guard of `FrameBasedAnimations#bakeDataTexture()` against a data texture wider than `FrameBasedAnimations.MaxTextureSize` names the numbers behind the refusal: how many frames in how many animations are registered, how wide the texture they ask for would be, and what the maximum is
 - `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
+- `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own
 
 ### Deprecated
 
@@ -249,8 +250,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `unpick()`: it keeps every enumerable symbol key it is not asked to remove, as it keeps the string keys
 - fix `AnimatedSpritesMaterial`: the `time` option of the constructor sets the animation time the material starts at
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
+- fix `Canvas2DStage#setContainerSize()`: the size goes through the public `stageRenderer`, whose `width` and `height` then hold the container size instead of staying `0`. A `pipeline` set on that renderer gets an internal render target of the container size rather than the 1×1 minimum
 
 ### Migration Guide
+
+#### A projection places the camera it updates
+
+`updateCamera()` of `ParallaxProjection` and `OrthographicProjection` gives a camera the setup `createCamera()` gives a new one, position and direction included. A `Stage2D` with a projection calls it on its camera at every resize, whether the camera came from the projection or was set on `Stage2D#camera`: a camera of your own is moved back to the projection plane each time. A stage whose camera you steer yourself gets no projection. A camera of the wrong type is refused with a `TypeError` instead of being written to.
+
+**Before**
+
+```ts
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'fill'}));
+stage.camera = myCamera;
+myCamera.position.set(400, 300, 100); // a resize leaves this where it is
+
+new ParallaxProjection('xy|bottom-left').updateCamera(new OrthographicCamera()); // → writes fov and aspect to a camera that has neither
+```
+
+**After**
+
+```ts
+const stage = new Stage2D(); // no projection: nothing puts myCamera back
+stage.camera = myCamera;
+myCamera.position.set(400, 300, 100);
+
+new ParallaxProjection('xy|bottom-left').updateCamera(new OrthographicCamera());
+// → TypeError: ParallaxProjection: updateCamera() needs a PerspectiveCamera, got OrthographicCamera
+```
 
 #### The `FixedFrameLoop` constructor refuses a disposed display
 

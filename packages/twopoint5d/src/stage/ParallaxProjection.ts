@@ -1,3 +1,4 @@
+import type {Camera} from 'three/webgpu';
 import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
 import {expectDefined} from '../utils/expectDefined.js';
@@ -68,8 +69,8 @@ export class ParallaxProjection implements IProjection {
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
    * `[0, 0, 0, 0]`. A call that gives a view with an area also takes `near`, `far` and
-   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not given, as
-   * `ParallaxProjectionSpecs` describes.
+   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not
+   * given, as `ParallaxProjectionSpecs` describes.
    */
   updateViewRect(width: number, height: number): void {
     // a container without area has no aspect ratio to fit a view into, and a view without area
@@ -112,21 +113,40 @@ export class ParallaxProjection implements IProjection {
   }
 
   createCamera(): PerspectiveCamera {
-    const camera = new PerspectiveCamera(this.#fovy, this.#aspect, this.#near, this.#far);
+    const camera = new PerspectiveCamera();
+    this.#applyToCamera(camera);
+    return camera;
+  }
 
+  /**
+   * Gives `camera` the setup {@link createCamera} gives a new one: the field of view, aspect, near
+   * and far of the last {@link updateViewRect}, the direction of the projection plane and the
+   * position at its distance. Whatever the camera carried in these is replaced.
+   *
+   * @throws {TypeError} if `camera` is not a `PerspectiveCamera`.
+   */
+  updateCamera(camera: Camera): void {
+    if ((camera as PerspectiveCamera)?.isPerspectiveCamera !== true) {
+      throw new TypeError(`ParallaxProjection: updateCamera() needs a PerspectiveCamera, got ${camera?.type ?? String(camera)}`);
+    }
+    this.#applyToCamera(camera as PerspectiveCamera);
+  }
+
+  #applyToCamera(camera: PerspectiveCamera): void {
     const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
 
+    camera.fov = this.#fovy;
+    camera.aspect = this.#aspect;
+    camera.near = this.#near;
+    camera.far = this.#far;
+
+    // applyRotation() multiplies onto the orientation the camera already carries: without this
+    // reset a camera updated a second time would turn a second time
+    camera.quaternion.identity();
     projectionPlane.applyRotation(camera);
 
     camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
-    camera.updateProjectionMatrix();
-    return camera;
-  }
-
-  updateCamera(camera: PerspectiveCamera): void {
-    camera.fov = this.#fovy;
-    camera.aspect = this.#aspect;
     camera.updateProjectionMatrix();
   }
 

@@ -1,8 +1,8 @@
-import {OrthographicCamera} from 'three/webgpu';
+import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {OrthographicProjection, type OrthographicProjectionSpecs} from './OrthographicProjection.js';
-import {ProjectionPlane} from './ProjectionPlane.js';
+import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 
 describe('OrthographicProjection', () => {
   describe('construction', () => {
@@ -88,6 +88,59 @@ describe('OrthographicProjection', () => {
       projection.updateCamera(camera);
       expect([camera.left, camera.right, camera.top, camera.bottom], `${w}×${h}`).toEqual([-320, 320, 240, -240]);
     }
+  });
+
+  describe('updateCamera()', () => {
+    const plane = 'xy|bottom-left';
+
+    // 'xy|bottom-left' looks along the default direction of a camera, so it carries no rotation
+    // the orientation tests could tell apart from a camera nobody has turned
+    const tiltedPlane = 'xz|top-left';
+
+    const projectionFor = (specs: Partial<OrthographicProjectionSpecs>, projectionPlane: ProjectionPlaneDescription = plane) => {
+      const projection = new OrthographicProjection(projectionPlane, specs);
+      projection.updateViewRect(800, 600);
+      return projection;
+    };
+
+    it('moves a camera it updates to the distance the specs now name', () => {
+      const specs: Partial<OrthographicProjectionSpecs> = {fit: 'contain', width: 640, distanceToProjectionPlane: 300};
+      const projection = projectionFor(specs);
+      const camera = projection.createCamera();
+
+      specs.distanceToProjectionPlane = 150;
+      projection.updateViewRect(800, 600);
+      projection.updateCamera(camera);
+
+      expect(camera.position).toEqual(ProjectionPlane.get(plane).getPointByDistance(150));
+    });
+
+    it('aims a camera it updates at the projection plane', () => {
+      const projection = projectionFor({fit: 'contain', width: 640}, tiltedPlane);
+      const reference = projection.createCamera();
+      const camera = new OrthographicCamera();
+
+      projection.updateCamera(camera);
+
+      expect(camera.quaternion.toArray()).toEqual(reference.quaternion.toArray());
+    });
+
+    it('leaves the orientation where it is when it updates the same camera twice', () => {
+      const projection = projectionFor({fit: 'contain', width: 640}, tiltedPlane);
+      const camera = projection.createCamera();
+
+      projection.updateCamera(camera);
+      const once = camera.quaternion.toArray();
+      projection.updateCamera(camera);
+
+      expect(camera.quaternion.toArray()).toEqual(once);
+    });
+
+    it('refuses a camera that is no OrthographicCamera', () => {
+      const projection = projectionFor({fit: 'contain', width: 640});
+
+      expect(() => projection.updateCamera(new PerspectiveCamera())).toThrow(TypeError);
+    });
   });
 
   it('has no view before a container with area', () => {

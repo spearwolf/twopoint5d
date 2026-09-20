@@ -1,3 +1,4 @@
+import type {Camera} from 'three/webgpu';
 import {OrthographicCamera, Vector2} from 'three/webgpu';
 
 import {expectDefined} from '../utils/expectDefined.js';
@@ -66,8 +67,8 @@ export class OrthographicProjection implements IProjection {
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
    * `[0, 0, 0, 0]`. A call that gives a view with an area also takes `near`, `far` and
-   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not given, as
-   * `OrthographicProjectionSpecs` describes.
+   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not
+   * given, as `OrthographicProjectionSpecs` describes.
    */
   updateViewRect(width: number, height: number): void {
     // a container without area has no aspect ratio to fit a view into, and a view without area
@@ -107,32 +108,44 @@ export class OrthographicProjection implements IProjection {
   }
 
   createCamera(): OrthographicCamera {
-    const camera = new OrthographicCamera(
-      -this.#halfWidth,
-      this.#halfWidth,
-      this.#halfHeight,
-      -this.#halfHeight,
-      this.#near,
-      this.#far,
-    );
-
-    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
-
-    projectionPlane.applyRotation(camera);
-
-    camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
-
-    camera.updateProjectionMatrix();
+    const camera = new OrthographicCamera();
+    this.#applyToCamera(camera);
     return camera;
   }
 
-  updateCamera(camera: OrthographicCamera): void {
+  /**
+   * Gives `camera` the setup {@link createCamera} gives a new one: the frustum, near and far of the
+   * last {@link updateViewRect}, the direction of the projection plane and the position at its
+   * distance. Whatever the camera carried in these is replaced.
+   *
+   * @throws {TypeError} if `camera` is not an `OrthographicCamera`.
+   */
+  updateCamera(camera: Camera): void {
+    if ((camera as OrthographicCamera)?.isOrthographicCamera !== true) {
+      throw new TypeError(
+        `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${camera?.type ?? String(camera)}`,
+      );
+    }
+    this.#applyToCamera(camera as OrthographicCamera);
+  }
+
+  #applyToCamera(camera: OrthographicCamera): void {
+    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
+
     camera.left = -this.#halfWidth;
     camera.right = this.#halfWidth;
     camera.top = this.#halfHeight;
     camera.bottom = -this.#halfHeight;
     camera.near = this.#near;
     camera.far = this.#far;
+
+    // applyRotation() multiplies onto the orientation the camera already carries: without this
+    // reset a camera updated a second time would turn a second time
+    camera.quaternion.identity();
+    projectionPlane.applyRotation(camera);
+
+    camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
+
     camera.updateProjectionMatrix();
   }
 
