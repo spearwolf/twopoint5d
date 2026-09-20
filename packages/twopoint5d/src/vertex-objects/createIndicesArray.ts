@@ -8,7 +8,7 @@ import {expectDefined} from '../utils/expectDefined.js';
  * object and those of the next in every attribute buffer. The descriptor makes sure every
  * index lies below it.
  */
-export function createIndicesArray(indices: number[], count: number, stride: number): Uint32Array {
+export function createIndicesArray(indices: readonly number[], count: number, stride: number): Uint32Array {
   const itemCount = indices.length;
   const arr = new Uint32Array(count * itemCount);
 

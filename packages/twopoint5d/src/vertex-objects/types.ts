@@ -2,6 +2,10 @@ import type {BufferAttribute, DynamicDrawUsage, InterleavedBuffer, StaticDrawUsa
 import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import type {voBuffer, voIndex} from './constants.js';
 
+/**
+ * The typed arrays a vertex object buffer stores its values in — one per
+ * {@link VertexAttributeDataType}, which names the same set of element types.
+ */
 export type TypedArray =
   | Float64Array
   | Float32Array
@@ -14,14 +18,25 @@ export type TypedArray =
   | Uint8Array
   | Int8Array;
 
+/** The element type of the buffer an attribute is stored in, named as the typed array that holds it: `'float32'` is a `Float32Array`. */
 export type VertexAttributeDataType =
   'float64' | 'float32' | 'float16' | 'uint32' | 'int32' | 'uint16' | 'int16' | 'uint8clamped' | 'uint8' | 'int8';
 
+/**
+ * How often the values of an attribute change: `'static'` for values written once, `'dynamic'` and
+ * `'stream'` for values rewritten over the life of the pool. It becomes the draw usage of the
+ * buffer that holds the attribute.
+ */
 export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 
 /** Selects which buffers a geometry uploads to the GPU, keyed by the usage type of their attributes. */
 export type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
+/**
+ * What every attribute description states about how its values are stored, whichever way it gives
+ * its size. {@link VAComponentsDescription} and {@link VASizeDescription} extend it by that one
+ * way each.
+ */
 export interface VADescription {
   /** The element type of the buffer this attribute is stored in. Defaults to `'float32'`. */
   type?: VertexAttributeDataType;
@@ -63,6 +78,7 @@ export interface VADescription {
   bufferName?: string;
 }
 
+/** An attribute description that gives its size by naming each of its elements. */
 export interface VAComponentsDescription extends VADescription {
   /**
    * One name per element of the attribute, which is one of the two ways to give an attribute
@@ -75,6 +91,7 @@ export interface VAComponentsDescription extends VADescription {
   components: string[];
 }
 
+/** An attribute description that gives its size as a number of elements. */
 export interface VASizeDescription extends VADescription {
   /**
    * How many elements the attribute holds per vertex, which is the other way to give an
@@ -113,12 +130,21 @@ export interface VertexAttributeMethods {
   setter?: string | boolean;
 }
 
+/** A {@link VAComponentsDescription} together with the names of its getter and setter. */
 export type VAComponentsType = VAComponentsDescription & VertexAttributeMethods;
+/** A {@link VASizeDescription} together with the names of its getter and setter. */
 export type VASizeType = VASizeDescription & VertexAttributeMethods;
 
+/** One attribute of a {@link VertexObjectDescription}, sized either by `components` or by `size`. */
 export type VertexAttributeDescription = VAComponentsType | VASizeType;
+/** The attributes of a {@link VertexObjectDescription}, keyed by the name the geometry gives them. */
 export type VertexAttributesType = Record<string, VertexAttributeDescription>;
 
+/**
+ * What a vertex object is made of: its attributes, how many vertices it has and how they are
+ * drawn, and the behaviour it carries. A {@link VertexObjectDescriptor} checks it once, and every
+ * pool and geometry is built from that descriptor.
+ */
 export interface VertexObjectDescription {
   /** How many vertices one vertex object is made of. Defaults to `1`. */
   vertexCount?: number;
@@ -146,25 +172,46 @@ export interface VertexObjectDescription {
   methods?: object | null | undefined;
 }
 
+/**
+ * A vertex object as a pool hands it out: the slot it occupies in a {@link VertexObjectBuffer}.
+ * The interfaces of the sprite types extend it with the accessors their description generates.
+ */
 export interface VO {
   /**
    * The buffer that backs this vertex object, and unset once the pool has let it go:
    * a disposed or freed vertex object keeps its properties but no longer reaches a buffer.
    */
   [voBuffer]: VertexObjectBuffer | undefined;
+  /** The index of this vertex object among the objects of its buffer, which is where its values start. */
   [voIndex]: number;
 }
 
+/**
+ * The generated method that writes every value of an attribute at once, as separate arguments or
+ * as one array-like: `setPos(1, 2)` and `setPos([1, 2])` do the same. It is the type to give the
+ * `set…` method of a vertex object interface.
+ */
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
 
+/** The generated method that reads every value of an attribute at once. It is the type to give the `get…` method of a vertex object interface. */
 export type VOAttrGetter = () => ArrayLike<number>;
 
+/** The three.js buffer a geometry holds the values of an attribute in — interleaved when several attributes share one. */
 export type BufferLike = InterleavedBuffer | BufferAttribute;
 
+/** The three.js draw usage constant a buffer is created with, chosen by the {@link VertexAttributeUsageType} of its attributes. */
 export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
+/**
+ * A snapshot of the buffers of a {@link VOBufferPool}, as `toBuffersData()` hands it out and
+ * `fromBuffersData()` takes it in — the way to move the contents of a pool to another one built
+ * from the same description, or across a worker boundary.
+ */
 export interface VertexObjectBuffersData {
+  /** How many vertex objects the buffers were sized for; only a pool of this very capacity takes the snapshot in. */
   capacity: number;
+  /** How many of those vertex objects are in use. */
   usedCount: number;
+  /** The typed array of each buffer, keyed by buffer name. */
   buffers: Record<string, TypedArray>;
 }

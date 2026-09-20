@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `VertexObjectDescriptor#description` is frozen, and so is everything it is made of: its `indices`, every attribute description and the `components` of each, and the `methods` object. A write through `descriptor.description` — an attribute's `usage` included — `descriptor.indices`, `descriptor.getAttribute(name).components` or `descriptor.methods` throws a `TypeError`, so nothing can change a descriptor behind the checks its constructor ran. `VertexObjectDescriptor#indices` answers `readonly number[]` and `VertexAttributeDescriptor#components` `readonly string[]`. `basePrototype` and the individual functions of `methods` are not frozen — they are behaviour the descriptor shares, not structure it owns
 - an upload that comes out of a pool having written something carries only the objects that were written: `createVO()`, `freeVO()` over the swap path, `createFromAttributes()` and the `copy*` methods of `VertexObjectBuffer`. A spawn in a large, mostly static pool therefore costs the vertices of the one new object instead of every buffer of the pool over its whole area in use. An attribute that uploads through `touch()` or `autoTouch` still carries every object in use — the generated setters do not say what they wrote — and a geometry that sat out the frames in between gets the whole area as well, because what happened before the recorded range began is written down nowhere. An `update()` that no render follows leaves its range standing on the attribute, and the next one takes it along rather than replacing it
 - `InstancedVOBufferGeometry#attachInstancedPool()` uploads the static buffers of the new route and leaves the routes that were already on the geometry alone. Each route owes its own first upload; one arriving late puts none of the others back in debt
 - `AttributeBuffer` carries `dirtyFrom`, `dirtyTo`, `dirtySince` and `pickedUpSerial` next to `serial`: the object range written since the range began, the serial it began at, and the highest serial a consumer has taken a range for. Code that builds such a record itself has to fill them
@@ -277,6 +278,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `HelpersManager#removeFromScene(scene)` with a scene this manager was never given: that scene is searched for the nodes of the manager and the root above the scene the manager holds is left standing. `remove()` and the `scene` setter take the held scene and the root above it down together
 
 ### Migration Guide
+
+#### The description of a descriptor is frozen
+
+`VertexObjectDescriptor#description` is frozen with everything it is made of: its `indices`, every attribute description and the `components` of each, and the `methods` object. `descriptor.description`, `#indices`, `#methods` and the `components` behind `getAttribute(name)` hand out those very objects, so a write to any of them — `descriptor.description.attributes['pos'].usage = 'dynamic'` and `descriptor.methods.extra = fn` included — throws a `TypeError`. The constructor checks the description once — the indices lie inside the vertex count, an attribute names no more components than its size — and holds it as it is for the life of the descriptor. A write from outside would change it without the checks running again.
+
+A description that is to change is a second description. `cloneVertexObjectDescription()` copies one, the copy is yours to change, and a new descriptor takes it in.
+
+`VertexObjectDescriptor#indices` is typed `readonly number[]` and `VertexAttributeDescriptor#components` `readonly string[]`. Code that assigns either to a mutable array names the readonly type instead, or copies it with `[...descriptor.indices]`. `basePrototype` and the functions of `methods` are not frozen: they are behaviour the descriptor shares with the class or the object literal that declares them, and they stay in the hands of whoever wrote them.
+
+**Before**
+
+```ts
+const descriptor = new VertexObjectDescriptor({
+  vertexCount: 4,
+  indices: [0, 1, 2],
+  attributes: {pos: {components: ['x', 'y']}},
+});
+
+descriptor.description.vertexCount = 8;
+descriptor.indices.push(4, 5, 6);
+```
+
+**After**
+
+```ts
+const description = cloneVertexObjectDescription(descriptor);
+description.vertexCount = 8;
+description.indices = [0, 1, 2, 4, 5, 6];
+
+const wider = new VertexObjectDescriptor(description);
+```
 
 #### A write through a vertex object has to say so
 

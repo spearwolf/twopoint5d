@@ -59,7 +59,7 @@ export class VertexAttributeDescriptor {
     return (this.description.components?.length ?? 0) > 0;
   }
 
-  get components(): string[] {
+  get components(): readonly string[] {
     return this.description.components ?? [];
   }
 

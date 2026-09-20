@@ -242,7 +242,7 @@ describe('cloneVertexObjectDescription', () => {
     // would let a later push undo that check
     const source: VertexObjectDescription = {
       attributes: {
-        pos: {size: 2, components: ['x', 'y']} as never,
+        pos: {size: 2, components: ['x', 'y']},
       },
     };
 

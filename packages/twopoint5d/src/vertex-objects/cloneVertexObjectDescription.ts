@@ -23,6 +23,36 @@ export interface VertexAttributeUsageOverrides {
 }
 
 /**
+ * The names each usage type applies to, aliases resolved — the same for every attribute of a
+ * description, so it is built once. `undefined` where the overrides name no attribute at all: such
+ * a copy leaves every attribute description as it is, `usage` included.
+ */
+function resolveUsageLookup(attributeUsage: VertexAttributeUsageOverrides | undefined) {
+  if (!attributeUsage) return undefined;
+
+  const dynamics = new Set(attributeUsage.dynamic || []);
+  const streams = new Set(attributeUsage.stream || []);
+  const statics = new Set(attributeUsage.static || []);
+
+  if (dynamics.size === 0 && streams.size === 0 && statics.size === 0) return undefined;
+
+  if (attributeUsage.alias) {
+    for (const [aliasName, aliasValue] of Object.entries(attributeUsage.alias)) {
+      const aliases = Array.isArray(aliasValue) ? aliasValue : [aliasValue];
+      if (dynamics.has(aliasName)) {
+        aliases.forEach((alias) => dynamics.add(alias));
+      } else if (streams.has(aliasName)) {
+        aliases.forEach((alias) => streams.add(alias));
+      } else if (statics.has(aliasName)) {
+        aliases.forEach((alias) => statics.add(alias));
+      }
+    }
+  }
+
+  return {dynamics, streams, statics};
+}
+
+/**
  * Copies a vertex object description, optionally with a different usage type for some of its
  * attributes — the way to reuse a description of the library for a pool whose attributes change
  * at another rate than the original was written for.
@@ -41,6 +71,7 @@ export function cloneVertexObjectDescription(
   attributeUsage?: VertexAttributeUsageOverrides,
 ): VertexObjectDescription {
   const description = source instanceof VertexObjectDescriptor ? source.description : source;
+  const usageLookup = resolveUsageLookup(attributeUsage);
   // every field of a description belongs in here: `new VertexObjectDescriptor()` builds its own
   // copy through this function, so a field this list forgets never reaches a descriptor
   const target: VertexObjectDescription = {
@@ -57,30 +88,11 @@ export function cloneVertexObjectDescription(
           (clonedDesc as VAComponentsDescription).components = components.slice();
         }
 
-        if (!attributeUsage) {
+        if (!usageLookup) {
           return [name, clonedDesc];
         }
 
-        const dynamics = new Set(attributeUsage.dynamic || []);
-        const streams = new Set(attributeUsage.stream || []);
-        const statics = new Set(attributeUsage.static || []);
-
-        if (dynamics.size === 0 && streams.size === 0 && statics.size === 0) {
-          return [name, clonedDesc];
-        }
-
-        if (attributeUsage.alias) {
-          for (const [aliasName, aliasValue] of Object.entries(attributeUsage.alias)) {
-            const aliases = Array.isArray(aliasValue) ? aliasValue : [aliasValue];
-            if (dynamics.has(aliasName)) {
-              aliases.forEach((alias) => dynamics.add(alias));
-            } else if (streams.has(aliasName)) {
-              aliases.forEach((alias) => streams.add(alias));
-            } else if (statics.has(aliasName)) {
-              aliases.forEach((alias) => statics.add(alias));
-            }
-          }
-        }
+        const {dynamics, streams, statics} = usageLookup;
 
         let usage: VertexAttributeUsageType = desc.usage || 'static';
 

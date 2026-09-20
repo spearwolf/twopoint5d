@@ -88,10 +88,10 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
     const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
     const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
 
-    const methods: unknown[] = [];
+    const attrEntries: unknown[] = [];
 
     if (descriptor.vertexCount === 1 && attr.size === 1) {
-      methods.push([
+      attrEntries.push([
         attrName,
         {
           enumerable: true,
@@ -102,7 +102,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
     } else {
       // `getter: false` / `setter: false` leave the name undefined: the attribute gets no accessor
       if (attr.getterName != null) {
-        methods.push([
+        attrEntries.push([
           attr.getterName,
           {
             enumerable: true,
@@ -111,7 +111,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
         ]);
       }
       if (attr.setterName != null) {
-        methods.push([
+        attrEntries.push([
           attr.setterName,
           {
             enumerable: true,
@@ -129,7 +129,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
           // a component is skipped only where it coincides with the attribute accessor above: one
           // vertex, size 1 and the same name address the very same slot
           if (descriptor.vertexCount > 1 || attr.size > 1 || component !== attr.name) {
-            methods.push([
+            attrEntries.push([
               `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
               {
                 enumerable: true,
@@ -141,7 +141,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
         }
       });
     }
-    return methods;
+    return attrEntries;
   });
 
   if (methods) {

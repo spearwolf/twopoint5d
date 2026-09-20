@@ -1,9 +1,25 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
-import type {VertexObjectDescription} from './types.js';
+import type {VAComponentsDescription, VertexObjectDescription} from './types.js';
 import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
+
+// Freezes what a description is made of: the description, its attributes and their components, the
+// indices and the `methods` object. `basePrototype` and the functions in `methods` stay as they
+// are — they are behaviour the description shares with whoever wrote it, not structure the
+// descriptor owns, and a frozen `Sprite.prototype` would take that class away from its author.
+const freezeDescription = (description: VertexObjectDescription): void => {
+  for (const attribute of Object.values(description.attributes)) {
+    const {components} = attribute as Partial<VAComponentsDescription>;
+    if (components != null) Object.freeze(components);
+    Object.freeze(attribute);
+  }
+  if (description.indices != null) Object.freeze(description.indices);
+  if (description.methods != null) Object.freeze(description.methods);
+  Object.freeze(description.attributes);
+  Object.freeze(description);
+};
 
 /**
  * The checked description of a vertex object: which attributes it has, and how many vertices and
@@ -14,14 +30,15 @@ export class VertexObjectDescriptor {
   /**
    * This descriptor's own copy of the description it was built from. Changing the object the
    * constructor was handed does not change this one, and so does nothing to this descriptor.
+   *
+   * The copy is frozen, down to the `indices` and the `components` of each attribute: a write
+   * throws a `TypeError` instead of changing what the constructor has checked. The `basePrototype`
+   * and the functions of `methods` are the exception — they belong to whoever wrote them.
    */
   readonly description: VertexObjectDescription;
 
   readonly attributes: Map<string, VertexAttributeDescriptor>;
   readonly bufferNames: Set<string>;
-
-  readonly basePrototype?: object | null | undefined;
-  readonly methods?: object | null | undefined;
 
   #voPrototype?: object;
 
@@ -67,6 +84,7 @@ export class VertexObjectDescriptor {
     // the copy is what keeps the checks below true for the life of this descriptor: a later
     // change to the description handed in here no longer reaches it
     this.description = cloneVertexObjectDescription(description);
+    freezeDescription(this.description);
     this.attributes = new Map();
     this.bufferNames = new Set();
     Object.entries(this.description.attributes).forEach(([attrName, attrDesc]) => {
@@ -74,8 +92,6 @@ export class VertexObjectDescriptor {
       this.attributes.set(attrName, descriptor);
       this.bufferNames.add(descriptor.bufferName);
     });
-    this.basePrototype = this.description.basePrototype;
-    this.methods = this.description.methods;
     this.#validate();
   }
 
@@ -141,6 +157,16 @@ export class VertexObjectDescriptor {
     }
   }
 
+  /** The prototype the generated accessors are placed on; the one the description names, not a copy of it. */
+  get basePrototype(): object | null | undefined {
+    return this.description.basePrototype;
+  }
+
+  /** The functions that become properties of every vertex object; the object is frozen, the functions in it are not. */
+  get methods(): object | null | undefined {
+    return this.description.methods;
+  }
+
   /** Returns `vertexCount` or `1` */
   get vertexCount(): number {
     return this.description.vertexCount ?? 1;
@@ -150,7 +176,7 @@ export class VertexObjectDescriptor {
     return this.description.indices != null && this.description.indices.length > 0;
   }
 
-  get indices(): number[] {
+  get indices(): readonly number[] {
     return this.description.indices ?? [];
   }
 

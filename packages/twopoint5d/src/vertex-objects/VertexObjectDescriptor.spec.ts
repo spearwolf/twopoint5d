@@ -2,6 +2,7 @@ import {describe, expect, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {VAComponentsType, VertexObjectDescription} from './types.js';
 import {TileBaseSpriteDescriptor, TileSpriteDescriptor} from '../map2d/TileSprites/descriptors.js';
 import {AnimatedSpriteDescriptor} from '../sprites/AnimatedSprites/AnimatedSprite.js';
@@ -94,7 +95,7 @@ describe('VertexObjectDescriptor', () => {
   test('answers from its own copy of an attribute that declares size and components', () => {
     const description: VertexObjectDescription = {
       attributes: {
-        pos: {size: 2, components: ['x', 'y']} as never,
+        pos: {size: 2, components: ['x', 'y']},
         other: {size: 1},
       },
     };
@@ -105,6 +106,73 @@ describe('VertexObjectDescriptor', () => {
     // a third component for a size of 2 is the very layout rule 3 of the constructor turns away:
     // the accessor for it would write past the attribute, into the next vertex object
     expect(descriptor.getAttribute('pos')!.components).toEqual(['x', 'y']);
+  });
+
+  describe('holds a description a caller cannot change through it', () => {
+    const makeDescriptor = (basePrototype?: object) =>
+      new VertexObjectDescriptor({
+        vertexCount: 4,
+        indices: [0, 1, 2, 0, 2, 3],
+        attributes: {pos: {components: ['x', 'y'], type: 'float32', usage: 'static'}},
+        basePrototype,
+      });
+
+    test('a write to the description throws and leaves it as it was', () => {
+      const descriptor = makeDescriptor();
+
+      // rule 1 and rule 4 of the constructor were checked against this value
+      expect(() => {
+        descriptor.description.vertexCount = 0;
+      }).toThrow(TypeError);
+
+      expect(descriptor.description.vertexCount).toBe(4);
+      expect(descriptor.vertexCount).toBe(4);
+    });
+
+    test('a push onto the indices throws and leaves them as they were', () => {
+      const descriptor = makeDescriptor();
+
+      // the indices are typed `readonly`; the cast is the caller that ignores that
+      expect(() => (descriptor.indices as number[]).push(99)).toThrow(TypeError);
+
+      expect(descriptor.indices).toEqual([0, 1, 2, 0, 2, 3]);
+    });
+
+    test('a push onto the components of an attribute throws and leaves them as they were', () => {
+      const descriptor = makeDescriptor();
+
+      // @ts-expect-error the components are typed `readonly`, and the write throws all the same
+      expect(() => descriptor.getAttribute('pos')!.components.push('z')).toThrow(TypeError);
+
+      expect(descriptor.getAttribute('pos')!.components).toEqual(['x', 'y']);
+    });
+
+    test('hands out a copy through cloneVertexObjectDescription() that is free to change', () => {
+      const descriptor = makeDescriptor();
+
+      const description = cloneVertexObjectDescription(descriptor);
+      description.vertexCount = 8;
+      description.indices = [0, 1, 2, 4, 5, 6];
+      (description.attributes['pos'] as VAComponentsType).components.push('z');
+
+      const wider = new VertexObjectDescriptor(description);
+      expect(wider.vertexCount).toBe(8);
+      expect(wider.indices).toEqual([0, 1, 2, 4, 5, 6]);
+      expect(wider.getAttribute('pos')!.components).toEqual(['x', 'y', 'z']);
+      expect(descriptor.vertexCount, 'the descriptor it was cloned from stays as it is').toBe(4);
+    });
+
+    test('leaves the basePrototype to its owner, who can still add a method to it', () => {
+      class Sprite {}
+      const descriptor = makeDescriptor(Sprite.prototype);
+
+      expect(() => {
+        (Sprite.prototype as {later?: () => void}).later = () => {};
+      }).not.toThrow();
+
+      expect(descriptor.basePrototype).toBe(Sprite.prototype);
+      expect(Object.isFrozen(Sprite.prototype)).toBe(false);
+    });
   });
 
   describe('the vertex object prototype', () => {
@@ -159,13 +227,11 @@ describe('VertexObjectDescriptor', () => {
     });
 
     test('the size of a later attribute before the components of an earlier one', () => {
-      expect(build({attributes: {a: {size: 1, components: ['x', 'y']} as never, b: {size: 0}}})).toThrow(
-        /needs a size of at least 1/,
-      );
+      expect(build({attributes: {a: {size: 1, components: ['x', 'y']}, b: {size: 0}}})).toThrow(/needs a size of at least 1/);
     });
 
     test('an attribute with more components than its size', () => {
-      expect(build({attributes: {pos: {size: 1, components: ['a', 'b', 'c']} as never}})).toThrow(
+      expect(build({attributes: {pos: {size: 1, components: ['a', 'b', 'c']}}})).toThrow(
         'VertexObjectDescriptor: attribute "pos" declares 3 components for a size of 1',
       );
     });
@@ -261,9 +327,7 @@ describe('VertexObjectDescriptor', () => {
     });
 
     test('an attribute with fewer components than its size', () => {
-      expect(
-        () => new VertexObjectDescriptor({attributes: {pos: {size: 4, components: ['x', 'y', 'z']} as never}}),
-      ).not.toThrow();
+      expect(() => new VertexObjectDescriptor({attributes: {pos: {size: 4, components: ['x', 'y', 'z']}}})).not.toThrow();
     });
   });
 });
