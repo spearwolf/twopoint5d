@@ -164,6 +164,28 @@ describe('Stage2D', () => {
     expect(stage.camera).not.toBe(custom);
   });
 
+  it('lets the projection place a camera it was given', () => {
+    const stage = new Stage2D(
+      new OrthographicProjection('xy|bottom-left', {
+        fit: 'contain',
+        width: 640,
+        near: 1,
+        far: 4000,
+        distanceToProjectionPlane: 300,
+      }),
+    );
+    const custom = new OrthographicCamera();
+    custom.position.set(11, 22, 33);
+    stage.camera = custom;
+
+    stage.resize(800, 600);
+
+    expect(stage.camera, 'the stage renders with the camera it was given').toBe(custom);
+    expect([custom.near, custom.far], 'near and far of the specs').toEqual([1, 4000]);
+    expect(custom.right - custom.left, 'the frustum of the projection').toBe(640);
+    expect(custom.position.z, 'the distance to the projection plane').toBe(300);
+  });
+
   describe('size after a change of projection', () => {
     const createResizedStage = () => {
       const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));

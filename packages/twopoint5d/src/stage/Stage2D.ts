@@ -124,6 +124,12 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * A camera assigned here takes precedence over the projection's. Assigning `undefined` hands
    * back to the projection's camera, created on the spot if the container already has an area.
    *
+   * A projection places a camera assigned here as it places its own: every `updateProjection()`
+   * — and every `resize()` that brings a new container size — gives it the frustum or the field
+   * of view of the specs, their `near` and `far`, the direction of the projection plane and the
+   * position at its `distanceToProjectionPlane`, as long as container and specs give a view with
+   * an area. A stage whose camera you place yourself gets no projection.
+   *
    * Every change of the camera emits `OnStageAfterCameraChanged` with the camera it replaced.
    */
   get camera(): Camera | undefined {

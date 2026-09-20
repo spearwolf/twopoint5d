@@ -60,6 +60,18 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animId('anim_1')).toBe(auto);
     });
 
+    test('an add that throws spends no name of the counter', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      expect(() => animations.add(undefined, {frameRate: 0}, frames)).toThrow();
+
+      const id = animations.add(undefined, 1.0, frames);
+
+      expect(id).toBe(0);
+      expect(animations.animId('anim_0')).toBe(id);
+    });
+
     test('add animation with symbol name', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];

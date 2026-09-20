@@ -142,7 +142,8 @@ export class FrameBasedAnimations {
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
    * stepping over every name already taken — so it is reachable through `animId()` like
-   * any other.
+   * any other. The counter moves for an animation that was registered: an `add()` that throws
+   * spends no name.
    */
   add(
     ...args:
@@ -164,12 +165,8 @@ export class FrameBasedAnimations {
   ): number {
     let [name] = args;
 
-    if (name) {
-      if (this.#animations.has(name)) {
-        throw new Error(`name='${name.toString()}' must be unique!`);
-      }
-    } else {
-      name = this.#nextAnonymousName();
+    if (name && this.#animations.has(name)) {
+      throw new Error(`name='${name.toString()}' must be unique!`);
     }
 
     let frames: TextureCoords[];
@@ -215,6 +212,12 @@ export class FrameBasedAnimations {
     const id = this.#names.length;
     const timing = args[1];
     const duration = resolveDuration(timing, frames.length);
+
+    // the counter hands out a name only once the animation can be built: an add() that throws
+    // spends none, and the names follow the animations that were registered
+    if (!name) {
+      name = this.#nextAnonymousName();
+    }
 
     this.#names.push(name);
     this.#animations.set(name, {
