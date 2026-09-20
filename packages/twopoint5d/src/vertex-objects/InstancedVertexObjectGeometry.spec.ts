@@ -199,7 +199,7 @@ describe('InstancedVertexObjectGeometry', () => {
       expect(geometry.extraInstancedBufferSerials.size).toBe(0);
     });
 
-    test('detachInstancedPool removes the autoDispose tracking entry', () => {
+    test('a pool that was detached is not disposed a second time by geometry.dispose()', () => {
       const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
       const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
 

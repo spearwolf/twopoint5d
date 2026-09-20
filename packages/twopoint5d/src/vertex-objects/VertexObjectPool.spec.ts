@@ -620,6 +620,113 @@ describe('VertexObjectPool', () => {
     });
   });
 
+  describe('onCreateVO', () => {
+    test('is called once for every vertex object createVO() materializes, with the object the pool built', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const seen: Array<{vo: MyVertexObject & VO; index: number}> = [];
+      pool.onCreateVO = (vo) => {
+        seen.push({vo, index: VOUtils.getIndex(vo)});
+      };
+
+      const first = pool.createVO()!;
+      const second = pool.createVO()!;
+
+      expect(seen.map(({index}) => index)).toEqual([0, 1]);
+      expect(seen[0]!.vo).toBe(first);
+      expect(seen[1]!.vo).toBe(second);
+    });
+
+    test('an object the hook returns is what createVO() and getVO() answer', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const replacement = {marker: 'replacement'} as unknown as MyVertexObject & VO;
+      pool.onCreateVO = () => replacement;
+
+      const vo = pool.createVO();
+
+      expect(vo).toBe(replacement);
+      expect(pool.getVO(0)).toBe(replacement);
+    });
+
+    test('a hook that answers undefined leaves the vertex object the pool built', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      let built: (MyVertexObject & VO) | undefined;
+      pool.onCreateVO = (vo) => {
+        built = vo;
+        return undefined;
+      };
+
+      const vo = pool.createVO();
+
+      expect(built).toBeDefined();
+      expect(vo).toBe(built);
+      expect(pool.getVO(0)).toBe(built);
+    });
+
+    test('is called for a vertex object that getVO() materializes for a slot createFromAttributes() filled', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      let calls = 0;
+      pool.onCreateVO = () => {
+        calls++;
+      };
+
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2]});
+
+      expect(pool.usedCount).toBe(2);
+      expect(calls, 'raising usedCount builds no vertex object').toBe(0);
+
+      const vo = pool.getVO(1)!;
+
+      expect(calls).toBe(1);
+      expect(VOUtils.getIndex(vo)).toBe(1);
+    });
+
+    test('is not called again for a vertex object that already sits in the index', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.createFromAttributes({bar: [1, 1, 1, 1]});
+      let calls = 0;
+      pool.onCreateVO = () => {
+        calls++;
+      };
+
+      const first = pool.getVO(0);
+      const second = pool.getVO(0);
+
+      expect(second).toBe(first);
+      expect(calls).toBe(1);
+    });
+
+    test('is not called on a disposed pool, which builds no vertex object', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.createFromAttributes({bar: [1, 1, 1, 1]});
+      let calls = 0;
+      pool.onCreateVO = () => {
+        calls++;
+      };
+
+      pool.dispose();
+
+      expect(pool.createVO()).toBeUndefined();
+      expect(pool.getVO(0)).toBeUndefined();
+      expect(calls).toBe(0);
+    });
+
+    test('a hook set after the pool was built applies from the next vertex object on, and stops once it is reset', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      let calls = 0;
+
+      pool.createVO();
+      pool.onCreateVO = () => {
+        calls++;
+      };
+      pool.createVO();
+      pool.createVO();
+      pool.onCreateVO = undefined;
+      pool.createVO();
+
+      expect(calls, 'the object built before the hook was set does not count').toBe(2);
+    });
+  });
+
   describe('getVO()', () => {
     test('answers undefined for an index that names no used slot', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);

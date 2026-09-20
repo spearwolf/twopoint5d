@@ -37,6 +37,24 @@ async function readBack(renderer, attr) {
   return Array.from(new Float32Array(await renderer.getArrayBufferAsync(attr)));
 }
 
+/**
+ * Reads an interleaved attribute back out of the gpu buffer it shares with its siblings.
+ *
+ * three's WebGL fallback files the byte length of an interleaved buffer under the attribute
+ * wrapper but looks it up under the shared buffer, so `getArrayBufferAsync()` answers an empty
+ * buffer there. The gl buffer is read directly instead; the WebGPU backend takes the usual path.
+ */
+async function readBackInterleaved(display, attr) {
+  if (display.isWebGPUBackend) return readBack(display.renderer, attr);
+
+  const {gl} = display.renderer.backend;
+  const buffer = bufferOf(attr);
+  const out = new Float32Array(buffer.array.length);
+  gl.bindBuffer(gl.ARRAY_BUFFER, display.renderer.backend.get(buffer).bufferGPU);
+  gl.getBufferSubData(gl.ARRAY_BUFFER, 0, out);
+  return Array.from(out);
+}
+
 const quadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
@@ -45,6 +63,16 @@ const quadDescription = {
 
 const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
+};
+
+// both attributes share the buffer name `dynamic_float32`, so they interleave into one buffer of stride 6
+const interleavedQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {
+    position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'},
+    color: {components: ['r', 'g', 'b'], type: 'float32', usage: 'dynamic'},
+  },
 };
 
 describe('vertex-objects — gpu upload', function () {
@@ -166,5 +194,44 @@ describe('vertex-objects — gpu upload', function () {
     const indices = Array.from(new Uint32Array(await display.renderer.getArrayBufferAsync(geometry.index)));
 
     expect(indices.slice(0, 6)).to.deep.equal([0, 1, 2, 4, 5, 6]);
+  });
+
+  it('two attributes that share a buffer upload the whole stride of every used vertex', async function () {
+    const geometry = new VertexObjectGeometry(interleavedQuadDescription, 8);
+    const material = new MeshBasicNodeMaterial();
+    // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
+    material.positionNode = attribute('position', 'vec3');
+    material.colorNode = attribute('color', 'vec3');
+    const mesh = new VertexObjects(geometry, material);
+    scene.add(mesh);
+
+    const quad = geometry.pool.createVO();
+    quad.setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+    quad.setColor([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]);
+
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const position = geometry.getAttribute('position');
+    const color = geometry.getAttribute('color');
+
+    expect(bufferOf(position), 'one interleaved buffer carries both attributes').to.equal(bufferOf(color));
+
+    // rewrite both attributes of the very same object
+    quad.setPosition([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
+    quad.setColor([2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5]);
+    mesh.update();
+
+    // itemSize (6, the stride) * vertexCount (4) * usedCount (1) — a range of 12 would ignore the stride
+    expect(bufferOf(position).updateRanges).to.deep.equal([{start: 0, count: 24}]);
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    // the attributes sit in alphabetical order inside the stride: color at offset 0, position at offset 3
+    expect((await readBackInterleaved(display, position)).slice(0, 24)).to.deep.equal([
+      2, 2, 2, 0, 0, 0, 3, 3, 3, 7, 7, 7, 4, 4, 4, 8, 8, 8, 5, 5, 5, 9, 9, 9,
+    ]);
   });
 });
