@@ -75,7 +75,10 @@ export class VOBufferPool {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
     const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
     if (capacity < 0 || !Number.isInteger(capacity)) {
-      throw new Error('Capacity must be a non-negative integer');
+      // which of the two ways the capacity arrived, so a caller who handed in a snapshot looks at
+      // its `capacity` field rather than at the argument
+      const capacityName = typeof capacityOrData === 'number' ? 'capacity' : 'buffersData.capacity';
+      throw new RangeError(`VOBufferPool: ${capacityName} must be a non-negative integer, got ${String(capacity)}`);
     }
     if (typeof capacityOrData === 'number') {
       this.#capacity = capacity;
@@ -183,7 +186,7 @@ export class VOBufferPool {
    * and on a {@link VertexObjectPool} `createVO()` answers `undefined` while `resize()`
    * throws. The method is idempotent.
    *
-   * NOTE: `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
+   * `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
    * that were created on top of this pool — the geometry that owns those is
    * responsible for calling its own `dispose()` (see `VOBufferGeometry`).
    */
@@ -236,8 +239,8 @@ export class VOBufferPool {
   }
 
   /**
-   * NOTE: The capacity must be the same as the original pool; any other capacity throws
-   * `Error('Invalid buffersData capacity')`.
+   * The capacity must be the same as the original pool; any other capacity throws a `RangeError`
+   * that names the capacity of this pool and the one that arrived.
    *
    * Throws on a disposed pool, which has no capacity left to serve: the method turns away a
    * mismatched capacity as it is, and a silent no-op here would let a caller believe the data
@@ -257,7 +260,10 @@ export class VOBufferPool {
       throw disposedError('fromBuffersData()');
     }
     if (buffersData.capacity !== this.capacity) {
-      throw new Error('Invalid buffersData capacity');
+      throw new RangeError(
+        `VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, ` +
+          `${this.capacity}, got ${String(buffersData.capacity)}`,
+      );
     }
     // every array is checked before the first write, so a payload that fails leaves the pool as it was
     for (const [bufferName, typedArray] of Object.entries(buffersData.buffers)) {

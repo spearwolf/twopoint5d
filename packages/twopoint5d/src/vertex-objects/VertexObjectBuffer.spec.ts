@@ -396,6 +396,153 @@ describe('VertexObjectBuffer', () => {
     ]);
   });
 
+  describe('a copy that does not fit the target buffer', () => {
+    const makeDescriptor = () =>
+      new VertexObjectDescriptor({
+        vertexCount: 2,
+        attributes: {
+          pos: {components: ['x', 'y'], type: 'float32', usage: 'dynamic'},
+          id: {size: 1, type: 'float32', usage: 'static'},
+        },
+      });
+
+    /** Writes `value` into the last element of every buffer — the one a copy past the end reaches first. */
+    const markLastElement = (buffer: VertexObjectBuffer, value: number): void => {
+      for (const buf of buffer.buffers.values()) {
+        buf.typedArray![buf.typedArray!.length - 1] = value;
+      }
+    };
+
+    const lastElements = (buffer: VertexObjectBuffer): number[] =>
+      Array.from(buffer.buffers.values(), (buf) => buf.typedArray![buf.typedArray!.length - 1]!);
+
+    /** Every buffer element by element — what a write lands in shows up wherever it lands. */
+    const contentsOf = (buffer: VertexObjectBuffer): number[][] =>
+      Array.from(buffer.buffers.values(), (buf) => Array.from(buf.typedArray!));
+
+    const fillAll = (buffer: VertexObjectBuffer, value: number): void => {
+      for (const buf of buffer.buffers.values()) {
+        buf.typedArray!.fill(value);
+      }
+    };
+
+    test('copy() names itself when the source has more objects than fit', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(), 4);
+      const source = new VertexObjectBuffer(makeDescriptor(), 3);
+
+      markLastElement(target, 7);
+
+      const run = () => target.copy(source, 2);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copy\(\)/);
+      expect(lastElements(target), 'a refused call leaves the target as it was').toEqual([7, 7]);
+    });
+
+    test('copyArray() names itself and the buffer when the source reaches past the last object', () => {
+      const buffer = new VertexObjectBuffer(makeDescriptor(), 2);
+      const {itemSize, typedArray} = buffer.buffers.get('dynamic_float32')!;
+
+      markLastElement(buffer, 7);
+
+      // one object more than the buffer has room for
+      const source = new Float32Array(typedArray!.length + 2 * itemSize);
+      const run = () => buffer.copyArray(source, 'dynamic_float32');
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        /VertexObjectBuffer#copyArray\(\).*"dynamic_float32"/,
+      );
+      expect(lastElements(buffer), 'a refused call leaves the buffer as it was').toEqual([7, 7]);
+    });
+
+    test('copy() refuses a target offset that names no object', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(), 4);
+      const source = new VertexObjectBuffer(makeDescriptor(), 1);
+
+      fillAll(target, 7);
+
+      const before = contentsOf(target);
+      const run = () => target.copy(source, 0.5);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and the value').toThrow(/VertexObjectBuffer#copy\(\).*0\.5/);
+      // half an object is a whole number of elements wherever itemSize is even, so the write
+      // would land inside object 0 and shift every value against the layout
+      expect(contentsOf(target), 'no element of any buffer was written').toEqual(before);
+    });
+
+    test('copyArray() refuses a target offset that names no object', () => {
+      const buffer = new VertexObjectBuffer(makeDescriptor(), 4);
+
+      fillAll(buffer, 7);
+
+      const before = contentsOf(buffer);
+      const run = () => buffer.copyArray(new Float32Array(4), 'dynamic_float32', 0.5);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and the value').toThrow(/VertexObjectBuffer#copyArray\(\).*0\.5/);
+      expect(contentsOf(buffer), 'no element of any buffer was written').toEqual(before);
+    });
+
+    test.each([-1, -0.5])('copy() refuses a target offset of %s', (offset) => {
+      const target = new VertexObjectBuffer(makeDescriptor(), 4);
+      const source = new VertexObjectBuffer(makeDescriptor(), 1);
+
+      expect(() => target.copy(source, offset)).toThrow(RangeError);
+      expect(() => target.copy(source, offset)).toThrow(`got ${offset}`);
+    });
+  });
+
+  describe('a copy the target cannot take buffer for buffer', () => {
+    /**
+     * Two buffers, `first` and `second`, with `second` sized by `tagSize`. Two descriptors built
+     * with different sizes agree on the buffer names and disagree on how wide `second` is.
+     */
+    const makeDescriptor = (tagSize: number) =>
+      new VertexObjectDescriptor({
+        vertexCount: 1,
+        attributes: {
+          // `pos` sorts before `tag`, so `first` is the buffer a copy would write before it reaches `second`
+          pos: {size: 2, type: 'float32', bufferName: 'first'},
+          tag: {size: tagSize, type: 'float32', bufferName: 'second'},
+        },
+      });
+
+    const contentsOfFirst = (buffer: VertexObjectBuffer): number[] => Array.from(buffer.buffers.get('first')!.typedArray!);
+
+    test('a source buffer wider than its target leaves no buffer of the target written', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(1), 4);
+      const source = new VertexObjectBuffer(makeDescriptor(4), 4);
+
+      target.buffers.get('first')!.typedArray!.fill(7);
+
+      const run = () => target.copy(source);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      // as many objects as the target holds, so the object count alone lets this copy through
+      expect(contentsOfFirst(target), 'the buffer that would have fit is untouched').toEqual(new Array(8).fill(7));
+    });
+
+    test('a source missing one of the buffers leaves no buffer of the target written', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(1), 4);
+      const source = new VertexObjectBuffer(
+        new VertexObjectDescriptor({vertexCount: 1, attributes: {pos: {size: 2, type: 'float32', bufferName: 'first'}}}),
+        4,
+      );
+
+      target.buffers.get('first')!.typedArray!.fill(7);
+
+      const run = () => target.copy(source);
+
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        /VertexObjectBuffer#copy\(\) finds no buffer named "second"/,
+      );
+      expect(contentsOfFirst(target), 'the buffer the source does have is untouched').toEqual(new Array(8).fill(7));
+    });
+  });
+
   test('copyWithin', () => {
     const descriptor = new VertexObjectDescriptor({
       vertexCount: 4,
@@ -639,6 +786,27 @@ describe('VertexObjectBuffer', () => {
 
       expect(() => buffer.copyWithin(0, 1, 2)).not.toThrow();
       expect(() => buffer.touch()).not.toThrow();
+    });
+
+    test('copy() into a released buffer does nothing, whatever the source brings', () => {
+      const target = releasedBuffer();
+      // more objects than the target ever had room for, and a fractional offset besides
+      const source = new VertexObjectBuffer(makeDescriptor(), 10);
+
+      expect(target.capacity, 'a released buffer goes on saying what it was sized for').toBe(2);
+      expect(() => target.copy(source)).not.toThrow();
+      expect(() => target.copy(source, 0.5)).not.toThrow();
+    });
+
+    test('copy() into a buffer over a description without attributes does nothing, whatever the source brings', () => {
+      const target = new VertexObjectBuffer(new VertexObjectDescriptor({vertexCount: 2, attributes: {}}), 2);
+      // more objects than the target has room for, a negative and a fractional offset besides
+      const source = new VertexObjectBuffer(makeDescriptor(), 10);
+
+      expect(target.buffers.size, 'there is nothing to write into').toBe(0);
+      expect(target.copy(source), 'the buffer itself comes back').toBe(target);
+      expect(target.copy(source, 0.5)).toBe(target);
+      expect(target.copy(source, -1)).toBe(target);
     });
 
     test('the read-only fields go on saying what this buffer was', () => {

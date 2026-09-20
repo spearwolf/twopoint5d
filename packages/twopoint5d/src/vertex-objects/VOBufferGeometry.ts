@@ -15,8 +15,18 @@ import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './type
 export class VOBufferGeometry extends BufferGeometry {
   readonly pool: VOBufferPool;
 
-  readonly buffers: Map<string, BufferLike> = new Map();
-  readonly bufferSerials: Map<string, number> = new Map();
+  readonly #buffers: Map<string, BufferLike> = new Map();
+  readonly #bufferSerials: Map<string, number> = new Map();
+
+  /** The three.js buffer behind each buffer name of the pool. */
+  get buffers(): ReadonlyMap<string, BufferLike> {
+    return this.#buffers;
+  }
+
+  /** The serial this geometry last saw for each of those buffers. */
+  get bufferSerials(): ReadonlyMap<string, number> {
+    return this.#bufferSerials;
+  }
 
   readonly #attachments = new GeometryPoolAttachments();
   readonly #slots = new GeometryAttributeSlots();
@@ -42,11 +52,11 @@ export class VOBufferGeometry extends BufferGeometry {
       this.declareOwnedPool(this.pool);
     }
     this.#attachments.attach(this.pool);
-    initializeAttributes(this, this.pool, this.buffers, this.bufferSerials, this.#slots);
+    initializeAttributes(this, this.pool, this.#buffers, this.#bufferSerials, this.#slots);
 
-    // the route bundles the public maps, it does not copy them: this geometry draws one pool and
-    // has no halves, so the route carries no group
-    this.#routes.add({pool: this.pool, buffers: this.buffers, bufferSerials: this.bufferSerials});
+    // the route bundles the maps behind the read-only views, it does not copy them: this geometry
+    // draws one pool and has no halves, so the route carries no group
+    this.#routes.add({pool: this.pool, buffers: this.#buffers, bufferSerials: this.#bufferSerials});
   }
 
   /**
@@ -81,15 +91,15 @@ export class VOBufferGeometry extends BufferGeometry {
 
     // an attribute left behind would still read from the pool arrays, and a geometry put back
     // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-    this.#slots.releaseRoute(this, this.buffers);
+    this.#slots.releaseRoute(this, this.#buffers);
     this.setIndex(null);
 
     if (this.#attachments.owns(this.pool)) {
       this.pool.dispose();
     }
 
-    this.buffers.clear();
-    this.bufferSerials.clear();
+    this.#buffers.clear();
+    this.#bufferSerials.clear();
     this.#attachments.clear();
     // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
     this.#routes.clear();

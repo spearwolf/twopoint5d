@@ -23,14 +23,37 @@ export type {TouchInstancedBuffersType};
  */
 export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly basePool?: VOBufferPool;
-  /** Set exactly when `basePool` is — the constructor builds the base route as a whole or not at all. */
-  readonly baseBuffers?: Map<string, BufferLike>;
 
-  readonly baseBufferSerials: Map<string, number> = new Map();
-  readonly instancedBufferSerials: Map<string, number> = new Map();
+  readonly #baseBuffers?: Map<string, BufferLike>;
+
+  readonly #baseBufferSerials: Map<string, number> = new Map();
+  readonly #instancedBufferSerials: Map<string, number> = new Map();
 
   readonly instancedPool: VOBufferPool;
-  readonly instancedBuffers: Map<string, BufferLike> = new Map();
+  readonly #instancedBuffers: Map<string, BufferLike> = new Map();
+
+  /**
+   * The three.js buffer behind each buffer name of the base pool. Set exactly when `basePool`
+   * is — the constructor builds the base route as a whole or not at all.
+   */
+  get baseBuffers(): ReadonlyMap<string, BufferLike> | undefined {
+    return this.#baseBuffers;
+  }
+
+  /** The serial this geometry last saw for each buffer of the base pool. */
+  get baseBufferSerials(): ReadonlyMap<string, number> {
+    return this.#baseBufferSerials;
+  }
+
+  /** The three.js buffer behind each buffer name of the instanced pool. */
+  get instancedBuffers(): ReadonlyMap<string, BufferLike> {
+    return this.#instancedBuffers;
+  }
+
+  /** The serial this geometry last saw for each buffer of the instanced pool. */
+  get instancedBufferSerials(): ReadonlyMap<string, number> {
+    return this.#instancedBufferSerials;
+  }
 
   readonly #attachments = new GeometryPoolAttachments();
   readonly #slots = new GeometryAttributeSlots();
@@ -41,8 +64,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * views of the same routes, so a name that has a pool has the other two.
    */
   readonly extraInstancedPools: ReadonlyMap<string, VertexObjectPool<unknown>> = this.#routes.attachedPools;
-  readonly extraInstancedBuffers: ReadonlyMap<string, Map<string, BufferLike>> = this.#routes.attachedBuffers;
-  readonly extraInstancedBufferSerials: ReadonlyMap<string, Map<string, number>> = this.#routes.attachedBufferSerials;
+  readonly extraInstancedBuffers: ReadonlyMap<string, ReadonlyMap<string, BufferLike>> = this.#routes.attachedBuffers;
+  readonly extraInstancedBufferSerials: ReadonlyMap<string, ReadonlyMap<string, number>> = this.#routes.attachedBufferSerials;
 
   /**
    * The attributes that a detached route left behind in slots nothing else fills. The renderer
@@ -85,7 +108,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
           'buffers to build attributes on. Build the geometry while the pool is alive, or hand it a live pool.',
       );
     }
-    if (!(args[2] instanceof BufferGeometry) && args[2] instanceof VOBufferPool && args[2].isDisposed) {
+    if (args[2] instanceof VOBufferPool && args[2].isDisposed) {
       throw new Error(
         'InstancedVOBufferGeometry: the base pool handed to the constructor has been disposed and holds no ' +
           'buffers to build attributes on. Build the geometry while the pool is alive, or hand it a live pool.',
@@ -116,21 +139,21 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
         this.declareOwnedPool(basePool);
       }
       const baseBuffers = new Map<string, BufferLike>();
-      this.baseBuffers = baseBuffers;
+      this.#baseBuffers = baseBuffers;
       this.#attachments.attach(basePool);
-      initializeAttributes(this, basePool, baseBuffers, this.baseBufferSerials, this.#slots);
-      this.#routes.add({pool: basePool, buffers: baseBuffers, bufferSerials: this.baseBufferSerials, group: 'base'});
+      initializeAttributes(this, basePool, baseBuffers, this.#baseBufferSerials, this.#slots);
+      this.#routes.add({pool: basePool, buffers: baseBuffers, bufferSerials: this.#baseBufferSerials, group: 'base'});
     }
 
     // after the copy(): BufferGeometry#copy() takes the name of its source, which is usually the empty string
     this.name = 'InstancedVOBufferGeometry';
 
     this.#attachments.attach(this.instancedPool);
-    initializeInstancedAttributes(this, this.instancedPool, this.instancedBuffers, this.instancedBufferSerials, this.#slots);
+    initializeInstancedAttributes(this, this.instancedPool, this.#instancedBuffers, this.#instancedBufferSerials, this.#slots);
     this.#routes.add({
       pool: this.instancedPool,
-      buffers: this.instancedBuffers,
-      bufferSerials: this.instancedBufferSerials,
+      buffers: this.#instancedBuffers,
+      bufferSerials: this.#instancedBufferSerials,
       group: 'instanced',
     });
   }
@@ -385,12 +408,17 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     // an attribute left behind would still read from the pool arrays, and a geometry put back
     // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-    if (this.baseBuffers != null) {
-      this.#slots.releaseRoute(this, this.baseBuffers);
+    if (this.#baseBuffers != null) {
+      this.#slots.releaseRoute(this, this.#baseBuffers);
     }
-    this.#slots.releaseRoute(this, this.instancedBuffers);
-    for (const buffers of this.extraInstancedBuffers.values()) {
-      this.#slots.releaseRoute(this, buffers);
+    this.#slots.releaseRoute(this, this.#instancedBuffers);
+    // through the routes rather than through the read-only view, whose type is a ReadonlyMap while
+    // releaseRoute() asks for the writable map a route was built with. A named route is one of the
+    // attached ones
+    for (const route of this.#routes) {
+      if (route.name != null) {
+        this.#slots.releaseRoute(this, route.buffers);
+      }
     }
     this.setIndex(null);
 
@@ -406,10 +434,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       }
     }
 
-    this.baseBuffers?.clear();
-    this.baseBufferSerials.clear();
-    this.instancedBuffers.clear();
-    this.instancedBufferSerials.clear();
+    this.#baseBuffers?.clear();
+    this.#baseBufferSerials.clear();
+    this.#instancedBuffers.clear();
+    this.#instancedBufferSerials.clear();
     // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
     this.#routes.clear();
     this.#attachments.clear();

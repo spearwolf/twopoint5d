@@ -94,10 +94,13 @@ export class GeometryRoutes {
   );
 
   /** The buffer maps of the named routes, keyed by their name. */
-  readonly attachedBuffers: ReadonlyMap<string, AttributeRoute> = projectValues(this.#attached, (route) => route.buffers);
+  readonly attachedBuffers: ReadonlyMap<string, ReadonlyMap<string, BufferLike>> = projectValues(
+    this.#attached,
+    (route) => route.buffers,
+  );
 
   /** The buffer serials of the named routes, keyed by their name. */
-  readonly attachedBufferSerials: ReadonlyMap<string, Map<string, number>> = projectValues(
+  readonly attachedBufferSerials: ReadonlyMap<string, ReadonlyMap<string, number>> = projectValues(
     this.#attached,
     (route) => route.bufferSerials,
   );

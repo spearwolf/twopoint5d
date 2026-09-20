@@ -463,13 +463,17 @@ describe('VertexObjectPool', () => {
     test('resize throws error for negative capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      expect(() => pool.resize(-1)).toThrow('Capacity must be a non-negative integer');
+      const run = () => pool.resize(-1);
+      expect(run).toThrow(RangeError);
+      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got -1');
     });
 
     test('resize throws error for non-integer capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
-      expect(() => pool.resize(10.5)).toThrow('Capacity must be a non-negative integer');
+      const run = () => pool.resize(10.5);
+      expect(run).toThrow(RangeError);
+      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got 10.5');
     });
 
     test('shrinking unlinks every vertex object beyond the new capacity', () => {
@@ -761,15 +765,18 @@ describe('VertexObjectPool', () => {
   });
 
   describe('input the layout cannot hold', () => {
-    test('a pool refuses a capacity that is not a non-negative integer', () => {
-      const message = 'Capacity must be a non-negative integer';
-
-      expect(() => new VertexObjectPool(descriptor, 1.5)).toThrow(message);
-      expect(() => new VertexObjectPool(descriptor, -1)).toThrow(message);
-      expect(() => new VertexObjectPool(descriptor, NaN)).toThrow(message);
+    test('a pool refuses a capacity that is not a non-negative integer and names it', () => {
+      // a string per case, not one RegExp: the text of 1.5 holds a dot
+      for (const capacity of [1.5, -1, NaN]) {
+        const build = () => new VertexObjectPool(descriptor, capacity);
+        expect(build, String(capacity)).toThrow(RangeError);
+        expect(build, String(capacity)).toThrow(`VOBufferPool: capacity must be a non-negative integer, got ${capacity}`);
+      }
 
       const buffersData = new VertexObjectPool(descriptor, 2).toBuffersData();
-      expect(() => new VertexObjectPool(descriptor, {...buffersData, capacity: 1.5})).toThrow(message);
+      const build = () => new VertexObjectPool(descriptor, {...buffersData, capacity: 1.5});
+      expect(build).toThrow(RangeError);
+      expect(build).toThrow('VOBufferPool: buffersData.capacity must be a non-negative integer, got 1.5');
     });
 
     test('fromBuffersData() refuses an array of another type and leaves the pool as it was', () => {
@@ -808,6 +815,18 @@ describe('VertexObjectPool', () => {
       expect(write).toThrow(/"static_float32" takes at most 64 elements/);
       expect(pool.usedCount).toBe(2);
       expect(pool.buffer.buffers.get('static_float32')!.typedArray).toBe(before);
+    });
+
+    test('fromBuffersData() names itself and both capacities for a snapshot of another size', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+      const buffersData = new VertexObjectPool(descriptor, 2).toBuffersData();
+
+      const write = () => pool.fromBuffersData(buffersData);
+
+      expect(write).toThrow(RangeError);
+      expect(write, 'the message names the class, the method and the two values').toThrow(
+        'VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, 4, got 2',
+      );
     });
   });
 

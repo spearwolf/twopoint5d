@@ -1,7 +1,7 @@
 import {toDrawUsage} from './toDrawUsage.js';
 import type {BufferLike, TouchBuffersType, VertexAttributeUsageType} from './types.js';
 
-export function selectBuffers(buffers: Map<string, BufferLike>, bufferTypes: TouchBuffersType): BufferLike[] {
+export function selectBuffers(buffers: ReadonlyMap<string, BufferLike>, bufferTypes: TouchBuffersType): BufferLike[] {
   const results: BufferLike[] = [];
   for (const usageType in bufferTypes) {
     if (bufferTypes[usageType as VertexAttributeUsageType] !== true) continue;

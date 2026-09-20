@@ -38,7 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `VertexObjectDescriptor#description` is frozen, and so is everything it is made of: its `indices`, every attribute description and the `components` of each, and the `methods` object. A write through `descriptor.description` — an attribute's `usage` included — `descriptor.indices`, `descriptor.getAttribute(name).components` or `descriptor.methods` throws a `TypeError`, so nothing can change a descriptor behind the checks its constructor ran. `VertexObjectDescriptor#indices` answers `readonly number[]` and `VertexAttributeDescriptor#components` `readonly string[]`. `basePrototype` and the individual functions of `methods` are not frozen — they are behaviour the descriptor shares, not structure it owns
+- `VOBufferPool#fromBuffersData()` throws a `RangeError` reading `VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, …, got …` for a snapshot sized for another pool, where it was a bare `Error` reading `Invalid buffersData capacity` that named neither the pool nor either of the two numbers. `RangeError` extends `Error`, so a `catch` that tests for `Error` is unaffected
+- `VertexObjectPool#resize()` throws a `RangeError` reading `VertexObjectPool#resize(): capacity must be a non-negative integer, got …` for a capacity that is no integer of 0 or more, and the pool constructor one reading `VOBufferPool: capacity must be …` or `VOBufferPool: buffersData.capacity must be …`, depending on which way the capacity arrived. The constructor message names `VOBufferPool` for a `VertexObjectPool` as well — that is where the check lives. Both were a bare `Error` reading `Capacity must be a non-negative integer`, which said neither where it came from nor what it had been given; `RangeError` extends `Error`, so a `catch` that tests for `Error` is unaffected. The `VertexObjectBuffer` constructor answers the same kind of `RangeError`, naming itself, the value and which of the two ways it arrived
+- the buffer maps of a geometry are read-only views: `VOBufferGeometry#buffers` and `#bufferSerials` answer `ReadonlyMap`, as do `InstancedVOBufferGeometry#baseBuffers`, `#baseBufferSerials`, `#instancedBuffers` and `#instancedBufferSerials`, and `#extraInstancedBuffers` and `#extraInstancedBufferSerials` hand out read-only maps of read-only maps. Writing into `bufferSerials` moved the very serial a geometry measures its uploads against and could silence them; the maps are written by the geometry alone
+- `VertexObjectDescriptor#attributes` answers `ReadonlyMap` and `#bufferNames` `ReadonlySet`. Both are derived from the frozen description of the descriptor, and a write to either left the descriptor saying something its description does not
+- `VertexObjectDescriptor#description` is typed `FrozenVertexObjectDescription`, the new type that says in the type system what the freeze already does at runtime: the description, its `indices`, its `attributes` record and the `components` of each attribute cannot be written to. `FrozenVertexAttributeDescription` names one attribute of it. Both are exported from the `vertex-objects` module; `VertexObjectDescription` is unchanged and keeps every consumer it has, and `cloneVertexObjectDescription()` takes the frozen form as well, so `cloneVertexObjectDescription(descriptor.description)` still compiles
+- `VertexObjectDescriptor#description` is frozen, and so is everything it is made of: its `indices`, the `attributes` record, every attribute description in it and the `components` of each, and the `methods` object. A write through `descriptor.description` — an attribute's `usage` included — `descriptor.indices`, `descriptor.getAttribute(name).components` or `descriptor.methods` throws a `TypeError`, so nothing can change a descriptor behind the checks its constructor ran. `VertexObjectDescriptor#indices` answers `readonly number[]` and `VertexAttributeDescriptor#components` `readonly string[]`. `basePrototype` and the individual functions of `methods` are not frozen — they are behaviour the descriptor shares, not structure it owns
 - an upload that comes out of a pool having written something carries only the objects that were written: `createVO()`, `freeVO()` over the swap path, `createFromAttributes()` and the `copy*` methods of `VertexObjectBuffer`. A spawn in a large, mostly static pool therefore costs the vertices of the one new object instead of every buffer of the pool over its whole area in use. An attribute that uploads through `touch()` or `autoTouch` still carries every object in use — the generated setters do not say what they wrote — and a geometry that sat out the frames in between gets the whole area as well, because what happened before the recorded range began is written down nowhere. An `update()` that no render follows leaves its range standing on the attribute, and the next one takes it along rather than replacing it
 - `InstancedVOBufferGeometry#attachInstancedPool()` uploads the static buffers of the new route and leaves the routes that were already on the geometry alone. Each route owes its own first upload; one arriving late puts none of the others back in debt
 - `AttributeBuffer` carries `dirtyFrom`, `dirtyTo`, `dirtySince` and `pickedUpSerial` next to `serial`: the object range written since the range began, the serial it began at, and the highest serial a consumer has taken a range for. Code that builds such a record itself has to fill them
@@ -150,7 +155,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
 - `new VertexObjectDescriptor()` refuses a malformed description, and with it every pool and geometry built from one. It throws a `RangeError` for a `vertexCount` that is no positive integer, for an attribute whose size is no positive integer (`components: []`, `size: 0`, `size: 1.5`), for an attribute that declares both `size` and more `components` than that size, and for an index that is no integer in `0` … `vertexCount - 1`; it throws an `Error` for two attributes, components or `methods` that give the vertex object the same property name. Fewer `components` than `size` pad the attribute and are taken
 - `VertexObjectBuffer` and `VOBufferPool#fromBuffersData()` check every array of `buffersData` against the buffer it is meant for: a typed array of another element type throws a `TypeError`, a length that does not fit a `RangeError`, both naming the buffer. The constructor takes an array by reference and asks for exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most that many and copies a shorter array. A typed array from a worker or another realm is taken. `fromBuffersData()` checks every array before it changes anything about the pool
-- the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more; the `VertexObjectBuffer` constructor throws a `RangeError` for such a capacity that names the value and whether it came as `capacity` or as `buffersData.capacity`
 - `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
 - `PanControl2D` recognises its keys by `event.code` against `keys`, so the default keys sit at the WASD position on every keyboard layout
 - a `resize-to` value that selects an element is looked up in the root node of `Display#resizeToAttributeEl` — the document, or the shadow root the element sits in
@@ -184,6 +188,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `VertexObjectBuffer#copy()`: it judges every buffer before it writes the first of them — the source has a buffer of that name, and its elements fit their target at `targetObjectOffset` — so a copy that is refused leaves the target exactly as it was. Both throws used to come from inside the writing loop, with everything written before them left standing: the `Error` for a buffer name the source does not have, and the bare `RangeError` reading `offset is out of bounds` that the typed array raises. Two descriptions that agree on a `bufferName` while sizing it differently are what reaches the second of those — the object counts match, one buffer fits and the next overruns
+- fix `VertexObjectBuffer#copyArray()`: it measures the source against the buffer before writing and throws a `RangeError` naming the class, the method, the buffer and the numbers, where the overrun used to surface as `offset is out of bounds` and named nothing. A source array shorter than the buffer is taken as it always was
+- fix the `targetObjectOffset` of `VertexObjectBuffer#copy()` and `#copyArray()`: on a buffer that has something to write into, a value that is no integer of 0 or more throws a `RangeError` naming the method and the value. A buffer that has nothing — that of a disposed pool, or one over a description without attributes — is met earlier: `copy()` returns without looking at the offset, and `copyArray()` throws for the buffer it lacks. A fraction used to reach the typed array as an element offset, and the write landed inside an object instead of on its boundary, shifting every value of the copy against the layout without a word
 - fix `TileSpritesFactory#createTile()`: it resolves the tile set and the atlas frame of a tile before it takes a slot out of the instanced pool. A factory without a tile set threw after the slot was gone, and nothing on that path books a slot back, so the pool ran empty frame by frame until it handed out nothing at all
 - fix the published type declaration of `texture/TextureResource`: it imported `./types.ts` with the suffix of the source instead of `./types.js`, an extension that does not exist in the package
 - fix the tile coordinates `CameraBasedVisibility` computes for a map whose `xOffset` or `yOffset` lies outside the first tile: the view rectangle of a tile, the box it is tested with and the tiles the search walks on to are the ones of the tile coordinate they belong to. The query these are derived from was handed a coordinate without the map offset while it reads one with it, which shifted every tile of such a map by `floor(-offset / tileSize)` tiles against the tile coordinate it was found under. An offset within the first tile — the usual `-tileSize / 2` among them — was and is unaffected
@@ -279,9 +286,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration Guide
 
+#### The containers a geometry and a descriptor hand out are read-only
+
+Eight fields that used to hand out a live `Map` or `Set` now answer a read-only view of it: `VOBufferGeometry#buffers` and `#bufferSerials`, `InstancedVOBufferGeometry#baseBuffers`, `#baseBufferSerials`, `#instancedBuffers` and `#instancedBufferSerials`, plus `VertexObjectDescriptor#attributes` (`ReadonlyMap`) and `#bufferNames` (`ReadonlySet`). `InstancedVOBufferGeometry#extraInstancedBuffers` and `#extraInstancedBufferSerials` were read-only maps already and are now read-only down to the maps inside them.
+
+Nothing about reading changes — `get()`, `has()`, `size`, `keys()`, `values()`, `entries()`, `forEach()` and iteration answer exactly as before. What no longer compiles is a write, and handing one of them to a signature that asks for a `Map` or a `Set`. Name the read-only type where the value is only read, and copy it where it is written: the copy is yours, and writing into it changes nothing about the geometry.
+
+Writing into `bufferSerials` was never a way to steer an upload. The serial a geometry holds per buffer is what it measures the pool against, and a value put there by hand made the geometry believe it had already uploaded what it had not.
+
+**Before**
+
+```ts
+function inspect(buffers: Map<string, BufferLike>) {}
+
+inspect(geometry.buffers);
+geometry.bufferSerials.set('dynamic_float32', 0);
+```
+
+**After**
+
+```ts
+function inspect(buffers: ReadonlyMap<string, BufferLike>) {}
+
+inspect(geometry.buffers);
+
+// a copy of your own, if something really has to be written
+const serials = new Map([...geometry.bufferSerials]);
+
+// to have a buffer uploaded again, say so to the geometry
+geometry.touch('position');
+```
+
+#### `VertexObjectDescriptor#description` is typed as the frozen object it is
+
+`descriptor.description` answers `FrozenVertexObjectDescription`: the description, its `indices`, its `attributes` record and the `components` of every attribute are typed as unwritable, which is what the runtime has been answering with a `TypeError` all along. A write that used to type-check and then throw is now caught by the compiler.
+
+`VertexObjectDescription` itself is unchanged — a description written by hand, handed to a constructor or kept in a variable keeps its type and stays as writable as it was. Only the value that comes out of a descriptor carries the new one, and `cloneVertexObjectDescription()` takes both, so the way out is the clone that _The description of a descriptor is frozen_ below spells out.
+
+**Before**
+
+```ts
+const description: VertexObjectDescription = descriptor.description;
+descriptor.description.vertexCount = 8;
+```
+
+**After**
+
+```ts
+const description: FrozenVertexObjectDescription = descriptor.description;
+
+const wider = cloneVertexObjectDescription(descriptor);
+wider.vertexCount = 8;
+const widerDescriptor = new VertexObjectDescriptor(wider);
+```
+
 #### The description of a descriptor is frozen
 
-`VertexObjectDescriptor#description` is frozen with everything it is made of: its `indices`, every attribute description and the `components` of each, and the `methods` object. `descriptor.description`, `#indices`, `#methods` and the `components` behind `getAttribute(name)` hand out those very objects, so a write to any of them — `descriptor.description.attributes['pos'].usage = 'dynamic'` and `descriptor.methods.extra = fn` included — throws a `TypeError`. The constructor checks the description once — the indices lie inside the vertex count, an attribute names no more components than its size — and holds it as it is for the life of the descriptor. A write from outside would change it without the checks running again.
+`VertexObjectDescriptor#description` is frozen with everything it is made of: its `indices`, the `attributes` record, every attribute description in it and the `components` of each, and the `methods` object. `descriptor.description`, `#indices`, `#methods` and the `components` behind `getAttribute(name)` hand out those very objects, so a write to any of them — `descriptor.description.attributes['pos'].usage = 'dynamic'`, `descriptor.description.attributes.extra = {size: 1}` and `descriptor.methods.extra = fn` included — throws a `TypeError`. The constructor checks the description once — the indices lie inside the vertex count, an attribute names no more components than its size — and holds it as it is for the life of the descriptor. A write from outside would change it without the checks running again.
 
 A description that is to change is a second description. `cloneVertexObjectDescription()` copies one, the copy is yours to change, and a new descriptor takes it in.
 
@@ -317,6 +378,8 @@ An upload out of a pool carries the objects that were written, and `getVO()` mar
 This reaches every write through a generated setter, not only the ones behind a `getVO()`. A vertex object taken from `createVO()` in an earlier frame writes into a slot that no longer rides along with whatever the pool marks next — a spawn somewhere else in the pool names its own object and nothing more.
 
 Say what was written: call `touch()` on the geometry after writing, or give the attribute `autoTouch`. An attribute with `usage: 'dynamic'` or `'stream'` already carries `autoTouch` and needs no change. Values written right after the `createVO()` that handed the slot out need none either — that spawn marks its own slot.
+
+Setting `attribute.needsUpdate = true` by hand is not the way to say it. It asks for an upload but names no range, so an attribute still carrying the narrow range of an earlier `update()` whose upload has not gone out yet uploads that range alone and the values written beside it never reach the gpu. `touch()` clears the range along with marking the attribute, which is what makes it the full upload a caller who cannot say more needs.
 
 #### `AttributeBuffer` carries four more fields
 

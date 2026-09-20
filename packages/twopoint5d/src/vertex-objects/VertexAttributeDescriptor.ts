@@ -1,5 +1,5 @@
 import type {
-  VAComponentsDescription,
+  FrozenVertexAttributeDescription,
   VASizeDescription,
   VertexAttributeDataType,
   VertexAttributeDescription,
@@ -9,7 +9,10 @@ import type {
 
 const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) => m1.toUpperCase());
 
-type VADescriptionFields = Partial<VASizeDescription> & Partial<VAComponentsDescription> & VertexAttributeMethods;
+// read-only throughout, and the components with them: this descriptor only ever reads, and the
+// description it is built from may be the frozen one a VertexObjectDescriptor hands out
+type VADescriptionFields = Readonly<Partial<VASizeDescription>> &
+  Readonly<VertexAttributeMethods> & {readonly components?: readonly string[]};
 
 /**
  * A single attribute of a {@link VertexObjectDescriptor}: its type, size, components and usage.
@@ -26,7 +29,7 @@ export class VertexAttributeDescriptor {
 
   readonly name: string;
 
-  constructor(name: string, description: VertexAttributeDescription) {
+  constructor(name: string, description: VertexAttributeDescription | FrozenVertexAttributeDescription) {
     this.name = name;
     this.description = description;
   }

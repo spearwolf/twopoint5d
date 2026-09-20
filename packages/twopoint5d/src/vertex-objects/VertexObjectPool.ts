@@ -49,6 +49,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * If it is smaller, every vertex object from the new capacity onwards is unlinked from its
    * buffer — any further read or write on such a vertex object fails. The `usedCount` is
    * capped at the new capacity.
+   *
+   * @throws a `RangeError` that names the value when `capacity` is no integer of 0 or more
    */
   resize(capacity: number): void {
     if (this.isDisposed) {
@@ -56,7 +58,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     }
 
     if (capacity < 0 || !Number.isInteger(capacity)) {
-      throw new Error('Capacity must be a non-negative integer');
+      throw new RangeError(`VertexObjectPool#resize(): capacity must be a non-negative integer, got ${String(capacity)}`);
     }
 
     if (capacity === this.capacity) return;

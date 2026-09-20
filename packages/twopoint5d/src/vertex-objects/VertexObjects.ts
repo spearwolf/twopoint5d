@@ -27,7 +27,9 @@ export class VertexObjects<GeoType extends VOBufferGeometry | InstancedVertexObj
    * Update the mesh. Must be called after any changes to the vertex-objects,
    * or in the update loop if you are constantly changing the geometry data.
    *
-   * XXX Object3D#onBeforeRender is too late for updating the geometry (attribute data arrays + draw range)
+   * The caller makes this call itself because `Object3D#onBeforeRender` comes too late for it:
+   * by then the renderer has read the attribute data arrays and the draw range of the geometry,
+   * and whatever this method would have written reaches the gpu a frame late.
    */
   update(): void {
     if (typeof this.geometry?.update === 'function') {

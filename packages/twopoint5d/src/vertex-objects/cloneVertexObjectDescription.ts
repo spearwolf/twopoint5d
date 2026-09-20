@@ -1,4 +1,10 @@
-import type {VAComponentsDescription, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
+import type {
+  FrozenVertexObjectDescription,
+  VAComponentsDescription,
+  VertexAttributeDescription,
+  VertexAttributeUsageType,
+  VertexObjectDescription,
+} from './types.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 /**
@@ -67,7 +73,7 @@ function resolveUsageLookup(attributeUsage: VertexAttributeUsageOverrides | unde
  *   Naming no attribute at all in any of the three lists leaves every usage as it is.
  */
 export function cloneVertexObjectDescription(
-  source: VertexObjectDescriptor | VertexObjectDescription,
+  source: VertexObjectDescriptor | VertexObjectDescription | FrozenVertexObjectDescription,
   attributeUsage?: VertexAttributeUsageOverrides,
 ): VertexObjectDescription {
   const description = source instanceof VertexObjectDescriptor ? source.description : source;
@@ -79,7 +85,9 @@ export function cloneVertexObjectDescription(
     indices: description.indices?.slice(),
     attributes: Object.fromEntries(
       Object.entries(description.attributes).map(([name, desc]) => {
-        const clonedDesc = {...desc};
+        // the clone owns its structure: the spread and the components copy below build new objects,
+        // so what comes out is free to change even when the source was a frozen description
+        const clonedDesc = {...desc} as VertexAttributeDescription;
         // an attribute is free to declare `size` and `components` together, so a components array
         // is copied wherever there is one: a shared array would let a later push on the source
         // description undo the size-against-components check of VertexObjectDescriptor

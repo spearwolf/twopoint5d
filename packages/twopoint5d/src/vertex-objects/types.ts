@@ -173,6 +173,33 @@ export interface VertexObjectDescription {
 }
 
 /**
+ * One attribute of a {@link FrozenVertexObjectDescription}: the same attribute description,
+ * with a `components` list that cannot be written to.
+ *
+ * The two ways of sizing an attribute are written out one by one rather than mapped over the
+ * union, so each member keeps the fields it has — and so that the type behind this name is one
+ * a consumer can write down, which a generic helper would not be.
+ */
+export type FrozenVertexAttributeDescription =
+  (Readonly<Omit<VAComponentsType, 'components'>> & {readonly components: readonly string[]}) | Readonly<VASizeType>;
+
+/**
+ * A {@link VertexObjectDescription} as a {@link VertexObjectDescriptor} hands its own out:
+ * frozen down to the `indices`, the attributes record and the `components` of each attribute,
+ * so that a write a `TypeError` answers at runtime is already a type error.
+ *
+ * `basePrototype` and the functions in `methods` keep their types — they are behaviour the
+ * descriptor shares, not structure it owns, and they are not frozen.
+ */
+export type FrozenVertexObjectDescription = {
+  readonly [K in keyof VertexObjectDescription]: K extends 'indices'
+    ? readonly number[]
+    : K extends 'attributes'
+      ? Readonly<Record<string, FrozenVertexAttributeDescription>>
+      : VertexObjectDescription[K];
+};
+
+/**
  * A vertex object as a pool hands it out: the slot it occupies in a {@link VertexObjectBuffer}.
  * The interfaces of the sprite types extend it with the accessors their description generates.
  */

@@ -1,7 +1,11 @@
 import type {VOBufferPool} from './VOBufferPool.js';
 import type {BufferLike} from './types.js';
 
-export function selectAttributes(pool: VOBufferPool, buffers: Map<string, BufferLike>, attrNames: string[]): BufferLike[] {
+export function selectAttributes(
+  pool: VOBufferPool,
+  buffers: ReadonlyMap<string, BufferLike>,
+  attrNames: string[],
+): BufferLike[] {
   const attrs = new Set<string>();
   for (const name of attrNames) {
     const bufAttr = pool.buffer.bufferAttributes.get(name);

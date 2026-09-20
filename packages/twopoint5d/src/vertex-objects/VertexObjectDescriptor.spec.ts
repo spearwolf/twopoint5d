@@ -122,6 +122,7 @@ describe('VertexObjectDescriptor', () => {
 
       // rule 1 and rule 4 of the constructor were checked against this value
       expect(() => {
+        // @ts-expect-error the description is typed frozen, and the write throws all the same
         descriptor.description.vertexCount = 0;
       }).toThrow(TypeError);
 
@@ -141,8 +142,10 @@ describe('VertexObjectDescriptor', () => {
     test('a push onto the components of an attribute throws and leaves them as they were', () => {
       const descriptor = makeDescriptor();
 
+      const pos = descriptor.getAttribute('pos')!;
+
       // @ts-expect-error the components are typed `readonly`, and the write throws all the same
-      expect(() => descriptor.getAttribute('pos')!.components.push('z')).toThrow(TypeError);
+      expect(() => pos.components.push('z')).toThrow(TypeError);
 
       expect(descriptor.getAttribute('pos')!.components).toEqual(['x', 'y']);
     });

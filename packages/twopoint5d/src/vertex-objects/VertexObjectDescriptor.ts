@@ -1,6 +1,6 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
-import type {VAComponentsDescription, VertexObjectDescription} from './types.js';
+import type {FrozenVertexObjectDescription, VAComponentsDescription, VertexObjectDescription} from './types.js';
 import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
@@ -31,14 +31,26 @@ export class VertexObjectDescriptor {
    * This descriptor's own copy of the description it was built from. Changing the object the
    * constructor was handed does not change this one, and so does nothing to this descriptor.
    *
-   * The copy is frozen, down to the `indices` and the `components` of each attribute: a write
-   * throws a `TypeError` instead of changing what the constructor has checked. The `basePrototype`
-   * and the functions of `methods` are the exception — they belong to whoever wrote them.
+   * The copy is frozen, down to the `indices`, the `attributes` record, every attribute
+   * description in it and the `components` of each: a write throws a `TypeError` instead of
+   * changing what the constructor has checked, and {@link FrozenVertexObjectDescription} says so
+   * in the type as well. The `basePrototype` and the functions of `methods` are the exception —
+   * they belong to whoever wrote them.
    */
-  readonly description: VertexObjectDescription;
+  readonly description: FrozenVertexObjectDescription;
 
-  readonly attributes: Map<string, VertexAttributeDescriptor>;
-  readonly bufferNames: Set<string>;
+  readonly #attributes: Map<string, VertexAttributeDescriptor> = new Map();
+  readonly #bufferNames: Set<string> = new Set();
+
+  /** The descriptor of each attribute, keyed by the name the geometry gives it. */
+  get attributes(): ReadonlyMap<string, VertexAttributeDescriptor> {
+    return this.#attributes;
+  }
+
+  /** The names of the buffers the attributes of this descriptor are laid out in. */
+  get bufferNames(): ReadonlySet<string> {
+    return this.#bufferNames;
+  }
 
   #voPrototype?: object;
 
@@ -82,15 +94,15 @@ export class VertexObjectDescriptor {
    */
   constructor(description: VertexObjectDescription) {
     // the copy is what keeps the checks below true for the life of this descriptor: a later
-    // change to the description handed in here no longer reaches it
-    this.description = cloneVertexObjectDescription(description);
-    freezeDescription(this.description);
-    this.attributes = new Map();
-    this.bufferNames = new Set();
+    // change to the description handed in here no longer reaches it. It is frozen before it is
+    // assigned, so freezeDescription() still works on an object it is allowed to write to
+    const ownDescription = cloneVertexObjectDescription(description);
+    freezeDescription(ownDescription);
+    this.description = ownDescription;
     Object.entries(this.description.attributes).forEach(([attrName, attrDesc]) => {
       const descriptor = new VertexAttributeDescriptor(attrName, attrDesc);
-      this.attributes.set(attrName, descriptor);
-      this.bufferNames.add(descriptor.bufferName);
+      this.#attributes.set(attrName, descriptor);
+      this.#bufferNames.add(descriptor.bufferName);
     });
     this.#validate();
   }
@@ -111,7 +123,7 @@ export class VertexObjectDescriptor {
     }
     for (const attr of this.attributes.values()) {
       // the raw description, because the descriptor answers `size` from either field
-      const raw = this.description.attributes[attr.name] as {size?: number; components?: string[]};
+      const raw = this.description.attributes[attr.name] as {size?: number; components?: readonly string[]};
       if (raw.size != null && raw.components != null && raw.components.length > raw.size) {
         throw new RangeError(
           `VertexObjectDescriptor: attribute "${attr.name}" declares ${raw.components.length} components for a size of ${raw.size}`,

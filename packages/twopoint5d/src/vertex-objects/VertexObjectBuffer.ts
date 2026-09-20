@@ -281,11 +281,39 @@ export class VertexObjectBuffer {
   /**
    * Both objects should use the same vertex-object-description
    *
-   * Throws when `other` is the buffer of a disposed pool, which has no data to read, and for a
-   * buffer of this one that `other` does not have. Copying into the buffer of a disposed pool
-   * does nothing — there is nothing left to write to.
+   * A buffer with nothing to write into — that of a disposed pool, or one over a description
+   * without attributes — does nothing and checks nothing, `other` and the offset included. Any
+   * other buffer throws when `other` is the buffer of a disposed pool, which has no data to read,
+   * and for a buffer of this one that `other` does not have.
+   *
+   * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
+   * more, or when a buffer of `other` does not fit its counterpart here at that offset. Every
+   * buffer is judged before the first of them is written, so a copy that is refused leaves this
+   * buffer exactly as it was.
    */
   copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
+    // nothing to write into: the buffer of a disposed pool, or one of a description without
+    // attributes. Such a buffer goes on reporting the capacity it was built for, so the checks
+    // below would weigh a copy that has nowhere to land either way
+    if (this.buffers.size === 0) return this;
+
+    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
+      throw new RangeError(
+        `VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+      );
+    }
+    if (targetObjectOffset + other.capacity > this.capacity) {
+      throw new RangeError(
+        `VertexObjectBuffer#copy(): ${other.capacity} objects at offset ${targetObjectOffset} do not fit a buffer of ${this.capacity}`,
+      );
+    }
+
+    // every buffer is judged first and written afterwards, in two passes. A typed array catches an
+    // overrun only once it reaches it, so a throw from a single pass would leave the buffers before
+    // it written over — and two descriptions that agree on a buffer name while sizing it
+    // differently overrun exactly one of them, which the object count above cannot see
+    const pairs: [target: AttributeBuffer, source: AttributeBuffer][] = [];
+
     for (const buf of this.buffers.values()) {
       const source = other.buffers.get(buf.bufferName);
       if (source == null) {
@@ -298,6 +326,21 @@ export class VertexObjectBuffer {
                 'both buffers have to be built from the same vertex object description',
             );
       }
+
+      const offset = targetObjectOffset * this.descriptor.vertexCount * buf.itemSize;
+      const sourceLength = source.typedArray!.length;
+      const targetLength = buf.typedArray!.length;
+      if (offset + sourceLength > targetLength) {
+        throw new RangeError(
+          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" takes ${sourceLength} elements at offset ${offset}, ` +
+            `which does not fit its ${targetLength}`,
+        );
+      }
+
+      pairs.push([buf, source]);
+    }
+
+    for (const [buf, source] of pairs) {
       buf.typedArray!.set(source.typedArray!, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
       this.#markDirty(buf, targetObjectOffset, targetObjectOffset + other.capacity - 1);
     }
@@ -315,6 +358,12 @@ export class VertexObjectBuffer {
   /**
    * Throws on the buffer of a disposed pool, which has no array to write into, and for a
    * buffer name this buffer does not know.
+   *
+   * A source shorter than the buffer is taken as it is and fills the objects it reaches.
+   *
+   * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
+   * more, or when the source reaches past the last object of the buffer from that offset on.
+   * Nothing is written then.
    */
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
     const buf = this.buffers.get(bufferName);
@@ -325,10 +374,21 @@ export class VertexObjectBuffer {
         ? releasedError('copyArray()')
         : new Error(`VertexObjectBuffer#copyArray() does not know a buffer named "${bufferName}"`);
     }
-    buf.typedArray!.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
     // as many objects as the source fills, rounded up: a source that ends inside an object still
     // wrote into that object
     const objCount = Math.ceil(source.length / (this.descriptor.vertexCount * buf.itemSize));
+    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
+      throw new RangeError(
+        `VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+      );
+    }
+    if (targetObjectOffset + objCount > this.capacity) {
+      throw new RangeError(
+        `VertexObjectBuffer#copyArray(): buffer "${bufferName}" takes ${objCount} objects at offset ${targetObjectOffset}, which does not fit a buffer of ${this.capacity}`,
+      );
+    }
+
+    buf.typedArray!.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
     this.#markDirty(buf, targetObjectOffset, targetObjectOffset + objCount - 1);
   }
 
