@@ -98,11 +98,9 @@ export function initializeInstancedAttributes(
   bufferSerials: Map<string, number>,
   slots: GeometryAttributeSlots,
 ): void {
-  // every instanced attribute advances once per mesh of the descriptor
-  const meshPerAttribute = pool.descriptor.meshCount;
   initializeRoute(geometry, pool, buffers, bufferSerials, slots, {
-    interleavedBuffer: (array, itemSize) => new InstancedInterleavedBuffer(array, itemSize, meshPerAttribute),
-    bufferAttribute: (array, itemSize, normalized) => new InstancedBufferAttribute(array, itemSize, normalized, meshPerAttribute),
+    interleavedBuffer: (array, itemSize) => new InstancedInterleavedBuffer(array, itemSize),
+    bufferAttribute: (array, itemSize, normalized) => new InstancedBufferAttribute(array, itemSize, normalized),
     // the index of an instanced geometry comes from its base route, never from this one
     ownsIndex: false,
   });

@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `Stylesheets.retainRule()` and `Stylesheets.releaseRule()`: a rule that several users share, counted per root. It installs like `installRule()` and leaves the stylesheet when the last user gives it back, unless `installRule()` put it there as well. A release without a retain, or in a root the module never wrote to, does nothing
 - add `Stage2D#dispose()` and `Stage2D#isDisposed`: `dispose()` releases the pass node the stage built for itself and the render target behind it — the one thing it creates. The scene, the camera and the projection were handed in and stay the caller's: a `THREE.Scene` has nothing to release, and a camera has no `dispose()`, the one the projection created as little as one assigned to `camera`. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true` and `asPassNode()` throws an error naming the class and the state, while `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()`, a write to `projection` or `camera` and a second `dispose()` do nothing; `scene`, `camera`, `projection`, `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a write to `scene` goes through and has no effect, since the stage no longer builds a node from it. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add `dispose()` to `IMap2DVisibilitorHelpers`, and `dispose()` plus `isDisposed` to both implementations, `CameraBasedVisibilityHelpers` and `RectangularVisibilityAreaHelpers`: `dispose()` takes the helper set out of the scene graph and releases the geometry and the material of every node it built — the only things a helper set owns. The scene it was handed, the visibility and the visibility area it reads belong to the caller and are left as they are. Afterwards `isDisposed` is `true`, `show` answers `false`, and a write to `show`, `add()`, `remove()`, `update()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- add `cloneVertexObjectDescription()` and the `VertexAttributeUsageOverrides` type it takes to the public api of the `vertex-objects` module: it copies a vertex object description, optionally giving named attributes another usage type, and its `alias` option carries such an entry over to the further names the description knows those attributes by. The copy owns its structure — the description, every attribute description in it, their `components`, the `indices` array and the `methods` object are new objects — while `basePrototype` and each individual method are shared
 
 ### Changed
 
@@ -139,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer` warns about stages sharing a name only while `renderOrder` lists that name, on `add()` and on every write to `renderOrder`. An order that lists no name — `'*'`, `'*,*'`, `' * '` — never warns
 - `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
-- `new VertexObjectDescriptor()` refuses a malformed description, and with it every pool and geometry built from one. It throws a `RangeError` for a `vertexCount` or `meshCount` that is no positive integer, for an attribute whose size is no positive integer (`components: []`, `size: 0`, `size: 1.5`), for an attribute that declares both `size` and more `components` than that size, and for an index that is no integer in `0` … `vertexCount - 1`; it throws an `Error` for two attributes, components or `methods` that give the vertex object the same property name. Fewer `components` than `size` pad the attribute and are taken
+- `new VertexObjectDescriptor()` refuses a malformed description, and with it every pool and geometry built from one. It throws a `RangeError` for a `vertexCount` that is no positive integer, for an attribute whose size is no positive integer (`components: []`, `size: 0`, `size: 1.5`), for an attribute that declares both `size` and more `components` than that size, and for an index that is no integer in `0` … `vertexCount - 1`; it throws an `Error` for two attributes, components or `methods` that give the vertex object the same property name. Fewer `components` than `size` pad the attribute and are taken
 - `VertexObjectBuffer` and `VOBufferPool#fromBuffersData()` check every array of `buffersData` against the buffer it is meant for: a typed array of another element type throws a `TypeError`, a length that does not fit a `RangeError`, both naming the buffer. The constructor takes an array by reference and asks for exactly `capacity × vertexCount × itemSize` elements; `fromBuffersData()` takes at most that many and copies a shorter array. A typed array from a worker or another realm is taken. `fromBuffersData()` checks every array before it changes anything about the pool
 - the `VOBufferPool` and `VertexObjectPool` constructors throw `Capacity must be a non-negative integer` for a capacity, given as a number or as `buffersData.capacity`, that is no integer of 0 or more; the `VertexObjectBuffer` constructor throws a `RangeError` for such a capacity that names the value and whether it came as `capacity` or as `buffersData.capacity`
 - `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
@@ -154,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
 - `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own. A projection that has no projection plane refuses the call with an `Error` naming what is missing, as `createCamera()` does: the direction and the position `updateCamera()` writes are read off that plane.
 - `FrameBasedAnimations#add()` refuses an animation that carries no frames — an atlas query that matches none, an empty tile range, an empty frame list — and one whose duration is not a finite number at or above zero. Either of them put a number into the data texture that no shader can play with: a frame count of 0, or a frame time that is negative, infinite or `NaN`. A duration of zero stays what it always was, a still image. Each error names the case and the animation it belongs to, and neither of them spends a name of the auto counter
+- `new VertexObjectDescriptor()` copies the description it is handed and answers from that copy, so a change to the original object no longer reaches the descriptor and cannot slip past the checks the constructor ran. `VertexObjectDescriptor#description` is that copy
+- `new VertexObjectDescriptor()` refuses a description whose generated accessor would take a name the `basePrototype` carries — an own property of it, or one inherited from a prototype below `Object.prototype` — and throws an `Error` naming the property and the attribute or `methods` it comes from. Such an accessor shadows the property of the prototype, which is the collision a name shared with `methods` already threw on. A name that only `Object.prototype` carries, `toString` or `valueOf`, is unaffected: a vertex object covers those whether it has a `basePrototype` or not
 
 ### Deprecated
 
@@ -165,6 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove `TileSpritesFactory#freeTileSprite()`: `destroyTile()` gives a tile sprite back to the pool, and is the call `IMapTileFactory` names
 - remove the `DependencyProp` type: `DependencyDeclaration<Shape>` is the type the `Dependencies` constructor takes, and it holds the name of an entry against the shape wherever it can read it
 - remove the write of the plane coordinates into the first element with the class `map2dCoords` from `CameraBasedVisibilityHelpers`: the helpers read and write no DOM, so they run in a host without one — a worker, Node — as they do in a browser. `CameraBasedVisibility#planeCoords2D` carries those coordinates for a page that wants to show them
+- remove `meshCount` from `VertexObjectDescription`, and with it the `VertexObjectDescriptor#meshCount` getter and `VertexObjectDescriptor#getInstanceCount()`. Every instanced attribute of a geometry advances once per instance, and the `instanceCount` of an instanced geometry is the `usedCount` of its pool
 
 ### Fixed
 
@@ -1795,6 +1799,100 @@ stage.dispose(); // the stage built the node, the stage releases it
 ```
 
 A stage that a `StageRenderer` holds is taken out of it with `remove()` before it is disposed.
+
+#### `meshCount` leaves the vertex object description
+
+Drop the field from every description; there is nothing to put in its place. A value above 1 never took effect all the way through: it was read as a factor when the instanced attributes were built, ignored when the instance count of the geometry was written, and divided out again by `getInstanceCount()`. The instance count of an instanced geometry is the `usedCount` of its pool, and that is the number to work with.
+
+**Before**
+
+```ts
+const description = {
+  meshCount: 1,
+
+  attributes: {
+    instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'},
+  },
+};
+
+const instanceCount = descriptor.getInstanceCount(pool.capacity);
+```
+
+**After**
+
+```ts
+const description = {
+  attributes: {
+    instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'},
+  },
+};
+
+const instanceCount = pool.usedCount;
+```
+
+#### A generated accessor may not shadow a `basePrototype` property
+
+`new VertexObjectDescriptor()` throws when a name of the vertex object — a generated accessor, a component or an entry of `methods` — is already a property of the `basePrototype` or of a prototype it inherits from below `Object.prototype`. Such an accessor took the name for itself and the property of the prototype was never reached again, which is the collision a name shared with `methods` has always been refused for. Every pool and geometry built from such a description throws with it.
+
+Rename whichever of the two is the easier one to move: the attribute, its component, the `methods` entry, or the member of the prototype. An attribute keeps its name in the geometry and gives its accessors another one through `getter` and `setter`, and `getter: false` / `setter: false` drop an accessor that is not needed at all.
+
+**Before**
+
+```ts
+class Sprite {
+  setPos(x: number, y: number) {
+    this.setPosition([x, y]); // never called — the generated setPos won
+  }
+}
+
+new VertexObjectDescriptor({
+  attributes: {pos: {components: ['x', 'y']}},
+  basePrototype: Sprite.prototype,
+});
+```
+
+**After**
+
+```ts
+class Sprite {
+  moveTo(x: number, y: number) {
+    this.setPos([x, y]);
+  }
+}
+
+new VertexObjectDescriptor({
+  attributes: {pos: {components: ['x', 'y']}},
+  basePrototype: Sprite.prototype,
+});
+```
+
+#### A descriptor answers from its own copy of the description
+
+`new VertexObjectDescriptor()` copies the description it is handed. Writing on that object afterwards changes nothing about the descriptor, the pools built on it or their geometries — a write that used to take effect now does nothing at all, and neither does one that used to reach around the checks of the constructor.
+
+Build the description the way it is meant to be and hand it over then; a variant of it is a second description. `cloneVertexObjectDescription()` is the way to derive one, and `descriptor.description` is the descriptor's copy, for reading.
+
+**Before**
+
+```ts
+const description = {attributes: {pos: {components: ['x', 'y']}}};
+const descriptor = new VertexObjectDescriptor(description);
+
+description.vertexCount = 4; // the descriptor followed along
+```
+
+**After**
+
+```ts
+const descriptor = new VertexObjectDescriptor({
+  vertexCount: 4,
+  attributes: {pos: {components: ['x', 'y']}},
+});
+
+const streaming = new VertexObjectDescriptor(
+  cloneVertexObjectDescription(descriptor, {stream: ['pos']}),
+);
+```
 
 ## [0.21.2] - 2026-06-19
 

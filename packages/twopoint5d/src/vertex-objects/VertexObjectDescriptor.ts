@@ -1,10 +1,15 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
+import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {VertexObjectDescription} from './types.js';
 import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
 export class VertexObjectDescriptor {
+  /**
+   * This descriptor's own copy of the description it was built from. Changing the object the
+   * constructor was handed does not change this one, and so does nothing to this descriptor.
+   */
   readonly description: VertexObjectDescription;
 
   readonly attributes: Map<string, VertexAttributeDescriptor>;
@@ -40,20 +45,23 @@ export class VertexObjectDescriptor {
    * throws:
    *
    * 1. `vertexCount`, when given, is a positive integer (`RangeError`)
-   * 2. `meshCount`, when given, is a positive integer (`RangeError`)
-   * 3. every attribute has a size of at least 1 — a positive integer `size`, or at least one
+   * 2. every attribute has a size of at least 1 — a positive integer `size`, or at least one
    *    component (`RangeError`)
-   * 4. an attribute that declares both `size` and `components` has no more components than its
+   * 3. an attribute that declares both `size` and `components` has no more components than its
    *    size; fewer pad the attribute to its size (`RangeError`)
-   * 5. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
-   * 6. no two attributes, components or methods give the vertex object the same property name
+   * 4. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
+   * 5. no two attributes, components or methods give the vertex object the same property name
    *    (`Error`)
+   * 6. no property name of the vertex object appears on the `basePrototype`, neither as an own
+   *    property nor inherited from a prototype below `Object.prototype` (`Error`)
    *
    * @throws when the description breaks one of the rules above; the message names the rule,
    * the attribute where there is one, and the value received
    */
   constructor(description: VertexObjectDescription) {
-    this.description = description;
+    // the copy is what keeps the checks below true for the life of this descriptor: a later
+    // change to the description handed in here no longer reaches it
+    this.description = cloneVertexObjectDescription(description);
     this.attributes = new Map();
     this.bufferNames = new Set();
     Object.entries(this.description.attributes).forEach(([attrName, attrDesc]) => {
@@ -61,19 +69,16 @@ export class VertexObjectDescriptor {
       this.attributes.set(attrName, descriptor);
       this.bufferNames.add(descriptor.bufferName);
     });
-    this.basePrototype = description.basePrototype;
-    this.methods = description.methods;
+    this.basePrototype = this.description.basePrototype;
+    this.methods = this.description.methods;
     this.#validate();
   }
 
   // a malformed description would otherwise show up frames later as wrong pixels, far from here
   #validate(): void {
-    const {vertexCount, meshCount} = this.description;
+    const {vertexCount} = this.description;
     if (vertexCount != null && !isPositiveInteger(vertexCount)) {
       throw new RangeError(`VertexObjectDescriptor: vertexCount must be a positive integer, got ${vertexCount}`);
-    }
-    if (meshCount != null && !isPositiveInteger(meshCount)) {
-      throw new RangeError(`VertexObjectDescriptor: meshCount must be a positive integer, got ${meshCount}`);
     }
 
     for (const attr of this.attributes.values()) {
@@ -109,26 +114,31 @@ export class VertexObjectDescriptor {
       }
       origins.set(name, origin);
     }
+
+    const {basePrototype} = this.description;
+    if (basePrototype != null) {
+      // `Object.prototype` is where the chain stops: a description without a basePrototype builds
+      // its vertex objects on it and covers `toString` and its siblings anyway, so counting those
+      // names here would turn away descriptions that never had a problem
+      let proto: object | null = basePrototype;
+      while (proto != null && proto !== Object.prototype) {
+        // only own names per step, and no symbols — a generated accessor always carries a string
+        for (const name of Object.getOwnPropertyNames(proto)) {
+          const origin = origins.get(name);
+          if (origin != null) {
+            throw new Error(
+              `VertexObjectDescriptor: the vertex object property "${name}" from ${origin} would shadow a property of the basePrototype`,
+            );
+          }
+        }
+        proto = Object.getPrototypeOf(proto) as object | null;
+      }
+    }
   }
 
   /** Returns `vertexCount` or `1` */
   get vertexCount(): number {
     return this.description.vertexCount ?? 1;
-  }
-
-  /** Returns `meshCount` or `1` */
-  get meshCount(): number {
-    return this.description.meshCount ?? 1;
-  }
-
-  /**
-   * Calculate the instance count if your `meshCount` is greater than 1,
-   * otherwise return the given capacity
-   * TODO remove?!
-   */
-  getInstanceCount(capacity: number): number {
-    const meshCount = this.description.meshCount ?? 1;
-    return meshCount > 1 ? Math.ceil(capacity / meshCount) : capacity;
   }
 
   get hasIndices(): boolean {

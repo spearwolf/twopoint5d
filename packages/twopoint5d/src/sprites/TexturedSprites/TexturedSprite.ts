@@ -57,8 +57,6 @@ export class TexturedSprite {
 }
 
 export const TexturedSpriteDescriptor: VertexObjectDescription = {
-  meshCount: 1,
-
   attributes: {
     quadSize: {components: ['width', 'height']},
     texCoords: {components: ['s', 't', 'u', 'v']},

@@ -144,8 +144,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * In the following update cycles the geometry will also synchronize these vertex-object-pools,
    * respectively their buffers with the corresponding gpu buffers.
    *
-   * This can be very useful if you have instanced attributes that have a different _meshCount_ than that of the default `.instancedPool`.
-   * Or you have grouped different attributes with the help of different vertex-object-descriptors and now want to combine them here.
+   * This is the way to combine attributes that are grouped across several
+   * vertex-object-descriptors into the one geometry that draws them.
    *
    * A descriptor or description handed in here becomes a pool with the capacity of the
    * `.instancedPool` — **the reference instance count is derived from it.** An existing pool with

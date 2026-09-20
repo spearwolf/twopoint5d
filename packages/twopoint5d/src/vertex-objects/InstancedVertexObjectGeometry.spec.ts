@@ -20,8 +20,6 @@ describe('InstancedVertexObjectGeometry', () => {
   });
 
   const instancedDescriptor = new VertexObjectDescriptor({
-    meshCount: 1,
-
     attributes: {
       color: {
         components: ['r', 'g', 'b'],
@@ -42,8 +40,6 @@ describe('InstancedVertexObjectGeometry', () => {
   });
 
   const extraInstancedDescriptor = new VertexObjectDescriptor({
-    meshCount: 2,
-
     attributes: {
       extra: {
         size: 1,
@@ -54,8 +50,6 @@ describe('InstancedVertexObjectGeometry', () => {
 
   // shares no attribute name with `extraInstancedDescriptor`, so both fit on one geometry
   const secondExtraInstancedDescriptor = new VertexObjectDescriptor({
-    meshCount: 2,
-
     attributes: {
       extraToo: {
         size: 1,

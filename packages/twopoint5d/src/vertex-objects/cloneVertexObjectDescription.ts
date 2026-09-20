@@ -1,18 +1,61 @@
-import type {VertexAttributeUsageType, VertexObjectDescription} from './types.js';
+import type {VAComponentsDescription, VertexAttributeUsageType, VertexObjectDescription} from './types.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
-export default (
+/**
+ * The attributes of a copied description that take another usage type than the source declares.
+ * An attribute named in none of the three lists keeps the usage it has.
+ */
+export interface VertexAttributeUsageOverrides {
+  /** the attributes that become `dynamic` */
+  dynamic?: string[];
+  /** the attributes that become `stream` */
+  stream?: string[];
+  /** the attributes that become `static` */
+  static?: string[];
+  /**
+   * Further names an entry of the three lists above applies to as well, keyed by the name that
+   * entry uses: `{dynamic: ['position'], alias: {position: 'instancePosition'}}` makes
+   * `instancePosition` dynamic along with `position`. This is how a caller asks for an attribute
+   * by a word of its own — `position`, `size` — while the description knows that attribute as
+   * something else.
+   */
+  alias?: Record<string, string | string[]>;
+}
+
+/**
+ * Copies a vertex object description, optionally with a different usage type for some of its
+ * attributes — the way to reuse a description of the library for a pool whose attributes change
+ * at another rate than the original was written for.
+ *
+ * The copy owns its structure: the description itself, every attribute description in it, the
+ * `components` array of each of those, the `indices` array and the `methods` object are new
+ * objects. `basePrototype` and each individual method are taken by reference, because those are
+ * the behaviour the copy is meant to share.
+ *
+ * @param source a description, or a descriptor whose description is copied
+ * @param attributeUsage the attributes that take another usage type than the source declares.
+ *   Naming no attribute at all in any of the three lists leaves every usage as it is.
+ */
+export function cloneVertexObjectDescription(
   source: VertexObjectDescriptor | VertexObjectDescription,
-  attributeUsage?: {dynamic?: string[]; stream?: string[]; static?: string[]; alias?: Record<string, string | string[]>},
-): VertexObjectDescription => {
+  attributeUsage?: VertexAttributeUsageOverrides,
+): VertexObjectDescription {
   const description = source instanceof VertexObjectDescriptor ? source.description : source;
+  // every field of a description belongs in here: `new VertexObjectDescriptor()` builds its own
+  // copy through this function, so a field this list forgets never reaches a descriptor
   const target: VertexObjectDescription = {
     vertexCount: description.vertexCount,
     indices: description.indices?.slice(),
-    meshCount: description.meshCount,
     attributes: Object.fromEntries(
       Object.entries(description.attributes).map(([name, desc]) => {
-        const clonedDesc = 'size' in desc ? {...desc} : {...desc, components: desc.components.slice()};
+        const clonedDesc = {...desc};
+        // an attribute is free to declare `size` and `components` together, so a components array
+        // is copied wherever there is one: a shared array would let a later push on the source
+        // description undo the size-against-components check of VertexObjectDescriptor
+        const {components} = clonedDesc as Partial<VAComponentsDescription>;
+        if (components != null) {
+          (clonedDesc as VAComponentsDescription).components = components.slice();
+        }
 
         if (!attributeUsage) {
           return [name, clonedDesc];
@@ -58,4 +101,4 @@ export default (
     target.methods = {...description.methods};
   }
   return target;
-};
+}

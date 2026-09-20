@@ -2,7 +2,7 @@ import {describe, expect, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
-import type {VertexObjectDescription} from './types.js';
+import type {VAComponentsType, VertexObjectDescription} from './types.js';
 import {TileBaseSpriteDescriptor, TileSpriteDescriptor} from '../map2d/TileSprites/descriptors.js';
 import {AnimatedSpriteDescriptor} from '../sprites/AnimatedSprites/AnimatedSprite.js';
 import {BaseSpriteDescriptor} from '../sprites/BaseSprite.js';
@@ -34,39 +34,10 @@ describe('VertexObjectDescriptor', () => {
     });
     expect(descriptor).toBeDefined();
     expect(descriptor.vertexCount).toBe(4);
-    expect(descriptor.getInstanceCount(3)).toBe(3);
     expect(descriptor.hasIndices).toBeTruthy();
     expect(descriptor.indices).toEqual([0, 1, 2, 0, 2, 3]);
     expect(Array.from(descriptor.attributeNames.values())).toEqual(['foo', 'bar', 'plah']);
     expect(Array.from(descriptor.bufferNames.values())).toEqual(['dynamic_float32', 'static_float32']);
-    expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
-    expect(descriptor.getAttribute('bar')!.name).toBe('bar');
-  });
-
-  test('construct with meshCount', () => {
-    const descriptor = new VertexObjectDescriptor({
-      meshCount: 2,
-
-      attributes: {
-        foo: {
-          components: ['x', 'y'],
-          type: 'float32',
-          usage: 'static',
-        },
-        bar: {
-          size: 2,
-          type: 'float32',
-          usage: 'static',
-        },
-      },
-    });
-    expect(descriptor).toBeDefined();
-    expect(descriptor.vertexCount).toBe(1);
-    expect(descriptor.getInstanceCount(3)).toBe(2);
-    expect(descriptor.hasIndices).toBeFalsy();
-    expect(descriptor.indices).toEqual([]);
-    expect(Array.from(descriptor.attributeNames.values())).toEqual(['foo', 'bar']);
-    expect(Array.from(descriptor.bufferNames.values())).toEqual(['static_float32']);
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar')!.name).toBe('bar');
   });
@@ -94,6 +65,46 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.bufferNames.values())).toEqual(['static_float32', 'dynamic_float32']);
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar')!.name).toBe('bar');
+  });
+
+  test('answers from its own copy of the description', () => {
+    const description: VertexObjectDescription = {
+      vertexCount: 4,
+      indices: [0, 1, 2, 0, 2, 3],
+
+      attributes: {
+        pos: {
+          components: ['x', 'y'],
+          type: 'float32',
+          usage: 'static',
+        },
+      },
+    };
+    const descriptor = new VertexObjectDescriptor(description);
+
+    description.vertexCount = 1;
+    description.indices!.push(7);
+    (description.attributes['pos'] as VAComponentsType).usage = 'dynamic';
+
+    expect(descriptor.vertexCount).toBe(4);
+    expect(descriptor.indices).toEqual([0, 1, 2, 0, 2, 3]);
+    expect(descriptor.getAttribute('pos')!.usageType).toBe('static');
+  });
+
+  test('answers from its own copy of an attribute that declares size and components', () => {
+    const description: VertexObjectDescription = {
+      attributes: {
+        pos: {size: 2, components: ['x', 'y']} as never,
+        other: {size: 1},
+      },
+    };
+    const descriptor = new VertexObjectDescriptor(description);
+
+    (description.attributes['pos'] as VAComponentsType).components.push('z');
+
+    // a third component for a size of 2 is the very layout rule 3 of the constructor turns away:
+    // the accessor for it would write past the attribute, into the next vertex object
+    expect(descriptor.getAttribute('pos')!.components).toEqual(['x', 'y']);
   });
 
   describe('the vertex object prototype', () => {
@@ -130,12 +141,6 @@ describe('VertexObjectDescriptor', () => {
       }
       expect(build({vertexCount: 0, attributes: {pos}})).toThrow(
         'VertexObjectDescriptor: vertexCount must be a positive integer, got 0',
-      );
-    });
-
-    test('a meshCount that is not a positive integer', () => {
-      expect(build({meshCount: 0, attributes: {pos}})).toThrow(
-        'VertexObjectDescriptor: meshCount must be a positive integer, got 0',
       );
     });
 
@@ -195,6 +200,41 @@ describe('VertexObjectDescriptor', () => {
       expect(build({attributes: {pos}, methods: {setPos() {}}})).toThrow(
         'VertexObjectDescriptor: the vertex object property "setPos" comes from both attribute "pos" and methods',
       );
+    });
+
+    test('an accessor named like an own property of the basePrototype', () => {
+      class Sprite {
+        setPos() {}
+      }
+      expect(build({attributes: {pos}, basePrototype: Sprite.prototype})).toThrow(
+        'VertexObjectDescriptor: the vertex object property "setPos" from attribute "pos" would shadow a property of the basePrototype',
+      );
+    });
+
+    test('an accessor named like a property the basePrototype inherits', () => {
+      class SpriteBase {
+        setPos() {}
+      }
+      class Sprite extends SpriteBase {}
+      expect(build({attributes: {pos}, basePrototype: Sprite.prototype})).toThrow(
+        /property "setPos" from attribute "pos" would shadow a property of the basePrototype/,
+      );
+    });
+
+    test('a method named like a property of the basePrototype', () => {
+      class Sprite {
+        setPos() {}
+      }
+      expect(build({attributes: {other: {size: 1}}, methods: {setPos() {}}, basePrototype: Sprite.prototype})).toThrow(
+        'VertexObjectDescriptor: the vertex object property "setPos" from methods would shadow a property of the basePrototype',
+      );
+    });
+
+    test('but takes an accessor named like a property of Object.prototype', () => {
+      class Sprite {}
+      // a description without a basePrototype builds on Object.prototype and shadows these names
+      // anyway, so a rule that refused them here would refuse descriptions that never had a problem
+      expect(build({attributes: {toString: {size: 1}}, basePrototype: Sprite.prototype})).not.toThrow();
     });
   });
 

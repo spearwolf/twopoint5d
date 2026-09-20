@@ -34,12 +34,10 @@ const quadDescription = {
 };
 
 const instancedDescription = {
-  meshCount: 1,
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
 const extraInstancedDescription = {
-  meshCount: 1,
   attributes: {extraOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
@@ -249,7 +247,6 @@ describe('vertex-objects — dispose', function () {
     await renderOnce(new VertexObjects(geometry, material));
 
     geometry.attachInstancedPool('extra', {
-      meshCount: 1,
       attributes: {someOtherOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
     });
     expect(geometry.getAttribute('extraOffset'), 'the replaced route gives up its slot').to.be.undefined;

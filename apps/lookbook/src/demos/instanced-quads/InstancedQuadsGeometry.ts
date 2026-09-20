@@ -74,8 +74,6 @@ export interface InstancedQuad extends VO {
 }
 
 export const InstancedQuadDescriptor = {
-  meshCount: 1,
-
   attributes: {
     quadSize: {components: ['width', 'height']},
     instancePosition: {components: ['x', 'y', 'z']},

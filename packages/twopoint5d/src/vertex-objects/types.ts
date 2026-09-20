@@ -23,8 +23,19 @@ export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 export type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
 export interface VADescription {
+  /** The element type of the buffer this attribute is stored in. Defaults to `'float32'`. */
   type?: VertexAttributeDataType;
+  /**
+   * Whether the gpu maps the stored integers onto `0` … `1` (`-1` … `1` for a signed type)
+   * when it reads this attribute, instead of taking each value as the number it is. Has no
+   * effect on a floating point type. Defaults to `false`.
+   */
   normalized?: boolean;
+  /**
+   * How often the values of this attribute are expected to change. It becomes the draw usage
+   * of the buffer and, unless `autoTouch` says otherwise, decides whether that buffer is
+   * uploaded on every `update()`. Defaults to `'static'`.
+   */
   usage?: VertexAttributeUsageType;
   /**
    * Whether the geometry uploads this attribute's buffer to the GPU on every `update()`,
@@ -42,20 +53,63 @@ export interface VADescription {
    * upload only the frames in which something actually happened.
    */
   autoTouch?: boolean;
+  /**
+   * The buffer that holds the values of this attribute. Defaults to
+   * `` `${usage}_${type}${normalized ? 'N' : ''}` ``, so attributes that agree on all three end
+   * up together by themselves. Every attribute that names the same buffer shares one
+   * interleaved buffer with the others, which is one gpu upload for all of them instead of one
+   * each — name a buffer to group attributes that are written in the same breath.
+   */
   bufferName?: string;
-  // TODO add optional attributeName? to VADescription
 }
 
 export interface VAComponentsDescription extends VADescription {
+  /**
+   * One name per element of the attribute, which is one of the two ways to give an attribute
+   * its size: as many elements as there are names here.
+   *
+   * Every name becomes a property of the vertex object that reads and writes that one element,
+   * and with a `vertexCount` above 1 each of them carries the vertex index: `components:
+   * ['x', 'y']` and `vertexCount: 4` give a vertex object `x0` … `x3` and `y0` … `y3`.
+   */
   components: string[];
 }
 
 export interface VASizeDescription extends VADescription {
+  /**
+   * How many elements the attribute holds per vertex, which is the other way to give an
+   * attribute its size — the one for elements that need no names of their own.
+   *
+   * A description may declare `components` as well, and then names at most `size` of them;
+   * fewer leave the rest of the attribute without a name of its own, and the attribute keeps
+   * the size declared here.
+   */
   size: number;
 }
 
+/**
+ * The names of the two methods a vertex object gets for an attribute that holds more than one
+ * value — `size` above 1, `vertexCount` above 1, or both. An attribute of a single value on a
+ * single vertex becomes a property of the attribute's own name instead, and these two names
+ * are then unused.
+ */
 export interface VertexAttributeMethods {
+  /**
+   * The name of the method that reads every value of this attribute at once.
+   *
+   * The key itself decides, not only its value: a description *without* this key gets the
+   * default name — `get` plus the attribute name in PascalCase — while a description that
+   * *carries* the key with a falsy value (`false`, `undefined` or `null`) gets no getter at
+   * all. A string names it. `{getter: undefined}` is therefore not the same as an object
+   * without a `getter`; see {@link VertexAttributeDescriptor#getterName}.
+   */
   getter?: string | boolean;
+  /**
+   * The name of the method that writes every value of this attribute at once. The key decides
+   * the same way `getter` does: absent gives the default name — `set` plus the attribute name
+   * in PascalCase — present and falsy gives no setter, a string names it. See
+   * {@link VertexAttributeDescriptor#setterName}.
+   */
   setter?: string | boolean;
 }
 
@@ -66,11 +120,29 @@ export type VertexAttributeDescription = VAComponentsType | VASizeType;
 export type VertexAttributesType = Record<string, VertexAttributeDescription>;
 
 export interface VertexObjectDescription {
+  /** How many vertices one vertex object is made of. Defaults to `1`. */
   vertexCount?: number;
+  /**
+   * The draw order of the vertices of one vertex object, as indices into the object's own
+   * vertices — integers in `0` … `vertexCount - 1`. Every object of a pool is drawn by this one
+   * list; the geometry repeats it per object with the offsets applied.
+   */
   indices?: number[];
-  meshCount?: number;
+  /** The attributes of a vertex object, keyed by the name the geometry gives them. */
   attributes: VertexAttributesType;
+  /**
+   * The prototype the generated accessors of a vertex object are placed on, which is how
+   * methods and accessors of your own reach a vertex object.
+   *
+   * No name a generated accessor takes may appear on it, neither as an own property nor
+   * inherited from a prototype below `Object.prototype`: the descriptor refuses such a
+   * description rather than let the accessor shadow that property in silence.
+   */
   basePrototype?: object | null | undefined;
+  /**
+   * Functions that become properties of every vertex object of this description, keyed by the
+   * name they get there. Only values of type function are taken; anything else is ignored.
+   */
   methods?: object | null | undefined;
 }
 

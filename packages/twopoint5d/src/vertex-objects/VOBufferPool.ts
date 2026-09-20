@@ -231,7 +231,8 @@ export class VOBufferPool {
   }
 
   /**
-   * NOTE: The capacity should be the same as the original pool.
+   * NOTE: The capacity must be the same as the original pool; any other capacity throws
+   * `Error('Invalid buffersData capacity')`.
    *
    * Throws on a disposed pool, which has no capacity left to serve: the method turns away a
    * mismatched capacity as it is, and a silent no-op here would let a caller believe the data

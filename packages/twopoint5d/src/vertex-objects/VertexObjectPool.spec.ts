@@ -144,7 +144,7 @@ describe('VertexObjectPool', () => {
     });
 
     test('vertexCount = 1', () => {
-      const pool = new VertexObjectPool<MyInstancedVertexObject>({meshCount: 1, attributes: descriptor.attributes}, 100);
+      const pool = new VertexObjectPool<MyInstancedVertexObject>({attributes: descriptor.attributes}, 100);
 
       const vo = pool.createVO()!;
       vo.setFoo(3, 2);

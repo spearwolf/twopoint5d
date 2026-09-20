@@ -44,7 +44,6 @@ const quadDescription = {
 };
 
 const instancedDescription = {
-  meshCount: 1,
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 

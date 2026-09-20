@@ -1,7 +1,7 @@
 import {createSandbox} from 'sinon';
 import {afterEach, describe, expect, test} from 'vitest';
 
-import cloneVertexObjectDescription from './cloneVertexObjectDescription.js';
+import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {VAComponentsType, VASizeType, VertexObjectDescription} from './types.js';
 
 describe('cloneVertexObjectDescription', () => {
@@ -18,8 +18,6 @@ describe('cloneVertexObjectDescription', () => {
   };
 
   const desc1: VertexObjectDescription = {
-    meshCount: 1,
-
     attributes: {
       color: {
         components: ['r', 'g', 'b'],
@@ -40,8 +38,6 @@ describe('cloneVertexObjectDescription', () => {
   };
 
   const desc2: VertexObjectDescription = {
-    meshCount: 1,
-
     attributes: {
       instancePosition: {
         components: ['x', 'y', 'z'],
@@ -62,8 +58,6 @@ describe('cloneVertexObjectDescription', () => {
   }
 
   const desc3: VertexObjectDescription = {
-    meshCount: 1,
-
     attributes: {
       position: {
         components: ['x', 'y', 'z'],
@@ -125,7 +119,6 @@ describe('cloneVertexObjectDescription', () => {
     const clonedDesc = cloneVertexObjectDescription(desc1);
 
     expect(clonedDesc).not.toBe(desc1);
-    expect(clonedDesc.meshCount).toBe(1);
 
     const colorAttr = clonedDesc.attributes['color'] as VAComponentsType;
 
@@ -154,7 +147,6 @@ describe('cloneVertexObjectDescription', () => {
     });
 
     expect(clonedDesc).not.toBe(desc1);
-    expect(clonedDesc.meshCount).toBe(1);
 
     const colorAttr = clonedDesc.attributes['color'] as VAComponentsType;
 
@@ -219,7 +211,6 @@ describe('cloneVertexObjectDescription', () => {
     });
 
     expect(clonedDesc).not.toBe(desc2);
-    expect(clonedDesc.meshCount).toBe(1);
 
     const posAttr = clonedDesc.attributes['instancePosition'] as VAComponentsType;
 
@@ -235,7 +226,6 @@ describe('cloneVertexObjectDescription', () => {
     });
 
     expect(clonedDesc).not.toBe(desc3);
-    expect(clonedDesc.meshCount).toBe(1);
 
     const posAttr = clonedDesc.attributes['position'] as VAComponentsType;
 
@@ -245,6 +235,27 @@ describe('cloneVertexObjectDescription', () => {
     expect(posAttr.usage).toBe('dynamic');
 
     expect(clonedDesc.basePrototype).toBe(Foo.prototype);
+  });
+
+  test('an attribute that declares size and components gets a components array of its own', () => {
+    // a description may declare both, and the descriptor checks the pair — so a shared array
+    // would let a later push undo that check
+    const source: VertexObjectDescription = {
+      attributes: {
+        pos: {size: 2, components: ['x', 'y']} as never,
+      },
+    };
+
+    const clonedDesc = cloneVertexObjectDescription(source);
+    const clonedAttr = clonedDesc.attributes['pos'] as VAComponentsType;
+    const sourceAttr = source.attributes['pos'] as VAComponentsType;
+
+    expect(clonedAttr.components).toEqual(['x', 'y']);
+    expect(clonedAttr.components).not.toBe(sourceAttr.components);
+
+    sourceAttr.components.push('z');
+
+    expect(clonedAttr.components).toEqual(['x', 'y']);
   });
 
   test('desc3 methods is a new object but all methods remain the same instances', () => {

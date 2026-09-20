@@ -1,4 +1,4 @@
-import cloneVertexObjectDescription from '../../vertex-objects/cloneVertexObjectDescription.js';
+import {cloneVertexObjectDescription} from '../../vertex-objects/cloneVertexObjectDescription.js';
 import {InstancedVertexObjectGeometry} from '../../vertex-objects/InstancedVertexObjectGeometry.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {BaseSprite} from '../BaseSprite.js';

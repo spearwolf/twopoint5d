@@ -70,8 +70,6 @@ export const TileBaseSpriteDescriptor: VertexObjectDescription = {
 };
 
 export const TileSpriteDescriptor: VertexObjectDescription = {
-  meshCount: 1,
-
   attributes: {
     instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: false},
     texCoords: {size: 4, usage: 'dynamic', autoTouch: false},

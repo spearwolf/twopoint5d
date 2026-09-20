@@ -9,6 +9,7 @@ export * from './VertexObjectDescriptor.js';
 export * from './VertexObjectGeometry.js';
 export * from './VertexObjectPool.js';
 export * from './VertexObjects.js';
+export * from './cloneVertexObjectDescription.js';
 export * from './constants.js';
 export * from './getDescriptorOf.js';
 export type * from './types.js';

@@ -28,8 +28,6 @@ export class AnimatedSprite {
 }
 
 export const AnimatedSpriteDescriptor: VertexObjectDescription = {
-  meshCount: 1,
-
   attributes: {
     quadSize: {components: ['width', 'height']},
     anim: {components: ['animId', 'animOffset']},

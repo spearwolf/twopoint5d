@@ -35,8 +35,6 @@ describe('vertex-buffers-geometry-updates', () => {
   });
 
   const instancedDesc = new VertexObjectDescriptor({
-    meshCount: 1,
-
     attributes: {
       color: {
         components: ['r', 'g', 'b', 'a'],
@@ -82,8 +80,6 @@ describe('vertex-buffers-geometry-updates', () => {
   }
 
   const extraDesc = new VertexObjectDescriptor({
-    meshCount: 1,
-
     attributes: {
       quux: {
         size: 1,
@@ -94,8 +90,6 @@ describe('vertex-buffers-geometry-updates', () => {
 
   // shares no attribute name with any other descriptor here
   const otherExtraDesc = new VertexObjectDescriptor({
-    meshCount: 1,
-
     attributes: {
       plah: {
         size: 1,
@@ -106,8 +100,6 @@ describe('vertex-buffers-geometry-updates', () => {
 
   // declares an attribute name of `instancedDesc`
   const fooDesc = new VertexObjectDescriptor({
-    meshCount: 1,
-
     attributes: {
       foo: {
         size: 1,
@@ -956,7 +948,6 @@ describe('vertex-buffers-geometry-updates', () => {
 
   describe('attachInstancedPool()', () => {
     const dynamicExtraDesc = new VertexObjectDescriptor({
-      meshCount: 1,
       attributes: {
         quux: {
           size: 1,
@@ -1225,8 +1216,6 @@ describe('vertex-buffers-geometry-updates', () => {
   describe('attribute slots', () => {
     // declares the attribute name of `extraDesc` a second time, with its own typed arrays
     const otherQuuxDesc = new VertexObjectDescriptor({
-      meshCount: 1,
-
       attributes: {
         quux: {
           size: 2,
