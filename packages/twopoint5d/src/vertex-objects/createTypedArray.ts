@@ -23,6 +23,6 @@ export function createTypedArray(dataType: VertexAttributeDataType, size: number
     case 'int8':
       return new Int8Array(size);
     default:
-      throw new Error(`unknown typed-array data-type: '${dataType}'`);
+      throw new Error(`createTypedArray(): unknown data type '${dataType}'`);
   }
 }

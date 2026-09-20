@@ -1,5 +1,4 @@
-import {createSandbox} from 'sinon';
-import {afterEach, describe, expect, test} from 'vitest';
+import {describe, expect, test} from 'vitest';
 
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {VAComponentsType, VASizeType, VertexObjectDescription} from './types.js';
@@ -72,12 +71,6 @@ describe('cloneVertexObjectDescription', () => {
       bar,
     },
   };
-
-  const sandbox = createSandbox();
-
-  afterEach(() => {
-    sandbox.restore();
-  });
 
   test('desc0 without attribute usage change', () => {
     const clonedDesc = cloneVertexObjectDescription(desc0);

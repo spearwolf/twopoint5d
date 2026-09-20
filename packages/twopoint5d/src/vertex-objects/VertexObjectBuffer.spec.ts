@@ -541,6 +541,62 @@ describe('VertexObjectBuffer', () => {
       );
       expect(contentsOfFirst(target), 'the buffer the source does have is untouched').toEqual(new Array(8).fill(7));
     });
+
+    test('a source buffer narrower than its target leaves no buffer of the target written', () => {
+      const target = new VertexObjectBuffer(makeDescriptor(4), 4);
+      const source = new VertexObjectBuffer(makeDescriptor(2), 4);
+
+      target.buffers.get('first')!.typedArray!.fill(7);
+
+      const run = () => target.copy(source);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      // the narrower source fits into the target element for element, so a length alone lets this
+      // copy through — and every value of it would land at the stride of the wider layout
+      expect(contentsOfFirst(target), 'the buffer that would have fit is untouched').toEqual(new Array(8).fill(7));
+    });
+
+    test('a source of another data type leaves no buffer of the target written', () => {
+      const makeTypedDescriptor = (tagType: 'float32' | 'uint32') =>
+        new VertexObjectDescriptor({
+          vertexCount: 1,
+          attributes: {
+            pos: {size: 2, type: 'float32', bufferName: 'first'},
+            tag: {size: 1, type: tagType, bufferName: 'second'},
+          },
+        });
+
+      const target = new VertexObjectBuffer(makeTypedDescriptor('float32'), 4);
+      const source = new VertexObjectBuffer(makeTypedDescriptor('uint32'), 4);
+
+      target.buffers.get('first')!.typedArray!.fill(7);
+
+      const run = () => target.copy(source);
+
+      expect(run).toThrow(TypeError);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      expect(contentsOfFirst(target), 'the buffer of the matching type is untouched').toEqual(new Array(8).fill(7));
+    });
+
+    test('a source describing another vertex count leaves no buffer of the target written', () => {
+      const makeCountedDescriptor = (vertexCount: number) =>
+        new VertexObjectDescriptor({
+          vertexCount,
+          attributes: {pos: {size: 2, type: 'float32', bufferName: 'first'}},
+        });
+
+      const target = new VertexObjectBuffer(makeCountedDescriptor(4), 4);
+      const source = new VertexObjectBuffer(makeCountedDescriptor(1), 4);
+
+      target.buffers.get('first')!.typedArray!.fill(7);
+
+      const run = () => target.copy(source);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class, the method and both vertex counts').toThrow(/VertexObjectBuffer#copy\(\).*1.*4/);
+      expect(contentsOfFirst(target), 'the only buffer of the target is untouched').toEqual(new Array(32).fill(7));
+    });
   });
 
   test('copyWithin', () => {

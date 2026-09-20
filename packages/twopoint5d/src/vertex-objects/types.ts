@@ -55,7 +55,7 @@ export interface VADescription {
   /**
    * Whether the geometry uploads this attribute's buffer to the GPU on every `update()`,
    * regardless of whether any of its values changed. Defaults to `false` for `usage: 'static'`
-   * and `true` for `'dynamic'`/`'stream'` (see {@link VertexAttributeDescriptor#autoTouch}).
+   * and `true` for `'dynamic'`/`'stream'` (see `VertexAttributeDescriptor#autoTouch`).
    *
    * The generated property setters do not mark a buffer dirty when they write a value —
    * `autoTouch` is therefore the only path by which written values reach the GPU at all, unless
@@ -118,14 +118,14 @@ export interface VertexAttributeMethods {
    * default name — `get` plus the attribute name in PascalCase — while a description that
    * *carries* the key with a falsy value (`false`, `undefined` or `null`) gets no getter at
    * all. A string names it. `{getter: undefined}` is therefore not the same as an object
-   * without a `getter`; see {@link VertexAttributeDescriptor#getterName}.
+   * without a `getter`; see `VertexAttributeDescriptor#getterName`.
    */
   getter?: string | boolean;
   /**
    * The name of the method that writes every value of this attribute at once. The key decides
    * the same way `getter` does: absent gives the default name — `set` plus the attribute name
    * in PascalCase — present and falsy gives no setter, a string names it. See
-   * {@link VertexAttributeDescriptor#setterName}.
+   * `VertexAttributeDescriptor#setterName`.
    */
   setter?: string | boolean;
 }
@@ -142,7 +142,7 @@ export type VertexAttributesType = Record<string, VertexAttributeDescription>;
 
 /**
  * What a vertex object is made of: its attributes, how many vertices it has and how they are
- * drawn, and the behaviour it carries. A {@link VertexObjectDescriptor} checks it once, and every
+ * drawn, and the behaviour it carries. A `VertexObjectDescriptor` checks it once, and every
  * pool and geometry is built from that descriptor.
  */
 export interface VertexObjectDescription {
@@ -184,7 +184,7 @@ export type FrozenVertexAttributeDescription =
   (Readonly<Omit<VAComponentsType, 'components'>> & {readonly components: readonly string[]}) | Readonly<VASizeType>;
 
 /**
- * A {@link VertexObjectDescription} as a {@link VertexObjectDescriptor} hands its own out:
+ * A {@link VertexObjectDescription} as a `VertexObjectDescriptor` hands its own out:
  * frozen down to the `indices`, the attributes record and the `components` of each attribute,
  * so that a write a `TypeError` answers at runtime is already a type error.
  *
@@ -230,7 +230,7 @@ export type BufferLike = InterleavedBuffer | BufferAttribute;
 export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
 /**
- * A snapshot of the buffers of a {@link VOBufferPool}, as `toBuffersData()` hands it out and
+ * A snapshot of the buffers of a `VOBufferPool`, as `toBuffersData()` hands it out and
  * `fromBuffersData()` takes it in — the way to move the contents of a pool to another one built
  * from the same description, or across a worker boundary.
  */

@@ -4,16 +4,25 @@ import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
 import type {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
+/** Where one attribute of a vertex object sits inside the buffer that holds it. */
 export interface AttributeBufferLayout {
+  /** The buffer this attribute shares with every other attribute of the same data and usage type. */
   bufferName: string;
+  /** The attribute this layout is about, named as the description names it. */
   attributeName: string;
+  /** Where the attribute starts within a vertex of its buffer, counted in elements, not in bytes. */
   offset: number;
 }
 
+/** One typed array of a vertex object buffer, together with its layout and its upload bookkeeping. */
 export interface AttributeBuffer {
+  /** The name this buffer answers to, in the layout as well as in a geometry built from it. */
   bufferName: string;
+  /** The elements one vertex takes in this buffer, all attributes sharing it counted together. */
   itemSize: number;
+  /** The element type of the typed array, shared by every attribute in this buffer. */
   dataType: VertexAttributeDataType;
+  /** How often the data of this buffer is expected to change, shared by every attribute in it. */
   usageType: VertexAttributeUsageType;
   /**
    * Empty only for a buffer that someone grabbed a reference to before `VOBufferPool#dispose()`:
@@ -21,6 +30,7 @@ export interface AttributeBuffer {
    * still reachable through a living pool always holds its array.
    */
   typedArray: TypedArray | undefined;
+  /** Rises with every write to this buffer — the number a consumer holds its own state against. */
   serial: number;
   /** The lowest object index written since `dirtySince`; `-1` while nothing is recorded. */
   dirtyFrom: number;
@@ -64,8 +74,12 @@ export class VertexObjectBuffer {
    */
   readonly attributeNames: readonly string[];
 
+  readonly #buffers = new Map<string, AttributeBuffer>();
+
   /** Empty once the pool behind this buffer is disposed — the data is gone, the description of it is not. */
-  readonly buffers: Map<string, AttributeBuffer>;
+  get buffers(): ReadonlyMap<string, Readonly<AttributeBuffer>> {
+    return this.#buffers;
+  }
 
   /**
    * map attribute name to buffer-attribute info; it stays what it is once the pool behind this
@@ -130,10 +144,9 @@ export class VertexObjectBuffer {
       this.attributeNames = source.attributeNames;
       this.bufferAttributes = source.bufferAttributes;
       this.bufferNameAttributes = source.bufferNameAttributes;
-      this.buffers = new Map();
 
-      for (const [bufferName, buffer] of source.buffers) {
-        this.buffers.set(bufferName, {
+      for (const [bufferName, buffer] of source.#buffers) {
+        this.#buffers.set(bufferName, {
           bufferName,
           itemSize: buffer.itemSize,
           dataType: buffer.dataType,
@@ -183,10 +196,8 @@ export class VertexObjectBuffer {
         });
       }
 
-      this.buffers = new Map();
-
       for (const buffer of forming.values()) {
-        this.buffers.set(buffer.bufferName, {
+        this.#buffers.set(buffer.bufferName, {
           ...buffer,
           typedArray: this.#takeOrCreateArray(buffersData, buffer.bufferName, buffer.dataType, buffer.itemSize),
         });
@@ -244,8 +255,9 @@ export class VertexObjectBuffer {
    * caught up, so the next write can start a range of its own.
    */
   pickUpDirtyRange(bufferName: string, seenSerial: number | undefined, usedCount: number): {from: number; to: number} | null {
-    // the pool behind this buffer has let go, so there is nothing left to upload from it
-    const buf = this.buffers.get(bufferName);
+    const buf = this.#buffers.get(bufferName);
+    // either the pool behind this buffer has let go and there is nothing left to upload from it,
+    // or the caller asks for a buffer name this buffer never had
     if (buf == null) return null;
 
     if (seenSerial === buf.serial) return null;
@@ -279,7 +291,16 @@ export class VertexObjectBuffer {
   }
 
   /**
-   * Both objects should use the same vertex-object-description
+   * Takes over the objects of `other`, buffer by buffer, from `targetObjectOffset` on.
+   *
+   * Both buffers have to be built from the same vertex object description, and that is judged
+   * rather than asked for: the two descriptors have to state the same `vertexCount`, and every
+   * buffer of this one has to meet a buffer of `other` under the same name, with the same
+   * `itemSize` and the same `dataType`. A source of a narrower layout would otherwise land here
+   * at the stride of the wider one, every element of it beside the slot it belongs to.
+   *
+   * Every buffer is judged before the first of them is written, so a copy that is refused leaves
+   * this buffer exactly as it was.
    *
    * A buffer with nothing to write into — that of a disposed pool, or one over a description
    * without attributes — does nothing and checks nothing, `other` and the offset included. Any
@@ -287,15 +308,17 @@ export class VertexObjectBuffer {
    * and for a buffer of this one that `other` does not have.
    *
    * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
-   * more, or when a buffer of `other` does not fit its counterpart here at that offset. Every
-   * buffer is judged before the first of them is written, so a copy that is refused leaves this
-   * buffer exactly as it was.
+   * more, when the two descriptors disagree about their `vertexCount`, when a buffer pair
+   * disagrees about its `itemSize`, or when a buffer of `other` does not fit its counterpart here
+   * at that offset
+   * @throws a `TypeError` that names the buffer and both types when a buffer pair disagrees about
+   * its data type
    */
   copy(other: VertexObjectBuffer, targetObjectOffset = 0): VertexObjectBuffer {
     // nothing to write into: the buffer of a disposed pool, or one of a description without
     // attributes. Such a buffer goes on reporting the capacity it was built for, so the checks
     // below would weigh a copy that has nowhere to land either way
-    if (this.buffers.size === 0) return this;
+    if (this.#buffers.size === 0) return this;
 
     if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
       throw new RangeError(
@@ -308,14 +331,23 @@ export class VertexObjectBuffer {
       );
     }
 
+    // the vertex count multiplies into the length of every buffer on both sides, so a pair that
+    // agrees element for element can still describe a different number of objects
+    if (other.descriptor.vertexCount !== this.descriptor.vertexCount) {
+      throw new RangeError(
+        `VertexObjectBuffer#copy(): the source has a vertexCount of ${other.descriptor.vertexCount}, this buffer one of ` +
+          `${this.descriptor.vertexCount}: both buffers have to be built from the same vertex object description`,
+      );
+    }
+
     // every buffer is judged first and written afterwards, in two passes. A typed array catches an
     // overrun only once it reaches it, so a throw from a single pass would leave the buffers before
     // it written over — and two descriptions that agree on a buffer name while sizing it
     // differently overrun exactly one of them, which the object count above cannot see
-    const pairs: [target: AttributeBuffer, source: AttributeBuffer][] = [];
+    const pairs: [target: AttributeBuffer, source: Readonly<AttributeBuffer>][] = [];
 
-    for (const buf of this.buffers.values()) {
-      const source = other.buffers.get(buf.bufferName);
+    for (const buf of this.#buffers.values()) {
+      const source = other.#buffers.get(buf.bufferName);
       if (source == null) {
         // a name without a buffer means two different things, and a caller whose two buffers
         // were built from different descriptions should not be sent looking for a dispose()
@@ -325,6 +357,21 @@ export class VertexObjectBuffer {
               `VertexObjectBuffer#copy() finds no buffer named "${buf.bufferName}" in the source: ` +
                 'both buffers have to be built from the same vertex object description',
             );
+      }
+
+      // a pair that shares a name and nothing else writes at the stride of this side while the
+      // source counts its elements by another one — which no length can tell apart
+      if (source.itemSize !== buf.itemSize) {
+        throw new RangeError(
+          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" takes ${source.itemSize} elements per vertex in the ` +
+            `source and ${buf.itemSize} here: both buffers have to be built from the same vertex object description`,
+        );
+      }
+      if (source.dataType !== buf.dataType) {
+        throw new TypeError(
+          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" is of data type ${source.dataType} in the source and ` +
+            `${buf.dataType} here: both buffers have to be built from the same vertex object description`,
+        );
       }
 
       const offset = targetObjectOffset * this.descriptor.vertexCount * buf.itemSize;
@@ -366,7 +413,7 @@ export class VertexObjectBuffer {
    * Nothing is written then.
    */
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
-    const buf = this.buffers.get(bufferName);
+    const buf = this.#buffers.get(bufferName);
     if (buf == null) {
       // a name without a buffer means two different things, and a caller who mistyped one
       // should not be sent looking for a dispose() that never happened
@@ -395,7 +442,7 @@ export class VertexObjectBuffer {
   /** Does nothing on the buffer of a disposed pool, which has no array left to move data within. */
   copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
     const {vertexCount} = this.descriptor;
-    for (const buf of this.buffers.values()) {
+    for (const buf of this.#buffers.values()) {
       buf.typedArray!.copyWithin(
         targetIndex * vertexCount * buf.itemSize,
         startIndex * vertexCount * buf.itemSize,
@@ -413,7 +460,7 @@ export class VertexObjectBuffer {
       if (attr) {
         let attrObjCount = 0;
         // the attribute has a layout but its buffer is gone: the pool behind this buffer let go
-        const buffer = this.buffers.get(attr.bufferName);
+        const buffer = this.#buffers.get(attr.bufferName);
         if (buffer == null) {
           throw releasedError('copyAttributes()');
         }
@@ -456,7 +503,7 @@ export class VertexObjectBuffer {
         const attr = this.bufferAttributes.get(attrName);
         if (attr) {
           // the attribute has a layout but its buffer is gone: the pool behind this buffer let go
-          const buffer = this.buffers.get(attr.bufferName);
+          const buffer = this.#buffers.get(attr.bufferName);
           if (buffer == null) {
             throw releasedError('toAttributeArrays()');
           }
@@ -490,8 +537,24 @@ export class VertexObjectBuffer {
    * Does nothing on the buffer of a disposed pool, which has no buffer left to mark.
    */
   touch(fromIdx = 0, toIdx = this.capacity - 1): void {
-    for (const buffer of this.buffers.values()) {
+    for (const buffer of this.#buffers.values()) {
       this.#markDirty(buffer, fromIdx, toIdx);
+    }
+  }
+
+  /**
+   * Put `typedArray` in the place of the array the named buffer holds. A name this buffer does
+   * not know replaces nothing, the way `touchBuffer()` marks nothing for one.
+   *
+   * The pool behind this buffer calls it when a snapshot comes back in as a whole array to take
+   * over instead of being written into the array that is there.
+   *
+   * @internal
+   */
+  setTypedArray(bufferName: string, typedArray: TypedArray): void {
+    const buffer = this.#buffers.get(bufferName);
+    if (buffer != null) {
+      buffer.typedArray = typedArray;
     }
   }
 
@@ -502,7 +565,7 @@ export class VertexObjectBuffer {
    * Does nothing on the buffer of a disposed pool, which has no buffer left to mark.
    */
   touchBuffer(bufferName: string, fromIdx = 0, toIdx = this.capacity - 1): void {
-    const buffer = this.buffers.get(bufferName);
+    const buffer = this.#buffers.get(bufferName);
     if (buffer != null) {
       this.#markDirty(buffer, fromIdx, toIdx);
     }
@@ -520,10 +583,10 @@ export class VertexObjectBuffer {
    * @internal
    */
   release(): void {
-    for (const buffer of this.buffers.values()) {
+    for (const buffer of this.#buffers.values()) {
       buffer.typedArray = undefined;
     }
-    this.buffers.clear();
+    this.#buffers.clear();
     this.#released = true;
   }
 }

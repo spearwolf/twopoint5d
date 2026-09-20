@@ -88,7 +88,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
     const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
     const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
 
-    const attrEntries: unknown[] = [];
+    const attrEntries: [string, PropertyDescriptor][] = [];
 
     if (descriptor.vertexCount === 1 && attr.size === 1) {
       attrEntries.push([
@@ -148,11 +148,11 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
     entries.push(
       ...Object.entries(methods)
         .filter(([, val]) => typeof val === 'function')
-        .map(([key, value]) => [key, {value}]),
+        .map(([key, value]): [string, PropertyDescriptor] => [key, {value}]),
     );
   }
 
-  const props = Object.fromEntries(entries as []);
+  const props = Object.fromEntries(entries);
 
   return Object.create(descriptor.basePrototype ?? Object.prototype, props);
 }

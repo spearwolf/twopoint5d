@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `VertexObjectBuffer#copy()` judges the layout of both sides before the first buffer is written: the two descriptors have to state the same `vertexCount`, and every buffer pair has to share its name, its `itemSize` and its `dataType`. A mismatch throws a `RangeError` — a `TypeError` for the data type — naming the buffer and both values. A source buffer of a narrower layout used to pass the length check and land in the target at the stride of the wider one, every element of it beside the slot it belongs to. A copy that is refused leaves the target exactly as it was
+- `VertexObjectBuffer#buffers` is a read-only view, `ReadonlyMap<string, Readonly<AttributeBuffer>>` — the door the geometries already closed, one floor down. Reading is unchanged and the typed arrays stay writable; what no longer compiles is a write to the map and a write to the bookkeeping of a buffer record, `serial` and the dirty fields, which is what a geometry measures its uploads against
 - `VOBufferPool#fromBuffersData()` throws a `RangeError` reading `VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, …, got …` for a snapshot sized for another pool, where it was a bare `Error` reading `Invalid buffersData capacity` that named neither the pool nor either of the two numbers. `RangeError` extends `Error`, so a `catch` that tests for `Error` is unaffected
 - `VertexObjectPool#resize()` throws a `RangeError` reading `VertexObjectPool#resize(): capacity must be a non-negative integer, got …` for a capacity that is no integer of 0 or more, and the pool constructor one reading `VOBufferPool: capacity must be …` or `VOBufferPool: buffersData.capacity must be …`, depending on which way the capacity arrived. The constructor message names `VOBufferPool` for a `VertexObjectPool` as well — that is where the check lives. Both were a bare `Error` reading `Capacity must be a non-negative integer`, which said neither where it came from nor what it had been given; `RangeError` extends `Error`, so a `catch` that tests for `Error` is unaffected. The `VertexObjectBuffer` constructor answers the same kind of `RangeError`, naming itself, the value and which of the two ways it arrived
 - the buffer maps of a geometry are read-only views: `VOBufferGeometry#buffers` and `#bufferSerials` answer `ReadonlyMap`, as do `InstancedVOBufferGeometry#baseBuffers`, `#baseBufferSerials`, `#instancedBuffers` and `#instancedBufferSerials`, and `#extraInstancedBuffers` and `#extraInstancedBufferSerials` hand out read-only maps of read-only maps. Writing into `bufferSerials` moved the very serial a geometry measures its uploads against and could silence them; the maps are written by the geometry alone
@@ -2051,6 +2053,33 @@ detached?.createVO(); // the vertex object is typed `unknown`
 
 const typed = geometry.detachInstancedPool('other') as VertexObjectPool<MyExtraVO> | undefined;
 typed?.createVO()?.setFoo(1);
+```
+
+#### The buffer map of a `VertexObjectBuffer` is read-only
+
+`VertexObjectBuffer#buffers` answers `ReadonlyMap<string, Readonly<AttributeBuffer>>`. Reading is unchanged, and so is writing into a `typedArray` — the data of a buffer is yours to fill. What no longer compiles is a write to the map itself and a write to a field of a buffer record: `serial`, `dirtyFrom`, `dirtyTo`, `dirtySince` and `pickedUpSerial` are the bookkeeping a geometry measures its uploads against, and a value put there by hand made a geometry believe it had already uploaded what it had not. `touch()` and `touchBuffer()` are the way to say that a buffer has been written.
+
+**Before**
+
+```ts
+function inspect(buffers: Map<string, AttributeBuffer>) {}
+
+inspect(pool.buffer.buffers);
+pool.buffer.buffers.get('dynamic_float32')!.serial = 0;
+```
+
+**After**
+
+```ts
+function inspect(buffers: ReadonlyMap<string, Readonly<AttributeBuffer>>) {}
+
+inspect(pool.buffer.buffers);
+
+// the data of a buffer is still yours to write
+pool.buffer.buffers.get('dynamic_float32')!.typedArray!.fill(0);
+
+// and this is how the buffer is marked for upload
+pool.buffer.touchBuffer('dynamic_float32');
 ```
 
 ## [0.21.2] - 2026-06-19

@@ -94,7 +94,7 @@ export class VertexObjectDescriptor {
    */
   constructor(description: VertexObjectDescription) {
     // the copy is what keeps the checks below true for the life of this descriptor: a later
-    // change to the description handed in here no longer reaches it. It is frozen before it is
+    // change to the description handed in here does not reach it. It is frozen before it is
     // assigned, so freezeDescription() still works on an object it is allowed to write to
     const ownDescription = cloneVertexObjectDescription(description);
     freezeDescription(ownDescription);

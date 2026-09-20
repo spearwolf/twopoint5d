@@ -286,7 +286,7 @@ export class VOBufferPool {
         if (copyTypedArrays || typedArray.length < buffer.typedArray!.length) {
           buffer.typedArray!.set(typedArray);
         } else {
-          buffer.typedArray = typedArray;
+          this.buffer.setTypedArray(bufferName, typedArray);
         }
         // the array is replaced or written over as a whole, so every object of it is new
         this.buffer.touchBuffer(bufferName, 0, this.capacity - 1);

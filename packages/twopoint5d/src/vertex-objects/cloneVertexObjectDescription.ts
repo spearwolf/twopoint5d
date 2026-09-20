@@ -5,7 +5,7 @@ import type {
   VertexAttributeUsageType,
   VertexObjectDescription,
 } from './types.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 
 /**
  * The attributes of a copied description that take another usage type than the source declares.
@@ -76,7 +76,10 @@ export function cloneVertexObjectDescription(
   source: VertexObjectDescriptor | VertexObjectDescription | FrozenVertexObjectDescription,
   attributeUsage?: VertexAttributeUsageOverrides,
 ): VertexObjectDescription {
-  const description = source instanceof VertexObjectDescriptor ? source.description : source;
+  // the union tells the two apart by shape — only a descriptor carries a `description` — which
+  // is what lets this module need the descriptor as a type alone, so neither of the two modules
+  // has to be there for the other one at runtime
+  const description = 'description' in source ? source.description : source;
   const usageLookup = resolveUsageLookup(attributeUsage);
   // every field of a description belongs in here: `new VertexObjectDescriptor()` builds its own
   // copy through this function, so a field this list forgets never reaches a descriptor
