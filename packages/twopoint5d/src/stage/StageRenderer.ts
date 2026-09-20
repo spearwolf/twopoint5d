@@ -285,15 +285,28 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Hands the size to every stage of this renderer. A stage that refuses it does not keep the
    * others from theirs: each one is asked, and what they threw comes out together once every
-   * stage has had the call — a single error unchanged, several of them as an `AggregateError`.
+   * stage has had the call — a single error unchanged, several of them as an `AggregateError`
+   * whose message counts the stages that refused; a render target that refuses the size joins
+   * that error without counting as one of them.
    *
    * While a stage refuses the size, this renderer answers with the size it carried before the
    * call, and the {@link StageItem} of that stage keeps the size it carried — a stage that took
    * the new size keeps it, item and all. The very same call therefore goes through again as soon
-   * as the refusing stage fits, and reaches exactly the stages that do not have the size yet.
+   * as the refusing stage fits, and reaches exactly the stages that do not have the size yet. A
+   * call is carried out as long as one stage still owes the size this renderer answers with, so
+   * the size this renderer fell back to reaches the stages that moved past it.
    */
   resize(width: number, height: number): void {
-    if (this.width === width && this.height === height) return;
+    // the stage items are the record of which size each stage carries: while one of them still
+    // owes the size this renderer answers with, the call has work to do — a stage that took a
+    // size the renderer gave up again is reached by no other call
+    if (
+      this.width === width &&
+      this.height === height &&
+      this.stages.every((item) => item.width === width && item.height === height)
+    ) {
+      return;
+    }
 
     const prevWidth = this.width;
     const prevHeight = this.height;
@@ -301,24 +314,28 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.width = width;
     this.height = height;
 
-    const refused: unknown[] = [];
+    const refusedByRenderTarget: unknown[] = [];
 
     try {
       if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);
       if (this.#asPassNodeRT) this.#resizeRenderTarget(this.#asPassNodeRT);
     } catch (error) {
-      refused.push(error);
+      refusedByRenderTarget.push(error);
     }
 
     // a stage that refuses the size does not keep the others from theirs: each one is asked,
     // and what they threw comes out together once every stage has had the call
+    const refusedByStages: unknown[] = [];
+
     for (const stage of this.stages) {
       try {
         this.resizeStage(stage, width, height);
       } catch (error) {
-        refused.push(error);
+        refusedByStages.push(error);
       }
     }
+
+    const refused = [...refusedByRenderTarget, ...refusedByStages];
 
     if (refused.length > 0) {
       // while a stage refuses the size, this renderer keeps the one it carried into the call, so
@@ -326,12 +343,18 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       // would fall out of the size guard above and never reach the stage a second time
       this.width = prevWidth;
       this.height = prevHeight;
-      throw refused.length === 1
-        ? refused[0]
-        : new AggregateError(
-            refused,
-            `StageRenderer#resize(): ${refused.length} of ${this.stages.length} stages refused the size ${width}x${height}`,
-          );
+
+      if (refused.length === 1) throw refused[0];
+
+      // the render target is none of the stages: it joins the error without moving their count
+      const stagesRefused = `${refusedByStages.length} of ${this.stages.length} stages refused the size ${width}x${height}`;
+
+      throw new AggregateError(
+        refused,
+        refusedByRenderTarget.length > 0
+          ? `StageRenderer#resize(): the render target and ${stagesRefused}`
+          : `StageRenderer#resize(): ${stagesRefused}`,
+      );
     }
   }
 

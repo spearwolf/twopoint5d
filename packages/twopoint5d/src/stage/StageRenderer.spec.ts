@@ -438,6 +438,25 @@ describe('StageRenderer', () => {
       expect(stage1.resize).toHaveBeenLastCalledWith(320, 240);
       expect(stage3.resize).toHaveBeenLastCalledWith(320, 240);
     });
+
+    it('asks a stage for the size the renderer fell back to', () => {
+      const sr = new StageRenderer();
+      const stage1 = fakeStage('a');
+      const stage2 = fakeStage('b');
+      stage2.resize.mockImplementation(() => {
+        throw new Error('stage refused the size');
+      });
+      sr.add(stage1).add(stage2);
+
+      expect(() => sr.resize(320, 240)).toThrow('stage refused the size');
+      expect(stage1.resize, 'the first stage took the size').toHaveBeenLastCalledWith(320, 240);
+
+      sr.resize(0, 0);
+
+      expect(stage1.resize, 'and gives it up for the size the renderer carries').toHaveBeenLastCalledWith(0, 0);
+      expect(sr.width).toBe(0);
+      expect(sr.height).toBe(0);
+    });
   });
 
   describe('parent / host wiring (3.7)', () => {
@@ -699,6 +718,41 @@ describe('StageRenderer', () => {
 
       sr.resize(100.5, 50.5);
       expect([rt.width, rt.height]).toEqual([100, 50]);
+    });
+
+    it('counts only the stages that refused the size, not the render target', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 50);
+      const stage1 = fakeStage('a');
+      const stage2 = fakeStage('b');
+      sr.add(stage1).add(stage2);
+      sr.pipeline = makePipelineMock() as any;
+
+      let rt: any;
+      stage1.renderTo.mockImplementation(() => {
+        rt = renderer.__renderTarget;
+      });
+      sr.renderTo(renderer as any);
+
+      rt.setSize = () => {
+        throw new Error('the render target refused the size');
+      };
+      stage2.resize.mockImplementation(() => {
+        throw new Error('stage refused the size');
+      });
+
+      let caught: unknown;
+      try {
+        sr.resize(300, 150);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toHaveLength(2);
+      expect((caught as Error).message).toBe(
+        'StageRenderer#resize(): the render target and 1 of 2 stages refused the size 300x150',
+      );
     });
   });
 
