@@ -22,6 +22,21 @@ export interface AttributeBuffer {
    */
   typedArray: TypedArray | undefined;
   serial: number;
+  /** The lowest object index written since `dirtySince`; `-1` while nothing is recorded. */
+  dirtyFrom: number;
+  /** The highest object index written since `dirtySince`; `-1` while nothing is recorded. */
+  dirtyTo: number;
+  /**
+   * The serial this buffer carried when the current range started to collect. A consumer that
+   * last saw this serial or a later one has everything from before the range on the gpu already.
+   */
+  dirtySince: number;
+  /**
+   * The highest serial a consumer has taken a range for. Once it has caught up with `serial`,
+   * the next write starts a fresh range instead of widening the one that is there — which is how
+   * the range gets narrow again without anyone clearing it.
+   */
+  pickedUpSerial: number;
 }
 
 // one message for every method that refuses to work once the pool behind this buffer has
@@ -125,6 +140,10 @@ export class VertexObjectBuffer {
           usageType: buffer.usageType,
           typedArray: this.#takeOrCreateArray(buffersData, bufferName, buffer.dataType, buffer.itemSize),
           serial: 0,
+          dirtyFrom: -1,
+          dirtyTo: -1,
+          dirtySince: 0,
+          pickedUpSerial: 0,
         });
       }
     } else {
@@ -151,6 +170,10 @@ export class VertexObjectBuffer {
             dataType: attribute.dataType,
             usageType: attribute.usageType,
             serial: 0,
+            dirtyFrom: -1,
+            dirtyTo: -1,
+            dirtySince: 0,
+            pickedUpSerial: 0,
           });
         }
         this.bufferAttributes.set(attributeName, {
@@ -184,6 +207,59 @@ export class VertexObjectBuffer {
     if (!this.descriptor.voPrototype) {
       this.descriptor.voPrototype = createVertexObjectPrototype(this);
     }
+  }
+
+  /**
+   * Book the objects `fromIdx` … `toIdx` of `buf` as written: the range they fall into grows to
+   * hold them, and the serial says that something happened.
+   *
+   * The serial rises even when the range comes out empty — a write outside the slots this buffer
+   * has is still a write. The range then stays the one that was already there, and only a
+   * consumer that meets no range at all falls back to everything in use.
+   */
+  #markDirty(buf: AttributeBuffer, fromIdx: number, toIdx: number): void {
+    const from = Math.max(0, fromIdx);
+    const to = Math.min(this.capacity - 1, toIdx);
+    if (from <= to) {
+      // everyone who ever asked has taken the range that is there, so it has done its work and
+      // the objects written now are a range of their own
+      if (buf.pickedUpSerial === buf.serial || buf.dirtyFrom < 0) {
+        buf.dirtySince = buf.serial;
+        buf.dirtyFrom = from;
+        buf.dirtyTo = to;
+      } else {
+        buf.dirtyFrom = Math.min(buf.dirtyFrom, from);
+        buf.dirtyTo = Math.max(buf.dirtyTo, to);
+      }
+    }
+    buf.serial++;
+  }
+
+  /**
+   * What a consumer that last saw `seenSerial` has left to upload of `bufferName`: the objects
+   * `from` … `to`, capped at the slots in use, or `null` when the buffer has not moved on since.
+   *
+   * A consumer further behind than the current range reaches gets every object in use — what
+   * happened before the range began is recorded nowhere. Taking a range up counts as having
+   * caught up, so the next write can start a range of its own.
+   */
+  pickUpDirtyRange(bufferName: string, seenSerial: number | undefined, usedCount: number): {from: number; to: number} | null {
+    // the pool behind this buffer has let go, so there is nothing left to upload from it
+    const buf = this.buffers.get(bufferName);
+    if (buf == null) return null;
+
+    if (seenSerial === buf.serial) return null;
+
+    buf.pickedUpSerial = buf.serial;
+
+    if (seenSerial === undefined || seenSerial < buf.dirtySince || buf.dirtyFrom < 0) {
+      return {from: 0, to: usedCount - 1};
+    }
+
+    const from = buf.dirtyFrom;
+    const to = Math.min(buf.dirtyTo, usedCount - 1);
+    // what was written lies beyond the slots in use, so there is a write but nothing to carry
+    return from > to ? {from: 0, to: -1} : {from, to};
   }
 
   // an array from buffersData is taken over by reference, so it has to fit the layout exactly
@@ -223,7 +299,7 @@ export class VertexObjectBuffer {
             );
       }
       buf.typedArray!.set(source.typedArray!, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
-      buf.serial++;
+      this.#markDirty(buf, targetObjectOffset, targetObjectOffset + other.capacity - 1);
     }
     return this;
   }
@@ -250,7 +326,10 @@ export class VertexObjectBuffer {
         : new Error(`VertexObjectBuffer#copyArray() does not know a buffer named "${bufferName}"`);
     }
     buf.typedArray!.set(source, targetObjectOffset * this.descriptor.vertexCount * buf.itemSize);
-    buf.serial++;
+    // as many objects as the source fills, rounded up: a source that ends inside an object still
+    // wrote into that object
+    const objCount = Math.ceil(source.length / (this.descriptor.vertexCount * buf.itemSize));
+    this.#markDirty(buf, targetObjectOffset, targetObjectOffset + objCount - 1);
   }
 
   /** Does nothing on the buffer of a disposed pool, which has no array left to move data within. */
@@ -262,7 +341,7 @@ export class VertexObjectBuffer {
         startIndex * vertexCount * buf.itemSize,
         endIndex * vertexCount * buf.itemSize,
       );
-      buf.serial++;
+      this.#markDirty(buf, targetIndex, targetIndex + (endIndex - startIndex) - 1);
     }
   }
 
@@ -298,7 +377,11 @@ export class VertexObjectBuffer {
         if (attrObjCount > copiedObjCount) {
           copiedObjCount = attrObjCount;
         }
-        buffer.serial++;
+        // an attribute that filled no object wrote nothing, and a buffer nothing was written to
+        // has not moved on
+        if (attrObjCount > 0) {
+          this.#markDirty(buffer, targetObjectOffset, targetObjectOffset + attrObjCount - 1);
+        }
       }
     }
     return copiedObjCount;
@@ -340,10 +423,28 @@ export class VertexObjectBuffer {
     );
   }
 
-  /** Does nothing on the buffer of a disposed pool, which has no buffer left to mark. */
-  touch(): void {
+  /**
+   * Mark the objects `fromIdx` … `toIdx` as written in every buffer. Without arguments every
+   * object of this buffer counts as written — what a caller that cannot say more has to state.
+   *
+   * Does nothing on the buffer of a disposed pool, which has no buffer left to mark.
+   */
+  touch(fromIdx = 0, toIdx = this.capacity - 1): void {
     for (const buffer of this.buffers.values()) {
-      buffer.serial++;
+      this.#markDirty(buffer, fromIdx, toIdx);
+    }
+  }
+
+  /**
+   * Mark the objects `fromIdx` … `toIdx` as written in the one buffer `bufferName`, for a caller
+   * that knows which of them it wrote to. A name this buffer does not know marks nothing.
+   *
+   * Does nothing on the buffer of a disposed pool, which has no buffer left to mark.
+   */
+  touchBuffer(bufferName: string, fromIdx = 0, toIdx = this.capacity - 1): void {
+    const buffer = this.buffers.get(bufferName);
+    if (buffer != null) {
+      this.#markDirty(buffer, fromIdx, toIdx);
     }
   }
 

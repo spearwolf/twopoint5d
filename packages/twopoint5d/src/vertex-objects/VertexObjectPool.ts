@@ -67,32 +67,28 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       );
     }
 
-    // Create a new buffer with the new capacity
     const newBuffer = new VertexObjectBuffer(this.descriptor, capacity);
 
-    // Copy existing data up to the minimum of old and new capacity
     const copyCount = Math.min(this.usedCount, capacity);
     if (copyCount > 0) {
-      // Manually copy data for each buffer to handle different capacities
       const {vertexCount} = this.descriptor;
       for (const [bufferName, oldBuf] of this.buffer.buffers) {
         const newBuf = newBuffer.buffers.get(bufferName)!;
         const copyLength = copyCount * vertexCount * oldBuf.itemSize;
         // both buffers are reached through a live pool, so both hold their arrays
         newBuf.typedArray!.set(oldBuf.typedArray!.subarray(0, copyLength));
-        newBuf.serial++;
       }
     }
 
-    // Update the buffer reference
+    // this buffer is new, and a route that is given it later can have seen nothing of it
+    newBuffer.touch();
+
     this.buffer = newBuffer;
 
-    // Resize the voIndex array and update buffer references in existing VOs
     const newVoIndex: Array<(VOType & VO) | undefined> = new Array(capacity);
     for (let i = 0; i < copyCount; i++) {
       const vo = this.#voIndex[i];
       if (vo != null) {
-        // Update the VO's internal buffer reference to point to the new buffer
         vo[voBuffer] = newBuffer;
         newVoIndex[i] = vo;
       }
@@ -111,7 +107,6 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
     this.setCapacity(capacity);
 
-    // Adjust usedCount if necessary
     this.usedCount = Math.min(this.usedCount, capacity);
   }
 
@@ -121,6 +116,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * Answers `undefined` once `usedCount` has reached `capacity`, and on a disposed pool,
    * which has no slot to give: the declared type admits absence, and a caller has to
    * handle it either way. A refused slot is not counted — `usedCount` stays where it is.
+   *
+   * The slot that is handed out is marked for upload, and it alone.
    */
   createVO(): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
@@ -128,6 +125,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       const idx = this.usedCount++;
       const vo = this.#createVO(idx);
       this.#voIndex[idx] = vo;
+      // the slot arrives carrying whatever stood in it before, and the draw range has just grown
+      // over it, so its vertices have to reach the gpu
+      this.buffer.touch(idx, idx);
       return vo;
     }
     return undefined;
@@ -214,6 +214,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * Answers `undefined` for an index that is not an integer in `0` … `usedCount - 1`, and on a
    * disposed pool, which has no index left to look in: the declared type admits absence, and
    * the index went with {@link VOBufferPool#dispose}.
+   *
+   * Nothing is marked for upload: reading a slot changes no data. Write through the vertex
+   * object and call `touch()`, or give the attribute `autoTouch`.
    */
   getVO(idx: number): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
@@ -229,7 +232,6 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   #createVO(idx: number) {
     const vo = createVertexObject(this.descriptor, this.buffer, idx);
-    this.buffer.touch();
     if (this.onCreateVO != null) {
       return this.onCreateVO(vo) ?? vo;
     }

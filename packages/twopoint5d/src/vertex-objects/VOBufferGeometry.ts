@@ -1,7 +1,7 @@
 import {BufferGeometry} from 'three/webgpu';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
-import {GeometryRoutes, markForUpload} from './GeometryRoutes.js';
+import {GeometryRoutes} from './GeometryRoutes.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
@@ -97,12 +97,12 @@ export class VOBufferGeometry extends BufferGeometry {
 
   /** Marks the buffers behind the given attribute names for GPU upload on the next `update()`. */
   touchAttributes(...attrNames: string[]): void {
-    markForUpload(this.#routes.select(attrNames));
+    this.#routes.touchAttributes(attrNames);
   }
 
   /** Marks every buffer of the given usage types for GPU upload on the next `update()`. */
   touchBuffers(bufferTypes: TouchBuffersType): void {
-    markForUpload(this.#routes.selectByUsage(bufferTypes));
+    this.#routes.touchByUsage(bufferTypes);
   }
 
   /**
@@ -127,9 +127,9 @@ export class VOBufferGeometry extends BufferGeometry {
   update(): void {
     this.#updateDrawRange();
 
-    this.#routes.checkSerials();
+    // before the uploads are synced: what is asked for here decides how wide each of them goes
     this.#autoTouchAttributes();
-    this.#routes.updateRanges();
+    this.#routes.syncUploads();
 
     this.#slots.syncArrays(this);
   }

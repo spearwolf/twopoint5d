@@ -21,6 +21,18 @@ describe('vertex-buffers-geometry-updates', () => {
   /** The update ranges the gpu upload of `attrName` will use, read from the buffer behind the attribute. */
   const updateRangesOf = (geometry: BufferGeometry, attrName: string) => bufferInSlot(geometry, attrName)?.updateRanges;
 
+  /**
+   * Put the buffer of `attrName` into the state a delivered upload leaves it in: three takes the
+   * ranges of a buffer up as it uploads them and leaves none behind. Without a renderer in this
+   * suite, the tests that care whether a range was delivered say so here.
+   *
+   * It is the shorter promise of the two. three keeps that bargain from the second upload of an
+   * attribute on — the first builds the gpu buffer out of the whole array and lets the range
+   * stand — and it uploads only what `needsUpdate` marks on a mesh that is actually drawn. This
+   * asks after none of the three and empties the ranges either way.
+   */
+  const uploaded = (geometry: BufferGeometry, attrName: string) => bufferInSlot(geometry, attrName)?.clearUpdateRanges();
+
   const baseDesc = new VertexObjectDescriptor({
     vertexCount: 4,
     indices: [0, 1, 2, 0, 2, 3],
@@ -594,6 +606,156 @@ describe('vertex-buffers-geometry-updates', () => {
   });
 
   describe('update ranges', () => {
+    // `position` carries no usage and is therefore static and without autoTouch: what reaches the
+    // gpu here is what the pool wrote, which is what these tests are about
+    const staticQuadDesc = new VertexObjectDescriptor({
+      vertexCount: 4,
+
+      attributes: {
+        position: {
+          components: ['x', 'y', 'z'],
+          type: 'float32',
+          bufferName: 'positions',
+        },
+      },
+    });
+
+    /**
+     * A geometry over `staticQuadDesc` holding `count` objects, wound forward to the state it
+     * settles into: its first `update()` is behind it — that round spends the auto-touch which
+     * uploads a static buffer once in full — and the range of that round counts as delivered,
+     * which a first render would not manage on its own. Only the next `update()` measures what
+     * a single write costs.
+     */
+    const settledQuadGeometry = (count: number) => {
+      const geometry = new VertexObjectGeometry<MyBaseVO>(staticQuadDesc, 10);
+      const objects = Array.from({length: count}, () => geometry.pool.createVO()!);
+      geometry.update();
+      uploaded(geometry, 'position');
+      return [geometry, objects] as const;
+    };
+
+    test('two updates without a render in between upload both objects that were written', () => {
+      const [geometry] = settledQuadGeometry(5);
+
+      geometry.pool.createVO();
+      geometry.update();
+      // no upload follows: the range of this pass still stands on the buffer, and the serial
+      // behind it is already booked as seen
+
+      geometry.pool.createVO();
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 5 * 4 * 3, count: 2 * 4 * 3}]);
+    });
+
+    test('a spawn uploads the object that was created, not the whole pool', () => {
+      const [geometry] = settledQuadGeometry(5);
+
+      geometry.pool.createVO();
+      geometry.update();
+
+      // 3 components per vertex, 4 vertices per object — the sixth object and nothing else
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 5 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('a frame in which nothing is written leaves the next spawn its own narrow range', () => {
+      const [geometry] = settledQuadGeometry(5);
+
+      // no buffer of the pool moved on and nothing asked for an upload, so this pass has no range
+      // to name — and one it named anyway would still be standing when the spawn below names its
+      // own, which is the case a mostly static pool is in for most of its frames
+      geometry.update();
+
+      geometry.pool.createVO();
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 5 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('freeing an object in the middle uploads the slot that took its place', () => {
+      const [geometry, objects] = settledQuadGeometry(5);
+
+      // the swap fetches the object out of slot 4 and puts it into slot 1
+      geometry.pool.freeVO(objects[1]!);
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 1 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('a touch leaves no narrow range standing for a render that beats the next update', () => {
+      const [geometry] = settledQuadGeometry(5);
+
+      geometry.pool.createVO();
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position'), 'the spawn names its own object').toEqual([{start: 5 * 4 * 3, count: 4 * 3}]);
+
+      geometry.touch('position');
+
+      // a render before the next update() finds no range and uploads the whole array, rather
+      // than the one object the spawn named
+      expect(updateRangesOf(geometry, 'position')).toEqual([]);
+    });
+
+    test('an attribute that was touched uploads every object in use', () => {
+      const [geometry] = settledQuadGeometry(5);
+
+      // the spawn records a range of one object, and a touch says that values were written
+      // somewhere — nobody knows where, so the whole area in use goes up rather than that object
+      geometry.pool.createVO();
+      geometry.touch('position');
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 0, count: 6 * 4 * 3}]);
+    });
+
+    test('an attribute that uploads on every frame carries every object in use', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+
+      for (let i = 0; i < 3; i++) {
+        geometry.instancedPool.createVO();
+      }
+      geometry.update();
+      uploaded(geometry, 'impact');
+
+      // `impact` is dynamic and therefore carries autoTouch. The spawn records a range of one
+      // object, and a generated setter says nothing about what it wrote, so the whole area in
+      // use goes up rather than that object
+      geometry.instancedPool.createVO();
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'impact')).toEqual([{start: 0, count: 4}]);
+    });
+
+    test('a geometry that missed the frames in between uploads everything', () => {
+      const pool = new VertexObjectPool<MyBaseVO>(staticQuadDesc, 10);
+      const keepingUp = new VertexObjectGeometry<MyBaseVO>(pool, 10);
+      const fallingBehind = new VertexObjectGeometry<MyBaseVO>(pool, 10);
+
+      pool.createVO();
+      keepingUp.update();
+      uploaded(keepingUp, 'position');
+      fallingBehind.update();
+      uploaded(fallingBehind, 'position');
+
+      pool.createVO();
+      keepingUp.update();
+      uploaded(keepingUp, 'position');
+
+      pool.createVO();
+      keepingUp.update();
+
+      fallingBehind.update();
+
+      expect(updateRangesOf(keepingUp, 'position'), 'the geometry that saw every frame').toEqual([
+        {start: 2 * 4 * 3, count: 4 * 3},
+      ]);
+      expect(updateRangesOf(fallingBehind, 'position'), 'the geometry that sat out two frames').toEqual([
+        {start: 0, count: 3 * 4 * 3},
+      ]);
+    });
+
     test('the base pool of an instanced geometry uploads every vertex of a used object', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 

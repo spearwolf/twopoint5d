@@ -3,7 +3,7 @@ import {BufferGeometry, InstancedBufferGeometry} from 'three/webgpu';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import type {GeometryRoute} from './GeometryRoutes.js';
-import {GeometryRoutes, markForUpload} from './GeometryRoutes.js';
+import {GeometryRoutes} from './GeometryRoutes.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -266,11 +266,6 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       autoDispose: options?.autoDispose,
     });
 
-    // no attribute of this route has reached the gpu yet, and a static buffer uploads only when
-    // something asks for it — so the next update() owes the geometry the full pass over the
-    // static buffers that its own first update() did
-    this.#routes.resetAutoTouch();
-
     return extraPool;
   }
 
@@ -422,20 +417,20 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. */
   touchAttributes(...attrNames: string[]): void {
-    markForUpload(this.#routes.select(attrNames));
+    this.#routes.touchAttributes(attrNames);
   }
 
   /** Marks every buffer of the given usage types, across every route, for GPU upload on the next `update()`. */
   touchBuffers(bufferTypes: TouchInstancedBuffersType | TouchBuffersType): void {
     if ('base' in bufferTypes || 'instanced' in bufferTypes) {
       if (bufferTypes.base) {
-        markForUpload(this.#routes.selectByUsage(bufferTypes.base, 'base'));
+        this.#routes.touchByUsage(bufferTypes.base, 'base');
       }
       if (bufferTypes.instanced) {
-        markForUpload(this.#routes.selectByUsage(bufferTypes.instanced, 'instanced'));
+        this.#routes.touchByUsage(bufferTypes.instanced, 'instanced');
       }
     } else {
-      markForUpload(this.#routes.selectByUsage(bufferTypes as TouchBuffersType));
+      this.#routes.touchByUsage(bufferTypes as TouchBuffersType);
     }
   }
 
@@ -463,9 +458,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.instanceCount = this.instancedPool.usedCount;
     this.#updateDrawRange();
 
-    this.#routes.checkSerials();
+    // before the uploads are synced: what is asked for here decides how wide each of them goes
     this.#autoTouchAttributes();
-    this.#routes.updateRanges();
+    this.#routes.syncUploads();
 
     this.#slots.syncArrays(this);
   }

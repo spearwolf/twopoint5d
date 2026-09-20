@@ -61,6 +61,14 @@ const quadDescription = {
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
+// static and therefore without autoTouch: what reaches the gpu here comes from the pool having
+// written something, which is the whole point of this test
+const staticQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'static'}},
+};
+
 const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
@@ -130,6 +138,49 @@ describe('vertex-objects — gpu upload', function () {
     await display.nextFrame();
 
     expect((await readBack(display.renderer, position)).slice(0, 12)).to.deep.equal([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
+  });
+
+  it('a spawn in a large, mostly static pool uploads the new object alone', async function () {
+    const geometry = new VertexObjectGeometry(staticQuadDescription, 64);
+    const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
+    scene.add(mesh);
+
+    // one quad per object, side by side along x, so every object carries values of its own
+    const quadAt = (i) => [i, 0, 0, i + 1, 0, 0, i + 1, 1, 0, i, 1, 0];
+    for (let i = 0; i < 32; i++) {
+      geometry.pool.createVO().setPosition(quadAt(i));
+    }
+
+    // this pass spends the auto-touch round that uploads a static buffer once in full; from here
+    // on the upload hangs on the pool having written something
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const position = geometry.getAttribute('position');
+
+    // the pass above built the gpu buffer out of the whole array and left its range standing —
+    // three takes a range up only on an upload that follows one. This spawn is that upload, and
+    // the pool is in its steady state afterwards, which is where a sprite spawn really happens
+    geometry.pool.createVO().setPosition(quadAt(100));
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    geometry.pool.createVO().setPosition(quadAt(200));
+    mesh.update();
+
+    // the 34th object and nothing else: 4 vertices of 3 components, at object 33
+    expect(bufferOf(position).updateRanges).to.deep.equal([{start: 33 * 4 * 3, count: 4 * 3}]);
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const onTheGpu = await readBack(display.renderer, position);
+
+    expect(onTheGpu.slice(33 * 12, 34 * 12), 'the object that was spawned').to.deep.equal(quadAt(200));
+    expect(onTheGpu.slice(32 * 12, 33 * 12), 'the object of the spawn before it').to.deep.equal(quadAt(100));
+    expect(onTheGpu.slice(5 * 12, 6 * 12), 'an object that nobody touched').to.deep.equal(quadAt(5));
   });
 
   it('an instanced geometry uploads its base quad and every used instance', async function () {

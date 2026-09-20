@@ -1,4 +1,5 @@
 import {createSandbox} from 'sinon';
+import type {BufferAttribute} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
@@ -254,6 +255,24 @@ describe('InstancedVertexObjectGeometry', () => {
     // slot it took back" — has no subject here: this geometry never calls createVO(). It
     // holds pools, not vertex objects: a pool it built itself is released, and one handed in
     // stays the caller's together with every slot the caller took from it.
+  });
+
+  test('attaching a pool leaves the static buffers of the routes that were already there alone', () => {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+    const versionOf = (attrName: string) => (geometry.getAttribute(attrName) as BufferAttribute).version;
+
+    geometry.instancedPool.createVO();
+    geometry.update();
+
+    const baseStatic = versionOf('position');
+    const instancedStatic = versionOf('strength');
+
+    geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+    geometry.update();
+
+    expect(versionOf('position'), 'the static buffer of the base route').toBe(baseStatic);
+    expect(versionOf('strength'), 'the static buffer of the instanced route').toBe(instancedStatic);
+    expect(versionOf('extra'), 'the static buffer the new route owes its first upload').toBeGreaterThan(0);
   });
 
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {

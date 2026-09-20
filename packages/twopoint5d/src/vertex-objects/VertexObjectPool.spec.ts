@@ -743,6 +743,21 @@ describe('VertexObjectPool', () => {
       expect(VOUtils.getIndex(vo), 'getVO(-1) left no stray entry behind').toBe(0);
       expect(pool.usedCount).toBe(1);
     });
+
+    test('materializing a vertex object in a slot that was filled from attributes marks nothing for upload', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.createFromAttributes({bar: [1, 1, 1, 1, 2, 2, 2, 2]});
+
+      const serials = new Map(Array.from(pool.buffer.buffers, ([name, buffer]) => [name, buffer.serial]));
+
+      // the slot holds no vertex object yet, so this is the first one to reach it — and reading a
+      // slot changes none of its data
+      expect(pool.getVO(1)).toBeDefined();
+
+      for (const [name, buffer] of pool.buffer.buffers) {
+        expect(buffer.serial, name).toBe(serials.get(name));
+      }
+    });
   });
 
   describe('input the layout cannot hold', () => {

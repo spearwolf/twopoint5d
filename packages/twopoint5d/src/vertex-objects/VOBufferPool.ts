@@ -282,7 +282,8 @@ export class VOBufferPool {
         } else {
           buffer.typedArray = typedArray;
         }
-        buffer.serial++;
+        // the array is replaced or written over as a whole, so every object of it is new
+        this.buffer.touchBuffer(bufferName, 0, this.capacity - 1);
       }
     }
   }
