@@ -12,6 +12,10 @@ import {selectBuffers} from './selectBuffers.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 import {updateUpdateRange} from './updateUpdateRange.js';
 
+/**
+ * Hands the buffers of a {@link VOBufferPool} to three.js as one `THREE.BufferGeometry`. It works
+ * on buffer indices and knows no object type: the layer below {@link VertexObjectGeometry}.
+ */
 export class VOBufferGeometry extends BufferGeometry {
   readonly pool: VOBufferPool;
 

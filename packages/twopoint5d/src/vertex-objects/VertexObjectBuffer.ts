@@ -31,6 +31,11 @@ function releasedError(method: string): Error {
   return new Error(`VertexObjectBuffer#${method} is not available: the pool behind this buffer has been disposed`);
 }
 
+/**
+ * The typed arrays themselves, together with the layout that maps an attribute to its slice of
+ * them. It belongs to the side without an object type although its name carries the long prefix:
+ * a {@link VOBufferPool} holds one just as a {@link VertexObjectPool} does.
+ */
 export class VertexObjectBuffer {
   /** The description this buffer was built from; it stays what it is once the pool behind this buffer is disposed. */
   readonly descriptor: VertexObjectDescriptor;

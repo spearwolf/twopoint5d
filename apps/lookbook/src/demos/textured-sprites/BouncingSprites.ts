@@ -1,4 +1,4 @@
-import type {TextureAtlas, TexturedSprite, TexturedSpritePool} from '@spearwolf/twopoint5d';
+import type {TextureAtlas, TexturedSprite, TexturedSpritesPool} from '@spearwolf/twopoint5d';
 
 interface BounceSprite extends TexturedSprite {
   speedX: number;
@@ -22,7 +22,7 @@ export class BouncingSprites {
   speedRotateFactor = 1;
   shouldRotate = true;
 
-  spritePool: TexturedSpritePool;
+  spritePool: TexturedSpritesPool;
   textureAtlas: TextureAtlas;
 
   containerWidth: number;
@@ -34,7 +34,7 @@ export class BouncingSprites {
   sprites: BounceSprite[] = [];
 
   constructor(
-    spritePool: TexturedSpritePool,
+    spritePool: TexturedSpritesPool,
     textureAtlas: TextureAtlas,
     width = 300,
     height = 150,

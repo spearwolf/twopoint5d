@@ -9,6 +9,11 @@ function disposedError(method: string): Error {
   return new Error(`VOBufferPool#${method} is not available: this pool has been disposed`);
 }
 
+/**
+ * Allocates the typed arrays for a whole pool of vertex objects and owns them. It hands out
+ * buffer indices, not objects: the layer below {@link VertexObjectPool}, which knows the type of
+ * the vertex objects it hands out.
+ */
 export class VOBufferPool {
   /** What this pool is built from; it goes on saying so once {@link dispose} has run. */
   readonly descriptor: VertexObjectDescriptor;

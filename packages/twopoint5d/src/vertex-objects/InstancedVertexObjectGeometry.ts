@@ -10,6 +10,11 @@ const asPool = <T>(
   capacity = 1,
 ): VertexObjectPool<T> => (pool instanceof VertexObjectPool ? pool : new VertexObjectPool<T>(pool, capacity));
 
+/**
+ * An {@link InstancedVOBufferGeometry} over two typed pools: `VOBaseType` objects make up the base
+ * geometry, `VOInstancedType` objects the instances. The typed layer on top of the geometry that
+ * works on buffer indices alone.
+ */
 export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseType extends VO> extends InstancedVOBufferGeometry {
   declare readonly basePool?: VertexObjectPool<VOBaseType>;
   declare readonly instancedPool: VertexObjectPool<VOInstancedType>;

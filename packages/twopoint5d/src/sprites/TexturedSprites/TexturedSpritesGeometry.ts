@@ -1,4 +1,7 @@
-import {cloneVertexObjectDescription} from '../../vertex-objects/cloneVertexObjectDescription.js';
+import {
+  cloneVertexObjectDescription,
+  type VertexAttributeUsageOverrides,
+} from '../../vertex-objects/cloneVertexObjectDescription.js';
 import {InstancedVertexObjectGeometry} from '../../vertex-objects/InstancedVertexObjectGeometry.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {BaseSprite} from '../BaseSprite.js';
@@ -7,29 +10,36 @@ import type {TexturedSprite} from './TexturedSprite.js';
 import {TexturedSpriteDescriptor} from './TexturedSprite.js';
 
 export type TexturedSpritesBasePool = VertexObjectPool<BaseSprite>;
-export type TexturedSpritePool = VertexObjectPool<TexturedSprite>;
+export type TexturedSpritesPool = VertexObjectPool<TexturedSprite>;
 
-export type TexturedSpriteMakeBaseSpriteArgs =
+/** @deprecated Use {@link TexturedSpritesPool}. The plural belongs to the `TexturedSprites` module, not to a single sprite. */
+export type TexturedSpritePool = TexturedSpritesPool;
+
+export type TexturedSpritesMakeBaseSpriteArgs =
   [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number];
 
-export interface TexturedSpriteGeometryParameters {
+/** @deprecated Use {@link TexturedSpritesMakeBaseSpriteArgs}. The plural belongs to the `TexturedSprites` module, not to a single sprite. */
+export type TexturedSpriteMakeBaseSpriteArgs = TexturedSpritesMakeBaseSpriteArgs;
+
+export interface TexturedSpritesGeometryParameters {
   capacity: number;
-  attributeUsage?: {
-    dynamic?: string[];
-    stream?: string[];
-    static?: string[];
-  };
+  // no `alias`: the geometry sets the aliases itself (`size` -> `quadSize`, `position` ->
+  // `instancePosition`), and one set by the caller would replace exactly that mapping
+  attributeUsage?: Omit<VertexAttributeUsageOverrides, 'alias'>;
 }
+
+/** @deprecated Use {@link TexturedSpritesGeometryParameters}. The plural belongs to the `TexturedSprites` module, not to a single sprite. */
+export type TexturedSpriteGeometryParameters = TexturedSpritesGeometryParameters;
 
 export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<TexturedSprite, BaseSprite> {
   declare basePool: TexturedSpritesBasePool;
-  declare instancedPool: TexturedSpritePool;
+  declare instancedPool: TexturedSpritesPool;
 
   readonly isTexturedSpritesGeometry = true;
 
   constructor(
-    capacity: number | TexturedSpriteGeometryParameters = 100,
-    makeBaseSpriteArgs: TexturedSpriteMakeBaseSpriteArgs = [0.5, 0.5],
+    capacity: number | TexturedSpritesGeometryParameters = 100,
+    makeBaseSpriteArgs: TexturedSpritesMakeBaseSpriteArgs = [0.5, 0.5],
   ) {
     const cap = typeof capacity === 'number' ? capacity : capacity.capacity;
     const desc =

@@ -11,6 +11,11 @@ const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: stri
 
 type VADescriptionFields = Partial<VASizeDescription> & Partial<VAComponentsDescription> & VertexAttributeMethods;
 
+/**
+ * A single attribute of a {@link VertexObjectDescriptor}: its type, size, components and usage.
+ * It sits below both layers, the one that works on buffer indices and the one that hands out
+ * typed objects.
+ */
 export class VertexAttributeDescriptor {
   /**
    * A description declares either `components` or `size`, and the getters below

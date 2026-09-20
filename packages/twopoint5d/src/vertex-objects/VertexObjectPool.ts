@@ -12,6 +12,10 @@ function disposedError(method: string): Error {
   return new Error(`VertexObjectPool#${method} is not available: this pool has been disposed`);
 }
 
+/**
+ * Hands out `VOType` objects whose generated getters and setters write into the buffers of this
+ * pool: the typed layer on top of {@link VOBufferPool}, which only knows buffer indices.
+ */
 export class VertexObjectPool<VOType> extends VOBufferPool {
   // a slot is empty until a vertex object materializes in it, and empty again once one is freed
   #voIndex: Array<(VOType & VO) | undefined>;

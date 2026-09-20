@@ -2,6 +2,11 @@ import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {voBuffer, voIndex} from './constants.js';
 import type {VO} from './types.js';
 
+/**
+ * Reads and writes the two symbol properties every vertex object carries, `voBuffer` and
+ * `voIndex`. `VO` is the type name from `types.ts` here, not the prefix of the layer that works
+ * on buffer indices.
+ */
 export class VOUtils {
   static set(vo: VO, buffer: VertexObjectBuffer, bufferIndex: number): VO {
     vo[voBuffer] = buffer;

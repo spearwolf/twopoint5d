@@ -52,6 +52,22 @@ Everything else exists to make this layer usable. The idea:
    those arrays to three.js as a single `BufferGeometry`, so the whole pool draws in
    one call — usually via instanced rendering.
 
+The class names in this module carry the layer they belong to. These rules are binding for
+every class that is added here:
+
+1. `VO` is the abbreviation of "vertex object" throughout the module: the `VO` type in
+   `types.ts`, the `voBuffer` and `voIndex` symbols, `VOAttrSetter` and `VOAttrGetter`.
+2. The layer boundary runs along one question: does the class know the type of the object it
+   hands out? `VOBufferPool`, `VOBufferGeometry` and `InstancedVOBufferGeometry` do not; they
+   work with buffer indices. `VertexObjectPool<VOType>`, `VertexObjectGeometry<VOType>` and
+   `InstancedVertexObjectGeometry<VOInstancedType, VOBaseType>` extend them and hand out typed
+   objects with generated accessors.
+3. A new class is named `VO*` if it works without an object type and `VertexObject*` if it
+   carries one.
+4. Four classes stand across this line, and it is not a second rule: `VertexObjectBuffer`,
+   `VertexObjectDescriptor` and `VertexAttributeDescriptor` sit below the line — both layers
+   use them — and in `VOUtils` the `VO` is the type name from rule 1, not the layer prefix.
+
 The consequence that matters when editing higher layers: what looks like thousands of
 independent objects is one shared buffer. Reordering, freeing or copying an object
 touches other objects' memory. Buffer updates are flagged for upload rather than

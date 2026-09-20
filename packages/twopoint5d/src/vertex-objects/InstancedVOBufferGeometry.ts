@@ -21,6 +21,11 @@ export type TouchInstancedBuffersType = {
   instanced?: TouchBuffersType;
 };
 
+/**
+ * {@link VOBufferGeometry} for instanced rendering: one base pool and any number of instanced
+ * pools on a `THREE.InstancedBufferGeometry`. It works on buffer indices and knows no object
+ * type: the layer below {@link InstancedVertexObjectGeometry}.
+ */
 export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly basePool?: VOBufferPool;
   /** Set exactly when `basePool` is — the constructor builds the base route as a whole or not at all. */

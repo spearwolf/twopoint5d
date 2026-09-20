@@ -17,4 +17,4 @@ export * from './TileSprites/TileSprites.js';
 export * from './TileSprites/TileSpritesFactory.js';
 export * from './TileSprites/TileSpritesGeometry.js';
 export * from './TileSprites/TileSpritesMaterial.js';
-export * from './types.js';
+export type * from './types.js';

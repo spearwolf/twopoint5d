@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `TexturedSpritesGeometryParameters#attributeUsage` takes `Omit<VertexAttributeUsageOverrides, 'alias'>`. The shape is the same as before, so this is no breaking change, but the type now stands under a name a caller can write down. `alias` is left out because the geometry sets the aliases of the sprite layout itself
+- `map2d` exports its interfaces as types, `export type *`, as every other module does
 - `IProjection#getZoom()` and both implementations, `ParallaxProjection` and `OrthographicProjection`, name their parameter `distanceToCamera` — it carries the distance a plane sits from the camera, while the `distanceToProjectionPlane` of the view specs carries the distance from the camera to the projection plane. Callers are unaffected, JavaScript having no named arguments; a type that writes the signature down sees the new name
 - `new FixedFrameLoop(display)` throws when the display handed to it has been disposed, with a message naming the class and the state. A loop over such a display subscribes to an emitter that never fires again: it reports `isDisposed === false`, emits neither `OnTick` nor `OnRender` and never disposes itself, because the `OnDisplayDispose` it waits for has already gone out. `Display#isDisposed` is the question to ask wherever a loop is built from a display that belongs to someone else
 - change a `tileWidth` or `tileHeight` that is not a finite number above 0 into a `RangeError` naming class, property and value, thrown where the value is set: the constructors and setters of `Map2DTileCoordsUtil`, `Map2DTileStreamer` and `Map2DSpatialHashGrid`, and through the streamer also `Map2D#tileWidth` and `#tileHeight`. Every mapping from 2D coordinates to tile coordinates divides by these two, and a grid of 0 carried `±Infinity` and `NaN` tile indices into the visibilitors, where the map went on rendering nothing without a word. The default grid of `Map2DTileStreamer` and `Map2DSpatialHashGrid` is 1x1, the one `Map2DTileCoordsUtil` has always had
@@ -73,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the generated multi-component setters and `VertexObjectBuffer#copyAttributes()` copy element by element and allocate nothing per vertex
 - `InstancedVOBufferGeometry#attachInstancedPool()` is generic over the vertex object type and returns `VertexObjectPool<VOType>`; without a type argument the returned pool is typed `VertexObjectPool<unknown>`
 - a descriptor or description passed to `InstancedVOBufferGeometry#attachInstancedPool()` is wrapped in a pool that has the capacity of the geometry's `instancedPool`
-- `TexturedSprites#spritePool` is typed `TexturedSpritePool | undefined` and `#texture` is typed `Texture | undefined`: after `dispose()` the mesh holds neither geometry nor material, `spritePool` and `texture` answer `undefined`, `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
+- `TexturedSprites#spritePool` is typed `TexturedSpritesPool | undefined` and `#texture` is typed `Texture | undefined`: after `dispose()` the mesh holds neither geometry nor material, `spritePool` and `texture` answer `undefined`, `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
 - `VO[voBuffer]` is typed `VertexObjectBuffer | undefined`: a vertex object whose pool has let it go, through `freeVO()` or `dispose()`, reaches no buffer any more — the type `VOUtils.getBuffer()` answers with
 - change the return type of `getDescriptorOf()` to `VertexObjectDescriptor | undefined`: a vertex object without a buffer has no descriptor to answer with
 - `VertexObjects#geometry` is typed `GeoType | undefined` and `#material` `Material | Material[] | undefined`: the constructor takes both as optional, and `AnimatedSprites#dispose()` and `TexturedSprites#dispose()` give both up
@@ -160,6 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- deprecate `TexturedSpritePool`, `TexturedSpriteMakeBaseSpriteArgs` and `TexturedSpriteGeometryParameters` in favour of `TexturedSpritesPool`, `TexturedSpritesMakeBaseSpriteArgs` and `TexturedSpritesGeometryParameters`: the plural belongs to the `TexturedSprites` module, as it does in `TexturedSpritesBasePool` and `TexturedSpritesMaterialParameters`, not to a single sprite. The old names stay as aliases of the new types for one release
 - deprecate the `keyCodes` option and the `PanControl2D#keyCodes` field in favour of `keys`: `KeyboardEvent.keyCode` depends on the keyboard layout. `keyCodes` still decides as long as it holds anything other than `[87, 83, 65, 68]` and `keys` holds its default — a `keyCodes` passed in or rebound in place keeps working, and `keys` wins where both are set
 
 ### Removed
@@ -1299,7 +1302,7 @@ case — need no change.
 
 ```ts
 const sprites = new TexturedSprites(1000);
-const pool: TexturedSpritePool = sprites.spritePool;
+const pool: TexturedSpritesPool = sprites.spritePool;
 ```
 
 **After**

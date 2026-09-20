@@ -3,6 +3,10 @@ import {VOBufferGeometry} from './VOBufferGeometry.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
+/**
+ * A {@link VOBufferGeometry} over a {@link VertexObjectPool}`<VOType>`: the typed layer on top of
+ * the geometry that works on buffer indices alone.
+ */
 export class VertexObjectGeometry<VOType extends VO> extends VOBufferGeometry {
   declare readonly pool: VertexObjectPool<VOType>;
 

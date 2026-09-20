@@ -5,6 +5,11 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
+/**
+ * The checked description of a vertex object: which attributes it has, and how many vertices and
+ * indices. It sits below both layers, the one that works on buffer indices and the one that hands
+ * out typed objects.
+ */
 export class VertexObjectDescriptor {
   /**
    * This descriptor's own copy of the description it was built from. Changing the object the

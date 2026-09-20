@@ -3,8 +3,8 @@ import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {TexturedSprite} from './TexturedSprite.js';
 import {
   TexturedSpritesGeometry,
-  type TexturedSpriteGeometryParameters,
-  type TexturedSpritePool,
+  type TexturedSpritesGeometryParameters,
+  type TexturedSpritesPool,
 } from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from './TexturedSpritesMaterial.js';
 
@@ -18,7 +18,7 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   #ownsMaterial: boolean;
 
   /** The sprite pool of the geometry this mesh was built with — `undefined` once disposed. */
-  get spritePool(): TexturedSpritePool | undefined {
+  get spritePool(): TexturedSpritesPool | undefined {
     return this.geometry?.instancedPool;
   }
 
@@ -35,7 +35,7 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   }
 
   constructor(
-    geometry?: number | TexturedSpritesGeometry | TexturedSpriteGeometryParameters,
+    geometry?: number | TexturedSpritesGeometry | TexturedSpritesGeometryParameters,
     material?: Texture | TexturedSpritesMaterial | TexturedSpritesMaterialParameters,
   ) {
     super(

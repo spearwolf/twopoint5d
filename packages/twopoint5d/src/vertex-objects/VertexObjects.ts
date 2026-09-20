@@ -3,6 +3,9 @@ import type {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometr
 import type {VOBufferGeometry} from './VOBufferGeometry.js';
 
 /**
+ * The `THREE.Mesh` that draws a {@link VOBufferGeometry} or an {@link InstancedVertexObjectGeometry}:
+ * the class that puts either layer into a scene.
+ *
  * `THREE.Mesh` types both slots as always filled, so neither of its type parameters can carry
  * the `undefined` the two declarations below need; the slots are opened here and closed again
  * by those declarations, which are the types this class and its subclasses actually show.
