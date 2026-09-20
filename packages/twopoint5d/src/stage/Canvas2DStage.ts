@@ -197,10 +197,10 @@ export class Canvas2DStage {
 
   /**
    * Release the three.js resources this stage built for itself: the sprite material, both
-   * textures that ever sat behind it and the {@link StageRenderer}. The sprite leaves the scene
-   * before its material goes, so no frame reaches a sprite without one. {@link texture} is the
-   * one field the stage owns whoever wrote it — a texture assigned there from outside is
-   * released here as well.
+   * textures that ever sat behind it, the {@link StageRenderer} and the {@link Stage2D} behind
+   * {@link stage}. The sprite leaves the scene before its material goes, so no frame reaches a
+   * sprite without one. {@link texture} is the one field the stage owns whoever wrote it — a
+   * texture assigned there from outside is released here as well.
    *
    * The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are
    * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares
@@ -208,9 +208,9 @@ export class Canvas2DStage {
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
    * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do
-   * nothing. `canvas`, `renderer`, `projection`, `stage`, `scene`, `sprite`, `stageRenderer`,
-   * `width`, `height` and `needsUpdate` keep the values the stage was left with. A `dispose`
-   * event goes out to every subscriber before this stage stops listening; no event follows it.
+   * nothing. `canvas`, `renderer`, `projection`, `scene`, `sprite`, `stageRenderer`, `width`,
+   * `height` and `needsUpdate` keep the values the stage was left with. A `dispose` event goes
+   * out to every subscriber before this stage stops listening; no event follows it.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -230,5 +230,8 @@ export class Canvas2DStage {
     this.#textureFactory = undefined;
 
     this.stageRenderer.dispose();
+
+    // the stage was built in the constructor of this class, and the renderer above has let go of it
+    this.stage.dispose();
   }
 }

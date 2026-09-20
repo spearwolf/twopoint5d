@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
 - add `StageRenderer#isDisposed`: `true` once `dispose()` has run, so a caller holding a renderer it did not create has a question it can ask
-- add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, both textures that ever sat behind it and the `StageRenderer` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, both textures that ever sat behind it, and the `StageRenderer` and the `Stage2D` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add `InputControlBase#dispose()` and `InputControlBase#isDisposed`: `dispose()` takes every listener the control put on a host back off again — the hosts themselves are handed in and stay the caller's — and puts the control out of service. Afterwards `isDisposed` is `true`, `isActive` is `false`, and the control cannot be brought back: `subscribe()`, a write of `true` to `isActive` and every `addEventListener()` of a subclass do nothing. `destroyAllListeners()` is unaffected and stays what it is, a reset after which a control takes listeners again. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add the `coordsTarget` option and the `PanControl2D#coordsTarget` field: the element every pointer position is measured against, through its `getBoundingClientRect()`. It defaults to the `cursorStylesTarget`, and with that to `document.body`. A canvas inside a shadow root belongs here, because the browser retargets `event.target` onto the shadow host there
 - add the `error` event of `Display`, the `Display#onError()` shorthand and the exported `OnDisplayError` constant: a renderer that does not come up reports the reason through it. The event is retained, so a listener attached after the failure — the normal case, since the constructor returns before the renderer is ready — is told about it as well
@@ -30,9 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `'texture'` value to the `source` field of `TextureResource`'s `error` event: a failure behind an image that already loaded — texture creation itself, or any value derived from it, such as an atlas or a tile set — reports `{source: 'texture', id, error}`, naming the resource instead of a url that never failed
 - add the `keys` option and the `PanControl2D#keys` field: the `KeyboardEvent.code` of the keys for up, down, left and right, `['KeyW', 'KeyS', 'KeyA', 'KeyD']` by default — the keys at the WASD position, whatever the keyboard layout labels them
 - add `Stylesheets.retainRule()` and `Stylesheets.releaseRule()`: a rule that several users share, counted per root. It installs like `installRule()` and leaves the stylesheet when the last user gives it back, unless `installRule()` put it there as well. A release without a retain, or in a root the module never wrote to, does nothing
+- add `Stage2D#dispose()` and `Stage2D#isDisposed`: `dispose()` releases the pass node the stage built for itself and the render target behind it — the one thing it creates. The scene, the camera and the projection were handed in and stay the caller's: a `THREE.Scene` has nothing to release, and a camera has no `dispose()`, the one the projection created as little as one assigned to `camera`. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true` and `asPassNode()` throws an error naming the class and the state, while `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()`, a write to `projection` or `camera` and a second `dispose()` do nothing; `scene`, `camera`, `projection`, `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a write to `scene` goes through and has no effect, since the stage no longer builds a node from it. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 
 ### Changed
 
+- `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what they were, and releases the node built for the pair before it — and the render target behind that node — on the next `asPassNode()` after either of them has changed, or in `dispose()` if none comes. The node belongs to the stage and goes with its `dispose()`; a stage added to two `StageRenderer`s gives both the very same node, one that renders its scene once per frame and whose result both of them read
+- a `resize()` whose width or height is not a finite number above 0 leaves the view, the camera and `needsUpdate` as they are — the rule the projections already judge a container by, now also in `Stage2D` and in the pass-node composition of `StageRenderer`. A `needsUpdate` that was set stays set, so the next `updateProjection()` for a container with an area still carries it out
 - `StageRenderer#renderOrderArray` answers from the first access on with the split `renderOrder` — without a prior write to the `renderOrder` setter that means `['*']`. The order stages render in does not change
 - `TextureAtlas#add()` refuses a frame name that is already taken and throws an error naming it; the atlas keeps the frame it registered under that name, and the refused frame is not added. A name belongs to exactly one frame, as it already did in `FrameBasedAnimations#add()`
 - an animation built from a `TextureAtlas` takes the frames carrying a string name, in the order a numeric collation of those names puts them: `walk.2` runs before `walk.10`, so a sequence numbered without padding plays as it reads. Names that collation ranks equal — `walk.01` beside `walk.1` — keep the order the atlas registered them in. Frames registered under a symbol stay out — a symbol has no place in an ordered sequence, and an atlas that holds one can be turned into an animation as a whole
@@ -123,8 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VOBufferPool#capacity` is a getter over a private field, and `VertexObjectDescriptor#voPrototype` an accessor — neither stands as an own property on the instance, and `capacity` is written only through the pool that owns it
 - `TextureResource` checks the response of an `atlasUrl` fetch against the shape of a texture packer json, the same way `TextureAtlasLoader` already does, before it reads it: a 200 response that is none, or one that names no image and gives no `overrideImageUrl` to fall back on, is reported through the `error` event with `source: 'atlas'` instead of being read
 - `TextureAtlasLoader#loadAsync()` rejects when `TexturePackerJson.parse()` throws, instead of leaving its promise pending forever — the throw happens inside the `load` event of the image, a path the promise otherwise never hears from
-- `Stage2D` creates its camera on the first `resize()` whose width and height are both above 0 and for which the projection's specs give a view with an area. Until then `camera` is `undefined`, `renderTo()` draws nothing and `asPassNode()` throws; a `resize()` to a width or a height of 0 keeps the camera, `width` and `height` the stage has, so `OnStageResize` never carries `NaN`
-- a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is 0, or while a `Stage2D` it composes has no camera
+- `Stage2D` creates its camera on the first `resize()` whose width and height are both finite numbers above 0 and for which the projection's specs give a view with an area. Until then `camera` is `undefined`, `renderTo()` draws nothing and `asPassNode()` throws; a `resize()` whose width or height is not a finite number above 0 keeps the camera, `width` and `height` the stage has, so `OnStageResize` never carries `NaN`
+- a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is not a finite number above 0, or while a `Stage2D` it composes has no camera
 - `fitIntoRectangle()` gives a 0×0 view for `contain` and `cover` when the rectangle has a width or a height of 0; `minPixelZoom` and `maxPixelZoom` do not apply to it
 - `OrthographicProjection` and `ParallaxProjection` built without specs start from `{fit: 'fill'}`: the view is the container, one view unit per container pixel. Specs handed in stay the caller's object
 - `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
@@ -1449,8 +1452,8 @@ pattern of a provider built without arguments is `[[]]`: one row, no column.
 #### A `Stage2D` has a camera after the first `resize()` with an area
 
 `new Stage2D(projection)` creates no camera. The projection creates one on the first `resize()`
-whose width and height are both above 0 and for which its specs give a view with an area; a
-`StageRenderer` with a host does that when the display reports its size. Code that reads
+whose width and height are both finite numbers above 0 and for which its specs give a view with
+an area; a `StageRenderer` with a host does that when the display reports its size. Code that reads
 `stage.camera` right after construction, or calls `asPassNode()` before that `resize()`, finds
 `undefined` and a throw.
 
@@ -1594,6 +1597,31 @@ deps.update({centerX: 1});
 ```ts
 deps.update({centerX: 1, centerY: deps.value('centerY')});
 ```
+
+#### The node from `Stage2D#asPassNode()` belongs to the stage
+
+`Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what they
+were, and the stage releases it — with the render target behind it — when it builds a new one, or in
+`dispose()`. Code that released the node itself after use now releases a node the stage keeps and
+hands out again on the next call.
+
+**Before**
+
+```ts
+const node = stage.asPassNode(renderer) as PassNode;
+// … compose the node into a pipeline, render …
+node.dispose(); // the caller built it by asking, the caller released it
+```
+
+**After**
+
+```ts
+const node = stage.asPassNode(renderer);
+// … compose the node into a pipeline, render …
+stage.dispose(); // the stage built the node, the stage releases it
+```
+
+A stage that a `StageRenderer` holds is taken out of it with `remove()` before it is disposed.
 
 ## [0.21.2] - 2026-06-19
 

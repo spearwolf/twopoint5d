@@ -11,6 +11,7 @@ import {
   type StageAddedProps,
   type StageRemovedProps,
 } from '../events.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
@@ -510,11 +511,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #renderPipelineComposed(renderer: WebGPURenderer): void {
     // the stages take their camera from the first resize() with an area whose specs give a view, and
-    // a Stage2D has no pass node to give before that: while this renderer is 0×0, or a Stage2D of
-    // the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
+    // a Stage2D has no pass node to give before that: while this renderer has no area, or a Stage2D
+    // of the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
     // expects one pass per stage, so no stage is left out, and the output node stays dirty until the
     // first frame in which every Stage2D has a camera.
-    if (this.width === 0 || this.height === 0) return;
+    if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return;
     if (this.orderedStages.some(({stage}) => isStage2DWithoutCamera(stage))) return;
 
     for (const stageItem of this.orderedStages) {
@@ -694,7 +695,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     const renderOrder = this.renderOrderArray;
 
-    if (renderOrder.length === 0 || (renderOrder.length === 1 && (renderOrder[0] === '' || renderOrder[0] === '*'))) {
+    if (renderOrder.length === 0 || (renderOrder.length === 1 && renderOrder[0] === '*')) {
       return this.stages;
     }
 

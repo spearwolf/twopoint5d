@@ -121,6 +121,73 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses[0].camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
   });
 
+  it('Mode D: a rebuild without a camera change keeps the pass node and its render target', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
+    sr.pipeline = new RenderPipeline(display.renderer);
+
+    let buildCalls = 0;
+    let lastPasses;
+    sr.buildOutputNode = (passes) => {
+      buildCalls += 1;
+      lastPasses = passes;
+      return passes[0];
+    };
+
+    await display.start();
+    await display.nextFrame();
+    await display.nextFrame();
+
+    expect(buildCalls).to.equal(1);
+    const passNode = lastPasses[0];
+    const renderTarget = passNode.renderTarget;
+
+    sr.invalidateOutputNode();
+    await display.nextFrame();
+
+    expect(buildCalls, 'the output node is composed again').to.equal(2);
+    expect(lastPasses[0], 'the same scene through the same camera is the same pass node').to.equal(passNode);
+    expect(lastPasses[0].renderTarget, 'and so no second render target was allocated').to.equal(renderTarget);
+  });
+
+  it('stage.dispose() releases the render target of its pass node and closes the stage', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
+    const pipeline = new RenderPipeline(display.renderer);
+    sr.pipeline = pipeline;
+    sr.buildOutputNode = (passes) => passes[0];
+
+    await display.start();
+    await display.nextFrame();
+
+    const renderTarget = stage.asPassNode(display.renderer).renderTarget;
+    let disposeCalls = 0;
+    const origDispose = renderTarget.dispose.bind(renderTarget);
+    renderTarget.dispose = (...a) => {
+      disposeCalls += 1;
+      return origDispose(...a);
+    };
+
+    // the renderer composed the pass node into its output and is driven by the display: it lets go
+    // of the stage before the stage gives the node up, so no frame reaches a released render target
+    sr.dispose();
+    stage.dispose();
+
+    expect(disposeCalls, 'the stage gives up the render target it allocated').to.equal(1);
+    expect(() => stage.asPassNode(display.renderer), 'and builds no further pass node').to.throw();
+
+    // the pipeline was handed to the renderer and belongs to this test
+    pipeline.dispose();
+  });
+
   it('Mode C: a replaced pipeline takes over the output', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);

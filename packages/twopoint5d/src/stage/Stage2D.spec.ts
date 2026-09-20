@@ -1,10 +1,21 @@
-import {on} from '@spearwolf/eventize';
-import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
-import {describe, expect, it, vi} from 'vitest';
-import {OnStageAfterCameraChanged, OnStageResize, type StageResizeProps} from '../events.js';
+import {emit, on} from '@spearwolf/eventize';
+import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
+import {createSandbox} from 'sinon';
+import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, type WebGPURenderer} from 'three/webgpu';
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {
+  OnStageAfterCameraChanged,
+  OnStageFirstFrame,
+  OnStageResize,
+  OnStageUpdateFrame,
+  type StageResizeProps,
+} from '../events.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
+
+// asPassNode() does not read the renderer it is handed, and no test here has a real one
+const noRenderer = {} as WebGPURenderer;
 
 describe('Stage2D', () => {
   it('has a scene by default', () => {
@@ -89,6 +100,11 @@ describe('Stage2D', () => {
       [0, 600],
       [800, 0],
       [0, 0],
+      [-1, 600],
+      [800, -1],
+      [NaN, 600],
+      [800, NaN],
+      [Infinity, 600],
     ] as const) {
       stage.resize(w, h);
       expect(stage.camera, `camera after resize(${w}, ${h})`).toBe(camera);
@@ -258,6 +274,200 @@ describe('Stage2D', () => {
       expect(renderer.render).toHaveBeenCalledTimes(1);
       expect(renderer.render).toHaveBeenCalledWith(stage.scene, stage.camera);
     });
+  });
+
+  describe('asPassNode (IPassProvider)', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    const makeStage = () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(320, 200);
+      return stage;
+    };
+
+    it('gives the same node back while scene and camera stay', () => {
+      const stage = makeStage();
+
+      const first = stage.asPassNode(noRenderer);
+
+      expect(stage.asPassNode(noRenderer)).toBe(first);
+    });
+
+    it('builds a new node for a new camera and releases the one before', () => {
+      const stage = makeStage();
+      const first = stage.asPassNode(noRenderer) as PassNode;
+      const firstDispose = sandbox.spy(first, 'dispose');
+
+      stage.camera = new PerspectiveCamera();
+      const second = stage.asPassNode(noRenderer);
+
+      expect(second, 'a camera of its own needs a node of its own').not.toBe(first);
+      expect(firstDispose.calledOnce, 'the node of the camera before is released').toBe(true);
+    });
+
+    it('builds a new node for a new scene and releases the one before', () => {
+      const stage = makeStage();
+      const first = stage.asPassNode(noRenderer) as PassNode;
+      const firstDispose = sandbox.spy(first, 'dispose');
+
+      stage.scene = new Scene();
+      const second = stage.asPassNode(noRenderer);
+
+      expect(second, 'another scene needs a node of its own').not.toBe(first);
+      expect(firstDispose.calledOnce, 'the node of the scene before is released').toBe(true);
+    });
+  });
+
+  describe('dispose()', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    const makeStage = () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(320, 200);
+      return stage;
+    };
+
+    // (a) a resource the instance built itself is released exactly once
+    it('disposes the pass node it built itself', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const passNodeDispose = sandbox.spy(passNode, 'dispose');
+
+      stage.dispose();
+
+      expect(passNodeDispose.calledOnce).toBe(true);
+    });
+
+    // (b) a resource handed in belongs to the caller and is not touched
+    it('does NOT touch a scene that was handed in', () => {
+      const scene = new Scene();
+      const child = new Object3D();
+      scene.add(child);
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}), scene);
+
+      stage.dispose();
+
+      expect(stage.scene, 'the scene is still the one that was handed in').toBe(scene);
+      expect(scene.children, 'and it still holds what the caller put in it').toEqual([child]);
+    });
+
+    // (c) every public member behaves after dispose() as its TSDoc says
+    it('behaves as documented after dispose()', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(320, 200);
+      stage.name = 'the stage';
+      const {scene, camera} = stage;
+
+      stage.dispose();
+
+      expect(stage.isDisposed).toBe(true);
+      expect(() => stage.asPassNode(noRenderer), 'asPassNode() claims a node it can no longer build').toThrow(
+        /has been disposed/,
+      );
+
+      const renderer = {render: vi.fn()};
+      expect(() => {
+        stage.renderTo(renderer as any);
+        stage.updateFrame(1, 0.016, 1);
+        stage.resize(800, 600);
+        stage.updateProjection(true);
+        stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+        stage.camera = new PerspectiveCamera();
+        stage.name = 'renamed';
+        stage.needsUpdate = true;
+        stage.isFirstFrame = false;
+      }).not.toThrow();
+
+      expect(renderer.render, 'a disposed stage draws nothing').not.toHaveBeenCalled();
+      expect(stage.scene, 'the scene keeps its value').toBe(scene);
+      expect(stage.camera, 'and so does the camera').toBe(camera);
+      expect(stage.projection, 'a write to projection finds nothing to drive').toBe(projection);
+      expect([stage.width, stage.height], 'the size stays where it was').toEqual([640, 400]);
+      expect(stage.name, 'name writes through to scene.name, it just drives nothing').toBe('renamed');
+      expect(stage.needsUpdate, 'and so does needsUpdate').toBe(true);
+      expect(stage.isFirstFrame, 'and so does isFirstFrame').toBe(false);
+      expect([stage.containerWidth, stage.containerHeight], 'the container size stays where it was').toEqual([320, 200]);
+    });
+
+    // (d) the second call throws nothing and releases nothing a second time
+    it('is safe to call twice', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const passNodeDispose = sandbox.spy(passNode, 'dispose');
+
+      expect(() => {
+        stage.dispose();
+        stage.dispose();
+      }).not.toThrow();
+
+      expect(passNodeDispose.calledOnce).toBe(true);
+    });
+
+    // (e) no signal or effect outlives the instance
+    it('does not leak signals or effects', () => {
+      const baselineSignals = getSignalsCount();
+      const baselineEffects = getEffectsCount();
+
+      const stage = makeStage();
+
+      // this class works without signals: the counters stand still over its whole life, and this
+      // line is what says so out loud instead of leaving it to the reader
+      expect(getSignalsCount(), 'a live stage creates no signal').toBe(baselineSignals);
+      expect(getEffectsCount(), 'and no effect').toBe(baselineEffects);
+
+      stage.dispose();
+
+      expect(getSignalsCount()).toBe(baselineSignals);
+      expect(getEffectsCount()).toBe(baselineEffects);
+    });
+
+    it('sends a dispose event and stops listening afterwards', () => {
+      const stage = makeStage();
+      const disposed = vi.fn();
+      const updated = vi.fn();
+      on(stage, 'dispose', disposed);
+      on(stage, OnStageUpdateFrame, updated);
+
+      stage.dispose();
+
+      expect(disposed, 'the event goes out while the listeners are still attached').toHaveBeenCalledTimes(1);
+      expect(disposed).toHaveBeenCalledWith(stage);
+
+      // straight into the emitter, past the guard in updateFrame(): the question here is whether
+      // anyone is still subscribed, not whether the stage would emit
+      emit(stage, OnStageUpdateFrame, {stage, now: 1, deltaTime: 0.016, frameNo: 1});
+
+      expect(updated, 'no event follows the dispose').not.toHaveBeenCalled();
+    });
+
+    it('lets go of the retained first-frame props', () => {
+      const stage = makeStage();
+      stage.updateFrame(1, 0.016, 1);
+
+      const beforeDispose = vi.fn();
+      on(stage, OnStageFirstFrame, beforeDispose);
+      expect(beforeDispose, 'a late subscriber is told about the first frame that was').toHaveBeenCalledTimes(1);
+
+      stage.dispose();
+
+      // the retained props carry `stage: this`, so a value still held here would keep the stage
+      // itself reachable through the emitter
+      const afterDispose = vi.fn();
+      on(stage, OnStageFirstFrame, afterDispose);
+
+      expect(afterDispose, 'nothing is retained for a subscriber that comes after').not.toHaveBeenCalled();
+    });
+
+    // (f) has no subject here: this stage takes no slot from a pool and no tile from a factory.
   });
 
   it('does not expose the removed clearColor / clearAlpha / autoClear properties', () => {

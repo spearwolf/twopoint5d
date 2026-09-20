@@ -288,8 +288,8 @@ sr.buildOutputNode = ([scenePass]) => {
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
 after a stage announced a new camera through `OnStageAfterCameraChanged`
 (every `Stage2D` does), or after `invalidateOutputNode()`. While the renderer
-is 0×0, or while a `Stage2D` it composes has no camera yet, the composed mode
-draws nothing.
+has no area, or while a `Stage2D` it composes has no camera yet, the composed
+mode draws nothing.
 
 ### Shortcut: `RootRenderPipeline` — additive composition out of the box
 
@@ -383,6 +383,7 @@ To make it work inside a parent pipeline's `buildOutputNode`, also implement
 ```ts
 import type {IPassProvider} from '@spearwolf/twopoint5d';
 import {pass} from 'three/tsl';
+import type {PassNode} from 'three/webgpu';
 
 class MyStage implements IStage, IRenderable, IPassProvider {
   name = 'my';
@@ -390,7 +391,17 @@ class MyStage implements IStage, IRenderable, IPassProvider {
   updateFrame(now: number, dt: number, frameNo: number) { /* … as above … */ }
   renderTo(renderer: WebGPURenderer) { /* … as above … */ }
 
-  asPassNode(renderer: WebGPURenderer) { return pass(myScene, myCamera); }
+  // the node owns a render target: build it once and keep it, as long as scene and camera stand
+  #passNode?: PassNode;
+
+  asPassNode(renderer: WebGPURenderer) {
+    return (this.#passNode ??= pass(myScene, myCamera));
+  }
+
+  dispose() {
+    this.#passNode?.dispose();
+    this.#passNode = undefined;
+  }
 }
 ```
 
@@ -447,10 +458,19 @@ What this layer does on top of the general rules in
   write to `pipeline` falls through.
 - `remove(stage)` clears both sides of the relation: a removed child `StageRenderer`
   answers `undefined` as its `parent` and gets its `OnRemoveFromParent`.
+- `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what
+  they were, and releases the node built for the pair before it on the next `asPassNode()` after
+  either of them has changed.
+  `Stage2D.dispose()` releases that node and the render target behind it, and nothing else: the
+  scene, the camera and the projection were handed in and stay the caller's. Afterwards
+  `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
+  write to `projection` or `camera` do nothing. Take the stage out of every `StageRenderer` that
+  holds it first — see the pitfall *Disposing a stage a renderer still holds* below.
 - `Canvas2DStage.dispose()` releases the sprite material, both textures that ever sat behind it —
-  a texture assigned to `texture` from outside as much as one the stage built — and its
-  `StageRenderer`, and leaves the `WebGPURenderer` and a canvas handed to the constructor alone.
-  The sprite geometry is shared by every `THREE.Sprite` of the module and stays.
+  a texture assigned to `texture` from outside as much as one the stage built — its
+  `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
+  canvas handed to the constructor alone. The sprite geometry is shared by every `THREE.Sprite`
+  of the module and stays.
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
   handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
@@ -463,11 +483,11 @@ What this layer does on top of the general rules in
 - **Double frame loop**: passing `display` to the constructor *and* calling
   `renderTo` from your own handler renders every frame twice. Pick one.
 - **Stage with no camera yet**: `Stage2D#renderTo` is a no-op until the
-  first `resize()` with a width and a height above 0, for which the
-  projection's specs give a view with an area, creates the camera (or
-  you assign your own). `Stage2D#asPassNode` throws in that state, and a
-  `StageRenderer` composing pass nodes draws nothing while it is 0×0 or
-  while one of its `Stage2D`s has no camera. Until then its `width` and
+  first `resize()` with a width and a height that are finite numbers above
+  0, for which the projection's specs give a view with an area, creates the
+  camera (or you assign your own). `Stage2D#asPassNode` throws in that
+  state, and a `StageRenderer` composing pass nodes draws nothing while it
+  has no area or while one of its `Stage2D`s has no camera. Until then its `width` and
   `height` are 0, and assigning another `projection` — or `undefined` — puts
   them back to 0 with the camera until the new projection gives a view.
 - **Non-unique stage names + `renderOrder`**: stages sharing a name that
@@ -485,6 +505,15 @@ What this layer does on top of the general rules in
   whoever assigned them. Dispose the previous instance yourself when you replace
   one, and dispose the current one when you dispose the renderer; the renderer
   only releases what it owns — its internal RTs.
+- **Disposing a stage a renderer still holds**: take a `Stage2D` out of every
+  `StageRenderer` that has it — `remove(stage)` — before you call
+  `stage.dispose()`. A renderer that still lists a disposed stage keeps its
+  released pass node in the composed output node, and the backend silently
+  allocates a render target for it again on the next frame; the next rebuild of
+  that node — `add()`, `remove()`, a `renderOrder` write,
+  `invalidateOutputNode()` — asks the stage for a node again and gets the throw,
+  in the middle of the frame loop. `StageRenderer.dispose()` removes every stage
+  it holds, so disposing the renderer first is the shorter way there.
 - **Mixed pipeline / plain writers to the canvas**: don't mix a
   `pipeline.render()` and a plain `renderer.render(scene, camera)` on the
   same canvas in the same frame. Compose everything via one outer pipeline

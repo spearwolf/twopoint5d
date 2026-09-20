@@ -172,6 +172,15 @@ describe('Canvas2DStage', () => {
       expect(stageRendererDispose.calledOnce, 'the stage renderer').toBe(true);
     });
 
+    test('disposes the Stage2D its constructor built', () => {
+      const stage = makeStage();
+      const innerStageDispose = sandbox.spy(stage.stage, 'dispose');
+
+      stage.dispose();
+
+      expect(innerStageDispose.calledOnce).toBe(true);
+    });
+
     // (e) has no subject here: no class in this module creates a signal or an effect.
 
     // (f) has no subject here: this stage takes no slot from a pool and no tile from a factory.
