@@ -213,4 +213,38 @@ describe('map2d — visibility helper nodes', function () {
       expect(after[i], `helper node ${i} survived`).to.equal(before[i]);
     }
   });
+
+  it('dispose() takes the whole set down and releases what it built', async function () {
+    const {map2d, visibility} = makeMap(camera);
+    scene.add(map2d);
+
+    const helpers = new CameraBasedVisibilityHelpers(visibility);
+    helpers.add(map2d);
+    helpers.show = true;
+
+    await frame(map2d, helpers);
+    await frame(map2d, helpers);
+
+    const before = helperNodes(scene, map2d);
+    expect(before.length, 'helper nodes after the warm-up frames').to.be.greaterThan(0);
+
+    // three.js announces a release through the dispose event of the geometry itself, which is
+    // what a renderer listens to before it drops the buffers behind it
+    const withGeometry = before.filter((node) => node.geometry != null);
+    const released = new Set();
+    for (const node of withGeometry) {
+      node.geometry.addEventListener('dispose', () => released.add(node.geometry));
+    }
+
+    helpers.dispose();
+
+    expect(helperNodes(scene, map2d).length, 'no helper node is left in the scene graph').to.equal(0);
+    expect(released.size, 'every geometry of the set was released').to.equal(withGeometry.length);
+
+    // the map goes on without them, and nothing builds a second set
+    map2d.centerX = 1024;
+    await frame(map2d, helpers);
+
+    expect(helperNodes(scene, map2d).length, 'and none came back').to.equal(0);
+  });
 });

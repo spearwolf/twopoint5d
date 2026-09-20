@@ -192,6 +192,19 @@ export interface IMap2DVisibilitorHelpers {
   /** Brings the helper nodes up to the state the visibilitor currently describes. */
   update(): void;
 
+  /**
+   * Takes the helper nodes down for good and releases what they hold. The nodes of a helper
+   * set are geometry and material on the gpu, and they hang on nothing but this instance —
+   * whoever drops it without this call leaves them behind.
+   *
+   * It may be called any number of times. Afterwards the set stays down: `show`, {@link add},
+   * {@link remove} and {@link update} do nothing.
+   *
+   * Whatever was handed in — the scene of {@link add} and the visibilitor the set reads — is
+   * the caller's and is left as it is.
+   */
+  dispose(): void;
+
   /** Whether the helper nodes are built at all. */
   show: boolean;
 }

@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `keys` option and the `PanControl2D#keys` field: the `KeyboardEvent.code` of the keys for up, down, left and right, `['KeyW', 'KeyS', 'KeyA', 'KeyD']` by default — the keys at the WASD position, whatever the keyboard layout labels them
 - add `Stylesheets.retainRule()` and `Stylesheets.releaseRule()`: a rule that several users share, counted per root. It installs like `installRule()` and leaves the stylesheet when the last user gives it back, unless `installRule()` put it there as well. A release without a retain, or in a root the module never wrote to, does nothing
 - add `Stage2D#dispose()` and `Stage2D#isDisposed`: `dispose()` releases the pass node the stage built for itself and the render target behind it — the one thing it creates. The scene, the camera and the projection were handed in and stay the caller's: a `THREE.Scene` has nothing to release, and a camera has no `dispose()`, the one the projection created as little as one assigned to `camera`. A `dispose` event goes out to every subscriber before the stage stops listening. Afterwards `isDisposed` is `true` and `asPassNode()` throws an error naming the class and the state, while `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()`, a write to `projection` or `camera` and a second `dispose()` do nothing; `scene`, `camera`, `projection`, `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a write to `scene` goes through and has no effect, since the stage no longer builds a node from it. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- add `dispose()` to `IMap2DVisibilitorHelpers`, and `dispose()` plus `isDisposed` to both implementations, `CameraBasedVisibilityHelpers` and `RectangularVisibilityAreaHelpers`: `dispose()` takes the helper set out of the scene graph and releases the geometry and the material of every node it built — the only things a helper set owns. The scene it was handed, the visibility and the visibility area it reads belong to the caller and are left as they are. Afterwards `isDisposed` is `true`, `show` answers `false`, and a write to `show`, `add()`, `remove()`, `update()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 
 ### Changed
 
@@ -246,6 +247,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
 
 ### Migration Guide
+
+#### `IMap2DVisibilitorHelpers` requires a `dispose()`
+
+`dispose()` is a member of the interface, so an implementation of your own has to bring one. It is the call that takes the helper nodes out of the scene graph and releases what they hold; an implementation that owns nothing writes an empty body — whoever owns nothing has nothing to take down, and `show` stays what the caller writes. Both implementations this package ships bring it along, and a caller of theirs changes nothing.
+
+**Before**
+
+```ts
+class MyHelpers implements IMap2DVisibilitorHelpers {
+  show = false;
+  add(scene: Object3D): void {}
+  remove(scene: Object3D): void {}
+  update(): void {}
+}
+```
+
+**After**
+
+```ts
+class MyHelpers implements IMap2DVisibilitorHelpers {
+  show = false;
+  add(scene: Object3D): void {}
+  remove(scene: Object3D): void {}
+  update(): void {}
+  dispose(): void {}
+}
+```
 
 #### A tile grid of 0 is refused
 

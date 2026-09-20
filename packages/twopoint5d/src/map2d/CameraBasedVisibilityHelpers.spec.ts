@@ -59,7 +59,6 @@ function spyOnReleases(scene: Object3D) {
     const geometry = (node as unknown as {geometry?: BufferGeometry}).geometry;
     const material = (node as unknown as {material?: Material}).material;
     return {
-      type: node.type,
       geometry: geometry ? vi.spyOn(geometry, 'dispose') : undefined,
       material: material ? vi.spyOn(material, 'dispose') : undefined,
     };
@@ -322,5 +321,103 @@ describe('CameraBasedVisibilityHelpers', () => {
       expect(node.geometry!).toHaveBeenCalledTimes(1);
       expect(node.material!).toHaveBeenCalledTimes(1);
     }
+  });
+
+  describe('dispose()', () => {
+    test('releases the geometry and the material of every node it built', () => {
+      const scene = new Object3D();
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      helpers.add(scene);
+      helpers.show = true;
+
+      const released = spyOnReleases(scene);
+      expect(released, 'the set stands before it is taken down').not.toHaveLength(0);
+
+      helpers.dispose();
+
+      expect(scene.children).toHaveLength(0);
+      for (const node of released) {
+        expect(node.geometry).toBeDefined();
+        expect(node.material).toBeDefined();
+        expect(node.geometry!).toHaveBeenCalledTimes(1);
+        expect(node.material!).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    test('leaves the scene it was handed and the visibility it reads alone', () => {
+      const scene = new Object3D();
+      const visibility = makeVisibility();
+      const helpers = new CameraBasedVisibilityHelpers(visibility);
+
+      helpers.add(scene);
+      helpers.show = true;
+
+      // a node this set never built, in the scene it was handed
+      const ownNode = new Object3D();
+      scene.add(ownNode);
+
+      helpers.dispose();
+
+      expect(scene.children, 'only the node of the caller is left').toEqual([ownNode]);
+
+      // the scene is still a scene: it takes another node and gives it up again
+      const oneMore = new Object3D();
+      scene.add(oneMore);
+      expect(scene.children).toEqual([ownNode, oneMore]);
+      oneMore.removeFromParent();
+
+      expect(helpers.cameraBasedVisibility, 'the visibility was handed in and stays').toBe(visibility);
+      expect(visibility.pointOnPlane, 'and nothing in it was cleared').toEqual(new Vector3(1, 0, 1));
+    });
+
+    test('stays down after dispose()', () => {
+      const scene = new Object3D();
+      const visibility = makeVisibility();
+      const helpers = new CameraBasedVisibilityHelpers(visibility);
+
+      helpers.add(scene);
+      helpers.show = true;
+
+      helpers.dispose();
+
+      expect(helpers.isDisposed).toBe(true);
+      expect(helpers.show).toBe(false);
+
+      const otherScene = new Object3D();
+
+      expect(() => {
+        helpers.show = true;
+        helpers.add(otherScene);
+        helpers.remove(scene);
+        (visibility as unknown as {serial: number}).serial += 1;
+        helpers.update();
+      }).not.toThrow();
+
+      expect(helpers.show, 'a write to show does nothing').toBe(false);
+      expect(scene.children, 'the scene it was handed stays empty').toHaveLength(0);
+      expect(otherScene.children, 'and no set is built anywhere else').toHaveLength(0);
+    });
+
+    test('a second dispose() releases nothing a second time', () => {
+      const scene = new Object3D();
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      helpers.add(scene);
+      helpers.show = true;
+
+      const released = spyOnReleases(scene);
+      expect(released, 'the set stands before it is taken down').not.toHaveLength(0);
+
+      expect(() => {
+        helpers.dispose();
+        helpers.dispose();
+      }).not.toThrow();
+
+      for (const node of released) {
+        expect(node.geometry!).toHaveBeenCalledTimes(1);
+        expect(node.material!).toHaveBeenCalledTimes(1);
+      }
+    });
   });
 });

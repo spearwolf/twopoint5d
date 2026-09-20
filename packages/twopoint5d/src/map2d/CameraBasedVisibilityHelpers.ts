@@ -33,6 +33,7 @@ class PointHelper extends Mesh<BoxGeometry, MeshBasicMaterial> {
 
 export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   #show = false;
+  #disposed = false;
 
   /**
    * How many frustum box helpers are built for tiles no probe ray met directly. The frustum
@@ -90,11 +91,23 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
   constructor(public readonly cameraBasedVisibility: CameraBasedVisibility) {}
 
+  /** `true` once {@link dispose} has run. */
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
+  /**
+   * Whether the helper nodes are built at all. Switching it off takes the current set down and
+   * releases every node in it; switching it on builds the set again.
+   *
+   * On a disposed set this answers `false` and a write to it does nothing.
+   */
   get show() {
     return this.#show;
   }
 
   set show(show: boolean) {
+    if (this.#disposed) return;
     if (this.#show === show) return;
     this.#show = show;
     if (show) {
@@ -246,11 +259,11 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.#builtSerial = -1;
   }
 
-  private makePointOnPlane(point?: Vector2): Vector3 {
+  private makePointOnPlane(point: Vector2): Vector3 {
     return new Vector3(
-      this.cameraBasedVisibility.map2dTileCoords.xOffset + (point?.x ?? 0),
+      this.cameraBasedVisibility.map2dTileCoords.xOffset + point.x,
       0,
-      this.cameraBasedVisibility.map2dTileCoords.yOffset + (point?.y ?? 0),
+      this.cameraBasedVisibility.map2dTileCoords.yOffset + point.y,
     ).applyMatrix4(this.cameraBasedVisibility.matrixWorld);
   }
 
@@ -258,8 +271,11 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    * Names the scene the helper nodes go into. The scene named here is the map node: the tile
    * boxes are in its local space and go into it, while the plane, the points and the frustum
    * boxes are in world space and go into the root above it.
+   *
+   * On a disposed set this does nothing: no scene is taken, and none is built for.
    */
   add(scene: Object3D): void {
+    if (this.#disposed) return;
     if (this.#helpers.scene === scene) return;
     this.#helpers.scene = scene;
     this.releasePools();
@@ -274,8 +290,11 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    * The scene stays named and {@link show} stays on, so this takes the current nodes down and
    * not the set as such: the next {@link update} builds the same set again, out of fresh nodes.
    * Whoever wants it to stay down turns {@link show} off.
+   *
+   * On a disposed set this does nothing — its nodes are already down and released.
    */
   remove(scene: Object3D): void {
+    if (this.#disposed) return;
     if (this.#helpers.scene !== scene) return;
     this.#helpers.remove();
     this.releasePools();
@@ -286,8 +305,11 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    * A pass finds nothing to do as long as the visibility hands back the same tile set and none
    * of the public fields of this class has moved since the last build. A value written into one
    * of those fields is in the picture with the next pass.
+   *
+   * On a disposed set this does nothing: no pass runs and no node is built.
    */
   update(): void {
+    if (this.#disposed) return;
     if (!this.#show) return;
     // the manager refuses a node it cannot place, so nothing is built until there is a scene
     if (this.#helpers.scene == null) return;
@@ -309,5 +331,26 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
     this.#builtSerial = this.cameraBasedVisibility.serial;
     this.createHelpers();
+  }
+
+  /**
+   * Takes the whole set down for good and gives up the scene it was handed. The manager
+   * disposes every node it takes down, so geometry and material of the helper nodes go with
+   * this call; the visibility this instance reads was handed in and is left as it is.
+   *
+   * Afterwards {@link isDisposed} is `true` and {@link show} answers `false`, while a write to
+   * `show`, {@link add}, {@link remove}, {@link update} and a second {@link dispose} do
+   * nothing. The public fields of this class still take values, and none of them has an effect
+   * any more.
+   */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    // written directly and not through the setter: the setter would start the same work a
+    // second time, and behind the guard above it would do nothing at all
+    this.#show = false;
+    // the manager takes every node out of the scene and the root above it and disposes it
+    this.#helpers.scene = undefined;
+    this.releasePools();
   }
 }
