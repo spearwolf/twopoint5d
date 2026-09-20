@@ -32,7 +32,7 @@ if (!(source instanceof VOBufferPool)) {
 ```
 
 ```ts
-if (this.#ownedPools.has(this.pool)) {
+if (this.#attachments.owns(this.pool)) {
   this.pool.dispose();
 }
 ```

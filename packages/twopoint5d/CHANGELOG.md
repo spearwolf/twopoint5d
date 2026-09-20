@@ -159,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameBasedAnimations#add()` refuses an animation that carries no frames — an atlas query that matches none, an empty tile range, an empty frame list — and one whose duration is not a finite number at or above zero. Either of them put a number into the data texture that no shader can play with: a frame count of 0, or a frame time that is negative, infinite or `NaN`. A duration of zero stays what it always was, a still image. Each error names the case and the animation it belongs to, and neither of them spends a name of the auto counter
 - `new VertexObjectDescriptor()` copies the description it is handed and answers from that copy, so a change to the original object no longer reaches the descriptor and cannot slip past the checks the constructor ran. `VertexObjectDescriptor#description` is that copy
 - `new VertexObjectDescriptor()` refuses a description whose generated accessor would take a name the `basePrototype` carries — an own property of it, or one inherited from a prototype below `Object.prototype` — and throws an `Error` naming the property and the attribute or `methods` it comes from. Such an accessor shadows the property of the prototype, which is the collision a name shared with `methods` already threw on. A name that only `Object.prototype` carries, `toString` or `valueOf`, is unaffected: a vertex object covers those whether it has a `basePrototype` or not
+- `InstancedVOBufferGeometry#detachInstancedPool()` answers with `VertexObjectPool<unknown> | undefined` instead of `VOBufferPool | undefined`, and `extraInstancedPools` carries `VertexObjectPool<unknown>` — `attachInstancedPool()` stores nothing else. `createVO()` and the rest of the `VertexObjectPool` surface are reachable on the way back without a cast; a caller who wants the `VOType` they attached under still writes one, because the name a pool is filed under carries no type
+- `extraInstancedPools`, `extraInstancedBuffers` and `extraInstancedBufferSerials` are `ReadonlyMap`s. They are three views of the routes the geometry holds, so a name that answers in one of them answers in all three; reading them is what it always was
 
 ### Deprecated
 
@@ -1895,6 +1897,47 @@ const descriptor = new VertexObjectDescriptor({
 const streaming = new VertexObjectDescriptor(
   cloneVertexObjectDescription(descriptor, {stream: ['pos']}),
 );
+```
+
+#### The extra-instanced maps are read-only
+
+`extraInstancedPools`, `extraInstancedBuffers` and `extraInstancedBufferSerials` are `ReadonlyMap`s over the routes of the geometry. `attachInstancedPool()` and `detachInstancedPool()` are the calls that change what a name reaches: they build and release the `THREE.BufferAttribute`s of the route, count the attachment on the pool and decide whether the pool is disposed — none of which a write into one of the maps ever did.
+
+**Before**
+
+```ts
+geometry.extraInstancedPools.set('extra', extraPool);
+geometry.extraInstancedPools.delete('extra');
+```
+
+**After**
+
+```ts
+geometry.attachInstancedPool('extra', extraPool);
+geometry.detachInstancedPool('extra');
+```
+
+#### `detachInstancedPool()` gives back a `VertexObjectPool`
+
+The return type is `VertexObjectPool<unknown> | undefined` rather than `VOBufferPool | undefined`, which is what `attachInstancedPool()` stores in the first place. `createVO()` and the rest of the typed surface are reachable without a cast.
+
+The `VOType` is not carried along — a name says nothing about the type filed under it — so a caller who wants their own vertex object type back still writes it down, as they do at `attachInstancedPool<VOType>()`.
+
+**Before**
+
+```ts
+const detached = geometry.detachInstancedPool('extra') as VertexObjectPool<unknown> | undefined;
+detached?.createVO();
+```
+
+**After**
+
+```ts
+const detached = geometry.detachInstancedPool('extra');
+detached?.createVO(); // the vertex object is typed `unknown`
+
+const typed = geometry.detachInstancedPool('other') as VertexObjectPool<MyExtraVO> | undefined;
+typed?.createVO()?.setFoo(1);
 ```
 
 ## [0.21.2] - 2026-06-19

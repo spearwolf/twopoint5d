@@ -1,5 +1,6 @@
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
 import type {VOBufferPool} from './VOBufferPool.js';
+import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import type {BufferLike} from './types.js';
 
@@ -39,12 +40,18 @@ type SlotClaim = {
  * Claims stack only as far as the constructor of the geometry lays them down. Every slot name
  * this bookkeeping has ever seen is remembered, and {@link everHeld} lets the geometry refuse a
  * later route that would take one of them.
+ *
+ * Per slot it also knows the array version {@link syncArrays} last synced against, which is what
+ * makes that call cheap for the slots nothing has happened to.
  */
 export class GeometryAttributeSlots {
   readonly #slots: Map<string, SlotClaim[]> = new Map();
 
   /** Every slot name that has been claimed here, including the ones released since. */
   readonly #everHeld = new Set<string>();
+
+  /** The array version of the attribute in a slot, as of the last {@link syncArrays}. */
+  readonly #serials: Map<string, number> = new Map();
 
   /**
    * Note that `route` has put `attr` into the slot `attrName`. A route that already holds
@@ -119,9 +126,47 @@ export class GeometryAttributeSlots {
         geometry.setAttribute(attrName, expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).attr);
         changed.push({attrName});
       }
+
+      // the slot has changed hands; the version syncArrays() compares against belongs to the
+      // attribute that left
+      this.#serials.delete(attrName);
     }
 
     return changed;
+  }
+
+  /**
+   * If the references to the attribute arrays in a {@link VOBufferPool} are swapped,
+   * e.g. via a {@link VOBufferPool#fromBuffersData()} call, then of course the references
+   * to the typed arrays within the `THREE.BufferAttribute` structure must also be changed.
+   */
+  syncArrays(geometry: BufferGeometry): void {
+    for (const attrName in geometry.attributes) {
+      const attr = geometry.attributes[attrName];
+      const bufAttr = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute
+        ? (attr as InterleavedBufferAttribute).data
+        : (attr as BufferAttribute);
+
+      // an attribute this geometry has not synced yet carries no serial, and undefined never
+      // equals a version
+      const version = bufAttr.version;
+      if (this.#serials.get(attrName) === version) continue;
+      this.#serials.set(attrName, version);
+
+      // a slot without a pool holds an attribute copied from a `BufferGeometry` handed to the
+      // constructor, and there is no pool array behind it that could be pointed at
+      const pool = this.poolOf(attrName);
+      if (pool === undefined) continue;
+
+      const poolBufInfo = pool.buffer.bufferAttributes.get(attrName);
+      if (poolBufInfo === undefined) continue;
+
+      const poolBuf = pool.buffer.buffers.get(poolBufInfo.bufferName);
+      // the pool has been disposed, there is no array left to point at
+      if (poolBuf === undefined) continue;
+
+      bufAttr.array = asThreeTypedArray(poolBuf.typedArray!);
+    }
   }
 
   #claim(
