@@ -26,14 +26,38 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animId('walk')).toBe(0);
     });
 
-    test('add animation without name (using Symbol)', () => {
+    test('an animation added without a name gets one it can be found under', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
 
       const id = animations.add(undefined, 0.5, frames);
 
       expect(id).toBe(0);
-      expect(typeof id).toBe('number');
+      expect(animations.hasAnimation('anim_0')).toBe(true);
+      expect(animations.animId('anim_0')).toBe(0);
+    });
+
+    test('a second animation without a name gets the next name of the counter', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      animations.add(undefined, 1.0, frames);
+      const id = animations.add(undefined, 1.0, frames);
+
+      expect(id).toBe(1);
+      expect(animations.animId('anim_0')).toBe(0);
+      expect(animations.animId('anim_1')).toBe(1);
+    });
+
+    test('a name the caller already took is stepped over, not overwritten', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      const taken = animations.add('anim_0', 1.0, frames);
+      const auto = animations.add(undefined, 1.0, frames);
+
+      expect(animations.animId('anim_0')).toBe(taken);
+      expect(animations.animId('anim_1')).toBe(auto);
     });
 
     test('add animation with symbol name', () => {
@@ -361,6 +385,21 @@ describe('FrameBasedAnimations', () => {
   });
 
   describe('buffer size calculation', () => {
+    test('a data texture over the maximum is refused with the numbers that were asked for', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)];
+
+      animations.add('walk', 1.0, frames);
+
+      const maxBefore = FrameBasedAnimations.MaxTextureSize;
+      FrameBasedAnimations.MaxTextureSize = 2;
+      try {
+        expect(() => animations.bakeDataTexture()).toThrow(/3 frame\(s\) in 1 animation\(s\).*4 texels.*maximum of 2/);
+      } finally {
+        FrameBasedAnimations.MaxTextureSize = maxBefore;
+      }
+    });
+
     test('should handle reasonable number of animations', () => {
       const animations = new FrameBasedAnimations();
 

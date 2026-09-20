@@ -80,7 +80,9 @@ const getBufferSize = (animationsMap: AnimationsMap, sizePerTexture = 1, maxText
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
-    throw new Error('TODO too many animation frames - we need better way here to calculate a corresponding buffer size!');
+    throw new Error(
+      `FrameBasedAnimations: ${totalFramesCount} frame(s) in ${anims.length} animation(s) ask for a data texture of ${bufSize} texels, over the maximum of ${maxTextureSize}`,
+    );
   }
 
   return bufSize;
@@ -123,6 +125,8 @@ export class FrameBasedAnimations {
   // NOTE we can not just use animations.keys() here, because we need a consistent name <-> id mapping
   #names: AnimName[] = [];
 
+  #anonymousCounter = 0;
+
   /**
    * Register an animation and return its id.
    *
@@ -136,7 +140,9 @@ export class FrameBasedAnimations {
    * the set to the names it matches.
    *
    * A name is registered once; a second animation under the same name is refused with an
-   * error. Without a name the animation is reachable through the id alone.
+   * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
+   * stepping over every name already taken — so it is reachable through `animId()` like
+   * any other.
    */
   add(
     ...args:
@@ -163,7 +169,7 @@ export class FrameBasedAnimations {
         throw new Error(`name='${name.toString()}' must be unique!`);
       }
     } else {
-      name = Symbol('n/a');
+      name = this.#nextAnonymousName();
     }
 
     let frames: TextureCoords[];
@@ -219,6 +225,16 @@ export class FrameBasedAnimations {
     });
 
     return id;
+  }
+
+  // a name handed out here goes into the same lookup as one the caller picked, so it has to
+  // step over every name that is already taken — the counter alone cannot promise a free one
+  #nextAnonymousName(): string {
+    let name = `anim_${this.#anonymousCounter++}`;
+    while (this.#animations.has(name)) {
+      name = `anim_${this.#anonymousCounter++}`;
+    }
+    return name;
   }
 
   /**

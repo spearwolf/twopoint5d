@@ -29,4 +29,26 @@ describe('TextureImageLoader', () => {
     await expect(promise).rejects.toBe(failure);
     expect(disposeSpy).toHaveBeenCalledOnce();
   });
+
+  test('a load without texture classes reaches the factory with none', async () => {
+    let deliver!: () => void;
+    const imageLoader = {
+      load(_url: string, onLoad: (image: unknown) => void) {
+        deliver = () => onLoad({imgEl: {} as HTMLImageElement, texCoords: new TextureCoords(0, 0, 16, 16)});
+      },
+    } as unknown as PowerOf2ImageLoader;
+
+    let classesSeen: unknown[] | undefined;
+    const textureFactory = {
+      update(_texture: Texture, ...classes: unknown[]) {
+        classesSeen = classes;
+      },
+    } as unknown as TextureFactory;
+
+    const promise = new TextureImageLoader(textureFactory, imageLoader).loadAsync('image.png');
+    deliver();
+
+    await expect(promise).resolves.toMatchObject({texture: expect.any(Texture)});
+    expect(classesSeen).toEqual([]);
+  });
 });

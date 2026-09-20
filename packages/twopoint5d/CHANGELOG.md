@@ -148,6 +148,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `getContentAreaSize()` takes any `Element`
 - every cursor style of `PanControl2D` has a style rule of its own, so controls with different `cursorPanStyle` in one root each show their own cursor, and a write to `cursorPanStyle` affects only the control written to — during a drag as well. A cursor rule is in the stylesheet only while a control shows it: a write to `cursorPanStyle` and `dispose()` give back the rule of the control
 - the protected `InputControlBase#addEventListener()` and `#removeEventListener()` take a typed callback, `((event: E) => void) | EventListenerObject` with `E extends Event`
+- `FrameBasedAnimations#add()` gives an animation added without a name one of its own — `anim_0`, `anim_1`, and so on, stepping over every name already registered. It goes into the same lookup as a name the caller picked, so `hasAnimation()` and `animId()` reach such an animation like any other. A caller who hands out names of that shape themselves meets the usual "must be unique" error when they ask for one the counter has already spent
+- the guard of `FrameBasedAnimations#bakeDataTexture()` against a data texture wider than `FrameBasedAnimations.MaxTextureSize` names the numbers behind the refusal: how many frames in how many animations are registered, how wide the texture they ask for would be, and what the maximum is
+- `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
 
 ### Deprecated
 

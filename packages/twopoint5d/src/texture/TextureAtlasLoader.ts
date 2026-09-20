@@ -36,7 +36,7 @@ export class TextureAtlasLoader {
 
   load(
     url: string,
-    textureClasses: Array<TextureOptionClasses> | undefined,
+    textureClasses: Array<TextureOptionClasses> | null | undefined,
     options: TextureAtlasLoadOptions | undefined,
     onLoadCallback: TextureAtlasLoadCallback,
     onErrorCallback?: TextureAtlasLoadErrorCallback,
@@ -66,7 +66,7 @@ export class TextureAtlasLoader {
 
         this.textureImageLoader.load(
           imageUrl,
-          textureClasses ?? [],
+          textureClasses,
           ({texture, imgEl, texCoords}) => {
             // this callback runs inside the `load` event of the image, a path with no way
             // back into the promise `loadAsync()` wraps around `load()` — a throw here would
@@ -95,7 +95,7 @@ export class TextureAtlasLoader {
 
   loadAsync(
     url: string,
-    textureClasses?: Array<TextureOptionClasses>,
+    textureClasses?: Array<TextureOptionClasses> | null,
     options?: TextureAtlasLoadOptions,
   ): Promise<TextureAtlasData> {
     return new Promise((resolve, reject) => {

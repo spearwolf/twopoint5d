@@ -27,7 +27,7 @@ export class TextureImageLoader {
 
   load(
     url: string,
-    textureClasses: Array<TextureOptionClasses>,
+    textureClasses: Array<TextureOptionClasses> | null | undefined,
     onLoadCallback: TextureImageLoadCallback,
     onErrorCallback?: TextureImageLoadErrorCallback,
   ): void {
@@ -59,7 +59,7 @@ export class TextureImageLoader {
     );
   }
 
-  loadAsync(url: string, textureClasses: Array<TextureOptionClasses>): Promise<TextureImage> {
+  loadAsync(url: string, textureClasses?: Array<TextureOptionClasses> | null): Promise<TextureImage> {
     return new Promise((resolve, reject) => {
       this.load(url, textureClasses, resolve, reject);
     });

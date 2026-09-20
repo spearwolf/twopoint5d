@@ -550,10 +550,10 @@ export class TextureResource {
                 texture = factory.create(image, ...(classes ?? []));
                 texture.name = this.id;
                 // The resource owns the texture before it publishes it: a subscriber that throws
-                // inside the batch, or one that disposes this resource, cannot skip the handover
-                // any more — dispose() releases whatever is owned at that moment. The predecessor
-                // stays alive while it is still the published value and is released only after
-                // the batch, once the successor is on the signal and no reader can reach it
+                // inside the batch, or one that disposes this resource, cannot skip the handover —
+                // dispose() releases whatever is owned at that moment. The predecessor stays alive
+                // while it is still the published value and is released only after the batch, once
+                // the successor is on the signal and no reader can reach it
                 const previous = this.#ownTexture;
                 this.#ownTexture = texture;
                 try {

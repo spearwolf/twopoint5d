@@ -68,7 +68,11 @@ export class TileSetLoader {
     );
   }
 
-  loadAsync(url: string, tileSetOptions: TileSetOptions, textureClasses?: Array<TextureOptionClasses>): Promise<TileSetData> {
+  loadAsync(
+    url: string,
+    tileSetOptions: TileSetOptions,
+    textureClasses?: Array<TextureOptionClasses> | null,
+  ): Promise<TileSetData> {
     return new Promise((resolve, reject) => {
       this.load(url, tileSetOptions, textureClasses, resolve, reject);
     });
