@@ -96,6 +96,7 @@ import {description, showSource, title} from './_animated-billboards.json';
       mesh.update();
     });
 
+    // eslint-disable-next-line no-console
     console.log('BouncingSprites', bouncingSprites);
 
     const blueGroundTexture = await new TextureLoader().loadAsync(assetsUrl('blue-ground-2048x.webp'));
@@ -113,6 +114,7 @@ import {description, showSource, title} from './_animated-billboards.json';
 
     demo.scene.add(plane);
 
+    // eslint-disable-next-line no-console
     console.log('AnimatedSprites', mesh);
   });
 

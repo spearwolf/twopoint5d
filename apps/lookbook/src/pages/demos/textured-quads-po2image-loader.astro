@@ -39,7 +39,8 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
 </style>
 
 <script>
-  import {PowerOf2ImageLoader, TextureCoords} from '@spearwolf/twopoint5d';
+  import type {TextureCoords} from '@spearwolf/twopoint5d';
+  import {PowerOf2ImageLoader} from '@spearwolf/twopoint5d';
   import {DoubleSide, MeshBasicNodeMaterial, NearestFilter, NeutralToneMapping, Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -93,6 +94,7 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
 
   const data = await new PowerOf2ImageLoader().loadAsync(assetsUrl('platform-blau.png'));
 
+  // eslint-disable-next-line no-console
   console.log('loaded power-of-2 image', data);
 
   const texture = new Texture(data.imgEl);
@@ -112,5 +114,6 @@ import {description, showSource, title} from './_textured-quads-po2image-loader.
     demo.scene.add(makeMesh(16, 32, 10, 1, data.texCoords, texture));
   });
 
+  // eslint-disable-next-line no-console
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
 </script>

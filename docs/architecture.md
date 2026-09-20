@@ -51,7 +51,9 @@ the library rebuilds).
 clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:ci → test:browser
 ```
 
-- `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`/`.js`.
+- `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`/`.js`
+  and in the `<script>` blocks of `.astro` files (`eslint-plugin-astro` hands each block to
+  ESLint as a virtual `.ts` file, so the `.ts` rules apply there too).
 - `typecheck` covers the library including its specs, and the lookbook — its `.ts`
   files and its `.astro` pages, via `astro check`.
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/`.

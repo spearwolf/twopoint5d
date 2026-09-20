@@ -43,6 +43,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^3.2.1",
     "globals": "^17.12.0",
     "nx": "23.2.0",
     "playwright": "^1.62.1",

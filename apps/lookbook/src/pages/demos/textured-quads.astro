@@ -43,15 +43,11 @@ import {description, showSource, title} from './_textured-quads.json';
 </style>
 
 <script>
-  import {
-    colorFromTextureByTexCoords,
-    TextureCoords,
-    TextureImageLoader,
-    vertexByInstancePosition,
-    VertexObjects,
-  } from '@spearwolf/twopoint5d';
+  import type {TextureCoords} from '@spearwolf/twopoint5d';
+  import {colorFromTextureByTexCoords, TextureImageLoader, vertexByInstancePosition, VertexObjects} from '@spearwolf/twopoint5d';
   import {attribute, vec3} from 'three/tsl';
-  import {AgXToneMapping, NodeMaterial, Texture} from 'three/webgpu';
+  import type {Texture} from 'three/webgpu';
+  import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -134,6 +130,7 @@ import {description, showSource, title} from './_textured-quads.json';
     ['nearest', 'srgb'],
   );
 
+  // eslint-disable-next-line no-console
   console.log('loaded texture-image', {imgEl, texCoords, texture});
 
   // the <div id="texture-preview"> is written by the markup of this very page
@@ -146,5 +143,6 @@ import {description, showSource, title} from './_textured-quads.json';
     demo.scene.add(await createMesh(16, 32, 3.7, 1, texCoords, texture));
   });
 
+  // eslint-disable-next-line no-console
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
 </script>

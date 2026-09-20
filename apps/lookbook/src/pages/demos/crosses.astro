@@ -12,8 +12,6 @@ import {description, showSource, title} from './_crosses.json';
   body {
     height: 100vh;
     overflow-y: hidden;
-  }
-  body {
     background: radial-gradient(circle, rgb(77, 141, 81) 0%, rgb(113, 19, 114) 100%);
   }
 </style>
@@ -22,7 +20,8 @@ import {description, showSource, title} from './_crosses.json';
   import {VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
   import {abs, attribute, directionToColor, mul, sub, vec4} from 'three/tsl';
   import {DoubleSide, MeshBasicNodeMaterial} from 'three/webgpu';
-  import {Cross, CrossDescriptor} from '~demos/crosses/Crosses';
+  import type {Cross} from '~demos/crosses/Crosses';
+  import {CrossDescriptor} from '~demos/crosses/Crosses';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
   const COLS = 15;
@@ -69,6 +68,4 @@ import {description, showSource, title} from './_crosses.json';
   });
 
   demo.start();
-
-  console.dir(demo);
 </script>

@@ -87,6 +87,7 @@ import {description, showSource, title} from './_animated-sprites.json';
 
     store.load(assetsUrl('nobingers.json'));
 
+    // eslint-disable-next-line no-console
     console.log('loading textures...', store);
 
     const [texture, frameBasedAnimations] = await store.get('nobingers', ['texture', 'frameBasedAnimations']);
@@ -121,7 +122,9 @@ import {description, showSource, title} from './_animated-sprites.json';
       mesh.update();
     });
 
+    // eslint-disable-next-line no-console
     console.log('BouncingSprites', bouncingSprites);
+    // eslint-disable-next-line no-console
     console.log('AnimatedSprites', mesh);
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page

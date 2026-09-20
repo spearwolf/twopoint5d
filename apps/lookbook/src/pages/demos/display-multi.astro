@@ -84,7 +84,7 @@ import {description, showSource, title} from './_display-multi.json';
   function setRendererBackendInfo(el: HTMLElement, display: Display) {
     const rendererBackendInfo = el.parentElement!.querySelector('.rendererBackendInfo');
     if (rendererBackendInfo) {
-      let backend = el.hasAttribute('data-force-webgl')
+      const backend = el.hasAttribute('data-force-webgl')
         ? 'forceWebGL'
         : display.isWebGPUBackend
           ? 'WebGPU'

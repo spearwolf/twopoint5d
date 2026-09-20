@@ -51,9 +51,11 @@ import {description, showSource, title} from './_map2d-cam-visi.json';
 
   const cameraControl = queryRadioButtons('camera');
 
+  // eslint-disable-next-line no-console
   console.log('initial camera control set to:', cameraControl.get());
 
   cameraControl.onChange((value) => {
+    // eslint-disable-next-line no-console
     console.log('Camera control changed to:', value);
 
     emit(app, 'enableOrbitControls', value === 'map2d-camera');

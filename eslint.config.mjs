@@ -1,5 +1,6 @@
 import pluginJs from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import astro from 'eslint-plugin-astro';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -13,6 +14,7 @@ export default [
   },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
+  ...astro.configs['flat/recommended'],
   eslintConfigPrettier,
   {
     files: ['**/*.{mjs,cjs}', 'scripts/*.{js,mjs,cjs}'],
