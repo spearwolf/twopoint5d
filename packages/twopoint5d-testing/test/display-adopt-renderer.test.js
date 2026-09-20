@@ -16,8 +16,8 @@ describe('Display — the constructor that adopts a renderer', function () {
     document.body.appendChild(renderer.domElement);
   });
 
-  // the renderer belongs to this file, not to the display: it has to be released and its canvas
-  // taken out of the document even when the constructor threw and no display ever existed
+  // this block cleans up whatever got as far as existing — including the case where the
+  // constructor threw and no display ever took the renderer over
   afterEach(() => {
     if (display) {
       // Display.dispose() releases the renderer it was handed

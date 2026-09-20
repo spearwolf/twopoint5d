@@ -5,8 +5,8 @@ import {FixedFrameLoop, type FixedFrameLoopRenderProps, type FixedFrameLoopTickP
 import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
 
-function makeFakeDisplay(): Display {
-  return eventize({}) as unknown as Display;
+function makeFakeDisplay(isDisposed = false): Display {
+  return eventize({isDisposed}) as unknown as Display;
 }
 
 function makeFrame(deltaTime: number, extra?: Partial<DisplayEventProps>): DisplayEventProps {
@@ -240,6 +240,18 @@ describe('FixedFrameLoop', () => {
       const optioned = new FixedFrameLoop(makeFakeDisplay(), {fps: 120, maxStepsPerFrame: 0});
       expect(optioned.fps).toBe(120);
       expect(optioned.maxStepsPerFrame).toBe(2);
+    });
+  });
+
+  describe('a display that has been disposed', () => {
+    it('the constructor refuses it and builds no loop', () => {
+      const deadDisplay = makeFakeDisplay(true);
+      const subscriptionsBefore = getSubscriptionCount(deadDisplay);
+
+      expect(() => new FixedFrameLoop(deadDisplay)).toThrow(/has been disposed/);
+
+      // nothing came into being, so nothing listens on the display either
+      expect(getSubscriptionCount(deadDisplay)).toBe(subscriptionsBefore);
     });
   });
 

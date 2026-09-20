@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `new FixedFrameLoop(display)` throws when the display handed to it has been disposed, with a message naming the class and the state. A loop over such a display subscribes to an emitter that never fires again: it reports `isDisposed === false`, emits neither `OnTick` nor `OnRender` and never disposes itself, because the `OnDisplayDispose` it waits for has already gone out. `Display#isDisposed` is the question to ask wherever a loop is built from a display that belongs to someone else
 - change a `tileWidth` or `tileHeight` that is not a finite number above 0 into a `RangeError` naming class, property and value, thrown where the value is set: the constructors and setters of `Map2DTileCoordsUtil`, `Map2DTileStreamer` and `Map2DSpatialHashGrid`, and through the streamer also `Map2D#tileWidth` and `#tileHeight`. Every mapping from 2D coordinates to tile coordinates divides by these two, and a grid of 0 carried `±Infinity` and `NaN` tile indices into the visibilitors, where the map went on rendering nothing without a word. The default grid of `Map2DTileStreamer` and `Map2DSpatialHashGrid` is 1x1, the one `Map2DTileCoordsUtil` has always had
 - `Map2DTileRenderer#addTile()` writes on the tile it already holds for a coordinate, through `IMapTileFactory#updateTile()`, instead of replacing it with a new one. The tile a renderer holds is a slot it owes the factory, and only `removeTile()`, `clearTiles()` and `dispose()` give one back
 - `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what they were, and releases the node built for the pair before it — and the render target behind that node — on the next `asPassNode()` after either of them has changed, or in `dispose()` if none comes. The node belongs to the stage and goes with its `dispose()`; a stage added to two `StageRenderer`s gives both the very same node, one that renders its scene once per frame and whose result both of them read
@@ -247,6 +248,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
 
 ### Migration Guide
+
+#### The `FixedFrameLoop` constructor refuses a disposed display
+
+A `FixedFrameLoop` reads its frames from the `Display` it is handed. A display that has been disposed sends none and never will, so the constructor turns it away instead of building a loop that answers `isDisposed === false` and does nothing. Where the display comes from somewhere else, `Display#isDisposed` answers first.
+
+**Before**
+
+```ts
+display.dispose();
+const sim = new FixedFrameLoop(display); // → a loop that never ticks and never disposes itself
+```
+
+**After**
+
+```ts
+display.dispose();
+new FixedFrameLoop(display); // → Error: FixedFrameLoop: the display handed to the constructor has been disposed …
+
+if (!display.isDisposed) {
+  const sim = new FixedFrameLoop(display);
+}
+```
 
 #### `IMap2DVisibilitorHelpers` requires a `dispose()`
 

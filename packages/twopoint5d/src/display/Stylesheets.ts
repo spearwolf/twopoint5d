@@ -120,9 +120,13 @@ export class Stylesheets {
   static releaseRule(name: string, root: HTMLElement | ShadowRoot = document.head): void {
     // not getGlobalSheet(): a release is no reason to create a sheet
     const sheet = sheets.get(root);
-    const rules = sheet && installedRules.get(sheet);
-    const installed = rules?.get(name);
-    if (sheet == null || rules == null || installed == null || installed.users === 0) return;
+    if (sheet == null) return;
+
+    const rules = installedRules.get(sheet);
+    if (rules == null) return;
+
+    const installed = rules.get(name);
+    if (installed == null || installed.users === 0) return;
 
     installed.users -= 1;
     if (installed.users > 0 || installed.pinned) return;

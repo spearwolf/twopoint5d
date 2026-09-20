@@ -178,7 +178,20 @@ export class FixedFrameLoop {
     return this.#disposed;
   }
 
+  /**
+   * @throws when the display handed in has been disposed and sends no more render frames for
+   *   the loop to tick on. The message names the class and the state, and no loop comes into
+   *   being.
+   */
   constructor(display: Display, options?: {fps?: number; maxStepsPerFrame?: number}) {
+    // before eventize(), so that a loop which can never be ticked never comes into being
+    if (display.isDisposed) {
+      throw new Error(
+        'FixedFrameLoop: the display handed to the constructor has been disposed and sends no more ' +
+          'render frames to tick on. Build the loop while the display is alive, or hand it a live display.',
+      );
+    }
+
     eventize(this);
 
     this.display = display;
