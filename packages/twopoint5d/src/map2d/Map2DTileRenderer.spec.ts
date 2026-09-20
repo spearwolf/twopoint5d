@@ -143,6 +143,26 @@ describe('Map2DTileRenderer', () => {
     });
   });
 
+  describe('addTile()', () => {
+    test('a coordinate the renderer already holds writes the tile it holds on', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+      const destroyTile = sandbox.spy(tileFactory, 'destroyTile');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      expect(createTile.calledOnce, 'createTile()').toBe(true);
+      expect(updateTile.calledOnce, 'updateTile()').toBe(true);
+      expect(destroyTile.called, 'destroyTile()').toBe(false);
+    });
+  });
+
   describe('clearTiles()', () => {
     test('an empty renderer forces no upload', () => {
       const tileFactory = makeTileFactory();

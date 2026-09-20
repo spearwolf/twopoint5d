@@ -17,6 +17,37 @@ describe('Map2DTileCoordsUtil', () => {
       expect(view.xOffset).toBe(4);
       expect(view.yOffset).toBe(8);
     });
+    test('without arguments it is a 1x1 grid', () => {
+      const view = new Map2DTileCoordsUtil();
+      expect(view.tileWidth).toBe(1);
+      expect(view.tileHeight).toBe(1);
+    });
+    test('an offset of 0 goes through', () => {
+      const view = new Map2DTileCoordsUtil(16, 16);
+      view.xOffset = 0;
+      view.yOffset = 0;
+      expect(view.xOffset).toBe(0);
+      expect(view.yOffset).toBe(0);
+    });
+  });
+
+  describe('a tile size that cannot be divided by', () => {
+    test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileWidth', (width) => {
+      expect(() => new Map2DTileCoordsUtil(width, 16)).toThrow(RangeError);
+    });
+    test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileHeight', (height) => {
+      expect(() => new Map2DTileCoordsUtil(16, height)).toThrow(RangeError);
+    });
+    test.each([0, -1, NaN, Infinity])('the tileWidth setter refuses %p', (width) => {
+      const view = new Map2DTileCoordsUtil(16, 16);
+      expect(() => (view.tileWidth = width)).toThrow(RangeError);
+      expect(view.tileWidth, 'tileWidth after a refused write').toBe(16);
+    });
+    test.each([0, -1, NaN, Infinity])('the tileHeight setter refuses %p', (height) => {
+      const view = new Map2DTileCoordsUtil(16, 16);
+      expect(() => (view.tileHeight = height)).toThrow(RangeError);
+      expect(view.tileHeight, 'tileHeight after a refused write').toBe(16);
+    });
   });
   describe('getTileCoords()', () => {
     test('without offset', () => {

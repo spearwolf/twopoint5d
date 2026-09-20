@@ -51,6 +51,17 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
+    // a tile this renderer already holds for the id is a slot it owes the factory — overwriting
+    // the entry would lose the slot, which goes on drawing with nobody left to give it back
+    const existing = this.#tiles.get(tileCoords.id);
+    if (existing !== undefined) {
+      tileFactory.updateTile(existing, tileCoords);
+      // updateTile() writes the position into the attribute buffer, and without the serial
+      // endUpdatingTiles() leaves it on the CPU side — the same bookkeeping reuseTile() does
+      ++this.#dataSerial;
+      return;
+    }
+
     const tile = tileFactory.createTile(tileCoords);
     if (tile == null) {
       this.#declined.add(tileCoords.id);

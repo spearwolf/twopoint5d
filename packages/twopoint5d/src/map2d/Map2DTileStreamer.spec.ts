@@ -88,6 +88,18 @@ describe('Map2DTileStreamer', () => {
       expect(layer.tileWidth).toEqual(77);
       expect(layer.tileHeight).toEqual(99);
     });
+    test('without arguments it is a 1x1 grid', () => {
+      const layer = new Map2DTileStreamer();
+      expect(layer.tileWidth).toBe(1);
+      expect(layer.tileHeight).toBe(1);
+    });
+    test('a tile size that cannot be divided by is refused', () => {
+      expect(() => new Map2DTileStreamer(0, 16)).toThrow(RangeError);
+
+      const layer = new Map2DTileStreamer(8, 16);
+      expect(() => (layer.tileWidth = 0)).toThrow(RangeError);
+      expect(layer.tileWidth, 'tileWidth after a refused write').toBe(8);
+    });
     test('xOffset, yOffset', () => {
       let layer = new Map2DTileStreamer(1, 1);
       expect(layer.xOffset).toEqual(0);

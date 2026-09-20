@@ -37,9 +37,11 @@ export class Map2D extends Group {
       streamer.addTileRenderer(renderer);
     }
 
-    // the renderers hold the tiles of the streamer that left, and the one taking over starts with
-    // an empty tile list: without this every one of those tiles comes back as a createTile and
-    // overwrites its map entry, and the tile it replaces never reaches destroyTile()
+    // the renderers hold the tiles of the streamer that left, and every one of them carries the
+    // quad size and the texture coordinates of that streamer's grid. `IMapTileFactory#updateTile()`
+    // writes a position and nothing else, so no tile can be carried over into the grid of the
+    // streamer taking over — clearing is what has them built again in it. It is the same reason
+    // the four grid setters of `Map2DTileStreamer` clear.
     streamer.clearTiles();
   }
 

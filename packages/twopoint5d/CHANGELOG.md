@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- change a `tileWidth` or `tileHeight` that is not a finite number above 0 into a `RangeError` naming class, property and value, thrown where the value is set: the constructors and setters of `Map2DTileCoordsUtil`, `Map2DTileStreamer` and `Map2DSpatialHashGrid`, and through the streamer also `Map2D#tileWidth` and `#tileHeight`. Every mapping from 2D coordinates to tile coordinates divides by these two, and a grid of 0 carried `±Infinity` and `NaN` tile indices into the visibilitors, where the map went on rendering nothing without a word. The default grid of `Map2DTileStreamer` and `Map2DSpatialHashGrid` is 1x1, the one `Map2DTileCoordsUtil` has always had
+- `Map2DTileRenderer#addTile()` writes on the tile it already holds for a coordinate, through `IMapTileFactory#updateTile()`, instead of replacing it with a new one. The tile a renderer holds is a slot it owes the factory, and only `removeTile()`, `clearTiles()` and `dispose()` give one back
 - `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what they were, and releases the node built for the pair before it — and the render target behind that node — on the next `asPassNode()` after either of them has changed, or in `dispose()` if none comes. The node belongs to the stage and goes with its `dispose()`; a stage added to two `StageRenderer`s gives both the very same node, one that renders its scene once per frame and whose result both of them read
 - a `resize()` whose width or height is not a finite number above 0 leaves the view, the camera and `needsUpdate` as they are — the rule the projections already judge a container by, now also in `Stage2D` and in the pass-node composition of `StageRenderer`. A `needsUpdate` that was set stays set, so the next `updateProjection()` for a container with an area still carries it out
 - `StageRenderer#renderOrderArray` answers from the first access on with the split `renderOrder` — without a prior write to the `renderOrder` setter that means `['*']`. The order stages render in does not change
@@ -158,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `TileSpritesFactory#createTile()`: it resolves the tile set and the atlas frame of a tile before it takes a slot out of the instanced pool. A factory without a tile set threw after the slot was gone, and nothing on that path books a slot back, so the pool ran empty frame by frame until it handed out nothing at all
 - fix the published type declaration of `texture/TextureResource`: it imported `./types.ts` with the suffix of the source instead of `./types.js`, an extension that does not exist in the package
 - fix the tile coordinates `CameraBasedVisibility` computes for a map whose `xOffset` or `yOffset` lies outside the first tile: the view rectangle of a tile, the box it is tested with and the tiles the search walks on to are the ones of the tile coordinate they belong to. The query these are derived from was handed a coordinate without the map offset while it reads one with it, which shifted every tile of such a map by `floor(-offset / tileSize)` tiles against the tile coordinate it was found under. An offset within the first tile — the usual `-tileSize / 2` among them — was and is unaffected
 - fix `VertexObjectPool#freeVO()`: the vacated slot is cleared on both the last-index and the swap path, so a freed index holds no vertex object — `getVO()` on it returns `undefined` and the internal index keeps nothing alive
@@ -243,6 +246,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `RepeatingTilesProvider#getTileIdsWithin()` for a `limitToAxis` other than `'horizontal'`, `'vertical'` and `'none'`, which JavaScript can assign: the value counts as `'none'`, as in `getTileIdAt()`, so the pattern repeats along both axes and every cell of the rectangle is written
 
 ### Migration Guide
+
+#### A tile grid of 0 is refused
+
+A tile width or tile height has to be a finite number above 0 — the value every mapping from 2D coordinates to tile coordinates divides by. A map built without a tile size gets a grid of 1x1 instead of one of 0x0, and any attempt to set a size that cannot be divided by throws a `RangeError`.
+
+**Before**
+
+```ts
+const map = new Map2D(); // → a 0x0 grid, and nothing ever appears in it
+```
+
+**After**
+
+```ts
+const map = new Map2D(); // → a 1x1 grid
+map.tileWidth = 256; // the size the map is meant to have
+map.tileHeight = 256;
+
+map.tileWidth = 0; // → RangeError: [Map2DTileStreamer] tileWidth must be a finite number above 0, got 0
+```
 
 #### `Map2DTileStreamer#update()` places the renderer nodes in the local space of its node
 

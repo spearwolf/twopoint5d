@@ -186,7 +186,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
       case 'none':
       default:
         if (this.#cols === 1 && this.#rows === 1) {
-          target.fill(this.tileIds[0]![0]!);
+          target.fill(this.#tileIds[0]![0]!);
         } else {
           const topOffset = top < 0 ? top + Math.ceil(-top / this.#rows) * this.#rows : top;
           for (let y = 0; y < height; y++) {

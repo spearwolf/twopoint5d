@@ -1,3 +1,5 @@
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
+
 /**
  * A rectangular two-dimensional area consisting of one or more tiles
  */
@@ -60,8 +62,34 @@ export interface TilesWithinCoords {
  * to be in the upper left corner (with the y-axis pointing down).
  */
 export class Map2DTileCoordsUtil {
-  tileWidth: number;
-  tileHeight: number;
+  #tileWidth!: number;
+  #tileHeight!: number;
+
+  /**
+   * The width of a tile in _world space_: a finite number above 0, because every mapping from
+   * 2D coordinates to tile coordinates divides by it. Writing anything else throws a `RangeError`.
+   */
+  get tileWidth(): number {
+    return this.#tileWidth;
+  }
+
+  set tileWidth(width: number) {
+    assertPositiveFinite(width, 'Map2DTileCoordsUtil', 'tileWidth');
+    this.#tileWidth = width;
+  }
+
+  /**
+   * The height of a tile in _world space_: a finite number above 0, because every mapping from
+   * 2D coordinates to tile coordinates divides by it. Writing anything else throws a `RangeError`.
+   */
+  get tileHeight(): number {
+    return this.#tileHeight;
+  }
+
+  set tileHeight(height: number) {
+    assertPositiveFinite(height, 'Map2DTileCoordsUtil', 'tileHeight');
+    this.#tileHeight = height;
+  }
 
   xOffset: number;
   yOffset: number;
@@ -86,6 +114,7 @@ export class Map2DTileCoordsUtil {
   };
 
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
+    // through the setters, so a grid of 0 is refused here as much as it is later on
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
     this.xOffset = xOffset;

@@ -1,5 +1,6 @@
 import type {Object3D} from 'three/webgpu';
 import {Vector3} from 'three/webgpu';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
@@ -53,6 +54,8 @@ export class Map2DTileStreamer {
   // coordinates would go on describing the grid it was built in. The four setters below
   // therefore clear, and each of them only when the value really moves.
   set tileWidth(width: number) {
+    // before the equality check: an invalid value is invalid whatever the streamer holds right now
+    assertPositiveFinite(width, 'Map2DTileStreamer', 'tileWidth');
     if (this.#tileCoords.tileWidth === width) return;
     this.#tileCoords.tileWidth = width;
     this.clearTiles();
@@ -63,6 +66,7 @@ export class Map2DTileStreamer {
   }
 
   set tileHeight(height: number) {
+    assertPositiveFinite(height, 'Map2DTileStreamer', 'tileHeight');
     if (this.#tileCoords.tileHeight === height) return;
     this.#tileCoords.tileHeight = height;
     this.clearTiles();
@@ -94,7 +98,12 @@ export class Map2DTileStreamer {
   // Per-frame scratch — handed to beginUpdatingTiles(), which reads it during the call.
   readonly #position = new Vector3();
 
-  constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
+  constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
+    // checked here as well as in the util underneath, so the message names the class the caller
+    // holds in its hands
+    assertPositiveFinite(tileWidth, 'Map2DTileStreamer', 'tileWidth');
+    assertPositiveFinite(tileHeight, 'Map2DTileStreamer', 'tileHeight');
+
     this.#tileCoords = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
@@ -128,7 +137,8 @@ export class Map2DTileStreamer {
 
     node.updateWorldMatrix(true, false);
 
-    const visible = visibilitor.computeVisibleTiles(this.tiles, [this.centerX, this.centerY], this.#tileCoords, node.matrixWorld);
+    const viewCenter: [number, number] = [this.centerX, this.centerY];
+    const visible = visibilitor.computeVisibleTiles(this.tiles, viewCenter, this.#tileCoords, node.matrixWorld);
 
     if (visible) {
       this.tiles = visible.tiles;

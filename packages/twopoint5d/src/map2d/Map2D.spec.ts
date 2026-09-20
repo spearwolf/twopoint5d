@@ -99,6 +99,13 @@ describe('Map2D', () => {
     });
   });
 
+  describe('the tile grid', () => {
+    test('a tile size that cannot be divided by is refused', () => {
+      const map = new Map2D();
+      expect(() => (map.tileWidth = 0)).toThrow(RangeError);
+    });
+  });
+
   describe('visibilitor', () => {
     test('a visibilitor switched away and back leaves only its own tiles in the renderers', () => {
       const map = new Map2D();

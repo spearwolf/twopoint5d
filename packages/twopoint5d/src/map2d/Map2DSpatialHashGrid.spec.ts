@@ -9,6 +9,15 @@ describe('Map2DSpatialHashGrid', () => {
     expect(grid).toBeDefined();
   });
 
+  test('without arguments it is a 1x1 grid', () => {
+    const grid = new Map2DSpatialHashGrid();
+    expect(grid.getTile(0, 0)).toBeUndefined();
+  });
+
+  test('a tile size that cannot be divided by is refused', () => {
+    expect(() => new Map2DSpatialHashGrid(0, 100)).toThrow(RangeError);
+  });
+
   test('add', () => {
     const grid = new Map2DSpatialHashGrid(100, 100);
     const a: IMap2DRenderableArea = {aabb: new AABB2(10, 20, 150, 150)};

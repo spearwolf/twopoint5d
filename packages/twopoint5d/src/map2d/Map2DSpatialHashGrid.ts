@@ -1,3 +1,4 @@
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import type {AABB2} from './AABB2.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
@@ -18,7 +19,12 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   #tiles: Map<Map2DSpatialHashGridKeyType, Set<Renderable>>;
   #tileCoordsUtil: Map2DTileCoordsUtil;
 
-  constructor(tileWidth = 0, tileHeight = 0, xOffset = 0, yOffset = 0) {
+  constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
+    // checked here as well as in the util underneath, so the message names the class the caller
+    // holds in its hands
+    assertPositiveFinite(tileWidth, 'Map2DSpatialHashGrid', 'tileWidth');
+    assertPositiveFinite(tileHeight, 'Map2DSpatialHashGrid', 'tileHeight');
+
     this.#tiles = new Map();
     this.#tileCoordsUtil = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
