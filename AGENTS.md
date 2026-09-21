@@ -38,8 +38,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
   single-file run measure nothing
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
-  cache server and the docs' code block check (`scripts/**/*.test.mjs`); no Nx project owns
-  them, so `pnpm test` does not run them
+  cache server and the docs' code block check (`scripts/**/*.test.mjs`), plus one spec that
+  starts `makePackageJson.mjs` as a child process; no Nx project owns them, so `pnpm test`
+  does not run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, and every code block marked

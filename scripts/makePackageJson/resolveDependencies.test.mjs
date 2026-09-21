@@ -54,10 +54,22 @@ describe('resolveDependencies', () => {
     assert.deepEqual(section, {'@scope/missing': '^2.0.0'});
   });
 
+  it('a workspace: range ships trimmed and as written', () => {
+    assert.deepEqual(resolve({'@scope/other': 'workspace: ^2.0.0 '}, {}), {'@scope/other': '^2.0.0'});
+    // validRange would normalize this to `>=1.0.0 <2.0.0-0||>=2.5.0`
+    assert.deepEqual(resolve({'@scope/other': 'workspace:1.x || >=2.5.0'}, {}), {'@scope/other': '1.x || >=2.5.0'});
+  });
+
+  it('a workspace: operator with whitespace around it takes the version of the package it names', () => {
+    assert.deepEqual(resolve({'@scope/other': 'workspace: * '}, {}), {'@scope/other': '^2.3.4'});
+    assert.deepEqual(resolve({'@scope/other': 'workspace: ~'}, {}), {'@scope/other': '~2.3.4'});
+  });
+
   it('a workspace: specifier whose range is no version range stays as it is', () => {
     assert.deepEqual(resolve({'@scope/other': 'workspace:../other'}, {}), {'@scope/other': 'workspace:../other'});
     assert.deepEqual(resolve({'@scope/other': 'workspace:banana'}, {}), {'@scope/other': 'workspace:banana'});
     assert.deepEqual(resolve({'@scope/other': 'workspace:'}, {}), {'@scope/other': 'workspace:'});
+    assert.deepEqual(resolve({'@scope/other': 'workspace: '}, {}), {'@scope/other': 'workspace: '});
   });
 
   it('an aliased workspace: dependency stays as it is', () => {

@@ -1,4 +1,10 @@
 {
+  // `pnpm build` emits what npm gets, and the package ships `dist/` without `src/`. A
+  // declaration map or a source map would point at `src/`, so the build writes neither.
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declarationMap": false,
+    "sourceMap": false
+  },
   "exclude": ["**/*.spec.ts"]
 }

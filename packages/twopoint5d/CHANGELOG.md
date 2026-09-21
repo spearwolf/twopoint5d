@@ -187,6 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove the write of the plane coordinates into the first element with the class `map2dCoords` from `CameraBasedVisibilityHelpers`: the helpers read and write no DOM, so they run in a host without one — a worker, Node — as they do in a browser. `CameraBasedVisibility#planeCoords2D` carries those coordinates for a page that wants to show them
 - remove the upload marking from `VertexObjectPool#getVO()`: materializing a vertex object in a slot reads that slot and changes none of its data, so it marks no buffer of the pool any more
 - remove `meshCount` from `VertexObjectDescription`, and with it the `VertexObjectDescriptor#meshCount` getter and `VertexObjectDescriptor#getInstanceCount()`. Every instanced attribute of a geometry advances once per instance, and the `instanceCount` of an instanced geometry is the `usedCount` of its pool
+- remove the declaration maps and the source maps from the published package: both pointed at the TypeScript sources under `src/`, which the package does not contain, so neither "Go to definition" nor a debugger found anything behind them. The `.d.ts` and `.js` files only lose their `sourceMappingURL` comment
 
 ### Fixed
 

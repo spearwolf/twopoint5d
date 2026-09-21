@@ -1,14 +1,24 @@
-import {exec, execSync} from 'node:child_process';
+import {execFile, execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {USAGE, parseArguments} from './publishNpmPkg/parseArguments.mjs';
 import {isNotPublishedError, parsePublishedVersions} from './publishNpmPkg/publishedVersions.mjs';
 
-const DRY_RUN = process.argv.includes('--dry-run');
+let args;
+try {
+  args = parseArguments(process.argv.slice(2));
+} catch (error) {
+  console.error(error.message);
+  console.error(USAGE);
+  process.exit(1);
+}
+
+const DRY_RUN = args.dryRun;
 
 const workspaceRoot = path.resolve(fileURLToPath(import.meta.url), '../../');
 const projectRoot = path.resolve(process.cwd());
-const packageRoot = path.resolve(projectRoot, process.argv[2]);
+const packageRoot = path.resolve(projectRoot, args.packageDir);
 const pkgJson = JSON.parse(fs.readFileSync(path.resolve(packageRoot, 'package.json'), 'utf8'));
 
 console.log('workspaceRoot:', workspaceRoot);
@@ -23,7 +33,7 @@ if (pkgJson.version.endsWith('-dev')) {
   process.exit(0);
 }
 
-exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
+execFile('npm', ['show', pkgJson.name, 'versions', '--json'], (error, stdout, stderr) => {
   if (!error) {
     const versions = parsePublishedVersions(stdout);
     console.log('already published versions: ---');
@@ -39,7 +49,7 @@ exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
     console.log('oh it looks like this is the first time to publish the package');
     publishPackage(packageRoot);
   } else {
-    console.error(`exec() panic: ${stderr}`);
+    console.error(`npm show failed: ${stderr}`);
     process.exit(1);
   }
 });
@@ -57,7 +67,7 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
     copyFile(path.resolve(projectRoot, 'README.md'), readmeDstPath);
   }
 
-  execSync(`npm publish --access public${dryRun ? ' --dry-run' : ''}`, {cwd});
+  execFileSync('npm', ['publish', '--access', 'public', ...(dryRun ? ['--dry-run'] : [])], {cwd});
 
   process.exit(0);
 }

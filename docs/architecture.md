@@ -92,8 +92,8 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   `dependencies` or `optionalDependencies`. The library reaches its consumers with peer
   dependencies only, and the non-blocking audit step in CI relies on that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
-  pipeline's helpers (§4), of the CI cache server and of the helpers of the code block
-  check.
+  pipeline's helpers and of `makePackageJson.mjs` itself (§4, §6), of the CI cache server and
+  of the helpers of the code block check.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the thresholds in
   `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate: it runs the same specs
   without coverage. The thresholds sit two points under the level measured when they were set,
@@ -151,7 +151,10 @@ package from source.
 ## 4. Build and publish pipeline
 
 `packages/twopoint5d`'s `build` is `tsc -p tsconfig.build.json` into `dist/lib/`,
-followed by `scripts/makePackageJson.mjs`.
+followed by `scripts/makePackageJson.mjs`. The build writes neither declaration maps nor
+source maps, because both would point at `src/`, which the package does not contain. In
+the workspace, "Go to definition" from the lookbook or the testing package into the
+library lands in `dist/lib/*.d.ts`, and the browser shows its `.js`.
 
 `makePackageJson.mjs` synthesizes the publish-time manifest from the source
 `package.json` merged with `package.override.json`. The override file's `null` entries
@@ -159,8 +162,10 @@ strip development-only fields (`scripts`, `devDependencies`) from what
 ships. Specifiers are resolved to real ranges: `catalog:` and `catalog:<name>` from the
 default or the named catalog in `pnpm-workspace.yaml`; `workspace:` from the
 `package.json` of the package it names (`workspace:^` and `workspace:~` keep their
-operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is — but
-only if it is a version range, and anything else leaves the specifier standing). If a
+operator, `workspace:*` becomes a caret range, a spelled-out range ships as it is written,
+only without the whitespace around it and not in the form semver normalizes it to — but only if
+it is a version range; anything else, a range of nothing but whitespace included, leaves the
+specifier standing). If a
 `catalog:` or `workspace:` specifier is left in the manifest afterwards, the build
 fails — npm installs neither protocol. Since `dist/` is what gets
 published, `main`, `module`, `types` and every target in `exports` lose a leading
@@ -174,8 +179,10 @@ wire it up.
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
 publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a
-first publish. Never publish from `packages/twopoint5d/` and never run these
-scripts without being asked to.
+first publish. `publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and
+exit code 1 on a missing directory and on any other option — a misspelled `--dry-run`
+included — before it asks npm, and it calls npm without a shell. Never publish from
+`packages/twopoint5d/` and never run these scripts without being asked to.
 
 `.github/workflows/deploy.yml` runs after every successful CI run on `main`. Its first
 job asks npm whether the manifest version is published already, or whether it ends in
@@ -228,8 +235,10 @@ Two runners, deliberately in separate packages:
   JSDoc — vertex object interfaces, descriptions.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run under
-`node --test` (`pnpm test:scripts`); no Nx project owns them. Their specs import only the
-helper modules, never `publishNpmPkg.mjs`, which queries the registry as soon as it loads, nor
+`node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts
+`makePackageJson.mjs` itself, as a child process in a throwaway project directory, because
+its exit code and the manifest it does not write are wiring that no helper test sees. No spec
+runs `publishNpmPkg.mjs`, which queries the registry as soon as its arguments fit, nor
 `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.

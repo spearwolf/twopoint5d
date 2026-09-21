@@ -41,7 +41,9 @@ export function resolvePackageVersion(
     return undefined;
   }
 
-  const range = specifier.startsWith('workspace:') ? specifier.slice('workspace:'.length) : '*';
+  // whitespace around the range belongs to no version range; every check below and the
+  // manifest see the trimmed value
+  const range = specifier.startsWith('workspace:') ? specifier.slice('workspace:'.length).trim() : '*';
   if (range.includes('@')) {
     // `workspace:<name>@<range>` names another package than its key, which this script does not map
     console.warn(
@@ -58,6 +60,7 @@ export function resolvePackageVersion(
   if (range !== '*' && range !== '^' && range !== '~') {
     // a spelled-out range names the version it wants; the package under packages/ only
     // supplies one for `*`, `^` and `~`, so it is not looked up for this one
+    // semver's validRange('') answers '*', so the empty range needs a check of its own
     if (range === '' || validRange(range) == null) {
       // anything else would go into the published manifest as a version range and is none —
       // the specifier stays and the manifest check refuses it
@@ -71,6 +74,8 @@ export function resolvePackageVersion(
       );
       return undefined;
     }
+    // the range ships as written: validRange only vouches for it, and its normalized form
+    // (`^1` becomes `>=1.0.0 <2.0.0-0`) is not what the manifest says
     console.log('resolve package version', pkgName, '->', range);
     return range;
   }
