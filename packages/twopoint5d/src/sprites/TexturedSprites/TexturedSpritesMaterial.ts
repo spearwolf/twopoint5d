@@ -1,5 +1,5 @@
 import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
-import {attribute, float, rotate, vec3, vec4} from 'three/tsl';
+import {attribute, float, mul, rotate, vec3, vec4} from 'three/tsl';
 import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 import type {
@@ -126,14 +126,18 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     createEffect(
       () => {
         const rotationEulerNode = vec3(0, 0, this.rotationNode.toFloat());
-        const vertexPosition = rotate(this.vertexPositionNode, rotationEulerNode);
-        const instancePosition = this.instancePositionNode;
         const scale = vec3(this.quadSizeNode.xy, 1.0);
+        // scale before rotate: the other way round turns the unit quad and stretches the result,
+        // and a sprite that is not square comes out as a parallelogram
+        const vertexPosition = rotate(mul(this.vertexPositionNode, scale), rotationEulerNode);
+        const instancePosition = this.instancePositionNode;
 
         this.positionNode = (this.renderAsBillboards ? billboardVertexByInstancePosition : vertexByInstancePosition)({
           vertexPosition,
           instancePosition,
-          scale,
+          // the quad arrives scaled already; without a scale of its own, billboarding would
+          // fall back to the quadSize attribute and scale it a second time
+          scale: vec3(1, 1, 1),
         });
 
         this.needsUpdate = true;
