@@ -1,7 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
-import {stopAndDrain} from './support/stopAndDrain.js';
 
 /** @import {TextureNode} from 'three/webgpu' */
 
@@ -30,7 +29,6 @@ async function disposeDisplay(display) {
   } catch {
     // ignore
   }
-  await stopAndDrain(display);
   display.dispose();
 }
 

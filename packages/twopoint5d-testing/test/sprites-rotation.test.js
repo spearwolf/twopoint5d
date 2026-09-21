@@ -1,7 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, TexturedSprites} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'sprites-rotation-fixture';
 
@@ -22,9 +21,8 @@ function makeContainer({width = 320, height = 200} = {}) {
 }
 
 /** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-async function disposeDisplay(display) {
+function disposeDisplay(display) {
   if (!display) return;
-  await stopAndDrain(display);
   try {
     display.dispose();
   } catch {
@@ -71,10 +69,10 @@ describe('sprites — rotation of a sprite that is not square', function () {
     target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     target?.dispose();
     target = undefined;
-    await disposeDisplay(display);
+    disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

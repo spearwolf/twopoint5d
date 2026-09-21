@@ -1,8 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
-import {WebGPURenderer} from 'three/webgpu';
-import {stopAndDrain} from './support/stopAndDrain.js';
+import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
 
 const FIXTURE_ID = 'display-dispose-fixture';
 
@@ -33,9 +32,8 @@ describe('Display — the contract after dispose()', function () {
 
   // every test disposes in its own body; the teardown only has to catch the ones that did not get
   // that far, and it must not call start() — that is one of the calls a disposed display refuses
-  afterEach(async () => {
+  afterEach(() => {
     if (display) {
-      await stopAndDrain(display);
       display.dispose();
     }
     display = undefined;
@@ -45,12 +43,14 @@ describe('Display — the contract after dispose()', function () {
     host = undefined;
   });
 
-  // Assertion (a) of the dispose test pattern — "releases what it built itself" — is the DOM side
-  // here: the two cases below watch the container the display built come out of the host again,
-  // and the canvas it was handed stay where the caller put it. The GPU side has no subject:
-  // spying on renderer.dispose() only watches three.js clean up after itself, and what proves the
-  // release are the backend resources, which this test cannot see. What it can see, and what the
-  // rest of this file is about, is the contract afterwards.
+  // Assertion (a) of the dispose test pattern — "releases what it built itself" — has two sides
+  // here. The DOM side: the first two cases below watch the container the display built come out
+  // of the host again, and the canvas it was handed stay where the caller put it. The GPU side:
+  // the three cases after "a dispose() before the renderer is ready leaves the frame loop empty"
+  // watch when renderer.dispose() runs — after an init that dispose() landed in, not at all after
+  // a failed one, and only once the queue has run dry — and what the backend reports afterwards:
+  // a destroyed device, or a lost WebGL context. The rest of this file is about the contract
+  // afterwards.
 
   // Assertion (b) — "does not touch what was handed in" — is turned around for a Display: a
   // WebGPURenderer passed to the constructor is adopted and released with the display. That case
@@ -191,11 +191,6 @@ describe('Display — the contract after dispose()', function () {
   });
 
   it('a dispose() before the renderer is ready leaves the frame loop empty', async () => {
-    let rendererIsUp;
-    const rendererUp = new Promise((resolve) => {
-      rendererIsUp = resolve;
-    });
-
     /** @type {(value?: unknown) => void} */
     let releaseInit;
     const initReleased = new Promise((resolve) => {
@@ -213,18 +208,12 @@ describe('Display — the contract after dispose()', function () {
         // dispose() inside the window the constructor waits in
         renderer.init = () => {
           // three hands out one init promise for every call; the wrapper does the same
-          initSettled ??= realInit()
-            .then(rendererIsUp)
-            .then(() => initReleased);
+          initSettled ??= realInit().then(() => initReleased);
           return initSettled;
         };
         return renderer;
       },
     });
-
-    // the real init has to be through before dispose() falls, or renderer.dispose() would meet a
-    // half-built renderer and this case would prove something other than its name
-    await rendererUp;
 
     expect(display.frameLoop.subscriptionCount, 'before the display is up').to.equal(0);
 
@@ -235,6 +224,143 @@ describe('Display — the contract after dispose()', function () {
     await initSettled;
 
     expect(display.frameLoop.subscriptionCount, 'after the init promise settles').to.equal(0);
+  });
+
+  it('releases the renderer once an init that dispose() landed in is through', async () => {
+    host = makeContainer();
+    display = new Display(host);
+
+    const renderer = display.renderer;
+    // three always initializes asynchronously, so the init has not finished at this point
+    expect(renderer.hasInitialized(), 'the init is still running').to.equal(false);
+
+    let initializedAtRelease;
+    /** @type {(value?: unknown) => void} */
+    let markReleased;
+    const released = new Promise((resolve) => {
+      markReleased = resolve;
+    });
+    const realDispose = renderer.dispose.bind(renderer);
+    renderer.dispose = () => {
+      initializedAtRelease = renderer.hasInitialized();
+      realDispose();
+      markReleased();
+    };
+
+    display.dispose();
+    // a renderer that is never released leaves this promise open and runs into the timeout of
+    // this suite
+    await released;
+
+    expect(initializedAtRelease, 'renderer.dispose() ran after the init').to.equal(true);
+
+    // read only now: three can fall back to the WebGL backend during the init and swap the
+    // backend then. The three.js typings leave device and gl off the backend
+    const backend =
+      /** @type {{isWebGPUBackend?: boolean, isWebGLBackend?: boolean, device?: {lost: Promise<{reason: string}>}, gl?: WebGL2RenderingContext}} */ (
+        renderer.backend
+      );
+    if (backend.isWebGPUBackend) {
+      const info = await backend.device.lost;
+      expect(info.reason, 'the reason the device was lost').to.equal('destroyed');
+    } else {
+      expect(backend.isWebGLBackend, 'the backend is WebGL when it is not WebGPU').to.equal(true);
+      // WebGLBackend.dispose() releases the context through WEBGL_lose_context.loseContext()
+      expect(backend.gl.isContextLost(), 'the context is lost').to.equal(true);
+    }
+  });
+
+  it('lets no rejection escape when the init that dispose() landed in fails', async () => {
+    const initFailure = new Error('the init of this renderer fails on purpose');
+
+    /** @type {Promise<WebGPURenderer> | undefined} */
+    let initPromise;
+    /** @type {(reason?: unknown) => void} */
+    let failInit;
+
+    host = makeContainer();
+    display = new Display(host, {
+      createRenderer: (params) => {
+        const renderer = new WebGPURenderer({...params});
+        // three hands out one init promise for every call, and renderer.dispose() asks for it
+        // again through setAnimationLoop(null); the wrapper has to do the same, or this case
+        // proves something other than its name
+        renderer.init = () =>
+          (initPromise ??= new Promise((_, reject) => {
+            failInit = reject;
+          }));
+        return renderer;
+      },
+    });
+
+    /** @type {unknown[]} */
+    const escaped = [];
+    /** @param {PromiseRejectionEvent} event */
+    const onUnhandledRejection = (event) => {
+      if (event.reason !== initFailure) return;
+      escaped.push(event.reason);
+      // an escaped rejection is what this case reports; left alone it would fail the whole suite
+      event.preventDefault();
+    };
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    try {
+      display.dispose();
+      failInit(initFailure);
+      await initPromise.catch(() => {});
+      // the browser reports an unhandled rejection in a task of its own, after the microtasks
+      // have run, so the listener gets a moment to hear about it
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    }
+
+    expect(escaped, 'rejections of the failed init that nobody handled').to.have.length(0);
+  });
+
+  it('releases the renderer only after the GPU has run the work submitted to it', async function () {
+    host = makeContainer();
+    display = new Display(host);
+    await display.start();
+    await display.nextFrame();
+
+    // the WebGL2 backend has no queue to wait for
+    if (!display.isWebGPUBackend) this.skip();
+
+    const renderer = display.renderer;
+    // one piece of real work on the queue, submitted right before the release
+    renderer.render(new Scene(), new PerspectiveCamera());
+
+    /** @type {string[]} */
+    const steps = [];
+
+    // the three.js typings leave the device off WebGPUBackend
+    const {queue} = /** @type {{device?: {queue: {onSubmittedWorkDone(): Promise<unknown>}}}} */ (renderer.backend).device;
+    const realOnSubmittedWorkDone = queue.onSubmittedWorkDone.bind(queue);
+    queue.onSubmittedWorkDone = () => {
+      steps.push('queue asked');
+      return realOnSubmittedWorkDone().then((value) => {
+        steps.push('queue drained');
+        return value;
+      });
+    };
+
+    /** @type {(value?: unknown) => void} */
+    let markReleased;
+    const released = new Promise((resolve) => {
+      markReleased = resolve;
+    });
+    const realDispose = renderer.dispose.bind(renderer);
+    renderer.dispose = () => {
+      steps.push('renderer.dispose()');
+      realDispose();
+      markReleased();
+    };
+
+    display.dispose();
+    await released;
+
+    expect(steps).to.deep.equal(['queue asked', 'queue drained', 'renderer.dispose()']);
   });
 
   it('a second dispose() throws nothing and emits nothing', () => {

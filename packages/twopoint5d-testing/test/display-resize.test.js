@@ -1,7 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayResize} from '@spearwolf/twopoint5d';
 import {on, off} from '@spearwolf/eventize';
-import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'display-resize-fixture';
 
@@ -29,7 +28,6 @@ async function disposeDisplay(display) {
   } catch {
     // ignore — dispose still works
   }
-  await stopAndDrain(display);
   display.dispose();
 }
 

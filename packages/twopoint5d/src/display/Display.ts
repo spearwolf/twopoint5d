@@ -48,6 +48,21 @@ function disposedError(member: string): Error {
   return new Error(`Display#${member} is not available: this display has been disposed`);
 }
 
+// renderer.dispose() destroys the device (WebGPUBackend.dispose()). On Firefox 155 under WebGPU,
+// destroying a device while submitted work is still in flight reports a GPUInternalError on the
+// destroyed device, and the page gets no requestAnimationFrame callback after that — every
+// animation on the page stands still. So the queue runs dry first
+async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
+  // the three.js typings leave the device off the backend, and the WebGL backend has none
+  const device = (renderer.backend as {device?: {queue: {onSubmittedWorkDone(): Promise<unknown>}} | null} | undefined)?.device;
+  if (device == null) return;
+  try {
+    await device.queue.onSubmittedWorkDone();
+  } catch {
+    // a device that is already lost has no work left to wait for; the release goes on anyway
+  }
+}
+
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
 /**
@@ -67,9 +82,12 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    renderer that fails to initialize fires `OnDisplayError` instead, and
  *    `start()` rejects with the same error.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
- *    releases the renderer. A container this display created inside a host
- *    element comes out of the DOM with the canvas in it; a canvas or a
- *    renderer handed to the constructor keeps its place in the document.
+ *    gives up {@link Display.renderer} right away. A container this display
+ *    created inside a host element comes out of the DOM with the canvas in
+ *    it; a canvas or a renderer handed to the constructor keeps its place in
+ *    the document. The renderer itself is released after `dispose()` has
+ *    returned, once its init is through and the GPU has run the work
+ *    submitted to it.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
  *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
@@ -374,8 +392,9 @@ export class Display {
    * or around a `WebGPURenderer` that is already built.
    *
    * A renderer handed in here is adopted, not borrowed: the display takes it and its
-   * `domElement` as its own, and {@link Display.dispose} calls `renderer.dispose()` on the way
-   * out. A renderer that has to outlive this display therefore does not belong in here.
+   * `domElement` as its own, and after {@link Display.dispose} releases it with
+   * `renderer.dispose()`, once its init is through and the GPU has run the work submitted to it.
+   * A renderer that has to outlive this display therefore does not belong in here.
    *
    * @param domElementOrRenderer a `<canvas>`, any other `HTMLElement` to host a canvas, or a
    *   ready-made `WebGPURenderer`
@@ -874,6 +893,18 @@ export class Display {
     this.#stateMachine.pausedByUser = true;
   }
 
+  /**
+   * Tears the display down.
+   *
+   * Before it returns, `dispose()` stops the frame loop, fires `OnDisplayDispose`, drops every
+   * listener, gives up {@link Display.renderer} and takes a container this display built out of
+   * the DOM, with the canvas in it. The renderer itself is released after the return, with
+   * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it.
+   *
+   * A `dispose()` while the renderer is still initializing waits for that init instead of
+   * cutting it short. An init that fails has built nothing to release, and its rejection does
+   * not escape. A second call does nothing.
+   */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
@@ -884,12 +915,38 @@ export class Display {
     // and off(this) below is what makes it the last event this display ever emits
     emit(this, OnDisplayDispose, this);
     off(this);
-    this.renderer?.dispose();
+
+    const renderer = this.renderer;
     delete this.renderer;
-    // after renderer.dispose(), so the renderer still finds its canvas while it releases the
-    // context; removing the container takes the canvas inside it along
+    if (renderer != null) this.#releaseRenderer(renderer);
+
+    // the container and the canvas in it leave the document right away; the renderer holds on
+    // to its canvas itself and does not need it in the document to release it
     this.#ownContainer?.remove();
     this.#ownContainer = undefined;
+  }
+
+  #releaseRenderer(renderer: WebGPURenderer): void {
+    // dispose() can fall in the middle of the init (a mount and unmount under React StrictMode).
+    // three does not release a renderer whose init is still running: the init would run to its
+    // end and keep the device, the context and the animation loop of three for good. So the
+    // release waits for the init, and then for the GPU
+    void this.#waitForRenderer
+      .then(
+        async () => {
+          await drainSubmittedWork(renderer);
+          renderer.dispose();
+        },
+        () => {
+          // a failed init has built nothing that renderer.dispose() would release, and its
+          // setAnimationLoop(null) would wait on the rejected init once more — a rejection that
+          // nobody could catch
+        },
+      )
+      .catch((error: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error('Display#dispose(): releasing the renderer failed after dispose() returned', error);
+      });
   }
 
   /**

@@ -261,15 +261,10 @@ Two runners, deliberately in separate packages:
   type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it
   from JSDoc — vertex object interfaces, descriptions.
 
-A browser test that disposes a display in its teardown calls `stopAndDrain()` from
-`packages/twopoint5d-testing/test/support/stopAndDrain.js` right before `dispose()`: it
-stops the display and waits until the GPU has run everything submitted to it. On Firefox
-155 under WebGPU, destroying a device while submitted work is still in flight reports a
-`GPUInternalError` on that device and ends `requestAnimationFrame` for the whole page,
-and every later test in the file waits for a frame until it times out. A test whose
-subject is `dispose()` itself calls it without the helper. Once Firefox takes such a
-device down without stalling, the calls can go; `pnpm test:browser` without them shows
-when.
+A browser test tears a display down in its teardown with `dispose()` alone:
+`Display#dispose()` stops the loop right away and releases the renderer only once the GPU
+has run the work submitted to it. Firefox 155 under WebGPU needs that to keep drawing
+frames for the tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
 under `node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts

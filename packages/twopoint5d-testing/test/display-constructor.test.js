@@ -1,7 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayError} from '@spearwolf/twopoint5d';
-import {stopAndDrain} from './support/stopAndDrain.js';
 
 /** @import {WebGPURenderer} from 'three/webgpu' */
 
@@ -50,9 +49,8 @@ describe('Display — what the constructor accepts and what it reports', functio
   /** @type {HTMLElement | undefined} */
   let host;
 
-  afterEach(async () => {
+  afterEach(() => {
     if (display) {
-      await stopAndDrain(display);
       display.dispose();
     }
     display = undefined;

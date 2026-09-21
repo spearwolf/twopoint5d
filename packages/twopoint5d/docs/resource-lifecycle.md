@@ -163,10 +163,13 @@ dispose(): void {
   // and off(this) below is what makes it the last event this display ever emits
   emit(this, OnDisplayDispose, this);
   off(this);
-  this.renderer?.dispose();
+
+  const renderer = this.renderer;
   delete this.renderer;
-  // after renderer.dispose(), so the renderer still finds its canvas while it releases the
-  // context; removing the container takes the canvas inside it along
+  if (renderer != null) this.#releaseRenderer(renderer);
+
+  // the container and the canvas in it leave the document right away; the renderer holds on
+  // to its canvas itself and does not need it in the document to release it
   this.#ownContainer?.remove();
   this.#ownContainer = undefined;
 }

@@ -473,6 +473,8 @@ What this layer does on top of the general rules in
   of the module and stays.
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
   handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
+  The field is gone as soon as `dispose()` returns; the renderer itself is released once its
+  init is through and the GPU has run the work submitted to it.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline` or an `outputRenderTarget` assigned from outside.
 

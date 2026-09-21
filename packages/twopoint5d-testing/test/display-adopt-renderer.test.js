@@ -1,7 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
-import {stopAndDrain} from './support/stopAndDrain.js';
 
 describe('Display — the constructor that adopts a renderer', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -19,10 +18,9 @@ describe('Display — the constructor that adopts a renderer', function () {
 
   // this block cleans up whatever got as far as existing — including the case where the
   // constructor threw and no display ever took the renderer over
-  afterEach(async () => {
+  afterEach(() => {
     if (display) {
       // Display.dispose() releases the renderer it was handed
-      await stopAndDrain(display);
       display.dispose();
     } else if (renderer) {
       renderer.dispose();
@@ -58,13 +56,21 @@ describe('Display — the constructor that adopts a renderer', function () {
     await display.start();
 
     let disposeCalls = 0;
+    /** @type {(value?: unknown) => void} */
+    let markReleased;
+    const released = new Promise((resolve) => {
+      markReleased = resolve;
+    });
     const realDispose = renderer.dispose.bind(renderer);
     renderer.dispose = () => {
       disposeCalls++;
       realDispose();
+      markReleased();
     };
 
     display.dispose();
+    // the display releases its renderer after dispose() has returned, once the GPU has run dry
+    await released;
 
     expect(disposeCalls, 'calls to renderer.dispose()').to.equal(1);
   });
