@@ -12,18 +12,26 @@ const projectRoot = path.resolve(process.cwd());
 console.log('workspaceRoot:', workspaceRoot);
 console.log('projectRoot:', projectRoot);
 
-const packageJsonPath = path.resolve(projectRoot, 'package.json');
-const inPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+// every file the manifest is made from is input that can be wrong, and gets a message instead of a stack trace
+function readInput(filePath, parse) {
+  try {
+    return parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    console.error(`cannot read ${filePath}: ${error.message}`);
+    process.exit(1);
+  }
+}
 
-const sharedPackageJson = JSON.parse(fs.readFileSync(path.resolve(workspaceRoot, 'package.json'), 'utf8'));
+const packageJsonPath = path.resolve(projectRoot, 'package.json');
+const inPackageJson = readInput(packageJsonPath, JSON.parse);
+
+const sharedPackageJson = readInput(path.resolve(workspaceRoot, 'package.json'), JSON.parse);
 const sharedDependencies = {...(sharedPackageJson.dependencies ?? {}), ...sharedPackageJson.devDependencies};
 
-const pnpmWorkspaceConfig = YAML.parse(fs.readFileSync(path.resolve(workspaceRoot, 'pnpm-workspace.yaml'), 'utf8'));
+const pnpmWorkspaceConfig = readInput(path.resolve(workspaceRoot, 'pnpm-workspace.yaml'), YAML.parse);
 
 const packageJsonOverridePath = path.resolve(projectRoot, 'package.override.json');
-const packageJsonOverride = fs.existsSync(packageJsonOverridePath)
-  ? JSON.parse(fs.readFileSync(packageJsonOverridePath, 'utf8'))
-  : {};
+const packageJsonOverride = fs.existsSync(packageJsonOverridePath) ? readInput(packageJsonOverridePath, JSON.parse) : {};
 
 const outPackageJson = {
   ...inPackageJson,
@@ -57,6 +65,18 @@ if (unpublishable.length > 0) {
   process.exit(1);
 }
 
-const releasePackageJsonPath = path.resolve(projectRoot, 'dist/package.json');
+const distDir = path.resolve(projectRoot, 'dist');
+const releasePackageJsonPath = path.resolve(distDir, 'package.json');
+// the manifest belongs next to the compiled library; a `dist/` holding nothing but a manifest
+// would be a package without code, so the script does not create the directory itself
+if (!fs.existsSync(distDir)) {
+  console.error(`cannot write ${releasePackageJsonPath}: ${distDir} does not exist, compile the package first`);
+  process.exit(1);
+}
 console.log('Write to', releasePackageJsonPath);
-fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
+try {
+  fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
+} catch (error) {
+  console.error(`cannot write ${releasePackageJsonPath}: ${error.message}`);
+  process.exit(1);
+}

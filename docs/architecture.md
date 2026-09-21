@@ -167,7 +167,9 @@ only without the whitespace around it and not in the form semver normalizes it t
 it is a version range; anything else, a range of nothing but whitespace included, leaves the
 specifier standing). If a
 `catalog:` or `workspace:` specifier is left in the manifest afterwards, the build
-fails — npm installs neither protocol. Since `dist/` is what gets
+fails — npm installs neither protocol. The script writes `dist/package.json` only into an
+existing `dist/` and stops without the compiled library, with the hint to compile first; an
+input file it cannot read stops it with the path and the reason. Since `dist/` is what gets
 published, `main`, `module`, `types` and every target in `exports` lose a leading
 `dist/` or `./dist/`; a `dist/` further inside a path is part of the name and
 stays.
@@ -181,7 +183,14 @@ The publishable artifact is therefore `dist/`, not the source package directory.
 publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a
 first publish. `publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and
 exit code 1 on a missing directory and on any other option — a misspelled `--dry-run`
-included — before it asks npm, and it calls npm without a shell. Never publish from
+included — before it asks npm. npm is asked with `npm show .` in the package directory, so
+the name comes from the manifest that `npm publish` reads there and no value from it
+stands on a command line. npm runs without a shell; on Windows, where `npm` is an
+`npm.cmd` that Node starts only through `cmd.exe`, it runs as a single string of literals,
+and an argument with any character besides letters, digits and `_ @ . / -` is refused on
+every platform. Every failure — a manifest that is unreadable or has no `name` or
+`version`, an npm that is missing or fails — ends with one line and exit code 1, and what
+`npm publish` itself prints goes straight to the console. Never publish from
 `packages/twopoint5d/` and never run these scripts without being asked to.
 
 `.github/workflows/deploy.yml` runs after every successful CI run on `main`. Both jobs
@@ -261,9 +270,9 @@ without stalling, the calls can go; `pnpm test:browser` without them shows when.
 The helpers of the publish pipeline, the CI cache server and the code block check run under
 `node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts
 `makePackageJson.mjs` itself, as a child process in a throwaway project directory, because
-its exit code and the manifest it does not write are wiring that no helper test sees. No spec
-runs `publishNpmPkg.mjs`, which queries the registry as soon as its arguments fit, nor
-`checkDocSnippets.mjs`, which reads git and the file system.
+its exit codes, its messages and the manifest it does not write are wiring that no helper
+test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon as its
+arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 
