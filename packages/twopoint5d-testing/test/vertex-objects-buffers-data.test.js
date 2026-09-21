@@ -2,6 +2,9 @@ import {expect} from '@esm-bundle/chai';
 import {Display, VertexObjectBuffer, VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
 import {MeshBasicMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 
+/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
+
 const FIXTURE_ID = 'vertex-objects-buffers-data-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -31,6 +34,7 @@ async function readBack(renderer, attr) {
   return Array.from(new Float32Array(await renderer.getArrayBufferAsync(attr)));
 }
 
+/** @type {VertexObjectDescription} */
 const quadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
@@ -68,11 +72,13 @@ describe('vertex-objects — buffers data', function () {
   });
 
   it('a pool restored from buffers data renders the values it was handed', async function () {
+    /** @type {VertexObjectPool<QuadVO>} */
     const source = new VertexObjectPool(quadDescription, 2);
     source.createVO().setPosition([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
 
     const buffersData = source.toBuffersData();
 
+    /** @type {VertexObjectPool<QuadVO>} */
     const restored = new VertexObjectPool(quadDescription, 2);
     // exercises the raw constructor path itself, not VOBufferPool#fromBuffersData(); capacity
     // is 2 on both sides on purpose, since this constructor does not reconcile a mismatch

@@ -109,11 +109,12 @@ describe('Display — the contract after dispose()', function () {
 
     display.dispose();
 
+    /** @type {Error | undefined} */
     let error;
     try {
       await display.start();
     } catch (err) {
-      error = err;
+      error = /** @type {Error} */ (err);
     }
 
     expect(error, 'start() fails').to.be.an.instanceOf(Error);
@@ -193,6 +194,7 @@ describe('Display — the contract after dispose()', function () {
       rendererIsUp = resolve;
     });
 
+    /** @type {(value?: unknown) => void} */
     let releaseInit;
     const initReleased = new Promise((resolve) => {
       releaseInit = resolve;
@@ -284,6 +286,7 @@ describe('Display — the contract after dispose()', function () {
       enterCallback = resolve;
     });
 
+    /** @type {(value?: unknown) => void} */
     let releaseCallback;
     const callbackReleased = new Promise((resolve) => {
       releaseCallback = resolve;
@@ -292,6 +295,7 @@ describe('Display — the contract after dispose()', function () {
     // the rejection handler is attached in the same turn as the call: this case means to be
     // rejected, and an unhandled rejection would take the whole suite down with it
     let outcome = 'pending';
+    /** @type {Error | undefined} */
     let rejection;
     const started = display
       .start(() => {
@@ -304,7 +308,7 @@ describe('Display — the contract after dispose()', function () {
         },
         (err) => {
           outcome = 'rejected';
-          rejection = err;
+          rejection = /** @type {Error} */ (err);
         },
       );
 
@@ -344,11 +348,12 @@ describe('Display — the contract after dispose()', function () {
     expect(rejection.message).to.contain('Display#nextFrame()');
     expect(rejection.message).to.contain('disposed');
 
+    /** @type {Error | undefined} */
     let error;
     try {
       await display.nextFrame();
     } catch (err) {
-      error = err;
+      error = /** @type {Error} */ (err);
     }
 
     expect(error, 'nextFrame() called after dispose()').to.be.an.instanceOf(Error);

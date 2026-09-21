@@ -13,7 +13,7 @@ them.
 | Path | Role |
 | --- | --- |
 | `packages/twopoint5d` | the published library `@spearwolf/twopoint5d` — almost all work happens here |
-| `packages/twopoint5d-testing` | browser/WebGL integration tests, kept out of the library so it stays Vitest-only |
+| `packages/twopoint5d-testing` | browser/WebGL integration tests, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
 | `apps/lookbook` | Astro showcase and de-facto live documentation |
 
 Nx tags select projects in the root scripts: `twopoint5d` (library + browser harness),
@@ -37,12 +37,14 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
   thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
   single-file run measure nothing
-- `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline and the CI
-  cache server (`scripts/**/*.test.mjs`); no Nx project owns them, so `pnpm test` does not
-  run them
+- `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
+  cache server and the docs' code block check (`scripts/**/*.test.mjs`); no Nx project owns
+  them, so `pnpm test` does not run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
-  the lookbook's `.ts` and `.astro` files
+  the lookbook's `.ts` and `.astro` files, the browser tests, and every code block marked
+  `ts check` in the Markdown files; the tests and the blocks are checked against the built
+  library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
   checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser. Run
@@ -64,14 +66,21 @@ explicit instruction.
   the library.
 - **Publishing** happens from the generated `dist/`, never from
   `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
-  the published package. `scripts/ci/` is the exception: the Nx cache server of the CI
-  workflow.
+  the published package. `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions:
+  the Nx cache server of the CI workflow, and the check of the docs' code blocks, which
+  publishes nothing.
 - **`dispose()` and ownership** follow
   [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md). They
   are binding, not advisory.
 - **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and
   `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
   change to rendering or GPU-buffer code needs both.
+- **Code blocks in Markdown.** A plain `ts` code block is an excerpt and nothing checks it.
+  A block that stands on its own — imports everything it uses, declares everything it
+  names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as a
+  module of its own against the built library under the root tsconfig (unused locals and
+  parameters allowed). Released CHANGELOG sections are not marked after the fact; their
+  blocks show the API of their release.
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
   Code, comments and docs are written in English.
 

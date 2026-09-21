@@ -3,6 +3,10 @@ import {Display, InstancedVertexObjectGeometry, VertexObjects} from '@spearwolf/
 import {attribute} from 'three/tsl';
 import {MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 
+/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
+/** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
+
 const FIXTURE_ID = 'vertex-objects-heap-fixture';
 
 // The absolute heap size of the test page depends on the V8 version and on what three loads; a
@@ -34,15 +38,21 @@ function disposeDisplay(display) {
   }
 }
 
+/** @type {VertexObjectDescription} */
 const quadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
+/** @type {VertexObjectDescription} */
 const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
+
+// Chrome's non-standard heap counter; Firefox has none, which the `before()` hook checks for
+/** @type {Performance & {memory?: {usedJSHeapSize: number}}} */
+const chromePerformance = performance;
 
 /**
  * A single GC pass only clears the young generation, so a raw heap reading still climbs
@@ -55,7 +65,7 @@ async function sampleHeap() {
     globalThis.gc({execution: 'sync', type: 'major'});
   }
   await new Promise((resolve) => setTimeout(resolve, 50));
-  return performance.memory.usedJSHeapSize;
+  return chromePerformance.memory.usedJSHeapSize;
 }
 
 describe('vertex-objects — heap', function () {
@@ -63,7 +73,7 @@ describe('vertex-objects — heap', function () {
     // Firefox has neither performance.memory nor globalThis.gc, and on this machine it
     // gets no GL context at all — skip before a Display ever starts, so Firefox's error
     // count stays exactly where it was before this file existed.
-    if (typeof performance.memory === 'undefined' || typeof globalThis.gc !== 'function') {
+    if (typeof chromePerformance.memory === 'undefined' || typeof globalThis.gc !== 'function') {
       this.skip();
     }
   });
@@ -92,7 +102,7 @@ describe('vertex-objects — heap', function () {
     // that cache instead of the pool/geometry path it's actually after.
     material = new MeshBasicNodeMaterial();
     // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
-    material.positionNode = attribute('position', 'vec3').add(attribute('instanceOffset', 'vec3'));
+    material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
   });
 
   afterEach(() => {
@@ -107,6 +117,7 @@ describe('vertex-objects — heap', function () {
 
   it('does not leak geometries or heap across many create/render/dispose rounds', async function () {
     async function round() {
+      /** @type {InstancedVertexObjectGeometry<InstanceVO, QuadVO>} */
       const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
       geometry.basePool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
       geometry.instancedPool.createVO().setInstanceOffset([1, 1, 1]);

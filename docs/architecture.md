@@ -54,6 +54,14 @@ import it only as `@spearwolf/twopoint5d`, that is from `dist/`, so a change to 
 library's specs, docs or CHANGELOG leaves them in the cache, and a changed `dist/` does
 not.
 
+`twopoint5d-testing:typecheck` is the one consumer that also reads Markdown, so for it a
+Markdown file is an input. It checks the browser tests through the package's own
+`tsconfig.json` (`checkJs`, with `noImplicitAny` and `strictNullChecks` off) and every code
+block marked `ts check` through `scripts/checkDocSnippets.mjs`, both against the library's
+build output. Its inputs are that build output, the tests, the tsconfig, `package.json`, the
+modules of the check and every `*.md` of the repository: a marked block can sit in any of
+them, and one that stops compiling has to turn the target red.
+
 Named inputs worth knowing: `sharedTsconfigs` (root + project tsconfig),
 `makePackageJson` (everything that feeds the publish manifest, the root `package.json`
 included — change any of it and the library rebuilds).
@@ -71,8 +79,10 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   a relative import) apply to `.astro` files as well: to the frontmatter directly, and to
   every `<script>` block, because `eslint-plugin-astro` hands each block to ESLint as a
   virtual `.ts` file.
-- `typecheck` covers the library including its specs, and the lookbook — its `.ts`
-  files and its `.astro` pages, via `astro check`.
+- `typecheck` covers the library including its specs, the lookbook — its `.ts` files and
+  its `.astro` pages, via `astro check` — the browser tests of `twopoint5d-testing`, and every
+  code block marked `ts check` in the tracked Markdown files. The tests and the blocks are
+  checked against the built library.
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/`.
 - `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts`
   and fails on published declarations that reference a type consumers cannot name.
@@ -82,7 +92,8 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   `dependencies` or `optionalDependencies`. The library reaches its consumers with peer
   dependencies only, and the non-blocking audit step in CI relies on that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
-  pipeline's helpers (§4) and of the CI cache server.
+  pipeline's helpers (§4), of the CI cache server and of the helpers of the code block
+  check.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the thresholds in
   `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate: it runs the same specs
   without coverage. The thresholds sit two points under the level measured when they were set,
@@ -212,11 +223,14 @@ Two runners, deliberately in separate packages:
 - `@web/test-runner` with Playwright Chromium and Firefox in
   `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for
   anything that needs a real GPU context. `pnpm install` downloads no browsers; they come
-  from `pnpm exec playwright install chromium firefox`.
+  from `pnpm exec playwright install chromium firefox`. The `*.test.js` files are
+  type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from
+  JSDoc — vertex object interfaces, descriptions.
 
-The helpers of the publish pipeline and the CI cache server run under `node --test`
-(`pnpm test:scripts`); no Nx project owns them. Their specs import only the helper modules, never
-`publishNpmPkg.mjs`, which queries the registry as soon as it loads.
+The helpers of the publish pipeline, the CI cache server and the code block check run under
+`node --test` (`pnpm test:scripts`); no Nx project owns them. Their specs import only the
+helper modules, never `publishNpmPkg.mjs`, which queries the registry as soon as it loads, nor
+`checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

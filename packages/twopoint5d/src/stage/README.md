@@ -65,7 +65,7 @@ The minimal idiomatic setup. `StageRenderer(display)` hooks the renderer
 into the display's frame loop — you don't write your own `OnDisplayRenderFrame`
 handler.
 
-```ts
+```ts check
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color} from 'three/webgpu';
 
@@ -365,7 +365,7 @@ before its own pipeline runs.
 
 Anything that implements `IStage & IRenderable` can be added:
 
-```ts
+```ts check
 import type {IStage, IRenderable} from '@spearwolf/twopoint5d';
 import type {WebGPURenderer} from 'three/webgpu';
 

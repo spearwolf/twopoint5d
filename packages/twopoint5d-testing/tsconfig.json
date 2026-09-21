@@ -1,0 +1,17 @@
+// The tests are JavaScript. Under the strictness of the root config nearly every fixture
+// variable would need a cast, and those casts find nothing. So `noImplicitAny` and
+// `strictNullChecks` are off; unknown members and wrong argument shapes stay errors,
+// which is what the check is for. `types: ["mocha"]` keeps Node and Sinon globals out
+// of code that runs in the browser.
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "types": ["mocha"]
+  },
+  "include": ["test"]
+}

@@ -3,6 +3,11 @@ import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObje
 import {attribute} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 
+/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
+/** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
+/** @typedef {VO & {setPosition: VOAttrSetter, setColor: VOAttrSetter}} ColoredQuadVO */
+
 const FIXTURE_ID = 'vertex-objects-gpu-upload-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -55,6 +60,7 @@ async function readBackInterleaved(display, attr) {
   return Array.from(out);
 }
 
+/** @type {VertexObjectDescription} */
 const quadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
@@ -63,17 +69,20 @@ const quadDescription = {
 
 // static and therefore without autoTouch: what reaches the gpu here comes from the pool having
 // written something, which is the whole point of this test
+/** @type {VertexObjectDescription} */
 const staticQuadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'static'}},
 };
 
+/** @type {VertexObjectDescription} */
 const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
 // both attributes share the buffer name `dynamic_float32`, so they interleave into one buffer of stride 6
+/** @type {VertexObjectDescription} */
 const interleavedQuadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
@@ -114,6 +123,7 @@ describe('vertex-objects — gpu upload', function () {
   });
 
   it('every vertex of a used object reaches the gpu, not just the first', async function () {
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
     scene.add(mesh);
@@ -141,6 +151,7 @@ describe('vertex-objects — gpu upload', function () {
   });
 
   it('a spawn in a large, mostly static pool uploads the new object alone', async function () {
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(staticQuadDescription, 64);
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
     scene.add(mesh);
@@ -184,10 +195,11 @@ describe('vertex-objects — gpu upload', function () {
   });
 
   it('an instanced geometry uploads its base quad and every used instance', async function () {
+    /** @type {InstancedVertexObjectGeometry<InstanceVO, QuadVO>} */
     const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
     const material = new MeshBasicNodeMaterial();
     // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
-    material.positionNode = attribute('position', 'vec3').add(attribute('instanceOffset', 'vec3'));
+    material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
     const mesh = new VertexObjects(geometry, material);
     scene.add(mesh);
 
@@ -226,11 +238,13 @@ describe('vertex-objects — gpu upload', function () {
 
   it('an object whose indices leave a vertex unused is drawn from its own vertices', async function () {
     // four vertices per object, of which the indices name three: the second object starts at vertex 4
+    /** @type {VertexObjectDescription} */
     const description = {
       vertexCount: 4,
       indices: [0, 1, 2],
       attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
     };
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(description, 2);
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
     scene.add(mesh);
@@ -248,6 +262,7 @@ describe('vertex-objects — gpu upload', function () {
   });
 
   it('two attributes that share a buffer upload the whole stride of every used vertex', async function () {
+    /** @type {VertexObjectGeometry<ColoredQuadVO>} */
     const geometry = new VertexObjectGeometry(interleavedQuadDescription, 8);
     const material = new MeshBasicNodeMaterial();
     // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it

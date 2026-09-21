@@ -2,6 +2,8 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayError} from '@spearwolf/twopoint5d';
 
+/** @import {WebGPURenderer} from 'three/webgpu' */
+
 const FIXTURE_ID = 'display-constructor-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -22,16 +24,20 @@ function makeContainer({width = 320, height = 200} = {}) {
 
 // The members the display touches on its renderer before the first frame. The result of
 // createRenderer is never checked against WebGPURenderer, so a failing init needs no real one —
-// and a real one cannot be made to fail on demand.
+// and a real one cannot be made to fail on demand. The stub carries what `Display` calls on the
+// renderer and nothing else, so it goes through `unknown` to be handed out as a WebGPURenderer.
+/** @returns {WebGPURenderer} */
 function makeRendererStub(canvas, initResult) {
-  return {
-    domElement: canvas,
-    init: () => initResult,
-    setPixelRatio() {},
-    setSize() {},
-    setAnimationLoop() {},
-    dispose() {},
-  };
+  return /** @type {WebGPURenderer} */ (
+    /** @type {unknown} */ ({
+      domElement: canvas,
+      init: () => initResult,
+      setPixelRatio() {},
+      setSize() {},
+      setAnimationLoop() {},
+      dispose() {},
+    })
+  );
 }
 
 describe('Display — what the constructor accepts and what it reports', function () {
@@ -56,6 +62,7 @@ describe('Display — what the constructor accepts and what it reports', functio
 
   it('refuses a first argument that is neither an element nor a renderer', () => {
     const withNull = () => new Display(null);
+    // @ts-expect-error — the case hands the constructor what it refuses
     const withPlainObject = () => new Display({});
 
     expect(withNull, 'null names what the constructor takes').to.throw(TypeError, /WebGPURenderer or an HTML element/);

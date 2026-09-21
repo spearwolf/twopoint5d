@@ -5,6 +5,19 @@
   "targets": {
     "test": {
       "inputs": ["default", {"dependentTasksOutputFiles": "**/*", "transitive": true}]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "{projectRoot}/test/**/*.js",
+        "{projectRoot}/package.json",
+        "sharedTsconfigs",
+        "{workspaceRoot}/**/*.md",
+        "{workspaceRoot}/scripts/checkDocSnippets.mjs",
+        "{workspaceRoot}/scripts/checkDocSnippets/*.mjs",
+        "!{workspaceRoot}/scripts/checkDocSnippets/*.test.mjs",
+        {"dependentTasksOutputFiles": "**/*", "transitive": true}
+      ]
     }
   }
 }

@@ -4,6 +4,7 @@ import {on, off} from '@spearwolf/eventize';
 
 const FIXTURE_ID = 'display-resize-fixture';
 
+/** @param {{width?: number, height?: number, id?: string}} [options] */
 function makeContainer({width = 320, height = 200, id} = {}) {
   const el = document.createElement('div');
   el.id = id ?? `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;

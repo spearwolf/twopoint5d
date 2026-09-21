@@ -139,6 +139,7 @@ describe('TextureStore.on() — black-box workflow', function () {
 
     it('on(id, ["texture", "imageCoords"]) delivers a tuple in the requested order, once', async () => {
       let calls = 0;
+      /** @type {[Texture, TextureCoords] | undefined} */
       let tuple;
       const unsubscribe = store.on('plain', ['texture', 'imageCoords'], (values) => {
         calls++;
@@ -280,6 +281,7 @@ describe('TextureStore.on() — black-box workflow', function () {
 
     it('tuple ["texture", "tileSet", "frameBasedAnimations"] fires once with all three values', async () => {
       let calls = 0;
+      /** @type {[Texture, TileSet, FrameBasedAnimations] | undefined} */
       let payload;
       const unsub = store.on('sheet', ['texture', 'tileSet', 'frameBasedAnimations'], (values) => {
         calls++;
@@ -348,6 +350,7 @@ describe('TextureStore.on() — black-box workflow', function () {
 
     it('tuple ["texture", "atlas"] fires once with both values', async () => {
       let calls = 0;
+      /** @type {[Texture, TextureAtlas] | undefined} */
       let payload;
       const unsub = store.on('balls', ['texture', 'atlas'], (values) => {
         calls++;

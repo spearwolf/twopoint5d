@@ -14,7 +14,7 @@ describe('hello twopoint5d canvas', function () {
   });
 
   it('renders its first frame as frame 1 on the canvas of the test page, at a size above 0x0', async () => {
-    const el = document.querySelector('canvas#test-canvas');
+    const el = /** @type {HTMLCanvasElement} */ (document.querySelector('canvas#test-canvas'));
     expect(el, 'canvas#test-canvas').to.exist;
 
     display = new Display(el);

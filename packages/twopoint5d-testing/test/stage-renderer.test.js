@@ -2,6 +2,8 @@ import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
 
+/** @import {TextureNode} from 'three/webgpu' */
+
 const FIXTURE_ID = 'stage-renderer-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -29,6 +31,13 @@ async function disposeDisplay(display) {
   }
   display.dispose();
 }
+
+// `Texture.image` is `unknown` in the three.js typings; a render target texture carries its size there
+/** @param {TextureNode} node */
+const imageSize = (node) => {
+  const image = /** @type {{width: number, height: number}} */ (node.value.image);
+  return [image.width, image.height];
+};
 
 describe('StageRenderer — integration with Display', () => {
   /** @type {Display | undefined} */
@@ -179,11 +188,11 @@ describe('StageRenderer — integration with Display', () => {
     const sr = new StageRenderer();
     sr.resize(100, 50);
 
-    const passNode = sr.asPassNode(display.renderer);
-    expect([passNode.value.image.width, passNode.value.image.height]).to.deep.equal([200, 100]);
+    const passNode = /** @type {TextureNode} */ (sr.asPassNode(display.renderer));
+    expect(imageSize(passNode)).to.deep.equal([200, 100]);
 
     sr.resize(300, 150);
-    expect([passNode.value.image.width, passNode.value.image.height]).to.deep.equal([600, 300]);
+    expect(imageSize(passNode)).to.deep.equal([600, 300]);
 
     sr.dispose();
   });

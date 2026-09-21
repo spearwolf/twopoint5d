@@ -2,6 +2,8 @@ import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline} from 'three/webgpu';
 
+/** @import {PassNode} from 'three/webgpu' */
+
 const FIXTURE_ID = 'stage-pipeline-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -76,10 +78,11 @@ describe('StageRenderer — pipeline integration', () => {
     sr.pipeline = new RenderPipeline(display.renderer);
 
     let buildCalls = 0;
+    /** @type {PassNode[] | undefined} */
     let lastPasses;
     sr.buildOutputNode = (passes) => {
       buildCalls += 1;
-      lastPasses = passes;
+      lastPasses = /** @type {PassNode[]} */ (passes);
       return passes[0];
     };
 
@@ -101,10 +104,11 @@ describe('StageRenderer — pipeline integration', () => {
     sr.pipeline = new RenderPipeline(display.renderer);
 
     let buildCalls = 0;
+    /** @type {PassNode[] | undefined} */
     let lastPasses;
     sr.buildOutputNode = (passes) => {
       buildCalls += 1;
-      lastPasses = passes;
+      lastPasses = /** @type {PassNode[]} */ (passes);
       return passes[0];
     };
 
@@ -131,10 +135,11 @@ describe('StageRenderer — pipeline integration', () => {
     sr.pipeline = new RenderPipeline(display.renderer);
 
     let buildCalls = 0;
+    /** @type {PassNode[] | undefined} */
     let lastPasses;
     sr.buildOutputNode = (passes) => {
       buildCalls += 1;
-      lastPasses = passes;
+      lastPasses = /** @type {PassNode[]} */ (passes);
       return passes[0];
     };
 
@@ -168,7 +173,7 @@ describe('StageRenderer — pipeline integration', () => {
     await display.start();
     await display.nextFrame();
 
-    const renderTarget = stage.asPassNode(display.renderer).renderTarget;
+    const renderTarget = /** @type {PassNode} */ (stage.asPassNode(display.renderer)).renderTarget;
     let disposeCalls = 0;
     const origDispose = renderTarget.dispose.bind(renderTarget);
     renderTarget.dispose = (...a) => {

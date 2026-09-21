@@ -3,6 +3,11 @@ import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObje
 import {attribute} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 
+/** @import {VO, VOAttrSetter, VertexObjectDescription, VertexObjectPool} from '@spearwolf/twopoint5d' */
+/** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
+/** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
+/** @typedef {VO & {setExtraOffset: VOAttrSetter}} ExtraVO */
+
 const FIXTURE_ID = 'vertex-objects-dispose-fixture';
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -27,16 +32,19 @@ function disposeDisplay(display) {
   }
 }
 
+/** @type {VertexObjectDescription} */
 const quadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
+/** @type {VertexObjectDescription} */
 const instancedDescription = {
   attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
+/** @type {VertexObjectDescription} */
 const extraInstancedDescription = {
   attributes: {extraOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
@@ -118,6 +126,7 @@ describe('vertex-objects — dispose', function () {
   // on the geometry, not slots lent out by a pool.
 
   it('a rendered geometry disposes and gives up its slots', async function () {
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
     await renderOnce(new VertexObjects(geometry, new MeshBasicMaterial()));
@@ -131,6 +140,7 @@ describe('vertex-objects — dispose', function () {
   });
 
   it('a rendered geometry taken out of the scene disposes and gives up its slots', async function () {
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
@@ -148,10 +158,11 @@ describe('vertex-objects — dispose', function () {
   });
 
   it('a rendered instanced geometry disposes and gives up its slots', async function () {
+    /** @type {InstancedVertexObjectGeometry<InstanceVO, QuadVO>} */
     const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
     const material = new MeshBasicNodeMaterial();
     // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
-    material.positionNode = attribute('position', 'vec3').add(attribute('instanceOffset', 'vec3'));
+    material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
     geometry.basePool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
     geometry.instancedPool.createVO().setInstanceOffset([1, 1, 1]);
     await renderOnce(new VertexObjects(geometry, material));
@@ -164,10 +175,12 @@ describe('vertex-objects — dispose', function () {
 
   /** A geometry with a third route, and a material whose shader reads all three attributes. */
   function makeGeometryWithExtraRoute() {
+    /** @type {InstancedVertexObjectGeometry<InstanceVO, QuadVO>} */
     const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
+    /** @type {VertexObjectPool<ExtraVO>} */
     const extraPool = geometry.attachInstancedPool('extra', extraInstancedDescription);
     const material = new MeshBasicNodeMaterial();
-    material.positionNode = attribute('position', 'vec3')
+    material.positionNode = attribute('position', /** @type {const} */ ('vec3'))
       .add(attribute('instanceOffset', 'vec3'))
       .add(attribute('extraOffset', 'vec3'));
     geometry.basePool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
@@ -214,7 +227,7 @@ describe('vertex-objects — dispose', function () {
 
     // the slot of the detached route is empty, so the shader may not read it any more
     const withoutExtra = new MeshBasicNodeMaterial();
-    withoutExtra.positionNode = attribute('position', 'vec3').add(attribute('instanceOffset', 'vec3'));
+    withoutExtra.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
     mesh.material = withoutExtra;
 
     display.renderer.render(scene, camera);
@@ -263,6 +276,7 @@ describe('vertex-objects — dispose', function () {
 
   it('a second dispose() frees nothing a second time', async function () {
     const attributesBefore = await attributesBaseline();
+    /** @type {VertexObjectGeometry<QuadVO>} */
     const geometry = new VertexObjectGeometry(quadDescription, 8);
     geometry.pool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
     await renderOnce(new VertexObjects(geometry, new MeshBasicMaterial()));

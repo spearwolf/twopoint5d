@@ -12,7 +12,9 @@ function ruleCount(root) {
 
 function findRule(className, root) {
   const selector = `.${className}`;
-  return Array.from(Stylesheets.getGlobalSheet(root).cssRules).find((rule) => rule.selectorText === selector);
+  return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).find(
+    (rule) => rule.selectorText === selector,
+  );
 }
 
 describe('Stylesheets', function () {

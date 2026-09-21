@@ -11,7 +11,8 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "test": "pnpm web-test-runner"
+    "test": "pnpm web-test-runner",
+    "typecheck": "pnpm tsc -p tsconfig.json && node ../../scripts/checkDocSnippets.mjs"
   },
   "dependencies": {
     "@spearwolf/eventize": "catalog:",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@esm-bundle/chai": "4.3.4-fix.0",
+    "@types/mocha": "^10.0.10",
     "@web/dev-server-esbuild": "^2.0.0",
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-playwright": "^1.0.0"

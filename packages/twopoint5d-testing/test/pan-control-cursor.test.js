@@ -152,7 +152,7 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
   }
 
   function cursorRules(root) {
-    return Array.from(Stylesheets.getGlobalSheet(root).cssRules).filter((rule) =>
+    return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).filter((rule) =>
       rule.selectorText?.startsWith('.PanControl2D-'),
     );
   }
