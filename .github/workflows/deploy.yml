@@ -17,12 +17,18 @@ jobs:
   version:
     name: Check whether npm has this version
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # both jobs check out the commit the CI run names, so only a push to this repository may name it
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_repository.full_name == github.repository }}
     outputs:
       publish: ${{ steps.check.outputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          # the commit the CI run tested; main may have moved on since
+          ref: ${{ github.event.workflow_run.head_sha }}
           sparse-checkout: packages/twopoint5d/package.json
           sparse-checkout-cone-mode: false
 
@@ -65,10 +71,12 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
-          version: 10.27.0
+          # the same commit the version job read
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # installs the pnpm that packageManager in package.json names
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

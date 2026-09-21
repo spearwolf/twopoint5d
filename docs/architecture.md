@@ -184,7 +184,11 @@ exit code 1 on a missing directory and on any other option — a misspelled `--d
 included — before it asks npm, and it calls npm without a shell. Never publish from
 `packages/twopoint5d/` and never run these scripts without being asked to.
 
-`.github/workflows/deploy.yml` runs after every successful CI run on `main`. Its first
+`.github/workflows/deploy.yml` runs after every successful CI run on `main`. Both jobs
+check out `github.event.workflow_run.head_sha`, the commit that CI run tested: `main` may
+have moved on while CI ran, and a newer commit gets a CI run and a deploy of its own. They
+run only for a CI run triggered by a push to this repository, the one kind of run that may
+name the commit to publish. The first
 job asks npm whether the manifest version is published already, or whether it ends in
 `-dev`; only if neither holds does the second job install, build and run
 `publishNpmPkg`. It authenticates through npm Trusted Publishing (OIDC, with
@@ -213,8 +217,20 @@ Dependabot proposes the jump as a pull request of its own, and the group leaves 
 out for that reason. Overrides live in `pnpm-workspace.yaml`. Each one carries a comment
 that names the advisory it answers and says when the entry can go.
 
+`@emnapi/core` and `@emnapi/runtime` are root devDependencies that nothing imports. They are
+peers of `@napi-rs/wasm-runtime`, which `eslint-plugin-astro` pulls in through the
+WebAssembly build of the Astro compiler. Left undeclared, pnpm resolves that peer one way or
+the other from run to run: an install that re-resolves on top of the lockfile — after any
+manifest change, in every Dependabot update — rewrites about 40 lines of `pnpm-lock.yaml` and
+warns about a missing peer, and a resolution from scratch lands on either form. Declared,
+every resolution writes the same lockfile. They can go once
+`pnpm install --lockfile-only --resolution-only` leaves the lockfile untouched and warns
+about nothing without them.
+
 Node and pnpm versions come from `engines` in the root `package.json`: Node
-`^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. `.nvmrc`,
+`^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm is
+`packageManager` in the root `package.json`; `pnpm/action-setup` in both workflows reads it
+from there and names no version of its own. `.nvmrc`,
 `mise.toml` and the `node-version` of the CI workflows name a plain `24`. They answer
 which version to install, not which ones are allowed, and none of them understands an
 alternative like `||`; a `24` picks the newest 24.x the tool can get and lands inside

@@ -8,6 +8,7 @@
     "url": "https://www.spearwolf.de"
   },
   "license": "Apache-2.0",
+  "private": true,
   "sideEffects": false,
   "type": "module",
   "scripts": {

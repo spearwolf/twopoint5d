@@ -65,6 +65,9 @@ explicit instruction.
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. They are peer dependencies of
   the library.
+- **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
+  nothing and stay: they hold `pnpm-lock.yaml` to one resolution
+  ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
 - **Publishing** happens from the generated `dist/`, never from
   `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
   the published package. `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions:

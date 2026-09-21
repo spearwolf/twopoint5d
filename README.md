@@ -16,7 +16,7 @@
 <div align="center">
 
 ![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/twopoint5d)
-![github actions main workflow status](https://github.com/spearwolf/twopoint5d/actions/workflows/deploy.yml/badge.svg)
+[![continuous integration status](https://github.com/spearwolf/twopoint5d/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/spearwolf/twopoint5d/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
 </div>
@@ -88,7 +88,7 @@ $ pnpm exec playwright install chromium firefox
 ### 2. Build and test everything
 
 ```sh
-$ pnpm cbt  # clean, lint, build, type-check, check package types, lint the manifest, then all tests
+$ pnpm cbt  # clean, lint, build, type-check, check the package types and that every published type can be named, lint the manifest, then the script tests, the Vitest suite with coverage and the browser tests
 ```
 
 ### 3. Run the local LOOKBOOK app
