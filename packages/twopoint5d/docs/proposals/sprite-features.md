@@ -48,12 +48,13 @@ A feature is written once and fits every sprite kind whose base satisfies its co
 
 Two observations from reading the current sprites:
 
-- **Rotation runs before the non-uniform scale.** `TexturedSpritesMaterial` rotates the
-  unit quad and multiplies the result by `vec3(quadSize, 1)` afterwards
-  (`vertexByInstancePosition` / `billboardVertexByInstancePosition`). For `width !== height`
-  a rotated sprite therefore comes out as a parallelogram, not as a rotated rectangle. This
-  proposal fixes the order by construction (§4.2); independently of it, the existing
-  materials should scale first and rotate second.
+- **The order of the local transforms is easy to get wrong.** `TexturedSpritesMaterial`
+  used to rotate the unit quad and multiply the result by `vec3(quadSize, 1)` afterwards,
+  so a rotated sprite with `width !== height` came out as a parallelogram. It now scales
+  first and rotates second, and `packages/twopoint5d-testing/test/sprites-rotation.test.js`
+  holds it there. The order was a line in one effect, and nothing but a rendered picture
+  could tell it was wrong — which is why this proposal makes it part of the model (§4.2)
+  instead of leaving it to each material.
 - **`TexturedSprite` writes a `color` attribute that no shader reads.** The descriptor
   declares it and `[voInitialize]` fills it with white, but `TexturedSpritesMaterial` only
   samples the color map. It is a tint feature with the shader half missing.
@@ -338,9 +339,10 @@ its tint attribute `color`, the `Tint` feature calls it `tint` (§8, question 5)
 - Vitest, next to the sources: merging, the `requires` and cardinality errors, collision
   errors that name both features, stage order including ties, `initialize` running for a
   reused slot, `freeSprite()` moving every feature's attributes together.
-- Browser (`packages/twopoint5d-testing`): one non-square sprite through
-  QuadSize + Shear + Rotation, compared against a reference image — the case the current
-  rotate-then-scale order gets wrong — and flat vs. billboard placement.
+- Browser (`packages/twopoint5d-testing`): the presets of §5.3 against the pixel boxes
+  `sprites-rotation.test.js` measures for `TexturedSprites` today, flat and as billboards;
+  then a non-square sprite through QuadSize + Shear + Rotation. Measuring the covered box
+  in a render target needs no reference images and survives the WebGL2 fallback.
 
 ## 7. Later: pool groups for shared or runtime features
 
