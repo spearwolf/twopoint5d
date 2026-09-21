@@ -61,9 +61,11 @@ included — change any of it and the library rebuilds).
 clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:ci → test:browser
 ```
 
-- `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`/`.js`
-  and in the `<script>` blocks of `.astro` files (`eslint-plugin-astro` hands each block to
-  ESLint as a virtual `.ts` file, so the `.ts` rules apply there too).
+- `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`, `.js`
+  and `.astro` files. The `.ts` rules (`consistent-type-imports`, the ban on a `.ts` suffix in
+  a relative import) apply to `.astro` files as well: to the frontmatter directly, and to
+  every `<script>` block, because `eslint-plugin-astro` hands each block to ESLint as a
+  virtual `.ts` file.
 - `typecheck` covers the library including its specs, and the lookbook — its `.ts`
   files and its `.astro` pages, via `astro check`.
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/`.
@@ -71,7 +73,9 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   and fails on published declarations that reference a type consumers cannot name.
   `attw` and `publint` resolve such a type structurally and stay quiet, which is
   exactly why this check exists.
-- `lintPkg` runs publint against `dist/`.
+- `lintPkg` runs publint against `dist/` and fails as soon as `dist/package.json` declares
+  `dependencies` or `optionalDependencies`. The library reaches its consumers with peer
+  dependencies only, and the non-blocking audit step in CI relies on that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
   pipeline's helpers (§4) and of the CI cache server.
 
@@ -83,6 +87,12 @@ code that runs. The workflow reads `contents` only. Its concurrency group is the
 so a newer push cancels the running or waiting run of the same branch — except on
 `main`, where the group is the commit: every commit there gets its own run, which
 nothing cancels, because `deploy.yml` follows each successful one.
+
+The step `Audit dependencies` follows the install and runs `pnpm audit --audit-level=high`.
+It reports high and critical advisories without failing the run: the published package
+declares peer dependencies only (`lintPkg` holds that), so whatever the audit finds sits in
+tooling, and Dependabot proposes the update that fixes it (§5). Dependabot also keeps the
+commit SHAs of the actions, and the version comment next to each, current.
 
 The Playwright browsers are cached under the key `playwright-<os>-<version>`, the
 version being what `pnpm exec playwright --version` reports from the root package. A
@@ -156,6 +166,16 @@ the `catalog:` block of `pnpm-workspace.yaml`. Individual `package.json` files r
 them as `"catalog:"`, so a version bump happens in exactly one place and stays
 consistent across library, test harness and lookbook. In the library they are
 `peerDependencies`.
+
+`.github/dependabot.yml` has Dependabot look at `npm` and `github-actions` once a week. The
+minor and patch updates of the toolchain arrive as one pull request, the group `toolchain`.
+The four catalog entries stay out of it: a jump of `three` moves the peer range of the
+library and needs a review of its own, so each of them, and every major update, comes as a
+pull request by itself. Playwright is held to `~1.62.1` in the root `package.json`, because
+the browser suite hangs under WebGPU on the Firefox 155 that Playwright 1.63 ships;
+Dependabot proposes the jump as a pull request of its own, and the group leaves `playwright`
+out for that reason. Overrides live in `pnpm-workspace.yaml`. Each one carries a comment
+that names the advisory it answers and says when the entry can go.
 
 Node and pnpm versions come from `engines` in the root `package.json`: Node
 `^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. `.nvmrc`,

@@ -24,8 +24,5 @@ apps/*/.astro
 # playwright run artifacts
 packages/*/test-results
 
-# vendored build output, kept byte-for-byte as shipped
-apps/lookbook/public/js
-
 # report artifact, rewritten wholesale by its generator
 audit.html

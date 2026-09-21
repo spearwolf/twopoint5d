@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ['.nx/*', '.vscode/*', '**/dist', '**/.astro', '**/lookbook/public', '**/*.d.ts', '**/node_modules'],
+    ignores: ['.nx/*', '.vscode/*', '**/dist', '**/.astro', '**/*.d.ts', '**/node_modules'],
   },
   {
     files: ['**/*.{js,ts}'],
@@ -21,13 +21,13 @@ export default [
     languageOptions: {globals: globals.node},
   },
   {
-    files: ['**/*.{js,ts}'],
+    files: ['**/*.{js,ts,astro}'],
     rules: {
       'no-console': 'error',
     },
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,astro}'],
     rules: {
       '@typescript-eslint/ban-ts-comment': 'error',
       '@typescript-eslint/consistent-type-imports': 'error',

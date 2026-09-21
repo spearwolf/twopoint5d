@@ -52,7 +52,7 @@
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",
     "checkNameableTypes": "node ../../scripts/checkNameableTypes.mjs",
-    "lintPkg": "pnpm exec publint dist",
+    "lintPkg": "pnpm exec publint dist && node -e \"const m = require('./dist/package.json'); if (Object.keys({...m.dependencies, ...m.optionalDependencies}).length > 0) { console.error('dist/package.json declares runtime dependencies; the library ships with peer dependencies only'); process.exit(1); }\"",
     "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run checkNameableTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {

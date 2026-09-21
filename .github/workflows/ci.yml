@@ -34,6 +34,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit dependencies
+        # reports high and critical advisories without failing the run: the published
+        # package declares peer dependencies only (lintPkg holds that), so whatever this
+        # finds sits in tooling, and Dependabot proposes the update that fixes it
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
       - name: Read the Playwright version
         id: playwright
         run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # the four catalog entries in pnpm-workspace.yaml are the peer dependencies of the
+  # library, and playwright moves the browsers the test suite runs on; each of their
+  # updates comes as a pull request of its own
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      toolchain:
+        patterns: ['*']
+        exclude-patterns:
+          - three
+          - '@types/three'
+          - '@spearwolf/eventize'
+          - '@spearwolf/signalize'
+          - playwright
+        update-types: [minor, patch]
+  # keeps the commit SHAs the workflows pin, and the version comment next to each, current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

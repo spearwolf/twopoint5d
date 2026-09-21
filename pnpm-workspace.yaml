@@ -16,3 +16,7 @@ onlyBuiltDependencies:
   - nx
   - sharp
 
+overrides:
+  # nx 23.2.x pins smol-toml 1.6.1, which GHSA-7w5x-hrqm-74c2 covers. Drop this entry
+  # once the nx in package.json depends on smol-toml >=1.7.1 itself.
+  'nx>smol-toml': ^1.7.1
