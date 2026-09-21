@@ -1,49 +1,37 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
 
-let display;
-let firstFrameNo = -1;
+describe('hello twopoint5d canvas', function () {
+  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
+  this.timeout(20000);
 
-describe('hello twopoint5d canvas', () => {
-  it('canvas element exists', () => {
-    const el = document.querySelector('canvas#test-canvas');
+  /** @type {Display | undefined} */
+  let display;
 
-    expect(el).to.exist;
+  afterEach(() => {
+    display?.dispose();
+    display = undefined;
   });
 
-  it('create Display', () => {
+  it('renders its first frame as frame 1 on the canvas of the test page, at a size above 0x0', async () => {
     const el = document.querySelector('canvas#test-canvas');
+    expect(el, 'canvas#test-canvas').to.exist;
+
     display = new Display(el);
 
+    let firstFrameNo = -1;
     display.onNextFrame(({frameNo}) => {
-      if (display.isFirstFrame) {
-        firstFrameNo = frameNo;
-        console.debug(`Display: first frame rendered with frameNo=${firstFrameNo}`);
-      }
+      firstFrameNo = frameNo;
     });
 
-    expect(display).to.exist;
-  });
-
-  it('display has a dimension greater than 0x0', async () => {
     await display.start();
 
     console.debug(`Display: canvas dimension is ${display.width}x${display.height}`);
+    expect(display.width, 'width').to.be.greaterThan(0);
+    expect(display.height, 'height').to.be.greaterThan(0);
 
-    expect(display.width).to.greaterThan(0);
-    expect(display.height).to.greaterThan(0);
-  });
+    await display.nextFrame();
 
-  it('frameNo starts at 1', async () => {
-    const {display: _display, renderer: _renderer, ...otherDisplayArgs} = await display.nextFrame();
-
-    console.debug(`Display: current frameNo is #${display.frameNo}, "renderFrame" event args=`, {
-      ...otherDisplayArgs,
-      display: _display ? '[Object]' : 'undefined',
-      renderer: _renderer ? '[Object]' : 'undefined',
-    });
-
-    expect(firstFrameNo).to.equal(1, 'first frameNo should be 1');
-    expect(display.frameNo).to.greaterThan(0, 'current frameNo should be equal or greater');
+    expect(firstFrameNo, 'the frameNo of the first frame').to.equal(1);
   });
 });

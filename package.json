@@ -16,6 +16,7 @@
     "rebuild:twopoint5d": "pnpm run build:twopoint5d && pnpm run test:twopoint5d",
     "test": "pnpm nx run-many -t test",
     "test:ci": "pnpm nx run-many -t test --projects=tag:ci",
+    "test:coverage": "pnpm nx run-many -t coverage",
     "test:browser": "pnpm nx run-many -t test --projects=tag:browser",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:twopoint5d": "pnpm nx run-many -t test --projects=tag:twopoint5d",
@@ -29,7 +30,7 @@
     "lintPkg": "pnpm nx run-many -t lintPkg",
     "publishNpmPkg": "pnpm nx run-many -t publishNpmPkg",
     "update": "pnpm dlx npm-check --update",
-    "ci": "pnpm run clean && pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run checkPkgTypes && pnpm run checkNameableTypes && pnpm run lintPkg && pnpm run test:scripts && pnpm run test:ci && pnpm run test:browser",
+    "ci": "pnpm run clean && pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run checkPkgTypes && pnpm run checkNameableTypes && pnpm run lintPkg && pnpm run test:scripts && pnpm run test:coverage && pnpm run test:browser",
     "cbt": "pnpm run ci",
     "lookbook": "pnpm nx dev lookbook"
   },

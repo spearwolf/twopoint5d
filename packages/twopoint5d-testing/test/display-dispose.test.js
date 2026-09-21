@@ -21,12 +21,6 @@ function makeContainer({width = 320, height = 200} = {}) {
   return el;
 }
 
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 describe('Display — the contract after dispose()', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
   this.timeout(20000);
@@ -204,6 +198,8 @@ describe('Display — the contract after dispose()', function () {
       releaseInit = resolve;
     });
 
+    let initSettled;
+
     host = makeContainer();
     display = new Display(host, {
       createRenderer: (params) => {
@@ -211,10 +207,13 @@ describe('Display — the contract after dispose()', function () {
         const realInit = renderer.init.bind(renderer);
         // the display waits on a promise that outlives the real init, so the test can land its
         // dispose() inside the window the constructor waits in
-        renderer.init = () =>
-          realInit()
+        renderer.init = () => {
+          // three hands out one init promise for every call; the wrapper does the same
+          initSettled ??= realInit()
             .then(rendererIsUp)
             .then(() => initReleased);
+          return initSettled;
+        };
         return renderer;
       },
     });
@@ -227,7 +226,9 @@ describe('Display — the contract after dispose()', function () {
 
     display.dispose();
     releaseInit();
-    await wait(50);
+    // the display attached its handler to this very promise in its constructor, before this
+    // await; reactions run in the order they were attached, so that handler has run by now
+    await initSettled;
 
     expect(display.frameLoop.subscriptionCount, 'after the init promise settles').to.equal(0);
   });
@@ -328,21 +329,16 @@ describe('Display — the contract after dispose()', function () {
 
     // no start(): without a running loop no frame arrives, so the only thing that can
     // settle this promise is dispose() itself
-    let outcome = 'pending';
-    let rejection;
-    display.nextFrame().then(
-      () => {
-        outcome = 'resolved';
-      },
-      (err) => {
-        outcome = 'rejected';
-        rejection = err;
-      },
+    const settled = display.nextFrame().then(
+      () => ({outcome: 'resolved', rejection: undefined}),
+      (err) => ({outcome: 'rejected', rejection: err}),
     );
 
     display.dispose();
 
-    await wait(100);
+    // dispose() rejects the open promise before it returns; one that stays open runs into the
+    // timeout of this suite instead
+    const {outcome, rejection} = await settled;
 
     expect(outcome, 'a nextFrame() promise open at dispose()').to.equal('rejected');
     expect(rejection.message).to.contain('Display#nextFrame()');

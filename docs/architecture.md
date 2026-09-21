@@ -33,10 +33,15 @@ at least one tag.
   binaries themselves, and the packages that specs and tested code load at runtime: `three`,
   `@spearwolf/eventize`, `@spearwolf/signalize`, `sinon`). A spec that imports a package
   outside that list adds it there; otherwise a bump of that package leaves an old result
-  standing in the cache.
+  standing in the cache. `test` measures no coverage, so a run over a single spec is not held to
+  thresholds meant for the whole suite.
 - `typecheck` — cached, runs the project's own `typecheck` script.
 - `checkPkgTypes`, `checkNameableTypes`, `lintPkg`, `publishNpmPkg` — all depend on
   `build` and are deliberately uncached, since they inspect build output.
+
+The library's `project.json` adds the target `coverage`, which no other project has: the same
+Vitest run as `test` with `--coverage`, cached with the inputs of `test`. Its output is
+`{projectRoot}/coverage`, which the CI workflow archives.
 
 Per-project `inputs` narrow the cache key further. The library's `build` input list
 excludes `*.spec.ts` — specs do not invalidate a build, which is also why
@@ -58,7 +63,7 @@ included — change any of it and the library rebuilds).
 `pnpm run ci` (alias `pnpm cbt`) chains:
 
 ```
-clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:ci → test:browser
+clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:coverage → test:browser
 ```
 
 - `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`, `.js`
@@ -78,6 +83,12 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   dependencies only, and the non-blocking audit step in CI relies on that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
   pipeline's helpers (§4) and of the CI cache server.
+- `test:coverage` runs the library's Vitest suite once, with coverage, against the thresholds in
+  `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate: it runs the same specs
+  without coverage. The thresholds sit two points under the level measured when they were set,
+  globally and per module: the measured percentage rounded down, minus two. A regression turns
+  the gate red, a line that moves does not. `controls` and `display` carry no threshold of their
+  own; the browser suite exercises them and is not measured.
 
 ### In CI
 
@@ -93,6 +104,13 @@ It reports high and critical advisories without failing the run: the published p
 declares peer dependencies only (`lintPkg` holds that), so whatever the audit finds sits in
 tooling, and Dependabot proposes the update that fixes it (§5). Dependabot also keeps the
 commit SHAs of the actions, and the version comment next to each, current.
+
+The browser suite writes one line per browser and run into the "Browser logs" of the test
+output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from
+`packages/twopoint5d-testing/test/renderer-backend.test.js`. Measured locally with Playwright
+1.62.1, Chromium 151 runs on WebGL2 (three reports `WebGPU is not available, running under
+WebGL2 backend`) and Firefox 153 on WebGPU (`dom.webgpu.enabled` in
+`web-test-runner.config.js`). What CI gets is in the log of the CI run.
 
 The Playwright browsers are cached under the key `playwright-<os>-<version>`, the
 version being what `pnpm exec playwright --version` reports from the root package. A

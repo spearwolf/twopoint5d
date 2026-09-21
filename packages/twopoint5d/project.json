@@ -21,6 +21,10 @@
       ]
     },
     "test": {
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
+    },
+    "coverage": {
+      "cache": true,
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
       "outputs": ["{projectRoot}/coverage"]
     }

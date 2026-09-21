@@ -34,12 +34,6 @@ function makeRendererStub(canvas, initResult) {
   };
 }
 
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 describe('Display — what the constructor accepts and what it reports', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
   this.timeout(20000);
@@ -79,14 +73,11 @@ describe('Display — what the constructor accepts and what it reports', functio
       createRenderer: ({canvas}) => makeRendererStub(canvas, Promise.reject(initFailed)),
     });
 
-    let reported;
-    on(display, OnDisplayError, (error) => {
-      reported = error;
+    const reported = new Promise((resolve) => {
+      on(display, OnDisplayError, resolve);
     });
 
-    await wait(50);
-
-    expect(reported, 'the error the subscriber is told about').to.equal(initFailed);
+    expect(await reported, 'the error the subscriber is told about').to.equal(initFailed);
 
     // the constructor returns before the renderer is up, so a subscriber attaching afterwards is
     // the normal case — a renderer that failed is an end state and is still there to be read

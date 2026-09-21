@@ -180,8 +180,10 @@ describe('TextureStore.on() — black-box workflow', function () {
 
     it('unsubscribe() stops further callbacks and is idempotent', async () => {
       let calls = 0;
-      const unsubscribe = store.on('plain', 'texture', () => {
+      let firstTexture;
+      const unsubscribe = store.on('plain', 'texture', (texture) => {
         calls++;
+        firstTexture ??= texture;
       });
       store.load(catalogUrl);
 
@@ -191,13 +193,22 @@ describe('TextureStore.on() — black-box workflow', function () {
       unsubscribe();
       unsubscribe(); // idempotent — no throw
 
-      // Trigger more emissions by re-parsing the resource (same type)
+      // the subscriber that stays on proves the re-parse delivered a new texture; the event
+      // reaches every listener in one synchronous emit, so the unsubscribed callback has had its
+      // chance by then
+      const controlTextures = [];
+      const unsubscribeControl = store.on('plain', 'texture', (texture) => controlTextures.push(texture));
+
+      // a texture class the catalog does not carry makes the resource build a new texture
       store.parse({
         defaultTextureClasses: [],
-        items: {plain: {imageUrl: IMG_URL}},
+        items: {plain: {imageUrl: IMG_URL, texture: ['linear']}},
       });
-      // give the system a tick to settle
-      await new Promise((r) => setTimeout(r, 50));
+
+      // the event is retained on the resource, so the control subscriber is handed the old
+      // texture on subscribing; only a different one is the re-parse arriving
+      await waitUntil(() => controlTextures.some((texture) => texture !== firstTexture));
+      unsubscribeControl();
 
       expect(calls).to.equal(callsAfterFirst, 'no callbacks after unsubscribe()');
     });

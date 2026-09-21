@@ -34,6 +34,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
+- `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
+  thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
+  single-file run measure nothing
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline and the CI
   cache server (`scripts/**/*.test.mjs`); no Nx project owns them, so `pnpm test` does not
   run them
@@ -42,7 +45,7 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   the lookbook's `.ts` and `.astro` files
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
-  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:ci, test:browser. Run
+  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser. Run
   it before committing.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
