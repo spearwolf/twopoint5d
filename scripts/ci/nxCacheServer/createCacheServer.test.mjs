@@ -16,9 +16,9 @@ let baseUrl;
 
 beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'nx-cache-server-'));
-  // the served directory sits one level down, so a path that escapes it still lands inside root
-  dir = path.join(root, 'cache');
-  fs.mkdirSync(dir);
+  // the served directory sits two levels down, so a hash that climbs two levels out of it still lands inside root
+  dir = path.join(root, 'parent', 'cache');
+  fs.mkdirSync(dir, {recursive: true});
   server = createCacheServer({dir, token: TOKEN});
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -86,8 +86,8 @@ test('a hash that is not alphanumeric answers 400 and writes nothing outside the
     assert.equal((await put(hash, Buffer.from('data'))).status, 400, `PUT ${hash}`);
   }
   assert.deepEqual(fs.readdirSync(dir), []);
-  assert.deepEqual(fs.readdirSync(root), ['cache']);
-  assert.equal(fs.existsSync(path.join(dir, '..', '..', 'x')), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(dir)), ['cache']);
+  assert.deepEqual(fs.readdirSync(root), ['parent']);
 });
 
 test('GET refreshes the mtime of the entry it serves', async () => {
