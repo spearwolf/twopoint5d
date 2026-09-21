@@ -11,9 +11,26 @@ const FIXTURE_ID = 'vertex-objects-heap-fixture';
 
 // The absolute heap size of the test page depends on the V8 version and on what three loads; a
 // limit measured against the run's own first sample holds across versions. The samples grow
-// linearly, about 13 KB per round across all six of them — 11.8 % of the first sample, measured
-// on Chromium 153. The cause is not settled: a leak, or a cache inside three. The limit lets this
-// growth through and catches anything above it.
+// linearly, about 13.5 KB per round — 11.8 % of the first sample, measured on Chromium 153 with
+// three 0.185 and its WebGL2 backend. Heap snapshots show three retaining what grows, and JIT code
+// the page compiles meanwhile counts too. A plain three mesh with the same attributes grows 5.2 %
+// in the same rounds; the rest are objects of this library that three keeps along the same path:
+// - every mesh rendered with the shared material gets a `RenderObject`, held by its dispose
+//   listener on the material. It keeps the mesh, the disposed geometry and its own uniform group.
+//   `geometry.dispose()` leaves the listener in place; three releases the `RenderObject` on
+//   `material.dispose()` or when its cache key changes, and all of it goes once the material is
+//   garbage collected.
+// - that `RenderObject` also keeps the typed arrays of the geometry through `attributes`: three
+//   clears the field on the dispose event of the geometry, and its geometry bookkeeping fills it
+//   again while handling the same event, because the geometry still holds its attributes then.
+//   With the pool capacities of this test (1 quad, 8 instances) that is 144 bytes of vertex data
+//   per round; it grows with the capacity of the pools.
+// - the WebGL backend caches a vertex array object per attribute set in `vaoCache` and never
+//   deletes one; they go only when the renderer itself is garbage collected.
+// Disposing the material every 20 rounds leaves about 3 KB per round (2.2 % over 80 rounds): the
+// vertex-array cache plus JIT code. Runs repeat to within 0.01 points; the limit sits three points
+// above them, so a shift in three or V8 does not fail the test, while a leak on the scale of what
+// three keeps here pushes the growth past it.
 const MAX_HEAP_GROWTH = 0.15;
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -98,8 +115,9 @@ describe('vertex-objects — heap', function () {
     camera.position.z = 5;
 
     // one material for the whole loop: a fresh one each round would force the
-    // WebGPURenderer to build a fresh pipeline each round, and the test would measure
-    // that cache instead of the pool/geometry path it's actually after.
+    // `WebGPURenderer` to build a fresh pipeline each round, and the test would measure
+    // that cache instead of the pool/geometry path it's actually after. The render objects
+    // three keeps on this material are most of the growth `MAX_HEAP_GROWTH` allows for.
     material = new MeshBasicNodeMaterial();
     // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
     material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
