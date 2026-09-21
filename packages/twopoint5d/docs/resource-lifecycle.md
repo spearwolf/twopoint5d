@@ -225,6 +225,16 @@ A `Mesh` that gives up its geometry or material calls `removeFromParent()` first
 or not, rather than demanding the right order from the caller — a mesh with an empty
 geometry slot cannot be rendered, and the next frame would fail inside the renderer.
 
+**A shared material holds on to every mesh drawn with it.** three keeps a `RenderObject`
+for every mesh it renders with a material, held by the dispose listener it puts on that
+material. The `RenderObject` holds the mesh, its geometry — disposed or not — with the
+typed arrays behind it, and a uniform group. Neither `geometry.dispose()` nor
+`renderer.dispose()` lets it go; `material.dispose()` does, and so does a change of its
+cache key. A long-lived material that many short-lived meshes share therefore grows by
+one `RenderObject` per mesh until it is disposed itself — dispose it along with the last
+of them, or accept the growth. `vertex-objects-heap.test.js` in
+`packages/twopoint5d-testing` measures it.
+
 ## 6. Checklist for a new `dispose()`
 
 1. Release every resource this instance created itself, give back every slot it took

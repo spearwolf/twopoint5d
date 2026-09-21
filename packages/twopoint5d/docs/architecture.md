@@ -84,8 +84,9 @@ frames into the timing data the animated sprite shaders read.
 
 ### `display/`
 
-`Display` owns the canvas and the three.js renderer (WebGL or WebGPU —
-`isWebGLRenderer` / `isWebGPURenderer` discriminate) and drives the frame loop.
+`Display` owns the three.js renderer (WebGL or WebGPU —
+`isWebGLRenderer` / `isWebGPURenderer` discriminate) and its canvas, unless the
+canvas was handed to the constructor, and drives the frame loop.
 `Chronometer` is the time source; `FrameLoop` and `FixedFrameLoop` are the two tick
 strategies. Everything above this layer receives time and frame events from here
 instead of reading the clock itself.

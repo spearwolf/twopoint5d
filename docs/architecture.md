@@ -261,10 +261,10 @@ Two runners, deliberately in separate packages:
   type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it
   from JSDoc — vertex object interfaces, descriptions.
 
-A browser test tears a display down in its teardown with `dispose()` alone:
-`Display#dispose()` stops the loop right away and releases the renderer only once the GPU
-has run the work submitted to it. Firefox 155 under WebGPU needs that to keep drawing
-frames for the tests that follow.
+A browser test takes its display down with `dispose()` alone: `Display#dispose()`
+stops the loop right away and releases the renderer only once the GPU has run the work
+submitted to it. Firefox 155 under WebGPU needs that to keep drawing frames for the
+tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
 under `node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts

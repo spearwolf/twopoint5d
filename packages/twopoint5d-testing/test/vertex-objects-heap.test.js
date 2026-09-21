@@ -18,8 +18,9 @@ const FIXTURE_ID = 'vertex-objects-heap-fixture';
 // - every mesh rendered with the shared material gets a `RenderObject`, held by its dispose
 //   listener on the material. It keeps the mesh, the disposed geometry and its own uniform group.
 //   `geometry.dispose()` leaves the listener in place; three releases the `RenderObject` on
-//   `material.dispose()` or when its cache key changes, and all of it goes once the material is
-//   garbage collected.
+//   `material.dispose()` or when its cache key changes. A material that is only garbage
+//   collected takes the `RenderObject` along, but not its uniform group: the renderer's
+//   `info.memoryMap` keeps that until `material.dispose()` or `renderer.dispose()`.
 // - that `RenderObject` also keeps the typed arrays of the geometry through `attributes`: three
 //   clears the field on the dispose event of the geometry, and its geometry bookkeeping fills it
 //   again while handling the same event, because the geometry still holds its attributes then.
@@ -27,10 +28,11 @@ const FIXTURE_ID = 'vertex-objects-heap-fixture';
 //   per round; it grows with the capacity of the pools.
 // - the WebGL backend caches a vertex array object per attribute set in `vaoCache` and never
 //   deletes one; they go only when the renderer itself is garbage collected.
-// Disposing the material every 20 rounds leaves about 3 KB per round (2.2 % over 80 rounds): the
-// vertex-array cache plus JIT code. Runs repeat to within 0.01 points; the limit sits three points
-// above them, so a shift in three or V8 does not fail the test, while a leak on the scale of what
-// three keeps here pushes the growth past it.
+// Disposing the material every 20 rounds leaves about 3 KB per round (2.2 % over 80 rounds);
+// the snapshots trace about 1.6 KB of it to the vertex-array cache and name no owner for the
+// rest. Runs repeat to within 0.01 points; the limit sits three points above them, so a shift in
+// three or V8 does not fail the test, while a leak on the scale of what three keeps here pushes
+// the growth past it.
 const MAX_HEAP_GROWTH = 0.15;
 
 function makeContainer({width = 320, height = 200} = {}) {
@@ -95,7 +97,7 @@ describe('vertex-objects — heap', function () {
     }
   });
 
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
+  // the display comes up in the hook — renderer init included — and hooks have their own budget
   this.timeout(30000);
 
   /** @type {Display | undefined} */
@@ -161,7 +163,9 @@ describe('vertex-objects — heap', function () {
       }
     }
 
-    expect(display.renderer.info.memory.geometries, 'geometries given up their renderer slot').to.equal(geometriesBefore);
+    expect(display.renderer.info.memory.geometries, 'geometries the renderer still counts after the rounds').to.equal(
+      geometriesBefore,
+    );
 
     const heapGrowth = heapSamples[heapSamples.length - 1] - heapSamples[0];
     const growthRatio = heapGrowth / heapSamples[0];

@@ -10,7 +10,7 @@ fast and need the canonical idioms.
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Display                                     │   owns canvas + WebGPURenderer
+│ Display                                     │   owns WebGPURenderer + its canvas
 │   – frame loop (OnDisplayRenderFrame)       │   drives the per-frame tick
 │   – resize  (OnDisplayResize)               │
 └──────────────────┬──────────────────────────┘
@@ -41,7 +41,7 @@ fast and need the canonical idioms.
 
 | Class | Role |
 |---|---|
-| `Display` | Owns the canvas + `WebGPURenderer`, drives the frame loop, emits resize/render events. Source of truth for size + time. |
+| `Display` | Owns the `WebGPURenderer` and its canvas (a canvas handed to the constructor stays the caller's), drives the frame loop, emits resize/render events. Source of truth for size + time. |
 | `Stage2D` | Holds a `THREE.Scene` and a camera derived from an `IProjection`. Implements `IStage + IRenderable + IPassProvider`. |
 | `StageRenderer` | Container for stages. Implements `IStage + IRenderable + IPassProvider` so it can be nested. Optional clearing policy and `RenderPipeline` post-processing. |
 | `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. What its `dispose()` releases is in [Resource lifecycle](#resource-lifecycle). |
@@ -474,7 +474,12 @@ What this layer does on top of the general rules in
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
   handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
   The field is gone as soon as `dispose()` returns; the renderer itself is released once its
-  init is through and the GPU has run the work submitted to it.
+  init is through and the GPU has run the work submitted to it. A renderer whose init failed
+  has built nothing, and `renderer.dispose()` is not called on it. A canvas handed to the
+  constructor stays the caller's and carries a new `Display` afterwards. Under WebGL its
+  context stays lost until then; the next `Display` on it — built while the release is still
+  running or any time later — waits for the release, restores the context and then starts
+  its renderer.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline` or an `outputRenderTarget` assigned from outside.
 
