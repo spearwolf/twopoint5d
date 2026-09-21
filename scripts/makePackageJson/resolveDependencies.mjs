@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {validRange} from 'semver';
+import {valid, validRange} from 'semver';
 
 /**
  * Replaces the `catalog:`, `workspace:` and `*` specifiers of a dependency section by the
@@ -84,8 +84,30 @@ export function resolvePackageVersion(
   const pkgJsonPath = path.resolve(workspaceRoot, `packages/${pkgNameWithoutScope}/package.json`);
 
   if (fs.existsSync(pkgJsonPath)) {
-    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-    const version = pkgJson.version.replace(/-dev$/, '');
+    // the package under packages/ is the one pnpm links, so its manifest is the only source of
+    // the version; without a readable one the specifier stays and the manifest check refuses it,
+    // and sharedDependencies does not stand in for it
+    let pkgJson;
+    try {
+      pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    } catch (error) {
+      console.warn(
+        'oops.. cannot read workspace package:',
+        pkgName,
+        '->',
+        `${pkgJsonPath}: ${error.message}`,
+        'referenced from:',
+        referencedFrom,
+      );
+      return undefined;
+    }
+
+    const version = typeof pkgJson?.version === 'string' ? pkgJson.version.replace(/-dev$/, '') : undefined;
+    if (valid(version) == null) {
+      console.warn('oops.. workspace package has no version:', pkgName, '->', pkgJsonPath, 'referenced from:', referencedFrom);
+      return undefined;
+    }
+
     const pkgVersion = range === '*' ? `^${version}` : `${range}${version}`;
     console.log('resolve package version', pkgName, '->', pkgVersion);
     return pkgVersion;

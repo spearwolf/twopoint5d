@@ -6,6 +6,7 @@ import {checkManifest} from './publishNpmPkg/checkManifest.mjs';
 import {npmCommand} from './publishNpmPkg/npmCommand.mjs';
 import {USAGE, parseArguments} from './publishNpmPkg/parseArguments.mjs';
 import {isNotPublishedError, parsePublishedVersions} from './publishNpmPkg/publishedVersions.mjs';
+import {releaseFiles} from './publishNpmPkg/releaseFiles.mjs';
 
 let args;
 try {
@@ -78,16 +79,15 @@ execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdo
 });
 
 function publishPackage(cwd, dryRun = DRY_RUN) {
-  copyFile(path.resolve(workspaceRoot, '.npmrc'), path.resolve(cwd, '.npmrc'));
-  copyFile(path.resolve(workspaceRoot, 'LICENSE'), path.resolve(cwd, 'LICENSE'));
-  copyFile(path.resolve(projectRoot, 'CHANGELOG.md'), path.resolve(cwd, 'CHANGELOG.md'));
-
-  const readmePkgPath = path.resolve(projectRoot, 'README-pkg.md');
-  const readmeDstPath = path.resolve(cwd, 'README.md');
-  if (fs.existsSync(readmePkgPath)) {
-    copyFile(readmePkgPath, readmeDstPath);
-  } else {
-    copyFile(path.resolve(projectRoot, 'README.md'), readmeDstPath);
+  let files;
+  try {
+    files = releaseFiles({workspaceRoot, projectRoot, packageRoot: cwd});
+  } catch (error) {
+    console.error(`cannot publish ${cwd}: ${error.message}`);
+    process.exit(1);
+  }
+  for (const {src, dst} of files) {
+    copyFile(src, dst);
   }
 
   const publish = npmCommand(['publish', '--access', 'public', ...(dryRun ? ['--dry-run'] : [])]);
@@ -104,12 +104,10 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
 }
 
 function copyFile(src, dst) {
-  if (fs.existsSync(src)) {
-    try {
-      fs.copyFileSync(src, dst);
-    } catch (error) {
-      console.error(`cannot copy ${src} to ${dst}: ${error.message}`);
-      process.exit(1);
-    }
+  try {
+    fs.copyFileSync(src, dst);
+  } catch (error) {
+    console.error(`cannot copy ${src} to ${dst}: ${error.message}`);
+    process.exit(1);
   }
 }

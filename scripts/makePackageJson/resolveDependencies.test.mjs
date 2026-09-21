@@ -12,6 +12,10 @@ describe('resolveDependencies', () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'makePackageJson-'));
     writeManifest('other', {name: '@scope/other', version: '2.3.4-dev'});
     writeManifest('self', {name: '@scope/self', version: '9.9.9'});
+    writeManifest('noversion', {name: '@scope/noversion'});
+    writeManifest('badversion', {name: '@scope/badversion', version: 'banana'});
+    fs.mkdirSync(path.join(dir, 'packages', 'broken'), {recursive: true});
+    fs.writeFileSync(path.join(dir, 'packages', 'broken', 'package.json'), '{');
   });
 
   after(() => {
@@ -70,6 +74,19 @@ describe('resolveDependencies', () => {
     assert.deepEqual(resolve({'@scope/other': 'workspace:banana'}, {}), {'@scope/other': 'workspace:banana'});
     assert.deepEqual(resolve({'@scope/other': 'workspace:'}, {}), {'@scope/other': 'workspace:'});
     assert.deepEqual(resolve({'@scope/other': 'workspace: '}, {}), {'@scope/other': 'workspace: '});
+  });
+
+  it('a workspace: dependency whose package.json is not JSON stays as it is', () => {
+    assert.deepEqual(resolve({'@scope/broken': 'workspace:*'}, {}), {'@scope/broken': 'workspace:*'});
+    assert.deepEqual(resolve({'@scope/broken': 'workspace:^'}, {}), {'@scope/broken': 'workspace:^'});
+  });
+
+  it('a workspace: dependency whose package has no version semver can read stays as it is', () => {
+    for (const name of ['@scope/noversion', '@scope/badversion']) {
+      for (const specifier of ['workspace:*', 'workspace:~']) {
+        assert.deepEqual(resolve({[name]: specifier}, {}), {[name]: specifier});
+      }
+    }
   });
 
   it('an aliased workspace: dependency stays as it is', () => {
