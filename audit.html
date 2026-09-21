@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-21T13:34:34.908Z"
+    "generatedAt": "2026-09-21T21:01:10.943Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,17 +198,17 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 63,
-        "penalty": 89,
+        "score": 64,
+        "penalty": 85.5,
         "bySeverity": {
           "critical": 0,
-          "high": 4,
-          "medium": 22,
-          "low": 50,
+          "high": 3,
+          "medium": 21,
+          "low": 57,
           "info": 23
         },
         "byCategory": {
-          "correctness": 25,
+          "correctness": 24,
           "api": 23,
           "consistency": 10,
           "performance": 7,
@@ -216,10 +216,10 @@
           "security": 2,
           "resources": 4,
           "architecture": 2,
-          "async": 4,
-          "readability": 4,
+          "async": 3,
+          "readability": 6,
           "types": 3,
-          "dx": 5,
+          "dx": 10,
           "testing": 4
         }
       },
@@ -252,8 +252,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 136,
-        "score": 70
+        "findings": 142,
+        "score": 71
       },
       {
         "name": "workspace",
@@ -266,8 +266,8 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 13,
-        "score": 94.5
+        "findings": 12,
+        "score": 95
       },
       {
         "name": "lookbook",
@@ -277,7 +277,7 @@
         "score": 94.5
       }
     ],
-    "resolvedCount": 11,
+    "resolvedCount": 14,
     "scoreModel": 2,
     "score": 63,
     "scoring": {
@@ -295,27 +295,27 @@
     },
     "bySeverity": {
       "critical": 0,
-      "high": 4,
-      "medium": 29,
-      "low": 92,
+      "high": 3,
+      "medium": 28,
+      "low": 99,
       "info": 53
     },
     "byCategory": {
-      "correctness": 25,
+      "correctness": 24,
       "api": 23,
       "consistency": 14,
       "performance": 7,
-      "dx": 38,
+      "dx": 43,
       "completeness": 7,
       "security": 2,
       "resources": 5,
       "types": 8,
       "testing": 28,
       "architecture": 2,
-      "async": 4,
+      "async": 3,
       "dependencies": 3,
       "build": 3,
-      "readability": 9
+      "readability": 11
     },
     "byComponent": {
       "map2d": 25,
@@ -323,23 +323,28 @@
       "vertex-objects": 15,
       "stage": 24,
       "sprites": 7,
-      "display": 16,
+      "display": 20,
       "controls": 3
     },
     "counts": {
-      "findings": 178,
+      "findings": 183,
       "improvements": 18,
       "byStatus": {
-        "new": 50,
+        "new": 57,
         "unchanged": 15,
         "improved": 7,
-        "carried-over": 106
+        "carried-over": 104
       }
     },
     "deltaBreakdown": {
       "code": 0,
       "coverage": 0,
       "unknown": 50
+    },
+    "lastRun": {
+      "source": "remediation",
+      "date": "2026-09-21",
+      "ref": "2026-09-21"
     }
   },
   "portrait": {
@@ -1433,25 +1438,6 @@
       "effort": "S",
       "status": "unchanged",
       "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ASYNC-004",
-      "category": "async",
-      "domain": "code",
-      "severity": "high",
-      "title": "Den Renderer bei Display.dispose() während eines laufenden init() erst nach dem Init freigeben",
-      "location": "packages/twopoint5d/src/display/Display.ts:887",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:468",
-        "packages/twopoint5d/src/display/Display.ts:527-539"
-      ],
-      "description": "`Renderer.dispose()` räumt in three 0.185 nur bei `_initialized === true` auf und ruft danach `setAnimationLoop(null)`, das bei `_initialized === false` erst `await this.init()` macht. Ein Dispose vor Init-Ende, etwa bei Mount/Unmount unter React StrictMode oder schnellen Routenwechseln, lässt das Init zu Ende laufen. GPU-Device und Context werden dann nie freigegeben, und die Animation fordert für immer rAF an. Scheitert das Init, wartet `setAnimationLoop(null)` auf das verworfene `_initPromise`, und das endet als Unhandled Rejection. Der Browser-Test umgeht genau diesen Fall.",
-      "evidence": "three `Renderer.js:2535` `if ( this._initialized === true ) {…}` · `:1923` `if ( this._initialized === false ) await this.init();`",
-      "recommendation": "Ist `#waitForRenderer` noch offen, `renderer.dispose()` an `#waitForRenderer.then(() => r.dispose(), () => {})` hängen und die Kette abfangen. Dazu ein Browser-Test, der während eines echten Init disposed.",
-      "effort": "M",
-      "status": "new",
-      "component": "display",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2889,20 +2875,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "BUG-100",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Display.dispose() zerstört das WebGPU-Device, während eingereichte Arbeit noch läuft",
-      "location": "packages/twopoint5d/src/display/Display.ts:887",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21 (vorbestehend, \u003ccode>dispose()\u003c/code> ist an \u003ccode>42a88429^\u003c/code> identisch). \u003ccode>dispose()\u003c/code> ruft \u003ccode>renderer.dispose()\u003c/code>, und three (\u003ccode>WebGPUBackend.dispose()\u003c/code>) zerstört das Device, während eingereichte Arbeit noch läuft. Auf Firefox 155 mit WebGPU meldet das zerstörte Device \u003ccode>GPUInternalError: Buffer with '' label has been destroyed\u003c/code>, danach bekommt die ganze Seite keinen \u003ccode>requestAnimationFrame\u003c/code>-Callback mehr — eine App, die ein Display abbaut, verliert jede Animation der Seite. Ursache ist ein Firefox-Fehler, belegt nur headless mit Software-Rendering (Playwright-Firefox); auf echter Hardware ungeprüft, trifft es dort zu, ist die Severity auf \u003cem>high\u003c/em> zu prüfen. Die Browser-Suite umgeht den Fehler im Teardown (\u003ccode>stopAndDrain()\u003c/code>: \u003ccode>stop()\u003c/code> und \u003ccode>queue.onSubmittedWorkDone()\u003c/code> vor \u003ccode>dispose()\u003c/code>), die Bibliothek selbst nicht.",
-      "recommendation": "Das Verhalten auf echter Hardware mit Firefox 155+ prüfen. Hält es, das Drain in die Bibliothek ziehen — etwa ein \u003ccode>Display#disposeAsync()\u003c/code> oder ein \u003ccode>dispose()\u003c/code>, das \u003ccode>stop()\u003c/code> sofort ausführt und \u003ccode>renderer.dispose()\u003c/code> erst nach \u003ccode>device.queue.onSubmittedWorkDone()\u003c/code> — und den Fehler bei Mozilla melden; der Helfer \u003ccode>packages/twopoint5d-testing/test/support/stopAndDrain.js\u003c/code> zeigt die Reihenfolge.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-003",
       "category": "dx",
       "domain": "harness",
@@ -3242,19 +3214,6 @@
       "package": "twopoint5d-testing"
     },
     {
-      "id": "MEM-014",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "title": "Der Heap der Browser-Testseite wächst mit jeder Aufbau-/Abbau-Runde linear",
-      "location": "packages/twopoint5d-testing/test/vertex-objects-heap.test.js:13-18",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, als Rückfrage an das Audit zurückgegeben: die Messung sitzt im Test-Harness, die Ursache vermutlich in Bibliothekscode unter \u003ccode>src/\u003c/code>, den die Scope-Regel des Laufs nicht deckte. Über die sechs Proben wächst der Heap der Testseite linear, rund 13 KB je Runde — 11,72 % der ersten Probe auf Chromium 151, in sechs Läufen auf 0,01 Punkte gleich; auf Chromium 153 11,8 %. Ungeklärt ist, ob \u003ccode>vertex-objects\u003c/code>/\u003ccode>display\u003c/code> beim Dispose etwas festhalten oder ob ein Cache in three wächst. Der Test hält die Grenze deshalb auf \u003ccode>MAX_HEAP_GROWTH = 0.15\u003c/code> statt der empfohlenen 0,1 — eine Abweichung, die den Zuwachs durchlässt; die frühere absolute 4-MiB-Linie (≈ 35 %) hatte ihn ganz verdeckt.",
-      "recommendation": "Die Ursache isolieren: Heap-Snapshots nach der ersten und der sechsten Runde vergleichen (Retainer der gewachsenen Objekte), dabei \u003ccode>Display\u003c/code>, \u003ccode>VertexObjects\u003c/code> und die three-Geometrie einzeln abbauen. Liegt es in der Bibliothek, dort beheben und die Grenze auf 0,1 zurücknehmen; liegt es in three, den Cache im Test-Kommentar benennen.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
       "id": "DOC-054",
       "category": "dx",
       "domain": "harness",
@@ -3461,6 +3420,156 @@
       "effort": "S",
       "status": "carried-over",
       "package": "workspace"
+    },
+    {
+      "id": "DOC-063",
+      "category": "dx",
+      "domain": "code",
+      "severity": "low",
+      "title": "Das TSDoc von Display#frameNo nennt 1 als Startwert, das Feld beginnt bei 0",
+      "location": "packages/twopoint5d/src/display/Display.ts:409",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Das TSDoc sagt »Starts at 1«. Das Feld wird mit \u003ccode>0\u003c/code> angelegt und erst im ersten Frame zu 1.",
+      "recommendation": "Das TSDoc auf »0 vor dem ersten Frame, 1 im ersten Frame« korrigieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      }
+    },
+    {
+      "id": "DOC-064",
+      "category": "dx",
+      "domain": "code",
+      "severity": "low",
+      "title": "Zwei TSDoc-Kommentare in Display.ts beziehen sich auf einen früheren Zustand",
+      "location": "packages/twopoint5d/src/display/Display.ts:333",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. »matching the legacy behavior« am Resize-Intervall und »no longer cascades« an der \u003ccode>deltaTime\u003c/code>-Obergrenze setzen einen früheren Zustand voraus, den ein Leser nicht kennt.",
+      "recommendation": "Beide Stellen so formulieren, dass sie beschreiben, was jetzt gilt.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      },
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:739"
+      ]
+    },
+    {
+      "id": "READ-019",
+      "category": "readability",
+      "domain": "code",
+      "severity": "low",
+      "title": "Ein verwaistes TODO steht am Spread der Renderer-Parameter im Standard-makeRenderer",
+      "location": "packages/twopoint5d/src/display/Display.ts:606",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. \u003ccode>// TODO check if this is still needed\u003c/code> steht an einem reinen Spread der Renderer-Parameter. Offen bleibt, was geprüft werden soll.",
+      "recommendation": "Klären und entweder den Spread begründen oder das TODO entfernen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      }
+    },
+    {
+      "id": "DOC-065",
+      "category": "dx",
+      "domain": "code",
+      "severity": "low",
+      "title": "Das TSDoc von Display#styleImageRendering bricht mitten im Satz ab",
+      "location": "packages/twopoint5d/src/display/Display.ts:380",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. »If you want to explicitly specify a value here, set.« — der Satz nennt nicht, was zu setzen ist.",
+      "recommendation": "Den Satz vervollständigen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      }
+    },
+    {
+      "id": "DOC-066",
+      "category": "dx",
+      "domain": "code",
+      "severity": "low",
+      "title": "Die Stage-README verweist auf nummerierte Abschnitte, die sie nicht hat",
+      "location": "packages/twopoint5d/src/stage/README.md:22-25",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Die Verweise auf \u003ccode>§3.2\u003c/code>, \u003ccode>§6.2\u003c/code>, \u003ccode>§6.3\u003c/code> und \u003ccode>§6.4\u003c/code> führen ins Leere, weil die README keine nummerierten Abschnitte hat.",
+      "recommendation": "Die Verweise durch Überschriften-Links ersetzen oder die Abschnitte nummerieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      },
+      "locations": [
+        "packages/twopoint5d/src/stage/README.md:246",
+        "packages/twopoint5d/src/stage/README.md:262",
+        "packages/twopoint5d/src/stage/README.md:313"
+      ]
+    },
+    {
+      "id": "DOC-067",
+      "category": "dx",
+      "domain": "code",
+      "severity": "low",
+      "title": "resource-lifecycle.md hat 11 Zeilen über der Zeilenlänge von 88 Zeichen",
+      "location": "packages/twopoint5d/docs/resource-lifecycle.md",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. 11 Zeilen sind länger als 88 Zeichen (\u003ccode>awk 'length>88'\u003c/code>). Die übrigen Architektur-Dokumente sind auf 88 Spalten umbrochen.",
+      "recommendation": "Die Datei auf 88 Spalten umbrechen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      }
+    },
+    {
+      "id": "MEM-019",
+      "category": "resources",
+      "domain": "code",
+      "severity": "low",
+      "title": "Ein gescheitertes WebGL-Init auf einem übergebenen Canvas hinterlässt den webglcontextlost-Listener von three",
+      "location": "packages/twopoint5d/src/display/Display.ts:1125",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. three hängt in \u003ccode>WebGLBackend.init\u003c/code> einen \u003ccode>webglcontextlost\u003c/code>-Listener an den Canvas, bevor \u003ccode>new WebGLState\u003c/code> scheitern kann (three 0.185.1 \u003ccode>three.webgpu.js:71329\u003c/code>/\u003ccode>:71339\u003c/code>). Scheitert das Init, bleibt der Listener hängen. Er hält den gescheiterten Renderer erreichbar und meldet bei jedem späteren Kontextverlust des Canvas \u003ccode>WebGL Device Lost\u003c/code>. Der Kommentar »a failed init has built nothing that renderer.dispose() would release« trifft dafür nicht zu. Das betrifft jedes gescheiterte Init auf einem Canvas mit verlorenem Kontext.",
+      "recommendation": "Im Rejection-Zweig von \u003ccode>#releaseRenderer()\u003c/code> den Listener abbauen, soweit three ihn erreichbar macht, sonst den Fall im Kommentar benennen und bei three melden.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-21"
+      }
+    },
+    {
+      "id": "READ-020",
+      "category": "readability",
+      "domain": "code",
+      "severity": "low",
+      "title": "Die Beschreibung der Map lostContexts stimmt nach einem verspäteten Kontext-Restore nur ungefähr",
+      "location": "packages/twopoint5d/src/display/Display.ts:97",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Kommt der WebGL-Kontext erst nach dem Timeout zurück, während ein Display auf dem toten Kontext läuft, bleibt der \u003ccode>lostContexts\u003c/code>-Eintrag mit lebendem Kontext stehen, bis der nächste Display ihn herausnimmt. Das ist harmlos, aber die Beschreibung der Map (»for as long as it stays lost«) stimmt in diesem Fenster nicht.",
+      "recommendation": "Den Eintrag bei \u003ccode>webglcontextrestored\u003c/code> entfernen oder die Beschreibung der Map anpassen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-21"
+      }
     }
   ],
   "openQuestions": [
@@ -3481,7 +3590,8 @@
       "Zwei neu gefundene Befunde decken sich mit akzeptierten Punkten, dem Tippfehler `anisotrophy` und der Asymmetrie zwischen `TexturedSprite` und `AnimatedSprite`. Sie stehen deshalb nur im Anhang.",
       "Mitgeführte Findings aus dem Lookbook und dem Browser-Testpaket zählen im Score, obwohl dieser Lauf dort keinen Umfang gelesen hat.",
       "Seit dem Vorlauf trägt kein Commit einen `Remediation-Run`-Trailer. Eine Fix-Bilanz entfällt deshalb.",
-      "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen."
+      "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen.",
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -3573,9 +3683,31 @@
         "harness": 63
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-21",
+      "score": 63,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 64,
+        "harness": 63
+      },
+      "coverage": 1
     }
   ],
-  "fixHistory": [],
+  "fixHistory": [
+    {
+      "date": "2026-09-21",
+      "source": "remediation",
+      "ref": "2026-09-21",
+      "fixed": 3,
+      "inducedFixed": 7,
+      "inducedOpen": 1,
+      "discovered": 13,
+      "attribution": "reviewed"
+    }
+  ],
   "acknowledged": [
     {
       "title": "defaultTextureClasses lässt sich beim Re-Parse nicht leeren",
