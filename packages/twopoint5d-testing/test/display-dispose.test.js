@@ -87,12 +87,13 @@ describe('Display — the contract after dispose()', function () {
   // the three cases after "a dispose() before the renderer is ready leaves the frame loop empty"
   // watch when renderer.dispose() runs — after an init that dispose() landed in, not at all after
   // a failed one, and only once the queue has run dry — and what the backend reports afterwards:
-  // a destroyed device, or a lost WebGL context. The five cases after those follow a canvas that
+  // a destroyed device, or a lost WebGL context. The six cases after those follow a canvas that
   // was handed in: it is the caller's, and after the display on it has been disposed it carries
   // the next one — built while the release runs, built once the release is through, built after
-  // a dispose() inside the init, and, bounded in time, when the WebGL context does not come
-  // back — while its WebGL context stays lost as long as no display follows. The rest of this
-  // file is about the contract afterwards.
+  // a dispose() inside the init, bounded in time when the WebGL context does not come back, and
+  // with that context back once the display after the one that waited in vain is built — while
+  // its WebGL context stays lost as long as no display follows. The rest of this file is about
+  // the contract afterwards.
 
   // Assertion (b) — "does not touch what was handed in" — is turned around for a Display: a
   // WebGPURenderer passed to the constructor is adopted and released with the display. That case
@@ -437,8 +438,9 @@ describe('Display — the contract after dispose()', function () {
     const released = whenReleased(previous.renderer);
     previous.dispose();
     await released;
-    // the release is through and the canvas has sat without a display for a few tasks: only the
-    // display built now can bring its WebGL context back
+    // the release is through and the canvas has sat without a display for 100 ms. Under WebGL
+    // only the display built now can bring the context back; under WebGPU there is nothing to
+    // restore, and the case checks that the second display draws
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     display = new Display(canvas);
@@ -506,6 +508,58 @@ describe('Display — the contract after dispose()', function () {
       warnings.some((w) => w.includes('new Display()')),
       'a warning names the display that waited',
     ).to.equal(true);
+  });
+
+  it('a WebGL context that did not come back in time gets another restore from the next display on its canvas', async function () {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+
+    previous = new Display(canvas);
+    await previous.start();
+
+    // only a WebGL context is lost on release and has to be restored
+    if (!previous.isWebGLBackend) this.skip();
+
+    // the three.js typings leave gl off the backend
+    const {gl} = /** @type {{gl?: WebGL2RenderingContext}} */ (previous.renderer.backend);
+    // the same object for as long as the context lives, and the one the release keeps
+    const extension = gl.getExtension('WEBGL_lose_context');
+    // the browser keeps the context lost while the display after the first one waits for it
+    extension.restoreContext = () => {};
+
+    /** @type {string[]} */
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => {
+      warnings.push(args.map(String).join(' '));
+    };
+
+    try {
+      previous.dispose();
+      previous = new Display(canvas);
+      // it starts on the lost context once its wait has run out, or fails to; either will do
+      await previous.start().then(
+        () => 'resolved',
+        () => 'rejected',
+      );
+
+      // from here on the browser lets the context come back
+      delete extension.restoreContext;
+
+      previous.dispose();
+      display = new Display(canvas);
+      await display.start();
+      await display.nextFrame();
+    } finally {
+      console.warn = realWarn;
+    }
+
+    await expectLiveBackend(display);
+    expect(
+      warnings.filter((w) => w.includes('new Display()')),
+      'warnings of a display that waited for the context in vain',
+    ).to.have.length(1);
   });
 
   it('a canvas that was handed in keeps its WebGL context lost while no display follows', async function () {

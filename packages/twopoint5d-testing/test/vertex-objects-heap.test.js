@@ -126,9 +126,12 @@ describe('vertex-objects — heap', function () {
   });
 
   afterEach(() => {
+    // three keeps a render object per rendered mesh on the material until the material is
+    // disposed; it goes while the renderer that built them is still there
+    material?.dispose();
+    material = undefined;
     disposeDisplay(display);
     display = undefined;
-    material = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);
     }

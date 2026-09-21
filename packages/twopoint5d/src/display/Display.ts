@@ -63,9 +63,9 @@ async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
   }
 }
 
-// A WebGL context the browser has not brought back after this long is not coming back, and
-// the display waiting for the canvas starts on it anyway: a failed init reaches its caller
-// through start() and the error event, a wait without end reaches nobody
+// A WebGL context the browser has not brought back after this long is not coming back for the
+// display waiting for the canvas, and that display starts on it anyway: a failed init reaches its
+// caller through start() and the error event, a wait without end reaches nobody
 const CONTEXT_RESTORE_TIMEOUT_MS = 2000;
 
 // The WebGL context a release has lost on a canvas handed to a display, kept restorable. The
@@ -78,24 +78,23 @@ interface LostContext {
   // settles once the webglcontextlost event has had its default prevented; before that the
   // browser turns down a restoreContext()
   prevented: Promise<void>;
-}
-
-interface CanvasRelease {
-  // settles once the renderer of the display on the canvas is released, with the context that
-  // release has lost; never rejects
-  released: Promise<LostContext | undefined>;
-  // the restore the first display built on the canvas has started — one per lost context, so a
-  // second display waits for the same one
-  restored?: Promise<void>;
+  // the restore a display built on the canvas has started, so a display built while it runs
+  // waits for the same one; cleared once it has ended with the context still lost
+  restoring?: Promise<void>;
 }
 
 // The release of a renderer runs on after dispose() has returned, and the canvas handed to
 // that display is not free before the release is through: a renderer initialized on it in
 // the meantime would share the WebGL context of the one being released and lose it with it.
-// The entry stays while the context waits to be restored, however long no display comes, and
-// the display that restores it takes the entry out. A WeakMap, so the entry does not hold on
-// to a canvas its caller has let go
-const canvasReleases = new WeakMap<HTMLCanvasElement, CanvasRelease>();
+// The entry settles once the release is through, never rejects, and goes with it. A WeakMap,
+// like lostContexts below, so an entry does not hold on to a canvas its caller has let go
+const canvasReleases = new WeakMap<HTMLCanvasElement, Promise<void>>();
+
+// The context a release has lost on a canvas handed to a display, for as long as it stays
+// lost: however long no display comes, and past a restore that ran out of time, so every
+// display built on the canvas tries once more. The display that brings it back takes the
+// entry out
+const lostContexts = new WeakMap<HTMLCanvasElement, LostContext>();
 
 // A canvas keeps its one WebGL context for good and answers every later getContext('webgl2')
 // with it, and WebGLBackend.dispose() gives that context up with WEBGL_lose_context.loseContext().
@@ -179,16 +178,25 @@ function restoreContext(canvas: HTMLCanvasElement, lost: LostContext): Promise<v
 }
 
 // What a display built on a canvas waits for before the init of its renderer starts: the release
-// of the display on that canvas before it, and the context that release has lost coming back
-async function takeOverCanvas(canvas: HTMLCanvasElement, release: CanvasRelease): Promise<void> {
-  const lost = await release.released;
+// of the display on that canvas before it, while one runs, and the context a release has lost on
+// the canvas coming back
+async function takeOverCanvas(canvas: HTMLCanvasElement, release: Promise<void> | undefined): Promise<void> {
+  await release;
+  const lost = lostContexts.get(canvas);
   if (lost == null) return;
 
-  release.restored ??= restoreContext(canvas, lost);
-  await release.restored;
+  lost.restoring ??= restoreContext(canvas, lost);
+  const restoring = lost.restoring;
+  await restoring;
 
-  // only this entry goes: one the release of a later display has made in the meantime stays
-  if (canvasReleases.get(canvas) === release) canvasReleases.delete(canvas);
+  if (!lost.gl.isContextLost()) {
+    // only this entry goes: one the release of a later display has made in the meantime stays
+    if (lostContexts.get(canvas) === lost) lostContexts.delete(canvas);
+  } else if (lost.restoring === restoring) {
+    // the wait has run out and the entry stays, so the next display built on the canvas tries
+    // the restore again
+    lost.restoring = undefined;
+  }
 }
 
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
@@ -217,7 +225,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    returned, once its init is through and the GPU has run the work
  *    submitted to it. A canvas handed to the constructor carries a new
  *    display afterwards; one built on it while the release runs waits for
- *    it.
+ *    it. Under WebGL only a display brings the context of that canvas
+ *    back — see {@link Display.dispose}.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
  *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
@@ -527,8 +536,8 @@ export class Display {
    *
    * A canvas handed in here stays the caller's. If a display disposed before this one is still
    * releasing the renderer it had on that canvas, or left its WebGL context lost, the renderer of
-   * this display starts its init once that release is through and the context is back — see
-   * {@link Display.dispose}.
+   * this display starts its init once that release is through and the context is back, or once
+   * the wait for the context has run out — see {@link Display.dispose}.
    *
    * A renderer handed in here is adopted, not borrowed: the display takes it and its
    * `domElement` as its own. {@link Display.dispose} releases it with `renderer.dispose()`, once
@@ -624,12 +633,13 @@ export class Display {
 
     // Both construction paths end with a renderer and both have to wait for the same promise.
     // One assignment, so a path that gets added later cannot leave the field empty. A canvas whose
-    // previous display is still releasing its renderer, or left its WebGL context lost, is not
-    // free yet: the init starts once that release is through and the context is back
+    // previous display is still releasing its renderer, or whose WebGL context a release has left
+    // lost, is not free yet: the init starts once that release is through and the context is back,
+    // or once the wait for the context has run out
     const renderer = this.renderer!;
     const previousRelease = canvasReleases.get(renderer.domElement);
     this.#waitForRenderer =
-      previousRelease != null
+      previousRelease != null || lostContexts.has(renderer.domElement)
         ? takeOverCanvas(renderer.domElement, previousRelease).then(() => renderer.init())
         : renderer.init();
 
@@ -1051,10 +1061,13 @@ export class Display {
    * A canvas handed to the constructor goes back to the caller able to carry a new display.
    * Under the WebGL backend `renderer.dispose()` loses the context of that canvas, and a canvas
    * keeps its one WebGL context for good, so the release keeps that context restorable and
-   * leaves it lost. The next `Display` built on the same canvas — while the release runs or any
-   * time after — waits for the release, restores the context and then starts the init of its
-   * renderer. A context the browser has not brought back within two seconds ends the wait with
-   * a warning on the console.
+   * leaves it lost. Only a `Display` brings it back: a `WebGPURenderer` or a
+   * `getContext('webgl2')` of your own on that canvas gets the lost context. The next `Display`
+   * built on the same canvas — while the release runs or any time after — waits for the
+   * release, restores the context and then starts the init of its renderer. A context the
+   * browser has not brought back within two seconds ends the wait with a warning on the
+   * console; it stays lost and restorable, and the next `Display` built on the canvas tries
+   * again.
    *
    * A `dispose()` while the renderer is still initializing waits for that init instead of
    * cutting it short. An init that fails has built nothing to release, and its rejection does
@@ -1096,36 +1109,35 @@ export class Display {
     // release waits for the init, and then for the GPU. A canvas handed to the constructor goes
     // back to its caller at the end of it, with its WebGL context lost but restorable, so the
     // next display on it can bring the context back
-    const released: Promise<LostContext | undefined> = this.#waitForRenderer
+    const released: Promise<void> = this.#waitForRenderer
       .then(
         async () => {
           await drainSubmittedWork(renderer);
-          if (handBack) return disposeKeepingContextRestorable(renderer);
-          renderer.dispose();
-          return undefined;
+          if (!handBack) {
+            renderer.dispose();
+            return;
+          }
+          const lost = await disposeKeepingContextRestorable(renderer);
+          // set before the release settles, so a display that waits for the release finds it
+          if (lost != null) lostContexts.set(canvas, lost);
         },
         () => {
           // a failed init has built nothing that renderer.dispose() would release, and its
           // setAnimationLoop(null) would wait on the rejected init once more — a rejection that
           // nobody could catch
-          return undefined;
         },
       )
       .catch((error: unknown) => {
         // eslint-disable-next-line no-console
         console.error('Display#dispose(): releasing the renderer failed after dispose() returned', error);
-        return undefined;
       });
 
     if (handBack) {
       // set before dispose() returns, so a display built on the canvas in the same tick sees it
-      const release: CanvasRelease = {released};
-      canvasReleases.set(canvas, release);
-      void released.then((lost) => {
-        // a lost context keeps the entry until a display restores it; without one there is
-        // nothing left to wait for. Only this entry goes: one a display after this one has made
-        // in the meantime stays
-        if (lost == null && canvasReleases.get(canvas) === release) canvasReleases.delete(canvas);
+      canvasReleases.set(canvas, released);
+      void released.then(() => {
+        // only this entry goes: one a display after this one has made in the meantime stays
+        if (canvasReleases.get(canvas) === released) canvasReleases.delete(canvas);
       });
     }
   }

@@ -479,7 +479,8 @@ What this layer does on top of the general rules in
   constructor stays the caller's and carries a new `Display` afterwards. Under WebGL its
   context stays lost until then; the next `Display` on it — built while the release is still
   running or any time later — waits for the release, restores the context and then starts
-  its renderer.
+  its renderer. Only a `Display` restores it: a `WebGPURenderer` or a `getContext('webgl2')`
+  of your own on that canvas gets the lost context.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline` or an `outputRenderTarget` assigned from outside.
 
