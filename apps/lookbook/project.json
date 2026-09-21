@@ -21,8 +21,11 @@
         "{projectRoot}/astro.config.mjs",
         "{projectRoot}/package.json",
         "sharedTsconfigs",
-        "^default"
+        {"dependentTasksOutputFiles": "**/*", "transitive": true}
       ]
+    },
+    "build": {
+      "inputs": ["default", {"dependentTasksOutputFiles": "**/*", "transitive": true}]
     }
   }
 }

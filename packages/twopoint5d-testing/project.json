@@ -4,7 +4,7 @@
   "root": "packages/twopoint5d-testing",
   "targets": {
     "test": {
-      "inputs": ["default", "^default"]
+      "inputs": ["default", {"dependentTasksOutputFiles": "**/*", "transitive": true}]
     }
   }
 }

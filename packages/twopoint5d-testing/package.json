@@ -11,11 +11,9 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "postinstall": "playwright install chromium firefox",
     "test": "pnpm web-test-runner"
   },
   "dependencies": {
-    "@playwright/test": "^1.62.1",
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
@@ -25,7 +23,6 @@
     "@esm-bundle/chai": "4.3.4-fix.0",
     "@web/dev-server-esbuild": "^2.0.0",
     "@web/test-runner": "^1.0.0",
-    "@web/test-runner-playwright": "^1.0.0",
-    "playwright": "^1.62.1"
+    "@web/test-runner-playwright": "^1.0.0"
   }
 }

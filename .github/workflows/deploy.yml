@@ -7,25 +7,72 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write # Required for OIDC
   contents: read
 
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    name: Deploy NPM Packages
+  version:
+    name: Check whether npm has this version
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: packages/twopoint5d/package.json
+          sparse-checkout-cone-mode: false
 
-      - uses: pnpm/action-setup@v4
+      - name: Compare the manifest version with npm
+        id: check
+        # publishNpmPkg.mjs skips the same two cases; this check only spares install and build
+        run: |
+          name=$(node -p "require('./packages/twopoint5d/package.json').name")
+          version=$(node -p "require('./packages/twopoint5d/package.json').version")
+          if [[ "$version" == *-dev ]]; then
+            echo "$version is a development version"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          npm view "$name@$version" version > npm-view.out 2> npm-view.err
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] && [ -s npm-view.out ]; then
+            echo "$name@$version is on npm already"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif [ "$status" -eq 0 ] || grep -q E404 npm-view.err; then
+            echo "$name@$version is not on npm yet"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            cat npm-view.err
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy NPM Packages
+    needs: version
+    if: ${{ needs.version.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read
+    env:
+      # nothing in the publish job runs a browser
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 10.27.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          always-auth: true
           registry-url: https://registry.npmjs.org
           scope: '@spearwolf'
           cache: pnpm
@@ -33,5 +80,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # builds from source: the Nx cache of the CI workflow never reaches a published package
       - run: pnpm run publishNpmPkg
         name: Publish npm packages

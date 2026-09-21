@@ -5,18 +5,28 @@ on:
     paths-ignore:
       - '**.md'
 
+permissions:
+  contents: read
+
+concurrency:
+  # on main each commit gets a group of its own, so none is cancelled or displaced from the
+  # queue and the deploy workflow has a result to follow; on other branches a newer push
+  # replaces the run of the older one
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     name: Build, Lint and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 10.27.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -24,15 +34,71 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Browsers
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
+
+      - name: Install the system libraries of the Playwright browsers
+        # the cache holds the browsers, not the apt packages they link against
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium firefox
+
+      - name: Restore the Nx cache
+        id: nx-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nx-cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-
+
+      - name: Start the Nx cache server
+        # Nx indexes its local cache in a database named after the machine id, so a
+        # restored ~/.nx means nothing to a new runner. Nx does take results from a
+        # self-hosted remote cache; this one serves the directory actions/cache restored.
+        run: |
+          token=$(openssl rand -hex 16)
+          echo "::add-mask::$token"
+          touch "$RUNNER_TEMP/nx-cache.start"
+          NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN="$token" nohup node scripts/ci/nxCacheServer.mjs --dir "$RUNNER_TEMP/nx-cache" --port 47873 > "$RUNNER_TEMP/nx-cache-server.log" 2>&1 &
+          curl --silent --output /dev/null --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:47873/v1/cache/0
+          echo "NX_SELF_HOSTED_REMOTE_CACHE_SERVER=http://127.0.0.1:47873" >> "$GITHUB_ENV"
+          echo "NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
 
       - name: Build packages and run all tests
         run: xvfb-run pnpm run ci
         timeout-minutes: 20
 
+      - name: Drop the Nx cache entries this run did not use
+        # the server touches every entry it serves; what is older than its start went unused
+        if: success() && steps.nx-cache.outputs.cache-hit != 'true'
+        run: find "$RUNNER_TEMP/nx-cache" -type f \( ! -newer "$RUNNER_TEMP/nx-cache.start" -o -name '*.partial' \) -delete
+
+      - name: Save the Nx cache
+        if: success() && steps.nx-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nx-cache
+          key: ${{ steps.nx-cache.outputs.cache-primary-key }}
+
+      - name: Show the Nx cache server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/nx-cache-server.log" || true
+
       - name: Archive coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: coverage

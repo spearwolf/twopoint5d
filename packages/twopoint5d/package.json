@@ -46,13 +46,13 @@
     "compile": "pnpm tsc -p tsconfig.build.json",
     "typecheck": "pnpm tsc -p tsconfig.typecheck.json",
     "build": "pnpm run compile && pnpm run makePackageJson",
-    "clean": "pnpm rimraf build types dist",
+    "clean": "pnpm rimraf dist",
     "test": "pnpm vitest --run --coverage",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "checkPkgTypes": "pnpm run build && pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",
-    "checkNameableTypes": "pnpm run build && node ../../scripts/checkNameableTypes.mjs",
-    "lintPkg": "pnpm run build && pnpm exec publint dist",
+    "checkPkgTypes": "pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",
+    "checkNameableTypes": "node ../../scripts/checkNameableTypes.mjs",
+    "lintPkg": "pnpm exec publint dist",
     "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run checkNameableTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
   "peerDependencies": {

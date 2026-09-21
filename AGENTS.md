@@ -28,12 +28,15 @@ Do not read them unless the task is about them.
 All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` — `engines` in `package.json`.
 
 - `pnpm install`
+- `pnpm exec playwright install chromium firefox` — the browsers for `pnpm test:browser`; once
+  after the first install and after every Playwright bump
 - `pnpm lint` — ESLint + `prettier --check`; `pnpm format` writes the Prettier changes
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
-- `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline
-  (`scripts/**/*.test.mjs`); no Nx project owns them, so `pnpm test` does not run them
+- `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline and the CI
+  cache server (`scripts/**/*.test.mjs`); no Nx project owns them, so `pnpm test` does not
+  run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files
@@ -58,7 +61,8 @@ explicit instruction.
   the library.
 - **Publishing** happens from the generated `dist/`, never from
   `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
-  the published package.
+  the published package. `scripts/ci/` is the exception: the Nx cache server of the CI
+  workflow.
 - **`dispose()` and ownership** follow
   [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md). They
   are binding, not advisory.
