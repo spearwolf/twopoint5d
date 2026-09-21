@@ -13,6 +13,7 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene} from 'three/webgpu';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'map2d-tile-upload-fixture';
 
@@ -34,8 +35,9 @@ function bufferOf(attr) {
 }
 
 /** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
+async function disposeDisplay(display) {
   if (!display) return;
+  await stopAndDrain(display);
   try {
     display.dispose();
   } catch {
@@ -86,8 +88,8 @@ describe('map2d — tile attribute upload', function () {
     camera.lookAt(0, 0, 0);
   });
 
-  afterEach(() => {
-    disposeDisplay(display);
+  afterEach(async () => {
+    await disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

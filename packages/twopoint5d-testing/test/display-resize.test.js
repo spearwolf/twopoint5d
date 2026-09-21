@@ -1,6 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayResize} from '@spearwolf/twopoint5d';
 import {on, off} from '@spearwolf/eventize';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'display-resize-fixture';
 
@@ -28,6 +29,7 @@ async function disposeDisplay(display) {
   } catch {
     // ignore — dispose still works
   }
+  await stopAndDrain(display);
   display.dispose();
 }
 
@@ -464,10 +466,8 @@ describe('Display — resize behavior', () => {
   });
 
   it('does not double-emit OnDisplayResize on the first frame when the size differs from construction', async () => {
-    // Force a measurable mismatch between the constructor's resize() and
-    // the first frame's resize() by mutating the host CSS synchronously
-    // after construction but before start() — this used to trigger a
-    // double emit on frame 1.
+    // The host CSS changes after construction and before start(), so the first frame measures a
+    // size the constructor never saw — frame 1 still emits OnDisplayResize exactly once, with that size.
     host = makeContainer({width: 100, height: 100});
     display = new Display(host);
 

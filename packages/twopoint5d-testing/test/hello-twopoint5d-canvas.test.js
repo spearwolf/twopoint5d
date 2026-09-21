@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 describe('hello twopoint5d canvas', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -8,7 +9,8 @@ describe('hello twopoint5d canvas', function () {
   /** @type {Display | undefined} */
   let display;
 
-  afterEach(() => {
+  afterEach(async () => {
+    await stopAndDrain(display);
     display?.dispose();
     display = undefined;
   });

@@ -13,6 +13,7 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'map2d-placement-fixture';
 
@@ -29,8 +30,9 @@ function makeContainer({width = 320, height = 200} = {}) {
 }
 
 /** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
+async function disposeDisplay(display) {
   if (!display) return;
+  await stopAndDrain(display);
   try {
     display.dispose();
   } catch {
@@ -82,8 +84,8 @@ describe('map2d — placement of a moved map', function () {
     await display.start();
   });
 
-  afterEach(() => {
-    disposeDisplay(display);
+  afterEach(async () => {
+    await disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

@@ -49,7 +49,7 @@
     "eslint-plugin-astro": "^3.2.1",
     "globals": "^17.12.0",
     "nx": "23.2.0",
-    "playwright": "~1.62.1",
+    "playwright": "^1.63.0",
     "prettier": "^3.9.8",
     "prettier-plugin-astro": "^0.14.1",
     "publint": "^0.3.24",

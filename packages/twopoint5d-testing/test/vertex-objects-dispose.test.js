@@ -2,6 +2,7 @@ import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription, VertexObjectPool} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
@@ -23,8 +24,9 @@ function makeContainer({width = 320, height = 200} = {}) {
 }
 
 /** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
+async function disposeDisplay(display) {
   if (!display) return;
+  await stopAndDrain(display);
   try {
     display.dispose();
   } catch {
@@ -69,8 +71,8 @@ describe('vertex-objects — dispose', function () {
     camera.position.z = 5;
   });
 
-  afterEach(() => {
-    disposeDisplay(display);
+  afterEach(async () => {
+    await disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

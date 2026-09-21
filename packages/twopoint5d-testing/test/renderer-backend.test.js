@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'renderer-backend-fixture';
 
@@ -28,7 +29,8 @@ describe('renderer backend', function () {
   /** @type {HTMLElement | undefined} */
   let host;
 
-  afterEach(() => {
+  afterEach(async () => {
+    await stopAndDrain(display);
     display?.dispose();
     display = undefined;
     host?.remove();

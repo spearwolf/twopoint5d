@@ -2,6 +2,7 @@ import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute} from 'three/tsl';
 import {MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
@@ -11,8 +12,8 @@ const FIXTURE_ID = 'vertex-objects-heap-fixture';
 
 // The absolute heap size of the test page depends on the V8 version and on what three loads; a
 // limit measured against the run's own first sample holds across versions. The samples grow
-// linearly, about 13 KB per round across all six of them — 11.7 % of the first sample, measured
-// on Chromium 151. The cause is not settled: a leak, or a cache inside three. The limit lets this
+// linearly, about 13 KB per round across all six of them — 11.8 % of the first sample, measured
+// on Chromium 153. The cause is not settled: a leak, or a cache inside three. The limit lets this
 // growth through and catches anything above it.
 const MAX_HEAP_GROWTH = 0.15;
 
@@ -29,8 +30,9 @@ function makeContainer({width = 320, height = 200} = {}) {
 }
 
 /** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
+async function disposeDisplay(display) {
   if (!display) return;
+  await stopAndDrain(display);
   try {
     display.dispose();
   } catch {
@@ -70,9 +72,9 @@ async function sampleHeap() {
 
 describe('vertex-objects — heap', function () {
   before(function () {
-    // Firefox has neither performance.memory nor globalThis.gc, and on this machine it
-    // gets no GL context at all — skip before a Display ever starts, so Firefox's error
-    // count stays exactly where it was before this file existed.
+    // Firefox has neither performance.memory nor globalThis.gc and cannot take a single sample —
+    // skip before beforeEach starts a Display, so this file starts no GPU device in a browser it
+    // cannot measure.
     if (typeof chromePerformance.memory === 'undefined' || typeof globalThis.gc !== 'function') {
       this.skip();
     }
@@ -105,8 +107,8 @@ describe('vertex-objects — heap', function () {
     material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
   });
 
-  afterEach(() => {
-    disposeDisplay(display);
+  afterEach(async () => {
+    await disposeDisplay(display);
     display = undefined;
     material = undefined;
     if (host && host.parentNode) {

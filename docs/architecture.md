@@ -118,9 +118,9 @@ commit SHAs of the actions, and the version comment next to each, current.
 
 The browser suite writes one line per browser and run into the "Browser logs" of the test
 output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from
-`packages/twopoint5d-testing/test/renderer-backend.test.js`. Measured locally with Playwright
-1.62.1, Chromium 151 runs on WebGL2 (three reports `WebGPU is not available, running under
-WebGL2 backend`) and Firefox 153 on WebGPU (`dom.webgpu.enabled` in
+`packages/twopoint5d-testing/test/renderer-backend.test.js`. Measured locally with
+Playwright 1.63.0, Chromium 153 runs on WebGL2 (three reports `WebGPU is not available,
+running under WebGL2 backend`) and Firefox 155 on WebGPU (`dom.webgpu.enabled` in
 `web-test-runner.config.js`). What CI gets is in the log of the CI run.
 
 The Playwright browsers are cached under the key `playwright-<os>-<version>`, the
@@ -211,10 +211,9 @@ consistent across library, test harness and lookbook. In the library they are
 minor and patch updates of the toolchain arrive as one pull request, the group `toolchain`.
 The four catalog entries stay out of it: a jump of `three` moves the peer range of the
 library and needs a review of its own, so each of them, and every major update, comes as a
-pull request by itself. Playwright is held to `~1.62.1` in the root `package.json`, because
-the browser suite hangs under WebGPU on the Firefox 155 that Playwright 1.63 ships;
-Dependabot proposes the jump as a pull request of its own, and the group leaves `playwright`
-out for that reason. Overrides live in `pnpm-workspace.yaml`. Each one carries a comment
+pull request by itself. `playwright` stays out of the group as well: each of its updates
+brings the Chromium and Firefox the browser suite runs on, so it comes as a pull request of
+its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a comment
 that names the advisory it answers and says when the entry can go.
 
 `@emnapi/core` and `@emnapi/runtime` are root devDependencies that nothing imports. They are
@@ -249,6 +248,15 @@ Two runners, deliberately in separate packages:
   from `pnpm exec playwright install chromium firefox`. The `*.test.js` files are
   type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from
   JSDoc — vertex object interfaces, descriptions.
+
+A browser test that disposes a display in its teardown calls `stopAndDrain()` from
+`packages/twopoint5d-testing/test/support/stopAndDrain.js` right before `dispose()`: it
+stops the display and waits until the GPU has run everything submitted to it. On Firefox
+155 under WebGPU, destroying a device while submitted work is still in flight reports a
+`GPUInternalError` on that device and ends `requestAnimationFrame` for the whole page, and
+every later test in the file waits for a frame until it times out. A test whose subject is
+`dispose()` itself calls it without the helper. Once Firefox takes such a device down
+without stalling, the calls can go; `pnpm test:browser` without them shows when.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run under
 `node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts

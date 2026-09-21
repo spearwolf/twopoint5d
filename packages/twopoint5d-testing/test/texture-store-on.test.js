@@ -29,7 +29,7 @@ function makeCatalogUrl(data) {
   return URL.createObjectURL(blob);
 }
 
-/** Resolve when `cb` returns a truthy value or the deadline elapses. */
+/** Resolve with the first truthy value `cb` returns; reject when `cb` throws or when the deadline elapses first. */
 function waitUntil(cb, {timeout = 4000, interval = 10} = {}) {
   return new Promise((resolve, reject) => {
     const start = performance.now();

@@ -2,6 +2,7 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
+import {stopAndDrain} from './support/stopAndDrain.js';
 
 const FIXTURE_ID = 'display-dispose-fixture';
 
@@ -32,8 +33,9 @@ describe('Display — the contract after dispose()', function () {
 
   // every test disposes in its own body; the teardown only has to catch the ones that did not get
   // that far, and it must not call start() — that is one of the calls a disposed display refuses
-  afterEach(() => {
+  afterEach(async () => {
     if (display) {
+      await stopAndDrain(display);
       display.dispose();
     }
     display = undefined;
