@@ -1,6 +1,6 @@
 {
-  "name": "@spearwolf/twopoint5d",
-  "description": "a library to create 2.5d realtime graphics and pixelart with three.js",
+  "name": "twopoint5d-workspace",
+  "description": "Nx + pnpm workspace of @spearwolf/twopoint5d, its browser tests and the lookbook",
   "version": "0.0.0",
   "author": "Wolfger Schramm <wolfger@spearwolf.de>",
   "license": "Apache-2.0",

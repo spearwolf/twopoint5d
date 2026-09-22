@@ -57,8 +57,13 @@ Markdown file is an input. It checks the browser tests through the package's own
 `tsconfig.json` (`checkJs`, with `noImplicitAny` and `strictNullChecks` off) and every
 code block marked `ts check` through `scripts/checkDocSnippets.mjs`, both against the
 library's build output. Its inputs are that build output, the tests, the tsconfig,
-`package.json`, the modules of the check and every `*.md` of the repository: a marked
+`package.json`, the modules of the check and every Markdown file git tracks: a marked
 block can sit in any of them, and one that stops compiling has to turn the target red.
+`project.json` names those files by the directories that hold tracked docs, and the
+three at the root by name, so an untracked note — which the check never reads — does not
+invalidate the cache. `scripts/checkDocSnippets/typecheckInputs.test.mjs` asks Nx for the
+inputs it resolves and fails on a tracked `*.md` outside them; a doc in a new place gets
+its glob there.
 
 Named inputs worth knowing: `sharedTsconfigs` (root + project tsconfig),
 `makePackageJson` (everything that feeds the publish manifest, the root `package.json`
@@ -86,14 +91,16 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   and fails on published declarations that reference a type consumers cannot name.
   `attw` and `publint` resolve such a type structurally and stay quiet, which is exactly
   why this check exists.
-- `lintPkg` runs publint against `dist/` and fails as soon as `dist/package.json`
-  declares `dependencies` or `optionalDependencies`. The library reaches its consumers
-  with peer dependencies only, and the non-blocking audit step in CI relies on that (see
-  below).
+- `lintPkg` runs publint against `dist/` and then `scripts/checkPeerDependenciesOnly.mjs`,
+  which fails as soon as `dist/package.json` declares `dependencies` or
+  `optionalDependencies`. The library reaches its consumers with peer dependencies only,
+  and the non-blocking audit step in CI relies on that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
-  publish pipeline's helpers and of `makePackageJson.mjs` itself (§4, §6), of the CI
-  cache server, of the helpers of the code block check, and the check that the lookbook
-  serves the script `RainbowLine` loads at runtime.
+  publish pipeline's helpers and of `makePackageJson.mjs` and
+  `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server, of the
+  helpers of the code block check, the check that every tracked Markdown file is an
+  input of `twopoint5d-testing:typecheck`, and the check that the lookbook serves the
+  script `RainbowLine` loads at runtime.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the
   thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
   it runs the same specs without coverage. The thresholds sit two points under the level
@@ -272,12 +279,14 @@ under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does
 `scripts/lookbook/rainbowLineScript.test.mjs`, which holds
 `apps/lookbook/public/js/` to the script `@spearwolf/astro-rainbow-line` loads at
 runtime — nothing in the repo references that file, so only a spec keeps it from being
-cleaned up. One spec starts
-`makePackageJson.mjs` itself, as a child process in a throwaway project directory,
-because its exit codes, its messages and the manifest it does not write are wiring that
-no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as
-soon as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file
-system.
+cleaned up. Two specs start a script itself, as a child process:
+`makePackageJson.mjs` in a throwaway project directory and
+`checkPeerDependenciesOnly.mjs` against a throwaway manifest, because their exit codes,
+their messages and the manifest the first one does not write are wiring that no helper
+test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon as its
+arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
+`scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds the
+Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

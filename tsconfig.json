@@ -13,6 +13,9 @@
     "emitDecoratorMetadata": false,
     "esModuleInterop": true,
     "experimentalDecorators": false,
+    // Off on purpose: it would make every optional member of the public option bags
+    // reject an explicit `undefined`, in the published declarations too, with no known bug behind it.
+    "exactOptionalPropertyTypes": false,
     "forceConsistentCasingInFileNames": true,
     "importHelpers": true,
     "isolatedModules": true,
@@ -24,7 +27,7 @@
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": true,
     "noImplicitOverride": true,
-    "noImplicitReturns": false,
+    "noImplicitReturns": true,
     "noImplicitThis": true,
     "noPropertyAccessFromIndexSignature": true,
     // Not implied by `strict`: an index or map lookup that can come up empty says so in its type.

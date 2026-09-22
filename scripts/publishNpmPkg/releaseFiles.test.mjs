@@ -38,9 +38,9 @@ describe('releaseFiles', () => {
     touch(project, 'CHANGELOG.md');
     touch(project, 'README.md');
     assert.deepEqual(files(), [
-      {src: `${ws}/LICENSE`, dst: `${dist}/LICENSE`},
-      {src: `${project}/CHANGELOG.md`, dst: `${dist}/CHANGELOG.md`},
-      {src: `${project}/README.md`, dst: `${dist}/README.md`},
+      {src: path.join(ws, 'LICENSE'), dst: path.join(dist, 'LICENSE')},
+      {src: path.join(project, 'CHANGELOG.md'), dst: path.join(dist, 'CHANGELOG.md')},
+      {src: path.join(project, 'README.md'), dst: path.join(dist, 'README.md')},
     ]);
   });
 
@@ -49,7 +49,7 @@ describe('releaseFiles', () => {
     touch(project, 'CHANGELOG.md');
     touch(project, 'README.md');
     touch(project, 'README-pkg.md');
-    assert.deepEqual(files()[2], {src: `${project}/README-pkg.md`, dst: `${dist}/README.md`});
+    assert.deepEqual(files()[2], {src: path.join(project, 'README-pkg.md'), dst: path.join(dist, 'README.md')});
   });
 
   it('a workspace .npmrc goes along, first', () => {
@@ -58,28 +58,28 @@ describe('releaseFiles', () => {
     touch(project, 'CHANGELOG.md');
     touch(project, 'README.md');
     assert.deepEqual(files(), [
-      {src: `${ws}/.npmrc`, dst: `${dist}/.npmrc`},
-      {src: `${ws}/LICENSE`, dst: `${dist}/LICENSE`},
-      {src: `${project}/CHANGELOG.md`, dst: `${dist}/CHANGELOG.md`},
-      {src: `${project}/README.md`, dst: `${dist}/README.md`},
+      {src: path.join(ws, '.npmrc'), dst: path.join(dist, '.npmrc')},
+      {src: path.join(ws, 'LICENSE'), dst: path.join(dist, 'LICENSE')},
+      {src: path.join(project, 'CHANGELOG.md'), dst: path.join(dist, 'CHANGELOG.md')},
+      {src: path.join(project, 'README.md'), dst: path.join(dist, 'README.md')},
     ]);
   });
 
   it('a missing CHANGELOG.md is named', () => {
     touch(ws, 'LICENSE');
     touch(project, 'README.md');
-    assert.throws(files, {message: /^\S*\/project\/CHANGELOG\.md does not exist$/});
+    assert.throws(files, {message: `${path.join(project, 'CHANGELOG.md')} does not exist`});
   });
 
   it('a missing README is named by the README.md it falls back to', () => {
     touch(ws, 'LICENSE');
     touch(project, 'CHANGELOG.md');
-    assert.throws(files, {message: /^\S*\/project\/README\.md does not exist$/});
+    assert.throws(files, {message: `${path.join(project, 'README.md')} does not exist`});
   });
 
   it('every missing file is named in one message', () => {
     assert.throws(files, {
-      message: `${ws}/LICENSE, ${project}/CHANGELOG.md, ${project}/README.md do not exist`,
+      message: `${path.join(ws, 'LICENSE')}, ${path.join(project, 'CHANGELOG.md')}, ${path.join(project, 'README.md')} do not exist`,
     });
   });
 });
