@@ -3,15 +3,13 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_animated-sprites.json';
 ---
 
-<Layout title={title} showSource={showSource}>
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
   <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
     <div class="actionBtn lessSprites">less</div>
     <div class="spriteCount">0</div>
     <div class="actionBtn moreSprites">more</div>
   </section>
-
-  <p slot="demo-description">{description}</p>
 </Layout>
 
 <style>

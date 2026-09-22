@@ -3,8 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_map2d-tile-sprites.json';
 ---
 
-<Layout title={title} showSource={showSource}>
-  <p slot="demo-description">{description}</p>
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 

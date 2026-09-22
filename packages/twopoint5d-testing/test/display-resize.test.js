@@ -21,14 +21,14 @@ function makeContainer({width = 320, height = 200, id} = {}) {
   return el;
 }
 
-async function disposeDisplay(display) {
+/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
+function disposeDisplay(display) {
   if (!display) return;
   try {
-    await display.start();
+    display.dispose();
   } catch {
-    // ignore — dispose still works
+    // ignore — the fixture still has to leave the dom
   }
-  display.dispose();
 }
 
 function nextFrame(display) {
@@ -66,8 +66,8 @@ describe('Display — resize behavior', () => {
   /** @type {HTMLElement | undefined} */
   let host;
 
-  afterEach(async () => {
-    await disposeDisplay(display);
+  afterEach(() => {
+    disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

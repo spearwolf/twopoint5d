@@ -9,8 +9,10 @@ import type {TextureStoreData} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-// the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer enough
-const rendererStub = {getMaxAnisotropy: () => 16} as unknown as WebGPURenderer;
+// the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer
+// enough; `dispose` is there for the test that watches whether the store releases a renderer
+const makeRendererStub = ({maxAnisotropy = 16, dispose = () => {}}: {maxAnisotropy?: number; dispose?: () => void} = {}) =>
+  ({getMaxAnisotropy: () => maxAnisotropy, dispose}) as unknown as WebGPURenderer;
 
 // a promise that never settles would run into the vitest timeout instead of failing; this races it
 // against a short timer so a still-waiting promise reports itself as 'pending' in milliseconds
@@ -142,9 +144,8 @@ describe('TextureStore', () => {
     // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose a renderer that was handed to the constructor', () => {
       const rendererDispose = vi.fn();
-      const renderer = {getMaxAnisotropy: () => 16, dispose: rendererDispose};
 
-      const store = new TextureStore(renderer as never);
+      const store = new TextureStore(makeRendererStub({dispose: rendererDispose}));
       store.dispose();
 
       expect(rendererDispose).not.toHaveBeenCalled();
@@ -179,8 +180,7 @@ describe('TextureStore', () => {
     });
 
     test('emits nothing after the dispose event', () => {
-      // the store never reads the renderer it is given; it only has to be something
-      const store = new TextureStore({backend: {}} as never);
+      const store = new TextureStore(makeRendererStub());
 
       const events: string[] = [];
       on(store, TextureStoreEvents.Dispose, () => {
@@ -263,7 +263,7 @@ describe('TextureStore', () => {
     test('behaves as documented after dispose()', () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
       try {
-        const store = new TextureStore({backend: {}} as never);
+        const store = new TextureStore(makeRendererStub());
         store.defaultTextureClasses = ['nearest'];
 
         store.dispose();
@@ -272,7 +272,7 @@ describe('TextureStore', () => {
         expect(store.textureFactory).toBeUndefined();
 
         expect(() => {
-          store.renderer = {backend: {}} as never;
+          store.renderer = makeRendererStub();
         }).not.toThrow();
 
         expect(store.renderer).toBeUndefined();
@@ -376,9 +376,7 @@ describe('TextureStore', () => {
   describe('central TextureFactory (§3.3, §6.1)', () => {
     test('TextureStore exposes a `textureFactory` that all resources share', () => {
       const store = new TextureStore();
-      // assign a stub "renderer" with the expected API surface
-      const stubRenderer = {getMaxAnisotropy: () => 16};
-      store.renderer = stubRenderer as never;
+      store.renderer = makeRendererStub();
 
       store.parse({
         defaultTextureClasses: [],
@@ -400,8 +398,7 @@ describe('TextureStore', () => {
       expect(resB?.textureFactory).toBe(factory);
 
       // swap renderer → new shared factory propagates
-      const stubRenderer2 = {getMaxAnisotropy: () => 8};
-      store.renderer = stubRenderer2 as never;
+      store.renderer = makeRendererStub({maxAnisotropy: 8});
       const factory2 = store.textureFactory;
       expect(factory2).not.toBe(factory);
       expect(resA?.textureFactory).toBe(factory2);
@@ -1160,7 +1157,7 @@ describe('TextureStore', () => {
     test('two resources that name the same image share one fetch and keep their own texture', async () => {
       const loadSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
-      const store = new TextureStore(rendererStub);
+      const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'shared.png'}, b: {imageUrl: 'shared.png'}}});
 
       const textures: unknown[] = [];
@@ -1184,7 +1181,7 @@ describe('TextureStore', () => {
     test('the image is fetched again once no resource wants it any more', async () => {
       const loadSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
-      const store = new TextureStore(rendererStub);
+      const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'shared.png'}, b: {imageUrl: 'shared.png'}}});
 
       const unsubscribeA = store.on('a', 'texture', () => {});
@@ -1588,7 +1585,7 @@ describe('TextureStore', () => {
       const resource = await store.whenResource('a');
 
       expect(resource.textureClasses).toEqual(['nearest', 'linear']);
-      expect(new TextureFactory(rendererStub, []).getOptions(resource.textureClasses!).magFilter).toBe(LinearFilter);
+      expect(new TextureFactory(makeRendererStub(), []).getOptions(resource.textureClasses!).magFilter).toBe(LinearFilter);
     });
 
     test('the item flipY class wins over the store default', async () => {
@@ -1599,7 +1596,7 @@ describe('TextureStore', () => {
       const resource = await store.whenResource('a');
 
       expect(resource.textureClasses).toEqual(['no-flipy', 'flipy']);
-      expect(new TextureFactory(rendererStub, []).getOptions(resource.textureClasses!).flipY).toBe(true);
+      expect(new TextureFactory(makeRendererStub(), []).getOptions(resource.textureClasses!).flipY).toBe(true);
     });
   });
 

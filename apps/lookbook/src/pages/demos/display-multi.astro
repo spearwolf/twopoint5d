@@ -3,9 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_display-multi.json';
 ---
 
-<Layout title={title} showSource={showSource}>
-  <p slot="demo-description">{description}</p>
-
+<Layout title={title} showSource={showSource} description={description}>
   <div class="pt-[28px] h-full">
     <section class="gridContainer">
       <div class="gridCell">

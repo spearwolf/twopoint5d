@@ -756,6 +756,91 @@ describe('vertex-buffers-geometry-updates', () => {
       ]);
     });
 
+    /**
+     * Two geometries over one pool of `count` objects, both wound forward past their first
+     * `update()` the way `settledQuadGeometry()` winds one. `write(idx)` writes the object in slot
+     * `idx` and names it to the pool: a generated setter records nothing, so the caller that knows
+     * which object it wrote says so.
+     */
+    const twoSettledQuadGeometries = (count: number) => {
+      const pool = new VertexObjectPool<MyBaseVO>(staticQuadDesc, 10);
+      const first = new VertexObjectGeometry<MyBaseVO>(pool, 10);
+      const second = new VertexObjectGeometry<MyBaseVO>(pool, 10);
+      const objects = Array.from({length: count}, () => pool.createVO()!);
+      for (const geometry of [first, second]) {
+        geometry.update();
+        uploaded(geometry, 'position');
+      }
+      const write = (idx: number) => {
+        objects[idx]!.setPosition([idx, 0, 0, idx, 0, 0, idx, 0, 0, idx, 0, 0]);
+        pool.buffer.touchBuffer('positions', idx, idx);
+      };
+      return {first, second, write};
+    };
+
+    test('two geometries that update in the same frame both upload the object that was written', () => {
+      const {first, second, write} = twoSettledQuadGeometries(6);
+
+      write(1);
+      first.update();
+      second.update();
+
+      expect(updateRangesOf(first, 'position'), 'first').toEqual([{start: 1 * 4 * 3, count: 4 * 3}]);
+      expect(updateRangesOf(second, 'position'), 'second').toEqual([{start: 1 * 4 * 3, count: 4 * 3}]);
+
+      uploaded(first, 'position');
+      uploaded(second, 'position');
+
+      write(4);
+      first.update();
+      second.update();
+
+      expect(updateRangesOf(first, 'position'), 'first, second write').toEqual([{start: 4 * 4 * 3, count: 4 * 3}]);
+      expect(updateRangesOf(second, 'position'), 'second, second write').toEqual([{start: 4 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('a write between the updates of two geometries sends the second one every object in use', () => {
+      const {first, second, write} = twoSettledQuadGeometries(6);
+
+      write(1);
+      first.update();
+      write(4);
+      second.update();
+
+      // the range over object 1 was picked up by first, a new one has started with object 4, and
+      // second stood before its own beginning — it takes every object in use
+      expect(updateRangesOf(first, 'position'), 'first').toEqual([{start: 1 * 4 * 3, count: 4 * 3}]);
+      expect(updateRangesOf(second, 'position'), 'second').toEqual([{start: 0, count: 6 * 4 * 3}]);
+
+      uploaded(first, 'position');
+      uploaded(second, 'position');
+
+      first.update();
+      second.update();
+
+      // second already took the write to 4 along with everything else and names no range
+      expect(updateRangesOf(first, 'position'), 'first, next frame').toEqual([{start: 4 * 4 * 3, count: 4 * 3}]);
+      expect(updateRangesOf(second, 'position'), 'second, next frame').toEqual([]);
+    });
+
+    test('a range still standing on one geometry widens there and nowhere else', () => {
+      const {first, second, write} = twoSettledQuadGeometries(6);
+
+      write(1);
+      first.update();
+      second.update();
+      uploaded(second, 'position');
+      // first's range over object 1 is left standing
+
+      write(4);
+      first.update();
+      second.update();
+
+      // objects 1..4 — the range that was never delivered widens rather than being replaced
+      expect(updateRangesOf(first, 'position'), 'first').toEqual([{start: 1 * 4 * 3, count: 4 * 4 * 3}]);
+      expect(updateRangesOf(second, 'position'), 'second').toEqual([{start: 4 * 4 * 3, count: 4 * 3}]);
+    });
+
     test('the base pool of an instanced geometry uploads every vertex of a used object', () => {
       const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
 

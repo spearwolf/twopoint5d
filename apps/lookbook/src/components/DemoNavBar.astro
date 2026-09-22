@@ -64,7 +64,6 @@ const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoi
 
   <section class="demo-description mb-16 text-sm text-slate-200 [&>p]:mb-2 [&>p:last-child]:mb-0">
     <Fragment set:html={marked.parse(description)} />
-    <slot name="description" />
   </section>
 
   <section class="text-center">

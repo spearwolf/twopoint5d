@@ -3,9 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_textured-sprites.json';
 ---
 
-<Layout title={title} showSource={showSource}>
-  <p slot="demo-description">{description}</p>
-
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">

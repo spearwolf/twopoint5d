@@ -3,10 +3,8 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_stage-postprocessing.json';
 ---
 
-<Layout title={title} showSource={showSource}>
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="twopoint5d" resize-to="window"></canvas>
-
-  <p slot="demo-description">{description}</p>
 </Layout>
 
 <script>

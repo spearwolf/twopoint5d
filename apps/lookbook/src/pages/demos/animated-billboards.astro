@@ -3,14 +3,12 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, showSource, title} from './_animated-billboards.json';
 ---
 
-<Layout title={title} showSource={showSource}>
+<Layout title={title} showSource={showSource} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <div class="loading-wrapper">
     <div class="loading-content">.&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.</div>
   </div>
-
-  <p slot="demo-description">{description}</p>
 </Layout>
 
 <style>
