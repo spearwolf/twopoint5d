@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-21T21:01:10.943Z"
+    "generatedAt": "2026-09-22T15:48:34.659Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,7 +205,7 @@
           "high": 3,
           "medium": 21,
           "low": 57,
-          "info": 23
+          "info": 24
         },
         "byCategory": {
           "correctness": 24,
@@ -216,7 +216,7 @@
           "security": 2,
           "resources": 4,
           "architecture": 2,
-          "async": 3,
+          "async": 4,
           "readability": 6,
           "types": 3,
           "dx": 10,
@@ -225,25 +225,25 @@
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 63,
-        "penalty": 35,
+        "score": 65,
+        "penalty": 32,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 7,
-          "low": 42,
-          "info": 30
+          "low": 36,
+          "info": 26
         },
         "byCategory": {
           "dx": 33,
-          "types": 5,
-          "testing": 24,
+          "types": 4,
+          "testing": 18,
           "dependencies": 3,
-          "build": 3,
           "consistency": 4,
           "completeness": 1,
-          "readability": 5,
-          "resources": 1
+          "readability": 4,
+          "resources": 1,
+          "build": 1
         }
       }
     },
@@ -252,34 +252,34 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 142,
+        "findings": 140,
         "score": 71
       },
       {
         "name": "workspace",
         "path": ".",
         "reviewedLoc": 1063,
-        "findings": 18,
+        "findings": 16,
         "score": 93
       },
       {
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 12,
-        "score": 95
+        "findings": 8,
+        "score": 96
       },
       {
         "name": "lookbook",
         "path": "apps/lookbook",
         "reviewedLoc": 0,
-        "findings": 11,
-        "score": 94.5
+        "findings": 10,
+        "score": 95
       }
     ],
-    "resolvedCount": 14,
+    "resolvedCount": 25,
     "scoreModel": 2,
-    "score": 63,
+    "score": 64,
     "scoring": {
       "model": 2,
       "weights": {
@@ -297,8 +297,8 @@
       "critical": 0,
       "high": 3,
       "medium": 28,
-      "low": 99,
-      "info": 53
+      "low": 93,
+      "info": 50
     },
     "byCategory": {
       "correctness": 24,
@@ -309,31 +309,31 @@
       "completeness": 7,
       "security": 2,
       "resources": 5,
-      "types": 8,
-      "testing": 28,
+      "types": 7,
       "architecture": 2,
-      "async": 3,
+      "async": 4,
+      "testing": 22,
       "dependencies": 3,
-      "build": 3,
-      "readability": 11
+      "readability": 10,
+      "build": 1
     },
     "byComponent": {
       "map2d": 25,
-      "texture": 28,
-      "vertex-objects": 15,
+      "texture": 27,
+      "vertex-objects": 14,
       "stage": 24,
       "sprites": 7,
-      "display": 20,
+      "display": 21,
       "controls": 3
     },
     "counts": {
-      "findings": 183,
+      "findings": 174,
       "improvements": 18,
       "byStatus": {
         "new": 57,
         "unchanged": 15,
         "improved": 7,
-        "carried-over": 104
+        "carried-over": 95
       }
     },
     "deltaBreakdown": {
@@ -343,8 +343,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-21",
-      "ref": "2026-09-21"
+      "date": "2026-09-22",
+      "ref": "2026-09-22"
     }
   },
   "portrait": {
@@ -1200,24 +1200,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "TEST-041",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Das Dirty-Range-Protokoll mit mehreren Konsumenten gezielt testen",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:257-275",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts",
-        "packages/twopoint5d/src/vertex-objects/setUploadRange.ts:15-38"
-      ],
-      "description": "`pickedUpSerial` und `dirtySince` sind dafür gebaut, dass mehrere Geometries denselben Pool lesen. Die Specs zu »second geometry« prüfen aber nur Dispose und Ownership, keine versetzt laufenden `update()`s mit Teil-Writes. `GeometryRoutes`, `GeometryAttributeSlots` und `setUploadRange` haben keine eigene Spec-Datei. Beim Durchrechnen ist das Protokoll korrekt, es hat aber kein Regressionsnetz.",
-      "recommendation": "Spec mit zwei Geometries auf einem Pool, abwechselnden `update()`s mit Writes an verschiedenen Indizes und Prüfung der `updateRanges`. Dazu Tabellentests für `setUploadRange`.",
-      "effort": "M",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "BUG-113",
       "category": "correctness",
       "domain": "code",
@@ -1835,19 +1817,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "CFG-025",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Das Root-Manifest anders benennen als die Library",
-      "location": "package.json:2",
-      "description": "Root und `packages/twopoint5d` heißen beide `@spearwolf/twopoint5d`. `pnpm -r ls` listet den Namen doppelt, und `pnpm outdated -r` schreibt die Root-devDependencies dem Library-Paket zu. `--filter` funktioniert nur über eine implizite Regel.",
-      "recommendation": "Das Root umbenennen, etwa in `twopoint5d-workspace`.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
       "id": "DEPS-009",
       "category": "dependencies",
       "domain": "harness",
@@ -2198,20 +2167,6 @@
       "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:1026",
       "description": "Tests im \u003ccode>describe('TextureStore')\u003c/code> prüfen ausschließlich \u003ccode>TextureResource\u003c/code>: \u003ccode>TextureResource.load() initial firing\u003c/code>, \u003ccode>TextureResource.load() image race\u003c/code>, \u003ccode>TextureResource.fromX input safety\u003c/code>. Neben der Datei liegt \u003ccode>TextureResource.spec.ts\u003c/code>, in die sie gehören. Die Datei ist mit 1504 Zeilen die größte Spec des Repos. Re-Check: unverändert.",
       "recommendation": "Die Blöcke nach \u003ccode>TextureResource.spec.ts\u003c/code> verschieben.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-019",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Zwei Bauformen für den Renderer-Stub in derselben Spec",
-      "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:13",
-      "description": "\u003ccode>{getMaxAnisotropy: () =&gt; 16, dispose}\u003c/code> und \u003ccode>{backend: {}}\u003c/code> stehen nebeneinander. Beide funktionieren, weil \u003ccode>TextureFactory\u003c/code> den Aufruf von \u003ccode>getMaxAnisotropy()\u003c/code> optional macht; welche die richtige ist, sagt die Datei nicht. Re-Check: unverändert.",
-      "recommendation": "Einen gemeinsamen Helfer \u003ccode>makeRendererStub()\u003c/code> anlegen.",
       "effort": "S",
       "status": "carried-over",
       "component": "texture",
@@ -2928,19 +2883,6 @@
       "package": "twopoint5d-testing"
     },
     {
-      "id": "CONS-029",
-      "category": "consistency",
-      "domain": "harness",
-      "severity": "low",
-      "title": "description auf der Index-Karte und im Demo-Dialog gleich rendern",
-      "location": "apps/lookbook/src/components/Card.astro:27-29",
-      "description": "Die Karte lässt \u003ccode>marked\u003c/code> über die Beschreibung laufen, Backticks werden also \u003ccode>&lt;code&gt;\u003c/code>; 15 von 17 Seiten reichen denselben String an \u003ccode>&lt;p slot=\"demo-description\"&gt;\u003c/code>, das ihn escaped, sodass der Dialog literale Backticks zeigt (\u003ccode>_map2d-tile-sprites\u003c/code>, \u003ccode>_stage-nested-pipelines\u003c/code>, \u003ccode>_stage-postprocessing\u003c/code>). Nur die zwei \u003ccode>map2d-*-visi\u003c/code>-Seiten nutzen die \u003ccode>description={description}\u003c/code>-Prop, die in \u003ccode>DemoNavBar\u003c/code> durch \u003ccode>marked\u003c/code> geht. XSS ist keins: Beide \u003ccode>set:html\u003c/code>-Eingaben sind repo-eigene Build-Zeit-JSON, kein Nutzerinput erreicht sie; dasselbe gilt für die \u003ccode>?raw\u003c/code>-SVG-Icons.",
-      "recommendation": "\u003ccode>VanillaDemo.astro\u003c/code> die \u003ccode>description\u003c/code> selbst aus der JSON lesen lassen (es bekommt \u003ccode>title\u003c/code>/\u003ccode>showSource\u003c/code> schon) und immer als Prop übergeben; den Slot streichen oder nur für zusätzliches Markup behalten. Jede Seite verliert drei Zeilen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
       "id": "DEPS-004",
       "category": "dependencies",
       "domain": "harness",
@@ -3097,19 +3039,6 @@
       "package": "lookbook"
     },
     {
-      "id": "TYPE-015",
-      "category": "types",
-      "domain": "harness",
-      "severity": "info",
-      "title": "noImplicitReturns einschalten; exactOptionalPropertyTypes bewusst auslassen",
-      "location": "tsconfig.json:27",
-      "description": "\u003ccode>noFallthroughCasesInSwitch\u003c/code> ist bereits durch ESLints \u003ccode>no-fallthrough\u003c/code> (in \u003ccode>eslint:recommended\u003c/code>) abgedeckt — nichts zu tun. \u003ccode>noImplicitReturns\u003c/code> ist billig, fängt die »Return in einem Zweig vergessen«-Klasse, und die strenge Basis (\u003ccode>noUncheckedIndexedAccess\u003c/code>, \u003ccode>noPropertyAccessFromIndexSignature\u003c/code>, \u003ccode>verbatimModuleSyntax\u003c/code>) zeigt, dass die Codebasis es verträgt. \u003ccode>exactOptionalPropertyTypes\u003c/code> würde jede Options-Bag im öffentlichen \u003ccode>.d.ts\u003c/code> und jedes \u003ccode>foo?: T = undefined\u003c/code> in Tests berühren — Churn ohne bekannten Bug dahinter.",
-      "recommendation": "\u003ccode>noImplicitReturns: true\u003c/code> setzen, das Aufkommende fixen (vermutlich eine Handvoll), und die Entscheidung gegen \u003ccode>exactOptionalPropertyTypes\u003c/code> in einem Kommentar neben der Option festhalten.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
       "id": "DOC-040",
       "category": "dx",
       "domain": "harness",
@@ -3121,19 +3050,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-026",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Browsertests zum Pipeline- und Projektionswechsel einmal rot sehen",
-      "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js:99",
-      "description": "Die beiden Browsertests zum Wechsel von Pipeline bzw. Stage-Projektion nach dem ersten Frame wurden nie rot gesehen, weil die Browser-Suite gegen das gebaute \u003ccode>dist\u003c/code> läuft. Dass sie den Defekt erkennen würden, belegen nur die Vitest-Regressionen. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Einmal gegen ein \u003ccode>dist\u003c/code> vom Stand vor dem Fix laufen lassen oder die Erwartung testweise umdrehen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "MEM-006",
@@ -3266,19 +3182,6 @@
       "package": "workspace"
     },
     {
-      "id": "READ-015",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die lintPkg-Prüfung auf Laufzeit-Dependencies steckt in einem node -e-Einzeiler",
-      "location": "packages/twopoint5d/package.json:56",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Die Invariante »das Paket liefert nur Peer-Dependencies aus« steht als rund 250 Zeichen langer \u003ccode>node -e\u003c/code>-String mit escapten Anführungszeichen im Script \u003ccode>lintPkg\u003c/code> — schwer zu lesen, nicht testbar.",
-      "recommendation": "In ein kleines Skript unter \u003ccode>scripts/\u003c/code> ziehen (mit Spec, wie die übrigen Publish-Helfer) und aus \u003ccode>lintPkg\u003c/code> aufrufen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-058",
       "category": "dx",
       "domain": "harness",
@@ -3331,19 +3234,6 @@
       "package": "workspace"
     },
     {
-      "id": "CFG-022",
-      "category": "build",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Der Typecheck-Input {workspaceRoot}/**/*.md erfasst auch ungetrackte Dateien",
-      "location": "packages/twopoint5d-testing/project.json:15",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Das Target \u003ccode>twopoint5d-testing:typecheck\u003c/code> nimmt jede \u003ccode>.md\u003c/code> im Workspace als Input, der Snippet-Check liest aber nur getrackte Dateien. Eine lokale Notiz invalidiert den Cache ohne Anlass — unnötige Misses, kein falsches Ergebnis (so geplant).",
-      "recommendation": "Hinnehmen oder die Inputs auf die Verzeichnisse mit getrackter Doku eingrenzen, sobald die Misses spürbar werden.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
       "id": "DOC-059",
       "category": "dx",
       "domain": "harness",
@@ -3352,32 +3242,6 @@
       "location": "packages/twopoint5d-testing/package.json:11",
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. \u003ccode>\"private\": true\u003c/code> schützt das reine Testpaket vor einem versehentlichen Publish; weder \u003ccode>AGENTS.md\u003c/code> noch \u003ccode>docs/architecture.md\u003c/code> noch das README nennen das.",
       "recommendation": "Einen Satz in \u003ccode>docs/architecture.md\u003c/code> (Abschnitt zum Testpaket oder zum Publish) ergänzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
-      "id": "TEST-038",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "stopAndDrain wartet ohne Timeout auf onSubmittedWorkDone()",
-      "location": "packages/twopoint5d-testing/test/support/stopAndDrain.js:23",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Geht das Device verloren, löst \u003ccode>device.queue.onSubmittedWorkDone()\u003c/code> womöglich nie auf; der Teardown hängt dann bis zum Mocha-Timeout, und die Meldung zeigt auf den Timeout statt auf das verlorene Device.",
-      "recommendation": "Das Warten mit einer kurzen Frist per \u003ccode>Promise.race\u003c/code> begrenzen und bei Ablauf mit einer eigenen Meldung weitermachen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
-      "id": "TEST-039",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "In elf Teardown-Helfern steht stopAndDrain vor dem try, ein Reject lässt die Fixture stehen",
-      "location": "packages/twopoint5d-testing/test/sprites-rotation.test.js:24-31",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. \u003ccode>disposeDisplay\u003c/code> in den elf Testdateien mit eigenem Helfer ruft \u003ccode>await stopAndDrain(display)\u003c/code> vor dem \u003ccode>try\u003c/code>; rejected es, laufen \u003ccode>dispose()\u003c/code> und das Entfernen des Containers nicht, und die Fixture bleibt für die folgenden Tests im DOM (so vom Detailplan festgelegt).",
-      "recommendation": "\u003ccode>stopAndDrain\u003c/code> in das \u003ccode>try\u003c/code> ziehen oder den Container in einem \u003ccode>finally\u003c/code> entfernen — in allen elf Helfern gleich.",
       "effort": "S",
       "status": "carried-over",
       "package": "twopoint5d-testing"
@@ -3404,19 +3268,6 @@
       "location": "scripts/publishNpmPkg/publishedVersions.mjs:2-3",
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleine Befunde zweier Reviewer. Der Doc-Kommentar von \u003ccode>parsePublishedVersions\u003c/code> bricht nach 112 und 70 Zeichen um; der Kommentar zur Verzeichnistiefe im Cache-Server-Test ist rund 115 Zeichen lang. Prettier lässt beides durch.",
       "recommendation": "Beide auf die Breite der Nachbarzeilen umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "TEST-040",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die releaseFiles-Spec setzt erwartete Pfade mit / zusammen",
-      "location": "scripts/publishNpmPkg/releaseFiles.test.mjs:41-43",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Die erwarteten \u003ccode>src\u003c/code>/\u003ccode>dst\u003c/code>-Pfade entstehen per Template-String mit \u003ccode>/\u003c/code>, \u003ccode>releaseFiles\u003c/code> selbst nutzt \u003ccode>path.join\u003c/code>; unter Windows liefe die Spec rot. CI läuft auf Linux, betroffen wäre ein lokaler Lauf unter Windows — derselbe Kreis, für den \u003ccode>npmCommand\u003c/code> einen Windows-Zweig trägt.",
-      "recommendation": "Die Erwartungen mit \u003ccode>path.join\u003c/code> bilden.",
       "effort": "S",
       "status": "carried-over",
       "package": "workspace"
@@ -3570,6 +3421,46 @@
         "kind": "induced",
         "run": "2026-09-21"
       }
+    },
+    {
+      "id": "ASYNC-006",
+      "category": "async",
+      "domain": "code",
+      "severity": "info",
+      "title": "drainSubmittedWork() wartet ohne Frist auf onSubmittedWorkDone()",
+      "location": "packages/twopoint5d/src/display/Display.ts:55-64",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:1112-1115",
+        "packages/twopoint5d/src/display/Display.ts:183-184",
+        "packages/twopoint5d/src/display/Display.ts:640-643"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-22. \u003ccode>drainSubmittedWork()\u003c/code> wartet unbegrenzt auf \u003ccode>device.queue.onSubmittedWorkDone()\u003c/code>. Löst eine Implementierung dieses Promise nach einem Device-Verlust nie auf, wartet die Freigabe des Renderers ohne Ende, und über \u003ccode>canvasReleases\u003c/code> auch jedes spätere Display auf demselben übergebenen Canvas. Die WebGPU-Spec verlangt, dass ausstehende \u003ccode>onSubmittedWorkDone()\u003c/code> bei Device-Verlust auflösen. Das Risiko liegt deshalb nur bei abweichenden Implementierungen.",
+      "recommendation": "Das Warten per \u003ccode>Promise.race\u003c/code> mit einer kurzen Frist begrenzen oder zusätzlich auf \u003ccode>device.lost\u003c/code> reagieren und bei Ablauf mit einer Warnung weitermachen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-22"
+      }
+    },
+    {
+      "id": "CONS-057",
+      "category": "consistency",
+      "domain": "harness",
+      "severity": "info",
+      "title": "exactOptionalPropertyTypes steht in tsconfig.json nicht an seiner alphabetischen Stelle",
+      "location": "tsconfig.json:18",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-22, kleiner Befund des Reviewers. Die bewusst abgeschaltete Option \u003ccode>exactOptionalPropertyTypes\u003c/code> steht nach \u003ccode>experimentalDecorators\u003c/code>, obwohl die Datei ihre Optionen sonst alphabetisch führt. Für \u003ccode>tsc\u003c/code> spielt die Reihenfolge keine Rolle.",
+      "recommendation": "Die Option samt Kommentar vor \u003ccode>experimentalDecorators\u003c/code> ziehen.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-22"
+      }
     }
   ],
   "openQuestions": [
@@ -3591,7 +3482,8 @@
       "Mitgeführte Findings aus dem Lookbook und dem Browser-Testpaket zählen im Score, obwohl dieser Lauf dort keinen Umfang gelesen hat.",
       "Seit dem Vorlauf trägt kein Commit einen `Remediation-Run`-Trailer. Eine Fix-Bilanz entfällt deshalb.",
       "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -3694,6 +3586,17 @@
         "harness": 63
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-22",
+      "score": 64,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 64,
+        "harness": 65
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -3705,6 +3608,16 @@
       "inducedFixed": 7,
       "inducedOpen": 1,
       "discovered": 13,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-22",
+      "source": "remediation",
+      "ref": "2026-09-22",
+      "fixed": 11,
+      "inducedFixed": 0,
+      "inducedOpen": 1,
+      "discovered": 1,
       "attribution": "reviewed"
     }
   ],
