@@ -22,5 +22,10 @@ apps/*/.astro
 # playwright run artifacts
 packages/*/test-results
 
+# vendored build output, kept byte-for-byte as shipped; RainbowLine from
+# @spearwolf/astro-rainbow-line loads it at runtime, so it is not dead weight
+# even though nothing in the repo references it (see AGENTS.md)
+apps/lookbook/public/js
+
 # report artifact, rewritten wholesale by its generator
 audit.html

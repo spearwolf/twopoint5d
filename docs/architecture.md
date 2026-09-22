@@ -92,7 +92,8 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
   publish pipeline's helpers and of `makePackageJson.mjs` itself (§4, §6), of the CI
-  cache server and of the helpers of the code block check.
+  cache server, of the helpers of the code block check, and the check that the lookbook
+  serves the script `RainbowLine` loads at runtime.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the
   thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
   it runs the same specs without coverage. The thresholds sit two points under the level
@@ -267,7 +268,11 @@ submitted to it. Firefox 155 under WebGPU needs that to keep drawing frames for 
 tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
-under `node --test` (`pnpm test:scripts`); no Nx project owns them. One spec starts
+under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does
+`scripts/lookbook/rainbowLineScript.test.mjs`, which holds
+`apps/lookbook/public/js/` to the script `@spearwolf/astro-rainbow-line` loads at
+runtime — nothing in the repo references that file, so only a spec keeps it from being
+cleaned up. One spec starts
 `makePackageJson.mjs` itself, as a child process in a throwaway project directory,
 because its exit codes, its messages and the manifest it does not write are wiring that
 no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as

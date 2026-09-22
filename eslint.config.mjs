@@ -7,7 +7,8 @@ import tseslint from 'typescript-eslint';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ['.nx/*', '.vscode/*', '**/dist', '**/.astro', '**/*.d.ts', '**/node_modules'],
+    // lookbook/public carries the vendored script that RainbowLine loads at runtime, see AGENTS.md
+    ignores: ['.nx/*', '.vscode/*', '**/dist', '**/.astro', '**/lookbook/public', '**/*.d.ts', '**/node_modules'],
   },
   {
     files: ['**/*.{js,ts}'],

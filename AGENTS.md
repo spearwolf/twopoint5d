@@ -39,8 +39,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   single-file run measure nothing
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server and the docs' code block check (`scripts/**/*.test.mjs`), plus one spec that
-  starts `makePackageJson.mjs` as a child process; no Nx project owns them, so `pnpm test`
-  does not run them
+  starts `makePackageJson.mjs` as a child process and one that checks the lookbook's
+  vendored `rainbow-line` script; no Nx project owns them, so `pnpm test` does not run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, and every code block marked
@@ -68,6 +68,16 @@ explicit instruction.
 - **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
   nothing and stay: they hold `pnpm-lock.yaml` to one resolution
   ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
+- **`apps/lookbook/public/js/rainbow-line-v0.4.0.js`** is the web component behind every
+  `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
+  `<script src="${BASE_URL}/js/rainbow-line-v0.4.0.js">` at runtime and expects the file
+  in `public/` — it ships a copy but does not serve it. The only reference lives inside
+  `node_modules`, so a grep of the repo finds nothing; the file is not dead weight and
+  stays. Keep it byte-for-byte identical to the package's copy, and replace it when a
+  package bump changes the version in that path —
+  `scripts/lookbook/rainbowLineScript.test.mjs` (`pnpm test:scripts`) fails otherwise.
+  The `.prettierignore` entry and the `**/lookbook/public` ignore in `eslint.config.mjs`
+  exist for it and stay too.
 - **Publishing** happens from the generated `dist/`, never from
   `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
   the published package. `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions:
