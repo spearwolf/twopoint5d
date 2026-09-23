@@ -1,12 +1,12 @@
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
-import {beforeEach, describe, expect, test} from 'vitest';
+import {beforeEach, describe, expect, test, vi} from 'vitest';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
-import {voBuffer, voIndex} from './constants.js';
+import {voBuffer, voIndex, voInitialize} from './constants.js';
 import type {BufferLike, VO, VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
 
 interface MyVertexObject {
@@ -68,6 +68,18 @@ interface MyInstancedVertexObject {
 
   zack: number;
 }
+
+// a vertex object whose prototype carries the creation hook, as TexturedSprite does; the
+// interface and the class merge only in the same scope, which is why both live up here
+interface Leveled extends VO {
+  level: number;
+}
+class Leveled {
+  [voInitialize]() {
+    this.level = 9;
+  }
+}
+const leveledDescription: VertexObjectDescription = {attributes: {level: {size: 1}}, basePrototype: Leveled.prototype};
 
 describe('VertexObjectPool', () => {
   let descriptor: VertexObjectDescription;
@@ -731,6 +743,78 @@ describe('VertexObjectPool', () => {
     });
   });
 
+  describe('voInitialize', () => {
+    test('createVO() runs the hook once for the slot it hands out, with the vertex object as this, before onCreateVO', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      const calls: Array<{name: string; self: unknown}> = [];
+      const hook = vi.spyOn(Leveled.prototype, voInitialize).mockImplementation(function (this: Leveled) {
+        calls.push({name: 'voInitialize', self: this});
+        this.level = 9;
+      });
+      try {
+        pool.onCreateVO = (vo) => {
+          calls.push({name: 'onCreateVO', self: vo});
+        };
+
+        const vo = pool.createVO()!;
+
+        expect(calls.map(({name}) => name)).toEqual(['voInitialize', 'onCreateVO']);
+        expect(calls[0]!.self, 'this of the hook').toBe(vo);
+        expect(hook).toHaveBeenCalledTimes(1);
+        expect(vo.level).toBe(9);
+      } finally {
+        hook.mockRestore();
+      }
+    });
+
+    test('getVO() leaves a slot filled through createFromAttributes() as it was written', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      const hook = vi.spyOn(Leveled.prototype, voInitialize);
+      try {
+        pool.createFromAttributes({level: [3]});
+
+        expect(pool.getVO(0)!.level).toBe(3);
+        expect(hook).not.toHaveBeenCalled();
+      } finally {
+        hook.mockRestore();
+      }
+    });
+
+    test('getVO() leaves a slot of a pool built from buffers data as it was', () => {
+      const source = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      source.createFromAttributes({level: [3]});
+      const data = source.toBuffersData();
+
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, data);
+
+      expect(pool.getVO(0)!.level).toBe(3);
+    });
+
+    test('getVO() leaves a slot written through fromBuffersData() as it was', () => {
+      const source = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      source.createFromAttributes({level: [3]});
+      const data = source.toBuffersData();
+
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      pool.fromBuffersData(data);
+
+      expect(pool.getVO(0)!.level).toBe(3);
+    });
+
+    test('getVO() of a slot createVO() handed out does not run the hook again', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      const hook = vi.spyOn(Leveled.prototype, voInitialize);
+      try {
+        const vo = pool.createVO()!;
+
+        expect(pool.getVO(0)).toBe(vo);
+        expect(hook).toHaveBeenCalledTimes(1);
+      } finally {
+        hook.mockRestore();
+      }
+    });
+  });
+
   describe('getVO()', () => {
     test('answers undefined for an index that names no used slot', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
@@ -817,7 +901,7 @@ describe('VertexObjectPool', () => {
       expect(pool.buffer.buffers.get('static_float32')!.typedArray).toBe(before);
     });
 
-    test('fromBuffersData() names itself and both capacities for a snapshot of another size', () => {
+    test('fromBuffersData() names itself and both capacities for buffers data of another size', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
       const buffersData = new VertexObjectPool(descriptor, 2).toBuffersData();
 
@@ -827,6 +911,34 @@ describe('VertexObjectPool', () => {
       expect(write, 'the message names the class, the method and the two values').toThrow(
         'VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, 4, got 2',
       );
+    });
+  });
+
+  describe('toBuffersData()', () => {
+    test('toBuffersData() hands out the arrays of the pool', () => {
+      const pool = new VertexObjectPool(descriptor, 4);
+
+      const buffersData = pool.toBuffersData();
+
+      for (const [name, typedArray] of Object.entries(buffersData.buffers)) {
+        expect(typedArray).toBe(pool.buffer.buffers.get(name)!.typedArray);
+      }
+    });
+
+    test('toBuffersData({copy: true}) hands out arrays the pool does not hold', () => {
+      const pool = new VertexObjectPool(descriptor, 4);
+
+      const buffersData = pool.toBuffersData({copy: true});
+
+      for (const [name, typedArray] of Object.entries(buffersData.buffers)) {
+        const poolArray = pool.buffer.buffers.get(name)!.typedArray!;
+        expect(typedArray).not.toBe(poolArray);
+        expect(typedArray).toEqual(poolArray);
+        expect(typedArray.constructor).toBe(poolArray.constructor);
+
+        (typedArray as Float32Array).fill(123);
+        expect(poolArray, 'a write into the copy does not change the pool').not.toEqual(typedArray);
+      }
     });
   });
 
@@ -1234,7 +1346,7 @@ describe('VertexObjectPool', () => {
       expect(pool.getVO(2)).toBeUndefined();
     });
 
-    // (c) every public member behaves after dispose() as its TSDoc says
+    // (c) the internal buffer setter keeps the guard its TSDoc names; only resize() writes it in the library
     test('VOBufferPool: a write to buffer falls through on a disposed pool', () => {
       const pool = new VOBufferPool(descriptor, 10);
       const spent = pool.buffer;

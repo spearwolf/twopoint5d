@@ -1,6 +1,7 @@
 import {createSandbox} from 'sinon';
 import {BufferGeometry} from 'three/webgpu';
-import {afterEach, describe, expect, test} from 'vitest';
+import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
+import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjects} from './VertexObjects.js';
 import type {VertexObjectDescription} from './types.js';
@@ -49,6 +50,30 @@ describe('VertexObjects', () => {
 
     expect(mesh.geometry).toBeInstanceOf(BufferGeometry);
     expect(() => mesh.update()).not.toThrow();
+  });
+
+  test('update() passes on to an InstancedVOBufferGeometry', () => {
+    const geometry = new InstancedVOBufferGeometry(description, 4, description, 1);
+    const mesh = new VertexObjects(geometry);
+    const update = sandbox.spy(geometry, 'update');
+
+    mesh.update();
+
+    expect(update.callCount).toBe(1);
+  });
+
+  test('a mesh built without a geometry is typed with the BufferGeometry THREE.Mesh puts there', () => {
+    const mesh = new VertexObjects();
+
+    expectTypeOf(mesh.geometry).toEqualTypeOf<BufferGeometry | undefined>();
+    expect(mesh.geometry).toBeInstanceOf(BufferGeometry);
+  });
+
+  test('a mesh built with a geometry is typed with that geometry', () => {
+    const geometry = new VertexObjectGeometry(description, 4);
+    const mesh = new VertexObjects(geometry);
+
+    expectTypeOf(mesh.geometry).toEqualTypeOf<typeof geometry | undefined>();
   });
 
   test('update() reaches a geometry that is assigned after the mesh was built', () => {

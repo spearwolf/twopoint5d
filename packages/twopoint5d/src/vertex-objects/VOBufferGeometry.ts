@@ -10,20 +10,21 @@ import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './type
 
 /**
  * Hands the buffers of a {@link VOBufferPool} to three.js as one `THREE.BufferGeometry`. It works
- * on buffer indices and knows no object type: the layer below {@link VertexObjectGeometry}.
+ * on buffer indices and knows no object type: the layer below `VertexObjectGeometry`.
  */
 export class VOBufferGeometry extends BufferGeometry {
+  /** The pool this geometry was built on. Answers with it after `dispose()` as well — see {@link dispose}. */
   readonly pool: VOBufferPool;
 
   readonly #buffers: Map<string, BufferLike> = new Map();
   readonly #bufferSerials: Map<string, number> = new Map();
 
-  /** The three.js buffer behind each buffer name of the pool. */
+  /** The three.js buffer behind each buffer name of the pool; empty after `dispose()`. */
   get buffers(): ReadonlyMap<string, BufferLike> {
     return this.#buffers;
   }
 
-  /** The serial this geometry last saw for each of those buffers. */
+  /** The serial this geometry last saw for each of those buffers; empty after `dispose()`. */
   get bufferSerials(): ReadonlyMap<string, number> {
     return this.#bufferSerials;
   }
@@ -31,6 +32,8 @@ export class VOBufferGeometry extends BufferGeometry {
   readonly #attachments = new GeometryPoolAttachments();
   readonly #slots = new GeometryAttributeSlots();
   readonly #routes = new GeometryRoutes();
+
+  #disposed = false;
 
   /**
    * @throws when the pool handed in has been disposed and holds no buffers to build attributes
@@ -79,9 +82,11 @@ export class VOBufferGeometry extends BufferGeometry {
    *
    * After this call the geometry holds no route, no buffer and no pool of its own any more.
    * What stays behind belongs to the attributes that are still there: their serials from the
-   * last `update()`.
+   * last `update()`. `update()` is a no-op from here on — see {@link update}.
    */
   override dispose(): void {
+    this.#disposed = true;
+
     // the renderer reads the attributes of this geometry once more while it handles the
     // dispose event, and reaches for the id of a slot before it checks that the slot is
     // filled — so the event goes out while every slot is still there
@@ -105,19 +110,19 @@ export class VOBufferGeometry extends BufferGeometry {
     this.#routes.clear();
   }
 
-  /** Marks the buffers behind the given attribute names for GPU upload on the next `update()`. */
+  /** Marks the buffers behind the given attribute names for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
   touchAttributes(...attrNames: string[]): void {
     this.#routes.touchAttributes(attrNames);
   }
 
-  /** Marks every buffer of the given usage types for GPU upload on the next `update()`. */
+  /** Marks every buffer of the given usage types for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
   touchBuffers(bufferTypes: TouchBuffersType): void {
     this.#routes.touchByUsage(bufferTypes);
   }
 
   /**
    * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
-   * mix of both. This is the counterpart to `autoTouch: false` (see {@link VADescription#autoTouch}):
+   * mix of both. This is the counterpart to `autoTouch: false` (see `VADescription#autoTouch`):
    * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
    * were written.
    */
@@ -134,7 +139,16 @@ export class VOBufferGeometry extends BufferGeometry {
     }
   }
 
+  /**
+   * Sets the draw range from `pool.usedCount`, uploads the buffers that need it and syncs the
+   * attribute arrays to the pool's own.
+   *
+   * A no-op after `dispose()`: the geometry has no attribute left to draw or upload, and a draw
+   * range taken from a pool that is still alive would name vertices this geometry no longer has.
+   */
   update(): void {
+    if (this.#disposed) return;
+
     this.#updateDrawRange();
 
     // before the uploads are synced: what is asked for here decides how wide each of them goes

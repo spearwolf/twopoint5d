@@ -3,7 +3,7 @@ import {expectDefined} from '../utils/expectDefined.js';
 
 /**
  * The geometry attribute names a route to this pool puts into slots. Read from the same
- * two maps that {@link initializeAttributes} and {@link initializeInstancedAttributes}
+ * two maps that `initializeAttributes` and `initializeInstancedAttributes`
  * walk, so the answer cannot drift from what they actually claim — a disposed pool has no
  * buffers left and therefore claims nothing.
  */

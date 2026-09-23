@@ -1,5 +1,5 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, VertexObjectBuffer, VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
+import {Display, VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
 import {MeshBasicMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
@@ -78,12 +78,9 @@ describe('vertex-objects — buffers data', function () {
 
     const buffersData = source.toBuffersData();
 
+    // the way a caller restores a pool: its constructor takes the buffers data, usedCount included
     /** @type {VertexObjectPool<QuadVO>} */
-    const restored = new VertexObjectPool(quadDescription, 2);
-    // exercises the raw constructor path itself, not VOBufferPool#fromBuffersData(); capacity
-    // is 2 on both sides on purpose, since this constructor does not reconcile a mismatch
-    restored.buffer = new VertexObjectBuffer(restored.buffer, buffersData);
-    restored.usedCount = buffersData.usedCount;
+    const restored = new VertexObjectPool(quadDescription, buffersData);
 
     const geometry = new VertexObjectGeometry(restored, 2);
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());

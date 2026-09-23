@@ -11,7 +11,7 @@ function disposedError(method: string): Error {
 
 /**
  * Allocates the typed arrays for a whole pool of vertex objects and owns them. It hands out
- * buffer indices, not objects: the layer below {@link VertexObjectPool}, which knows the type of
+ * buffer indices, not objects: the layer below `VertexObjectPool`, which knows the type of
  * the vertex objects it hands out.
  */
 export class VOBufferPool {
@@ -26,7 +26,7 @@ export class VOBufferPool {
   }
 
   /**
-   * Writes the capacity this pool reports. Only {@link VertexObjectPool#resize} has any business
+   * Writes the capacity this pool reports. Only `VertexObjectPool#resize` has any business
    * here, and only after it has built the buffers for the new size — everything that reads
    * `capacity` reads it as the size of the buffers behind it.
    *
@@ -47,19 +47,26 @@ export class VOBufferPool {
   protected onUsedCountShrunk(_from: number, _to: number): void {}
 
   /**
-   * The buffer every vertex object of this pool reads and writes through.
+   * The buffer every vertex object of this pool reads and writes through. Only
+   * `VertexObjectPool#resize()` replaces it, with a buffer of the new capacity that every
+   * vertex object is moved over to.
    *
    * The same {@link VertexObjectBuffer} once {@link dispose} has run, but one without data: it
    * holds no `typedArray` and no entry in `buffers` any more, and every method of it that would
    * read or write through an array throws.
-   *
-   * A write falls through on a disposed pool: a pool that has given up its buffers takes no
-   * fresh one, and the getter goes on answering the buffer the pool was disposed with.
    */
   get buffer(): VertexObjectBuffer {
     return this.#buffer;
   }
 
+  /**
+   * Swaps in the buffer `VertexObjectPool#resize()` has built for the new capacity; nothing
+   * else writes here. A write falls through on a disposed pool: a pool that has given up its
+   * buffers takes no fresh one, and the getter goes on answering the buffer the pool was
+   * disposed with.
+   *
+   * @internal
+   */
   set buffer(buffer: VertexObjectBuffer) {
     // a disposed pool that took a fresh buffer would let vertex objects work on it again
     if (this.#disposed) return;
@@ -75,7 +82,7 @@ export class VOBufferPool {
     this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
     const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
     if (capacity < 0 || !Number.isInteger(capacity)) {
-      // which of the two ways the capacity arrived, so a caller who handed in a snapshot looks at
+      // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at
       // its `capacity` field rather than at the argument
       const capacityName = typeof capacityOrData === 'number' ? 'capacity' : 'buffersData.capacity';
       throw new RangeError(`VOBufferPool: ${capacityName} must be a non-negative integer, got ${String(capacity)}`);
@@ -102,8 +109,8 @@ export class VOBufferPool {
    * clamped the same way. Throws a `RangeError` for `NaN` and for a fraction, which name no
    * slot — on a disposed pool as well.
    *
-   * A lower value gives up the slots above it: on a {@link VertexObjectPool} every vertex object
-   * sitting in one of them is let go of, as {@link VertexObjectPool#freeVO} would, and every
+   * A lower value gives up the slots above it: on a `VertexObjectPool` every vertex object
+   * sitting in one of them is let go of, as `VertexObjectPool#freeVO` would, and every
    * further read or write through it fails. The data in the buffer stays where it is.
    *
    * A write falls through on a disposed pool, which has no slot left to count: the getter
@@ -126,7 +133,7 @@ export class VOBufferPool {
    * How many vertex objects this pool can still hand out.
    *
    * `0` once {@link dispose} has run: a disposed pool has no slot left to give, and
-   * {@link VertexObjectPool#createVO} answers `undefined` for every one of them.
+   * `VertexObjectPool#createVO` answers `undefined` for every one of them.
    */
   get availableCount(): number {
     return this.#disposed ? 0 : this.capacity - this.#usedCount;
@@ -139,7 +146,7 @@ export class VOBufferPool {
 
   /**
    * True while at least one geometry has built `THREE.BufferAttribute`s on top of this
-   * pool's buffers. While this holds, {@link VertexObjectPool#resize} refuses every change
+   * pool's buffers. While this holds, `VertexObjectPool#resize` refuses every change
    * of capacity; only a `resize()` to the capacity the pool already has still goes through,
    * because it leaves the buffers alone.
    *
@@ -165,7 +172,7 @@ export class VOBufferPool {
 
   /**
    * Sets `usedCount` to `0`. The buffers keep their data and their memory. On a
-   * {@link VertexObjectPool} every vertex object handed out so far is let go of, as the
+   * `VertexObjectPool` every vertex object handed out so far is let go of, as the
    * `usedCount` setter describes. On a disposed pool it is a no-op without effect — the count
    * is already `0` and stays there.
    */
@@ -183,7 +190,7 @@ export class VOBufferPool {
    * the array reference. After `dispose()` the pool is **dead**: any further
    * read/write operation on its vertex objects will fail, {@link createFromAttributes},
    * {@link toBuffersData} and {@link fromBuffersData} throw, {@link availableCount} is `0`,
-   * and on a {@link VertexObjectPool} `createVO()` answers `undefined` while `resize()`
+   * and on a `VertexObjectPool` `createVO()` answers `undefined` while `resize()`
    * throws. The method is idempotent.
    *
    * `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
@@ -219,21 +226,34 @@ export class VOBufferPool {
   }
 
   /**
-   * Snapshot of the buffers this pool holds, for transfer or for handing to a second pool.
+   * The buffers this pool holds, for handing to a second pool or for transfer.
+   *
+   * Without `{copy: true}` every array is the pool's own: a write through a vertex object of
+   * this pool shows up in it, and a pool that takes this output in its constructor or through
+   * `fromBuffersData()` shares the arrays with this one. Transferring their `ArrayBuffer`s
+   * through `postMessage` detaches the arrays of this pool — its vertex objects write into
+   * nothing afterwards, and a geometry built on it uploads nothing more.
+   *
+   * `{copy: true}` hands out arrays this pool does not hold: the way to transfer buffers, or to
+   * build a second pool that stays independent of this one.
    *
    * Throws on a disposed pool: the return type promises the buffers of a live pool, and an
-   * empty snapshot would read like an untouched pool rather than a spent one.
+   * empty result would read like an untouched pool rather than a spent one.
    */
-  toBuffersData(): VertexObjectBuffersData {
+  toBuffersData(options?: {copy?: boolean}): VertexObjectBuffersData {
     if (this.#disposed) {
       throw disposedError('toBuffersData()');
     }
+    const copy = options?.copy ?? false;
     return {
       capacity: this.capacity,
       usedCount: this.usedCount,
       buffers: Object.fromEntries(
         // a buffer still in this map holds its array; `dispose()` empties the map in the same breath
-        Array.from(this.buffer.buffers.values()).map((buffer) => [buffer.bufferName, buffer.typedArray!]),
+        Array.from(this.buffer.buffers.values()).map((buffer) => [
+          buffer.bufferName,
+          copy ? buffer.typedArray!.slice() : buffer.typedArray!,
+        ]),
       ),
     };
   }

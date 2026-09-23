@@ -1,5 +1,6 @@
 import vm from 'node:vm';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
+import type {AttributeBufferLayout} from './VertexObjectBuffer.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -594,7 +595,9 @@ describe('VertexObjectBuffer', () => {
       const run = () => target.copy(source);
 
       expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class, the method and both vertex counts').toThrow(/VertexObjectBuffer#copy\(\).*1.*4/);
+      expect(run, 'the message names the class, the method and both vertex counts').toThrow(
+        /VertexObjectBuffer#copy\(\): the source has a vertexCount of 1, this buffer one of 4:/,
+      );
       expect(contentsOfFirst(target), 'the only buffer of the target is untouched').toEqual(new Array(32).fill(7));
     });
   });
@@ -704,6 +707,13 @@ describe('VertexObjectBuffer', () => {
     ]);
   });
 
+  test('the layout maps are typed read-only', () => {
+    const vob = new VertexObjectBuffer(new VertexObjectDescriptor({vertexCount: 1, attributes: {v: {size: 1}}}), 1);
+
+    expectTypeOf(vob.bufferAttributes).toEqualTypeOf<ReadonlyMap<string, Readonly<AttributeBufferLayout>>>();
+    expectTypeOf(vob.bufferNameAttributes).toEqualTypeOf<ReadonlyMap<string, readonly Readonly<AttributeBufferLayout>[]>>();
+  });
+
   test('toAttributeArrays', () => {
     const vob = new VertexObjectBuffer(
       new VertexObjectDescriptor({
@@ -736,6 +746,88 @@ describe('VertexObjectBuffer', () => {
 
     // prettier-ignore
     expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar']!)).toEqual([100, 101, 102, 103]);
+  });
+
+  describe('object index checks', () => {
+    const makeBuffer = () =>
+      new VertexObjectBuffer(
+        new VertexObjectDescriptor({
+          vertexCount: 1,
+          attributes: {
+            v: {size: 2, type: 'float32'},
+          },
+        }),
+        4,
+      );
+
+    test('toAttributeArrays() turns away an end beyond the capacity', () => {
+      const vob = makeBuffer();
+
+      const run = () => vob.toAttributeArrays(['v'], 2, 6);
+
+      expect(run).toThrow(RangeError);
+      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#toAttributeArrays\(\)/);
+    });
+
+    test('toAttributeArrays() turns away a negative start', () => {
+      const vob = makeBuffer();
+
+      const run = () => vob.toAttributeArrays(['v'], -1, 1);
+
+      expect(run).toThrow(RangeError);
+    });
+
+    test('toAttributeArrays() turns away a start after the end', () => {
+      const vob = makeBuffer();
+
+      const run = () => vob.toAttributeArrays(['v'], 3, 1);
+
+      expect(run).toThrow(RangeError);
+    });
+
+    test('toAttributeArrays() turns away a fraction', () => {
+      const vob = makeBuffer();
+
+      const run = () => vob.toAttributeArrays(['v'], 0.5, 2);
+
+      expect(run).toThrow(RangeError);
+    });
+
+    test('copyWithin() turns away a negative index', () => {
+      const vob = makeBuffer();
+
+      expect(() => vob.copyWithin(-1, 0, 1)).toThrow(RangeError);
+      expect(() => vob.copyWithin(0, -1, 1)).toThrow(RangeError);
+    });
+
+    test('copyWithin() turns away a range that reaches past the capacity', () => {
+      const vob = makeBuffer();
+
+      expect(() => vob.copyWithin(3, 0, 2)).toThrow(RangeError);
+    });
+
+    test('copyWithin() that is turned away writes nothing', () => {
+      const vob = makeBuffer();
+      vob.copyAttributes({v: [1, 2, 3, 4, 5, 6, 7, 8]});
+
+      const before = Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial]);
+
+      expect(() => vob.copyWithin(3, 0, 2)).toThrow(RangeError);
+
+      const after = Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial]);
+      expect(after).toEqual(before);
+    });
+
+    test('copyWithin() on the buffer of a disposed pool checks nothing', () => {
+      const pool = new VertexObjectPool<VO>(
+        new VertexObjectDescriptor({vertexCount: 1, attributes: {v: {size: 2, type: 'float32'}}}),
+        4,
+      );
+      const {buffer} = pool;
+      pool.dispose();
+
+      expect(() => buffer.copyWithin(-1, 0, 1)).not.toThrow();
+    });
   });
 
   describe('after the pool has been disposed', () => {
@@ -854,17 +946,6 @@ describe('VertexObjectBuffer', () => {
       expect(() => target.copy(source, 0.5)).not.toThrow();
     });
 
-    test('copy() into a buffer over a description without attributes does nothing, whatever the source brings', () => {
-      const target = new VertexObjectBuffer(new VertexObjectDescriptor({vertexCount: 2, attributes: {}}), 2);
-      // more objects than the target has room for, a negative and a fractional offset besides
-      const source = new VertexObjectBuffer(makeDescriptor(), 10);
-
-      expect(target.buffers.size, 'there is nothing to write into').toBe(0);
-      expect(target.copy(source), 'the buffer itself comes back').toBe(target);
-      expect(target.copy(source, 0.5)).toBe(target);
-      expect(target.copy(source, -1)).toBe(target);
-    });
-
     test('the read-only fields go on saying what this buffer was', () => {
       const pool = new VertexObjectPool<VO>(makeDescriptor(), 2);
       const {buffer} = pool;
@@ -881,6 +962,28 @@ describe('VertexObjectBuffer', () => {
       expect(Array.from(buffer.bufferAttributes.keys()).sort()).toEqual(bufferAttributeNames);
       expect(Array.from(buffer.bufferNameAttributes.keys()).sort()).toEqual(bufferNames);
       expect(buffer.buffers.size, 'the data is gone, the description of it is not').toBe(0);
+    });
+  });
+
+  describe('a buffer over a description without attributes', () => {
+    test('copy() does nothing, whatever the source brings', () => {
+      const target = new VertexObjectBuffer(new VertexObjectDescriptor({vertexCount: 2, attributes: {}}), 2);
+      // more objects than the target has room for, a negative and a fractional offset besides
+      const source = new VertexObjectBuffer(
+        new VertexObjectDescriptor({
+          vertexCount: 4,
+          attributes: {
+            foo: {components: ['x', 'y'], type: 'float32'},
+            bar: {size: 1, type: 'float32', usage: 'dynamic'},
+          },
+        }),
+        10,
+      );
+
+      expect(target.buffers.size, 'there is nothing to write into').toBe(0);
+      expect(target.copy(source), 'the buffer itself comes back').toBe(target);
+      expect(target.copy(source, 0.5)).toBe(target);
+      expect(target.copy(source, -1)).toBe(target);
     });
   });
 

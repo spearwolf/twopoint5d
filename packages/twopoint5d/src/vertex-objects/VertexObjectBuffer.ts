@@ -59,7 +59,7 @@ function releasedError(method: string): Error {
 /**
  * The typed arrays themselves, together with the layout that maps an attribute to its slice of
  * them. It belongs to the side without an object type although its name carries the long prefix:
- * a {@link VOBufferPool} holds one just as a {@link VertexObjectPool} does.
+ * a `VOBufferPool` holds one just as a `VertexObjectPool` does.
  */
 export class VertexObjectBuffer {
   /** The description this buffer was built from; it stays what it is once the pool behind this buffer is disposed. */
@@ -85,13 +85,13 @@ export class VertexObjectBuffer {
    * map attribute name to buffer-attribute info; it stays what it is once the pool behind this
    * buffer is disposed
    */
-  readonly bufferAttributes: Map<string, AttributeBufferLayout>;
+  readonly bufferAttributes: ReadonlyMap<string, Readonly<AttributeBufferLayout>>;
 
   /**
    * buffer name -> list of buffer attributes; it stays what it is once the pool behind this
    * buffer is disposed
    */
-  readonly bufferNameAttributes: Map<string, AttributeBufferLayout[]>;
+  readonly bufferNameAttributes: ReadonlyMap<string, readonly Readonly<AttributeBufferLayout>[]>;
 
   #released = false;
 
@@ -103,12 +103,11 @@ export class VertexObjectBuffer {
    * `buffersData.capacity`; `usedCount` belongs to the pool, not the buffer.
    *
    * The capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or
-   * more; beyond that this constructor checks it against nothing. A
-   * `VOBufferPool` carries its own `capacity`, fixed at construction, which does not follow
-   * whatever buffer is later assigned to `pool.buffer` — assigning a buffer built here with a
-   * differing `buffersData.capacity` leaves pool and buffer disagreeing about size, silently.
-   * Use `VOBufferPool#fromBuffersData()` to restore a pool from `toBuffersData()` output: it
-   * reconciles the two and throws on a capacity mismatch instead of leaving one.
+   * more; beyond that this constructor checks it against nothing. A buffer built here stands on
+   * its own: a pool builds its buffer itself and takes no other one. To restore a pool from
+   * `toBuffersData()` output, hand the buffers data to the `VOBufferPool` or `VertexObjectPool`
+   * constructor, or to `VOBufferPool#fromBuffersData()` of a pool of the same capacity, which
+   * throws on a mismatch.
    *
    * Every array in `buffersData` has to be the typed array of its buffer's data type and hold
    * exactly `capacity × vertexCount × itemSize` elements; otherwise the constructor throws a
@@ -161,8 +160,9 @@ export class VertexObjectBuffer {
       }
     } else {
       this.descriptor = source;
-      this.bufferAttributes = new Map();
       this.attributeNames = Object.freeze(Array.from(this.descriptor.attributeNames).sort());
+
+      const bufferAttributes = new Map<string, AttributeBufferLayout>();
 
       // a buffer can only be sized once every attribute has contributed its share to itemSize,
       // so the typed arrays come after this loop and the records carry none until then
@@ -189,7 +189,7 @@ export class VertexObjectBuffer {
             pickedUpSerial: 0,
           });
         }
-        this.bufferAttributes.set(attributeName, {
+        bufferAttributes.set(attributeName, {
           bufferName,
           attributeName,
           offset,
@@ -203,16 +203,19 @@ export class VertexObjectBuffer {
         });
       }
 
-      this.bufferNameAttributes = new Map();
+      const bufferNameAttributes = new Map<string, AttributeBufferLayout[]>();
 
-      for (const bufAttr of this.bufferAttributes.values()) {
+      for (const bufAttr of bufferAttributes.values()) {
         const {bufferName} = bufAttr;
-        if (this.bufferNameAttributes.has(bufferName)) {
-          this.bufferNameAttributes.get(bufferName)!.push(bufAttr);
+        if (bufferNameAttributes.has(bufferName)) {
+          bufferNameAttributes.get(bufferName)!.push(bufAttr);
         } else {
-          this.bufferNameAttributes.set(bufferName, [bufAttr]);
+          bufferNameAttributes.set(bufferName, [bufAttr]);
         }
       }
+
+      this.bufferAttributes = bufferAttributes;
+      this.bufferNameAttributes = bufferNameAttributes;
     }
 
     if (!this.descriptor.voPrototype) {
@@ -439,8 +442,36 @@ export class VertexObjectBuffer {
     this.#markDirty(buf, targetObjectOffset, targetObjectOffset + objCount - 1);
   }
 
-  /** Does nothing on the buffer of a disposed pool, which has no array left to move data within. */
+  /**
+   * Does nothing and checks nothing on the buffer of a disposed pool, which has no array left to
+   * move data within.
+   *
+   * `startIndex === endIndex` is allowed and moves zero objects.
+   *
+   * @throws a `RangeError` that names the values when `targetIndex`, `startIndex` or `endIndex`
+   * is no integer, when `0 ≤ startIndex ≤ endIndex ≤ capacity` does not hold, or when
+   * `targetIndex + (endIndex - startIndex)` reaches past the capacity. Nothing is written then.
+   */
   copyWithin(targetIndex: number, startIndex: number, endIndex = this.capacity): void {
+    if (this.#buffers.size === 0) return;
+
+    if (
+      !Number.isInteger(targetIndex) ||
+      !Number.isInteger(startIndex) ||
+      !Number.isInteger(endIndex) ||
+      startIndex < 0 ||
+      startIndex > endIndex ||
+      endIndex > this.capacity ||
+      targetIndex < 0 ||
+      targetIndex + (endIndex - startIndex) > this.capacity
+    ) {
+      throw new RangeError(
+        `VertexObjectBuffer#copyWithin(): targetIndex, startIndex and endIndex must be integers with ` +
+          `0 ≤ startIndex ≤ endIndex ≤ ${this.capacity} and targetIndex + (endIndex - startIndex) ≤ ${this.capacity}, ` +
+          `got ${String(targetIndex)}, ${String(startIndex)} and ${String(endIndex)}`,
+      );
+    }
+
     const {vertexCount} = this.descriptor;
     for (const buf of this.#buffers.values()) {
       buf.typedArray!.copyWithin(
@@ -494,8 +525,28 @@ export class VertexObjectBuffer {
     return copiedObjCount;
   }
 
-  /** Throws on the buffer of a disposed pool, which has no array to read from. */
+  /**
+   * Throws on the buffer of a disposed pool, which has no array to read from — the buffer keeps
+   * reporting its capacity, so the range check below still applies to it.
+   *
+   * @throws a `RangeError` that names the values when `startIndex` or `endIndex` is no integer,
+   * or when `0 ≤ startIndex ≤ endIndex ≤ capacity` does not hold. Checked before an attribute
+   * name is looked up.
+   */
   toAttributeArrays(attributeNames: string[], startIndex = 0, endIndex = this.capacity): Record<string, TypedArray | undefined> {
+    if (
+      !Number.isInteger(startIndex) ||
+      !Number.isInteger(endIndex) ||
+      startIndex < 0 ||
+      startIndex > endIndex ||
+      endIndex > this.capacity
+    ) {
+      throw new RangeError(
+        `VertexObjectBuffer#toAttributeArrays(): startIndex and endIndex must be integers with ` +
+          `0 ≤ startIndex ≤ endIndex ≤ ${this.capacity}, got ${String(startIndex)} and ${String(endIndex)}`,
+      );
+    }
+
     return Object.fromEntries(
       // the explicit tuple type picks the typed `Object.fromEntries()` overload; without it
       // the result is `any` and no caller of this method gets its lookups checked
@@ -546,7 +597,7 @@ export class VertexObjectBuffer {
    * Put `typedArray` in the place of the array the named buffer holds. A name this buffer does
    * not know replaces nothing, the way `touchBuffer()` marks nothing for one.
    *
-   * The pool behind this buffer calls it when a snapshot comes back in as a whole array to take
+   * The pool behind this buffer calls it when buffers data comes back in as a whole array to take
    * over instead of being written into the array that is there.
    *
    * @internal

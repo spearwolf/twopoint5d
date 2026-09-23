@@ -249,6 +249,25 @@ describe('InstancedVertexObjectGeometry', () => {
       expect(geometry.basePool!.isDisposed).toBe(true);
     });
 
+    test('attachInstancedPool() on a disposed geometry throws and attaches nothing', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      geometry.dispose();
+
+      expect(() => geometry.attachInstancedPool('extraPool', extraInstancedDescriptor)).toThrow(
+        /InstancedVOBufferGeometry#attachInstancedPool\("extraPool"\)/,
+      );
+
+      const livePool = new VertexObjectPool<VO>(secondExtraInstancedDescriptor, 2);
+
+      expect(() => geometry.attachInstancedPool('extraPool2', livePool)).toThrow(
+        /InstancedVOBufferGeometry#attachInstancedPool\("extraPool2"\)/,
+      );
+
+      expect(livePool.isAttachedToGeometry).toBe(false);
+      expect(livePool.isDisposed).toBe(false);
+      expect(Object.keys(geometry.attributes)).toEqual([]);
+    });
+
     // (e) has no subject here: nothing in vertex-objects creates a signal or an effect.
 
     // Assertion (f) of the dispose test pattern in docs/resource-lifecycle.md — "gives every
@@ -273,6 +292,28 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(versionOf('position'), 'the static buffer of the base route').toBe(baseStatic);
     expect(versionOf('strength'), 'the static buffer of the instanced route').toBe(instancedStatic);
     expect(versionOf('extra'), 'the static buffer the new route owes its first upload').toBeGreaterThan(0);
+  });
+
+  test('touchBuffers({instanced}) reaches the buffers of an attached pool', () => {
+    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+    const extraPool = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+    extraPool.createVO();
+    geometry.update();
+
+    const buffer = geometry.extraInstancedBuffers.get('extraPool')!.get('extraBuffer')! as BufferAttribute;
+    const versionBeforeInstanced = buffer.version;
+
+    geometry.touchBuffers({instanced: {static: true}});
+    geometry.update();
+
+    expect(buffer.version).toBeGreaterThan(versionBeforeInstanced);
+
+    const versionBeforeBase = buffer.version;
+
+    geometry.touchBuffers({base: {static: true}});
+    geometry.update();
+
+    expect(buffer.version).toBe(versionBeforeBase);
   });
 
   test('touch() calls touchAttributes() and/or touchBuffers()', () => {

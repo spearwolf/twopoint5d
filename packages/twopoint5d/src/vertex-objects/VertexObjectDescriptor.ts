@@ -5,6 +5,8 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
+const noIndices: readonly number[] = Object.freeze([]);
+
 // Freezes what a description is made of: the description, its attributes and their components, the
 // indices and the `methods` object. `basePrototype` and the functions in `methods` stay as they
 // are — they are behaviour the description shares with whoever wrote it, not structure the
@@ -41,6 +43,8 @@ export class VertexObjectDescriptor {
 
   readonly #attributes: Map<string, VertexAttributeDescriptor> = new Map();
   readonly #bufferNames: Set<string> = new Set();
+  readonly #attributeNames: readonly string[];
+  readonly #indices: readonly number[];
 
   /** The descriptor of each attribute, keyed by the name the geometry gives it. */
   get attributes(): ReadonlyMap<string, VertexAttributeDescriptor> {
@@ -56,7 +60,7 @@ export class VertexObjectDescriptor {
 
   /**
    * The prototype every vertex object of this descriptor is created from. The first
-   * {@link VertexObjectBuffer} built on this descriptor builds it and assigns it here; before
+   * `VertexObjectBuffer` built on this descriptor builds it and assigns it here; before
    * that there is none, and the declared type says otherwise because every caller reaches this
    * through a buffer that has already built it.
    *
@@ -70,6 +74,11 @@ export class VertexObjectDescriptor {
     return this.#voPrototype!;
   }
 
+  /**
+   * Written once, by the first `VertexObjectBuffer` built on this descriptor.
+   *
+   * @internal
+   */
   set voPrototype(prototype: object) {
     this.#voPrototype = prototype;
   }
@@ -79,8 +88,8 @@ export class VertexObjectDescriptor {
    * throws:
    *
    * 1. `vertexCount`, when given, is a positive integer (`RangeError`)
-   * 2. every attribute has a size of at least 1 — a positive integer `size`, or at least one
-   *    component (`RangeError`)
+   * 2. every attribute declares a `size` or `components`, and that size is at least 1 — a
+   *    positive integer `size`, or at least one component (`RangeError`)
    * 3. an attribute that declares both `size` and `components` has no more components than its
    *    size; fewer pad the attribute to its size (`RangeError`)
    * 4. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
@@ -104,6 +113,8 @@ export class VertexObjectDescriptor {
       this.#attributes.set(attrName, descriptor);
       this.#bufferNames.add(descriptor.bufferName);
     });
+    this.#attributeNames = Object.freeze(Array.from(this.#attributes.keys()));
+    this.#indices = this.description.indices ?? noIndices;
     this.#validate();
   }
 
@@ -115,6 +126,12 @@ export class VertexObjectDescriptor {
     }
 
     for (const attr of this.attributes.values()) {
+      // the raw description, because the descriptor's own `size` getter already falls back to 1
+      // for an attribute that declares neither — a fallback this descriptor does not allow
+      const raw = this.description.attributes[attr.name] as {size?: number; components?: readonly string[]};
+      if (raw.size == null && raw.components == null) {
+        throw new RangeError(`VertexObjectDescriptor: attribute "${attr.name}" declares neither a size nor components`);
+      }
       if (!isPositiveInteger(attr.size)) {
         throw new RangeError(
           `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${attr.size}`,
@@ -185,15 +202,17 @@ export class VertexObjectDescriptor {
   }
 
   get hasIndices(): boolean {
-    return this.description.indices != null && this.description.indices.length > 0;
+    return this.#indices.length > 0;
   }
 
+  /** The draw order of the vertices of one vertex object; empty without `indices`. The same frozen array on every read. */
   get indices(): readonly number[] {
-    return this.description.indices ?? [];
+    return this.#indices;
   }
 
-  get attributeNames(): string[] {
-    return Array.from(this.attributes.keys());
+  /** The attribute names in the order the description declares them. The same frozen array on every read. */
+  get attributeNames(): readonly string[] {
+    return this.#attributeNames;
   }
 
   getAttribute(name: string): VertexAttributeDescriptor | undefined {

@@ -2,6 +2,7 @@ export * from './AABB2.js';
 export * from './CameraBasedVisibility.js';
 export * from './CameraBasedVisibilityHelpers.js';
 export * from './chunk-quad-tree/public-api.js';
+export * from './constants.js';
 export * from './Map2D.js';
 export * from './Map2DSpatialHashGrid.js';
 export * from './Map2DTileCoords.js';

@@ -112,9 +112,16 @@ export class GeometryRoutes {
     this.#dropAutoTouchSelection();
   }
 
-  /** Take on a named route. A name that is in use keeps its route — the caller detaches first. */
-  attach(route: GeometryRoute & {name: string}): void {
-    if (this.#attached.has(route.name)) return;
+  /**
+   * Take on a named route.
+   *
+   * @throws when the name already has a route. `attachInstancedPool()`, the only caller, detaches
+   * the name first — a name that reaches here already taken is an invariant broken elsewhere.
+   */
+  attach(route: GeometryRoute & {name: string; group: 'instanced'}): void {
+    if (this.#attached.has(route.name)) {
+      throw new Error(`GeometryRoutes#attach(): the name "${route.name}" already has a route — detach it first`);
+    }
 
     // no attribute of this route has reached the gpu yet, and a static buffer uploads only when
     // something asks for it — so this route owes its static buffers a full pass, and the routes
@@ -229,8 +236,9 @@ export class GeometryRoutes {
   #selectByUsage(bufferTypes: TouchBuffersType, group?: RouteGroup): BufferLike[] {
     const selected: BufferLike[] = [];
     for (const route of this) {
-      // an attached pool feeds the instanced half, so asking for that half reaches it too
-      const feeds = group === undefined || route.group === group || (group === 'instanced' && route.name != null);
+      // an attached route always carries group: 'instanced', so asking for that group already
+      // reaches it through the term above — group: 'instanced' is the invariant attach() types
+      const feeds = group === undefined || route.group === group;
       if (!feeds) continue;
 
       selected.push(...selectBuffers(route.buffers, bufferTypes));

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- the generated `get…()` method of an attribute takes an optional target — a typed array or a plain array — writes the attribute's values into it and answers the target, without allocating anything; without a target it answers a new typed array as before. A target shorter than the attribute throws a `RangeError` and is left unchanged. `VOAttrGetter` carries both call signatures
 - add `CameraBasedVisibility#pointsOnPlane`: the points where the probe rays of the view frustum met the map plane, in probe order. It is empty for a recomputation in which the camera looked past the plane, and its first entry is the point `pointOnPlane` carries. The `Vector3`s belong to the visibility and are written again on the next recomputation. `CameraBasedVisibilityHelpers` marks each of them, the first one as before and the further ones smaller and in blue
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
@@ -35,9 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the two optional parameters of `VertexObjectBuffer#touch(fromIdx?, toIdx?)`: they mark the objects `fromIdx` … `toIdx` as written in every buffer, for a caller that knows which of them it wrote to. Without arguments every object of the buffer counts as written, which is what a caller that cannot say more has to state
 - add `VertexObjectBuffer#touchBuffer(bufferName, fromIdx?, toIdx?)` and `VertexObjectBuffer#pickUpDirtyRange(bufferName, seenSerial, usedCount)`: `touchBuffer()` marks a range of objects as written in the one named buffer, where `touch()` marks it in all of them, and a name the buffer does not know marks nothing. `pickUpDirtyRange()` answers what a consumer that last saw `seenSerial` has left to upload of that buffer — the object range it recorded, capped at the slots in use, `null` when the buffer has not moved on, and every object in use for a consumer further behind than the range reaches
 - add `cloneVertexObjectDescription()` and the `VertexAttributeUsageOverrides` type it takes to the public api of the `vertex-objects` module: it copies a vertex object description, optionally giving named attributes another usage type, and its `alias` option carries such an entry over to the further names the description knows those attributes by. The copy owns its structure — the description, every attribute description in it, their `components`, the `indices` array and the `methods` object are new objects — while `basePrototype` and each individual method are shared
+- add `noTileCapacity` (map2d): what `IMapTileFactory#createTile()` answers when the factory has no room for another tile right now. It is a registered symbol, `Symbol.for('twopoint5d:IMapTileFactory.noTileCapacity')`, so two copies of the library in one page answer with the same one
+- add the `{copy: true}` option to `VOBufferPool#toBuffersData()`: it hands out arrays the pool does not hold, `typedArray.slice()` of its own. That is the way to transfer buffers through `postMessage`, or to build a second pool that stays independent of this one — without it, every array is the pool's own, shared by reference with whatever takes the result in
 
 ### Changed
 
+- the generated `set…()` method of an attribute of at most four values (`vertexCount * size`) takes them as separate parameters instead of a rest parameter, so a call with separate values allocates nothing. The call forms are unchanged — an array-like still works — and every generated setter now leaves an element it is handed `undefined` for as it was, instead of writing `NaN`
+- `TexturedSprite`, `AnimatedSprite` and `TileSprite` declare their setters of at most four values with a separate-values overload as well as the tuple form; `setSize()`, `setPosition()`, `setFrame()`, `setColor()` and `TileSpritesFactory` pass their values on one by one and allocate nothing per call
 - `VertexObjectBuffer#copy()` judges the layout of both sides before the first buffer is written: the two descriptors have to state the same `vertexCount`, and every buffer pair has to share its name, its `itemSize` and its `dataType`. A mismatch throws a `RangeError` — a `TypeError` for the data type — naming the buffer and both values. A source buffer of a narrower layout used to pass the length check and land in the target at the stride of the wider one, every element of it beside the slot it belongs to. A copy that is refused leaves the target exactly as it was
 - `VertexObjectBuffer#buffers` is a read-only view, `ReadonlyMap<string, Readonly<AttributeBuffer>>` — the door the geometries already closed, one floor down. Reading is unchanged and the typed arrays stay writable; what no longer compiles is a write to the map and a write to the bookkeeping of a buffer record, `serial` and the dirty fields, which is what a geometry measures its uploads against
 - `VOBufferPool#fromBuffersData()` throws a `RangeError` reading `VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, …, got …` for a snapshot sized for another pool, where it was a bare `Error` reading `Invalid buffersData capacity` that named neither the pool nor either of the two numbers. `RangeError` extends `Error`, so a `catch` that tests for `Error` is unaffected
@@ -91,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSprites#spritePool` is typed `TexturedSpritesPool | undefined` and `#texture` is typed `Texture | undefined`: after `dispose()` the mesh holds neither geometry nor material, `spritePool` and `texture` answer `undefined`, `createSprite()` answers `undefined`, and `freeSprite()` and a write to `texture` do nothing
 - `VO[voBuffer]` is typed `VertexObjectBuffer | undefined`: a vertex object whose pool has let it go, through `freeVO()` or `dispose()`, reaches no buffer any more — the type `VOUtils.getBuffer()` answers with
 - change the return type of `getDescriptorOf()` to `VertexObjectDescriptor | undefined`: a vertex object without a buffer has no descriptor to answer with
-- `VertexObjects#geometry` is typed `GeoType | undefined` and `#material` `Material | Material[] | undefined`: the constructor takes both as optional, and `AnimatedSprites#dispose()` and `TexturedSprites#dispose()` give both up
+- `VertexObjects<GeoType extends BufferGeometry = BufferGeometry>` is generic over the geometry it holds: `geometry` is typed `GeoType | undefined` and `material` `Material | Material[] | undefined`. Built without a geometry, the mesh holds the plain `BufferGeometry` `THREE.Mesh` puts in its place and is `VertexObjects<BufferGeometry>`; `undefined` only after a caller writes it or `AnimatedSprites#dispose()`/`TexturedSprites#dispose()` gives it up
+- `TileSprites<GeoType extends TileSpritesGeometry | BufferGeometry = BufferGeometry>` is generic the same way: built with a `TileSpritesGeometry`, `geometry` is typed as exactly that; built without one, `BufferGeometry`. The constructor takes any `BufferGeometry`; with one that is not a `TileSpritesGeometry`, `TileSpritesFactory#createTile()` answers `noTileCapacity`. `material` is typed `TileSpritesMaterial | MeshBasicMaterial | undefined`
 - `VertexObjects` extends `THREE.Mesh<any, any>`: neither type parameter of `THREE.Mesh` can carry the `undefined` that the `geometry` and `material` declarations of this class need. Both slots are re-declared in the class itself, and those declarations are the types it shows
 - change the return types of `TextureAtlas#randomFrame()` and `#randomFrameName()` to `TextureAtlasFrame | undefined` and `TextureAtlasFrameName | undefined`, and those of `#randomFrames()` and `#randomFrameNames()` to arrays of the same: an atlas without frames, or without named frames, has nothing to draw
 - a lookup whose result an invariant guarantees — an attribute descriptor, the claim on an attribute slot, the buffers of a pool attached under a name — throws an error naming what was missing when that invariant is broken, at the place that relies on it
@@ -173,6 +179,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new VertexObjectDescriptor()` refuses a description whose generated accessor would take a name the `basePrototype` carries — an own property of it, or one inherited from a prototype below `Object.prototype` — and throws an `Error` naming the property and the attribute or `methods` it comes from. Such an accessor shadows the property of the prototype, which is the collision a name shared with `methods` already threw on. A name that only `Object.prototype` carries, `toString` or `valueOf`, is unaffected: a vertex object covers those whether it has a `basePrototype` or not
 - `InstancedVOBufferGeometry#detachInstancedPool()` answers with `VertexObjectPool<unknown> | undefined` instead of `VOBufferPool | undefined`, and `extraInstancedPools` carries `VertexObjectPool<unknown>` — `attachInstancedPool()` stores nothing else. `createVO()` and the rest of the `VertexObjectPool` surface are reachable on the way back without a cast; a caller who wants the `VOType` they attached under still writes one, because the name a pool is filed under carries no type
 - `extraInstancedPools`, `extraInstancedBuffers` and `extraInstancedBufferSerials` are `ReadonlyMap`s. They are three views of the routes the geometry holds, so a name that answers in one of them answers in all three; reading them is what it always was
+- `IMapTileFactory#createTile()` answers `T | undefined | typeof noTileCapacity`. `undefined` says only that there is no tile at the coordinate; `noTileCapacity` says the factory is full right now, nothing was built and nothing has to be given back. `TileSpritesFactory#createTile()` answers `noTileCapacity` once the instanced pool of its geometry has no slot left, and when `tileSprites` has no `TileSpritesGeometry` and so no pool
+- `VOBufferPool#buffer` is read-only in the published types. Its setter is internal and belongs to `VertexObjectPool#resize()`, which swaps in a buffer of the new capacity and moves every vertex object over to it; a buffer assigned from outside left the pool's `capacity`, its vertex objects and any geometry on it disagreeing about which buffer they read
+- the `voInitialize` hook of a `basePrototype` runs only for the slot `VertexObjectPool#createVO()` hands out — once, with the new vertex object as `this`, before `onCreateVO`. `getVO()` no longer runs it for a slot filled through `createFromAttributes()`, `fromBuffersData()` or a snapshot handed to the constructor
 
 ### Deprecated
 
@@ -289,12 +298,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Stage2D#resize()` for a projection that refuses the camera: a `TypeError` out of `updateCamera()` leaves `width`, `height`, `containerWidth`, `containerHeight` and `needsUpdate` the way it found them. A `resize()` on the stage itself therefore goes through with the same numbers as soon as the camera fits — with the container size written along the way, a second `resize()` with those numbers fell out of the size guard and the stage was stuck reporting a view it had never announced. Through a `StageRenderer` the same recovery holds: while a stage refuses the size, the renderer keeps the one it had and the stage item of that stage keeps its own, so the second attempt with those numbers reaches the stage again
 - fix `StageRenderer#resize()` for a stage that refuses the size: `width` and `height` of the renderer stay the way the call found them, and so does the size of the stage item of every stage that refused — a stage that took the size keeps it, item and all. Each of the other stages is asked for the size all the same. A call is carried out as long as one stage item still owes the size the renderer answers with, so the size the renderer fell back to reaches the stages that moved past it, and the very same call goes through again as soon as the refusing stage takes the size, reaching exactly the stages that still owe it. Several stages refusing at once come out as one `AggregateError` naming how many of them it was, and a render target that refuses the size joins that error without counting as a stage; a single error comes out unchanged, so a `TypeError` of a projection reaches the caller as a `TypeError`
 - fix `HelpersManager#removeFromScene(scene)` with a scene this manager was never given: that scene is searched for the nodes of the manager and the root above the scene the manager holds is left standing. `remove()` and the `scene` setter take the held scene and the root above it down together
+- fix `Map2DTileRenderer` with a full `TileSpritesGeometry`: a tile the instanced pool had no slot for is built once a tile leaves the view and gives its slot back. The factory used to answer such a tile with `undefined`, the renderer took that as "no tile here" and did not ask again while the tile stayed in view, so the map kept holes after panning freed slots. The renderer warns once per instance through `console.warn` that the factory ran out of room
+- fix `VertexObjectPool#getVO()`: a slot filled through `createFromAttributes()`, `fromBuffersData()` or a snapshot keeps its data when its vertex object is materialized. The `voInitialize` hook ran there as well and wrote over it without marking anything for upload — a `TexturedSprite` restored from a snapshot turned white on the CPU side on its first read, while the GPU showed the imported colour until the next upload of that buffer carried the white along
+- fix `VertexObjectBuffer#toAttributeArrays()` and `#copyWithin()`: both throw a `RangeError` naming the values for an object index outside `0` … `capacity` or one that is not an integer, as `copy()` and `copyArray()` already do. `toAttributeArrays()` used to pad the result with zeros for an end past the capacity and to read from the end of the buffer for a negative start; `copyWithin()` passed every value straight to `TypedArray#copyWithin`, which quietly clamps a target reaching past the capacity and counts a negative value from the end
+- fix `VertexObjectDescriptor`: an attribute that declares neither a `size` nor `components` throws a `RangeError` naming the attribute, instead of being taken as a size of `1`
+- fix `VertexObjects`: it accepts an `InstancedVOBufferGeometry` and not only the typed `InstancedVertexObjectGeometry` built on it, so the untyped layer can be rendered through the module's own `THREE.Mesh` as well
+- fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` once the geometry itself has been disposed: both are a no-op from there on, so a pool handed in and still alive afterwards no longer pulls the draw range — and, on the instanced geometry, `instanceCount` — back up on a geometry that has no attribute left to draw
+- fix `InstancedVOBufferGeometry#attachInstancedPool()` on a geometry that has been disposed: it throws instead of building a new route — attributes and a pool attachment included — that nothing ever releases again
 
 ### Migration Guide
 
+#### A generated getter takes a target, a sprite setter takes separate values
+
+A function of your own that is typed as `VOAttrGetter` has to satisfy both call signatures now: called without an argument it answers a new typed array, called with a target — typed array or plain array — it writes into that target and answers it, throwing a `RangeError` for one that is too short.
+
+A class of your own that implements `TexturedSprite`, `AnimatedSprite` or `TileSprite` instead of taking the generated methods needs the separate-values overload for every setter of at most four values, in addition to the existing tuple overload: `setQuadSize`, `setTexCoords`, `setInstancePosition` and `setColorValues` on `TexturedSprite`, `setQuadSize` and `setInstancePosition` on `AnimatedSprite`, and `setInstancePosition`, `setTexCoords` and `setQuadSize` on `TileSprite`.
+
 #### The containers a geometry and a descriptor hand out are read-only
 
-Eight fields that used to hand out a live `Map` or `Set` now answer a read-only view of it: `VOBufferGeometry#buffers` and `#bufferSerials`, `InstancedVOBufferGeometry#baseBuffers`, `#baseBufferSerials`, `#instancedBuffers` and `#instancedBufferSerials`, plus `VertexObjectDescriptor#attributes` (`ReadonlyMap`) and `#bufferNames` (`ReadonlySet`). `InstancedVOBufferGeometry#extraInstancedBuffers` and `#extraInstancedBufferSerials` were read-only maps already and are now read-only down to the maps inside them.
+Ten fields that used to hand out a live `Map` or `Set` now answer a read-only view of it: `VOBufferGeometry#buffers` and `#bufferSerials`, `InstancedVOBufferGeometry#baseBuffers`, `#baseBufferSerials`, `#instancedBuffers` and `#instancedBufferSerials`, `VertexObjectDescriptor#attributes` (`ReadonlyMap`) and `#bufferNames` (`ReadonlySet`), plus `VertexObjectBuffer#bufferAttributes` and `#bufferNameAttributes` (both `ReadonlyMap`, with a `Readonly` value). `InstancedVOBufferGeometry#extraInstancedBuffers` and `#extraInstancedBufferSerials` were read-only maps already and are now read-only down to the maps inside them.
 
 Nothing about reading changes — `get()`, `has()`, `size`, `keys()`, `values()`, `entries()`, `forEach()` and iteration answer exactly as before. What no longer compiles is a write, and handing one of them to a signature that asks for a `Map` or a `Set`. Name the read-only type where the value is only read, and copy it where it is written: the copy is yours, and writing into it changes nothing about the geometry.
 
@@ -1410,6 +1432,39 @@ if (sprites.material != null) {
 }
 ```
 
+#### A mesh built without a geometry is typed with the `BufferGeometry` it holds
+
+`VertexObjects<GeoType>` and `TileSprites<GeoType>` take their geometry type from the
+constructor argument. Built without one, `geometry` is typed `BufferGeometry | undefined`, not
+`VOBufferGeometry`/`TileSpritesGeometry` — reading a member of the more specific geometry needs
+an `instanceof` check, or the mesh built with its geometry in the first place. The same holds for
+`tileSprites.material`, typed `TileSpritesMaterial | MeshBasicMaterial | undefined`.
+
+**Before**
+
+```ts
+const tileSprites = new TileSprites();
+tileSprites.geometry!.instancedPool.createVO(); // compiled; threw a TypeError at runtime — geometry held a bare BufferGeometry
+```
+
+**After**
+
+```ts
+const tileSprites = new TileSprites();
+tileSprites.geometry!.instancedPool.createVO(); // no longer compiles: instancedPool is not a member of BufferGeometry
+
+if (tileSprites.geometry instanceof TileSpritesGeometry) {
+  tileSprites.geometry.instancedPool.createVO();
+}
+```
+
+Or build the mesh with its geometry in the first place, which keeps `geometry` typed as exactly that geometry:
+
+```ts
+const namedTileSprites = new TileSprites(new TileSpritesGeometry());
+namedTileSprites.geometry!.instancedPool.createVO();
+```
+
 #### `TexturedSprites#spritePool` and `#texture` can be `undefined`
 
 `TexturedSprites#dispose()` gives up the geometry and the material and leaves the mesh
@@ -2084,6 +2139,113 @@ pool.buffer.buffers.get('dynamic_float32')!.typedArray!.fill(0);
 
 // and this is how the buffer is marked for upload
 pool.buffer.touchBuffer('dynamic_float32');
+```
+
+#### `IMapTileFactory#createTile()` can answer `noTileCapacity`
+
+A factory answers `noTileCapacity` when it has no room for another tile right now. It is no tile: nothing was built, and nothing goes back through `destroyTile()`. Code that calls `createTile()` itself handles the new case. A factory of your own answers `noTileCapacity` when its pool is full, so that `Map2DTileRenderer` asks for the tile again in its next update cycle; a factory that goes on answering `undefined` there gets the behaviour of "no tile at this coordinate", which the renderer does not ask about again until the coordinate leaves the view.
+
+**Before**
+
+```ts
+const tile = factory.createTile(coords);
+if (tile === undefined) return;
+use(tile);
+```
+
+**After**
+
+```ts
+import {noTileCapacity} from '@spearwolf/twopoint5d';
+
+const tile = factory.createTile(coords);
+if (tile === undefined) return; // no tile at this coordinate
+if (tile === noTileCapacity) return; // the factory is full; ask again later
+use(tile);
+```
+
+#### `VOBufferPool#buffer` is read-only
+
+The setter of `buffer` is internal; an assignment no longer compiles. Restore a pool from a snapshot through its constructor, or through `fromBuffersData()` of a pool of the same capacity, and change the capacity with `resize()`.
+
+**Before**
+
+```ts
+pool.buffer = new VertexObjectBuffer(pool.buffer, snapshot);
+pool.usedCount = snapshot.usedCount;
+```
+
+**After**
+
+```ts
+const restored = new VertexObjectPool(description, snapshot);
+// or, into a pool of the same capacity
+pool.fromBuffersData(snapshot);
+// and for another capacity
+pool.resize(capacity);
+```
+
+#### `voInitialize` runs only for `createVO()`
+
+The hook fills the slot `createVO()` hands out and nothing else. A hook that was relied on to fill the slots of `createFromAttributes()`, `fromBuffersData()` or a snapshot handed to the constructor no longer reaches them: put the start values into the attributes or the snapshot you hand over.
+
+**Before**
+
+```ts
+pool.createFromAttributes({instancePosition: positions});
+// the hook wrote the colour when getVO() first read the slot
+const sprite = pool.getVO(0);
+```
+
+**After**
+
+```ts
+pool.createFromAttributes({instancePosition: positions, color: colors});
+const sprite = pool.getVO(0);
+```
+
+#### `VertexObjectDescriptor#voPrototype` has no setter, `#attributeNames` is frozen
+
+The setter of `voPrototype` is internal; an assignment no longer compiles. It was never a caller's to write — the first `VertexObjectBuffer` built on a descriptor builds the prototype and assigns it once.
+
+`attributeNames` answers `readonly string[]`: the same frozen array on every read. Code that sorts it or writes into it names the readonly type instead, or works on a copy of its own.
+
+**Before**
+
+```ts
+descriptor.voPrototype = myPrototype;
+
+const sorted = descriptor.attributeNames.sort();
+```
+
+**After**
+
+```ts
+// the prototype builds itself; there is nothing left to assign
+
+const sorted = [...descriptor.attributeNames].sort();
+```
+
+#### New throws for indices, attribute sizes and a disposed geometry
+
+`VertexObjectBuffer#toAttributeArrays()` and `#copyWithin()` throw a `RangeError` for an object index outside `0` … `capacity`, or one that is not an integer — callers that always passed valid ranges see no change. A `VertexObjectDescription` attribute that declares neither `size` nor `components` is refused by its `VertexObjectDescriptor`; give it a `size` of at least `1`. `InstancedVOBufferGeometry#attachInstancedPool()` throws once the geometry itself has been disposed, instead of building a route nothing ever releases again.
+
+**Before**
+
+```ts
+buffer.toAttributeArrays(['pos'], 0, buffer.capacity + 10); // silently padded with zeros
+descriptor.getAttribute('pos'); // built from {type: 'float32'}, size fell back to 1
+geometry.dispose();
+geometry.attachInstancedPool('extra', extraDescriptor); // built a route on a dead geometry
+```
+
+**After**
+
+```ts
+buffer.toAttributeArrays(['pos'], 0, buffer.capacity); // stay inside 0 … capacity
+descriptor.getAttribute('pos'); // description names {type: 'float32', size: 1}
+geometry.dispose();
+// attachInstancedPool() throws here now — attach before dispose(), or build a new geometry
 ```
 
 ## [0.21.2] - 2026-06-19

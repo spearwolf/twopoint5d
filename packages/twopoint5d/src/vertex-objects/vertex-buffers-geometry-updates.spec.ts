@@ -1458,6 +1458,40 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(buffer.version).toBe(versionAfterDispose);
       expect(handedIn.isDisposed).toBe(false);
     });
+
+    test('leaves the draw range and the instance count as dispose() left them', () => {
+      const handedIn = new VertexObjectPool<MyInstancedVO>(instancedDesc, 10);
+      handedIn.createVO();
+
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(handedIn, 10, baseDesc, 1);
+      geometry.update();
+      geometry.dispose();
+
+      const drawRangeAfterDispose = {...geometry.drawRange};
+      const instanceCountAfterDispose = geometry.instanceCount;
+
+      handedIn.createVO();
+      geometry.update();
+
+      expect(geometry.drawRange).toEqual(drawRangeAfterDispose);
+      expect(geometry.instanceCount).toBe(instanceCountAfterDispose);
+    });
+
+    test('leaves the draw range as dispose() left them', () => {
+      const handedIn = new VertexObjectPool<MyBaseVO>(baseDesc, 10);
+      handedIn.createVO();
+
+      const geometry = new VertexObjectGeometry<MyBaseVO>(handedIn, 10);
+      geometry.update();
+      geometry.dispose();
+
+      const drawRangeAfterDispose = {...geometry.drawRange};
+
+      handedIn.createVO();
+      geometry.update();
+
+      expect(geometry.drawRange).toEqual(drawRangeAfterDispose);
+    });
   });
 
   describe('attribute slots', () => {

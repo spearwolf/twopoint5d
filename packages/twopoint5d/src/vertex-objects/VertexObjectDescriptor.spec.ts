@@ -1,9 +1,9 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
-import type {VAComponentsType, VertexObjectDescription} from './types.js';
+import type {VAComponentsType, VertexAttributeDescription, VertexObjectDescription} from './types.js';
 import {TileBaseSpriteDescriptor, TileSpriteDescriptor} from '../map2d/TileSprites/descriptors.js';
 import {AnimatedSpriteDescriptor} from '../sprites/AnimatedSprites/AnimatedSprite.js';
 import {BaseSpriteDescriptor} from '../sprites/BaseSprite.js';
@@ -66,6 +66,21 @@ describe('VertexObjectDescriptor', () => {
     expect(Array.from(descriptor.bufferNames.values())).toEqual(['static_float32', 'dynamic_float32']);
     expect(descriptor.getAttribute('foo')).toBeInstanceOf(VertexAttributeDescriptor);
     expect(descriptor.getAttribute('bar')!.name).toBe('bar');
+  });
+
+  test('attributeNames and indices are frozen and the same array on every read', () => {
+    const descriptor = new VertexObjectDescriptor({
+      attributes: {
+        foo: {size: 1},
+      },
+    });
+
+    expect(descriptor.attributeNames).toBe(descriptor.attributeNames);
+    expect(Object.isFrozen(descriptor.attributeNames)).toBe(true);
+    expectTypeOf(descriptor.attributeNames).toEqualTypeOf<readonly string[]>();
+
+    expect(descriptor.indices).toBe(descriptor.indices);
+    expect(Object.isFrozen(descriptor.indices)).toBe(true);
   });
 
   test('answers from its own copy of the description', () => {
@@ -144,8 +159,10 @@ describe('VertexObjectDescriptor', () => {
 
       const pos = descriptor.getAttribute('pos')!;
 
-      // @ts-expect-error the components are typed `readonly`, and the write throws all the same
-      expect(() => pos.components.push('z')).toThrow(TypeError);
+      expect(() => {
+        // @ts-expect-error the components are typed `readonly`, and the write throws all the same
+        pos.components.push('z');
+      }).toThrow(TypeError);
 
       expect(descriptor.getAttribute('pos')!.components).toEqual(['x', 'y']);
     });
@@ -262,6 +279,12 @@ describe('VertexObjectDescriptor', () => {
     test('one attribute that declares a component twice', () => {
       expect(build({attributes: {pos: {components: ['x', 'x']}}})).toThrow(
         /property "x" comes from both attribute "pos" and attribute "pos"/,
+      );
+    });
+
+    test('an attribute without size and without components', () => {
+      expect(build({attributes: {pos: {type: 'float32'} as VertexAttributeDescription}})).toThrow(
+        'VertexObjectDescriptor: attribute "pos" declares neither a size nor components',
       );
     });
 

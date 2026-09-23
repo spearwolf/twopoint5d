@@ -78,14 +78,17 @@ export const TileSpriteDescriptor: VertexObjectDescription = {
 };
 
 export interface TileSprite extends VO {
+  setInstancePosition(x: number, y: number, z: number): void;
   setInstancePosition(position: [x: number, y: number, z: number]): void;
 
   x: number;
   y: number;
   z: number;
 
+  setTexCoords(s: number, t: number, u: number, v: number): void;
   setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
 
+  setQuadSize(width: number, height: number): void;
   setQuadSize(size: [width: number, height: number]): void;
 
   width: number;

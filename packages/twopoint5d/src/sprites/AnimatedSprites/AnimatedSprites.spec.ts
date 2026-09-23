@@ -2,6 +2,9 @@ import {createSandbox} from 'sinon';
 import {Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
+import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
+import type {AnimatedSprite} from './AnimatedSprite.js';
+import {AnimatedSpriteDescriptor} from './AnimatedSprite.js';
 import {AnimatedSprites} from './AnimatedSprites.js';
 import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
 import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
@@ -11,6 +14,23 @@ describe('AnimatedSprites', () => {
 
   afterEach(() => {
     sandbox.restore();
+  });
+
+  test('the sprite methods write every value they are given', () => {
+    const pool = new VertexObjectPool<AnimatedSprite>(AnimatedSpriteDescriptor, 1);
+    const sprite = pool.createVO()!;
+
+    sprite.setSize(4, 5);
+    expect(sprite.width).toBe(4);
+    expect(sprite.height).toBe(5);
+
+    sprite.setPosition(1, 2);
+    expect(sprite.x).toBe(1);
+    expect(sprite.y).toBe(2);
+    expect(sprite.z).toBe(0);
+
+    sprite.setPosition(1, 2, 3);
+    expect(sprite.z).toBe(3);
   });
 
   describe('dispose()', () => {

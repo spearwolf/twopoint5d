@@ -1,10 +1,12 @@
 import {createSandbox} from 'sinon';
 import type {Object3D} from 'three/webgpu';
 import {Vector3} from 'three/webgpu';
-import {afterEach, describe, expect, test} from 'vitest';
+import type {MockInstance} from 'vitest';
+import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileRenderer} from './Map2DTileRenderer.js';
+import {noTileCapacity} from './constants.js';
 import type {IMap2DTileCoords, IMapTileFactory} from './types.js';
 
 interface FakeTile {
@@ -140,6 +142,107 @@ describe('Map2DTileRenderer', () => {
       renderer.reuseTile(tileCoords);
 
       expect(createTile.callCount, 'createTile()').toBe(2);
+    });
+  });
+
+  describe('a factory without room for another tile', () => {
+    // a factory with `room` free slots: it answers noTileCapacity while none is left, and a
+    // destroyTile() gives one back
+    function makeFullFactory(room: number): IMapTileFactory<FakeTile> {
+      return {
+        ...makeTileFactory(),
+        createTile(tileCoords: IMap2DTileCoords): FakeTile | typeof noTileCapacity {
+          if (room === 0) return noTileCapacity;
+          --room;
+          return {coords: tileCoords};
+        },
+        destroyTile(_tile: FakeTile) {
+          ++room;
+        },
+      };
+    }
+
+    let warn: MockInstance<typeof console.warn>;
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    test('is asked for again in the next cycle', () => {
+      const tileFactory = makeFullFactory(0);
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+
+      renderer.addTile(tileCoords);
+      renderer.reuseTile(tileCoords);
+
+      expect(createTile.callCount, 'createTile()').toBe(2);
+    });
+
+    test('is built once a slot comes free', () => {
+      const tileFactory = makeFullFactory(1);
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const a = new Map2DTileCoords(0, 0);
+      const b = new Map2DTileCoords(1, 0);
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+      const destroyTile = sandbox.spy(tileFactory, 'destroyTile');
+
+      renderer.addTile(a);
+      renderer.addTile(b);
+      renderer.removeTile(a);
+      renderer.reuseTile(b);
+
+      expect(createTile.callCount, 'createTile()').toBe(3);
+      expect(destroyTile.callCount, 'destroyTile()').toBe(1);
+      expect(destroyTile.firstCall.args[0], 'the tile given back').toEqual({coords: a});
+
+      const tileOfB = createTile.thirdCall.returnValue;
+      if (tileOfB === noTileCapacity || tileOfB === undefined) throw new Error('b was not built');
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.reuseTile(b);
+
+      expect(updateTile.calledOnceWith(tileOfB, b), 'updateTile() with the tile of b').toBe(true);
+    });
+
+    test('raises no upload for the tile it could not place', () => {
+      const tileFactory = makeFullFactory(0);
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      // the first cycle brings the serial gate in step with the empty renderer
+      renderer.endUpdatingTiles();
+
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      expect(update.called, 'factory.update()').toBe(false);
+    });
+
+    test('warns once per renderer', () => {
+      const tileFactory = makeFullFactory(0);
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.addTile(tileCoords);
+      renderer.addTile(new Map2DTileCoords(1, 0));
+      renderer.addTile(new Map2DTileCoords(2, 0));
+      renderer.reuseTile(tileCoords);
+
+      expect(warn, 'the first renderer').toHaveBeenCalledTimes(1);
+
+      const second = new Map2DTileRenderer(tileFactory);
+      second.addTile(tileCoords);
+
+      expect(warn, 'both renderers').toHaveBeenCalledTimes(2);
     });
   });
 

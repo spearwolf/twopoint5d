@@ -3,7 +3,7 @@ import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {createVertexObject} from './createVertexObject.js';
-import {voBuffer} from './constants.js';
+import {voBuffer, voInitialize} from './constants.js';
 import type {VO, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 // one message for every method that refuses to work once the pool is gone, so the class, the
@@ -21,9 +21,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   #voIndex: Array<(VOType & VO) | undefined>;
 
   /**
-   * Called for every vertex object this pool materializes. The hook stays where it is once
-   * {@link VOBufferPool#dispose} has run and is never called again — neither {@link createVO}
-   * nor {@link getVO} builds a vertex object on a disposed pool.
+   * Called for every vertex object this pool materializes — by {@link createVO} after the
+   * `voInitialize` hook, and by {@link getVO} for a slot that holds no vertex object yet. The
+   * hook stays where it is once {@link VOBufferPool#dispose} has run and is never called again —
+   * neither {@link createVO} nor {@link getVO} builds a vertex object on a disposed pool.
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
@@ -119,13 +120,17 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * which has no slot to give: the declared type admits absence, and a caller has to
    * handle it either way. A refused slot is not counted — `usedCount` stays where it is.
    *
+   * Before it answers, the pool runs the `voInitialize` hook of the vertex object, when its
+   * prototype has one, and then {@link onCreateVO}. This is the one place the hook runs, and the
+   * upload mark covers what it wrote.
+   *
    * The slot that is handed out is marked for upload, and it alone.
    */
   createVO(): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
     if (this.usedCount < this.capacity) {
       const idx = this.usedCount++;
-      const vo = this.#createVO(idx);
+      const vo = this.#createVO(idx, true);
       this.#voIndex[idx] = vo;
       // the slot arrives carrying whatever stood in it before, and the draw range has just grown
       // over it, so its vertices have to reach the gpu
@@ -195,8 +200,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     } else {
       this.buffer.copyWithin(idx, lastUsedIdx, lastUsedIdx + 1);
       const lastUsedVO = this.#voIndex[lastUsedIdx];
-      // createFromAttributes() raises usedCount without materializing a VO,
-      // so the slot that is swapped down can legitimately be empty
+      // createFromAttributes(), fromBuffersData() and buffers data handed to the constructor
+      // raise usedCount without materializing a vertex object, so the slot that is swapped down
+      // can legitimately be empty
       if (lastUsedVO != null) {
         VOUtils.setIndex(lastUsedVO, idx);
       }
@@ -211,11 +217,16 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   /**
    * The vertex object sitting in the slot `idx`, materialized on first access for a slot that
-   * was filled through {@link VOBufferPool#createFromAttributes}.
+   * holds none yet — one filled through {@link VOBufferPool#createFromAttributes},
+   * {@link VOBufferPool#fromBuffersData} or the buffers data handed to the constructor.
    *
    * Answers `undefined` for an index that is not an integer in `0` … `usedCount - 1`, and on a
    * disposed pool, which has no index left to look in: the declared type admits absence, and
    * the index went with {@link VOBufferPool#dispose}.
+   *
+   * The `voInitialize` hook does not run here: the slot keeps the data that
+   * `createFromAttributes()`, `fromBuffersData()` or the buffers data handed to the constructor put
+   * there.
    *
    * Nothing is marked for upload: reading a slot changes no data. Write through the vertex
    * object and call `touch()`, or give the attribute `autoTouch`.
@@ -226,14 +237,18 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
     let vo = this.#voIndex[idx];
     if (vo == null) {
-      vo = this.#createVO(idx);
+      vo = this.#createVO(idx, false);
       this.#voIndex[idx] = vo;
     }
     return vo;
   }
 
-  #createVO(idx: number) {
-    const vo = createVertexObject(this.descriptor, this.buffer, idx);
+  #createVO(idx: number, initialize: boolean): VOType & VO {
+    const vo = createVertexObject<VOType>(this.descriptor, this.buffer, idx);
+    // only a slot createVO() has just handed out is new; one getVO() materializes carries the
+    // data createFromAttributes(), fromBuffersData() or buffers data put there, and the hook
+    // would write over it without marking anything for upload
+    if (initialize) vo[voInitialize]?.();
     if (this.onCreateVO != null) {
       return this.onCreateVO(vo) ?? vo;
     }

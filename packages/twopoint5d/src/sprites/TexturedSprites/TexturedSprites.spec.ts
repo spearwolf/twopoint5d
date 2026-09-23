@@ -1,8 +1,9 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {Scene, Texture} from 'three/webgpu';
+import {Color, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
+import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {TexturedSprites} from './TexturedSprites.js';
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
@@ -33,6 +34,42 @@ describe('TexturedSprites', () => {
     sprite.setPosition(1, 2, 3);
 
     expect(sprites.spritePool!.getVO(0)!.x).toBe(1);
+
+    sprites.dispose();
+  });
+
+  test('the sprite methods write every value they are given', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+
+    expect(sprite.r).toBe(1);
+    expect(sprite.g).toBe(1);
+    expect(sprite.b).toBe(1);
+    expect(sprite.a).toBe(1);
+
+    sprite.setSize(4, 5);
+    expect(sprite.width).toBe(4);
+    expect(sprite.height).toBe(5);
+
+    sprite.setPosition(1, 2);
+    expect(sprite.x).toBe(1);
+    expect(sprite.y).toBe(2);
+    expect(sprite.z).toBe(0);
+
+    sprite.setPosition(1, 2, 3);
+    expect(sprite.z).toBe(3);
+
+    sprite.setFrame({coords: {s: 0.25, t: 0.5, u: 0.75, v: 1}} as unknown as TextureAtlasFrame);
+    expect(sprite.s).toBe(0.25);
+    expect(sprite.t).toBe(0.5);
+    expect(sprite.u).toBe(0.75);
+    expect(sprite.v).toBe(1);
+
+    sprite.setColor(new Color(0.5, 0.25, 0.125), 0.75);
+    expect(sprite.r).toBe(0.5);
+    expect(sprite.g).toBe(0.25);
+    expect(sprite.b).toBe(0.125);
+    expect(sprite.a).toBe(0.75);
 
     sprites.dispose();
   });

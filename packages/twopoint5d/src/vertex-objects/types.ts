@@ -112,7 +112,8 @@ export interface VASizeDescription extends VADescription {
  */
 export interface VertexAttributeMethods {
   /**
-   * The name of the method that reads every value of this attribute at once.
+   * The name of the method that reads every value of this attribute at once, called with the
+   * signatures of {@link VOAttrGetter}.
    *
    * The key itself decides, not only its value: a description *without* this key gets the
    * default name — `get` plus the attribute name in PascalCase — while a description that
@@ -122,10 +123,10 @@ export interface VertexAttributeMethods {
    */
   getter?: string | boolean;
   /**
-   * The name of the method that writes every value of this attribute at once. The key decides
-   * the same way `getter` does: absent gives the default name — `set` plus the attribute name
-   * in PascalCase — present and falsy gives no setter, a string names it. See
-   * `VertexAttributeDescriptor#setterName`.
+   * The name of the method that writes every value of this attribute at once, called with the
+   * signature of {@link VOAttrSetter}. The key decides the same way `getter` does: absent gives
+   * the default name — `set` plus the attribute name in PascalCase — present and falsy gives no
+   * setter, a string names it. See `VertexAttributeDescriptor#setterName`.
    */
   setter?: string | boolean;
 }
@@ -163,6 +164,10 @@ export interface VertexObjectDescription {
    * No name a generated accessor takes may appear on it, neither as an own property nor
    * inherited from a prototype below `Object.prototype`: the descriptor refuses such a
    * description rather than let the accessor shadow that property in silence.
+   *
+   * A method under the key `voInitialize` on this prototype is the hook that fills every slot
+   * `VertexObjectPool#createVO()` hands out; `voInitialize` says when it runs and when it does
+   * not.
    */
   basePrototype?: object | null | undefined;
   /**
@@ -215,13 +220,27 @@ export interface VO {
 
 /**
  * The generated method that writes every value of an attribute at once, as separate arguments or
- * as one array-like: `setPos(1, 2)` and `setPos([1, 2])` do the same. It is the type to give the
- * `set…` method of a vertex object interface.
+ * as one array-like: `setPos(1, 2)` and `setPos([1, 2])` do the same. Fewer values than the
+ * attribute has, or a value of `undefined`, leave the rest of the attribute as it was; values
+ * beyond the attribute are ignored. The generated method of an attribute of at most four values
+ * (`vertexCount * size`) takes four separate parameters instead of a rest parameter, whatever the
+ * attribute's size — parameters beyond its values are ignored — so a call with separate values
+ * allocates nothing. It is the type to give the `set…` method of a vertex object interface.
  */
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
 
-/** The generated method that reads every value of an attribute at once. It is the type to give the `get…` method of a vertex object interface. */
-export type VOAttrGetter = () => ArrayLike<number>;
+/**
+ * The generated method that reads every value of an attribute at once. Without a target it
+ * answers a new typed array of the attribute's data type. With a target — a typed array or plain
+ * array holding at least `vertexCount * size` elements — it writes the values into the target's
+ * first elements, answers the target and allocates nothing; a shorter target throws a
+ * `RangeError` and is left unchanged. It is the type to give the `get…` method of a vertex object
+ * interface.
+ */
+export type VOAttrGetter = {
+  (): ArrayLike<number>;
+  <T extends TypedArray | number[]>(target: T): T;
+};
 
 /** The three.js buffer a geometry holds the values of an attribute in — interleaved when several attributes share one. */
 export type BufferLike = InterleavedBuffer | BufferAttribute;
@@ -230,12 +249,17 @@ export type BufferLike = InterleavedBuffer | BufferAttribute;
 export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
 /**
- * A snapshot of the buffers of a `VOBufferPool`, as `toBuffersData()` hands it out and
- * `fromBuffersData()` takes it in — the way to move the contents of a pool to another one built
- * from the same description, or across a worker boundary.
+ * The buffers of a `VOBufferPool`, as `toBuffersData()` hands them out and `fromBuffersData()`
+ * takes them in — the way to move the contents of a pool to another one built from the same
+ * description, or across a worker boundary.
+ *
+ * `toBuffersData()` gives out the arrays of the pool it was called on, unless it was called with
+ * `{copy: true}`. The constructors of `VOBufferPool` and `VertexObjectPool`, as well as
+ * `fromBuffersData()` without `copyTypedArrays`, take the arrays over by reference rather than
+ * copying them.
  */
 export interface VertexObjectBuffersData {
-  /** How many vertex objects the buffers were sized for; only a pool of this very capacity takes the snapshot in. */
+  /** How many vertex objects the buffers were sized for; only a pool of this very capacity takes these buffers in. */
   capacity: number;
   /** How many of those vertex objects are in use. */
   usedCount: number;

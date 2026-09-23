@@ -17,11 +17,16 @@ import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './type
 export type {TouchInstancedBuffersType};
 
 /**
- * {@link VOBufferGeometry} for instanced rendering: one base pool and any number of instanced
+ * `VOBufferGeometry` for instanced rendering: one base pool and any number of instanced
  * pools on a `THREE.InstancedBufferGeometry`. It works on buffer indices and knows no object
- * type: the layer below {@link InstancedVertexObjectGeometry}.
+ * type: the layer below `InstancedVertexObjectGeometry`.
  */
 export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
+  /**
+   * The pool this geometry builds its base route from, when it has one. Answers with it after
+   * `dispose()` as well: disposed with the geometry when the geometry built it itself, otherwise
+   * exactly as the caller holds it — see {@link dispose}.
+   */
   readonly basePool?: VOBufferPool;
 
   readonly #baseBuffers?: Map<string, BufferLike>;
@@ -29,28 +34,36 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   readonly #baseBufferSerials: Map<string, number> = new Map();
   readonly #instancedBufferSerials: Map<string, number> = new Map();
 
+  /**
+   * The pool this geometry builds its instanced route from. Answers with it after `dispose()`
+   * as well: disposed with the geometry when the geometry built it itself, otherwise exactly as
+   * the caller holds it — see {@link dispose}.
+   */
   readonly instancedPool: VOBufferPool;
   readonly #instancedBuffers: Map<string, BufferLike> = new Map();
 
+  #disposed = false;
+
   /**
    * The three.js buffer behind each buffer name of the base pool. Set exactly when `basePool`
-   * is — the constructor builds the base route as a whole or not at all.
+   * is — the constructor builds the base route as a whole or not at all. Empty after
+   * `dispose()`; stays `undefined` for a geometry without a base pool.
    */
   get baseBuffers(): ReadonlyMap<string, BufferLike> | undefined {
     return this.#baseBuffers;
   }
 
-  /** The serial this geometry last saw for each buffer of the base pool. */
+  /** The serial this geometry last saw for each buffer of the base pool; empty after `dispose()`. */
   get baseBufferSerials(): ReadonlyMap<string, number> {
     return this.#baseBufferSerials;
   }
 
-  /** The three.js buffer behind each buffer name of the instanced pool. */
+  /** The three.js buffer behind each buffer name of the instanced pool; empty after `dispose()`. */
   get instancedBuffers(): ReadonlyMap<string, BufferLike> {
     return this.#instancedBuffers;
   }
 
-  /** The serial this geometry last saw for each buffer of the instanced pool. */
+  /** The serial this geometry last saw for each buffer of the instanced pool; empty after `dispose()`. */
   get instancedBufferSerials(): ReadonlyMap<string, number> {
     return this.#instancedBufferSerials;
   }
@@ -61,7 +74,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   /**
    * The pools attached under a name, and the buffers and serials of their routes. All three are
-   * views of the same routes, so a name that has a pool has the other two.
+   * views of the same routes, so a name that has a pool has the other two. Empty after
+   * `dispose()`, which gives up every route.
    */
   readonly extraInstancedPools: ReadonlyMap<string, VertexObjectPool<unknown>> = this.#routes.attachedPools;
   readonly extraInstancedBuffers: ReadonlyMap<string, ReadonlyMap<string, BufferLike>> = this.#routes.attachedBuffers;
@@ -212,12 +226,20 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *   the geometry is left exactly as it was.
    * @throws when `pool` has been disposed and holds no buffers to build attributes on. The route
    *   that holds `name` at the time keeps every attribute it has.
+   * @throws when this geometry has been disposed. The declared return type promises a pool, and
+   *   a disposed geometry has no route left to build one on; `pool` is attached to nothing.
    */
   attachInstancedPool<VOType = unknown>(
     name: string,
     pool: VertexObjectPool<VOType> | VertexObjectDescriptor | VertexObjectDescription,
     options?: {autoDispose?: boolean},
   ): VertexObjectPool<VOType> {
+    if (this.#disposed) {
+      throw new Error(
+        `InstancedVOBufferGeometry#attachInstancedPool("${name}") is not available: this geometry has been disposed`,
+      );
+    }
+
     // the same pool taking its own name over again changes nothing about the slots, and
     // rebuilding the attributes would push the live ones off the geometry for good
     if (pool instanceof VertexObjectPool && this.extraInstancedPools.get(name) === pool) {
@@ -313,6 +335,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * that matches the routes it has left, or take it out of the scene. Disposing the geometry goes
    * through either way.
    *
+   * After `dispose()` every name is free: this answers `undefined` for any `name`, the way it
+   * does before a route was ever attached under it.
+   *
    * @returns the pool that was attached under `name`, or `undefined` if the name was free.
    */
   detachInstancedPool(name: string): VertexObjectPool<unknown> | undefined {
@@ -378,9 +403,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * After this call the geometry holds no route, no buffer and no pool of its own any more.
    * What stays behind belongs to the attributes that are still there: their serials from the
-   * last `update()`.
+   * last `update()`. `update()` is a no-op from here on and `attachInstancedPool()` throws — see
+   * both.
    */
   override dispose(): void {
+    this.#disposed = true;
+
     // the renderer reads the attributes of this geometry once more while it handles the
     // dispose event, and reaches for the id of a slot before it checks that the slot is
     // filled — so the event goes out while every slot is there. A slot that a detached route
@@ -443,12 +471,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#attachments.clear();
   }
 
-  /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. */
+  /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
   touchAttributes(...attrNames: string[]): void {
     this.#routes.touchAttributes(attrNames);
   }
 
-  /** Marks every buffer of the given usage types, across every route, for GPU upload on the next `update()`. */
+  /** Marks every buffer of the given usage types, across every route, for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
   touchBuffers(bufferTypes: TouchInstancedBuffersType | TouchBuffersType): void {
     if ('base' in bufferTypes || 'instanced' in bufferTypes) {
       if (bufferTypes.base) {
@@ -464,7 +492,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   /**
    * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
-   * mix of both. This is the counterpart to `autoTouch: false` (see {@link VADescription#autoTouch}):
+   * mix of both. This is the counterpart to `autoTouch: false` (see `VADescription#autoTouch`):
    * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
    * were written.
    */
@@ -482,7 +510,17 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     }
   }
 
+  /**
+   * Sets `instanceCount` and the draw range from the pools, uploads the buffers that need it and
+   * syncs the attribute arrays to the pools' own.
+   *
+   * A no-op after `dispose()`: the geometry has no attribute left to draw or upload, and an
+   * `instanceCount` or draw range taken from a pool that is still alive would name instances or
+   * vertices this geometry no longer has.
+   */
   update(): void {
+    if (this.#disposed) return;
+
     this.instanceCount = this.instancedPool.usedCount;
     this.#updateDrawRange();
 

@@ -13,17 +13,19 @@ export interface AnimatedSprite extends VO {
 
   rotation: number;
 
+  setQuadSize(width: number, height: number): void;
   setQuadSize(quadSize: [width: number, height: number]): void;
+  setInstancePosition(x: number, y: number, z: number): void;
   setInstancePosition(position: [x: number, y: number, z: number]): void;
 }
 
 export class AnimatedSprite {
   setSize(width: number, height: number): void {
-    this.setQuadSize([width, height]);
+    this.setQuadSize(width, height);
   }
 
   setPosition(x: number, y: number, z = 0): void {
-    this.setInstancePosition([x, y, z]);
+    this.setInstancePosition(x, y, z);
   }
 }
 

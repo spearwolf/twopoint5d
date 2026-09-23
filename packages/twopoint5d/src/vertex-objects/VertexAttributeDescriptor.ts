@@ -15,7 +15,7 @@ type VADescriptionFields = Readonly<Partial<VASizeDescription>> &
   Readonly<VertexAttributeMethods> & {readonly components?: readonly string[]};
 
 /**
- * A single attribute of a {@link VertexObjectDescriptor}: its type, size, components and usage.
+ * A single attribute of a `VertexObjectDescriptor`: its type, size, components and usage.
  * It sits below both layers, the one that works on buffer indices and the one that hands out
  * typed objects.
  */
@@ -48,12 +48,17 @@ export class VertexAttributeDescriptor {
 
   /**
    * Defaults to `false` for `usageType: 'static'` and `true` otherwise.
-   * See {@link VADescription#autoTouch} for what this controls.
+   * See `VADescription#autoTouch` for what this controls.
    */
   get autoTouch(): boolean {
     return this.description.autoTouch ?? this.usageType !== 'static';
   }
 
+  /**
+   * The `size` of the description, or the number of its `components`. A `VertexObjectDescriptor`
+   * refuses an attribute that declares neither; a `VertexAttributeDescriptor` built on its own,
+   * without going through one, answers `1` for such an attribute instead.
+   */
   get size(): number {
     return this.description.size ?? this.description.components?.length ?? 1;
   }

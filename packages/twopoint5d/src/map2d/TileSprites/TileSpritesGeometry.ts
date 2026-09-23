@@ -9,6 +9,15 @@ export interface TileSpritesGeometry {
   instancedPool: VertexObjectPool<TileSprite>;
 }
 
+/**
+ * The instanced geometry of the tile sprites of a map: one base quad, and one instance per tile.
+ *
+ * `capacity` is how many tiles it holds at once, and a pool that backs a geometry refuses a
+ * `resize()`, so the number is fixed with the geometry. When the view shows more tiles than
+ * that, `TileSpritesFactory#createTile()` answers `noTileCapacity` for the ones beyond: they
+ * stay empty until tiles that leave the view give their slots back, and `Map2DTileRenderer`
+ * warns once. Size it for the most tiles the view can show at once.
+ */
 export class TileSpritesGeometry extends InstancedVertexObjectGeometry<TileSprite, TileBaseSprite> {
   constructor(capacity = 100) {
     super(TileSpriteDescriptor, capacity, TileBaseSpriteDescriptor);

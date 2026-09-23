@@ -1,5 +1,6 @@
 import type {Matrix4, Object3D, Vector2, Vector3} from 'three/webgpu';
 import type {AABB2} from './AABB2.js';
+import type {noTileCapacity} from './constants.js';
 import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 export interface IMap2DRenderableArea {
@@ -34,7 +35,18 @@ export interface IMapTileFactory<T = unknown> {
   addToNode(node: Object3D): void;
   removeFromNode(node: Object3D): void;
 
-  createTile(tileCoords: IMap2DTileCoords): T | undefined;
+  /**
+   * Builds the tile for a coordinate and answers one of three things:
+   *
+   * - the tile, which the caller holds until it hands it back through {@link destroyTile}
+   * - `undefined`: there is no tile at this coordinate. `Map2DTileRenderer` takes that as the
+   *   answer for the coordinate and asks again only after the coordinate has gone through
+   *   `removeTile()` or the renderer through `clearTiles()`
+   * - {@link noTileCapacity}: the factory has no room for another tile right now. Nothing was
+   *   built and nothing has to be given back; `Map2DTileRenderer` asks again in its next
+   *   update cycle
+   */
+  createTile(tileCoords: IMap2DTileCoords): T | undefined | typeof noTileCapacity;
   updateTile(tile: T, tileCoords: IMap2DTileCoords): void;
   destroyTile(tile: T): void;
 

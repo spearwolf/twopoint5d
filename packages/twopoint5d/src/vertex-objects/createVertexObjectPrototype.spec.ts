@@ -1,4 +1,5 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
+import type {VOAttrGetter, VOAttrSetter} from './types.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 describe('the generated attribute accessors', () => {
@@ -139,5 +140,163 @@ describe('the generated attribute accessors', () => {
     expect(vo.v).toBe(0.0999755859375);
     vo.v = 1.5;
     expect(vo.v).toBe(1.5);
+  });
+
+  test('a getter writes into the target it is handed and answers with that target', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    const target = new Float32Array(3);
+    expect(vo.getPos(target)).toBe(target);
+    expect(Array.from(target)).toEqual([1, 2, 3]);
+  });
+
+  test('a getter takes a plain array as its target', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    const target = [0, 0, 0];
+    expect(vo.getPos(target)).toBe(target);
+    expect(Array.from(target)).toEqual([1, 2, 3]);
+  });
+
+  test('a getter writes every vertex into its target, across an interleaved buffer', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>(
+      {
+        vertexCount: 2,
+        attributes: {
+          foo: {components: ['x', 'y']},
+          bar: {size: 3},
+        },
+      },
+      1,
+    );
+    const vo = pool.createVO()!;
+    vo.setFoo(new Float32Array([7, 8, 9, 10]));
+    const target = new Float32Array(4);
+    expect(Array.from(vo.getFoo(target))).toEqual([7, 8, 9, 10]);
+  });
+
+  test('a getter refuses a target shorter than the attribute and leaves it as it was', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    const target = new Float32Array([5, 5]);
+    expect(() => vo.getPos(target)).toThrow(/^getPos\(\): the target holds 2 values, attribute "pos" has 3$/);
+    expect(Array.from(target)).toEqual([5, 5]);
+  });
+
+  test('a getter without a target answers a new array on every call', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    const a = vo.getPos();
+    const b = vo.getPos();
+    expect(a).not.toBe(b);
+    expect(Array.from(a)).toEqual(Array.from(b));
+  });
+
+  test('a getter is typed to answer the target it is handed', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+
+    const target = new Float32Array(3);
+    expectTypeOf(vo.getPos(target)).toEqualTypeOf(target);
+
+    const list = [0, 0, 0];
+    expectTypeOf(vo.getPos(list)).toEqualTypeOf<number[]>();
+  });
+
+  test('a setter of up to four values declares them one by one', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    expect(vo.setPos.length).toBe(4);
+  });
+
+  test('a setter of up to four values leaves the values it was not given', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    vo.setPos(9);
+    expect(Array.from(vo.getPos())).toEqual([9, 2, 3]);
+  });
+
+  test('a setter of up to four values ignores values beyond the attribute', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 2);
+    const a = pool.createVO()!;
+    const b = pool.createVO()!;
+    b.setPos(7, 7, 7);
+    a.setPos(1, 2, 3, 4);
+    expect(Array.from(a.getPos())).toEqual([1, 2, 3]);
+    expect(Array.from(b.getPos())).toEqual([7, 7, 7]);
+  });
+
+  test('a setter of up to four values writes separate values across every vertex of an interleaved buffer', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>(
+      {
+        vertexCount: 2,
+        attributes: {
+          foo: {components: ['x', 'y']},
+          bar: {size: 3},
+        },
+      },
+      1,
+    );
+    const vo = pool.createVO()!;
+    vo.setFoo(7, 8, 9, 10);
+    // prettier-ignore
+    expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
+      0, 0, 0, 7, 8,
+      0, 0, 0, 9, 10,
+    ]);
+  });
+
+  test('a setter leaves an element it is handed undefined for as it was', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    vo.setPos(4, undefined as unknown as number, 6);
+    expect(Array.from(vo.getPos())).toEqual([4, 2, 6]);
+
+    const restPool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 2, attributes: {pos: {size: 3}}}, 1);
+    const restVo = restPool.createVO()!;
+    restVo.setPos([1, 2, 3, 4, 5, 6]);
+    restVo.setPos([9, undefined as unknown as number, 9, 9, 9, 9]);
+    expect(Array.from(restVo.getPos())).toEqual([9, 2, 9, 9, 9, 9]);
   });
 });

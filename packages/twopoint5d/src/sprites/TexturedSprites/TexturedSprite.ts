@@ -23,32 +23,36 @@ export interface TexturedSprite extends VO {
   b: number;
   a: number;
 
+  setQuadSize(width: number, height: number): void;
   setQuadSize(quadSize: [width: number, height: number]): void;
+  setTexCoords(s: number, t: number, u: number, v: number): void;
   setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
+  setInstancePosition(x: number, y: number, z: number): void;
   setInstancePosition(position: [x: number, y: number, z: number]): void;
+  setColorValues(r: number, g: number, b: number, a: number): void;
   setColorValues(color: [r: number, g: number, b: number, a: number]): void;
 }
 
 export class TexturedSprite {
   [voInitialize]() {
-    this.setColorValues([1, 1, 1, 1]);
+    this.setColorValues(1, 1, 1, 1);
   }
 
   setSize(width: number, height: number): void {
-    this.setQuadSize([width, height]);
+    this.setQuadSize(width, height);
   }
 
   setPosition(x: number, y: number, z = 0): void {
-    this.setInstancePosition([x, y, z]);
+    this.setInstancePosition(x, y, z);
   }
 
   setFrame(frame: TextureAtlasFrame): void {
     const {coords} = frame;
-    this.setTexCoords([coords.s, coords.t, coords.u, coords.v]);
+    this.setTexCoords(coords.s, coords.t, coords.u, coords.v);
   }
 
   setColor(color: Color, a = 1): void {
-    this.setColorValues([color.r, color.g, color.b, a]);
+    this.setColorValues(color.r, color.g, color.b, a);
   }
 
   getColor(target: Color = new Color()): Color {

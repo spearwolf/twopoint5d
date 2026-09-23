@@ -1,15 +1,20 @@
 import type {Vector3} from 'three/webgpu';
 import {Object3D} from 'three/webgpu';
+import {noTileCapacity} from './constants.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './types.js';
 
 export class Map2DTileRenderer implements IMap2DTileRenderer {
   readonly #tiles = new Map<string, unknown>();
 
-  // The tile coordinates the factory answered `createTile()` with nothing for. Its answer for a
-  // coordinate stands until `removeTile()` takes that coordinate out or `clearTiles()` empties
-  // the renderer — those two are what puts the question back; asking again in between costs the
-  // tile data provider one lookup per frame and per hole in the map.
+  // The tile coordinates the factory answered createTile() with `undefined` for: there is no
+  // tile there. Its answer for a coordinate stands until removeTile() takes that coordinate out
+  // or clearTiles() empties the renderer — those two are what puts the question back; asking
+  // again in between costs the tile data provider one lookup per frame and per hole in the map.
+  // A factory that answers `noTileCapacity` has said nothing about the coordinate, and it does
+  // not land here.
   readonly #declined = new Set<string>();
+
+  #warnedNoTileCapacity = false;
 
   #dataSerial = 0;
   #updateDataSerial = -1;
@@ -63,6 +68,13 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     }
 
     const tile = tileFactory.createTile(tileCoords);
+    if (tile === noTileCapacity) {
+      // not an answer about the coordinate: the factory is full right now. The coordinate stays
+      // out of `#declined`, so reuseTile() asks for it again in the next cycle, once a tile that
+      // left the view may have given its slot back. Nothing was written, so the serial stays.
+      this.#warnNoTileCapacity(tileCoords);
+      return;
+    }
     if (tile == null) {
       this.#declined.add(tileCoords.id);
       return;
@@ -71,6 +83,15 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     this.#tiles.set(tileCoords.id, tile);
 
     ++this.#dataSerial;
+  }
+
+  #warnNoTileCapacity(tileCoords: IMap2DTileCoords): void {
+    if (this.#warnedNoTileCapacity) return;
+    this.#warnedNoTileCapacity = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `Map2DTileRenderer: the tile factory has no room for another tile, so the tile at (${tileCoords.x}, ${tileCoords.y}) stays empty until a tile that leaves the view gives its slot back. With a TileSpritesFactory, build its TileSpritesGeometry with a capacity for the most tiles the view shows at once. This warning is shown once per renderer.`,
+    );
   }
 
   reuseTile(tileCoords: IMap2DTileCoords): void {
