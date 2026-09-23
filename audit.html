@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-22T15:48:34.659Z"
+    "generatedAt": "2026-09-23T07:40:00.653Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,46 +198,46 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 64,
-        "penalty": 85.5,
+        "score": 67,
+        "penalty": 73.5,
         "bySeverity": {
           "critical": 0,
-          "high": 3,
-          "medium": 21,
-          "low": 57,
-          "info": 24
+          "high": 2,
+          "medium": 19,
+          "low": 51,
+          "info": 23
         },
         "byCategory": {
-          "correctness": 24,
-          "api": 23,
-          "consistency": 10,
-          "performance": 7,
-          "completeness": 6,
+          "correctness": 20,
+          "api": 20,
+          "consistency": 9,
+          "performance": 6,
+          "completeness": 5,
           "security": 2,
           "resources": 4,
           "architecture": 2,
           "async": 4,
-          "readability": 6,
-          "types": 3,
+          "readability": 5,
+          "types": 4,
           "dx": 10,
           "testing": 4
         }
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 65,
-        "penalty": 32,
+        "score": 66,
+        "penalty": 31.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 7,
-          "low": 36,
-          "info": 26
+          "low": 35,
+          "info": 22
         },
         "byCategory": {
           "dx": 33,
           "types": 4,
-          "testing": 18,
+          "testing": 13,
           "dependencies": 3,
           "consistency": 4,
           "completeness": 1,
@@ -252,8 +252,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 140,
-        "score": 71
+        "findings": 127,
+        "score": 73
       },
       {
         "name": "workspace",
@@ -266,8 +266,8 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 8,
-        "score": 96
+        "findings": 6,
+        "score": 96.5
       },
       {
         "name": "lookbook",
@@ -277,9 +277,9 @@
         "score": 95
       }
     ],
-    "resolvedCount": 25,
+    "resolvedCount": 44,
     "scoreModel": 2,
-    "score": 64,
+    "score": 66,
     "scoring": {
       "model": 2,
       "weights": {
@@ -295,45 +295,44 @@
     },
     "bySeverity": {
       "critical": 0,
-      "high": 3,
-      "medium": 28,
-      "low": 93,
-      "info": 50
+      "high": 2,
+      "medium": 26,
+      "low": 86,
+      "info": 45
     },
     "byCategory": {
-      "correctness": 24,
-      "api": 23,
-      "consistency": 14,
-      "performance": 7,
+      "correctness": 20,
+      "api": 20,
+      "consistency": 13,
+      "performance": 6,
       "dx": 43,
-      "completeness": 7,
+      "completeness": 6,
       "security": 2,
       "resources": 5,
-      "types": 7,
+      "types": 8,
       "architecture": 2,
       "async": 4,
-      "testing": 22,
+      "testing": 17,
       "dependencies": 3,
-      "readability": 10,
+      "readability": 9,
       "build": 1
     },
     "byComponent": {
-      "map2d": 25,
+      "map2d": 27,
       "texture": 27,
-      "vertex-objects": 14,
       "stage": 24,
-      "sprites": 7,
+      "sprites": 8,
       "display": 21,
       "controls": 3
     },
     "counts": {
-      "findings": 174,
-      "improvements": 18,
+      "findings": 159,
+      "improvements": 17,
       "byStatus": {
-        "new": 57,
-        "unchanged": 15,
+        "new": 52,
+        "unchanged": 13,
         "improved": 7,
-        "carried-over": 95
+        "carried-over": 87
       }
     },
     "deltaBreakdown": {
@@ -343,8 +342,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-22",
-      "ref": "2026-09-22"
+      "date": "2026-09-23",
+      "ref": "2026-09-23"
     }
   },
   "portrait": {
@@ -511,25 +510,6 @@
     }
   },
   "findings": [
-    {
-      "id": "BUG-101",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "high",
-      "title": "Pool-Erschöpfung im Tile-Renderer von »kein Tile hier« unterscheiden",
-      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesFactory.ts:44",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:65-68",
-        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:88",
-        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:124-135"
-      ],
-      "description": "Ist der `instancedPool` voll, liefert `createTile()` `undefined`, also dieselbe Antwort wie für tileId 0. `Map2DTileRenderer` bucht die Koordinate deshalb in `#declined` und fragt erst wieder, wenn sie per `removeTile()` aus dem Blick fällt. Findet die Sichtbarkeit 110 Tiles bei der Default-Kapazität 100, bleiben zehn Löcher in der Karte. Die bleiben auch dann, wenn beim Schwenken Slots frei werden, solange diese Tiles sichtbar sind. Eine Warnung gibt es nicht.",
-      "evidence": "`const sprite = this.createTileSprite(); if (sprite == null) return;` → Renderer: `if (tile == null) { this.#declined.add(tileCoords.id); return; }`",
-      "recommendation": "Im `IMapTileFactory`-Vertrag »keine Kapazität« von »kein Tile« trennen, etwa über einen eigenen Rückgabewert oder einen Wurf. `#declined` nur für den zweiten Fall setzen. Pool-Erschöpfung einmal per `error`-Event oder Warnung melden und in der TSDoc von `TileSpritesGeometry(capacity)` dokumentieren.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
     {
       "id": "BUG-102",
       "category": "correctness",
@@ -1028,175 +1008,6 @@
       "recommendation": "Umsetzen oder als Issue erfassen und aus dem Code entfernen.",
       "effort": "S",
       "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-110",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "voInitialize nur für frisch vergebene Slots aufrufen, nicht beim späten Materialisieren",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:223-241",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/createVertexObject.ts:17",
-        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:33-35"
-      ],
-      "description": "`getVO()` materialisiert ein Objekt über `createVertexObject()`, und das ruft bei jeder Materialisierung `vo[voInitialize]?.()` auf, auch für Slots aus `createFromAttributes()`, `fromBuffersData()` oder dem Konstruktor mit Daten. `TexturedSprite` setzt dort die Farbe auf Weiß. Nachgestellt: `createFromAttributes({color:[.1,.2,.3,.4]})` und danach `getVO(0)` ergibt `[1,1,1,1]`. Das widerspricht der TSDoc (»reading a slot changes no data«), und weil nichts dirty markiert wird, laufen CPU- und GPU-Stand auseinander.",
-      "recommendation": "`voInitialize` per Flag nur aus `createVO()` für einen neu vergebenen Slot aufrufen. Den Hook-Vertrag dokumentieren und einen Spec mit `basePrototype`, `voInitialize` und `getVO` ergänzen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-111",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Den öffentlichen Setter VOBufferPool#buffer schließen oder absichern",
-      "location": "packages/twopoint5d/src/vertex-objects/VOBufferPool.ts:63-67",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:384"
-      ],
-      "description": "Der Setter prüft weder Deskriptor noch Kapazität noch eine angehängte Geometry und verlinkt bestehende VOs nicht um. Nachgestellt: Pool mit Kapazität 4, `buffer = new VertexObjectBuffer(desc, 8)`. Danach meldet `capacity` 4, `containsVO(vo)` ist `false`, `freeVO(vo)` tut still nichts. An einer Geometry beginnt der neue Buffer mit serial 0, und `pickUpDirtyRange` liefert nur einen Teilbereich. Auf der GPU bleiben veraltete Daten.",
-      "recommendation": "Den Setter `@internal`/protected machen (nur `resize()` braucht ihn) oder bei Abweichung von Deskriptor und Kapazität sowie bei angehängter Geometry werfen.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-060",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "VertexObjects auch die untypisierte InstancedVOBufferGeometry annehmen lassen",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjects.ts:13",
-      "description": "Der Constraint `VOBufferGeometry | InstancedVertexObjectGeometry\u003cany, any>` lässt `new VertexObjects(new InstancedVOBufferGeometry(...))` mit TS2345 scheitern. Die untere Schicht des Moduls lässt sich damit nicht mit dem Mesh des Moduls rendern.",
-      "recommendation": "Den Constraint auf `VOBufferGeometry | InstancedVOBufferGeometry` setzen, die typisierte Unterklasse ist darin enthalten.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-061",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das Aliasing von toBuffersData() dokumentieren statt »Snapshot« zu versprechen",
-      "location": "packages/twopoint5d/src/vertex-objects/VOBufferPool.ts:221-238",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/types.ts:232-236"
-      ],
-      "description": "Die TSDoc nennt das Ergebnis »Snapshot« und empfiehlt es für den Worker-Transfer. Geliefert werden aber die lebenden Typed Arrays des Pools. Wer die ArrayBuffers wie empfohlen per `postMessage` transferiert, detacht die Arrays des Quell-Pools. Danach schreiben die Setter still ins Leere, und Uploads haben die Länge 0.",
-      "recommendation": "Aliasing und Transfer-Folgen in der TSDoc nennen, optional `toBuffersData({copy: true})` anbieten.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-099",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Objektindizes in toAttributeArrays() und copyWithin() prüfen wie in den Geschwistermethoden",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:443-453",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:498-531"
-      ],
-      "description": "`toAttributeArrays(['v'], 2, 6)` bei Kapazität 4 liefert still mit Nullen aufgefüllte Daten. `(…, -1, 1)` liest per `subarray` vom Ende her. `copyWithin` reicht negative Werte ungeprüft an `TypedArray#copyWithin` durch. `copy()` und `copyArray()` werfen in diesen Fällen einen `RangeError`.",
-      "recommendation": "Dieselben Prüfungen übernehmen: Ganzzahl und `0 ≤ start ≤ end ≤ capacity`.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-112",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Attribute ohne size und ohne components in der Deskriptor-Validierung ablehnen",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexAttributeDescriptor.ts:57-59",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectDescriptor.ts:117-123"
-      ],
-      "description": "`size` fällt über `?? components?.length ?? 1` auf 1 zurück. `{pos: {type: 'float32'}}` wird angenommen, obwohl die Konstruktor-TSDoc »a positive integer size, or at least one component« verlangt. JS-Aufrufer und `as`-Casts kommen am TS-Typ vorbei.",
-      "recommendation": "In `#validate()` gegen die Rohbeschreibung prüfen oder den Default dokumentieren.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-058",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Veränderbare Interna von VertexObjectBuffer und VertexObjectDescriptor schließen",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:88",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:94",
-        "packages/twopoint5d/src/vertex-objects/VertexObjectDescriptor.ts:73-75"
-      ],
-      "description": "`bufferAttributes` und `bufferNameAttributes` sind veränderbare `Map`s und werden zwischen Buffern per Referenz geteilt. `buffers` ist dagegen ein `ReadonlyMap`. Der Setter `voPrototype` lässt jeden den Prototyp austauschen. Eine Mutation desynchronisiert alle Buffer und die schon gebauten Prototyp-Offsets.",
-      "recommendation": "Die Maps als `ReadonlyMap` exponieren und den Setter mit `@internal` markieren (`stripInternal` ist aktiv).",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-012",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "low",
-      "title": "voBuffer, voIndex und den Lebenszyklus-Hook voInitialize dokumentieren",
-      "location": "packages/twopoint5d/src/vertex-objects/constants.ts:1-3",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/types.ts"
-      ],
-      "description": "`voInitialize` ist ein exportierter Erweiterungspunkt, den `TexturedSprite` nutzt. Nirgends steht, wann er läuft, mit welchem `this` und ob er dirty markieren muss. Diese Lücke hat das späte Überschreiben importierter Daten erst möglich gemacht.",
-      "recommendation": "TSDoc an alle drei Symbole und einen Absatz am Feld `basePrototype` in `types.ts`.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-030",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Allokationen der generierten Accessoren im Per-Frame-Pfad vermeiden",
-      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:42",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:63",
-        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:38-43"
-      ],
-      "description": "Jeder `get…()`-Aufruf mit mehreren Werten erzeugt ein neues Typed Array, jeder `set…(...values)`-Aufruf ein Rest-Array. Aufrufer wie `setPosition` bauen zusätzlich ein Array-Literal. Bei 10k Sprites mit mehreren Settern pro Frame entsteht messbarer GC-Druck.",
-      "recommendation": "Setter mit fester Parameterzahl für Größen ≤ 4 generieren und `get…(target?)` mit Zielarray anbieten.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-056",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das Verhalten der Geometry-Member nach dispose() festlegen und dokumentieren",
-      "location": "packages/twopoint5d/src/vertex-objects/VOBufferGeometry.ts:72-106",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/InstancedVOBufferGeometry.ts:365-383"
-      ],
-      "description": "resource-lifecycle.md §3 verlangt für jeden öffentlichen Member eine Aussage zum Verhalten nach dem Dispose. Für `pool`, `buffers`, `update()` und `touch*()` fehlt sie. `update()` nach dem Dispose mit einem übergebenen, noch lebenden Pool setzt wieder einen Draw Range ungleich 0 auf eine Geometry ohne Attribute.",
-      "recommendation": "Die §3-Kategorie pro Member ins TSDoc schreiben und `update()` nach dem Dispose per `#disposed`-Flag zum No-op machen.",
-      "effort": "S",
-      "status": "new",
-      "component": "vertex-objects",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2746,90 +2557,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "DOC-052",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "19 TSDoc-Links im Modul zeigen auf Symbole, die ihre Datei nicht kennt",
-      "location": "packages/twopoint5d/src/vertex-objects/VOBufferPool.ts:14",
-      "description": "19 Links der Form \u003ccode>{@link X}\u003c/code> zeigen auf Symbole, die die jeweilige Datei weder importiert noch selbst deklariert; sie lösen weder im Editor noch in einem Doc-Generator auf, und kein Lint fängt es. Ein \u003ccode>import type\u003c/code> ist nicht der Weg: \u003ccode>@typescript-eslint/no-unused-vars\u003c/code> steht auf \u003ccode>error\u003c/code> und zählt eine Nutzung im Doc-Kommentar nicht. Von 37 Links im Modul standen 32 bereits vor dem Lauf; \u003ccode>types.ts\u003c/code> ist bereits abgeräumt. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Je Stelle entscheiden — ein Link auf ein Member der eigenen Klasse löst auf, einer auf eine fremde Klasse nicht. Den Modulpfad in den Link aufnehmen (\u003ccode>{@link ./VOBufferPool.js!VOBufferPool}\u003c/code>) oder den Namen als Code-Span schreiben.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-025",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Zwei Descriptor-Getter bauen bei jedem Lesezugriff ein neues Objekt",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectDescriptor.ts:191",
-      "description": "\u003ccode>indices\u003c/code> liefert bei jedem Zugriff \u003ccode>this.description.indices ?? []\u003c/code>, \u003ccode>attributeNames\u003c/code> jedes Mal ein frisches \u003ccode>Array.from(…)\u003c/code>. Zwei Lesevorgänge geben nie dasselbe Objekt zurück (\u003ccode>descriptor.indices !== descriptor.indices\u003c/code>), und beide Getter werden in Schleifen der Geometrie-Seite gelesen. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Beide einmal im Konstruktor berechnen und als eingefrorenes Feld halten — die Description ist ohnehin eingefroren, der Wert kann sich nicht ändern.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "READ-014",
-      "category": "readability",
-      "domain": "code",
-      "severity": "info",
-      "title": "Zwei Restposten in GeometryRoutes: ein toter Term und ein stilles return",
-      "location": "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:233",
-      "description": "\u003ccode>:233\u003c/code> — in \u003ccode>selectByUsage()\u003c/code> ist der zweite Term von \u003ccode>group === 'instanced' &amp;&amp; route.name != null\u003c/code> toter Code, weil jede benannte Route mit \u003ccode>group: 'instanced'\u003c/code> angelegt wird und der vorhergehende Term sie bereits fängt. \u003ccode>:105\u003c/code> — \u003ccode>attach()\u003c/code> verschluckt einen belegten Namen mit einem stillen \u003ccode>return\u003c/code>, obwohl der Aufrufer die Attribute der Route zu dem Zeitpunkt bereits auf der Geometrie gebaut hat. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Den toten Term streichen und das stille \u003ccode>return\u003c/code> in einen Wurf oder einen benannten Rückgabewert überführen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-033",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "@ts-expect-error deckt die ganze Zeile statt nur den erwarteten Fehler",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectDescriptor.spec.ts:147",
-      "description": "Die Direktive steht über einer vollständigen \u003ccode>expect(…).toThrow(TypeError)\u003c/code>-Zeile und deckt damit auch \u003ccode>toThrow\u003c/code> und den Fehlertyp mit ab. Der Reviewer hat es nachgewiesen: eine Umbenennung von \u003ccode>getAttribute\u003c/code> in einen Namen, den es nicht gibt, blieb unbemerkt. Ein Tippfehler in \u003ccode>toThrow\u003c/code> fiele ebenso wenig auf. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Den Aufruf, der den Typfehler auslöst, in eine eigene Zeile ziehen und die Direktive nur darüber setzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-035",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Ein Test über eine Description ohne Attribute steht im describe für disposte Pools",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.spec.ts:857",
-      "description": "Der Test \u003ccode>copy() into a buffer over a description without attributes does nothing\u003c/code> liegt in \u003ccode>describe('after the pool has been disposed')\u003c/code> (\u003ccode>:741\u003c/code>), obwohl eine Description ohne Attribute kein disposter Pool ist. Er prüft das Richtige, steht aber unter einer Überschrift, die etwas anderes ankündigt. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Den Test in einen eigenen \u003ccode>describe\u003c/code>-Block über leere Descriptions verschieben.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-036",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Ein Meldungs-Regex nimmt mehr an, als sein Testname behauptet",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.spec.ts:597",
-      "description": "Der Regex \u003ccode>/VertexObjectBuffer#copy\\(\\).*1.*4/\u003c/code> nimmt jede Meldung an, in der irgendwo eine \u003ccode>1\u003c/code> vor einer \u003ccode>4\u003c/code> steht, und nagelt damit nicht fest, was der Testname behauptet. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Ein Muster, das die beiden Zahlen an ihren Rollen im Meldungstext festmacht, statt an ihrer Reihenfolge.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "vertex-objects",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-003",
       "category": "dx",
       "domain": "harness",
@@ -3102,32 +2829,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "lookbook"
-    },
-    {
-      "id": "TEST-032",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Der Workaround um einen three-Fehler im Interleaved-Readback braucht ein Verfallsdatum",
-      "location": "packages/twopoint5d-testing/test/vertex-objects-gpu-upload.test.js:47-63",
-      "description": "\u003ccode>readBackInterleaved()\u003c/code> umgeht einen Fehler in three 0.185.1: im WebGL-Fallback liefert \u003ccode>renderer.getArrayBufferAsync()\u003c/code> für ein \u003ccode>InterleavedBufferAttribute\u003c/code> 0 Bytes, weil \u003ccode>WebGLAttributeUtils#createAttribute()\u003c/code> die \u003ccode>byteLength\u003c/code> unter dem Attribut-Wrapper ablegt, \u003ccode>getArrayBufferAsync()\u003c/code> sie aber unter dem geteilten Buffer sucht. Der Helfer greift dafür auf three-Interna zu (\u003ccode>renderer.backend.get(…).bufferGPU\u003c/code>, \u003ccode>gl.getBufferSubData\u003c/code>). Aus diesem Repo nicht behebbar; betrifft jeden Konsumenten, der interleavte Attribute im Fallback zurückliest. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Den Fehler upstream melden, Version und Fundstelle im TSDoc des Helfers nennen, und den Workaround nach dem nächsten three-Upgrade auf Rückbaubarkeit prüfen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
-      "id": "TEST-034",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Zwei Rauheiten an den Readback-Helfern der GPU-Upload-Suite",
-      "location": "packages/twopoint5d-testing/test/vertex-objects-gpu-upload.test.js:43-60",
-      "description": "\u003ccode>readBackInterleaved(display, attr)\u003c/code> nimmt das Display, der Schwesterhelfer \u003ccode>readBack(renderer, attr)\u003c/code> den Renderer — zwei benachbarte Helfer mit verschiedenen ersten Parametern. Und \u003ccode>:53\u003c/code> lässt die \u003ccode>gl.bindBuffer(gl.ARRAY_BUFFER, …)\u003c/code>-Bindung stehen; heute harmlos, weil der Test der letzte der Datei ist. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Die beiden Signaturen angleichen und die Bindung in einem \u003ccode>finally\u003c/code> zurücksetzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "DOC-054",
@@ -3461,6 +3162,66 @@
         "kind": "induced",
         "run": "2026-09-22"
       }
+    },
+    {
+      "id": "BUG-123",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Map2DTileRenderer prüft gehaltene Tiles auf Truthiness statt auf Anwesenheit",
+      "location": "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:102",
+      "locations": [
+        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:123"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. \u003ccode>reuseTile()\u003c/code> und \u003ccode>removeTile()\u003c/code> fragen das gehaltene Tile mit einer Truthiness-Prüfung ab. Eine Factory, deren Tiles falsy sein können (etwa eine numerische ID \u003ccode>0\u003c/code>), verliert in \u003ccode>removeTile()\u003c/code> den Slot, ohne dass \u003ccode>destroyTile()\u003c/code> aufgerufen wird.",
+      "recommendation": "Auf Anwesenheit prüfen (\u003ccode>tiles.has(id)\u003c/code> bzw. \u003ccode>!== undefined\u003c/code>) statt auf Truthiness, dazu ein Spec mit einer Factory, die \u003ccode>0\u003c/code> als Tile liefert.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "map2d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-23"
+      }
+    },
+    {
+      "id": "TYPE-023",
+      "category": "types",
+      "domain": "code",
+      "severity": "low",
+      "title": "AnimatedSprites deklariert geometry und material enger, als three sie belegt",
+      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:8",
+      "locations": [
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:11"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. \u003ccode>declare geometry: AnimatedSpritesGeometry | undefined\u003c/code> und \u003ccode>declare material: AnimatedSpritesMaterial | undefined\u003c/code>: Ohne Argumente hält das Mesh die nackte \u003ccode>BufferGeometry\u003c/code> und das \u003ccode>MeshBasicMaterial\u003c/code> von \u003ccode>THREE.Mesh\u003c/code>. Der Konstruktor nimmt außerdem jedes \u003ccode>Material\u003c/code>, das die Deklaration dann \u003ccode>AnimatedSpritesMaterial\u003c/code> nennt. \u003ccode>VertexObjects\u003c/code> und \u003ccode>TileSprites\u003c/code> sind für dieselbe Ursache bereits generisch über die Geometrie.",
+      "recommendation": "Wie bei \u003ccode>TileSprites\u003c/code>: generisch über die Geometrie mit Default \u003ccode>BufferGeometry\u003c/code>, und das Material als \u003ccode>AnimatedSpritesMaterial | MeshBasicMaterial | undefined\u003c/code> typisieren. Dazu ein Typtest für den argumentlosen Konstruktor.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "sprites",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-23"
+      }
+    },
+    {
+      "id": "DOC-068",
+      "category": "dx",
+      "domain": "code",
+      "severity": "info",
+      "title": "Das TSDoc von TileSprites nennt noTileCapacity zweimal",
+      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSprites.ts:9",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. Der Klassenkommentar in den Zeilen 9 bis 15 erklärt die Antwort \u003ccode>noTileCapacity\u003c/code> zweimal mit fast gleichem Wortlaut.",
+      "recommendation": "Die beiden Sätze zu einem zusammenziehen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "component": "map2d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-23"
+      }
     }
   ],
   "openQuestions": [
@@ -3483,7 +3244,8 @@
       "Seit dem Vorlauf trägt kein Commit einen `Remediation-Run`-Trailer. Eine Fix-Bilanz entfällt deshalb.",
       "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -3597,6 +3359,17 @@
         "harness": 65
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-23",
+      "score": 66,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 67,
+        "harness": 66
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -3618,6 +3391,16 @@
       "inducedFixed": 0,
       "inducedOpen": 1,
       "discovered": 1,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-23",
+      "source": "remediation",
+      "ref": "2026-09-23",
+      "fixed": 19,
+      "inducedFixed": 6,
+      "inducedOpen": 1,
+      "discovered": 8,
       "attribution": "reviewed"
     }
   ],
