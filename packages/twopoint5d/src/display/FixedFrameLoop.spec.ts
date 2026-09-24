@@ -1,4 +1,4 @@
-import {emit, eventize, getSubscribedEventNames, getSubscriptionCount} from '@spearwolf/eventize';
+import {emit, eventize, getSubscribedEventNames, getSubscriptionCount, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
 import {FixedFrameLoop, type FixedFrameLoopRenderProps, type FixedFrameLoopTickProps} from './FixedFrameLoop.js';
@@ -36,6 +36,23 @@ describe('FixedFrameLoop', () => {
     renders = [];
     sim.onTick((p) => ticks.push(p));
     sim.onRender((p) => renders.push(p));
+  });
+
+  it('onTick() and onRender() hand back the function that takes the handler off again', () => {
+    let calls = 0;
+    const handler = () => {
+      calls += 1;
+    };
+
+    const offTick: UnsubscribeFunc = sim.onTick(handler);
+    const offRender: UnsubscribeFunc = sim.onRender(handler);
+
+    offTick();
+    offRender();
+
+    emit(display, OnDisplayRenderFrame, makeFrame(1 / 60));
+
+    expect(calls).toBe(0);
   });
 
   it('emits exactly one sim tick when deltaTime equals fixedDelta', () => {

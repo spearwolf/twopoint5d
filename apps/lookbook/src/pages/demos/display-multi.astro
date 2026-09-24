@@ -17,7 +17,7 @@ import {description, showSource, title} from './_display-multi.json';
         </div>
       </div>
       <div class="gridCell">
-        <div class="canvasContainer content-box create-canvas-here debug"></div>
+        <div class="canvasContainer content-box create-canvas-here"></div>
         <div class="gridInfo">
           <b>div</b>.no-size.content-box
           <span class="rendererBackendInfo"></span>
@@ -99,7 +99,8 @@ import {description, showSource, title} from './_display-multi.json';
 
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {pixelZoom: 2}));
 
-    new StageRenderer(display).setClearColor(new Color('#304050')).add(stage);
+    const stageRenderer = new StageRenderer(display);
+    stageRenderer.setClearColor(new Color('#304050')).add(stage);
 
     const textureFactory = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']);
 
@@ -109,6 +110,15 @@ import {description, showSource, title} from './_display-multi.json';
 
     sprite.scale.set(100, 100, 0); // => should result in a 200x200 (css pixels) pixelart/crisp image
     stage.scene.add(sprite);
+
+    // the display carries the lifetime of everything built for it here, so its end is where they go
+    display.onDispose(() => {
+      stageRenderer.dispose();
+      stage.dispose();
+      sprite.removeFromParent();
+      material.dispose();
+      textureImage.dispose();
+    });
 
     let canvasContainer: HTMLElement = canvas as HTMLElement;
     if (!canvasContainer.classList.contains('canvasContainer')) {

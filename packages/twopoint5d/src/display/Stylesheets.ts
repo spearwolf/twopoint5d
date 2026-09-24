@@ -1,5 +1,4 @@
-export const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
-export const globalStylesID = `display3--${postFixID}`;
+const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
 
 // One sheet per document or shadow root: a rule installed for a shadow root has to land in that
 // root, or the elements inside it never see it.
@@ -21,12 +20,19 @@ function scopeOf(root: HTMLElement | ShadowRoot): Document | ShadowRoot {
 
 // A document or shadow root adopts only a sheet built by the CSSStyleSheet of its own window; the
 // one of this module's realm is refused with a NotAllowedError in the document of an iframe and in
-// a shadow root inside it. A document without a window falls back on the constructor of this realm
+// a shadow root inside it. A document without a window adopts no constructed sheet at all, so the
+// call throws for it — before getSheet() puts anything into the cache `sheets`
 function newSheetFor(scope: Document | ShadowRoot): CSSStyleSheet {
   // a document is its own owner, and answers ownerDocument with null
   const doc = scope.ownerDocument ?? (scope as Document);
-  const SheetConstructor = (doc.defaultView as (Window & typeof globalThis) | null)?.CSSStyleSheet ?? CSSStyleSheet;
-  return new SheetConstructor();
+  const view = doc.defaultView as (Window & typeof globalThis) | null;
+  if (view == null) {
+    throw new Error(
+      'Stylesheets: the root lies in a document without a window, and such a document adopts no ' +
+        'constructed stylesheet. Install the rule for a root in a document that a window or a frame shows.',
+    );
+  }
+  return new view.CSSStyleSheet();
 }
 
 interface InstalledRule {
@@ -47,7 +53,7 @@ const classNameOf = (name: string): string => `${name}-${postFixID}`;
 // A name carries one rule within one root; the rule object stays valid wherever it sits in the
 // sheet, so writing through it cannot be thrown off by a rule someone else inserted in front of it.
 function putRule(name: string, css: string, root: HTMLElement | ShadowRoot): InstalledRule {
-  const sheet = Stylesheets.getGlobalSheet(root);
+  const sheet = Stylesheets.getSheet(root);
 
   let rules = installedRules.get(sheet);
   if (rules == null) {
@@ -82,6 +88,7 @@ function putRule(name: string, css: string, root: HTMLElement | ShadowRoot): Ins
  * Adopted sheets come after the document's own sheets in the cascade: a rule of the page with
  * the same specificity as these class rules does not win by coming later. Whoever replaces the
  * `adoptedStyleSheets` of a root takes the sheet out; the next call for that root puts it back.
+ * A root in a document without a window gets an error that says so.
  */
 export class Stylesheets {
   /**
@@ -93,8 +100,12 @@ export class Stylesheets {
    * @param root `document.head` by default, which stands for the document. A shadow root carries
    *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
    *   that sits in neither for its document.
+   * @throws when `root` lies in a document without a window — one from
+   *   `document.implementation.createHTMLDocument()`, a `DOMParser` or the content of a
+   *   `<template>` —, since such a document adopts no constructed stylesheet. Nothing is cached for
+   *   it, and every call throws again.
    */
-  static getGlobalSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
+  static getSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
     const scope = scopeOf(root);
     let sheet = sheets.get(scope);
     if (sheet == null) {
@@ -106,6 +117,14 @@ export class Stylesheets {
       scope.adoptedStyleSheets = [...scope.adoptedStyleSheets, sheet];
     }
     return sheet;
+  }
+
+  /**
+   * @deprecated Use {@link Stylesheets.getSheet}: there is one sheet per document or shadow root,
+   *   not one global sheet. This name stays as an alias for one release.
+   */
+  static getGlobalSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
+    return Stylesheets.getSheet(root);
   }
 
   /**
@@ -165,7 +184,7 @@ export class Stylesheets {
    *   that sits in neither for its document.
    */
   static releaseRule(name: string, root: HTMLElement | ShadowRoot = document.head): void {
-    // not getGlobalSheet(): a release is no reason to create a sheet, nor to adopt it again
+    // not getSheet(): a release is no reason to create a sheet, nor to adopt it again
     const sheet = sheets.get(scopeOf(root));
     if (sheet == null) return;
 
@@ -178,7 +197,8 @@ export class Stylesheets {
     installed.users -= 1;
     if (installed.users > 0 || installed.pinned) return;
 
-    // the index is looked up now: rules in front of this one may have come or gone since it was inserted
+    // the index is looked up now: rules in front of this one may have come or gone since it
+    // was inserted
     const index = Array.from(sheet.cssRules).indexOf(installed.rule);
     if (index >= 0) {
       sheet.deleteRule(index);

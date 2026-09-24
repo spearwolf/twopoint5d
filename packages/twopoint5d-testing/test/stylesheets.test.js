@@ -7,12 +7,12 @@ function uniqueName(prefix) {
 }
 
 function ruleCount(root) {
-  return Stylesheets.getGlobalSheet(root).cssRules.length;
+  return Stylesheets.getSheet(root).cssRules.length;
 }
 
 function findRule(className, root) {
   const selector = `.${className}`;
-  return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).find(
+  return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getSheet(root).cssRules)).find(
     (rule) => rule.selectorText === selector,
   );
 }
@@ -81,10 +81,8 @@ describe('Stylesheets', function () {
     const classNameA = Stylesheets.installRule(name, 'cursor: pointer;', rootA);
     const classNameB = Stylesheets.installRule(name, 'cursor: pointer;', rootB);
 
-    expect(Stylesheets.getGlobalSheet(rootA), 'the sheet of the first shadow root').to.not.equal(
-      Stylesheets.getGlobalSheet(rootB),
-    );
-    expect(Stylesheets.getGlobalSheet(rootA), 'the sheet of the first shadow root').to.not.equal(Stylesheets.getGlobalSheet());
+    expect(Stylesheets.getSheet(rootA), 'the sheet of the first shadow root').to.not.equal(Stylesheets.getSheet(rootB));
+    expect(Stylesheets.getSheet(rootA), 'the sheet of the first shadow root').to.not.equal(Stylesheets.getSheet());
 
     expect(findRule(classNameA, rootA), 'the rule inside the first shadow root').to.exist;
     expect(findRule(classNameB, rootB), 'the rule inside the second shadow root').to.exist;
@@ -235,20 +233,18 @@ describe('Stylesheets', function () {
 
     // compared by identity: a failed comparison of two sheets has the whole DOM to print
     expect(
-      Stylesheets.getGlobalSheet(elementInShadowRoot) === Stylesheets.getGlobalSheet(shadowRoot),
+      Stylesheets.getSheet(elementInShadowRoot) === Stylesheets.getSheet(shadowRoot),
       'an element in a shadow root has the sheet of that root',
     ).to.equal(true);
     expect(
-      Stylesheets.getGlobalSheet(document.body) === Stylesheets.getGlobalSheet(),
+      Stylesheets.getSheet(document.body) === Stylesheets.getSheet(),
       'document.body has the sheet of the document',
     ).to.equal(true);
     expect(
-      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet(shadowRoot)),
+      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getSheet(shadowRoot)),
       'the shadow root has adopted its sheet',
     ).to.equal(true);
-    expect(document.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet()), 'the document has adopted its sheet').to.equal(
-      true,
-    );
+    expect(document.adoptedStyleSheets.includes(Stylesheets.getSheet()), 'the document has adopted its sheet').to.equal(true);
   });
 
   it('escapes the class name in the selector of its rule', () => {
@@ -274,7 +270,7 @@ describe('Stylesheets', function () {
     Stylesheets.installRule(uniqueName('adopted-b'), 'cursor: crosshair;', shadowRoot);
 
     expect(
-      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet(shadowRoot)),
+      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getSheet(shadowRoot)),
       'the shadow root has adopted its sheet again',
     ).to.equal(true);
     expect(getComputedStyle(div).cursor, 'the cursor of the first rule').to.equal('pointer');
@@ -311,5 +307,26 @@ describe('Stylesheets', function () {
     div.classList.add(className);
 
     expect(iframeDocument.defaultView.getComputedStyle(div).cursor, 'the cursor in the shadow root').to.equal('pointer');
+  });
+
+  it('getGlobalSheet() answers the sheet getSheet() answers for the same root', () => {
+    const shadowRoot = makeShadowRoot();
+
+    expect(Stylesheets.getGlobalSheet(), 'the document').to.equal(Stylesheets.getSheet());
+    expect(Stylesheets.getGlobalSheet(shadowRoot), 'a shadow root').to.equal(Stylesheets.getSheet(shadowRoot));
+  });
+
+  it('refuses a root in a document without a window, on every call, with a message that says so', () => {
+    const doc = document.implementation.createHTMLDocument('');
+    const el = doc.createElement('div');
+    doc.body.appendChild(el);
+
+    for (const call of ['the first call', 'the second call']) {
+      expect(() => Stylesheets.installRule('twopoint5d-test-windowless', 'color: red', el), call).to.throw(
+        Error,
+        'without a window',
+      );
+    }
+    expect(() => Stylesheets.releaseRule('twopoint5d-test-windowless', el), 'releaseRule()').to.not.throw();
   });
 });

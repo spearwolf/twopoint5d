@@ -135,7 +135,7 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
   }
 
   function cursorRules(root) {
-    return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).filter((rule) =>
+    return /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getSheet(root).cssRules)).filter((rule) =>
       rule.selectorText?.startsWith('.PanControl2D-'),
     );
   }
@@ -220,7 +220,7 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
       expect(control.cursorPanStyle, 'the cursor style of the control').to.equal('grab');
       expect(cursorRules(root).length, 'cursor rules in the sheet').to.equal(1);
       expect(
-        /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).some(
+        /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getSheet(root).cssRules)).some(
           (rule) => rule.style?.display === 'none',
         ),
         'a rule that hides its elements',
@@ -279,7 +279,7 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
     const control = new PanControl2D({state: makeState(), styleSheetRoot: anchor, cursorPanStyle: `url("data:,${token}"), auto`});
     controls.push(control);
     const rulesInDocument = () =>
-      /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet().cssRules)).filter((rule) =>
+      /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getSheet().cssRules)).filter((rule) =>
         rule.selectorText?.includes(token),
       );
 

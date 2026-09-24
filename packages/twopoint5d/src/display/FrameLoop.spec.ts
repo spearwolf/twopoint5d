@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {FrameLoop, OnRAF} from './FrameLoop.js';
+import {FrameLoop} from './FrameLoop.js';
 
 interface FrameProps {
   now: number;
@@ -290,7 +290,6 @@ describe('FrameLoop', () => {
     // Symbol.for() reaches into the realm-wide registry: a key such as 'onFrame' is handed to
     // every other library that asks for the same name, and their listeners meet in one channel
     expect(FrameLoop.OnFrame).toBe(Symbol.for('twopoint5d:FrameLoop.OnFrame'));
-    expect(OnRAF).toBe(Symbol.for('twopoint5d:FrameLoop.OnRAF'));
   });
 
   describe('resetRAF()', () => {

@@ -57,8 +57,8 @@ It should significantly cut down on the amount of boilerplate code and state man
 #### [display](src/display/)
 - cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop
 - nice starting point for your three.js demos
-- there is no other dependency than the three.js package itself
-- api docs: [stage layer cheat-sheet](src/stage/README.md)
+- depends on nothing but three.js and `@spearwolf/eventize`, both peer dependencies of the package
+- api docs: the `Display` class docs — lifecycle and resize model — in [src/display/Display.ts](src/display/Display.ts)
 - :heavy_check_mark: api is stable and ready to use
 
 #### [resource lifecycle](docs/resource-lifecycle.md)

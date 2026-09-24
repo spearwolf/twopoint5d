@@ -434,7 +434,8 @@ describe('Display', () => {
   });
 
   describe('release', () => {
-    // a device whose lost promise never settles, with a queue that answers as `onSubmittedWorkDone` does
+    // a device whose lost promise never settles, with a queue that answers as
+    // `onSubmittedWorkDone` does
     const backendWith = (onSubmittedWorkDone: () => Promise<unknown>, lost: Promise<unknown> = new Promise(() => {})) => ({
       device: {queue: {onSubmittedWorkDone}, lost},
     });
@@ -515,6 +516,24 @@ describe('Display', () => {
       await settle();
 
       expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('read-only state', () => {
+    it('renderer, frameLoop and frameNo are accessors without a setter', () => {
+      const {display} = makeDisplay();
+
+      for (const name of ['renderer', 'frameLoop', 'frameNo']) {
+        const descriptor = Object.getOwnPropertyDescriptor(Display.prototype, name);
+        expect(descriptor?.get, `${name} has a getter`).toBeTypeOf('function');
+        expect(descriptor?.set, `${name} has no setter`).toBeUndefined();
+
+        const before = (display as unknown as Record<string, unknown>)[name];
+        expect(() => {
+          (display as unknown as Record<string, unknown>)[name] = {};
+        }, `a write to ${name}`).toThrow(TypeError);
+        expect((display as unknown as Record<string, unknown>)[name], `${name} after the write`).toBe(before);
+      }
     });
   });
 

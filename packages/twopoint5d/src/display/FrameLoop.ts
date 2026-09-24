@@ -1,11 +1,11 @@
-import {emit, type EventizedObject, eventize, off, on} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
 
-export interface ISetAnimationLoop {
+interface ISetAnimationLoop {
   // `null` is how three.js stops the loop again, and `stop()` below uses it.
   setAnimationLoop(callback: ((now: number) => unknown) | null): unknown;
 }
 
-export const OnRAF = Symbol.for('twopoint5d:FrameLoop.OnRAF');
+const OnRAF = Symbol.for('twopoint5d:FrameLoop.OnRAF');
 const OnFrame = Symbol.for('twopoint5d:FrameLoop.OnFrame');
 
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;
@@ -38,7 +38,7 @@ class RAF {
 
   // The driver runs exactly as long as somebody drives it: a rAF chain nobody listens to keeps
   // the page awake and measures fps into the void.
-  #loops = new Set<FrameLoop>();
+  #loops = new Map<FrameLoop, UnsubscribeFunc>();
 
   // Set whenever the driver picks its work back up. The first tick after that has no previous
   // timestamp to measure against, so it anchors the window instead of producing a sample.
@@ -57,19 +57,20 @@ class RAF {
     eventize(this);
   }
 
-  attach(loop: FrameLoop): void {
+  attach(loop: FrameLoop, onRAF: (now: number, frameNo: number, measuredFps: number) => void): void {
     if (this.#loops.has(loop)) return;
 
-    this.#loops.add(loop);
-    on(this, OnRAF, loop);
+    this.#loops.set(loop, on(this, OnRAF, onRAF));
 
     this.start();
   }
 
   detach(loop: FrameLoop): void {
-    if (!this.#loops.delete(loop)) return;
+    const unsubscribe = this.#loops.get(loop);
+    if (unsubscribe == null) return;
 
-    off(this, OnRAF, loop);
+    this.#loops.delete(loop);
+    unsubscribe();
 
     if (this.#loops.size === 0) {
       this.stop();
@@ -204,7 +205,8 @@ export class FrameLoop {
 
   private readonly raf: RAF;
 
-  constructor(maxFps = 0, renderer?: ISetAnimationLoop) {
+  // the shape is written out, so the published signature names nothing the package keeps inside
+  constructor(maxFps = 0, renderer?: {setAnimationLoop(callback: ((now: number) => unknown) | null): unknown}) {
     eventize(this);
     this.raf = RAF.get(renderer);
     this.setFps(maxFps);
@@ -228,7 +230,7 @@ export class FrameLoop {
       this.#subscribers.add(target);
 
       if (this.subscriptionCount === 1) {
-        this.raf.attach(this);
+        this.raf.attach(this, this.#onRAF);
       }
 
       on(this as FrameLoop, FrameLoop.OnFrame, target);
@@ -252,7 +254,7 @@ export class FrameLoop {
     }
   }
 
-  [OnRAF](now: number, _frameNo: number, measuredFps: number) {
+  readonly #onRAF = (now: number, _frameNo: number, measuredFps: number): void => {
     // Rastered throttle: emit when `now` reaches the next scheduled slot
     // (minus a small jitter tolerance). The schedule stays on a fixed grid
     // so individual rAF jitter cannot drift the cadence; a long pause
@@ -285,7 +287,7 @@ export class FrameLoop {
       deltaTime: this.deltaTime / 1000,
       measuredFps: this.measuredFps,
     });
-  }
+  };
 
   clear() {
     for (const target of Array.from(this.#subscribers)) {

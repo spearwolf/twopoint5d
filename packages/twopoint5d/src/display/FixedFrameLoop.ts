@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, on, once} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on, once, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
 import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
@@ -271,8 +271,8 @@ export class FixedFrameLoop {
    * reached. `display`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left
    * with; nothing behind them was released. {@link reset} and a further `dispose()` do
    * nothing. `fps` and `maxStepsPerFrame` stay writable and keep their values until someone
-   * writes them: a write the setter accepts lands, `fps` recomputes `fixedDelta` with it, and no tick ever
-   * reads either one again.
+   * writes them: a write the setter accepts lands, `fps` recomputes `fixedDelta` with it, and no
+   * tick ever reads either one again.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -282,11 +282,12 @@ export class FixedFrameLoop {
     off(this);
   }
 
-  readonly onTick = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnTick) as unknown as (
-    handler: (props: FixedFrameLoopTickProps) => unknown,
-  ) => unknown;
+  /** Subscribes `handler` to every simulation tick. Returns the function that takes it off again. */
+  readonly onTick = (handler: (props: FixedFrameLoopTickProps) => unknown): UnsubscribeFunc => on(this, OnTick, handler);
 
-  readonly onRender = (on as (...args: unknown[]) => unknown).bind(undefined, this, OnRender) as unknown as (
-    handler: (props: FixedFrameLoopRenderProps) => unknown,
-  ) => unknown;
+  /**
+   * Subscribes `handler` to every render frame of the loop. Returns the function that takes it off
+   * again.
+   */
+  readonly onRender = (handler: (props: FixedFrameLoopRenderProps) => unknown): UnsubscribeFunc => on(this, OnRender, handler);
 }

@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
-- export 30 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `ISetAnimationLoop`, `OnRAF`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
+- export 28 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
 - add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `cloneVertexObjectDescription()` and the `VertexAttributeUsageOverrides` type it takes to the public api of the `vertex-objects` module: it copies a vertex object description, optionally giving named attributes another usage type, and its `alias` option carries such an entry over to the further names the description knows those attributes by. The copy owns its structure — the description, every attribute description in it, their `components`, the `indices` array and the `methods` object are new objects — while `basePrototype` and each individual method are shared
 - add `noTileCapacity` (map2d): what `IMapTileFactory#createTile()` answers when the factory has no room for another tile right now. It is a registered symbol, `Symbol.for('twopoint5d:IMapTileFactory.noTileCapacity')`, so two copies of the library in one page answer with the same one
 - add the `{copy: true}` option to `VOBufferPool#toBuffersData()`: it hands out arrays the pool does not hold, `typedArray.slice()` of its own. That is the way to transfer buffers through `postMessage`, or to build a second pool that stays independent of this one — without it, every array is the pool's own, shared by reference with whatever takes the result in
+- add `Stylesheets.getSheet()`: the stylesheet of the document or shadow root that `root` stands for — the sheet `getGlobalSheet()` answers, under the name of what it is
 
 ### Changed
 
@@ -114,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameBasedAnimations#add()` throws when its third argument is neither a `TextureAtlas`, a `TileSet` nor an array of frames; the message names what that argument has to be, and no animation is registered
 - the `typedArray` of a buffer in `VertexObjectBuffer#buffers` is typed `TypedArray | undefined`: `VOBufferPool#dispose()` takes every buffer its array and clears the same map in the same breath, so the field is empty only in a reference that was grabbed before that call
 - change the return type of `VertexObjectBuffer#toAttributeArrays()` to `Record<string, TypedArray | undefined>` — an attribute name the descriptor does not know gets an entry without an array
-- change the return type of `FrameLoop#start()` to `(() => void) | undefined`: a missing `target`, or one already running on the loop, gets no second unsubscribe function
+- `FrameLoop#start()` answers every call with a function that takes `target` off the loop again — also for a `target` that is already on the loop, which stays there exactly once
 - upgrade the `three` peer dependency to `~0.185.1` (was `~0.183.1`) and `@types/three` to `~0.185.4`. Under the new types `vec3()` no longer accepts an `AttributeNode<unknown>` in any overload: a bare `attribute('name')` passed into a TSL constructor needs its type argument, as in `attribute<'vec2'>('quadSize')`
 - `DisplayRendererParameters` names the 17 options it carries instead of being the empty type `{}`. An object literal handed to the `Display` constructor is now checked against them; an unknown key is an error where it used to pass unnoticed
 - `TexturedSprites#dispose()` releases exactly the geometry and the material the mesh built for itself, and leaves a `TexturedSpritesGeometry`, a `TexturedSpritesMaterial` or a `Texture` handed to the constructor untouched — those belong to the caller. The mesh also takes itself out of the scene graph before it gives both slots up. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
@@ -135,7 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderer#remove()` clears both sides of the relation: a removed child `StageRenderer` answers `undefined` as its `parent` afterwards and gets its `OnRemoveFromParent`, exactly as a `parent = undefined` on the child would do. A listener reading `renderer.parent` from that event sees `undefined` — the event says the child has been removed
 - the `VertexObjectBuffer` behind a disposed pool says which state it is in: `copy()` from it, `copyArray()`, `copyAttributes()` and `toAttributeArrays()` throw an error naming the class, the method and the state instead of a `TypeError` from somewhere inside, and `clone()` and the constructor refuse it as a source rather than answering a second buffer without data. `copyWithin()` and `touch()` do nothing, and `descriptor`, `capacity`, `attributeNames`, `bufferAttributes` and `bufferNameAttributes` go on saying what this buffer was. `copyArray()` with a buffer name the buffer does not know says exactly that, so a typo is not read as a dispose
 - a disposed pool is turned away at the door: the `VOBufferGeometry` and `InstancedVOBufferGeometry` constructors and `InstancedVOBufferGeometry#attachInstancedPool()` throw when they are handed one, with a message naming the call and the state. A pool without buffers gives a route no attributes, and a geometry built over one draws nothing while looking like any other
-- `FrameLoop.OnFrame` and the exported `OnRAF` are `Symbol.for('twopoint5d:FrameLoop.OnFrame')` and `Symbol.for('twopoint5d:FrameLoop.OnRAF')`: the keys carry the library namespace, so no other code in the realm reaches the same channel by asking the symbol registry for a name as common as `onFrame`. Code that subscribes through the exported constants needs no change; code that rebuilds the key from its string does — see the migration guide
+- `FrameLoop.OnFrame` is `Symbol.for('twopoint5d:FrameLoop.OnFrame')`: the key carries the library namespace, so no other code in the realm reaches the same channel by asking the symbol registry for a name as common as `onFrame`. Code that subscribes through `FrameLoop.OnFrame` needs no change; code that rebuilds the key from its string does — see the migration guide
+- `Display#renderer`, `#frameLoop` and `#frameNo` are read-only accessors on the prototype: a write is a type error and throws a `TypeError` at runtime. The display owns the renderer and the frame loop and releases both in `dispose()`, and it counts `frameNo` itself — see the migration guide
+- `FixedFrameLoop#onTick()` and `#onRender()` return the `UnsubscribeFunc` that takes the handler off again, as the `on…()` methods of `Display` do
 - a `createRenderer` callback receives only renderer options in its `params`: `maxFps`, `pauseOutsideViewport`, `resizeTo`, `resizeToElement`, `resizeToAttributeEl`, `styleSheetRoot` and `createRenderer` stay with the display. `CreateRendererParameters` names none of them
 - `PanControl2D` emits `restoreCursor` for a cursor it hid, and takes the cursor class off the target then. A pointer moving over the page with no button down passes through without an event
 - a value written to `Map2DTileStreamer#tileWidth`, `#tileHeight`, `#xOffset` or `#yOffset`, and with it to the same four properties of `Map2D`, builds the tiles again: the next `update()` clears every renderer and lets the visibilitor lay out the whole set in the new grid. A tile is recognised by its `(x, y)` id and would otherwise come back as a reuse, where `IMapTileFactory#updateTile()` writes only its position — the sprite would go on showing the size and the texture coordinates of the grid it was built in. Writing the value a property already holds costs nothing
@@ -186,13 +189,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the `voInitialize` hook of a `basePrototype` runs only for the slot `VertexObjectPool#createVO()` hands out — once, with the new vertex object as `this`, before `onCreateVO`. `getVO()` no longer runs it for a slot filled through `createFromAttributes()`, `fromBuffersData()` or a snapshot handed to the constructor
 - `ResizeDisplayToFn` returns `[width: number, height: number] | undefined`
 - `Display` sizes its renderer with one call of `setDrawingBufferSize(width, height, pixelRatio)` and calls neither `setPixelRatio()` nor `setSize()`; a `createRenderer` that hands back a wrapper or a stub needs that method
-- `Stylesheets` keeps its rules in a constructed stylesheet per document or shadow root and adopts it through `adoptedStyleSheets`; it puts no `<style>` element into the DOM. A shadow root carries its rules before its host is in the document and keeps them when the host moves. The sheet comes from the window of its document, so a document or shadow root inside an iframe carries rules as well. An element passed as root stands for the document or shadow root it sits in at each call, which a `releaseRule()` has to match. Adopted sheets come after the document's own sheets in the cascade. The selector of a rule carries the class name through `CSS.escape()`
+- `Stylesheets` keeps its rules in a constructed stylesheet per document or shadow root and adopts it through `adoptedStyleSheets`; it puts no `<style>` element into the DOM. A shadow root carries its rules before its host is in the document and keeps them when the host moves. The sheet comes from the window of its document, so a document or shadow root inside an iframe carries rules as well. An element passed as root stands for the document or shadow root it sits in at each call, which a `releaseRule()` has to match. Adopted sheets come after the document's own sheets in the cascade. The selector of a rule carries the class name through `CSS.escape()`. A root in a document without a window — from `document.implementation.createHTMLDocument()`, a `DOMParser` or the content of a `<template>` — gets an error that says so, since such a document adopts no constructed stylesheet
 - a write to `Display#styleSheetRoot` installs the rules of the display in the new root, under the same class names; a write after `dispose()` does nothing
 
 ### Deprecated
 
 - deprecate `TexturedSpritePool`, `TexturedSpriteMakeBaseSpriteArgs` and `TexturedSpriteGeometryParameters` in favour of `TexturedSpritesPool`, `TexturedSpritesMakeBaseSpriteArgs` and `TexturedSpritesGeometryParameters`: the plural belongs to the `TexturedSprites` module, as it does in `TexturedSpritesBasePool` and `TexturedSpritesMaterialParameters`, not to a single sprite. The old names stay as aliases of the new types for one release
 - deprecate the `keyCodes` option and the `PanControl2D#keyCodes` field in favour of `keys`: `KeyboardEvent.keyCode` depends on the keyboard layout. `keyCodes` still decides as long as it holds anything other than `[87, 83, 65, 68]` and `keys` holds its default — a `keyCodes` passed in or rebound in place keeps working, and `keys` wins where both are set
+- deprecate `Stylesheets.getGlobalSheet()` in favour of `getSheet()`: there is one sheet per document or shadow root, not one global sheet. The old name stays as an alias of `getSheet()` for one release
 
 ### Removed
 
@@ -203,6 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove the upload marking from `VertexObjectPool#getVO()`: materializing a vertex object in a slot reads that slot and changes none of its data, so it marks no buffer of the pool any more
 - remove `meshCount` from `VertexObjectDescription`, and with it the `VertexObjectDescriptor#meshCount` getter and `VertexObjectDescriptor#getInstanceCount()`. Every instanced attribute of a geometry advances once per instance, and the `instanceCount` of an instanced geometry is the `usedCount` of its pool
 - remove the declaration maps and the source maps from the published package: both pointed at the TypeScript sources under `src/`, which the package does not contain, so neither "Go to definition" nor a debugger found anything behind them. The `.d.ts` and `.js` files only lose their `sourceMappingURL` comment
+- remove the exports `postFixID` and `globalStylesID`: the class name `Stylesheets` hands out comes whole from the return value of `installRule()`, `retainRule()` and `addRule()`, and `globalStylesID` named a `<style>` element the module does not create — see the migration guide
 
 ### Fixed
 
@@ -245,7 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the `TileBox` pool of `CameraBasedVisibility`: every recomputation that finds the map plane leaves it holding the tiles that run visited and no others, and a frame in which the camera looks past the plane leaves it as it stands. A camera travelling far no longer leaves a `Box3`, a `Vector3` and a `Map2DTileCoords` behind per tile it has passed, and a tile that stays visible keeps its pooled objects as before
 - fix the gpu buffer of an attribute that a second route pushed out of an attribute slot of an `InstancedVOBufferGeometry`: it stayed with the renderer with nothing left to reach it. three.js frees one attribute per name through the dispose event of the geometry — the one sitting in the slot at that moment — so the second route is refused instead
 - fix the listener `FixedFrameLoop` leaves on its `Display`: the loop takes its own `OnDisplayDispose` subscription off again, so a display that outlives a series of short-lived loops no longer collects one closure over a spent loop per loop
-- fix `Stylesheets.installRule()`: a name carries exactly one rule in the stylesheet of its root, and a call with a different `css` rewrites that rule instead of appending another one. The sheet no longer grows by a rule per `Display`, per created container and per fullscreen toggle
+- fix `Stylesheets.installRule()`: a name carries exactly one rule in the stylesheet of its root, and a call with a different `css` rewrites that rule instead of appending another one. A name carries one rule per root, however many displays, containers and fullscreen toggles install it
 - fix a `Display` that is disposed before its renderer is ready: it does not put itself into its frame loop once the renderer initialization resolves, so the loop is left with no subscriber to carry
 - fix `Display#dispose()` for a renderer that is still initializing or still has work on the GPU: the renderer is released once its init is through and the GPU has run the work submitted to it, or once the device reports itself lost, or after two seconds with a warning on the console, so a `dispose()` during the init takes the device, the context and the animation loop of three along, and an init that fails ends without an unhandled rejection. `dispose()` itself stays synchronous — `renderer` is `undefined` and a container the display built is out of the DOM when it returns, and the renderer is released after that
 - fix `Display#dispose()` for a canvas handed to the constructor: the canvas carries a new `Display` afterwards. Under the WebGL backend three loses the context of the canvas as it releases the renderer, and a canvas keeps its one WebGL context for good, so the release keeps that context restorable and leaves it lost until a `Display` is built on the canvas again; that display — built while the release is still running, as in a remount under React StrictMode, or any time later — restores the context and then initializes its renderer. Only a `Display` restores it: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets the lost context. A context that has not come back after two seconds ends the wait with a console warning and stays restorable, and the next `Display` built on the canvas tries again
@@ -884,6 +889,47 @@ function backendName(display: Display) {
   if (display.isDisposed) return 'gone';
   return display.isWebGPUBackend ? 'webgpu' : 'webgl';
 }
+```
+
+#### `Display#renderer`, `#frameLoop` and `#frameNo` are read-only
+
+The three are accessors without a setter: a write is a type error and throws a `TypeError` at
+runtime. The display owns its renderer and its frame loop and releases both in `dispose()`, and it
+counts `frameNo` itself. A renderer of your own goes to the constructor, a subscriber of your own
+goes onto the frame loop the display runs on, and `frameNo` is only read.
+
+**Before**
+
+```ts
+display.renderer = myRenderer;
+display.frameLoop = new FrameLoop(30);
+display.frameNo = 0;
+```
+
+**After**
+
+```ts
+const display = new Display(myRenderer, {maxFps: 30});
+
+display.frameLoop.start(target); // or display.onRenderFrame(…) and the other on…() methods
+```
+
+#### `postFixID` and `globalStylesID` are gone
+
+The class name `Stylesheets` hands out comes whole from the return value of `installRule()`,
+`retainRule()` and `addRule()`; there is no postfix to put together by hand. `globalStylesID`
+named a `<style>` element the module does not create.
+
+**Before**
+
+```ts
+const className = `${name}-${postFixID}`;
+```
+
+**After**
+
+```ts
+const className = Stylesheets.installRule(name, css);
 ```
 
 #### A disposed texture store rejects what its callers are still awaiting
@@ -1650,25 +1696,6 @@ const foo = arrays['foo'];
 if (foo === undefined) return; // 'foo' is not an attribute of this descriptor
 ```
 
-#### `FrameLoop#start()` can answer `undefined`
-
-The method hands back a function that unsubscribes the `target` again. There is nothing to
-hand back for a missing `target` or for one that is already running on the loop.
-
-**Before**
-
-```ts
-const unsubscribe = frameLoop.start(target);
-unsubscribe();
-```
-
-**After**
-
-```ts
-const unsubscribe = frameLoop.start(target);
-unsubscribe?.(); // or use frameLoop.stop(target)
-```
-
 #### A disposed `StageRenderer` leaves its pipeline alone
 
 `StageRenderer#dispose()` releases the render targets the renderer built for itself. A
@@ -1771,7 +1798,7 @@ scene.add(new THREE.Mesh(geometry, material));
 
 #### The event keys of `FrameLoop` carry the library namespace
 
-The symbols are exported; take them from the module instead of building them from their name.
+`FrameLoop.OnFrame` carries the key; take it from the class instead of building it from its name.
 
 **Before**
 

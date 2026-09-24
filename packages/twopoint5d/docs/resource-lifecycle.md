@@ -182,7 +182,7 @@ dispose(): void {
   this.#giveBackCallersCanvas();
 
   const renderer = this.renderer;
-  delete this.renderer;
+  this.#renderer = undefined;
   if (renderer != null) this.#releaseRenderer(renderer);
 
   // the container and the canvas in it leave the document right away; the renderer holds on

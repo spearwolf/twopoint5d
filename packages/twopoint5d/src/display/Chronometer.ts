@@ -48,7 +48,8 @@ export class Chronometer {
 
   /**
    * The time that has elapsed since the previous time and the current time.
-   * Note that the pause times are subtracted here - so it is the time elapsed during the active phases.
+   * Note that the pause times are subtracted here - so it is the time elapsed during the active
+   * phases.
    */
   get deltaTime(): number {
     return this.#deltaTime;

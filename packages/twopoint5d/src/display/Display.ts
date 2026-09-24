@@ -527,8 +527,8 @@ export class Display {
    * If it is greater than 0, the _devicePixelRatio_ value is ignored and
    * _cssPixel * pixelZoom_ is used as the effective pixelRatio of the display.
    *
-   * This is interesting for pixelart: a value of 2 means that each CSS pixel is rendered twice as large,
-   * regardless of the devicePixelRatio.
+   * This is interesting for pixelart: a value of 2 means that each CSS pixel is rendered twice as
+   * large, regardless of the devicePixelRatio.
    */
   pixelZoom = 0;
 
@@ -569,11 +569,15 @@ export class Display {
     return this.#height;
   }
 
+  #frameNo = 0;
+
   /**
    * The number of the frame being rendered: `0` until the first frame, `1` during the first
    * one, and one more with every frame after it.
    */
-  frameNo = 0;
+  get frameNo(): number {
+    return this.#frameNo;
+  }
 
   #isFirstFrame = true;
 
@@ -581,7 +585,15 @@ export class Display {
     return this.#isFirstFrame;
   }
 
-  frameLoop: FrameLoop;
+  readonly #frameLoop: FrameLoop;
+
+  /**
+   * The {@link FrameLoop} this display runs on, built by the constructor with `maxFps`. The display
+   * stands on it while it runs, and {@link Display.dispose} takes it off again.
+   */
+  get frameLoop(): FrameLoop {
+    return this.#frameLoop;
+  }
 
   /**
    * The HTML element whose content-area size drives the canvas size each
@@ -650,7 +662,16 @@ export class Display {
     this.#installRules(root);
   }
 
-  renderer?: WebGPURenderer;
+  #renderer?: WebGPURenderer;
+
+  /**
+   * The `WebGPURenderer` this display draws with — the one it built, or the one handed to the
+   * constructor. The display owns it and releases it in {@link Display.dispose}; afterwards this
+   * answers `undefined`.
+   */
+  get renderer(): WebGPURenderer | undefined {
+    return this.#renderer;
+  }
 
   /**
    * `true` once {@link Display.dispose} has run. Branch on this wherever a display
@@ -774,8 +795,8 @@ export class Display {
     }
 
     if (isWebGPURenderer(domElementOrRenderer)) {
-      this.renderer = domElementOrRenderer;
-      this.resizeToElement = this.renderer.domElement;
+      this.#renderer = domElementOrRenderer;
+      this.resizeToElement = domElementOrRenderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
       let canvas: HTMLCanvasElement;
       let callersCanvasBefore: CanvasState | undefined;
@@ -800,15 +821,12 @@ export class Display {
 
       const makeRenderer =
         createRenderer ??
-        ((params: CreateRendererParameters) => {
-          return new WebGPURenderer({
-            // TODO check if this is still needed
-            ...params,
-          });
-        });
+        // three writes its getFallback onto the options it is given; these are built
+        // for this one call
+        ((params: CreateRendererParameters) => new WebGPURenderer(params));
 
       try {
-        this.renderer = makeRenderer({
+        this.#renderer = makeRenderer({
           canvas,
           stencil: false,
           alpha: true,
@@ -826,7 +844,7 @@ export class Display {
 
       // a createRenderer that ignores the canvas it was given leaves that canvas untouched, and
       // writing the state back would overwrite what its caller has done with it since
-      if (callersCanvasBefore != null && this.renderer.domElement === canvas) {
+      if (callersCanvasBefore != null && this.#renderer.domElement === canvas) {
         this.#callersCanvasBefore = callersCanvasBefore;
       }
     } else {
@@ -848,7 +866,7 @@ export class Display {
         ? takeOverCanvas(renderer.domElement, previousRelease).then(() => renderer.init())
         : renderer.init();
 
-    this.frameLoop = new FrameLoop(maxFps ?? 0, this.renderer);
+    this.#frameLoop = new FrameLoop(maxFps ?? 0, this.#renderer);
 
     // From here on a throw takes down what the constructor has built, as dispose() does: it
     // releases the renderer, gives a canvas handed in back and takes its own container out.
@@ -1256,7 +1274,7 @@ export class Display {
     if (this.#disposed) return;
 
     this.#isFirstFrame = this.frameNo === 0;
-    this.frameNo += 1;
+    this.#frameNo += 1;
 
     this.#chronometer.update(now / 1000);
 
@@ -1386,7 +1404,7 @@ export class Display {
     this.#giveBackCallersCanvas();
 
     const renderer = this.renderer;
-    delete this.renderer;
+    this.#renderer = undefined;
     if (renderer != null) this.#releaseRenderer(renderer);
 
     // the container and the canvas in it leave the document right away; the renderer holds on

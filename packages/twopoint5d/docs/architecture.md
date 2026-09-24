@@ -21,8 +21,10 @@ set of `public-api.ts` files _is_ the package's API contract:
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
   declaration references a type that consumers cannot name — usually the symptom of a
   type that was forgotten here.
-- Type-only exports use `export type * from './types.js'`, matching
-  `@typescript-eslint/consistent-type-imports` on the import side.
+- Type-only exports go through `export type` — `export type * from './types.js'`, or a
+  named `export type {…}` list in a module that names its exports one by one, as
+  `display/` does —, matching `@typescript-eslint/consistent-type-imports` on the import
+  side.
 
 ## 2. Layers
 
