@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-23T07:40:00.653Z"
+    "generatedAt": "2026-09-24T12:54:08.951Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,51 +198,50 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 67,
-        "penalty": 73.5,
+        "score": 71,
+        "penalty": 60,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 19,
-          "low": 51,
-          "info": 23
+          "medium": 15,
+          "low": 40,
+          "info": 25
         },
         "byCategory": {
-          "correctness": 20,
-          "api": 20,
+          "correctness": 17,
+          "api": 19,
           "consistency": 9,
           "performance": 6,
           "completeness": 5,
-          "security": 2,
-          "resources": 4,
+          "security": 1,
+          "resources": 1,
           "architecture": 2,
-          "async": 4,
+          "async": 2,
           "readability": 5,
           "types": 4,
-          "dx": 10,
+          "dx": 7,
           "testing": 4
         }
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 66,
-        "penalty": 31.5,
+        "score": 67,
+        "penalty": 30,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 7,
-          "low": 35,
-          "info": 22
+          "low": 32,
+          "info": 17
         },
         "byCategory": {
-          "dx": 33,
-          "types": 4,
-          "testing": 13,
+          "dx": 28,
+          "types": 3,
+          "testing": 14,
           "dependencies": 3,
-          "consistency": 4,
+          "consistency": 3,
           "completeness": 1,
-          "readability": 4,
-          "resources": 1,
+          "readability": 3,
           "build": 1
         }
       }
@@ -252,8 +251,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 127,
-        "score": 73
+        "findings": 105,
+        "score": 77
       },
       {
         "name": "workspace",
@@ -266,20 +265,20 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 6,
-        "score": 96.5
+        "findings": 9,
+        "score": 96
       },
       {
         "name": "lookbook",
         "path": "apps/lookbook",
         "reviewedLoc": 0,
-        "findings": 10,
+        "findings": 8,
         "score": 95
       }
     ],
-    "resolvedCount": 44,
+    "resolvedCount": 74,
     "scoreModel": 2,
-    "score": 66,
+    "score": 69,
     "scoring": {
       "model": 2,
       "weights": {
@@ -296,43 +295,43 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 26,
-      "low": 86,
-      "info": 45
+      "medium": 22,
+      "low": 72,
+      "info": 42
     },
     "byCategory": {
-      "correctness": 20,
-      "api": 20,
-      "consistency": 13,
+      "correctness": 17,
+      "api": 19,
+      "consistency": 12,
       "performance": 6,
-      "dx": 43,
+      "dx": 35,
       "completeness": 6,
-      "security": 2,
-      "resources": 5,
-      "types": 8,
+      "security": 1,
+      "resources": 1,
+      "types": 7,
       "architecture": 2,
-      "async": 4,
-      "testing": 17,
+      "testing": 18,
       "dependencies": 3,
-      "readability": 9,
+      "async": 2,
+      "readability": 8,
       "build": 1
     },
     "byComponent": {
       "map2d": 27,
       "texture": 27,
-      "stage": 24,
+      "stage": 25,
       "sprites": 8,
-      "display": 21,
-      "controls": 3
+      "controls": 4,
+      "display": 2
     },
     "counts": {
-      "findings": 159,
-      "improvements": 17,
+      "findings": 138,
+      "improvements": 16,
       "byStatus": {
-        "new": 52,
-        "unchanged": 13,
+        "new": 44,
+        "unchanged": 11,
         "improved": 7,
-        "carried-over": 87
+        "carried-over": 76
       }
     },
     "deltaBreakdown": {
@@ -342,8 +341,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-23",
-      "ref": "2026-09-23"
+      "date": "2026-09-24",
+      "ref": "2026-09-24"
     }
   },
   "portrait": {
@@ -1234,201 +1233,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "BUG-117",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Display.MaxResolution in Device-Pixeln begrenzen, wie die TSDoc es sagt",
-      "location": "packages/twopoint5d/src/display/Display.ts:735-740",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:146-154",
-        "packages/twopoint5d/src/display/Display.ts:759-760"
-      ],
-      "description": "Geklemmt werden CSS-Pixel aus `getBoundingClientRect` bzw. `innerWidth`. Danach setzen `setPixelRatio(devicePixelRatio)` und `setSize(width, …)` den Drawing Buffer auf `width × dpr`. Bei dpr 2 oder 3 entstehen 16384 bzw. 24576 px, also genau die Texturgrenze, vor der der Clamp schützen soll. Der Browser-Test prüft nur die logische Breite.",
-      "recommendation": "Gegen `w × pixelRatio` klemmen (bei `pixelZoom > 0` gegen `w`) oder die TSDoc korrigieren. Im Test `canvas.width` mit emuliertem dpr prüfen.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-017",
-      "category": "resources",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Stylesheets auf Constructable Stylesheets umstellen, damit Regeln Reconnects überstehen",
-      "location": "packages/twopoint5d/src/display/Stylesheets.ts:61-73",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:473",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:265"
-      ],
-      "description": "`Stylesheets` merkt sich pro Root das CSSOM-Sheet eines `\u003cstyle>`-Elements. Das existiert nur, solange das Element im Dokument hängt. Ein ShadowRoot, der noch nicht eingehängt ist (Web Component, die im Konstruktor baut), liefert `sheet === null`, und `expectDefined` wirft. Im Display passiert das erst, nachdem der Renderer gebaut und `init()` gestartet ist, außerhalb des Aufräum-`try`. Wird ein Host verschoben, baut der Browser das Sheet aus dem leeren `textContent` neu, und alle per `insertRule` gesetzten Regeln sind weg. Dieser zweite Fall folgt aus der HTML-Spec und ist nicht im Browser reproduziert.",
-      "recommendation": "`new CSSStyleSheet()` mit `adoptedStyleSheets` verwenden und im Display-Konstruktor alles nach `makeRenderer` ins Aufräum-`try` nehmen.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ASYNC-005",
-      "category": "async",
-      "domain": "code",
-      "severity": "medium",
-      "title": "stop() und pause während eines wartenden start() respektieren",
-      "location": "packages/twopoint5d/src/display/Display.ts:867-868",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:852-875"
-      ],
-      "description": "`start()` setzt nach dem `await` auf den Renderer ohne weitere Prüfung `pausedByUser = false`. Ruft eine UI `start()` und direkt danach, während die Assets noch laden, `stop()` oder `pause = true` auf, läuft das Display trotzdem los.",
-      "recommendation": "Beim Aufruf von `start()` eine Generation festhalten und `pausedByUser` nach dem `await` nur zurücksetzen, wenn seitdem kein `stop()` bzw. `pause` kam.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-118",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Negative Deltas im Chronometer abfangen",
-      "location": "packages/twopoint5d/src/display/Display.ts:497-499",
-      "locations": [
-        "packages/twopoint5d/src/display/Chronometer.ts:95-101",
-        "packages/twopoint5d/src/display/FixedFrameLoop.ts:216"
-      ],
-      "description": "Beim Start setzt das Display den Chronometer auf `performance.now()`, die Frames kommen aber mit dem rAF-Timestamp. Der kann vor einem `performance.now()` liegen, das zwischen VSync und Frame-Callbacks gelesen wurde. Das erste Delta wird dann negativ, und `FixedFrameLoop.alpha` verlässt das dokumentierte Intervall `[0, 1)`.",
-      "recommendation": "In `Chronometer.update` mit `Math.max(0, …)` klemmen oder beim Start denselben Zeitgeber wie die Frames nutzen.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-013",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "onTick/onRender eine echte Signatur geben und die Unsubscribe-Funktion zurückgeben",
-      "location": "packages/twopoint5d/src/display/FixedFrameLoop.ts:285-291",
-      "description": "`onTick` und `onRender` sind per `as unknown as` mit dem Rückgabetyp `unknown` typisiert. Wer abmelden will, muss casten, anders als bei den `on*`-Methoden von `Display`.",
-      "recommendation": "Als echte Methoden mit `UnsubscribeFunc` als Rückgabetyp und ohne `.bind`-Cast deklarieren.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-065",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Interna und veränderbaren Zustand aus der Display-Oberfläche nehmen",
-      "location": "packages/twopoint5d/src/display/Stylesheets.ts:3-4",
-      "locations": [
-        "packages/twopoint5d/src/display/FrameLoop.ts:3-8",
-        "packages/twopoint5d/src/display/Display.ts:254",
-        "packages/twopoint5d/src/display/Display.ts:262",
-        "packages/twopoint5d/src/display/Display.ts:314"
-      ],
-      "description": "`export *` veröffentlicht `postFixID`, `globalStylesID`, `OnRAF` und `ISetAnimationLoop`. `frameNo`, `frameLoop` und `renderer` sind öffentlich beschreibbar. Wer `renderer` oder `frameLoop` neu zuweist, unterläuft Ownership und `dispose()`, und ein geschriebenes `frameNo` bricht die Erst-Frame-Logik. Jede spätere Einschränkung wird ein Breaking Change.",
-      "recommendation": "In den `public-api.ts`-Dateien benannte Exporte führen und die drei Felder als Getter bzw. `readonly` exponieren.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-119",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "styleImageRendering sofort anwenden, nicht erst beim nächsten Resize",
-      "location": "packages/twopoint5d/src/display/Display.ts:743",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:764"
-      ],
-      "description": "Der Resize-Hash enthält `styleImageRendering` nicht, und das Style wird nur im Changed-Zweig geschrieben. `display.styleImageRendering = 'pixelated'` bleibt ohne Wirkung, bis sich Größe oder Pixel Ratio ändern.",
-      "recommendation": "Den Wert in den Hash aufnehmen oder außerhalb des Hash-Zweigs gegen den aktuellen Inline-Style vergleichen.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-120",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das Ergebnis von resizeToCallback validieren und korrekt typisieren",
-      "location": "packages/twopoint5d/src/display/Display.ts:691-696",
-      "locations": [
-        "packages/twopoint5d/src/display/types.ts:15"
-      ],
-      "description": "Der Typ verspricht immer ein Tupel, die Laufzeit akzeptiert aber auch ein falsy Ergebnis. `NaN` und `Infinity` laufen ungeprüft bis `setSize`. Ein Callback, der aus einem noch nicht gelayouteten Element `0/0` ableitet, erzeugt so `NaN`.",
-      "recommendation": "Rückgabetyp `[number, number] | undefined` und nicht endliche Werte wie »kein Ergebnis« behandeln.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-018",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "title": "Einen übergebenen Canvas bei dispose() von Display-Klassen und -Styles befreien",
-      "location": "packages/twopoint5d/src/display/Display.ts:877-893",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:473-474",
-        "packages/twopoint5d/src/display/Display.ts:762-764"
-      ],
-      "description": "resource-lifecycle.md §1 sagt über übergebene Ressourcen »not disposed, not cleared, not modified«. Ein übergebener Canvas behält nach `dispose()` aber Klassen, Inline-Größe und die Fullscreen-Klasse mit `position:fixed`.",
-      "recommendation": "Mindestens die Fullscreen-Klasse beim Dispose entfernen und den Rest dokumentieren, oder alle Änderungen zurücknehmen.",
-      "effort": "S",
-      "status": "new",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-022",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Das Display vom rAF-Treiber lösen, solange es pausiert oder noch nicht gestartet ist",
-      "location": "packages/twopoint5d/src/display/Display.ts:527-534",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:803-808",
-        "packages/twopoint5d/src/display/FrameLoop.ts:60-67"
-      ],
-      "description": "`frameLoop.start(this)` läuft schon im Konstruktor, und `stop()`/`pause` melden das Display nicht ab. Ein gestopptes Display lässt rAF mit voller Refresh-Rate weiterlaufen, die Ticks prüfen nur `isRunning`. Auf Mobilgeräten kostet das Akku.",
-      "recommendation": "In den Pause- und Start-Handlern der State-Machine `frameLoop.stop(this)` bzw. `start(this)` aufrufen.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-009",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "Den elementIsInsideViewport-Eingang verdrahten oder entfernen",
-      "location": "packages/twopoint5d/src/display/DisplayStateMachine.ts:34",
-      "locations": [
-        "packages/twopoint5d/src/display/DisplayStateMachine.ts:62-71",
-        "packages/twopoint5d/src/display/DisplayStateMachine.ts:102-113"
-      ],
-      "description": "Offscreen-Pausing ist in der State-Machine vorbereitet, aber niemand setzt den Eingang. Ein IntersectionObserver fehlt, der Zustand ist toter Code.",
-      "recommendation": "Über einen IntersectionObserver auf den Canvas verdrahten und beim Dispose trennen, oder den Eingang entfernen.",
-      "effort": "S",
-      "status": "improved",
-      "previousSeverity": "low",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "BUG-121",
       "category": "correctness",
       "domain": "code",
@@ -1465,22 +1269,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "SEC-002",
-      "category": "security",
-      "domain": "code",
-      "severity": "low",
-      "title": "Cursor-Wert validieren, bevor er das Stylesheet erreicht",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:261-265",
-      "locations": [
-        "packages/twopoint5d/src/display/Stylesheets.ts:45"
-      ],
-      "description": "`cursorPanStyle` wird ungeprüft in eine CSS-Regel interpoliert. `\"pointer; display:none\"` fügt dem Cursor-Target (Default `document.body`) beliebige Deklarationen hinzu. Ein `}` lässt `insertRule` werfen, nachdem `#cursorPanStyle` und `#cursorPanRuleName` schon überschrieben sind. Die vorherige Regel wird dann nie freigegeben. Die Quelle ist Entwicklercode.",
-      "recommendation": "Nur einen Deklarationswert erlauben (`;{}` ablehnen oder `CSS.supports('cursor', v)`) und die Felder erst nach einem erfolgreichen `retainRule` zuweisen.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "PERF-031",
       "category": "performance",
       "domain": "code",
@@ -1500,17 +1288,15 @@
       "category": "testing",
       "domain": "harness",
       "severity": "medium",
-      "title": "Die riskantesten GPU- und Lifecycle-Pfade mit Browser-Tests absichern",
+      "title": "Die riskantesten GPU-Pfade von Stage, Sprites und PanControl2D mit Browser-Tests absichern",
       "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js",
       "locations": [
-        "packages/twopoint5d-testing/test/display-dispose.test.js:225",
-        "packages/twopoint5d-testing/test/display-resize.test.js:307-327",
         "packages/twopoint5d-testing/test/pan-control-keys.test.js",
         "packages/twopoint5d/src/sprites/node-utils.ts:75-83",
         "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:74-81"
       ],
-      "description": "Die Defekte dieses Laufs mit der höchsten Wirkung sitzen dort, wo Vitest-Mocks nichts sehen, und kein Test deckt sie ab. Es gibt keinen Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames. Nicht getestet sind außerdem Billboards an einem verschobenen Mesh, `texCoordsFromIndex` und die Frame-Index-Formel, ein Dispose während eines echten Init, der Device-Pixel-Clamp bei dpr > 1, der start/stop-Race und ein verlorenes `keyup`. `Display` und `PanControl2D` haben keine `*.spec.ts`.",
-      "recommendation": "Je Pfad einen Browser-Test mit Pixel-Readback bzw. echtem Renderer ergänzen. Für den start/stop-Race und den Chronometer genügen Vitest-Specs mit Renderer-Stub.",
+      "description": "Der Display-Anteil (start/stop-Race, Chronometer, Dispose während Init, Device-Pixel-Clamp bei dpr > 1) ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`). Offen bleiben die Pfade, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames, keine Tests für Billboards an einem verschobenen Mesh, `texCoordsFromIndex` und die Frame-Index-Formel, kein verlorenes `keyup`; `PanControl2D` hat keine `*.spec.ts`.",
+      "recommendation": "Je Pfad einen Browser-Test mit Pixel-Readback bzw. echtem Renderer ergänzen; für das verlorene `keyup` genügt eine Vitest-Spec.",
       "effort": "M",
       "status": "new",
       "package": "twopoint5d-testing"
@@ -1745,32 +1531,19 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "ASYNC-002",
-      "category": "async",
-      "domain": "code",
-      "severity": "medium",
-      "title": "OnDisplayInit vor OnDisplayStart emittieren, wie das Klassen-TSDoc verspricht",
-      "location": "packages/twopoint5d/src/display/Display.ts:482",
-      "description": "\u003ccode>DisplayStateMachine.start()\u003c/code> emittiert \u003ccode>Init\u003c/code> und setzt dann synchron \u003ccode>RUNNING\u003c/code> und emittiert \u003ccode>Start\u003c/code>. Der Init-Handler ist \u003ccode>async\u003c/code> und \u003ccode>await\u003c/code>et eine bereits gesettelte Promise, \u003ccode>OnDisplayInit\u003c/code> wird also auf einen Microtask verschoben, während der Start-Handler \u003ccode>#emit(OnDisplayStart)\u003c/code> synchron ausführt — Listener sehen Start, dann Init, und da beide in Vollendungsreihenfolge retained werden, bekommen späte Subscriber dieselbe verkehrte Reihenfolge. Das \u003ccode>try/catch\u003c/code> ist tot: \u003ccode>Init\u003c/code> ist nur über \u003ccode>this.#stateMachine.start()\u003c/code> in Zeile 833 erreichbar, hinter \u003ccode>await this.#waitForRenderer\u003c/code>, das bereits geworfen hätte. Die Lookbook-Demos bauen ihre Szenen in \u003ccode>onInit\u003c/code>; alles, was ein Konsument an \u003ccode>onStart\u003c/code> hängt und eine existierende Szene erwartet, läuft einen Microtask zu früh.",
-      "recommendation": "Den Handler synchron machen: \u003ccode>[DisplayStateMachine.Init]: () =&gt; this.#emit(OnDisplayInit)\u003c/code>. Browsertest auf die Reihenfolge \u003ccode>init, start, renderFrame\u003c/code> bei einem frischen Display und \u003ccode>start\u003c/code> (ohne \u003ccode>init\u003c/code>) nach Un-Pause.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-004",
       "category": "testing",
       "domain": "harness",
       "severity": "low",
-      "title": "Die Testlücken um Pause/Restart, styleUtils und Touch-Eingabe schließen; controls steht bei 15 % Vitest-Coverage",
-      "location": "packages/twopoint5d-testing/test/display-dispose.test.js:273",
-      "description": "Die Browsertests decken Konstruktor, Dispose-Vertrag, Resize-Quellen und Renderer-Übernahme gut ab, aber nichts prüft an einem laufenden Display \u003ccode>pause = true/false\u003c/code>, \u003ccode>stop()\u003c/code>, den \u003ccode>visibilitychange\u003c/code>-Listener (und sein Entfernen), \u003ccode>OnDisplayPause\u003c/code>/\u003ccode>OnDisplayRestart\u003c/code>, \u003ccode>maxFps\u003c/code>, \u003ccode>resizePollIntervalMs\u003c/code>, die Init/Start-Reihenfolge (ASYNC-002) oder ein \u003ccode>start()\u003c/code>, das bei fehlgeschlagenem Init rejected. \u003ccode>styleUtils\u003c/code> hat keine Spec (BUG-083 ist die Folge). \u003ccode>PanControl2D\u003c/code>-Tests nutzen nur Maus mit \u003ccode>pointerId: 1\u003c/code>: kein Touch, kein zweiter Pointer, kein \u003ccode>pointercancel\u003c/code> (BUG-085), keine \u003ccode>mouseButton\u003c/code>/\u003ccode>keyCodes\u003c/code>-Optionen, keine zwei Controls in einer Root. \u003ccode>Display.ts\u003c/code> und \u003ccode>PanControl2D.ts\u003c/code> stehen bei 0 % Vitest-Coverage; die Zahl ist unvollständig, weil die Browser-Suite keine Coverage meldet — und genau dort liegen die Lücken.",
-      "recommendation": "\u003ccode>styleUtils.spec.ts\u003c/code> (Vitest, Style-Stub). \u003ccode>display-lifecycle.test.js\u003c/code>: start → pause → restart samt Event-Reihenfolge und \u003ccode>frameLoop.subscriptionCount\u003c/code>, Hidden-Tab-Simulation via \u003ccode>Object.defineProperty(document, 'hidden')\u003c/code> + \u003ccode>visibilitychange\u003c/code>, die Rejection bei fehlgeschlagenem Init. \u003ccode>pan-control-input.test.js\u003c/code> um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen \u003ccode>pointercancel\u003c/code>-Fall erweitern.",
+      "title": "Die Testlücken um Touch-Eingabe und PanControl2D schließen; controls steht bei 15 % Vitest-Coverage",
+      "location": "packages/twopoint5d-testing/test/pan-control-input.test.js",
+      "description": "Der Display-Anteil (Pause/Restart, `stop()`, `visibilitychange`, `maxFps`, `resizePollIntervalMs`, Init/Start-Reihenfolge, Rejection bei gescheitertem Init) ist mit `Display.spec.ts` und `display-lifecycle.test.js` abgedeckt (Remediation-Lauf vom 2026-09-24, `6a4bcacf`), `styleUtils` hat inzwischen eine Spec. Offen bleibt `PanControl2D`: die Tests nutzen nur Maus mit `pointerId: 1` — kein Touch, kein zweiter Pointer, kein `pointercancel`, keine `mouseButton`/`keyCodes`-Optionen, keine zwei Controls in einer Root. `PanControl2D.ts` steht bei 0 % Vitest-Coverage.",
+      "recommendation": "`pan-control-input.test.js` um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen `pointercancel`-Fall erweitern; eine `PanControl2D.spec.ts` für Optionen und zwei Controls in einer Root.",
       "effort": "M",
       "status": "improved",
       "previousSeverity": "medium",
-      "package": "twopoint5d-testing"
+      "package": "twopoint5d-testing",
+      "component": "controls"
     },
     {
       "id": "TEST-005",
@@ -1873,19 +1646,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "DOC-023",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Ein Unreleased-Eintrag beschreibt eine FrameLoop-Signatur, die es nicht gibt",
-      "location": "packages/twopoint5d/CHANGELOG.md:109",
-      "description": "Der Eintrag »change the return type of \u003ccode>FrameLoop#start()\u003c/code> to \u003ccode>(() =&gt; void) | undefined\u003c/code>« steht unter \u003ccode>[Unreleased]\u003c/code> (samt Migration-Guide-Abschnitt in Zeile 1197) und beschreibt ein Verhalten, das der Code nicht hat: \u003ccode>FrameLoop#start()\u003c/code> ist als \u003ccode>() =&gt; void\u003c/code> deklariert, das TSDoc sagt »every call hands one back«, und \u003ccode>FrameLoop.spec.ts\u003c/code> prüft genau das. So wandert die Zeile in die nächsten Release Notes. Re-Check: unverändert (Zeile verschoben von 62 nach 83).",
-      "recommendation": "Den Eintrag und den Migration-Guide-Abschnitt auf das tatsächliche Verhalten umschreiben oder streichen, bevor er in ein Release geht.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "IMPL-008",
       "category": "completeness",
       "domain": "code",
@@ -1918,13 +1678,13 @@
       "category": "readability",
       "domain": "code",
       "severity": "low",
-      "title": "Display.ts mit 940 und StageRenderer.ts mit 733 Zeilen; resize() als 140-Zeilen-Pipeline entwirren",
-      "location": "packages/twopoint5d/src/display/Display.ts:633",
-      "description": "Beide Dateien sind seit dem Vorlauf (731/624 Zeilen) weiter gewachsen. In \u003ccode>Display.resize()\u003c/code> heißt das Feld \u003ccode>#fullscreenCssRulesMustBeRemoved\u003c/code> tatsächlich »die Fullscreen-Klasse liegt gerade auf dem Canvas«, die lokale Kopie wechselt mitten in der Funktion die Bedeutung zu »am Ende dieses Aufrufs entfernen«. Die Logik stimmt (beide Richtungen nachvollzogen, der \u003ccode>resize-to=\"window\"\u003c/code>-Browsertest deckt den Rundweg), braucht aber drei Lesedurchgänge. \u003ccode>resize()\u003c/code> mischt Quellenauflösung, Klassen-Toggle, Messung, Clamping und Anwendung. Nebenbei: \u003ccode>#fullscreenCssRules\u003c/code> wird in den \u003ccode>styleSheetRoot\u003c/code> des ersten Fullscreen-Frames installiert und ignoriert eine spätere Neuzuweisung des öffentlichen Felds; der \u003ccode>typeof document !== 'undefined'\u003c/code>-Guard in 505 ist tot, weil \u003ccode>document.head\u003c/code> (387) und \u003ccode>Stylesheets.addRule\u003c/code> (465) schon bedingungslos liefen.",
-      "recommendation": "Umbenennen in \u003ccode>#fullscreenClassApplied\u003c/code> und \u003ccode>const wantsFullscreen = …; if (wantsFullscreen !== this.#fullscreenClassApplied) { classList.toggle(cls, wantsFullscreen); … }\u003c/code> schreiben. \u003ccode>#resolveSizeSource()\u003c/code> und \u003ccode>#applyMeasuredSize()\u003c/code> extrahieren, damit \u003ccode>resize()\u003c/code> sich als Pipeline liest. Den toten Guard streichen oder den Konstruktor durchgehend SSR-sicher machen.",
+      "title": "StageRenderer.ts mit 733 Zeilen entwirren",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
+      "description": "Der `Display.ts`-Anteil ist im Remediation-Lauf vom 2026-09-24 behoben (`resize()` als Pipeline benannter Schritte, `a33a6961`). `StageRenderer.ts` ist seit dem Vorlauf (624 Zeilen) auf 733 Zeilen gewachsen und mischt Modusauswahl, RenderTarget-Verwaltung und Pass-Komposition.",
+      "recommendation": "Modusauswahl und RenderTarget-Verwaltung in eigene Module oder private Methoden mit sprechenden Namen ziehen, sodass `render()` sich als Folge von Schritten liest.",
       "effort": "M",
       "status": "carried-over",
-      "component": "display",
+      "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2037,20 +1797,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-030",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "TSDoc von resizeToAttributeEl an das Verhalten von \"self\" angleichen",
-      "location": "packages/twopoint5d/src/display/types.ts:57",
-      "description": "Das TSDoc von \u003ccode>resizeToAttributeEl\u003c/code> sagt, \u003ccode>\"self\"\u003c/code> messe den Canvas. \u003ccode>Display.resize()\u003c/code> nimmt \u003ccode>this.resizeToElement ?? canvasElement\u003c/code>, und die Klassen-TSDoc von \u003ccode>Display\u003c/code> sagt das auch; nur die Parameter-Doku weicht ab. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Den Satz wie in der Klassen-TSDoc formulieren: »the canvas (or \u003ccode>resizeToElement\u003c/code>) itself«.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "display",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2194,20 +1940,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "DOC-031",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "TSDoc von Stylesheets.addRule() vervollständigen",
-      "location": "packages/twopoint5d/src/display/Stylesheets.ts:143",
-      "description": "Dem TSDoc von \u003ccode>addRule()\u003c/code> fehlt \u003ccode>@param element\u003c/code>, und es schreibt »uniq-number« statt »unique number«. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "\u003ccode>@param element\u003c/code> ergänzen (das Element, das die Klasse bekommt), Tippfehler korrigieren.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-032",
       "category": "dx",
       "domain": "harness",
@@ -2219,34 +1951,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-033",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Den Umbruch im TSDoc von FixedFrameLoop#dispose() reparieren",
-      "location": "packages/twopoint5d/src/display/FixedFrameLoop.ts:274",
-      "description": "Das TSDoc bricht mitten im Satz um, mit einer überlangen Zeile nach »writes them: a write the setter accepts lands, …«. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Den Absatz auf die Zeilenbreite der Umgebung neu umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "display",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-041",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die bewusst hingenommene Cache-Unschärfe des resize-to-Selektors im TSDoc nennen",
-      "location": "packages/twopoint5d/src/display/Display.ts:102",
-      "description": "Das TSDoc sagt »evaluated each frame«; tatsächlich hält \u003ccode>Display\u003c/code> das gefundene Element, solange es im selben Root-Knoten liegt und noch passt. Ein Element, das später \u003cem>vor\u003c/em> dem gecachten in Dokumentreihenfolge eingefügt wird und ebenfalls passt, übernimmt nicht — bewusst so entschieden, aber nirgends dokumentiert. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Einen Satz ans TSDoc: der Treffer bleibt, solange er im Root-Knoten liegt und passt; ein später davor eingefügtes Element übernimmt nicht.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "display",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2649,19 +2353,6 @@
       "package": "lookbook"
     },
     {
-      "id": "DOC-014",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Der display-Block im README verweist auf die stage-Doku",
-      "location": "packages/twopoint5d/README.md:61",
-      "description": "Der \u003ccode>#### [display]\u003c/code>-Block verweist unter »api docs« auf \u003ccode>src/stage/README.md\u003c/code>, dasselbe Ziel wie der Stage-Block darüber; für die Display-Schicht gibt es dort nur die Rolle in der Übersicht, keine eigene Doku. Re-Check: unverändert.",
-      "recommendation": "Den Verweis entfernen oder auf eine Display-Doku zeigen lassen, sobald es eine gibt.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-026",
       "category": "dx",
       "domain": "harness",
@@ -2699,19 +2390,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "lookbook"
-    },
-    {
-      "id": "TEST-024",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die kopierten Test-Helfer extrahieren und sich auf ein disposeDisplay einigen",
-      "location": "packages/twopoint5d-testing/test/display-resize.test.js:25-34",
-      "description": "\u003ccode>makeContainer\u003c/code> existiert in 11 Dateien, \u003ccode>disposeDisplay\u003c/code> in 9, \u003ccode>pointer\u003c/code>/\u003ccode>key\u003c/code>/\u003ccode>makeState\u003c/code> in 3, \u003ccode>bufferOf\u003c/code>/\u003ccode>readBack\u003c/code>/\u003ccode>quadDescription\u003c/code>/\u003ccode>instancedDescription\u003c/code> in 3–4. Schlimmer als das Volumen: Drei Dateien (\u003ccode>display-resize\u003c/code>, \u003ccode>stage-pipeline\u003c/code>, \u003ccode>stage-renderer\u003c/code>) \u003cem>starten\u003c/em> ein Display im Teardown, bevor sie es disposen — ein WebGPU-Init pro Test nur zum Abbauen —, während \u003ccode>display-dispose\u003c/code> dokumentiert, dass der Teardown \u003ccode>start()\u003c/code> nicht rufen darf. Zwei widersprüchliche Teardown-Verträge in derselben Suite.",
-      "recommendation": "\u003ccode>test/helpers/fixtures.js\u003c/code> mit \u003ccode>makeContainer\u003c/code>, \u003ccode>disposeDisplay\u003c/code> (nur dispose, try/catch), \u003ccode>pointer\u003c/code>, \u003ccode>key\u003c/code>, \u003ccode>makeState\u003c/code>, \u003ccode>bufferOf\u003c/code>, \u003ccode>readBack\u003c/code>, den zwei Descriptors. Das \u003ccode>await display.start()\u003c/code> im Teardown löschen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "DOC-034",
@@ -2777,32 +2455,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-006",
-      "category": "resources",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Multi-Display-Demo gibt sechsmal denselben Satz Ressourcen nie frei",
-      "location": "apps/lookbook/src/pages/demos/display-multi.astro:98-114",
-      "description": "Die Schleife baut pro Canvas ein \u003ccode>Display\u003c/code>, einen \u003ccode>StageRenderer\u003c/code>, eine \u003ccode>TextureFactory\u003c/code>, eine Textur, ein \u003ccode>SpriteMaterial\u003c/code> und einen \u003ccode>Sprite\u003c/code> und gibt nichts davon je frei — sechs Displays auf einer Seite, sechsmal derselbe Satz. Für eine Lookbook-Demo vertretbar, aber jede weitere Demo derselben Bauart erbt das Muster.",
-      "recommendation": "Den Aufräumpfad übernehmen, den \u003ccode>map2d-rect-visi.ts\u003c/code> trägt: \u003ccode>once(demo, OnDisplayDispose, …)\u003c/code> beziehungsweise \u003ccode>Display#onDispose()\u003c/code>.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "CONS-045",
-      "category": "consistency",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Klasse debug am zweiten Canvas-Container hat keine Regel",
-      "location": "apps/lookbook/src/pages/demos/display-multi.astro:22",
-      "description": "Der zweite \u003ccode>.canvasContainer\u003c/code> trägt die Klasse \u003ccode>debug\u003c/code>, für die der \u003ccode>&lt;style&gt;\u003c/code>-Block dieser Seite keine Regel führt. Ob ein globales Stylesheet sie trägt, ist nicht nachgesehen.",
-      "recommendation": "Nachsehen, ob eine globale Regel greift; wenn nicht, die Klasse entfernen oder ihr die gemeinte Regel geben.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
     },
     {
       "id": "TYPE-019",
@@ -2948,19 +2600,6 @@
       "package": "twopoint5d-testing"
     },
     {
-      "id": "READ-017",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "info",
-      "title": "»still« im Kommentar von display-resize liest sich wie ein Rückblick",
-      "location": "packages/twopoint5d-testing/test/display-resize.test.js:470",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. »frame 1 still emits OnDisplayResize exactly once« meint »trotzdem«, liest sich aber knapp als Hinweis auf einen früheren Zustand.",
-      "recommendation": "Umformulieren, etwa »frame 1 emits OnDisplayResize exactly once all the same«.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
       "id": "READ-018",
       "category": "readability",
       "domain": "harness",
@@ -2972,81 +2611,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "workspace"
-    },
-    {
-      "id": "DOC-063",
-      "category": "dx",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das TSDoc von Display#frameNo nennt 1 als Startwert, das Feld beginnt bei 0",
-      "location": "packages/twopoint5d/src/display/Display.ts:409",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Das TSDoc sagt »Starts at 1«. Das Feld wird mit \u003ccode>0\u003c/code> angelegt und erst im ersten Frame zu 1.",
-      "recommendation": "Das TSDoc auf »0 vor dem ersten Frame, 1 im ersten Frame« korrigieren.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "DOC-064",
-      "category": "dx",
-      "domain": "code",
-      "severity": "low",
-      "title": "Zwei TSDoc-Kommentare in Display.ts beziehen sich auf einen früheren Zustand",
-      "location": "packages/twopoint5d/src/display/Display.ts:333",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. »matching the legacy behavior« am Resize-Intervall und »no longer cascades« an der \u003ccode>deltaTime\u003c/code>-Obergrenze setzen einen früheren Zustand voraus, den ein Leser nicht kennt.",
-      "recommendation": "Beide Stellen so formulieren, dass sie beschreiben, was jetzt gilt.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      },
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:739"
-      ]
-    },
-    {
-      "id": "READ-019",
-      "category": "readability",
-      "domain": "code",
-      "severity": "low",
-      "title": "Ein verwaistes TODO steht am Spread der Renderer-Parameter im Standard-makeRenderer",
-      "location": "packages/twopoint5d/src/display/Display.ts:606",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. \u003ccode>// TODO check if this is still needed\u003c/code> steht an einem reinen Spread der Renderer-Parameter. Offen bleibt, was geprüft werden soll.",
-      "recommendation": "Klären und entweder den Spread begründen oder das TODO entfernen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "DOC-065",
-      "category": "dx",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das TSDoc von Display#styleImageRendering bricht mitten im Satz ab",
-      "location": "packages/twopoint5d/src/display/Display.ts:380",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. »If you want to explicitly specify a value here, set.« — der Satz nennt nicht, was zu setzen ist.",
-      "recommendation": "Den Satz vervollständigen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      }
     },
     {
       "id": "DOC-066",
@@ -3085,65 +2649,6 @@
       "origin": {
         "kind": "discovered",
         "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "MEM-019",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "title": "Ein gescheitertes WebGL-Init auf einem übergebenen Canvas hinterlässt den webglcontextlost-Listener von three",
-      "location": "packages/twopoint5d/src/display/Display.ts:1125",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. three hängt in \u003ccode>WebGLBackend.init\u003c/code> einen \u003ccode>webglcontextlost\u003c/code>-Listener an den Canvas, bevor \u003ccode>new WebGLState\u003c/code> scheitern kann (three 0.185.1 \u003ccode>three.webgpu.js:71329\u003c/code>/\u003ccode>:71339\u003c/code>). Scheitert das Init, bleibt der Listener hängen. Er hält den gescheiterten Renderer erreichbar und meldet bei jedem späteren Kontextverlust des Canvas \u003ccode>WebGL Device Lost\u003c/code>. Der Kommentar »a failed init has built nothing that renderer.dispose() would release« trifft dafür nicht zu. Das betrifft jedes gescheiterte Init auf einem Canvas mit verlorenem Kontext.",
-      "recommendation": "Im Rejection-Zweig von \u003ccode>#releaseRenderer()\u003c/code> den Listener abbauen, soweit three ihn erreichbar macht, sonst den Fall im Kommentar benennen und bei three melden.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "READ-020",
-      "category": "readability",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die Beschreibung der Map lostContexts stimmt nach einem verspäteten Kontext-Restore nur ungefähr",
-      "location": "packages/twopoint5d/src/display/Display.ts:97",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Kommt der WebGL-Kontext erst nach dem Timeout zurück, während ein Display auf dem toten Kontext läuft, bleibt der \u003ccode>lostContexts\u003c/code>-Eintrag mit lebendem Kontext stehen, bis der nächste Display ihn herausnimmt. Das ist harmlos, aber die Beschreibung der Map (»for as long as it stays lost«) stimmt in diesem Fenster nicht.",
-      "recommendation": "Den Eintrag bei \u003ccode>webglcontextrestored\u003c/code> entfernen oder die Beschreibung der Map anpassen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "ASYNC-006",
-      "category": "async",
-      "domain": "code",
-      "severity": "info",
-      "title": "drainSubmittedWork() wartet ohne Frist auf onSubmittedWorkDone()",
-      "location": "packages/twopoint5d/src/display/Display.ts:55-64",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts:1112-1115",
-        "packages/twopoint5d/src/display/Display.ts:183-184",
-        "packages/twopoint5d/src/display/Display.ts:640-643"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-22. \u003ccode>drainSubmittedWork()\u003c/code> wartet unbegrenzt auf \u003ccode>device.queue.onSubmittedWorkDone()\u003c/code>. Löst eine Implementierung dieses Promise nach einem Device-Verlust nie auf, wartet die Freigabe des Renderers ohne Ende, und über \u003ccode>canvasReleases\u003c/code> auch jedes spätere Display auf demselben übergebenen Canvas. Die WebGPU-Spec verlangt, dass ausstehende \u003ccode>onSubmittedWorkDone()\u003c/code> bei Device-Verlust auflösen. Das Risiko liegt deshalb nur bei abweichenden Implementierungen.",
-      "recommendation": "Das Warten per \u003ccode>Promise.race\u003c/code> mit einer kurzen Frist begrenzen oder zusätzlich auf \u003ccode>device.lost\u003c/code> reagieren und bei Ablauf mit einer Warnung weitermachen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-22"
       }
     },
     {
@@ -3222,6 +2727,156 @@
         "kind": "induced",
         "run": "2026-09-23"
       }
+    },
+    {
+      "id": "TEST-045",
+      "category": "testing",
+      "severity": "low",
+      "title": "Der Testtitel »runs once per frame« prüft nur runs > 0",
+      "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js:23",
+      "description": "Der Titel verspricht, dass der Pass einmal pro Frame läuft; geprüft wird nur, dass er überhaupt lief. Ein doppelter Aufruf pro Frame bliebe grün. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "Frames und Läufe zählen und `runs === frames` prüfen, oder den Titel auf das Geprüfte zurücknehmen.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "harness",
+      "status": "new",
+      "package": "twopoint5d-testing",
+      "effort": "S"
+    },
+    {
+      "id": "TEST-046",
+      "category": "testing",
+      "severity": "low",
+      "title": "Der Stylesheet-Root-Test von PanControl2D findet Regeln früherer Tests",
+      "location": "packages/twopoint5d-testing/test/pan-control-stylesheet-root.test.js:42",
+      "description": "`puts the rule in the stylesheet of the document when no root is named` sucht irgendeine `.PanControl2D-`-Regel im Sheet des Dokuments. Regeln früherer Tests bleiben dort stehen, der Test ist also grün, auch wenn der Control selbst keine Regel anlegt. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "Nach der Regel mit dem Klassennamen genau dieses Controls suchen oder die Regelzahl vor und nach dem Anlegen vergleichen.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "harness",
+      "status": "new",
+      "package": "twopoint5d-testing",
+      "effort": "S"
+    },
+    {
+      "id": "DOC-069",
+      "category": "dx",
+      "severity": "info",
+      "title": "Ein Kommentar in pan-control-switch-off nennt vier Tasten, die Datei hat eine",
+      "location": "packages/twopoint5d-testing/test/pan-control-switch-off.test.js:6",
+      "description": "Der Kommentar spricht von W, S, A und D; die Datei nutzt nur `KEY_NORTH`. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "Den Kommentar auf die eine Taste zurücknehmen.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "harness",
+      "status": "new",
+      "package": "twopoint5d-testing",
+      "effort": "S"
+    },
+    {
+      "id": "READ-021",
+      "category": "readability",
+      "severity": "info",
+      "title": "pan-control-keys baut den Zustand inline statt über makeState()",
+      "location": "packages/twopoint5d-testing/test/pan-control-keys.test.js:32",
+      "description": "Das Literal `{x: 0, y: 0, pixelRatio: 1}` steht inline, obwohl die gemeinsamen Test-Helfer `makeState()` dafür haben. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "`makeState()` verwenden.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "code",
+      "status": "new",
+      "package": "twopoint5d-testing",
+      "effort": "S"
+    },
+    {
+      "id": "READ-022",
+      "category": "readability",
+      "severity": "info",
+      "title": "Zwei map2d-Tests bauen die Kamera von makeCamera inline nach",
+      "location": "packages/twopoint5d-testing/test/map2d-tile-upload.test.js:24",
+      "locations": [
+        "packages/twopoint5d-testing/test/map2d-visibility-helpers.test.js:49",
+        "packages/twopoint5d-testing/test/map2d-placement.test.js"
+      ],
+      "description": "Beide Dateien bauen inline dieselbe Kamera wie `makeCamera` in `map2d-placement.test.js`. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "`makeCamera` in `test/helpers/fixtures.js` ziehen und in allen drei Dateien verwenden.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "code",
+      "status": "new",
+      "package": "twopoint5d-testing",
+      "effort": "S"
+    },
+    {
+      "id": "BUG-124",
+      "category": "correctness",
+      "severity": "low",
+      "title": "Ein OnDisplayStart-Listener, der wirft, lässt ein laufendes Display und ein rejectetes start() zurück",
+      "location": "packages/twopoint5d/src/display/DisplayStateMachine.ts",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts"
+      ],
+      "description": "`#initOrRestartThenStart()` setzt `state = RUNNING`, bevor es `Start` emittiert. Wirft ein `OnDisplayStart`-Listener synchron, läuft das Display (`RUNNING`, am Frame-Loop), `start()` rejected, spätere Listener hören `OnDisplayStart` nie, und weil `emit()` abbricht, bevor der Wert retained ist, auch späte Subscriber nicht. Bestand schon vor dem Remediation-Lauf vom 2026-09-24. Offene Frage: soll das Display bei einem werfenden Start-Listener laufen bleiben, zurückgerollt werden (Frame-Loop und Chronometer) oder eine Pause emittieren?",
+      "recommendation": "Die Frage entscheiden; danach das Emittieren so kapseln, dass alle Listener und späte Subscriber das Ereignis bekommen (wie beim Init-Listener gelöst), und den Zustand passend zur Entscheidung setzen. Test zuerst.",
+      "component": "display",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-24"
+      },
+      "domain": "code",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "effort": "S"
+    },
+    {
+      "id": "PERF-032",
+      "category": "performance",
+      "severity": "low",
+      "kind": "improvement",
+      "title": "Die rAF-Schleife von three läuft während einer Pause weiter",
+      "location": "packages/twopoint5d/src/display/Display.ts",
+      "locations": [
+        "node_modules/three/src/renderers/common/Animation.js:69-91"
+      ],
+      "description": "Ein pausiertes Display führt keinen twopoint5d-Code pro Frame mehr aus. three 0.185.1 startet aber in `renderer.init()` eine eigene rAF-Schleife, die bis `renderer.dispose()` läuft; `setAnimationLoop(null)` nimmt nur den Callback heraus. Der Tick von three bleibt also bei jeder Refresh-Rate. Grenze des Fixes aus dem Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "Beobachten, ob three die Schleife stoppbar macht (`Animation.stop()`), und dann beim Pausieren anhalten; bis dahin in der TSDoc von `pause` nennen.",
+      "component": "display",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-24"
+      },
+      "domain": "code",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "effort": "S"
+    },
+    {
+      "id": "ASYNC-007",
+      "category": "async",
+      "severity": "info",
+      "title": "Nach 2000 ms verborgener Seite wird der Canvas erst nach der Device-Zerstörung präsentiert",
+      "location": "packages/twopoint5d/src/display/Display.ts",
+      "description": "`drainSubmittedWork()` wartet höchstens `SUBMITTED_WORK_TIMEOUT_MS = 2000`, danach zwei Animation Frames, dann `renderer.dispose()`. Bleibt eine Seite länger verborgen, präsentiert der Browser den Canvas erst beim Sichtbarwerden, und dann ist das Device schon zerstört. Headless nicht prüfbar; Restrisiko des Fixes für den Firefox/WebGPU-rAF-Stillstand aus dem Remediation-Lauf vom 2026-09-24.",
+      "recommendation": "Bei verborgener Seite die Freigabe bis `visibilitychange` aufschieben oder das Risiko in `docs/resource-lifecycle.md` nennen.",
+      "component": "display",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-24"
+      },
+      "domain": "code",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "effort": "S"
     }
   ],
   "openQuestions": [
@@ -3245,7 +2900,8 @@
       "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -3370,6 +3026,17 @@
         "harness": 66
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-24",
+      "score": 69,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 71,
+        "harness": 67
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -3401,6 +3068,16 @@
       "inducedFixed": 6,
       "inducedOpen": 1,
       "discovered": 8,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-24",
+      "source": "remediation",
+      "ref": "2026-09-24",
+      "fixed": 30,
+      "inducedFixed": 9,
+      "inducedOpen": 2,
+      "discovered": 32,
       "attribution": "reviewed"
     }
   ],
