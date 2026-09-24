@@ -1,21 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
-
-// both controls listen on `document`, so one drag over `document.body` reaches them both
-function pointer(type, {x = 0, y = 0, buttons = 1} = {}) {
-  document.body.dispatchEvent(
-    new PointerEvent(type, {
-      bubbles: true,
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'mouse',
-      buttons,
-      clientX: x,
-      clientY: y,
-    }),
-  );
-}
+import {pointer, makeState} from './helpers/fixtures.js';
 
 function makeTarget() {
   const el = document.createElement('div');
@@ -25,10 +11,7 @@ function makeTarget() {
   return el;
 }
 
-function makeState() {
-  return {x: 0, y: 0, pixelRatio: 1};
-}
-
+// both controls listen on `document`, so one drag over `document.body` reaches them both
 describe('PanControl2D — the cursor each control shows while panning', () => {
   /** @type {PanControl2D[]} */
   let controls = [];

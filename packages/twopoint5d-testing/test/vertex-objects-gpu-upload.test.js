@@ -2,45 +2,12 @@ import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, bufferOf, readBack, quadDescription, instancedDescription} from './helpers/fixtures.js';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 /** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
 /** @typedef {VO & {setPosition: VOAttrSetter, setColor: VOAttrSetter}} ColoredQuadVO */
-
-const FIXTURE_ID = 'vertex-objects-gpu-upload-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** The buffer behind an attribute — that is where the update ranges live that steer the upload. */
-function bufferOf(attr) {
-  return attr.isInterleavedBufferAttribute ? attr.data : attr;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** Reads an attribute back out of the gpu buffer three has uploaded it into. */
-async function readBack(display, attr) {
-  return Array.from(new Float32Array(await display.renderer.getArrayBufferAsync(attr)));
-}
 
 /**
  * Reads an interleaved attribute back out of the gpu buffer it shares with its siblings.
@@ -55,7 +22,7 @@ async function readBack(display, attr) {
  * fails once a three release reads the whole buffer back — this helper and that test go then.
  */
 async function readBackInterleaved(display, attr) {
-  if (display.isWebGPUBackend) return readBack(display, attr);
+  if (display.isWebGPUBackend) return readBack(display.renderer, attr);
 
   const {gl} = display.renderer.backend;
   const buffer = bufferOf(attr);
@@ -70,13 +37,6 @@ async function readBackInterleaved(display, attr) {
   return Array.from(out);
 }
 
-/** @type {VertexObjectDescription} */
-const quadDescription = {
-  vertexCount: 4,
-  indices: [0, 1, 2, 0, 2, 3],
-  attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
-
 // static and therefore without autoTouch: what reaches the gpu here comes from the pool having
 // written something, which is the whole point of this test
 /** @type {VertexObjectDescription} */
@@ -84,11 +44,6 @@ const staticQuadDescription = {
   vertexCount: 4,
   indices: [0, 1, 2, 0, 2, 3],
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'static'}},
-};
-
-/** @type {VertexObjectDescription} */
-const instancedDescription = {
-  attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
 };
 
 // both attributes share the buffer name `dynamic_float32`, so they interleave into one buffer of stride 6
@@ -157,7 +112,7 @@ describe('vertex-objects — gpu upload', function () {
     display.renderer.render(scene, camera);
     await display.nextFrame();
 
-    expect((await readBack(display, position)).slice(0, 12)).to.deep.equal([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
+    expect((await readBack(display.renderer, position)).slice(0, 12)).to.deep.equal([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
   });
 
   it('a spawn in a large, mostly static pool uploads the new object alone', async function () {
@@ -197,7 +152,7 @@ describe('vertex-objects — gpu upload', function () {
     display.renderer.render(scene, camera);
     await display.nextFrame();
 
-    const onTheGpu = await readBack(display, position);
+    const onTheGpu = await readBack(display.renderer, position);
 
     expect(onTheGpu.slice(33 * 12, 34 * 12), 'the object that was spawned').to.deep.equal(quadAt(200));
     expect(onTheGpu.slice(32 * 12, 33 * 12), 'the object of the spawn before it').to.deep.equal(quadAt(100));
@@ -238,8 +193,10 @@ describe('vertex-objects — gpu upload', function () {
     display.renderer.render(scene, camera);
     await display.nextFrame();
 
-    expect((await readBack(display, position)).slice(0, 12), 'base quad').to.deep.equal([0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9]);
-    expect((await readBack(display, instanceOffset)).slice(0, 12), 'instances').to.deep.equal([
+    expect((await readBack(display.renderer, position)).slice(0, 12), 'base quad').to.deep.equal([
+      0, 0, 0, 7, 7, 7, 8, 8, 8, 9, 9, 9,
+    ]);
+    expect((await readBack(display.renderer, instanceOffset)).slice(0, 12), 'instances').to.deep.equal([
       1, 1, 1, 10, 10, 10, 20, 20, 20, 30, 30, 30,
     ]);
   });

@@ -2,24 +2,7 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
-
-const FIXTURE_ID = 'display-dispose-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.boxSizing = 'border-box';
-  el.style.padding = '0';
-  el.style.margin = '0';
-  el.style.border = '0';
-  document.body.appendChild(el);
-  return el;
-}
+import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
 
 /** Resolves once renderer.dispose() has run — the release of a display happens after its dispose() has returned. */
 function whenReleased(renderer) {
@@ -67,13 +50,9 @@ describe('Display — the contract after dispose()', function () {
   // every test disposes in its own body; the teardown only has to catch the ones that did not get
   // that far, and it must not call start() — that is one of the calls a disposed display refuses
   afterEach(() => {
-    if (previous) {
-      previous.dispose();
-    }
+    disposeDisplay(previous);
     previous = undefined;
-    if (display) {
-      display.dispose();
-    }
+    disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);

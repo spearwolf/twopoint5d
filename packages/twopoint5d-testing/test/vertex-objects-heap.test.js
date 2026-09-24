@@ -2,12 +2,11 @@ import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute} from 'three/tsl';
 import {MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, quadDescription, instancedDescription} from './helpers/fixtures.js';
 
-/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @import {VO, VOAttrSetter} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 /** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
-
-const FIXTURE_ID = 'vertex-objects-heap-fixture';
 
 // The absolute heap size of the test page depends on the V8 version and on what three loads; a
 // limit measured against the run's own first sample holds across versions. The samples grow
@@ -34,40 +33,6 @@ const FIXTURE_ID = 'vertex-objects-heap-fixture';
 // three or V8 does not fail the test, while a leak on the scale of what three keeps here pushes
 // the growth past it.
 const MAX_HEAP_GROWTH = 0.15;
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** @type {VertexObjectDescription} */
-const quadDescription = {
-  vertexCount: 4,
-  indices: [0, 1, 2, 0, 2, 3],
-  attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
-
-/** @type {VertexObjectDescription} */
-const instancedDescription = {
-  attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
 
 // Chrome's non-standard heap counter; Firefox has none, which the `before()` hook checks for
 /** @type {Performance & {memory?: {usedJSHeapSize: number}}} */

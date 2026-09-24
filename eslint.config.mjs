@@ -64,4 +64,9 @@ export default [
       '@typescript-eslint/no-unused-expressions': 0,
     },
   },
+  {
+    // the shared fixtures of the browser tests run in the page of the test that imports them
+    files: ['packages/twopoint5d-testing/test/helpers/*.js'],
+    languageOptions: {globals: globals.browser},
+  },
 ];

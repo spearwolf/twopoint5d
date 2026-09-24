@@ -1,34 +1,11 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, TexturedSprites} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-
-const FIXTURE_ID = 'sprites-rotation-fixture';
+import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
 const PIXELS_PER_UNIT = 8;
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
 
 /** The width and height, in pixels, of the box around every pixel the sprite covered. */
 function coveredBox(pixels, size) {

@@ -9,35 +9,7 @@ import {
   OnDisplayStart,
 } from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
-
-const FIXTURE_ID = 'display-lifecycle-fixture';
-
-/** @param {{width?: number, height?: number, id?: string}} [options] */
-function makeContainer({width = 320, height = 200, id} = {}) {
-  const el = document.createElement('div');
-  el.id = id ?? `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.boxSizing = 'border-box';
-  el.style.padding = '0';
-  el.style.margin = '0';
-  el.style.border = '0';
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
+import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
 async function animationFrames(count) {
   for (let i = 0; i < count; i++) {

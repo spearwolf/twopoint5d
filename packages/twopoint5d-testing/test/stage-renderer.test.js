@@ -1,36 +1,9 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
+import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
 /** @import {TextureNode} from 'three/webgpu' */
-
-const FIXTURE_ID = 'stage-renderer-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.boxSizing = 'border-box';
-  el.style.padding = '0';
-  el.style.margin = '0';
-  el.style.border = '0';
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
 
 // `Texture.image` is `unknown` in the three.js typings; a render target texture carries its size there
 /** @param {TextureNode} node */

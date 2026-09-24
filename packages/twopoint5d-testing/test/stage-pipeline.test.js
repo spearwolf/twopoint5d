@@ -1,32 +1,9 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline} from 'three/webgpu';
+import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
-
-const FIXTURE_ID = 'stage-pipeline-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
 
 describe('StageRenderer — pipeline integration', () => {
   /** @type {Display | undefined} */

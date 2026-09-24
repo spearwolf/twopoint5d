@@ -1,68 +1,7 @@
 import {expect} from '@esm-bundle/chai';
-import {
-  CameraBasedVisibility,
-  Display,
-  Map2D,
-  Map2DTileRenderer,
-  RepeatingTilesProvider,
-  TextureCoords,
-  TileSet,
-  TileSprites,
-  TileSpritesFactory,
-  TileSpritesGeometry,
-  TileSpritesMaterial,
-} from '@spearwolf/twopoint5d';
+import {CameraBasedVisibility, Display} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene} from 'three/webgpu';
-
-const FIXTURE_ID = 'map2d-tile-upload-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** The buffer behind an attribute — that is where the version lives that counts the uploads. */
-function bufferOf(attr) {
-  return attr.isInterleavedBufferAttribute ? attr.data : attr;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** A map on the XZ ground plane, without a loaded texture: the tile set builds its own atlas. */
-function makeMap(camera) {
-  const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
-  const tileData = new RepeatingTilesProvider([
-    [1, 2],
-    [3, 4],
-  ]);
-  const tileSprites = new TileSprites(new TileSpritesGeometry(512), new TileSpritesMaterial());
-  const tileRenderer = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileData));
-
-  const map2d = new Map2D();
-  map2d.tileWidth = 256;
-  map2d.tileHeight = 256;
-  map2d.xOffset = -128;
-  map2d.yOffset = -128;
-  map2d.visibilitor = new CameraBasedVisibility(camera);
-  map2d.addTileRenderer(tileRenderer);
-
-  return {map2d, tileSprites};
-}
+import {makeContainer, disposeDisplay, bufferOf, makeMap} from './helpers/fixtures.js';
 
 describe('map2d — tile attribute upload', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -96,7 +35,7 @@ describe('map2d — tile attribute upload', function () {
   });
 
   it('a second frame with a still camera touches no tile attribute buffer', async function () {
-    const {map2d, tileSprites} = makeMap(camera);
+    const {map2d, tileSprites} = makeMap(new CameraBasedVisibility(camera));
     scene.add(map2d);
 
     // the first render puts the camera projection onto the coordinate system of the renderer,
@@ -125,7 +64,7 @@ describe('map2d — tile attribute upload', function () {
   });
 
   it('a frame that moves the map touches the tile attribute buffers again', async function () {
-    const {map2d, tileSprites} = makeMap(camera);
+    const {map2d, tileSprites} = makeMap(new CameraBasedVisibility(camera));
     scene.add(map2d);
 
     // the first render puts the camera projection onto the coordinate system of the renderer,

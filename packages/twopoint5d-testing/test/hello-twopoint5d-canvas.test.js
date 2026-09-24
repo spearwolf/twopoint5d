@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
+import {disposeDisplay} from './helpers/fixtures.js';
 
 describe('hello twopoint5d canvas', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -9,7 +10,7 @@ describe('hello twopoint5d canvas', function () {
   let display;
 
   afterEach(() => {
-    display?.dispose();
+    disposeDisplay(display);
     display = undefined;
   });
 

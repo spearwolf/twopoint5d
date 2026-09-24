@@ -1,37 +1,14 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
+import {pointer, key, makeState} from './helpers/fixtures.js';
 
 // the default keys of PanControl2D, in the order the class reads them: up, down, left, right —
-// the KeyboardEvent.code of the keys at the W, S, A and D positions
-const KEY_NORTH = 'KeyW';
-const KEY_SOUTH = 'KeyS';
-const KEY_WEST = 'KeyA';
-const KEY_EAST = 'KeyD';
-
-// the control listens on `document`, so a pointer event dispatched on `document.body` bubbles up
-// to it
-function pointer(type, {x = 0, y = 0, buttons = 1} = {}) {
-  document.body.dispatchEvent(
-    new PointerEvent(type, {
-      bubbles: true,
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'mouse',
-      buttons,
-      clientX: x,
-      clientY: y,
-    }),
-  );
-}
-
-function key(type, code) {
-  document.dispatchEvent(new KeyboardEvent(type, {code, bubbles: true}));
-}
-
-function makeState() {
-  return {x: 0, y: 0, pixelRatio: 1};
-}
+// each as the init of a key event, naming the KeyboardEvent.code of the keys at the W, S, A and D positions
+const KEY_NORTH = {code: 'KeyW'};
+const KEY_SOUTH = {code: 'KeyS'};
+const KEY_WEST = {code: 'KeyA'};
+const KEY_EAST = {code: 'KeyD'};
 
 describe('PanControl2D — the contract after dispose()', () => {
   /** @type {PanControl2D | undefined} */

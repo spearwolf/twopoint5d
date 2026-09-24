@@ -3,89 +3,11 @@ import {
   CameraBasedVisibility,
   CameraBasedVisibilityHelpers,
   Display,
-  Map2D,
-  Map2DTileRenderer,
   RectangularVisibilityArea,
   RectangularVisibilityAreaHelpers,
-  RepeatingTilesProvider,
-  TextureCoords,
-  TileSet,
-  TileSprites,
-  TileSpritesFactory,
-  TileSpritesGeometry,
-  TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene} from 'three/webgpu';
-
-const FIXTURE_ID = 'map2d-visibility-helpers-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** A map on the XZ ground plane, without a loaded texture: the tile set builds its own atlas. */
-function makeMap(camera) {
-  const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
-  const tileData = new RepeatingTilesProvider([
-    [1, 2],
-    [3, 4],
-  ]);
-  const tileSprites = new TileSprites(new TileSpritesGeometry(512), new TileSpritesMaterial());
-  const tileRenderer = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileData));
-
-  const visibility = new CameraBasedVisibility(camera);
-
-  const map2d = new Map2D();
-  map2d.tileWidth = 256;
-  map2d.tileHeight = 256;
-  map2d.xOffset = -128;
-  map2d.yOffset = -128;
-  map2d.visibilitor = visibility;
-  map2d.addTileRenderer(tileRenderer);
-
-  return {map2d, visibility};
-}
-
-/** The same map, seen through a visibility area of a fixed size instead of through a camera. */
-function makeRectMap() {
-  const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
-  const tileData = new RepeatingTilesProvider([
-    [1, 2],
-    [3, 4],
-  ]);
-  const tileSprites = new TileSprites(new TileSpritesGeometry(512), new TileSpritesMaterial());
-  const tileRenderer = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileData));
-
-  const visibility = new RectangularVisibilityArea(640, 480);
-
-  const map2d = new Map2D();
-  map2d.tileWidth = 256;
-  map2d.tileHeight = 256;
-  map2d.xOffset = -128;
-  map2d.yOffset = -128;
-  map2d.visibilitor = visibility;
-  map2d.addTileRenderer(tileRenderer);
-
-  return {map2d, visibility};
-}
+import {makeContainer, disposeDisplay, makeMap} from './helpers/fixtures.js';
 
 /** Every node the helpers put into the scene graph carries the mark HelpersManager sets. */
 function helperNodes(...roots) {
@@ -145,7 +67,8 @@ describe('map2d — visibility helper nodes', function () {
   }
 
   it('a still frame leaves every helper node in place', async function () {
-    const {map2d, visibility} = makeMap(camera);
+    const visibility = new CameraBasedVisibility(camera);
+    const {map2d} = makeMap(visibility);
     scene.add(map2d);
 
     const helpers = new CameraBasedVisibilityHelpers(visibility);
@@ -175,7 +98,8 @@ describe('map2d — visibility helper nodes', function () {
   });
 
   it('a moved map writes into the helper nodes it already has', async function () {
-    const {map2d, visibility} = makeMap(camera);
+    const visibility = new CameraBasedVisibility(camera);
+    const {map2d} = makeMap(visibility);
     scene.add(map2d);
 
     const helpers = new CameraBasedVisibilityHelpers(visibility);
@@ -204,7 +128,8 @@ describe('map2d — visibility helper nodes', function () {
   });
 
   it('a scene the helpers were never handed leaves their nodes alone', async function () {
-    const {map2d, visibility} = makeMap(camera);
+    const visibility = new CameraBasedVisibility(camera);
+    const {map2d} = makeMap(visibility);
     scene.add(map2d);
 
     const helpers = new CameraBasedVisibilityHelpers(visibility);
@@ -240,7 +165,8 @@ describe('map2d — visibility helper nodes', function () {
   });
 
   it('dispose() takes the whole set down and releases what it built', async function () {
-    const {map2d, visibility} = makeMap(camera);
+    const visibility = new CameraBasedVisibility(camera);
+    const {map2d} = makeMap(visibility);
     scene.add(map2d);
 
     const helpers = new CameraBasedVisibilityHelpers(visibility);
@@ -274,7 +200,8 @@ describe('map2d — visibility helper nodes', function () {
   });
 
   it('the rectangular helper keeps its node across frames and takes it down with show', async function () {
-    const {map2d, visibility} = makeRectMap();
+    const visibility = new RectangularVisibilityArea(640, 480);
+    const {map2d} = makeMap(visibility);
     scene.add(map2d);
 
     const helpers = new RectangularVisibilityAreaHelpers(visibility);

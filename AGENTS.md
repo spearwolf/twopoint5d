@@ -91,6 +91,9 @@ explicit instruction.
 - **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and
   `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
   change to rendering or GPU-buffer code needs both.
+  The browser tests share their fixtures through
+  `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second
+  test file needs goes there, not into both.
 - **Code blocks in Markdown.** A plain `ts` code block is an excerpt and nothing checks it.
   A block that stands on its own — imports everything it uses, declares everything it
   names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as a

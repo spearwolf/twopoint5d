@@ -1,6 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
+import {disposeDisplay} from './helpers/fixtures.js';
 
 describe('Display — the constructor that adopts a renderer', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -21,7 +22,7 @@ describe('Display — the constructor that adopts a renderer', function () {
   afterEach(() => {
     if (display) {
       // Display.dispose() releases the renderer it was handed
-      display.dispose();
+      disposeDisplay(display);
     } else if (renderer) {
       renderer.dispose();
     }

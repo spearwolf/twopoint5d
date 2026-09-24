@@ -2,47 +2,12 @@ import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, quadDescription, instancedDescription} from './helpers/fixtures.js';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription, VertexObjectPool} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 /** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
 /** @typedef {VO & {setExtraOffset: VOAttrSetter}} ExtraVO */
-
-const FIXTURE_ID = 'vertex-objects-dispose-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** @type {VertexObjectDescription} */
-const quadDescription = {
-  vertexCount: 4,
-  indices: [0, 1, 2, 0, 2, 3],
-  attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
-
-/** @type {VertexObjectDescription} */
-const instancedDescription = {
-  attributes: {instanceOffset: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
 
 /** @type {VertexObjectDescription} */
 const extraInstancedDescription = {

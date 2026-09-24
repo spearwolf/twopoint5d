@@ -1,6 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
+import {pointer, makeState} from './helpers/fixtures.js';
 
 function makeBox({left = 0, width = 200, height = 200} = {}) {
   const el = document.createElement('div');
@@ -14,26 +15,6 @@ function makeBox({left = 0, width = 200, height = 200} = {}) {
   el.style.border = '0';
   document.body.appendChild(el);
   return el;
-}
-
-// the control listens on `document`, so an event dispatched anywhere in the document reaches it;
-// the element it is dispatched on decides what `event.target` is
-function pointer(target, type, {x = 0, y = 0, buttons = 1, pointerId = 1, pointerType = 'mouse'} = {}) {
-  target.dispatchEvent(
-    new PointerEvent(type, {
-      bubbles: true,
-      pointerId,
-      isPrimary: true,
-      pointerType,
-      buttons,
-      clientX: x,
-      clientY: y,
-    }),
-  );
-}
-
-function makeState() {
-  return {x: 0, y: 0, pixelRatio: 1};
 }
 
 describe('PanControl2D — what it measures and what it reports', () => {
@@ -64,8 +45,8 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     // a drag that starts over one element and ends over another: the pointer moves 320px, and
     // that is what the view has to follow — whatever lies under the pointer on the way
-    pointer(near, 'pointerdown', {x: 10, y: 10});
-    pointer(far, 'pointermove', {x: 330, y: 10});
+    pointer('pointerdown', {target: near, x: 10, y: 10});
+    pointer('pointermove', {target: far, x: 330, y: 10});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x after a 320px drag').to.equal(-320);
@@ -77,8 +58,8 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     control = new PanControl2D({state: makeState(), coordsTarget: box});
 
-    pointer(box, 'pointerdown', {x: 10, y: 10});
-    pointer(box, 'pointermove', {x: 30, y: 10});
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    pointer('pointermove', {target: box, x: 30, y: 10});
 
     control.pointerDisabled = true;
     control.pointerDisabled = false;
@@ -194,17 +175,17 @@ describe('PanControl2D — what it measures and what it reports', () => {
     });
 
     // a pointer moving over the page with no button down: nothing was ever hidden here
-    pointer(box, 'pointermove', {x: 10, y: 10, buttons: 0});
-    pointer(box, 'pointermove', {x: 20, y: 10, buttons: 0});
+    pointer('pointermove', {target: box, x: 10, y: 10, buttons: 0});
+    pointer('pointermove', {target: box, x: 20, y: 10, buttons: 0});
 
     expect(restores, 'restoreCursor events without a drag').to.equal(0);
 
-    pointer(box, 'pointerdown', {x: 10, y: 10});
-    pointer(box, 'pointermove', {x: 30, y: 10});
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    pointer('pointermove', {target: box, x: 30, y: 10});
 
     expect(box.classList.length, 'the cursor class while panning').to.equal(1);
 
-    pointer(box, 'pointerup', {x: 30, y: 10, buttons: 0});
+    pointer('pointerup', {target: box, x: 30, y: 10, buttons: 0});
 
     expect(restores, 'restoreCursor events after a drag that hid the cursor').to.equal(1);
     expect(box.classList.length, 'the cursor class after the drag').to.equal(0);
@@ -217,12 +198,12 @@ describe('PanControl2D — what it measures and what it reports', () => {
     control = new PanControl2D({state: makeState(), coordsTarget: box});
 
     const touch = {pointerId: 7, pointerType: 'touch'};
-    pointer(box, 'pointerdown', {...touch, x: 10, y: 10});
-    pointer(box, 'pointermove', {...touch, x: 30, y: 10});
-    pointer(box, 'pointercancel', {...touch, x: 30, y: 10});
+    pointer('pointerdown', {...touch, target: box, x: 10, y: 10});
+    pointer('pointermove', {...touch, target: box, x: 30, y: 10});
+    pointer('pointercancel', {...touch, target: box, x: 30, y: 10});
 
-    pointer(box, 'pointerdown', {...touch, x: 100, y: 10});
-    pointer(box, 'pointermove', {...touch, x: 110, y: 10});
+    pointer('pointerdown', {...touch, target: box, x: 100, y: 10});
+    pointer('pointermove', {...touch, target: box, x: 110, y: 10});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x').to.equal(-10);
@@ -234,15 +215,15 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     control = new PanControl2D({state: makeState(), coordsTarget: box});
 
-    pointer(box, 'pointerdown', {x: 10, y: 10});
-    pointer(box, 'pointermove', {x: 30, y: 10});
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    pointer('pointermove', {target: box, x: 30, y: 10});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x after the first drag').to.equal(-20);
 
     // the pointerup of the first drag never arrived
-    pointer(box, 'pointerdown', {x: 100, y: 10});
-    pointer(box, 'pointermove', {x: 110, y: 10});
+    pointer('pointerdown', {target: box, x: 100, y: 10});
+    pointer('pointermove', {target: box, x: 110, y: 10});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x after the second drag').to.equal(-30);
@@ -254,9 +235,9 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     control = new PanControl2D({state: makeState(), coordsTarget: box});
 
-    pointer(box, 'pointerdown', {x: 10, y: 10});
-    pointer(box, 'pointermove', {x: 30, y: 10});
-    pointer(box, 'pointerup', {x: 30, y: 10, buttons: 0});
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    pointer('pointermove', {target: box, x: 30, y: 10});
+    pointer('pointerup', {target: box, x: 30, y: 10, buttons: 0});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x').to.equal(-20);
@@ -270,10 +251,10 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     // the left button pans, the right one joins, the left one lets go: the browser reports the
     // last step as a pointermove, and the pointerup only comes with the right button
-    pointer(box, 'pointerdown', {x: 10, y: 10, buttons: 1});
-    pointer(box, 'pointermove', {x: 30, y: 10, buttons: 1});
-    pointer(box, 'pointermove', {x: 60, y: 10, buttons: 2});
-    pointer(box, 'pointerup', {x: 90, y: 10, buttons: 0});
+    pointer('pointerdown', {target: box, x: 10, y: 10, buttons: 1});
+    pointer('pointermove', {target: box, x: 30, y: 10, buttons: 1});
+    pointer('pointermove', {target: box, x: 60, y: 10, buttons: 2});
+    pointer('pointerup', {target: box, x: 90, y: 10, buttons: 0});
     control.update(1 / 60);
 
     expect(control.panView.x, 'panView.x').to.equal(-20);

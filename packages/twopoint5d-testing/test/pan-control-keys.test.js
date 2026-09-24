@@ -1,12 +1,8 @@
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
+import {key} from './helpers/fixtures.js';
 
-// the control listens on `document`; every keydown a test sends is followed by its keyup, so no
-// key stays held for the next control
-function key(type, init) {
-  document.dispatchEvent(new KeyboardEvent(type, {bubbles: true, ...init}));
-}
-
+// every keydown a test sends is followed by its keyup, so no key stays held for the next control
 function press(init) {
   key('keydown', init);
 }

@@ -1,45 +1,10 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
 import {MeshBasicMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, readBack, quadDescription} from './helpers/fixtures.js';
 
-/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @import {VO, VOAttrSetter} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
-
-const FIXTURE_ID = 'vertex-objects-buffers-data-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  document.body.appendChild(el);
-  return el;
-}
-
-/** Teardown must not mask the failure that got it here: no display, or a display that fails to go down. */
-function disposeDisplay(display) {
-  if (!display) return;
-  try {
-    display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
-  }
-}
-
-/** Reads an attribute back out of the gpu buffer three has uploaded it into. */
-async function readBack(renderer, attr) {
-  return Array.from(new Float32Array(await renderer.getArrayBufferAsync(attr)));
-}
-
-/** @type {VertexObjectDescription} */
-const quadDescription = {
-  vertexCount: 4,
-  indices: [0, 1, 2, 0, 2, 3],
-  attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'dynamic'}},
-};
 
 describe('vertex-objects — buffers data', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget

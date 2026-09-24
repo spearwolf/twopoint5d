@@ -1,26 +1,9 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayError} from '@spearwolf/twopoint5d';
+import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
 
 /** @import {WebGPURenderer} from 'three/webgpu' */
-
-const FIXTURE_ID = 'display-constructor-fixture';
-
-function makeContainer({width = 320, height = 200} = {}) {
-  const el = document.createElement('div');
-  el.id = `${FIXTURE_ID}-${Math.random().toString(36).slice(2, 8)}`;
-  el.style.position = 'absolute';
-  el.style.left = '0';
-  el.style.top = '0';
-  el.style.width = `${width}px`;
-  el.style.height = `${height}px`;
-  el.style.boxSizing = 'border-box';
-  el.style.padding = '0';
-  el.style.margin = '0';
-  el.style.border = '0';
-  document.body.appendChild(el);
-  return el;
-}
 
 // The members the display touches on its renderer before the first frame. The result of
 // createRenderer is never checked against WebGPURenderer, so a failing init needs no real one —
@@ -50,9 +33,7 @@ describe('Display — what the constructor accepts and what it reports', functio
   let host;
 
   afterEach(() => {
-    if (display) {
-      display.dispose();
-    }
+    disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);
