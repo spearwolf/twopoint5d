@@ -82,8 +82,8 @@ class RAF {
     }
 
     // three runs the first tick of its animation loop right away as the loop starts, without a
-    // timestamp — after a Display has started the loop again, and at the end of an XR session. A
-    // tick without one measures nothing and reaches no FrameLoop
+    // timestamp — after whoever stopped the loop has started it again, and at the end of an XR
+    // session. A tick without one measures nothing and reaches no FrameLoop
     if (!Number.isFinite(now)) return;
 
     this.#measureFps(now);

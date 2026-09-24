@@ -443,7 +443,9 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    that throws makes `start()` reject as well, after every listener has
  *    heard the event; the display then pauses as a {@link Display.stop} would
  *    pause it and fires `OnDisplayPause`. If a listener of `OnDisplayPause`
- *    throws as well, `start()` rejects with an `AggregateError` of both errors.
+ *    throws as well, `start()` rejects with an `AggregateError` of the error of
+ *    the start and that of the pause — each an `AggregateError` itself when
+ *    more than one listener of its event throws.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    gives up {@link Display.renderer} right away. A listener that throws does
  *    not stop it; its error follows once the display is down — see
@@ -1144,8 +1146,9 @@ export class Display {
    * as it goes into the pause and starts it again as it runs. three 0.185 offers no public way to
    * do so, and the display reaches the loop through `renderer._animation`: a renderer without it
    * keeps its loop running through the pause. So does a renderer another {@link FrameLoop} still
-   * runs on as the display goes into the pause, and before the first start the loop runs as three
-   * started it.
+   * runs on as the display goes into the pause. Until the display goes into the pause for the
+   * first time, it leaves the loop as three runs it — also while the first `start()` waits, and
+   * when a `stop()` or `pause = true` keeps that call from starting the display.
    *
    * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */

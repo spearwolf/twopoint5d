@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - a `Display` stands on its `FrameLoop` only while it runs: it subscribes when it starts and unsubscribes when it pauses — through `pause = true`, `stop()`, a hidden tab or, with `pauseOutsideViewport`, a canvas outside the viewport — and in `dispose()`. `display.frameLoop.subscriptionCount` is `0` before the first start and during a pause. A `FrameLoop` left without a subscriber lets go of the rAF driver of its renderer, and the driver takes its callback out of `renderer.setAnimationLoop()` once no `FrameLoop` of that renderer is left on it
-- a paused `Display` lets the animation loop of its renderer rest. three runs that loop from `renderer.init()` on, on every animation frame of the page, and `setAnimationLoop(null)` only takes the callback out of it; the display stops the loop through `renderer._animation` as it goes into the pause and starts it again as it runs. A renderer without that field, and one another `FrameLoop` still runs on as the display pauses, keep their loop running; before the first start the loop runs as three started it
+- a paused `Display` lets the animation loop of its renderer rest. three runs that loop from `renderer.init()` on, on every animation frame of the page, and `setAnimationLoop(null)` only takes the callback out of it; the display stops the loop through `renderer._animation` as it goes into the pause and starts it again as it runs. A renderer without that field, and one another `FrameLoop` still runs on as the display pauses, keep their loop running; until the display goes into the pause for the first time, it leaves the loop as three runs it — also while the first `start()` waits, and when a `stop()` or `pause = true` keeps that call from starting the display
 - the generated `set…()` method of an attribute of at most four values (`vertexCount * size`) takes them as separate parameters instead of a rest parameter, so a call with separate values allocates nothing. The call forms are unchanged — an array-like still works — and every generated setter now leaves an element it is handed `undefined` for as it was, instead of writing `NaN`
 - `TexturedSprite`, `AnimatedSprite` and `TileSprite` declare their setters of at most four values with a separate-values overload as well as the tuple form; `setSize()`, `setPosition()`, `setFrame()`, `setColor()` and `TileSpritesFactory` pass their values on one by one and allocate nothing per call
 - `VertexObjectBuffer#copy()` judges the layout of both sides before the first buffer is written: the two descriptors have to state the same `vertexCount`, and every buffer pair has to share its name, its `itemSize` and its `dataType`. A mismatch throws a `RangeError` — a `TypeError` for the data type — naming the buffer and both values. A source buffer of a narrower layout used to pass the length check and land in the target at the stride of the wider one, every element of it beside the slot it belongs to. A copy that is refused leaves the target exactly as it was
@@ -845,10 +845,10 @@ Whoever wants the tiles the view frustum meets the plane in — all of them — 
 rejected — both a call made afterwards and a promise that was still open when `dispose()` ran.
 `#start()` rejects as well: a call made afterwards at once, and one still waiting for the renderer
 or its `beforeStartCallback` once that wait is over. It is `async`, so the rejection reaches an
-`await` or a `.catch()`, not a `try` around a call that is not awaited. `#resize()`, `#renderFrame()`, `#stop()`, a write to `#pause` and a further
-`#dispose()` do nothing. `#pause` is the one of them with a getter, and it answers `true` once the
-display is disposed, however it is written. Use `Display#isDisposed` where a display may already be
-gone.
+`await` or a `.catch()`, not a `try` around a call that is not awaited. `#resize()`,
+`#renderFrame()`, `#stop()`, a write to `#pause` and a further `#dispose()` do nothing. `#pause` is
+the one of them with a getter, and it answers `true` once the display is disposed, however it is
+written. Use `Display#isDisposed` where a display may already be gone.
 
 The case that slips through without a compile error is an awaited `nextFrame()` next to a
 `dispose()` from another path: that `await` needs a `catch` around it.
