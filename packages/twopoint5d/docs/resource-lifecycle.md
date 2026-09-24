@@ -28,7 +28,10 @@ the `data-engine` attribute three marks it with. One thing stays changed under t
 backend, the context: three gives up the one WebGL context of the canvas as it releases
 the renderer, and the display leaves that context lost but restorable. Only a `Display`
 built on the canvas afterwards brings it back; a `WebGPURenderer` or a
-`getContext('webgl2')` of the caller's own on that canvas gets the lost context.
+`getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
+`Display` constructor that throws after it has built or taken over its renderer leaves
+nothing behind — it releases the renderer, gives a canvas handed in back and takes its
+own container out, as `dispose()` would.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and

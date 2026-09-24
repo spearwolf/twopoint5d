@@ -61,25 +61,26 @@ describe('Display — the contract after dispose()', function () {
   });
 
   // Assertion (a) of the dispose test pattern — "releases what it built itself" — has two sides
-  // here. The DOM side: the first two cases below watch the container the display built come out
-  // of the host again, and the canvas it was handed stay where the caller put it. The GPU side:
-  // the three cases after "a dispose() before the renderer is ready leaves the frame loop empty"
-  // watch when renderer.dispose() runs — after an init that dispose() landed in, not at all after
-  // a failed one, and only once the queue has run dry — and what the backend reports afterwards:
-  // a destroyed device, or a lost WebGL context. The six cases after those follow a canvas that
-  // was handed in: it is the caller's, and after the display on it has been disposed it carries
-  // the next one — built while the release runs, built once the release is through, built after
-  // a dispose() inside the init, bounded in time when the WebGL context does not come back, and
-  // with that context back once the display after the one that waited in vain is built — while
-  // its WebGL context stays lost as long as no display follows. The rest of this file is about
-  // the contract afterwards.
+  // here. The DOM side: the first two cases below watch the container the display built come out of
+  // the host again, and the canvas it was handed stay where the caller put it. The GPU side: the
+  // four cases after "a dispose() before the renderer is ready leaves the frame loop empty" watch
+  // when renderer.dispose() runs — after an init that dispose() landed in, not at all after a
+  // failed one, whose webglcontextlost listener comes off the canvas all the same, and only once
+  // the queue has run dry — and what the backend reports afterwards: a destroyed device, or a lost
+  // WebGL context. The six cases after those follow a canvas that was handed in: it is the
+  // caller's, and after the display on it has been disposed it carries the next one — built while
+  // the release runs, built once the release is through, built after a dispose() inside the init,
+  // bounded in time when the WebGL context does not come back, and with that context back once the
+  // display after the one that waited in vain is built — while its WebGL context stays lost as long
+  // as no display follows. The rest of this file is about the contract afterwards.
 
-  // Assertion (b) — "does not touch what was handed in" — holds word for word for a canvas
-  // passed to the constructor: the two cases after "leaves a canvas that was handed in where it
-  // stands" watch dispose() give it back as the display found it — a bare canvas, and one with
-  // classes, styles and attributes of its caller. It is turned around for a WebGPURenderer passed
-  // to the constructor: that one is adopted and released with the display. That case needs a
-  // renderer of its own and lives in display-adopt-renderer.test.js.
+  // Assertion (b) — "does not touch what was handed in" — holds word for word for a canvas passed
+  // to the constructor: the four cases after "leaves a canvas that was handed in where it stands"
+  // watch dispose() give it back as the display found it — a bare canvas, one with classes, styles
+  // and attributes of its caller, and a bare canvas again that carries no data-engine once the
+  // release is through, after a frame and after a dispose() inside the init. It is turned around
+  // for a WebGPURenderer passed to the constructor: that one is adopted and released with the
+  // display. That case needs a renderer of its own and lives in display-adopt-renderer.test.js.
 
   // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
   // what most of the cases below are: canvas, start(), getEventProps(), isWebGPUBackend
@@ -166,6 +167,42 @@ describe('Display — the contract after dispose()', function () {
     expect(canvas.getAttribute('height'), 'attribute height').to.equal('32');
     expect(canvas.getAttribute('touch-action'), 'attribute touch-action').to.equal('pan-y');
     expect(canvas.getAttribute('resize-to'), 'attribute resize-to').to.equal('window');
+  });
+
+  it('leaves no data-engine on a canvas that was handed in once the release is through', async () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+
+    display = new Display(canvas);
+    await display.start();
+    await display.nextFrame();
+    // under WebGPU the getter of the backend's context writes data-engine, and a render reads it
+    // the same way. getContext() reads it without putting work on the GPU: on a canvas that was
+    // handed in, a dispose() with work still in flight costs Firefox its requestAnimationFrame
+    display.renderer.getContext();
+    if (display.isWebGPUBackend) {
+      expect(canvas.hasAttribute('data-engine'), 'attribute data-engine while the display is alive').to.equal(true);
+    }
+
+    const released = whenReleased(display.renderer);
+    display.dispose();
+    await released;
+
+    expect(canvas.hasAttribute('data-engine'), 'attribute data-engine').to.equal(false);
+  });
+
+  it('leaves no data-engine on a canvas that was handed in once the release is through, also when dispose() lands in the init', async () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+
+    display = new Display(canvas);
+    const released = whenReleased(display.renderer);
+    display.dispose();
+    await released;
+
+    expect(canvas.hasAttribute('data-engine'), 'attribute data-engine').to.equal(false);
   });
 
   it('canvas throws after dispose()', () => {
@@ -392,6 +429,40 @@ describe('Display — the contract after dispose()', function () {
     }
 
     expect(escaped, 'rejections of the failed init that nobody handled').to.have.length(0);
+  });
+
+  it('takes the webglcontextlost listener of a failed WebGL init off the canvas', async () => {
+    const initFailure = new Error('the init of this renderer fails on purpose');
+
+    host = makeContainer();
+    display = new Display(host, {
+      createRenderer: (params) => {
+        const renderer = new WebGPURenderer({...params, forceWebGL: true});
+        const {backend} = renderer;
+        const realInit = backend.init.bind(backend);
+        // the real init runs first and puts the listener of three on the canvas; what fails after
+        // it stands for a WebGLState that cannot be built
+        backend.init = async (...args) => {
+          await realInit(...args);
+          throw initFailure;
+        };
+        return renderer;
+      },
+    });
+    const canvas = display.canvas;
+
+    await new Promise((resolve) => {
+      display.onError(resolve);
+    });
+    display.dispose();
+    // the release runs after dispose() has returned
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const event = new Event('webglcontextlost', {cancelable: true});
+    canvas.dispatchEvent(event);
+
+    // the handler of three prevents the default of every loss it hears about
+    expect(event.defaultPrevented, 'a loss that a listener of three has heard about').to.equal(false);
   });
 
   it('releases the renderer only after the GPU has run the work submitted to it', async function () {

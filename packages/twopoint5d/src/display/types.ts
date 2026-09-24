@@ -90,14 +90,14 @@ export interface DisplayParameters extends DisplayRendererParameters {
   resizeToAttributeEl?: HTMLElement;
 
   /**
-   * The display creates a few CSS style rules that it wants to use itself.
-   * Here you can specify WHERE the styles are installed.
+   * The root the display installs its few CSS rules in. Default is `document.head`, which stands
+   * for the document.
    *
-   * Normally, this is the main document in the browser window and you do not
-   * need to specify anything here.
+   * The rules live in a stylesheet the document or the shadow root has adopted. A display whose
+   * canvas sits in a shadow root names that root here; the root may be handed in before its host
+   * is in the document. An element stands for the document or shadow root it sits in.
    *
-   * However, if the display is used within a shadow DOM, this is the option
-   * to install the styles only in this shadow root.
+   * {@link Display.styleSheetRoot} changes the root later.
    */
   styleSheetRoot?: HTMLElement | ShadowRoot;
 

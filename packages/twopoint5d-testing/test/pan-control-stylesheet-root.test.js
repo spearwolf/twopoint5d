@@ -39,12 +39,12 @@ describe('PanControl2D — the root its cursor rule lands in', () => {
     expect(rule?.style.cursor, 'the cursor the rule carries').to.equal('grabbing');
   });
 
-  it('leaves the rule in document.head when no root is named', () => {
+  it('puts the rule in the stylesheet of the document when no root is named', () => {
     const shadowRoot = host.attachShadow({mode: 'open'});
 
     control = new PanControl2D({cursorPanStyle: 'crosshair'});
 
-    expect(findCursorRule(), 'the cursor rule in document.head').to.exist;
+    expect(findCursorRule(), 'the cursor rule in the stylesheet of the document').to.exist;
     expect(findCursorRule(shadowRoot), 'a cursor rule inside the untouched shadow root').to.not.exist;
   });
 });

@@ -71,10 +71,26 @@ const holdsDefault = (values: readonly unknown[], defaults: readonly unknown[]):
 const cursorRuleName = (cursor: string): string =>
   `PanControl2D-${cursor.replace(/[^a-zA-Z0-9-]/g, (ch) => `_${ch.charCodeAt(0).toString(16)}_`)}`;
 
+// The root a cursor rule is retained for and given back to: the shadow root or the document that
+// the styleSheetRoot stands for at the retain, pinned down as that shadow root or the head of that
+// document. Stylesheets looks the sheet up from where the root sits at each call, and an element
+// that moves between the retain and the release would lead the release to another sheet
+function pinnedRootOf(root: HTMLElement | ShadowRoot): HTMLElement | ShadowRoot {
+  const node = root.getRootNode();
+  // by property, not by instanceof, so a shadow root of another realm passes as well
+  if ('host' in node && 'adoptedStyleSheets' in node) return node as ShadowRoot;
+  return root.ownerDocument.head;
+}
+
 export interface PanControl2DOptions {
   state?: PanViewState;
 
-  /** Cursor css style while panning. Default is 'none' (hide cursor) */
+  /**
+   * Cursor css style while panning. Default is 'none' (hide cursor).
+   *
+   * A value the browser does not understand as a value of the CSS property `cursor` is refused
+   * with a warning on the console, and the control takes `'none'`.
+   */
   cursorPanStyle?: string;
 
   cursorStylesTarget?: HTMLElement;
@@ -177,6 +193,8 @@ export class PanControl2D extends InputControlBase {
   #cursorPanClass?: string;
   // the rule this control currently holds at Stylesheets, given back when it moves on or is disposed
   #cursorPanRuleName?: string;
+  // the root that rule was retained for, and the one it goes back to
+  #cursorPanRuleRoot?: HTMLElement | ShadowRoot;
   #cursorStylesTarget?: HTMLElement;
   #styleSheetRoot: HTMLElement | ShadowRoot;
   #hideCursorState = HideCursorState.NO;
@@ -222,6 +240,8 @@ export class PanControl2D extends InputControlBase {
     this.#styleSheetRoot = readOption(options, 'styleSheetRoot', document.head);
 
     this.cursorPanStyle = readOption(options, 'cursorPanStyle', 'none');
+    // an option the setter refuses leaves the default standing
+    if (this.#cursorPanClass == null) this.cursorPanStyle = 'none';
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
     this.coordsTarget = readOption(options, 'coordsTarget', this.#cursorStylesTarget);
 
@@ -246,6 +266,9 @@ export class PanControl2D extends InputControlBase {
    * the previous rule back, and a rule no living control shows any more leaves the stylesheet.
    * Written during a drag, the new cursor shows at once.
    *
+   * A value the browser does not understand as a value of the CSS property `cursor` is refused
+   * with a warning on the console, and the getter keeps its value.
+   *
    * On a disposed control the write is refused and the getter keeps its last value: a disposed
    * control retains no more rules from a stylesheet that is not its own, and has no target
    * left to carry the class.
@@ -254,29 +277,47 @@ export class PanControl2D extends InputControlBase {
     // a disposed control writes no further rules into a stylesheet it does not own
     if (this.isDisposed) return;
 
-    if (this.#cursorPanStyle !== value) {
-      const prevClass = this.#cursorPanClass;
-      const prevRuleName = this.#cursorPanRuleName;
+    if (this.#cursorPanStyle === value) return;
 
-      this.#cursorPanStyle = value;
+    const cursor = value || 'auto';
 
-      const cursor = value || 'auto';
-      this.#cursorPanRuleName = cursorRuleName(cursor);
-      this.#cursorPanClass = Stylesheets.retainRule(this.#cursorPanRuleName, `cursor: ${cursor}`, this.#styleSheetRoot);
+    // the value goes into a rule as it is, so it has to be a cursor and nothing else: a further
+    // declaration or a closing brace never passes. A value only another browser knows costs a
+    // warning, not the app
+    if (!CSS.supports('cursor', cursor)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[PanControl2D] cursorPanStyle "${value}" is not a value of the CSS property cursor in this browser; the write is refused`,
+      );
+      return;
+    }
 
-      // the target carries the old class while the cursor is hidden; left there, the restore
-      // would take off the new one and the old one would stay for good
-      const target = this.#cursorStylesTarget;
-      if (this.#hideCursorState === HideCursorState.YES && target && prevClass !== this.#cursorPanClass) {
-        if (prevClass) target.classList.remove(prevClass);
-        target.classList.add(this.#cursorPanClass);
-      }
+    const ruleName = cursorRuleName(cursor);
+    const ruleRoot = pinnedRootOf(this.#styleSheetRoot);
+    const cursorPanClass = Stylesheets.retainRule(ruleName, `cursor: ${cursor}`, ruleRoot);
 
-      // the new rule is taken before the old one is given back: '' and 'auto' share a rule, and
-      // the other way round it would leave the sheet only to be put there again at once
-      if (prevRuleName != null) {
-        Stylesheets.releaseRule(prevRuleName, this.#styleSheetRoot);
-      }
+    // the fields change only after retainRule(): one that throws leaves the control on the rule
+    // it holds, and that rule is still the one dispose() gives back
+    const prevClass = this.#cursorPanClass;
+    const prevRuleName = this.#cursorPanRuleName;
+    const prevRuleRoot = this.#cursorPanRuleRoot;
+    this.#cursorPanStyle = value;
+    this.#cursorPanRuleName = ruleName;
+    this.#cursorPanRuleRoot = ruleRoot;
+    this.#cursorPanClass = cursorPanClass;
+
+    // the target carries the old class while the cursor is hidden; left there, the restore
+    // would take off the new one and the old one would stay for good
+    const target = this.#cursorStylesTarget;
+    if (this.#hideCursorState === HideCursorState.YES && target && prevClass !== cursorPanClass) {
+      if (prevClass) target.classList.remove(prevClass);
+      target.classList.add(cursorPanClass);
+    }
+
+    // the new rule is taken before the old one is given back: '' and 'auto' share a rule, and
+    // the other way round it would leave the sheet only to be put there again at once
+    if (prevRuleName != null && prevRuleRoot != null) {
+      Stylesheets.releaseRule(prevRuleName, prevRuleRoot);
     }
   }
 
@@ -627,9 +668,10 @@ export class PanControl2D extends InputControlBase {
     // after super.dispose(): the cursor class is off the target by then (unsubscribe() restores
     // the cursor), so no element points at a rule that may leave the sheet here. unsubscribe()
     // keeps the rule, because a control that subscribes again still needs it
-    if (this.#cursorPanRuleName != null) {
-      Stylesheets.releaseRule(this.#cursorPanRuleName, this.#styleSheetRoot);
+    if (this.#cursorPanRuleName != null && this.#cursorPanRuleRoot != null) {
+      Stylesheets.releaseRule(this.#cursorPanRuleName, this.#cursorPanRuleRoot);
       this.#cursorPanRuleName = undefined;
+      this.#cursorPanRuleRoot = undefined;
     }
 
     // last: the restoreCursor above still has to reach the listeners that act on it

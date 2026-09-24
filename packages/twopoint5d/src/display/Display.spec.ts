@@ -45,17 +45,17 @@ function makeCanvas() {
 }
 
 /**
- * A display on an adopted renderer stub. A frame is a call of the callback the frame loop handed
- * to `setAnimationLoop()` last, with a timestamp in ms; while that callback is `null`, a frame
- * reaches nobody. Every call builds its own renderer: the rAF driver hangs off the renderer in a
- * WeakMap, so no two tests share one.
+ * A renderer stub with what the display calls on it. `backend` stands in for `renderer.backend`.
+ * `frame` calls the callback handed to `setAnimationLoop()` last, with a timestamp in ms; while
+ * that callback is `null`, a frame reaches nobody.
  */
-function makeDisplay(options?: DisplayParameters, init: () => Promise<unknown> = () => Promise.resolve()) {
+function makeRenderer(init: () => Promise<unknown> = () => Promise.resolve(), backend?: object) {
   const canvas = makeCanvas();
   let loop: ((now: number) => unknown) | null = null;
   const renderer = {
     isWebGPURenderer: true,
     domElement: canvas,
+    backend,
     init: vi.fn(init),
     setDrawingBufferSize: vi.fn(),
     setAnimationLoop: vi.fn((callback: ((now: number) => unknown) | null) => {
@@ -63,6 +63,20 @@ function makeDisplay(options?: DisplayParameters, init: () => Promise<unknown> =
     }),
     dispose: vi.fn(),
   };
+
+  const frame = (now: number) => {
+    loop?.(now);
+  };
+
+  return {renderer, canvas, frame};
+}
+
+/**
+ * A display on an adopted renderer stub, see {@link makeRenderer}. Every call builds its own
+ * renderer: the rAF driver hangs off the renderer in a WeakMap, so no two tests share one.
+ */
+function makeDisplay(options?: DisplayParameters, init?: () => Promise<unknown>, backend?: object) {
+  const {renderer, canvas, frame} = makeRenderer(init, backend);
 
   const display = new Display(renderer as unknown as WebGPURenderer, options);
   displays.push(display);
@@ -73,10 +87,6 @@ function makeDisplay(options?: DisplayParameters, init: () => Promise<unknown> =
       events.push(name);
     });
   }
-
-  const frame = (now: number) => {
-    loop?.(now);
-  };
 
   return {display, renderer, canvas, events, frame};
 }
@@ -420,6 +430,91 @@ describe('Display', () => {
           ).toBe(true);
         }
       }
+    });
+  });
+
+  describe('release', () => {
+    // a device whose lost promise never settles, with a queue that answers as `onSubmittedWorkDone` does
+    const backendWith = (onSubmittedWorkDone: () => Promise<unknown>, lost: Promise<unknown> = new Promise(() => {})) => ({
+      device: {queue: {onSubmittedWorkDone}, lost},
+    });
+
+    it('releases the renderer after a bounded wait when the queue never answers, with one warning', async () => {
+      vi.useFakeTimers();
+      try {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const {display, renderer} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => new Promise(() => {})),
+        );
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(1999);
+
+        expect(renderer.dispose, 'before the wait has run out').not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(renderer.dispose, 'once the wait has run out').toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('releases the renderer once the device reports itself lost, without waiting for the queue', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const {display, renderer} = makeDisplay(
+        undefined,
+        undefined,
+        backendWith(() => new Promise(() => {}), Promise.resolve({reason: 'unknown'})),
+      );
+
+      display.dispose();
+      await settle();
+
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('leaves no timer behind once the queue has run dry', async () => {
+      vi.useFakeTimers();
+      try {
+        const {display, renderer} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => Promise.resolve()),
+        );
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(renderer.dispose).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount(), 'timers left').toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('constructor', () => {
+    it('releases a renderer it has taken over when the constructor fails after taking it', async () => {
+      const failure = new Error('the resizeTo callback fails on purpose');
+      const {renderer} = makeRenderer();
+
+      expect(
+        () =>
+          new Display(renderer as unknown as WebGPURenderer, {
+            resizeTo: () => {
+              throw failure;
+            },
+          }),
+      ).toThrow(failure);
+
+      await settle();
+
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -190,4 +190,133 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
     expect(getComputedStyle(b).cursor, 'the cursor of the second control').to.equal('move');
     expect(cursorRules(root).length, 'cursor rules in the sheet').to.equal(2);
   });
+
+  /**
+   * Runs `body` with `console.warn` collecting its calls instead of printing them.
+   *
+   * @param {(warnings: unknown[][]) => void} body
+   */
+  function withWarnings(body) {
+    /** @type {unknown[][]} */
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => {
+      warnings.push(args);
+    };
+    try {
+      body(warnings);
+    } finally {
+      console.warn = realWarn;
+    }
+  }
+
+  it('refuses a cursor value that carries a further declaration, keeps its own and warns', () => {
+    const root = makeRoot();
+    const {control} = makeControl(root, 'grab');
+
+    withWarnings((warnings) => {
+      control.cursorPanStyle = 'pointer; display: none';
+
+      expect(control.cursorPanStyle, 'the cursor style of the control').to.equal('grab');
+      expect(cursorRules(root).length, 'cursor rules in the sheet').to.equal(1);
+      expect(
+        /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet(root).cssRules)).some(
+          (rule) => rule.style?.display === 'none',
+        ),
+        'a rule that hides its elements',
+      ).to.equal(false);
+      expect(warnings, 'warnings').to.have.length(1);
+    });
+  });
+
+  it('a value the stylesheet cannot take leaves the control on the rule it holds', () => {
+    const root = makeRoot();
+    const {control} = makeControl(root, 'grab');
+
+    withWarnings(() => {
+      expect(() => {
+        control.cursorPanStyle = 'pointer } div { display: none';
+      }, 'the write').to.not.throw();
+    });
+
+    expect(control.cursorPanStyle, 'the cursor style of the control').to.equal('grab');
+
+    control.dispose();
+
+    expect(cursorRules(root).length, 'cursor rules after dispose()').to.equal(0);
+  });
+
+  it('a retainRule() that throws leaves the control on the rule it holds', () => {
+    const root = makeRoot();
+    const {control} = makeControl(root, 'grab');
+
+    const realRetainRule = Stylesheets.retainRule;
+    Stylesheets.retainRule = () => {
+      throw new Error('retainRule() fails on purpose');
+    };
+    try {
+      expect(() => {
+        control.cursorPanStyle = 'move';
+      }, 'the write').to.throw('retainRule() fails on purpose');
+    } finally {
+      Stylesheets.retainRule = realRetainRule;
+    }
+
+    expect(control.cursorPanStyle, 'the cursor style of the control').to.equal('grab');
+
+    control.dispose();
+
+    expect(cursorRules(root).length, 'cursor rules after dispose()').to.equal(0);
+  });
+
+  it('gives its cursor rule back to the sheet it took it from when the styleSheetRoot element moves', () => {
+    const root = makeRoot();
+    const anchor = document.createElement('div');
+    document.body.appendChild(anchor);
+    hosts.push(anchor);
+    // a cursor of its own, so no other control shares the rule in the sheet of the document
+    const token = Math.random().toString(36).slice(2, 10);
+    const control = new PanControl2D({state: makeState(), styleSheetRoot: anchor, cursorPanStyle: `url("data:,${token}"), auto`});
+    controls.push(control);
+    const rulesInDocument = () =>
+      /** @type {CSSStyleRule[]} */ (Array.from(Stylesheets.getGlobalSheet().cssRules)).filter((rule) =>
+        rule.selectorText?.includes(token),
+      );
+
+    expect(rulesInDocument().length, 'rules of the cursor in the sheet of the document').to.equal(1);
+
+    // the element named as styleSheetRoot now stands for the shadow root
+    root.appendChild(anchor);
+    control.dispose();
+
+    expect(rulesInDocument().length, 'rules of the cursor in the sheet of the document after dispose()').to.equal(0);
+  });
+
+  it('falls back to none for a cursorPanStyle option that is not a cursor value', () => {
+    const root = makeRoot();
+
+    withWarnings(() => {
+      const {control} = makeControl(root, 'pointer; display: none');
+
+      expect(control.cursorPanStyle, 'the cursor style of the control').to.equal('none');
+    });
+
+    expect(
+      cursorRules(root).filter((rule) => rule.style.cursor === 'none'),
+      'cursor rules that hide the cursor',
+    ).to.have.length(1);
+  });
+
+  it('takes a cursor with a data URL and a fallback keyword', () => {
+    const root = makeRoot();
+    const {control} = makeControl(root, 'grab');
+    const cursor = 'url("data:image/png;base64,iVBORw0KGgo="), auto';
+
+    withWarnings((warnings) => {
+      control.cursorPanStyle = cursor;
+
+      expect(control.cursorPanStyle, 'the cursor style of the control').to.equal(cursor);
+      expect(warnings, 'warnings').to.have.length(0);
+    });
+  });
 });

@@ -28,6 +28,14 @@ describe('Stylesheets', function () {
     return host.attachShadow({mode: 'open'});
   }
 
+  /** The document of a fresh iframe in `document.body`: a document of another realm. */
+  function makeIframeDocument() {
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    hosts.push(iframe);
+    return /** @type {Document} */ (iframe.contentDocument);
+  }
+
   afterEach(() => {
     for (const host of hosts) {
       host.remove();
@@ -132,7 +140,7 @@ describe('Stylesheets', function () {
       () => Stylesheets.releaseRule(uniqueName('never-retained'), untouchedRoot),
       'a release in a root without a sheet',
     ).to.not.throw();
-    expect(untouchedRoot.querySelector('style'), 'the sheet of a root nothing was written to').to.equal(null);
+    expect(untouchedRoot.adoptedStyleSheets.length, 'the sheets of a root nothing was written to').to.equal(0);
 
     const root = makeShadowRoot();
     const name = uniqueName('released-too-often');
@@ -162,5 +170,146 @@ describe('Stylesheets', function () {
     const installed = Stylesheets.installRule(name, 'cursor: pointer;');
 
     expect(retained).to.equal(installed);
+  });
+
+  it('installs a rule in a shadow root whose host is not in the document yet', () => {
+    // a web component that builds its shadow tree in its constructor, before it is connected
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({mode: 'open'});
+    const name = uniqueName('detached-host');
+
+    /** @type {string | undefined} */
+    let className;
+    expect(() => {
+      className = Stylesheets.installRule(name, 'cursor: pointer;', shadowRoot);
+    }, 'installRule() in a shadow root of a detached host').to.not.throw();
+
+    const div = document.createElement('div');
+    div.classList.add(className);
+    shadowRoot.appendChild(div);
+    document.body.appendChild(host);
+    hosts.push(host);
+
+    expect(getComputedStyle(div).cursor, 'the cursor once the host is in the document').to.equal('pointer');
+  });
+
+  it('keeps its rules when the shadow host moves to another place in the document', () => {
+    const shadowRoot = makeShadowRoot();
+    const host = /** @type {HTMLElement} */ (shadowRoot.host);
+    const className = Stylesheets.installRule(uniqueName('moved-host'), 'cursor: pointer;', shadowRoot);
+    const div = document.createElement('div');
+    div.classList.add(className);
+    shadowRoot.appendChild(div);
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    hosts.push(other);
+    other.appendChild(host);
+
+    expect(getComputedStyle(div).cursor, 'the cursor after the host has moved').to.equal('pointer');
+  });
+
+  it('puts a rule installed after the shadow host moved where its elements see it', () => {
+    const shadowRoot = makeShadowRoot();
+    const host = /** @type {HTMLElement} */ (shadowRoot.host);
+    // the sheet of the root exists before the move
+    Stylesheets.installRule(uniqueName('before-move'), 'cursor: crosshair;', shadowRoot);
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    hosts.push(other);
+    other.appendChild(host);
+
+    const className = Stylesheets.installRule(uniqueName('after-move'), 'cursor: pointer;', shadowRoot);
+    const div = document.createElement('div');
+    div.classList.add(className);
+    shadowRoot.appendChild(div);
+
+    expect(getComputedStyle(div).cursor, 'the cursor of a rule installed after the move').to.equal('pointer');
+  });
+
+  it('an element stands for the document or shadow root it sits in', () => {
+    const shadowRoot = makeShadowRoot();
+    const elementInShadowRoot = document.createElement('div');
+    shadowRoot.appendChild(elementInShadowRoot);
+
+    // compared by identity: a failed comparison of two sheets has the whole DOM to print
+    expect(
+      Stylesheets.getGlobalSheet(elementInShadowRoot) === Stylesheets.getGlobalSheet(shadowRoot),
+      'an element in a shadow root has the sheet of that root',
+    ).to.equal(true);
+    expect(
+      Stylesheets.getGlobalSheet(document.body) === Stylesheets.getGlobalSheet(),
+      'document.body has the sheet of the document',
+    ).to.equal(true);
+    expect(
+      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet(shadowRoot)),
+      'the shadow root has adopted its sheet',
+    ).to.equal(true);
+    expect(document.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet()), 'the document has adopted its sheet').to.equal(
+      true,
+    );
+  });
+
+  it('escapes the class name in the selector of its rule', () => {
+    const root = makeShadowRoot();
+    const div = document.createElement('div');
+    root.appendChild(div);
+
+    // unescaped, the name turns the selector into a list that matches every div in the root
+    Stylesheets.installRule(`${uniqueName('x')}, div, y`, 'cursor: wait;', root);
+
+    expect(getComputedStyle(div).cursor, 'the cursor of a div without the class').to.not.equal('wait');
+  });
+
+  it('adopts its sheet again into a root whose adoptedStyleSheets were replaced', () => {
+    const shadowRoot = makeShadowRoot();
+    const classNameA = Stylesheets.installRule(uniqueName('adopted-a'), 'cursor: pointer;', shadowRoot);
+    const div = document.createElement('div');
+    div.classList.add(classNameA);
+    shadowRoot.appendChild(div);
+
+    // a framework that manages the sheets of the root writes its own list
+    shadowRoot.adoptedStyleSheets = [];
+    Stylesheets.installRule(uniqueName('adopted-b'), 'cursor: crosshair;', shadowRoot);
+
+    expect(
+      shadowRoot.adoptedStyleSheets.includes(Stylesheets.getGlobalSheet(shadowRoot)),
+      'the shadow root has adopted its sheet again',
+    ).to.equal(true);
+    expect(getComputedStyle(div).cursor, 'the cursor of the first rule').to.equal('pointer');
+  });
+
+  it('installs a rule in the document of an iframe', () => {
+    const iframeDocument = makeIframeDocument();
+    const div = iframeDocument.createElement('div');
+    iframeDocument.body.appendChild(div);
+
+    /** @type {string | undefined} */
+    let className;
+    expect(() => {
+      className = Stylesheets.installRule(uniqueName('iframe-document'), 'cursor: pointer;', iframeDocument.head);
+    }, 'installRule() in the document of an iframe').to.not.throw();
+    div.classList.add(className);
+
+    expect(iframeDocument.defaultView.getComputedStyle(div).cursor, 'the cursor in the iframe').to.equal('pointer');
+  });
+
+  it('installs a rule in a shadow root inside an iframe', () => {
+    const iframeDocument = makeIframeDocument();
+    const host = iframeDocument.createElement('div');
+    iframeDocument.body.appendChild(host);
+    const shadowRoot = host.attachShadow({mode: 'open'});
+    const div = iframeDocument.createElement('div');
+    shadowRoot.appendChild(div);
+
+    /** @type {string | undefined} */
+    let className;
+    expect(() => {
+      className = Stylesheets.installRule(uniqueName('iframe-shadow-root'), 'cursor: pointer;', shadowRoot);
+    }, 'installRule() in a shadow root inside an iframe').to.not.throw();
+    div.classList.add(className);
+
+    expect(iframeDocument.defaultView.getComputedStyle(div).cursor, 'the cursor in the shadow root').to.equal('pointer');
   });
 });

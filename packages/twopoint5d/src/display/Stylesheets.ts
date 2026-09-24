@@ -1,11 +1,33 @@
-import {expectDefined} from '../utils/expectDefined.js';
-
 export const postFixID = Math.round(Math.random() * (1 << 24)).toString(16);
 export const globalStylesID = `display3--${postFixID}`;
 
-// One sheet per root: a rule installed for a shadow root has to land in that root, or the
-// elements inside it never see it.
-const sheets = new WeakMap<HTMLElement | ShadowRoot, CSSStyleSheet>();
+// One sheet per document or shadow root: a rule installed for a shadow root has to land in that
+// root, or the elements inside it never see it.
+const sheets = new WeakMap<Document | ShadowRoot, CSSStyleSheet>();
+
+// The document or shadow root whose adoptedStyleSheets carry the rules for `root`. An element
+// stands for the root node it sits in, because a rule reaches the elements of exactly that root —
+// also a shadow root whose host is not in the document yet. An element that sits in neither falls
+// on its document: that is the default of this module, and whoever wants a shadow root names it.
+// The check goes by property, not by instanceof, so a root from another realm passes as well —
+// the sheet for it comes from that realm, see newSheetFor()
+function scopeOf(root: HTMLElement | ShadowRoot): Document | ShadowRoot {
+  const node = root.getRootNode();
+  if ('adoptedStyleSheets' in node) {
+    return node as Document | ShadowRoot;
+  }
+  return root.ownerDocument;
+}
+
+// A document or shadow root adopts only a sheet built by the CSSStyleSheet of its own window; the
+// one of this module's realm is refused with a NotAllowedError in the document of an iframe and in
+// a shadow root inside it. A document without a window falls back on the constructor of this realm
+function newSheetFor(scope: Document | ShadowRoot): CSSStyleSheet {
+  // a document is its own owner, and answers ownerDocument with null
+  const doc = scope.ownerDocument ?? (scope as Document);
+  const SheetConstructor = (doc.defaultView as (Window & typeof globalThis) | null)?.CSSStyleSheet ?? CSSStyleSheet;
+  return new SheetConstructor();
+}
 
 interface InstalledRule {
   rule: CSSStyleRule;
@@ -42,7 +64,8 @@ function putRule(name: string, css: string, root: HTMLElement | ShadowRoot): Ins
     return prevRule;
   }
 
-  const index = sheet.insertRule(`.${classNameOf(name)} {${css}}`, sheet.cssRules.length);
+  // escaped, so a name cannot turn the selector into a list or a different selector
+  const index = sheet.insertRule(`.${CSS.escape(classNameOf(name))} {${css}}`, sheet.cssRules.length);
   const installed: InstalledRule = {rule: sheet.cssRules[index] as CSSStyleRule, css, users: 0, pinned: false};
   rules.set(name, installed);
 
@@ -50,39 +73,53 @@ function putRule(name: string, css: string, root: HTMLElement | ShadowRoot): Ins
 }
 
 /**
- * Helpers for installing simple css-class-based rules
+ * Helpers for installing simple css-class-based rules.
+ *
+ * The rules live in a constructed stylesheet per document or shadow root, which this module
+ * puts into the `adoptedStyleSheets` of that document or shadow root. A shadow root carries its
+ * rules before its host is in the document, and keeps them when the host moves.
+ *
+ * Adopted sheets come after the document's own sheets in the cascade: a rule of the page with
+ * the same specificity as these class rules does not win by coming later. Whoever replaces the
+ * `adoptedStyleSheets` of a root takes the sheet out; the next call for that root puts it back.
  */
 export class Stylesheets {
   /**
-   * The stylesheet this module writes into, one per root, created on the first call for that root.
+   * The stylesheet this module writes into for `root`: the constructed sheet adopted by the
+   * document or shadow root that `root` stands for. It is created on the first call for that
+   * document or shadow root, and every call adopts it again if it is missing from
+   * `adoptedStyleSheets`.
    *
-   * @param root default is document.head
+   * @param root `document.head` by default, which stands for the document. A shadow root carries
+   *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
+   *   that sits in neither for its document.
    */
   static getGlobalSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
-    let sheet = sheets.get(root);
+    const scope = scopeOf(root);
+    let sheet = sheets.get(scope);
     if (sheet == null) {
-      const styleEl = document.createElement('style');
-      // The id names this module's sheet for whoever looks into the DOM; nothing ever looks it
-      // up, so every root can carry the same one.
-      styleEl.setAttribute('id', globalStylesID);
-      root.appendChild(styleEl);
-      // A <style> element carries a sheet only once it sits in a document — the appendChild above put it there.
-      sheet = expectDefined(styleEl.sheet, 'the stylesheet of the freshly appended <style> element');
-      sheets.set(root, sheet);
+      sheet = newSheetFor(scope);
+      sheets.set(scope, sheet);
+    }
+    // on every call: a framework that writes the adoptedStyleSheets of a root takes the sheet out
+    if (!scope.adoptedStyleSheets.includes(sheet)) {
+      scope.adoptedStyleSheets = [...scope.adoptedStyleSheets, sheet];
     }
     return sheet;
   }
 
   /**
-   * Install a className-based rule in the global stylesheet.
+   * Install a className-based rule in the stylesheet of the root.
    *
    * A name carries exactly one rule within one root: a call with a different `css` rewrites that
    * rule, and a call with the `css` it already has does nothing. A rule put here stays in the
    * sheet for good; {@link Stylesheets.releaseRule} does not take it out.
    *
-   * @param name The base class name
-   * @param css The styles
-   * @param root default is document.head; every root carries a stylesheet of its own
+   * @param name The base of the class name
+   * @param css The declarations of the rule, as in a style attribute
+   * @param root `document.head` by default, which stands for the document. A shadow root carries
+   *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
+   *   that sits in neither for its document.
    * @returns The postfixed class name
    */
   static installRule(name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {
@@ -96,11 +133,15 @@ export class Stylesheets {
    *
    * A name carries exactly one rule within one root: a call with a different `css` rewrites that
    * rule. Pair every call with a {@link Stylesheets.releaseRule} as soon as the user no longer
-   * shows the class.
+   * shows the class, for the same document or shadow root: an element that serves as root stands
+   * for the one it sits in at each call, and one that moves in between leads the release to
+   * another sheet.
    *
-   * @param name The base class name
-   * @param css The styles
-   * @param root default is document.head; every root carries a stylesheet of its own
+   * @param name The base of the class name
+   * @param css The declarations of the rule, as in a style attribute
+   * @param root `document.head` by default, which stands for the document. A shadow root carries
+   *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
+   *   that sits in neither for its document.
    * @returns The postfixed class name, the one `installRule()` returns for the name
    */
   static retainRule(name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {
@@ -114,12 +155,18 @@ export class Stylesheets {
    *
    * A release without an open retain, or in a root this module never wrote to, does nothing.
    *
-   * @param name The base class name
-   * @param root default is document.head
+   * The document or shadow root is looked up anew on every call: an element that serves as root
+   * and has moved between the document and a shadow root since the retain points the release at
+   * another sheet, and the retained rule stays.
+   *
+   * @param name The base of the class name
+   * @param root `document.head` by default, which stands for the document. A shadow root carries
+   *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
+   *   that sits in neither for its document.
    */
   static releaseRule(name: string, root: HTMLElement | ShadowRoot = document.head): void {
-    // not getGlobalSheet(): a release is no reason to create a sheet
-    const sheet = sheets.get(root);
+    // not getGlobalSheet(): a release is no reason to create a sheet, nor to adopt it again
+    const sheet = sheets.get(scopeOf(root));
     if (sheet == null) return;
 
     const rules = installedRules.get(sheet);
@@ -141,11 +188,17 @@ export class Stylesheets {
   }
 
   /**
-   * Install a global className-based style ruleset and add the className to the html element
-   * The class name gets a uniq-number as postfix added.
-   * @param name The base class name
-   * @param css The styles
-   * @param root default is document.head
+   * Install a rule like {@link Stylesheets.installRule} does and add its class to `element`.
+   *
+   * The class name carries the postfix of this module, a random hexadecimal number that is the
+   * same for every name.
+   *
+   * @param element The element that gets the class
+   * @param name The base of the class name
+   * @param css The declarations of the rule, as in a style attribute
+   * @param root `document.head` by default, which stands for the document. A shadow root carries
+   *   a sheet of its own; an element stands for the document or shadow root it sits in, and one
+   *   that sits in neither for its document.
    * @returns The postfixed class name
    */
   static addRule(element: HTMLElement, name: string, css: string, root: HTMLElement | ShadowRoot = document.head): string {

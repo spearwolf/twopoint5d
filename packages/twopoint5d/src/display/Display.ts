@@ -48,18 +48,70 @@ function disposedError(member: string): Error {
   return new Error(`Display#${member} is not available: this display has been disposed`);
 }
 
+// The rules a display installs through Stylesheets. The container rule is for the extra div
+// a display builds inside a host element: without a discrete size of its own, the line height
+// and font size of the host would give that div a weird client rect
+const CONTAINER_RULE_CSS = 'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;';
+const CANVAS_RULE_CSS = 'touch-action: none;';
+const FULLSCREEN_RULE_CSS = 'position:fixed;top:0;left:0;';
+
+// A GPU that has not reported the work submitted to it done after this long is not going to;
+// the release goes on instead of holding every later display on the canvas. Generous against the
+// reason for the wait below, short against a remount — the same as CONTEXT_RESTORE_TIMEOUT_MS
+const SUBMITTED_WORK_TIMEOUT_MS = 2000;
+
 // renderer.dispose() destroys the device (WebGPUBackend.dispose()). On Firefox 155 under WebGPU,
 // destroying a device while submitted work is still in flight reports a GPUInternalError on the
 // destroyed device, and the page gets no requestAnimationFrame callback after that — every
-// animation on the page stands still. So the queue runs dry first
+// animation on the page stands still. So the queue runs dry first, or the device reports itself
+// lost, which leaves no work to wait for. The wait ends after SUBMITTED_WORK_TIMEOUT_MS at the
+// latest, with a warning: an implementation that never answers must not hold the release forever
 async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
   // the three.js typings leave the device off the backend, and the WebGL backend has none
-  const device = (renderer.backend as {device?: {queue: {onSubmittedWorkDone(): Promise<unknown>}} | null} | undefined)?.device;
+  const device = (
+    renderer.backend as {device?: {queue: {onSubmittedWorkDone(): Promise<unknown>}; lost?: Promise<unknown>} | null} | undefined
+  )?.device;
   if (device == null) return;
+
+  const drained = (async () => {
+    try {
+      await device.queue.onSubmittedWorkDone();
+    } catch {
+      // a device that is already lost has no work left to wait for; the release goes on anyway
+    }
+    return false;
+  })();
+  // a device without the promise has one way less to end the wait
+  const lost = device.lost?.then(
+    () => false,
+    () => false,
+  );
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(true), SUBMITTED_WORK_TIMEOUT_MS);
+  });
+
   try {
-    await device.queue.onSubmittedWorkDone();
-  } catch {
-    // a device that is already lost has no work left to wait for; the release goes on anyway
+    if (await Promise.race(lost != null ? [drained, lost, timedOut] : [drained, timedOut])) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `Display#dispose(): the GPU did not report the work submitted to it done within ${SUBMITTED_WORK_TIMEOUT_MS} ms; the renderer is released anyway`,
+      );
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// WebGLBackend.init() puts a webglcontextlost listener on the canvas before the part of it that
+// can fail. renderer.dispose() would take it off, but releases only a renderer whose init went
+// through, and three makes the listener reachable only through this field, private by convention
+function dropContextLostListener(renderer: WebGPURenderer): void {
+  // the three.js typings leave the field off the backend
+  const backend = renderer.backend as {isWebGLBackend?: boolean; _onContextLost?: EventListener} | undefined;
+  if (backend?.isWebGLBackend && backend._onContextLost != null) {
+    renderer.domElement.removeEventListener('webglcontextlost', backend._onContextLost);
   }
 }
 
@@ -93,7 +145,11 @@ const canvasReleases = new WeakMap<HTMLCanvasElement, Promise<void>>();
 // The context a release has lost on a canvas handed to a display, for as long as it stays
 // lost: however long no display comes, and past a restore that ran out of time, so every
 // display built on the canvas tries once more. The display that brings it back takes the
-// entry out
+// entry out. In one case the entry outlasts the loss: a context the browser brings back only
+// after the wait has run out stays here, alive, until the next display built on the canvas
+// finds it alive — restoreContext() answers at once then — and takes the entry out. That is
+// harmless, and a listener for webglcontextrestored kept on the caller's canvas to clear it
+// would be exactly the kind of leftover a release must not leave behind
 const lostContexts = new WeakMap<HTMLCanvasElement, LostContext>();
 
 // A canvas keeps its one WebGL context for good and answers every later getContext('webgl2')
@@ -260,7 +316,12 @@ function restoreCanvasState(canvas: HTMLCanvasElement, state: CanvasState, class
 
   // a bare <canvas> goes back as <canvas></canvas>, without the empty attributes left behind
   if (state.attributes.class == null && canvas.classList.length === 0) canvas.removeAttribute('class');
-  if (state.attributes.style == null && canvas.style.length === 0) canvas.removeAttribute('style');
+  if (state.attributes.style == null && canvas.style.length === 0) {
+    // Chromium writes a change of the inline style into the attribute only once the attribute is
+    // read, and a removeAttribute() before that read comes back as style="" at the next one
+    canvas.getAttribute('style');
+    canvas.removeAttribute('style');
+  }
 }
 
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
@@ -294,10 +355,11 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    the document, and a canvas handed in gets back what the display wrote
  *    on it — its classes, attributes and inline styles. The renderer itself
  *    is released after `dispose()` has returned, once its init is through
- *    and the GPU has run the work submitted to it. A canvas handed to the
- *    constructor carries a new display afterwards; one built on it while the
- *    release runs waits for it. Under WebGL only a display brings the context of that canvas
- *    back — see {@link Display.dispose}.
+ *    and the GPU has run the work submitted to it, or for two seconds at
+ *    most, and goes on with a warning on the console after that. A canvas
+ *    handed to the constructor carries a new display afterwards; one built on
+ *    it while the release runs waits for it. Under WebGL only a display
+ *    brings the context of that canvas back — see {@link Display.dispose}.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
  *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
@@ -569,10 +631,24 @@ export class Display {
    */
   resizeToAttributeEl: HTMLElement;
 
+  #styleSheetRoot: HTMLElement | ShadowRoot;
+
   /**
-   * see {@link DisplayParameters.styleSheetRoot}
+   * The root the display installs its CSS rules in, see {@link DisplayParameters.styleSheetRoot}.
+   *
+   * A write installs the rules of the display in the new root, under the same class names: a
+   * canvas that moves into another shadow root keeps its rules that way. The rules in the
+   * previous root stay where they are. After {@link Display.dispose} a write changes nothing.
    */
-  styleSheetRoot: HTMLElement | ShadowRoot;
+  get styleSheetRoot(): HTMLElement | ShadowRoot {
+    return this.#styleSheetRoot;
+  }
+
+  set styleSheetRoot(root: HTMLElement | ShadowRoot) {
+    if (this.#disposed || root === this.#styleSheetRoot) return;
+    this.#styleSheetRoot = root;
+    this.#installRules(root);
+  }
 
   renderer?: WebGPURenderer;
 
@@ -654,8 +730,14 @@ export class Display {
    *
    * A renderer handed in here is adopted, not borrowed: the display takes it and its
    * `domElement` as its own. {@link Display.dispose} releases it with `renderer.dispose()`, once
-   * its init is through and the GPU has run the work submitted to it. A renderer that has to
-   * outlive this display therefore does not belong in here.
+   * its init is through and the GPU has run the work submitted to it, or for two seconds at most,
+   * and goes on with a warning on the console after that. A renderer that has to outlive this
+   * display therefore does not belong in here.
+   *
+   * A constructor that throws after it has built or taken over the renderer — from a `resizeTo`
+   * callback, say — gives everything back as {@link Display.dispose} would: the renderer is
+   * released, a canvas handed in goes back as the display found it, and a container the display
+   * built comes out of the host.
    *
    * @param domElementOrRenderer a `<canvas>`, any other `HTMLElement` to host a canvas, or a
    *   ready-made `WebGPURenderer`
@@ -680,7 +762,7 @@ export class Display {
     } = options ?? {};
 
     this.resizeToCallback = resizeTo;
-    this.styleSheetRoot = styleSheetRoot ?? document.head;
+    this.#styleSheetRoot = styleSheetRoot ?? document.head;
 
     if (isWebGLRenderer(domElementOrRenderer)) {
       // eslint-disable-next-line no-console
@@ -704,14 +786,7 @@ export class Display {
         callersCanvasBefore = readCanvasState(canvas);
       } else {
         const container = document.createElement('div');
-        Stylesheets.addRule(
-          container,
-          Display.CssRulesPrefixContainer,
-          // we create another container div here to avoid the if container-has-no-discrete-size
-          // then line-height-and-font-height-styles-give-weird-client-rect-behavior issue
-          'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;',
-          this.styleSheetRoot,
-        );
+        Stylesheets.addRule(container, Display.CssRulesPrefixContainer, CONTAINER_RULE_CSS, this.#styleSheetRoot);
         domElementOrRenderer.appendChild(container);
 
         canvas = document.createElement('canvas');
@@ -775,84 +850,87 @@ export class Display {
 
     this.frameLoop = new FrameLoop(maxFps ?? 0, this.renderer);
 
-    const {domElement: canvas} = this.renderer!;
-    this.#canvasClassName = Stylesheets.addRule(
-      canvas,
-      Display.CssRulesPrefixDisplay,
-      'touch-action: none;',
-      this.styleSheetRoot,
-    );
-    canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
+    // From here on a throw takes down what the constructor has built, as dispose() does: it
+    // releases the renderer, gives a canvas handed in back and takes its own container out.
+    // dispose() needs #waitForRenderer and frameLoop, which is why both stand before the try
+    try {
+      const {domElement: canvas} = this.renderer!;
+      this.#canvasClassName = Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, CANVAS_RULE_CSS, this.#styleSheetRoot);
+      canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
-    this.resizeToElement = resizeToElement ?? this.resizeToElement;
-    this.resizeToAttributeEl = resizeToAttributeEl ?? canvas;
+      this.resizeToElement = resizeToElement ?? this.resizeToElement;
+      this.resizeToAttributeEl = resizeToAttributeEl ?? canvas;
 
-    this.resize();
+      this.resize();
 
-    on(this.#stateMachine, {
-      [DisplayStateMachine.Init]: () => this.#emit(OnDisplayInit),
+      on(this.#stateMachine, {
+        [DisplayStateMachine.Init]: () => this.#emit(OnDisplayInit),
 
-      [DisplayStateMachine.Restart]: () => this.#emit(OnDisplayRestart),
+        [DisplayStateMachine.Restart]: () => this.#emit(OnDisplayRestart),
 
-      [DisplayStateMachine.Start]: () => {
-        const t = performance.now() / 1000;
-        this.#chronometer.start(t);
-        this.#chronometer.update(t);
+        [DisplayStateMachine.Start]: () => {
+          const t = performance.now() / 1000;
+          this.#chronometer.start(t);
+          this.#chronometer.update(t);
 
-        // on the loop before the event goes out: a start listener may set pause = true right
-        // away, the pause handler takes the display off the loop then, and a subscription after
-        // the emit would put a paused display back on it
-        this.frameLoop.start(this);
+          // on the loop before the event goes out: a start listener may set pause = true right
+          // away, the pause handler takes the display off the loop then, and a subscription after
+          // the emit would put a paused display back on it
+          this.frameLoop.start(this);
 
-        this.#emit(OnDisplayStart);
-      },
+          this.#emit(OnDisplayStart);
+        },
 
-      [DisplayStateMachine.Pause]: () => {
-        this.#chronometer.stop(performance.now() / 1000);
+        [DisplayStateMachine.Pause]: () => {
+          this.#chronometer.stop(performance.now() / 1000);
 
-        // off the loop before the event goes out, for the mirrored reason: a pause listener that
-        // sets pause = false starts the display again right away, and an unsubscription after the
-        // emit would take a running display off its loop
-        this.frameLoop.stop(this);
+          // off the loop before the event goes out, for the mirrored reason: a pause listener that
+          // sets pause = false starts the display again right away, and an unsubscription after the
+          // emit would take a running display off its loop
+          this.frameLoop.stop(this);
 
-        retainClear(this, OnDisplayStart);
+          retainClear(this, OnDisplayStart);
 
-        this.#emit(OnDisplayPause);
-      },
-    });
-
-    const onDocVisibilityChange = () => {
-      this.#stateMachine.documentIsVisible = !document.hidden;
-    };
-
-    document.addEventListener('visibilitychange', onDocVisibilityChange, false);
-
-    once(this, OnDisplayDispose, () => {
-      document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
-    });
-
-    onDocVisibilityChange();
-
-    if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
-      const observer = new IntersectionObserver((entries) => {
-        // the entries of one callback arrive in time order, and the last one is where the
-        // canvas is now
-        const entry = entries[entries.length - 1];
-        if (entry != null) {
-          this.#stateMachine.elementIsInsideViewport = entry.isIntersecting;
-        }
+          this.#emit(OnDisplayPause);
+        },
       });
-      observer.observe(canvas);
+
+      const onDocVisibilityChange = () => {
+        this.#stateMachine.documentIsVisible = !document.hidden;
+      };
+
+      document.addEventListener('visibilitychange', onDocVisibilityChange, false);
+
       once(this, OnDisplayDispose, () => {
-        observer.disconnect();
+        document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
-    }
 
-    this.#waitForRenderer.catch((error) => {
-      // a renderer that never comes up is what the caller has to hear about; left here it
-      // would be an unhandled rejection and the display would simply stay dark
-      emit(this, OnDisplayError, error, this);
-    });
+      onDocVisibilityChange();
+
+      if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
+        const observer = new IntersectionObserver((entries) => {
+          // the entries of one callback arrive in time order, and the last one is where the
+          // canvas is now
+          const entry = entries[entries.length - 1];
+          if (entry != null) {
+            this.#stateMachine.elementIsInsideViewport = entry.isIntersecting;
+          }
+        });
+        observer.observe(canvas);
+        once(this, OnDisplayDispose, () => {
+          observer.disconnect();
+        });
+      }
+
+      this.#waitForRenderer.catch((error) => {
+        // a renderer that never comes up is what the caller has to hear about; left here it
+        // would be an unhandled rejection and the display would simply stay dark
+        emit(this, OnDisplayError, error, this);
+      });
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   /**
@@ -1007,8 +1085,8 @@ export class Display {
     if (wantsFullscreen) {
       this.#fullscreenClassName ??= Stylesheets.installRule(
         Display.CssRulesPrefixFullscreen,
-        'position:fixed;top:0;left:0;',
-        this.styleSheetRoot,
+        FULLSCREEN_RULE_CSS,
+        this.#styleSheetRoot,
       );
       canvas.classList.add(this.#fullscreenClassName);
     } else if (this.#fullscreenClassName != null) {
@@ -1016,6 +1094,19 @@ export class Display {
     }
 
     this.#fullscreenClassApplied = wantsFullscreen;
+  }
+
+  // The rules this display has installed so far, now in `root` as well. The class names do not
+  // depend on the root, so the elements keep their classes. The rules in the previous root stay:
+  // other displays may share them, and installRule() pins them there anyway
+  #installRules(root: HTMLElement | ShadowRoot): void {
+    if (this.#ownContainer != null) {
+      Stylesheets.installRule(Display.CssRulesPrefixContainer, CONTAINER_RULE_CSS, root);
+    }
+    Stylesheets.installRule(Display.CssRulesPrefixDisplay, CANVAS_RULE_CSS, root);
+    if (this.#fullscreenClassName != null) {
+      Stylesheets.installRule(Display.CssRulesPrefixFullscreen, FULLSCREEN_RULE_CSS, root);
+    }
   }
 
   // The size of the source in CSS pixels
@@ -1256,7 +1347,8 @@ export class Display {
    * Before it returns, `dispose()` stops the frame loop, fires `OnDisplayDispose`, drops every
    * listener, gives up {@link Display.renderer} and takes a container this display built out of
    * the DOM, with the canvas in it. The renderer itself is released after the return, with
-   * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it.
+   * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it,
+   * or for two seconds at most, and goes on with a warning on the console after that.
    *
    * A canvas handed to the constructor goes back to the caller as the display found it: its
    * classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute
@@ -1274,7 +1366,8 @@ export class Display {
    * canvas tries again.
    *
    * A `dispose()` while the renderer is still initializing waits for that init instead of
-   * cutting it short. An init that fails has built nothing to release, and its rejection does
+   * cutting it short. An init that fails leaves nothing to release but the `webglcontextlost`
+   * listener three has put on the canvas, which the release takes off, and its rejection does
    * not escape. A second call does nothing.
    */
   dispose(): void {
@@ -1341,9 +1434,11 @@ export class Display {
           if (lost != null) lostContexts.set(canvas, lost);
         },
         () => {
-          // a failed init has built nothing that renderer.dispose() would release, and its
-          // setAnimationLoop(null) would wait on the rejected init once more — a rejection that
-          // nobody could catch
+          // a failed init has built nothing that renderer.dispose() would release but the
+          // webglcontextlost listener three put on the canvas before it failed, and that listener
+          // goes here. renderer.dispose() itself stays uncalled: its setAnimationLoop(null) would
+          // wait on the rejected init once more — a rejection that nobody could catch
+          dropContextLostListener(renderer);
         },
       )
       .catch((error: unknown) => {
