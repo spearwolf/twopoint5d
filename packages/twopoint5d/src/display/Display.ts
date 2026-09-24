@@ -1162,7 +1162,7 @@ export class Display {
    * say. Before the first start the loop follows `pause` too: a `stop()` or `pause = true` stops
    * it — one that comes while `renderer.init()` still runs stops it once the init has started
    * it — also when that call keeps the first `start()` from starting the display, and a
-   * `pause = false` or the next `start()` runs it again. A callback that goes on the renderer
+   * `pause = false` or the next `start()` runs it again. A callback that is set on the renderer
    * after the display has stopped the loop — through `renderer.setAnimationLoop()`, or through a
    * {@link FrameLoop} that starts on the renderer — gets no frame while the loop stands still.
    *
@@ -1734,8 +1734,8 @@ export class Display {
     // the display is off its frame loop here, and the rAF driver keeps its callback on the
     // renderer only while a FrameLoop is still on the driver. A callback left on the loop — the
     // driver's, or one the caller has set with renderer.setAnimationLoop() before the first
-    // start — keeps the loop running, and its frames go on. One that goes on the renderer after
-    // the display has stopped the loop gets no frame while it stands still
+    // start — keeps the loop running, and its frames go on. One that is set on the renderer after
+    // the display has stopped the loop gets no frame while the loop stands still
     if (renderer.getAnimationLoop() != null) return;
     animation.stop();
     this.#stoppedAnimationOfThree = animation;
