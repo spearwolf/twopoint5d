@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-24T12:54:08.951Z"
+    "generatedAt": "2026-09-24T14:29:27.247Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -199,12 +199,12 @@
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
         "score": 71,
-        "penalty": 60,
+        "penalty": 59.5,
         "bySeverity": {
           "critical": 0,
           "high": 2,
           "medium": 15,
-          "low": 40,
+          "low": 39,
           "info": 25
         },
         "byCategory": {
@@ -216,7 +216,7 @@
           "security": 1,
           "resources": 1,
           "architecture": 2,
-          "async": 2,
+          "async": 1,
           "readability": 5,
           "types": 4,
           "dx": 7,
@@ -251,7 +251,7 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 105,
+        "findings": 104,
         "score": 77
       },
       {
@@ -276,7 +276,7 @@
         "score": 95
       }
     ],
-    "resolvedCount": 74,
+    "resolvedCount": 76,
     "scoreModel": 2,
     "score": 69,
     "scoring": {
@@ -296,7 +296,7 @@
       "critical": 0,
       "high": 2,
       "medium": 22,
-      "low": 72,
+      "low": 71,
       "info": 42
     },
     "byCategory": {
@@ -312,7 +312,7 @@
       "architecture": 2,
       "testing": 18,
       "dependencies": 3,
-      "async": 2,
+      "async": 1,
       "readability": 8,
       "build": 1
     },
@@ -322,13 +322,13 @@
       "stage": 25,
       "sprites": 8,
       "controls": 4,
-      "display": 2
+      "display": 1
     },
     "counts": {
-      "findings": 138,
+      "findings": 137,
       "improvements": 16,
       "byStatus": {
-        "new": 44,
+        "new": 43,
         "unchanged": 11,
         "improved": 7,
         "carried-over": 76
@@ -342,7 +342,7 @@
     "lastRun": {
       "source": "remediation",
       "date": "2026-09-24",
-      "ref": "2026-09-24"
+      "ref": "main"
     }
   },
   "portrait": {
@@ -2818,27 +2818,6 @@
       "effort": "S"
     },
     {
-      "id": "BUG-124",
-      "category": "correctness",
-      "severity": "low",
-      "title": "Ein OnDisplayStart-Listener, der wirft, lässt ein laufendes Display und ein rejectetes start() zurück",
-      "location": "packages/twopoint5d/src/display/DisplayStateMachine.ts",
-      "locations": [
-        "packages/twopoint5d/src/display/Display.ts"
-      ],
-      "description": "`#initOrRestartThenStart()` setzt `state = RUNNING`, bevor es `Start` emittiert. Wirft ein `OnDisplayStart`-Listener synchron, läuft das Display (`RUNNING`, am Frame-Loop), `start()` rejected, spätere Listener hören `OnDisplayStart` nie, und weil `emit()` abbricht, bevor der Wert retained ist, auch späte Subscriber nicht. Bestand schon vor dem Remediation-Lauf vom 2026-09-24. Offene Frage: soll das Display bei einem werfenden Start-Listener laufen bleiben, zurückgerollt werden (Frame-Loop und Chronometer) oder eine Pause emittieren?",
-      "recommendation": "Die Frage entscheiden; danach das Emittieren so kapseln, dass alle Listener und späte Subscriber das Ereignis bekommen (wie beim Init-Listener gelöst), und den Zustand passend zur Entscheidung setzen. Test zuerst.",
-      "component": "display",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "code",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "effort": "S"
-    },
-    {
       "id": "PERF-032",
       "category": "performance",
       "severity": "low",
@@ -2861,13 +2840,13 @@
       "effort": "S"
     },
     {
-      "id": "ASYNC-007",
-      "category": "async",
+      "id": "BUG-125",
+      "category": "correctness",
       "severity": "info",
-      "title": "Nach 2000 ms verborgener Seite wird der Canvas erst nach der Device-Zerstörung präsentiert",
-      "location": "packages/twopoint5d/src/display/Display.ts",
-      "description": "`drainSubmittedWork()` wartet höchstens `SUBMITTED_WORK_TIMEOUT_MS = 2000`, danach zwei Animation Frames, dann `renderer.dispose()`. Bleibt eine Seite länger verborgen, präsentiert der Browser den Canvas erst beim Sichtbarwerden, und dann ist das Device schon zerstört. Headless nicht prüfbar; Restrisiko des Fixes für den Firefox/WebGPU-rAF-Stillstand aus dem Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "Bei verborgener Seite die Freigabe bis `visibilitychange` aufschieben oder das Risiko in `docs/resource-lifecycle.md` nennen.",
+      "title": "Ein OnDisplayPause-Listener, der beim Zurückrollen eines gescheiterten Starts wirft, verdrängt den Fehler des Start-Listeners",
+      "location": "packages/twopoint5d/src/display/DisplayStateMachine.ts:158",
+      "description": "Wirft ein `OnDisplayStart`-Listener, setzt `#initOrRestartThenStart()` die User-Pause und ruft `#pause()`, das `Pause` mit `emit()` statt `emitStrict()` emittiert. Wirft dabei auch ein `OnDisplayPause`-Listener, rejected `start()` mit dessen Fehler; der ursprüngliche Fehler des Start-Listeners geht verloren, ohne `cause`. Der Zustand bleibt konsistent, weil `PAUSED` vor dem Emit gesetzt wird. Restgrenze des Fixes für werfende Start-Listener (Commit `3d8bb8b1`), vom Reviewer als kleiner Befund gemeldet.",
+      "recommendation": "Den Fehler des Pause-Emits im Rollback fangen und beide als `AggregateError` weiterreichen, oder den Start-Fehler als `cause` anhängen. Test zuerst.",
       "component": "display",
       "origin": {
         "kind": "induced",
@@ -2901,7 +2880,8 @@
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus einem Einzel-Fix auf `main` ohne Remediation-Plan: 1 Commit (`3d8bb8b1`). BUG-124 (werfender `OnDisplayStart`-Listener: alle Listener hören das Event, danach User-Pause wie `stop()`, `start()` rejected) und ASYNC-007 (bei verborgener Seite wartet die WebGPU-Freigabe bis zur Sichtbarkeit und zwei Frames) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 1 induzierter kleiner Befund ging als neues Finding ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -3078,6 +3058,16 @@
       "inducedFixed": 9,
       "inducedOpen": 2,
       "discovered": 32,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-24",
+      "source": "remediation",
+      "ref": "main",
+      "fixed": 2,
+      "inducedFixed": 0,
+      "inducedOpen": 1,
+      "discovered": 0,
       "attribution": "reviewed"
     }
   ],
