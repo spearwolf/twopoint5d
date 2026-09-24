@@ -13,11 +13,11 @@ export interface DisplayEventProps {
 }
 
 /**
- * Supplies the size of a display in CSS pixels, once per {@link Display.resize}. Return
- * `undefined` while there is no size to report — an element that has not been laid out
- * yet, for example. A pair in which either value is not a finite number counts as no size
- * as well. Without a size the display takes the window under `resize-to="window"` or
- * `"fullscreen"`, and 300 × 150 otherwise.
+ * Supplies the size of a display in CSS pixels, once per measurement of
+ * {@link Display.resize}. Return `undefined` while there is no size to report — an element that
+ * has not been laid out yet, for example. A pair in which either value is not a finite number
+ * counts as no size as well. Without a size the display takes the window under
+ * `resize-to="window"` or `"fullscreen"`, and 300 × 150 otherwise.
  */
 export type ResizeDisplayToFn = (display: Display) => [width: number, height: number] | undefined;
 
@@ -60,8 +60,9 @@ export interface DisplayParameters extends DisplayRendererParameters {
   pauseOutsideViewport?: boolean;
 
   /**
-   * If a function is specified here, it is called for each frame and returns the size of the
-   * display: width and height in CSS pixels.
+   * If a function is specified here, it is called with every measurement of
+   * {@link Display.resize} (every frame, unless {@link Display.resizePollIntervalMs} spaces them
+   * out) and returns the size of the display: width and height in CSS pixels.
    *
    * With it, the display measures no element. What happens while the function reports no
    * size is described at {@link ResizeDisplayToFn}.
@@ -70,14 +71,16 @@ export interface DisplayParameters extends DisplayRendererParameters {
 
   /**
    * If an HTML element is specified here, the size of this element is determined
-   * at the beginning of each frame and the display is synchronized accordingly
-   * (only the size, not the position).
+   * with every measurement of {@link Display.resize} (every frame, unless
+   * {@link Display.resizePollIntervalMs} spaces them out) and the display is synchronized
+   * accordingly (only the size, not the position).
    */
   resizeToElement?: HTMLElement;
 
   /**
-   * At the beginning of each frame, this HTML element is queried for a `resize-to` attribute
-   * and read out. If nothing is specified, then this is the canvas element.
+   * With every measurement of {@link Display.resize} (every frame, unless
+   * {@link Display.resizePollIntervalMs} spaces them out), this HTML element is queried for a
+   * `resize-to` attribute and read out. If nothing is specified, then this is the canvas element.
    *
    * The `resize-to` attribute can contain either `"fullscreen"` or `"window"` as a value,
    * or alternatively `"self"`. With `"self"`, the display measures its `resizeToElement` — by

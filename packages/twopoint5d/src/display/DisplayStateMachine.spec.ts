@@ -167,6 +167,19 @@ describe('DisplayStateMachine', () => {
     expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
   });
 
+  it('an init listener that calls start() gets no restart: init, then start', () => {
+    const stateMachine = new DisplayStateMachine();
+    const events = recordEvents(stateMachine);
+    once(stateMachine, DisplayStateMachine.Init, () => {
+      stateMachine.start();
+    });
+
+    stateMachine.start();
+
+    expect(events).toEqual([DisplayStateMachine.Init, DisplayStateMachine.Start]);
+    expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
+  });
+
   it('a pause set by a restart listener holds the state machine in the pause', () => {
     const stateMachine = new DisplayStateMachine();
     stateMachine.start();
@@ -187,30 +200,23 @@ describe('DisplayStateMachine', () => {
     stateMachine.start();
     stateMachine.pausedByUser = true;
     const events = recordEvents(stateMachine);
-    let toggled = false;
-    on(stateMachine, DisplayStateMachine.Restart, () => {
-      // the toggle below restarts from inside this listener, which the restart reaches again
-      if (toggled) return;
-      toggled = true;
+    once(stateMachine, DisplayStateMachine.Restart, () => {
       stateMachine.pausedByUser = true;
       stateMachine.pausedByUser = false;
     });
 
     stateMachine.pausedByUser = false;
 
-    expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Restart, DisplayStateMachine.Start]);
+    expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Start]);
     expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
   });
 
-  it('a restart listener whose nested restart ends in a new pause leaves that pause as the only one', () => {
+  it('a restart listener that pauses, un-pauses and pauses again holds the state machine in the pause', () => {
     const stateMachine = new DisplayStateMachine();
     stateMachine.start();
     stateMachine.pausedByUser = true;
     const events = recordEvents(stateMachine);
-    let toggled = false;
-    on(stateMachine, DisplayStateMachine.Restart, () => {
-      if (toggled) return;
-      toggled = true;
+    once(stateMachine, DisplayStateMachine.Restart, () => {
       stateMachine.pausedByUser = true;
       stateMachine.pausedByUser = false;
       stateMachine.pausedByUser = true;
@@ -218,14 +224,7 @@ describe('DisplayStateMachine', () => {
 
     stateMachine.pausedByUser = false;
 
-    // the state is PAUSED again, as it was before the outer restart went out, and still the
-    // outer restart has nothing left to do: the nested one has run to its end
-    expect(events).toEqual([
-      DisplayStateMachine.Restart,
-      DisplayStateMachine.Restart,
-      DisplayStateMachine.Start,
-      DisplayStateMachine.Pause,
-    ]);
+    expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Pause]);
     expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);
   });
 });

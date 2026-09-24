@@ -44,14 +44,13 @@ class RAF {
   // timestamp to measure against, so it anchors the window instead of producing a sample.
   #needsMeasureAnchor = true;
 
-  frameNo = 0;
+  #frameNo = 0;
 
-  measureOnFrame = 0;
-  measureTimeBegin = 0;
-  measureTimeEnd = 0;
+  #measureOnFrame = 0;
+  #measureTimeBegin = 0;
 
-  measuredFps = 0;
-  measuredFpsCollection: number[] = [];
+  #measuredFps = 0;
+  #measuredFpsCollection: number[] = [];
 
   constructor(private readonly renderer?: ISetAnimationLoop) {
     eventize(this);
@@ -82,11 +81,11 @@ class RAF {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
     }
 
-    this.measureFps(now);
+    this.#measureFps(now);
 
-    ++this.frameNo;
+    ++this.#frameNo;
 
-    emit(this, OnRAF, now, this.frameNo, this.measuredFps);
+    emit(this, OnRAF, now, this.#frameNo, this.#measuredFps);
   };
 
   start() {
@@ -113,39 +112,38 @@ class RAF {
     // the anchor and the samples are one state: a window that has to be anchored again has no
     // samples to average, or the first fresh sample would be mixed with the rate from before
     this.#needsMeasureAnchor = true;
-    this.measuredFpsCollection.length = 0;
+    this.#measuredFpsCollection.length = 0;
   }
 
-  measureFps(now: number) {
+  #measureFps(now: number) {
     if (this.#needsMeasureAnchor) {
       // The tick that opens a measurement window anchors it. There is no previous timestamp to
       // measure against yet, and a window anchored at 0 — or across the span in which nobody
       // asked for a frame — reports an fps the renderer never ran at.
-      this.measureTimeBegin = now;
-      this.measureOnFrame = this.frameNo + MEASURE_FPS_AFTER_NTH_FRAME;
+      this.#measureTimeBegin = now;
+      this.#measureOnFrame = this.#frameNo + MEASURE_FPS_AFTER_NTH_FRAME;
       this.#needsMeasureAnchor = false;
       return;
     }
-    if (this.frameNo >= this.measureOnFrame) {
-      this.measureTimeEnd = now;
-      const measuredFps = Math.round(1000 / ((this.measureTimeEnd - this.measureTimeBegin) / MEASURE_FPS_AFTER_NTH_FRAME));
-      this.measureOnFrame = this.frameNo + MEASURE_FPS_AFTER_NTH_FRAME;
-      this.measureTimeBegin = now;
+    if (this.#frameNo >= this.#measureOnFrame) {
+      const measuredFps = Math.round(1000 / ((now - this.#measureTimeBegin) / MEASURE_FPS_AFTER_NTH_FRAME));
+      this.#measureOnFrame = this.#frameNo + MEASURE_FPS_AFTER_NTH_FRAME;
+      this.#measureTimeBegin = now;
 
-      this.measuredFpsCollection.push(measuredFps);
+      this.#measuredFpsCollection.push(measuredFps);
 
       // Trimmed before it is averaged: a collection that still carries the sample beyond the
       // window would average over one value more than the window is named for.
-      while (this.measuredFpsCollection.length > MEASURE_COLLECTION_SIZE) {
-        this.measuredFpsCollection.shift();
+      while (this.#measuredFpsCollection.length > MEASURE_COLLECTION_SIZE) {
+        this.#measuredFpsCollection.shift();
       }
 
-      if (this.measuredFpsCollection.length >= MEASURE_COLLECTION_SIZE) {
-        this.measuredFps = Math.round(
-          this.measuredFpsCollection.reduce((sum, fps) => sum + fps, 0) / this.measuredFpsCollection.length,
+      if (this.#measuredFpsCollection.length >= MEASURE_COLLECTION_SIZE) {
+        this.#measuredFps = Math.round(
+          this.#measuredFpsCollection.reduce((sum, fps) => sum + fps, 0) / this.#measuredFpsCollection.length,
         );
       } else {
-        this.measuredFps = measuredFps;
+        this.#measuredFps = measuredFps;
       }
     }
   }
@@ -194,10 +192,42 @@ export class FrameLoop {
   #nextEmitAt = 0;
   #emitTolerance = 0;
 
-  frameNo = 0;
-  now = 0;
-  deltaTime = 0;
-  measuredFps = 0;
+  #frameNo = 0;
+  #now = 0;
+  #deltaTime = 0;
+  #measuredFps = 0;
+
+  /**
+   * The number of frames this loop has emitted — `0` before the first, one more with every frame
+   * it emits; a frame `maxFps` holds back does not count.
+   */
+  get frameNo(): number {
+    return this.#frameNo;
+  }
+
+  /**
+   * The rAF timestamp of the frame this loop emitted last, in milliseconds; `0` before the first.
+   * `FrameLoop.OnFrame` carries it in seconds.
+   */
+  get now(): number {
+    return this.#now;
+  }
+
+  /**
+   * The milliseconds between the last two frames this loop emitted; `0` for the first.
+   * `FrameLoop.OnFrame` carries it in seconds.
+   */
+  get deltaTime(): number {
+    return this.#deltaTime;
+  }
+
+  /**
+   * The frame rate the rAF driver has measured, as of the frame this loop emitted last; `0` until
+   * the driver has measured its first window.
+   */
+  get measuredFps(): number {
+    return this.#measuredFps;
+  }
 
   get subscriptionCount() {
     return this.#subscribers.size;
@@ -265,10 +295,10 @@ export class FrameLoop {
     }
 
     const prevNow = this.#lastNow;
-    this.now = now;
-    ++this.frameNo;
-    this.measuredFps = measuredFps;
-    this.deltaTime = prevNow == null ? 0 : now - prevNow;
+    this.#now = now;
+    ++this.#frameNo;
+    this.#measuredFps = measuredFps;
+    this.#deltaTime = prevNow == null ? 0 : now - prevNow;
     this.#lastNow = now;
 
     if (this.#maxFps > 0) {
@@ -283,9 +313,9 @@ export class FrameLoop {
     emit(this, FrameLoop.OnFrame, {
       now: now / 1000,
       lastNow: (prevNow ?? now) / 1000,
-      frameNo: this.frameNo,
-      deltaTime: this.deltaTime / 1000,
-      measuredFps: this.measuredFps,
+      frameNo: this.#frameNo,
+      deltaTime: this.#deltaTime / 1000,
+      measuredFps: this.#measuredFps,
     });
   };
 

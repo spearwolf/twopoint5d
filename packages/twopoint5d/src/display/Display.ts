@@ -379,6 +379,12 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    outside the viewport, from the first report of the observer on.
  * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
  *    (once), then `OnDisplayStart`, and begins emitting `OnDisplayRenderFrame`.
+ *    While the tab is hidden — or, with {@link DisplayParameters.pauseOutsideViewport},
+ *    once the observer has reported the canvas out of view before the start,
+ *    see {@link Display.start} — the display goes into the pause instead and
+ *    fires `OnDisplayPause`; `OnDisplayInit` and `OnDisplayStart` follow once
+ *    it can run. A {@link Display.stop} or a `pause = true` that comes in
+ *    while `start()` waits keeps the display from starting.
  *    The display stands on its {@link FrameLoop} only while it runs: it is
  *    subscribed when it starts and taken off again when it pauses. A
  *    listener of `OnDisplayInit` or `OnDisplayRestart` that pauses the
@@ -410,7 +416,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    earlier that is still pending. {@link Display.width},
  *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
  *    {@link Display.deltaTime} keep their last value, {@link Display.pixelRatio}
- *    keeps reading the window and {@link Display.isRunning} is `false`. No further
+ *    keeps reading the window, {@link Display.isRunning} is `false` and
+ *    {@link Display.pause} answers `true`. No further
  *    event is emitted — no `OnDisplayRenderFrame`, no `OnDisplayResize`, no
  *    `OnDisplayError` — and a listener attached afterwards receives nothing, not
  *    even a retained value.
@@ -418,9 +425,10 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * ## Resize model
  *
  * **There is no `window.resize` listener.** {@link Display.resize} is invoked
- * at the beginning of every frame from {@link Display.renderFrame}, so the
- * canvas size, the `THREE` renderer size and the `pixelRatio` are always
- * re-evaluated against the current DOM/window state on the next frame. This
+ * at the beginning of every frame from {@link Display.renderFrame} and measures
+ * there, unless {@link Display.resizePollIntervalMs} holds the measurement back;
+ * with every measurement the canvas size, the `THREE` renderer size and the
+ * `pixelRatio` are re-evaluated against the current DOM/window state. This
  * is a deliberate design decision: it covers window resizes, container
  * reflows, devicePixelRatio changes, `resize-to` attribute mutations and
  * `resizeToElement` swaps uniformly, without registering DOM listeners that
@@ -429,7 +437,7 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * nothing. Apart from that, every call compares `image-rendering` against
  * the inline style of the canvas.
  *
- * The size source is resolved in this priority order, on every `resize()`:
+ * The size source is resolved in this priority order, with every measurement:
  *
  * 1. If {@link Display.resizeToAttributeEl} carries a `resize-to` attribute,
  *    its value selects the source:
@@ -452,7 +460,7 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      an element inserted in front of it later that matches as well does
  *      not take over. Once the found element leaves the root or stops
  *      matching, the next `resize()` looks the selector up again.
- * 2. If {@link Display.resizeToCallback} is set, it is called every frame and
+ * 2. If {@link Display.resizeToCallback} is set, it is called with every measurement and
  *    its `[width, height]` return value wins over any element-based size
  *    measurement (the `resize-to` attribute still controls the
  *    fullscreen-CSS toggle, but its measured size is discarded). A result of
@@ -474,14 +482,15 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * and written only where the inline style differs, see
  * {@link Display.styleImageRendering}.
  *
- * `OnDisplayResize` is emitted **exactly once** per frame. On the first
- * rendered frame the event always fires (so listeners attached before
- * `start()` receive a guaranteed initial-size event); on subsequent frames
- * it fires only when the resize hash actually changed. The constructor's
- * initial `resize()` does **not** emit, because `frameNo` is still `0` and
- * listeners cannot be attached yet — `OnDisplayResize` is also `retain`ed
- * so subscribers attaching after the first frame still receive the latest
- * size on subscription.
+ * `OnDisplayResize` goes out from a {@link Display.resize} whose measurement
+ * changes the size, the pixel ratio or the pixel zoom, once the first frame has
+ * begun (`frameNo > 0`) — the call at the start of a frame, or one of your own
+ * in between, which emits on its own. The first rendered frame emits it in any
+ * case, exactly once: where its `resize()` has not, {@link Display.renderFrame}
+ * does, so listeners attached before `start()` receive the initial size. The
+ * constructor's initial `resize()` does **not** emit, because `frameNo` is
+ * still `0` — `OnDisplayResize` is also `retain`ed, so subscribers attaching
+ * after the first frame still receive the latest size on subscription.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Display extends EventizedObject {}
@@ -544,9 +553,8 @@ export class Display {
   /**
    * Set by `resize()` to mark whether it emitted `OnDisplayResize` on its
    * most recent invocation. Read by `renderFrame()` to decide whether the
-   * first-frame fallback emit is still needed — guarantees that
-   * `OnDisplayResize` fires exactly once on the first frame and exactly once
-   * per subsequent frame in which the resize hash actually changed.
+   * first frame still needs its fallback emit, so the first frame emits
+   * `OnDisplayResize` exactly once.
    */
   #didEmitResize = false;
 
@@ -595,14 +603,22 @@ export class Display {
   #height = 0;
 
   /**
-   * The width of the canvas is recalculated for each frame.
+   * The width of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
+   * above `0`, and rounded down —, as the last measurement of {@link Display.resize} left it. The
+   * events of the display carry it as `width`. It follows the size source with every
+   * measurement: at the start of every frame, or less often with
+   * {@link Display.resizePollIntervalMs}.
    */
   get width(): number {
     return this.#width;
   }
 
   /**
-   * The height of the canvas is recalculated for each frame.
+   * The height of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
+   * above `0`, and rounded down —, as the last measurement of {@link Display.resize} left it. The
+   * events of the display carry it as `height`. It follows the size source with every
+   * measurement: at the start of every frame, or less often with
+   * {@link Display.resizePollIntervalMs}.
    */
   get height(): number {
     return this.#height;
@@ -635,8 +651,8 @@ export class Display {
   }
 
   /**
-   * The HTML element whose content-area size drives the canvas size each
-   * frame, when no `resize-to` attribute and no
+   * The HTML element whose content-area size drives the canvas size with
+   * every measurement of {@link Display.resize}, when no `resize-to` attribute and no
    * {@link Display.resizeToCallback} take precedence.
    *
    * Defaults to:
@@ -647,16 +663,18 @@ export class Display {
    *   container is created inside it and the canvas is appended there).
    *
    * Can be overridden via {@link DisplayParameters.resizeToElement} in the
-   * constructor or reassigned at runtime — the next frame's `resize()` picks
-   * up the change.
+   * constructor or reassigned at runtime — the next measurement of
+   * {@link Display.resize} picks up the change.
    *
    * @see {@link DisplayParameters.resizeToElement}
    */
   resizeToElement?: HTMLElement;
 
   /**
-   * Optional per-frame size provider. If set, it is invoked at the start of
-   * each frame and its returned `[width, height]` (in CSS pixels) overrides
+   * Optional size provider. If set, it is invoked with every measurement of
+   * {@link Display.resize} — at the start of each frame, unless
+   * {@link Display.resizePollIntervalMs} spaces the measurements out — and
+   * its returned `[width, height]` (in CSS pixels) overrides
    * any element-based measurement. Use this for app-specific sizing logic
    * (e.g. fitting to a UI panel, applying min/max constraints, locking
    * aspect ratio).
@@ -673,8 +691,8 @@ export class Display {
   resizeToCallback?: ResizeDisplayToFn;
 
   /**
-   * The HTML element that {@link Display.resize} consults each frame for the
-   * `resize-to` attribute. Defaults to the canvas element, but you can point
+   * The HTML element that {@link Display.resize} consults with every measurement for
+   * the `resize-to` attribute. Defaults to the canvas element, but you can point
    * it at a wrapper if you prefer to control sizing declaratively from the
    * outside (see {@link DisplayParameters.resizeToAttributeEl}).
    *
@@ -1026,14 +1044,18 @@ export class Display {
   }
 
   /**
-   * Whether the frame loop is paused.
+   * Whether the display is paused: `true` while it holds in the pause — through `pause = true`,
+   * {@link Display.stop}, a hidden tab or, with {@link DisplayParameters.pauseOutsideViewport}, a
+   * canvas outside the viewport —, and before the first start once `stop()` or `pause = true`
+   * has been called and no `pause = false` since. A write sets the pause the caller asks for; see
+   * {@link Display.start} for how it meets a pending start.
    *
-   * After {@link Display.dispose} a write does nothing, while the getter keeps reading the
-   * state the display was left in — one that was running when it was disposed answers `true`,
-   * whatever is written to it.
+   * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */
   get pause(): boolean {
-    return this.#stateMachine.state === DisplayStateMachine.PAUSED;
+    // in RUNNING the user pause is never set — a write of it pauses right away —, and in PAUSED
+    // the answer is true anyway: only a display that has not started yet answers from it
+    return this.#stateMachine.isPaused || this.#stateMachine.pausedByUser;
   }
 
   set pause(pause: boolean) {
@@ -1337,7 +1359,8 @@ export class Display {
    * this order; a start after a pause emits `OnDisplayRestart`, then `OnDisplayStart`. A
    * listener of `OnDisplayInit` or `OnDisplayRestart` that calls {@link Display.stop} or sets
    * `pause = true` holds the display in the pause: `OnDisplayPause` follows instead of
-   * `OnDisplayStart`.
+   * `OnDisplayStart`. A `pause = false` after it in the same listener lets the display start,
+   * with one `OnDisplayRestart` and no second one.
    *
    * A {@link Display.stop} or a `pause = true` that comes in while `start()` waits wins: the
    * promise resolves with the display, which does not run. A `pause = false` after it lets the

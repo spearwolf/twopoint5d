@@ -114,33 +114,31 @@ export class DisplayStateMachine {
 
   #pause = (): void => {
     if (this.state !== DisplayStateMachine.PAUSED) {
-      this.#transitions += 1;
       this.state = DisplayStateMachine.PAUSED;
       emit(this, DisplayStateMachine.Pause);
     }
   };
 
-  // counts every transition that emits Start or Pause, so start() can tell whether a listener of
-  // Init or Restart has already run a transition of its own
-  #transitions = 0;
+  // set while the listeners of Init or Restart run. A start() from one of them does nothing:
+  // the call that emitted the event reads the inputs once they are through and emits the one
+  // Start or Pause that follows — a nested start would emit a Restart before either
+  #emittingInitOrRestart = false;
 
   #isPaused(): boolean {
     return this.#pausedByUser || !this.#documentIsVisible || !this.#elementIsInsideViewport;
   }
 
   #initOrRestartThenStart(): void {
-    const transitions = this.#transitions;
-    this.#initOrRestart();
+    this.#emittingInitOrRestart = true;
+    try {
+      this.#initOrRestart();
+    } finally {
+      this.#emittingInitOrRestart = false;
+    }
 
     // the listeners of Init and Restart run while the state is still NEW or PAUSED, where a
-    // change of the inputs moves nothing. So the inputs are read again here: a pause one of them
-    // asked for holds, and whoever heard init or restart hears pause next. A listener that has
-    // started or paused the state machine itself (a pause and un-pause inside a restart listener
-    // restarts it nested) has already taken it where it belongs, and a second Start or Pause
-    // from here would repeat what went out
-    if (this.#transitions !== transitions) return;
-
-    this.#transitions += 1;
+    // change of the inputs moves nothing and start() does nothing. So the inputs are read here:
+    // a pause one of them asked for holds, and whoever heard init or restart hears pause next
     if (this.#isPaused()) {
       this.state = DisplayStateMachine.PAUSED;
       emit(this, DisplayStateMachine.Pause);
@@ -162,6 +160,7 @@ export class DisplayStateMachine {
   };
 
   start(): void {
+    if (this.#emittingInitOrRestart) return;
     if (this.state !== DisplayStateMachine.RUNNING) {
       const isPaused = this.#isPaused();
 

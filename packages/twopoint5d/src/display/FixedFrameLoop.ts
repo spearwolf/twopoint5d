@@ -282,7 +282,9 @@ export class FixedFrameLoop {
     off(this);
   }
 
-  /** Subscribes `handler` to every simulation tick. Returns the function that takes it off again. */
+  /**
+   * Subscribes `handler` to every simulation tick. Returns the function that takes it off again.
+   */
   readonly onTick = (handler: (props: FixedFrameLoopTickProps) => unknown): UnsubscribeFunc => on(this, OnTick, handler);
 
   /**

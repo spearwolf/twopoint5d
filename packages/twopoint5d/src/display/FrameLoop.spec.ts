@@ -292,6 +292,22 @@ describe('FrameLoop', () => {
     expect(FrameLoop.OnFrame).toBe(Symbol.for('twopoint5d:FrameLoop.OnFrame'));
   });
 
+  it('frameNo, now, deltaTime and measuredFps are accessors without a setter', () => {
+    const loop = new FrameLoop();
+
+    for (const name of ['frameNo', 'now', 'deltaTime', 'measuredFps']) {
+      const descriptor = Object.getOwnPropertyDescriptor(FrameLoop.prototype, name);
+      expect(descriptor?.get, `${name} has a getter`).toBeTypeOf('function');
+      expect(descriptor?.set, `${name} has no setter`).toBeUndefined();
+
+      const before = (loop as unknown as Record<string, unknown>)[name];
+      expect(() => {
+        (loop as unknown as Record<string, unknown>)[name] = 1;
+      }, `a write to ${name}`).toThrow(TypeError);
+      expect((loop as unknown as Record<string, unknown>)[name], `${name} after the write`).toBe(before);
+    }
+  });
+
   describe('resetRAF()', () => {
     afterEach(() => {
       // the module state must not travel from one case into the next; the globals go last,
@@ -368,7 +384,10 @@ describe('FrameLoop', () => {
       vi.unstubAllGlobals();
     });
 
-    /** requestAnimationFrame and cancelAnimationFrame do not exist under node — they have to be put there */
+    /**
+     * requestAnimationFrame and cancelAnimationFrame do not exist under node — they have to be put
+     * there
+     */
     function stubAnimationFrame() {
       const rafIDs: number[] = [];
       const cancelled: number[] = [];
@@ -506,6 +525,29 @@ describe('FrameLoop', () => {
       }
 
       expect(events.at(-1)!.measuredFps, 'the first sample after the pause').toBe(30);
+    });
+
+    it('lets frameNo, now, deltaTime and measuredFps read what the last frame carried', () => {
+      const VSYNC = 1000 / 60;
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {events} = subscribe(loop);
+
+      // a full measurement window, so each of the four holds a value of its own
+      for (let i = 0; i < 31; i++) {
+        renderer.tick(1000 + i * VSYNC);
+      }
+      const last = events.at(-1)!;
+
+      expect(loop.frameNo, 'frameNo').toBe(31);
+      expect(loop.frameNo, 'frameNo against the props').toBe(last.frameNo);
+      // the getters answer in milliseconds, the props carry seconds
+      expect(loop.now, 'now').toBeCloseTo(1500);
+      expect(loop.now / 1000, 'now against the props').toBeCloseTo(last.now);
+      expect(loop.deltaTime, 'deltaTime').toBeCloseTo(VSYNC);
+      expect(loop.deltaTime / 1000, 'deltaTime against the props').toBeCloseTo(last.deltaTime);
+      expect(loop.measuredFps, 'measuredFps').toBe(60);
+      expect(loop.measuredFps, 'measuredFps against the props').toBe(last.measuredFps);
     });
   });
 });

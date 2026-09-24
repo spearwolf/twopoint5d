@@ -214,6 +214,41 @@ describe('Display', () => {
       expect(display.isRunning).toBe(true);
     });
 
+    it('a display stopped before its first start answers pause = true, and false after pause = false', () => {
+      const {display} = makeDisplay();
+
+      display.stop();
+
+      expect(display.pause).toBe(true);
+
+      display.pause = false;
+
+      expect(display.pause).toBe(false);
+
+      display.pause = true;
+
+      expect(display.pause).toBe(true);
+    });
+
+    it('a stop() while start() waits keeps pause at true', async () => {
+      const {display} = makeDisplay();
+
+      const started = display.start();
+      display.stop();
+      await started;
+
+      expect(display.pause).toBe(true);
+      expect(display.isRunning).toBe(false);
+    });
+
+    it('a disposed display that never ran answers pause = true', () => {
+      const {display} = makeDisplay();
+
+      display.dispose();
+
+      expect(display.pause).toBe(true);
+    });
+
     it('a stop() inside an init listener holds the display in the pause', async () => {
       const {display, events} = makeDisplay();
       once(display, OnDisplayInit, () => {
@@ -253,6 +288,22 @@ describe('Display', () => {
       display.pause = false;
 
       expect(events).toEqual([OnDisplayRestart, OnDisplayPause, OnDisplayRestart, OnDisplayStart]);
+      expect(display.isRunning).toBe(true);
+    });
+
+    it('a pause = true and a pause = false inside a restart listener restart the display once', async () => {
+      const {display, events} = makeDisplay();
+      await display.start();
+      display.pause = true;
+      events.length = 0;
+      once(display, OnDisplayRestart, () => {
+        display.pause = true;
+        display.pause = false;
+      });
+
+      display.pause = false;
+
+      expect(events).toEqual([OnDisplayRestart, OnDisplayStart]);
       expect(display.isRunning).toBe(true);
     });
 

@@ -300,4 +300,42 @@ describe('Chronometer', () => {
 
     expect(chronus.lostTime).toBe(lostTime);
   });
+
+  it('a start() with a time before the stop lets no time run backwards', () => {
+    const chronus = new Chronometer(0);
+    chronus.update(1000);
+    chronus.stop(1000);
+    const time = chronus.time;
+
+    chronus.start(990);
+
+    expect(chronus.time).toBe(time);
+
+    chronus.update(1010);
+
+    expect(chronus.deltaTime).toBe(10);
+    expect(chronus.time).toBe(1010);
+  });
+
+  it('a stop() with a time before the current one lets no time run backwards at the next start()', () => {
+    const chronus = new Chronometer(0);
+    chronus.update(1000);
+    chronus.stop(990);
+
+    chronus.start(1000);
+
+    expect(chronus.time).toBe(1000);
+  });
+
+  it('a start() with a time before the last update() of the pause lets no time run backwards', () => {
+    const chronus = new Chronometer(0);
+    chronus.update(1000);
+    chronus.stop(1000);
+    chronus.update(1010);
+    const time = chronus.time;
+
+    chronus.start(1005);
+
+    expect(chronus.time).toBe(time);
+  });
 });

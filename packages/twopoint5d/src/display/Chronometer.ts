@@ -120,13 +120,18 @@ export class Chronometer {
    * can close the pause-gap in {@link lostTime} even when no `update()`
    * is called during the pause.
    *
+   * A `time` before the latest one the chronometer has seen counts as that one: time does not
+   * run backwards.
+   *
    * No-op when already stopped.
    */
   stop(time?: number): void {
     if (this.#isRunning) {
       this.#isRunning = false;
       this.#recentlyLostTime = 0;
-      this.#pausedAt = getCurrentTime(time);
+      // a time before the latest one the chronometer has seen counts as that one, as in
+      // update() — time does not run backwards
+      this.#pausedAt = Math.max(getCurrentTime(time), this.#currentTime);
     }
   }
 
@@ -139,6 +144,9 @@ export class Chronometer {
    * `update()` produces a normal small delta instead of swallowing the
    * pause duration as a frame spike.
    *
+   * A `time` before the latest one the chronometer has seen counts as that one: time does not
+   * run backwards, and the "current time" is only ever advanced, never set back.
+   *
    * `deltaTime` is reset to `0` — no active phase has elapsed yet.
    *
    * No-op when already running.
@@ -146,7 +154,9 @@ export class Chronometer {
   start(time?: number): void {
     if (!this.#isRunning) {
       this.#isRunning = true;
-      const now = getCurrentTime(time);
+      // a time before the latest one the chronometer has seen counts as that one, as in
+      // update() — time does not run backwards
+      const now = Math.max(getCurrentTime(time), this.#currentTime);
       // Untracked pause duration: wall-clock elapsed since stop() minus
       // whatever update() already booked into recentlyLostTime.
       const gap = Math.max(0, now - this.#pausedAt - this.#recentlyLostTime);

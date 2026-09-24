@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedSprites#dispose()` releases neither the geometry nor the material: this mesh builds neither of them, both are handed to its constructor and stay the caller's. It takes itself out of the scene graph and gives both slots up
 - `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
-- a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter keeps reading the state the display was left in; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas`, `start()` and `getEventProps()` throw an error that names the class and the state; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter answers `true`; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `TextureStore#get()` rejects an id that is still missing once the first `parse()` has gone by, with the same error `TextureStore#whenResource()` throws, instead of waiting for a later `parse()`. A subscription through `TextureStore#on()` still waits
 - `TextureResource#dispose()` releases the texture the resource built for itself. Afterwards every getter of the resource answers `undefined`, while `id` and `type` still say which resource this was, and a write to a setter, a `load()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller. That dispose event is also the last event the store emits; afterwards `renderer` and `textureFactory` answer `undefined`, `parse()`, `load()`, `on()`, `onResource()` and a write to `renderer` do nothing, and `defaultTextureClasses` keeps its last value — a configuration array is no resource, and the answer stays right
@@ -138,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a disposed pool is turned away at the door: the `VOBufferGeometry` and `InstancedVOBufferGeometry` constructors and `InstancedVOBufferGeometry#attachInstancedPool()` throw when they are handed one, with a message naming the call and the state. A pool without buffers gives a route no attributes, and a geometry built over one draws nothing while looking like any other
 - `FrameLoop.OnFrame` is `Symbol.for('twopoint5d:FrameLoop.OnFrame')`: the key carries the library namespace, so no other code in the realm reaches the same channel by asking the symbol registry for a name as common as `onFrame`. Code that subscribes through `FrameLoop.OnFrame` needs no change; code that rebuilds the key from its string does — see the migration guide
 - `Display#renderer`, `#frameLoop` and `#frameNo` are read-only accessors on the prototype: a write is a type error and throws a `TypeError` at runtime. The display owns the renderer and the frame loop and releases both in `dispose()`, and it counts `frameNo` itself — see the migration guide
+- `FrameLoop#frameNo`, `#now`, `#deltaTime` and `#measuredFps` are read-only accessors on the prototype: a write is a type error and throws a `TypeError` at runtime. The loop counts and measures them itself; `now` and `deltaTime` are in milliseconds, the props of `FrameLoop.OnFrame` carry both in seconds — see the migration guide
 - `FixedFrameLoop#onTick()` and `#onRender()` return the `UnsubscribeFunc` that takes the handler off again, as the `on…()` methods of `Display` do
 - a `createRenderer` callback receives only renderer options in its `params`: `maxFps`, `pauseOutsideViewport`, `resizeTo`, `resizeToElement`, `resizeToAttributeEl`, `styleSheetRoot` and `createRenderer` stay with the display. `CreateRendererParameters` names none of them
 - `PanControl2D` emits `restoreCursor` for a cursor it hid, and takes the cursor class off the target then. A pointer moving over the page with no button down passes through without an event
@@ -212,9 +213,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - fix the order of `OnDisplayInit` and `OnDisplayStart`: `Display#start()` emits `OnDisplayInit` before `OnDisplayStart`, both within the call, and a listener attached afterwards receives the two in the same order
-- fix a `stop()` or a `pause = true` inside a listener of `OnDisplayRestart`, and likewise inside one of `OnDisplayInit`: it holds the display in the pause, `OnDisplayPause` follows instead of `OnDisplayStart`, and a later `pause = false` starts the display again
+- fix a `stop()` or a `pause = true` inside a listener of `OnDisplayRestart`, and likewise inside one of `OnDisplayInit`: it holds the display in the pause, `OnDisplayPause` follows instead of `OnDisplayStart`, and a later `pause = false` starts the display again; a `pause = false` after it inside the same listener lets the display start with a single `OnDisplayRestart`
 - fix a `stop()` or a `pause = true` that lands while `Display#start()` waits for the renderer or for its `beforeStartCallback`: the display does not start, and the promise resolves with it. A `pause = false` after it lets the start through
-- fix `Chronometer#update()` with a time before the current one: `deltaTime` is `0` and `time` stays where it is, so `FixedFrameLoop#alpha` stays in `[0, 1)` when a frame timestamp lies before the start of the display
+- fix `Display#pause` before the first start: once `stop()` or `pause = true` has been called it answers `true` — also when that call keeps a pending `start()` from starting the display — until a `pause = false` or the next `start()` lets the display run
+- fix `Chronometer#update()`, `#start()` and `#stop()` with a time before the latest one the chronometer has seen: `deltaTime` is `0` and `time` stays where it is, across a pause as well, so `FixedFrameLoop#alpha` stays in `[0, 1)` when a frame timestamp lies before the start of the display
 - fix `TexturedSpritesMaterial` (and `AnimatedSpritesMaterial`, which builds on it): a sprite is scaled to its `quadSize` before it is rotated, so a sprite that is not square turns as the rectangle it is. The unit quad used to be rotated first and stretched afterwards, which drew a rotated sprite of 4 × 1 at a quarter turn as 4 × 1 again and every other angle as a parallelogram; flat sprites and billboards alike. Sprites without rotation, and square ones, draw exactly as before
 - fix `VertexObjectBuffer#copy()`: it judges every buffer before it writes the first of them — the source has a buffer of that name, and its elements fit their target at `targetObjectOffset` — so a copy that is refused leaves the target exactly as it was. Both throws used to come from inside the writing loop, with everything written before them left standing: the `Error` for a buffer name the source does not have, and the bare `RangeError` reading `offset is out of bounds` that the typed array raises. Two descriptions that agree on a `bufferName` while sizing it differently are what reaches the second of those — the object counts match, one buffer fits and the next overruns
 - fix `VertexObjectBuffer#copyArray()`: it measures the source against the buffer before writing and throws a `RangeError` naming the class, the method, the buffer and the numbers, where the overrun used to surface as `offset is out of bounds` and named nothing. A source array shorter than the buffer is taken as it always was
@@ -835,9 +837,9 @@ Whoever wants the tiles the view frustum meets the plane in — all of them — 
 `Display#canvas`, `#start()` and `#getEventProps()` throw once `dispose()` has run, and
 `#nextFrame()` is rejected — both a call made afterwards and a promise that was still open when
 `dispose()` ran. `#resize()`, `#renderFrame()`, `#stop()`, a write to `#pause` and a further
-`#dispose()` do nothing. `#pause` is the one of them with a getter, and it keeps reading the state
-the display was left in: a display disposed while it was running answers `true` however it is
-written. Use `Display#isDisposed` where a display may already be gone.
+`#dispose()` do nothing. `#pause` is the one of them with a getter, and it answers `true` once the
+display is disposed, however it is written. Use `Display#isDisposed` where a display may already be
+gone.
 
 The case that slips through without a compile error is an awaited `nextFrame()` next to a
 `dispose()` from another path: that `await` needs a `catch` around it.
@@ -912,6 +914,27 @@ display.frameNo = 0;
 const display = new Display(myRenderer, {maxFps: 30});
 
 display.frameLoop.start(target); // or display.onRenderFrame(…) and the other on…() methods
+```
+
+#### `FrameLoop#frameNo`, `#now`, `#deltaTime` and `#measuredFps` are read-only
+
+The four are accessors without a setter: a write is a type error and throws a `TypeError` at
+runtime. The loop counts its frames and measures their time and rate itself. To count frames from
+a point of your own, remember the value at that point and subtract it later.
+
+**Before**
+
+```ts
+display.frameLoop.frameNo = 0;
+```
+
+**After**
+
+```ts
+const firstFrame = display.frameLoop.frameNo;
+
+// later
+const frames = display.frameLoop.frameNo - firstFrame;
 ```
 
 #### `postFixID` and `globalStylesID` are gone
@@ -1796,7 +1819,7 @@ scene.add(new THREE.Mesh(geometry, material));
 // the pool goes when nothing reads it any more
 ```
 
-#### The event keys of `FrameLoop` carry the library namespace
+#### The event key of `FrameLoop` carries the library namespace
 
 `FrameLoop.OnFrame` carries the key; take it from the class instead of building it from its name.
 
