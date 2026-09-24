@@ -588,9 +588,10 @@ export class Display {
   // from starting, unless a pause = false has lifted it again since
   #pauseRequests = 0;
 
-  // the animation loop of three this display has stopped as it went into the pause, and the only
-  // one it starts again: three's Animation.start() does not ask whether its loop runs already,
-  // and a second call would run a second rAF chain beside the first
+  // the animation loop of three this display has stopped as it went into the pause, or while
+  // `pause` answered true before its first start, and the only one it starts again: three's
+  // Animation.start() does not ask whether its loop runs already, and a second call would run a
+  // second rAF chain beside the first
   #stoppedAnimationOfThree?: AnimationOfThree;
 
   #lastResizeHash = '';
@@ -1074,6 +1075,17 @@ export class Display {
         });
       }
 
+      // three starts its animation loop at the end of renderer.init(), and a stop() or a
+      // pause = true that came before found no loop to stop. Registered before any start() awaits
+      // the same promise, so the loop already stands still when a start() that such a pause holds
+      // up returns
+      this.#waitForRenderer.then(
+        () => this.#followPauseBeforeStart(),
+        () => {
+          // a failed init reaches the caller through the error event below and through start()
+        },
+      );
+
       this.#waitForRenderer.catch((error) => {
         // a renderer that never comes up is what the caller has to hear about; left here it
         // would be an unhandled rejection and the display would simply stay dark
@@ -1146,9 +1158,10 @@ export class Display {
    * as it goes into the pause and starts it again as it runs. three 0.185 offers no public way to
    * do so, and the display reaches the loop through `renderer._animation`: a renderer without it
    * keeps its loop running through the pause. So does a renderer another {@link FrameLoop} still
-   * runs on as the display goes into the pause. Until the display goes into the pause for the
-   * first time, it leaves the loop as three runs it — also while the first `start()` waits, and
-   * when a `stop()` or `pause = true` keeps that call from starting the display.
+   * runs on as the display goes into the pause. Before the first start the loop follows `pause`
+   * too: a `stop()` or `pause = true` stops it — one that comes while `renderer.init()` still
+   * runs stops it once the init has started it — also when that call keeps the first `start()`
+   * from starting the display, and a `pause = false` or the next `start()` runs it again.
    *
    * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */
@@ -1165,6 +1178,7 @@ export class Display {
 
     if (pause) this.#pauseRequests += 1;
     this.#stateMachine.pausedByUser = pause;
+    this.#followPauseBeforeStart();
   }
 
   get isRunning(): boolean {
@@ -1523,6 +1537,9 @@ export class Display {
     }
 
     this.#stateMachine.pausedByUser = false;
+    // a display its caller paused before this start gets the loop of three back here, also when
+    // a listener of init throws below and leaves the display in NEW with pause answering false
+    this.#followPauseBeforeStart();
     this.#stateMachine.start();
 
     return this;
@@ -1538,6 +1555,7 @@ export class Display {
   stop(): void {
     this.#pauseRequests += 1;
     this.#stateMachine.pausedByUser = true;
+    this.#followPauseBeforeStart();
   }
 
   /**
@@ -1690,6 +1708,18 @@ export class Display {
         // only this entry goes: one a display after this one has made in the meantime stays
         if (canvasReleases.get(canvas) === released) canvasReleases.delete(canvas);
       });
+    }
+  }
+
+  // Before its first start the display stands in NEW, where the state machine emits neither start
+  // nor pause, so the handlers that stop and start the animation loop of three do not run there.
+  // `pause` answers from the pause of the caller alone then, and the loop follows that answer here
+  #followPauseBeforeStart(): void {
+    if (!this.#stateMachine.isNew) return;
+    if (this.#stateMachine.pausedByUser) {
+      this.#stopAnimationOfThree();
+    } else {
+      this.#startAnimationOfThree();
     }
   }
 

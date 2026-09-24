@@ -181,6 +181,30 @@ describe('Display — lifecycle', function () {
     expect(display.isRunning).to.equal(true);
   });
 
+  it('a stop() while start() waits for a real init lets the animation loop of three stand still, and the next start() runs it once', async () => {
+    host = makeContainer();
+    display = new Display(host);
+
+    const started = display.start();
+    display.stop();
+    await started;
+
+    // three counts the ticks of its own animation loop in info.frame, and nothing else writes it
+    const {info} = display.renderer;
+    const stoppedAt = info.frame;
+    await animationFrames(5);
+    expect(info.frame, 'no tick of three before the first start').to.equal(stoppedAt);
+
+    await display.start();
+    await display.nextFrame();
+    const runningAt = info.frame;
+    await animationFrames(10);
+    const ticks = info.frame - runningAt;
+    expect(ticks, 'three ticks again').to.be.greaterThan(0);
+    // one loop ticks once per frame of the page; a second one started on top would tick twice
+    expect(ticks, 'one loop of three, not two').to.be.below(15);
+  });
+
   it('pauseOutsideViewport pauses the display while its canvas is out of view and runs it again once it is back', async () => {
     host = makeContainer();
     display = new Display(host, {pauseOutsideViewport: true});

@@ -659,6 +659,121 @@ describe('Display', () => {
       expect(display.isRunning).toBe(true);
     });
 
+    it('a stop() before the first start() stops the animation loop of three once the renderer is up, and pause = false starts it again once', async () => {
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      let finishInit!: () => void;
+      const {display, renderer} = makeDisplay(
+        undefined,
+        () =>
+          new Promise<void>((resolve) => {
+            finishInit = resolve;
+          }),
+      );
+
+      display.stop();
+
+      // three builds its animation loop at the end of init() and starts it there
+      Object.assign(renderer, {_animation: animation});
+      finishInit();
+      await settle();
+
+      expect(display.pause).toBe(true);
+      expect(animation.stop, 'once the renderer is up').toHaveBeenCalledTimes(1);
+
+      display.pause = false;
+
+      expect(animation.start, 'pause = false').toHaveBeenCalledTimes(1);
+
+      display.pause = false;
+
+      expect(animation.start, 'a second pause = false').toHaveBeenCalledTimes(1);
+      expect(animation.stop, 'a second pause = false').toHaveBeenCalledTimes(1);
+    });
+
+    it('a pause = true before the first start() stops the animation loop of three right away, and start() starts it again once', async () => {
+      const {display, renderer} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      await settle();
+
+      display.pause = true;
+
+      expect(animation.stop, 'pause = true').toHaveBeenCalledTimes(1);
+
+      display.pause = true;
+
+      expect(animation.stop, 'a second pause = true').toHaveBeenCalledTimes(1);
+
+      await display.start();
+
+      expect(display.isRunning).toBe(true);
+      expect(animation.start).toHaveBeenCalledTimes(1);
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('a stop() while the first start() waits stops the animation loop of three, and the next start() starts it again once', async () => {
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      let finishInit!: () => void;
+      const {display, renderer} = makeDisplay(
+        undefined,
+        () =>
+          new Promise<void>((resolve) => {
+            finishInit = resolve;
+          }),
+      );
+
+      const started = display.start();
+      display.stop();
+      Object.assign(renderer, {_animation: animation});
+      finishInit();
+      await started;
+
+      expect(display.isRunning).toBe(false);
+      expect(display.pause).toBe(true);
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+      expect(animation.start).not.toHaveBeenCalled();
+
+      await display.start();
+
+      expect(display.isRunning).toBe(true);
+      expect(animation.start).toHaveBeenCalledTimes(1);
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('an init listener that throws after a stop() before the first start() leaves the animation loop of three running, as pause answers false', async () => {
+      const {display, renderer} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      const error = new Error('init listener');
+      on(display, OnDisplayInit, () => {
+        throw error;
+      });
+
+      display.stop();
+      await settle();
+
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+
+      await expect(display.start()).rejects.toBe(error);
+
+      expect(display.isRunning).toBe(false);
+      expect(display.pause).toBe(false);
+      expect(animation.start).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispose() of a display that has not started stops the animation loop of three, as it does for a running display', async () => {
+      const {display, renderer} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      await settle();
+
+      display.dispose();
+
+      expect(display.pause).toBe(true);
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+      expect(animation.start).not.toHaveBeenCalled();
+    });
+
     it('lets no time pass for a frame whose timestamp lies before the start', async () => {
       // the chronometer reads its start time in a field initializer and in the constructor
       vi.spyOn(performance, 'now').mockReturnValue(1000);
