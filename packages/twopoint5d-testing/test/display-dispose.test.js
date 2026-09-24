@@ -2,17 +2,18 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
-import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
+import {disposeDisplay, makeContainer, whenPageAnimates, whenReleased} from './helpers/fixtures.js';
 
-/** Resolves once renderer.dispose() has run — the release of a display happens after its dispose() has returned. */
-function whenReleased(renderer) {
-  return new Promise((resolve) => {
-    const realDispose = renderer.dispose.bind(renderer);
-    renderer.dispose = () => {
-      realDispose();
-      resolve();
-    };
-  });
+/**
+ * The backend of a renderer, read only now: three can fall back to the WebGL backend during
+ * the init and swap the backend then. The three.js typings leave device and gl off the backend.
+ *
+ * @param {WebGPURenderer} renderer
+ */
+function backendOf(renderer) {
+  return /** @type {{isWebGPUBackend?: boolean, isWebGLBackend?: boolean, device?: {lost: Promise<{reason: string}>}, gl?: WebGL2RenderingContext}} */ (
+    renderer.backend
+  );
 }
 
 /**
@@ -22,12 +23,7 @@ function whenReleased(renderer) {
  * @param {Display} display
  */
 async function expectLiveBackend(display) {
-  // read only now: three can fall back to the WebGL backend during the init and swap the
-  // backend then. The three.js typings leave device and gl off the backend
-  const backend =
-    /** @type {{isWebGPUBackend?: boolean, isWebGLBackend?: boolean, device?: {lost: Promise<{reason: string}>}, gl?: WebGL2RenderingContext}} */ (
-      display.renderer.backend
-    );
+  const backend = backendOf(display.renderer);
   if (backend.isWebGPUBackend) {
     const outcome = await Promise.race([backend.device.lost.then(() => 'lost'), display.nextFrame().then(() => 'frame')]);
     expect(outcome, 'the device of the second display').to.equal('frame');
@@ -63,16 +59,18 @@ describe('Display — the contract after dispose()', function () {
   // Assertion (a) of the dispose test pattern — "releases what it built itself" — has two sides
   // here. The DOM side: the first two cases below watch the container the display built come out of
   // the host again, and the canvas it was handed stay where the caller put it. The GPU side: the
-  // four cases after "a dispose() before the renderer is ready leaves the frame loop empty" watch
+  // six cases after "a dispose() before the renderer is ready leaves the frame loop empty" watch
   // when renderer.dispose() runs — after an init that dispose() landed in, not at all after a
-  // failed one, whose webglcontextlost listener comes off the canvas all the same, and only once
-  // the queue has run dry — and what the backend reports afterwards: a destroyed device, or a lost
-  // WebGL context. The six cases after those follow a canvas that was handed in: it is the
-  // caller's, and after the display on it has been disposed it carries the next one — built while
-  // the release runs, built once the release is through, built after a dispose() inside the init,
-  // bounded in time when the WebGL context does not come back, and with that context back once the
-  // display after the one that waited in vain is built — while its WebGL context stays lost as long
-  // as no display follows. The rest of this file is about the contract afterwards.
+  // failed one, whose webglcontextlost listener comes off the canvas all the same, only once the
+  // queue has run dry, and late enough that the page keeps its animation frames, for a display in
+  // a host element and one on a canvas that was handed in (the case of an adopted renderer lives
+  // in display-adopt-renderer.test.js) — and what the backend reports afterwards: a destroyed
+  // device, or a lost WebGL context. The six cases after those follow a canvas that was handed in:
+  // it is the caller's, and after the display on it has been disposed it carries the next one —
+  // built while the release runs, built once the release is through, built after a dispose() inside
+  // the init, bounded in time when the WebGL context does not come back, and with that context back
+  // once the display after the one that waited in vain is built — while its WebGL context stays
+  // lost as long as no display follows. The rest of this file is about the contract afterwards.
 
   // Assertion (b) — "does not touch what was handed in" — holds word for word for a canvas passed
   // to the constructor: the four cases after "leaves a canvas that was handed in where it stands"
@@ -178,9 +176,7 @@ describe('Display — the contract after dispose()', function () {
     await display.start();
     await display.nextFrame();
     // under WebGPU the getter of the backend's context writes data-engine, and a render reads it
-    // the same way. getContext() reads it without putting work on the GPU: on a canvas that was
-    // handed in, a dispose() with work still in flight costs Firefox its requestAnimationFrame
-    display.renderer.getContext();
+    display.renderer.render(new Scene(), new PerspectiveCamera());
     if (display.isWebGPUBackend) {
       expect(canvas.hasAttribute('data-engine'), 'attribute data-engine while the display is alive').to.equal(true);
     }
@@ -367,12 +363,7 @@ describe('Display — the contract after dispose()', function () {
 
     expect(initializedAtRelease, 'renderer.dispose() ran after the init').to.equal(true);
 
-    // read only now: three can fall back to the WebGL backend during the init and swap the
-    // backend then. The three.js typings leave device and gl off the backend
-    const backend =
-      /** @type {{isWebGPUBackend?: boolean, isWebGLBackend?: boolean, device?: {lost: Promise<{reason: string}>}, gl?: WebGL2RenderingContext}} */ (
-        renderer.backend
-      );
+    const backend = backendOf(renderer);
     if (backend.isWebGPUBackend) {
       const info = await backend.device.lost;
       expect(info.reason, 'the reason the device was lost').to.equal('destroyed');
@@ -508,6 +499,40 @@ describe('Display — the contract after dispose()', function () {
     await released;
 
     expect(steps).to.deep.equal(['queue asked', 'queue drained', 'renderer.dispose()']);
+  });
+
+  it('the page keeps its animation frames when a display built in a host element is disposed right after a render()', async () => {
+    host = makeContainer();
+    display = new Display(host);
+    await display.start();
+    await display.nextFrame();
+
+    // one piece of work outside the frame loop, right before dispose(): the page has not presented it yet
+    display.renderer.render(new Scene(), new PerspectiveCamera());
+
+    const released = whenReleased(display.renderer);
+    display.dispose();
+    await released;
+
+    expect(await whenPageAnimates(), 'the animation frames of the page after the release').to.equal('frames');
+  });
+
+  it('the page keeps its animation frames when a display on a canvas that was handed in is disposed right after a render()', async () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+    display = new Display(canvas);
+    await display.start();
+    await display.nextFrame();
+
+    // one piece of work outside the frame loop, right before dispose(): the page has not presented it yet
+    display.renderer.render(new Scene(), new PerspectiveCamera());
+
+    const released = whenReleased(display.renderer);
+    display.dispose();
+    await released;
+
+    expect(await whenPageAnimates(), 'the animation frames of the page after the release').to.equal('frames');
   });
 
   it('a canvas that was handed in carries a second display built while the first one is being released', async () => {

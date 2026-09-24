@@ -440,6 +440,29 @@ describe('Display', () => {
       device: {queue: {onSubmittedWorkDone}, lost},
     });
 
+    // the window of the page a canvas stub sits in, with animation frames driven by hand: frame()
+    // runs the callbacks requested before it, as a browser runs those of one frame
+    const pageWithFrames = () => {
+      let requests = new Map<number, () => void>();
+      let nextId = 1;
+      const view = {
+        requestAnimationFrame: vi.fn((callback: () => void) => {
+          const id = nextId++;
+          requests.set(id, callback);
+          return id;
+        }),
+        cancelAnimationFrame: vi.fn((id: number) => {
+          requests.delete(id);
+        }),
+      };
+      const frame = () => {
+        const due = requests;
+        requests = new Map();
+        for (const callback of due.values()) callback();
+      };
+      return {view, frame};
+    };
+
     it('releases the renderer after a bounded wait when the queue never answers, with one warning', async () => {
       vi.useFakeTimers();
       try {
@@ -496,6 +519,78 @@ describe('Display', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('releases a WebGPU renderer once the page has drawn two animation frames after the queue has run dry', async () => {
+      vi.useFakeTimers();
+      try {
+        const {display, renderer, canvas} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => Promise.resolve()),
+        );
+        const {view, frame} = pageWithFrames();
+        Object.assign(canvas, {ownerDocument: {defaultView: view}});
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(renderer.dispose, 'before the first frame').not.toHaveBeenCalled();
+
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+
+        // two frames requested in the same tick would both have come with this one
+        expect(renderer.dispose, 'after the first frame').not.toHaveBeenCalled();
+
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(renderer.dispose, 'after the second frame').toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount(), 'timers left').toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('releases the renderer after a bounded wait when the page draws no frame, without a warning, and takes its frame request back', async () => {
+      vi.useFakeTimers();
+      try {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const {display, renderer, canvas} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => Promise.resolve()),
+        );
+        const {view} = pageWithFrames();
+        Object.assign(canvas, {ownerDocument: {defaultView: view}});
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(1999);
+
+        expect(renderer.dispose, 'before the wait has run out').not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(renderer.dispose, 'once the wait has run out').toHaveBeenCalledTimes(1);
+        expect(view.cancelAnimationFrame).toHaveBeenCalledWith(view.requestAnimationFrame.mock.results[0]!.value);
+        expect(warn).not.toHaveBeenCalled();
+        expect(vi.getTimerCount(), 'timers left').toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('waits for no animation frame under the WebGL backend', async () => {
+      const {display, renderer, canvas} = makeDisplay();
+      const {view} = pageWithFrames();
+      Object.assign(canvas, {ownerDocument: {defaultView: view}});
+
+      display.dispose();
+      await settle();
+
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+      expect(view.requestAnimationFrame).not.toHaveBeenCalled();
     });
   });
 

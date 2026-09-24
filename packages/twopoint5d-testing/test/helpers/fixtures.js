@@ -56,6 +56,39 @@ export function disposeDisplay(display) {
   }
 }
 
+/**
+ * Resolves once renderer.dispose() has run — the release of a display happens after its dispose() has returned.
+ *
+ * @param {{dispose(): void}} renderer
+ */
+export function whenReleased(renderer) {
+  return new Promise((resolve) => {
+    const realDispose = renderer.dispose.bind(renderer);
+    renderer.dispose = () => {
+      realDispose();
+      resolve();
+    };
+  });
+}
+
+/**
+ * Settles with `'frames'` once the page has drawn two animation frames, or with `'no frame'`
+ * when they have not come within a second — a page whose requestAnimationFrame has stopped.
+ *
+ * @returns {Promise<'frames' | 'no frame'>}
+ */
+export function whenPageAnimates() {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve('no frame'), 1000);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        clearTimeout(timer);
+        resolve('frames');
+      });
+    });
+  });
+}
+
 // --- input for PanControl2D ---
 
 /**

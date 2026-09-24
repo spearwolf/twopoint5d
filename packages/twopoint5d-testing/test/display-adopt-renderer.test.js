@@ -1,7 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
-import {WebGPURenderer} from 'three/webgpu';
-import {disposeDisplay} from './helpers/fixtures.js';
+import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
+import {disposeDisplay, whenPageAnimates, whenReleased} from './helpers/fixtures.js';
 
 describe('Display — the constructor that adopts a renderer', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -71,8 +71,24 @@ describe('Display — the constructor that adopts a renderer', function () {
 
     display.dispose();
     // the display releases its renderer after dispose() has returned, once the GPU has run dry
+    // and the page has drawn two more frames
     await released;
 
     expect(disposeCalls, 'calls to renderer.dispose()').to.equal(1);
+  });
+
+  it('the page keeps its animation frames when the display is disposed right after a render() while the canvas of the renderer stays in the document', async () => {
+    display = new Display(renderer);
+    await display.start();
+    await display.nextFrame();
+
+    // one piece of work outside the frame loop, right before dispose(): the page has not presented it yet
+    renderer.render(new Scene(), new PerspectiveCamera());
+
+    const released = whenReleased(renderer);
+    display.dispose();
+    await released;
+
+    expect(await whenPageAnimates(), 'the animation frames of the page after the release').to.equal('frames');
   });
 });

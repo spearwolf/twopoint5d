@@ -100,18 +100,20 @@ describe('Display — resize behavior', () => {
     host = makeContainer({width: 800, height: 600});
     const sizeRef = makeContainer({width: 256, height: 128, id: 'size-ref'});
 
-    display = new Display(host, {resizeToElement: sizeRef});
+    try {
+      display = new Display(host, {resizeToElement: sizeRef});
 
-    await display.start();
-    await nextFrame(display);
+      await display.start();
+      await nextFrame(display);
 
-    expect(display.width).to.equal(256);
-    expect(display.height).to.equal(128);
-
-    sizeRef.parentNode.removeChild(sizeRef);
+      expect(display.width).to.equal(256);
+      expect(display.height).to.equal(128);
+    } finally {
+      sizeRef.remove();
+    }
   });
 
-  it('resizeToCallback overrides element-based measurement', async () => {
+  it('a resizeTo callback overrides element-based measurement', async () => {
     host = makeContainer({width: 800, height: 600});
 
     let cbW = 123;
@@ -445,21 +447,23 @@ describe('Display — resize behavior', () => {
     host = makeContainer({width: 320, height: 200});
     const altRef = makeContainer({width: 96, height: 48, id: 'alt-ref'});
 
-    display = new Display(host);
-    await display.start();
-    await nextFrame(display);
+    try {
+      display = new Display(host);
+      await display.start();
+      await nextFrame(display);
 
-    expect(display.width).to.equal(320);
-    expect(display.height).to.equal(200);
+      expect(display.width).to.equal(320);
+      expect(display.height).to.equal(200);
 
-    display.resizeToElement = altRef;
-    await nextFrame(display);
-    await nextFrame(display);
+      display.resizeToElement = altRef;
+      await nextFrame(display);
+      await nextFrame(display);
 
-    expect(display.width).to.equal(96);
-    expect(display.height).to.equal(48);
-
-    altRef.parentNode.removeChild(altRef);
+      expect(display.width).to.equal(96);
+      expect(display.height).to.equal(48);
+    } finally {
+      altRef.remove();
+    }
   });
 
   it('emits OnDisplayResize exactly once on the first frame', async () => {

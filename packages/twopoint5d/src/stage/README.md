@@ -474,13 +474,15 @@ What this layer does on top of the general rules in
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
   handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
   The field is gone as soon as `dispose()` returns; the renderer itself is released once its
-  init is through and the GPU has run the work submitted to it. A renderer whose init failed
-  has built nothing, and `renderer.dispose()` is not called on it. A canvas handed to the
-  constructor stays the caller's and carries a new `Display` afterwards. Under WebGL its
-  context stays lost until then; the next `Display` on it — built while the release is still
-  running or any time later — waits for the release, restores the context and then starts
-  its renderer. Only a `Display` restores it: a `WebGPURenderer` or a `getContext('webgl2')`
-  of your own on that canvas gets the lost context.
+  init is through and the GPU has run the work submitted to it — two seconds at most, then
+  with a warning — and, under WebGPU, once the page has drawn two more animation frames or two
+  more seconds have passed without one. A renderer whose init failed has built nothing, and
+  `renderer.dispose()` is not called on it. A canvas handed to the constructor stays the
+  caller's and carries a new `Display` afterwards. Under WebGL its context stays lost until
+  then; the next `Display` on it — built while the release is still running or any time later
+  — waits for the release, restores the context and then starts its renderer. Only a `Display`
+  restores it: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets
+  the lost context.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline` or an `outputRenderTarget` assigned from outside.
 

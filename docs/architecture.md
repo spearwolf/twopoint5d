@@ -271,8 +271,9 @@ Two runners, deliberately in separate packages:
 
 A browser test takes its display down with `dispose()` alone: `Display#dispose()`
 stops the loop right away and releases the renderer only once the GPU has run the work
-submitted to it — or after two seconds at most, with a warning on the console. Firefox
-155 under WebGPU needs that to keep drawing frames for the tests that follow.
+submitted to it and, under WebGPU, the page has drawn two more animation frames — each
+wait two seconds at most, the first one with a warning on the console when it runs out.
+Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
 under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does

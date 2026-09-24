@@ -60,12 +60,11 @@ const FULLSCREEN_RULE_CSS = 'position:fixed;top:0;left:0;';
 // reason for the wait below, short against a remount — the same as CONTEXT_RESTORE_TIMEOUT_MS
 const SUBMITTED_WORK_TIMEOUT_MS = 2000;
 
-// renderer.dispose() destroys the device (WebGPUBackend.dispose()). On Firefox 155 under WebGPU,
-// destroying a device while submitted work is still in flight reports a GPUInternalError on the
-// destroyed device, and the page gets no requestAnimationFrame callback after that — every
-// animation on the page stands still. So the queue runs dry first, or the device reports itself
-// lost, which leaves no work to wait for. The wait ends after SUBMITTED_WORK_TIMEOUT_MS at the
-// latest, with a warning: an implementation that never answers must not hold the release forever
+// renderer.dispose() destroys the device (WebGPUBackend.dispose()), and WebGPU allows an
+// implementation to drop the work still pending on a device that is destroyed
+// (GPUDevice.destroy()). So the queue runs dry first, or the device reports itself lost, which
+// leaves no work to wait for. The wait ends after SUBMITTED_WORK_TIMEOUT_MS at the latest, with a
+// warning: an implementation that never answers must not hold the release forever
 async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
   // the three.js typings leave the device off the backend, and the WebGL backend has none
   const device = (
@@ -102,6 +101,44 @@ async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// A page that has not drawn two frames after this long is hidden, and a hidden page presents no
+// canvas either; the release goes on. The same as SUBMITTED_WORK_TIMEOUT_MS
+const ANIMATION_FRAMES_TIMEOUT_MS = 2000;
+
+// On Firefox 155 under WebGPU, a renderer.dispose() on a canvas that is still in the document,
+// before the page has presented what was drawn into it last, reports a GPUInternalError (`Buffer
+// with '' label has been destroyed`), and the page gets no requestAnimationFrame callback after
+// that — every animation on the page stands still. Whether the queue has run dry makes no
+// difference; a canvas outside the document is not affected. A canvas handed to the constructor
+// and the canvas of an adopted renderer stay where their caller put them, so the release waits
+// for two animation frames of the page: the callbacks of the first run before the page presents
+// the frame the canvas was drawn into last (the "update the rendering" steps of HTML run them
+// before painting), those of the second after it. Under WebGL, and for a canvas without a
+// window, there is nothing to wait for
+async function waitForTwoAnimationFrames(renderer: WebGPURenderer): Promise<void> {
+  // the three.js typings leave the device off the backend, and the WebGL backend has none
+  const device = (renderer.backend as {device?: object | null} | undefined)?.device;
+  // the window of the document the canvas sits in, which presents it — an iframe has its own
+  const view = renderer.domElement.ownerDocument?.defaultView;
+  if (device == null || view == null) return;
+
+  await new Promise<void>((resolve) => {
+    let request = 0;
+    const timer = setTimeout(() => {
+      view.cancelAnimationFrame(request);
+      resolve();
+    }, ANIMATION_FRAMES_TIMEOUT_MS);
+    // the second frame is requested inside the callback of the first: two requests in the same
+    // tick would come in the same frame
+    request = view.requestAnimationFrame(() => {
+      request = view.requestAnimationFrame(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  });
 }
 
 // WebGLBackend.init() puts a webglcontextlost listener on the canvas before the part of it that
@@ -356,7 +393,9 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    on it — its classes, attributes and inline styles. The renderer itself
  *    is released after `dispose()` has returned, once its init is through
  *    and the GPU has run the work submitted to it, or for two seconds at
- *    most, and goes on with a warning on the console after that. A canvas
+ *    most, and goes on with a warning on the console after that; under
+ *    WebGPU it also waits until the page has drawn two more animation
+ *    frames, or for two more seconds while the page draws none. A canvas
  *    handed to the constructor carries a new display afterwards; one built on
  *    it while the release runs waits for it. Under WebGL only a display
  *    brings the context of that canvas back — see {@link Display.dispose}.
@@ -752,8 +791,9 @@ export class Display {
    * A renderer handed in here is adopted, not borrowed: the display takes it and its
    * `domElement` as its own. {@link Display.dispose} releases it with `renderer.dispose()`, once
    * its init is through and the GPU has run the work submitted to it, or for two seconds at most,
-   * and goes on with a warning on the console after that. A renderer that has to outlive this
-   * display therefore does not belong in here.
+   * and goes on with a warning on the console after that; under WebGPU also once the page has
+   * drawn two more animation frames, or two more seconds have passed without one. A renderer that
+   * has to outlive this display therefore does not belong in here.
    *
    * A constructor that throws after it has built or taken over the renderer — from a `resizeTo`
    * callback, say — gives everything back as {@link Display.dispose} would: the renderer is
@@ -1366,7 +1406,11 @@ export class Display {
    * listener, gives up {@link Display.renderer} and takes a container this display built out of
    * the DOM, with the canvas in it. The renderer itself is released after the return, with
    * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it,
-   * or for two seconds at most, and goes on with a warning on the console after that.
+   * or for two seconds at most, and goes on with a warning on the console after that. Under
+   * WebGPU the release then waits until the page has drawn two more animation frames, or for two
+   * more seconds while it draws none: under Firefox with WebGPU the page otherwise stops its
+   * `requestAnimationFrame` when the canvas stays in the document — a canvas handed to the
+   * constructor, or that of an adopted renderer.
    *
    * A canvas handed to the constructor goes back to the caller as the display found it: its
    * classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute
@@ -1436,13 +1480,15 @@ export class Display {
     // dispose() can fall in the middle of the init (a mount and unmount under React StrictMode).
     // three does not release a renderer whose init is still running: the init would run to its
     // end and keep the device, the context and the animation loop of three for good. So the
-    // release waits for the init, and then for the GPU. A canvas handed to the constructor goes
-    // back to its caller at the end of it, with its WebGL context lost but restorable, so the
-    // next display on it can bring the context back
+    // release waits for the init, then for the GPU, and under WebGPU for two animation frames of
+    // the page — see waitForTwoAnimationFrames(). A canvas handed to the constructor goes back to
+    // its caller at the end of it, with its WebGL context lost but restorable, so the next display
+    // on it can bring the context back
     const released: Promise<void> = this.#waitForRenderer
       .then(
         async () => {
           await drainSubmittedWork(renderer);
+          await waitForTwoAnimationFrames(renderer);
           if (!handBack) {
             renderer.dispose();
             return;
