@@ -445,7 +445,9 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    pause it and fires `OnDisplayPause`. If a listener of `OnDisplayPause`
  *    throws as well, `start()` rejects with an `AggregateError` of both errors.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
- *    gives up {@link Display.renderer} right away. A container this display
+ *    gives up {@link Display.renderer} right away. A listener that throws does
+ *    not stop it; its error follows once the display is down — see
+ *    {@link Display.dispose}. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
  *    it; a canvas or a renderer handed to the constructor keeps its place in
  *    the document, and a canvas handed in gets back what the display wrote
@@ -462,8 +464,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * 4. After `dispose()` the instance is unusable, and says so.
  *    {@link Display.renderer} answers `undefined` and
  *    {@link Display.isDisposed} answers `true`. {@link Display.canvas},
- *    {@link Display.start}, {@link Display.getEventProps},
- *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend} throw.
+ *    {@link Display.getEventProps}, {@link Display.isWebGPUBackend} and
+ *    {@link Display.isWebGLBackend} throw, and {@link Display.start} rejects.
  *    {@link Display.resize}, {@link Display.renderFrame}, {@link Display.stop},
  *    a write to {@link Display.pause} and a further `dispose()` do nothing.
  *    {@link Display.nextFrame} is rejected, and so is a promise it handed out
@@ -1076,7 +1078,17 @@ export class Display {
         emit(this, OnDisplayError, error, this);
       });
     } catch (error) {
-      this.dispose();
+      try {
+        this.dispose();
+      } catch (disposeError) {
+        // neither goes missing: the error the constructor failed with, and the one a listener
+        // of dispose threw as the display was taken down again
+        throw new AggregateError(
+          [error, disposeError],
+          'new Display(): the constructor failed, and a listener of dispose threw as the display was taken down',
+          {cause: disposeError},
+        );
+      }
       throw error;
     }
   }
@@ -1475,9 +1487,11 @@ export class Display {
    * the canvas comes into view; if it lands after the start, the display starts first and
    * pauses with that report.
    *
-   * Throws after {@link Display.dispose}. A promise that resolves without a frame ever
-   * following would be a dead end the caller cannot see, and the caller is waiting on
-   * the effect, not on the value.
+   * Rejects after {@link Display.dispose}, and so does a call still waiting for the renderer or
+   * for `beforeStartCallback` when `dispose()` runs, once that wait is over. The rejection
+   * arrives through the promise: an `await` or a `.catch()` sees it, a `try` around a call that
+   * is not awaited does not. A promise that resolved without a frame ever following would be a
+   * dead end the caller cannot see, and the caller is waiting on the effect, not on the value.
    */
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
     if (this.#disposed) throw disposedError('start()');
@@ -1553,20 +1567,42 @@ export class Display {
    * a warning on the console; it stays lost and restorable, and the next `Display` built on the
    * canvas tries again.
    *
+   * Every listener of `OnDisplayPause` — a running display pauses first — and of
+   * `OnDisplayDispose` hears its event, even behind one that throws, and a listener that throws
+   * does not stop the teardown: `dispose()` runs to its end and then throws the error, or an
+   * `AggregateError` when more than one listener of the same event throws. When listeners of
+   * both events throw, the `AggregateError` carries the error of the pause and that of the
+   * dispose event, in this order. The display is disposed either way, and a second call does
+   * nothing.
+   *
    * A `dispose()` while the renderer is still initializing waits for that init instead of
    * cutting it short. An init that fails leaves nothing to release but the `webglcontextlost`
    * listener three has put on the canvas, which the release takes off, and its rejection does
-   * not escape. A second call does nothing.
+   * not escape.
    */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
 
-    this.stop();
+    // a listener that throws does not hold up the teardown: its error waits until the display
+    // is down, so a caller that catches it holds a disposed display, not half of one
+    const errors: unknown[] = [];
+
+    try {
+      // a running display pauses here, and every listener of OnDisplayPause hears it
+      this.stop();
+    } catch (error) {
+      errors.push(error);
+    }
     this.frameLoop.stop(this);
-    // the listeners are still attached here: this event is what tells them to let go,
-    // and off(this) below is what makes it the last event this display ever emits
-    emit(this, OnDisplayDispose, this);
+    try {
+      // the listeners are still attached here: this event is what tells them to let go,
+      // and off(this) below is what makes it the last event this display ever emits. Every
+      // listener hears it, even behind one that throws
+      emitStrict(this, OnDisplayDispose, this);
+    } catch (error) {
+      errors.push(error);
+    }
     off(this);
 
     // before the release, which lets go of the canvas; and synchronously, so a display built on
@@ -1581,6 +1617,14 @@ export class Display {
     // to its canvas itself and does not need it in the document to release it
     this.#ownContainer?.remove();
     this.#ownContainer = undefined;
+
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      // neither goes missing: the error of the pause, and the one of the dispose event after it
+      throw new AggregateError(errors, 'Display#dispose(): a listener of pause threw, and a listener of dispose threw', {
+        cause: errors[1],
+      });
+    }
   }
 
   #giveBackCallersCanvas(): void {
@@ -1744,7 +1788,8 @@ export class Display {
    * Subscribes `listener` to the one `OnDisplayDispose` event this display emits.
    *
    * A listener attached after {@link Display.dispose} is never called: the event has
-   * already gone out, and it is not replayed.
+   * already gone out, and it is not replayed. Every listener hears the event, even behind one
+   * that throws; {@link Display.dispose} throws that error once the display is down.
    */
   readonly onDispose = (listener: DisplayEventListener<Display>): UnsubscribeFunc => once(this, OnDisplayDispose, listener);
 }

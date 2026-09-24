@@ -170,11 +170,25 @@ dispose(): void {
   if (this.#disposed) return;
   this.#disposed = true;
 
-  this.stop();
+  // a listener that throws does not hold up the teardown: its error waits until the display
+  // is down, so a caller that catches it holds a disposed display, not half of one
+  const errors: unknown[] = [];
+
+  try {
+    // a running display pauses here, and every listener of OnDisplayPause hears it
+    this.stop();
+  } catch (error) {
+    errors.push(error);
+  }
   this.frameLoop.stop(this);
-  // the listeners are still attached here: this event is what tells them to let go,
-  // and off(this) below is what makes it the last event this display ever emits
-  emit(this, OnDisplayDispose, this);
+  try {
+    // the listeners are still attached here: this event is what tells them to let go,
+    // and off(this) below is what makes it the last event this display ever emits. Every
+    // listener hears it, even behind one that throws
+    emitStrict(this, OnDisplayDispose, this);
+  } catch (error) {
+    errors.push(error);
+  }
   off(this);
 
   // before the release, which lets go of the canvas; and synchronously, so a display built on
@@ -189,6 +203,14 @@ dispose(): void {
   // to its canvas itself and does not need it in the document to release it
   this.#ownContainer?.remove();
   this.#ownContainer = undefined;
+
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    // neither goes missing: the error of the pause, and the one of the dispose event after it
+    throw new AggregateError(errors, 'Display#dispose(): a listener of pause threw, and a listener of dispose threw', {
+      cause: errors[1],
+    });
+  }
 }
 ```
 

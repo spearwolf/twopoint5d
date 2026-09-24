@@ -215,16 +215,22 @@ describe('Display — the contract after dispose()', function () {
     expect(readCanvas, 'the message names the state').to.throw(/disposed/);
   });
 
-  it('start() throws after dispose()', async () => {
+  it('start() rejects after dispose()', async () => {
     host = makeContainer();
     display = new Display(host);
 
     display.dispose();
 
+    /** @type {Promise<Display> | undefined} */
+    let pending;
+    expect(() => {
+      pending = display.start();
+    }, 'start() throws nothing synchronously').to.not.throw();
+
     /** @type {Error | undefined} */
     let error;
     try {
-      await display.start();
+      await pending;
     } catch (err) {
       error = /** @type {Error} */ (err);
     }

@@ -1,7 +1,8 @@
-import {on, once} from '@spearwolf/eventize';
+import {getSubscriptionCount, on, once} from '@spearwolf/eventize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import {
+  OnDisplayDispose,
   OnDisplayError,
   OnDisplayInit,
   OnDisplayPause,
@@ -1038,6 +1039,116 @@ describe('Display', () => {
     });
   });
 
+  describe('dispose()', () => {
+    const catchError = (fn: () => void): unknown => {
+      try {
+        fn();
+      } catch (error) {
+        return error;
+      }
+      return undefined;
+    };
+
+    it('a pause listener that throws does not stop dispose(): the display is torn down, then dispose() throws its error', async () => {
+      const {display, renderer} = makeDisplay();
+      await display.start();
+
+      const pauseError = new Error('pause listener fails on purpose');
+      const heard: Display[] = [];
+      on(display, OnDisplayPause, () => {
+        throw pauseError;
+      });
+      on(display, OnDisplayDispose, (d: Display) => {
+        heard.push(d);
+      });
+      const pending = display.nextFrame();
+
+      expect(() => display.dispose()).toThrow(pauseError);
+
+      expect(display.isDisposed).toBe(true);
+      expect(display.renderer).toBeUndefined();
+      expect(heard).toHaveLength(1);
+      expect(display.frameLoop.subscriptionCount).toBe(0);
+      expect(getSubscriptionCount(display)).toBe(0);
+      expect(doc.removeEventListener).toHaveBeenCalledWith('visibilitychange', expect.anything(), expect.anything());
+      await expect(pending).rejects.toThrow(/disposed/);
+
+      await settle();
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+      expect(() => display.dispose()).not.toThrow();
+    });
+
+    it('a dispose listener that throws: every dispose listener hears dispose, the display is torn down, then dispose() throws its error', async () => {
+      const {display, renderer} = makeDisplay();
+      await display.start();
+
+      const disposeError = new Error('dispose listener fails on purpose');
+      const heard: Display[] = [];
+      on(display, OnDisplayDispose, () => {
+        throw disposeError;
+      });
+      on(display, OnDisplayDispose, (d: Display) => {
+        heard.push(d);
+      });
+      const pending = display.nextFrame();
+
+      expect(() => display.dispose()).toThrow(disposeError);
+
+      expect(heard).toHaveLength(1);
+      await expect(pending).rejects.toThrow(/disposed/);
+      expect(getSubscriptionCount(display)).toBe(0);
+
+      await settle();
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('two dispose listeners that throw make dispose() throw an AggregateError of both errors, after the teardown', async () => {
+      const {display, renderer} = makeDisplay();
+      await display.start();
+
+      const first = new Error('first dispose listener');
+      const second = new Error('second dispose listener');
+      on(display, OnDisplayDispose, () => {
+        throw first;
+      });
+      on(display, OnDisplayDispose, () => {
+        throw second;
+      });
+
+      const thrown = catchError(() => display.dispose());
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([first, second]);
+
+      await settle();
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a pause listener and a dispose listener that throw make dispose() throw an AggregateError of both errors, after the teardown', async () => {
+      const {display, renderer} = makeDisplay();
+      await display.start();
+
+      const pauseError = new Error('pause listener fails on purpose');
+      const disposeError = new Error('dispose listener fails on purpose');
+      on(display, OnDisplayPause, () => {
+        throw pauseError;
+      });
+      on(display, OnDisplayDispose, () => {
+        throw disposeError;
+      });
+
+      const thrown = catchError(() => display.dispose());
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([pauseError, disposeError]);
+      expect((thrown as AggregateError).cause).toBe(disposeError);
+      expect((thrown as AggregateError).message).toContain('Display#dispose()');
+
+      await settle();
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('constructor', () => {
     it('releases a renderer it has taken over when the constructor fails after taking it', async () => {
       const failure = new Error('the resizeTo callback fails on purpose');
@@ -1051,6 +1162,34 @@ describe('Display', () => {
             },
           }),
       ).toThrow(failure);
+
+      await settle();
+
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a constructor that fails, and a dispose listener that throws as it takes the display down, throw an AggregateError of both errors and release the renderer', async () => {
+      const failure = new Error('the resizeTo callback fails on purpose');
+      const disposeError = new Error('dispose listener fails on purpose');
+      const {renderer} = makeRenderer();
+
+      let thrown: unknown;
+      try {
+        new Display(renderer as unknown as WebGPURenderer, {
+          resizeTo: (display) => {
+            on(display, OnDisplayDispose, () => {
+              throw disposeError;
+            });
+            throw failure;
+          },
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([failure, disposeError]);
+      expect((thrown as AggregateError).cause).toBe(disposeError);
 
       await settle();
 
