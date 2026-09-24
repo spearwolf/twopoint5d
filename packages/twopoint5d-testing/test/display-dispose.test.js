@@ -59,18 +59,19 @@ describe('Display — the contract after dispose()', function () {
   // Assertion (a) of the dispose test pattern — "releases what it built itself" — has two sides
   // here. The DOM side: the first two cases below watch the container the display built come out of
   // the host again, and the canvas it was handed stay where the caller put it. The GPU side: the
-  // six cases after "a dispose() before the renderer is ready leaves the frame loop empty" watch
-  // when renderer.dispose() runs — after an init that dispose() landed in, not at all after a
-  // failed one, whose webglcontextlost listener comes off the canvas all the same, only once the
-  // queue has run dry, and late enough that the page keeps its animation frames, for a display in
-  // a host element and one on a canvas that was handed in (the case of an adopted renderer lives
-  // in display-adopt-renderer.test.js) — and what the backend reports afterwards: a destroyed
-  // device, or a lost WebGL context. The six cases after those follow a canvas that was handed in:
-  // it is the caller's, and after the display on it has been disposed it carries the next one —
-  // built while the release runs, built once the release is through, built after a dispose() inside
-  // the init, bounded in time when the WebGL context does not come back, and with that context back
-  // once the display after the one that waited in vain is built — while its WebGL context stays
-  // lost as long as no display follows. The rest of this file is about the contract afterwards.
+  // six cases after "a start() that dispose() lands in while it waits for the renderer rejects and
+  // leaves the frame loop empty" watch when renderer.dispose() runs — after an init that dispose()
+  // landed in, not at all after a failed one, whose webglcontextlost listener comes off the canvas
+  // all the same, only once the queue has run dry, and late enough that the page keeps its
+  // animation frames, for a display in a host element and one on a canvas that was handed in (the
+  // case of an adopted renderer lives in display-adopt-renderer.test.js) — and what the backend
+  // reports afterwards: a destroyed device, or a lost WebGL context. The six cases after those
+  // follow a canvas that was handed in: it is the caller's, and after the display on it has been
+  // disposed it carries the next one — built while the release runs, built once the release is
+  // through, built after a dispose() inside the init, bounded in time when the WebGL context does
+  // not come back, and with that context back once the display after the one that waited in vain is
+  // built — while its WebGL context stays lost as long as no display follows. The rest of this file
+  // is about the contract afterwards.
 
   // Assertion (b) — "does not touch what was handed in" — holds word for word for a canvas passed
   // to the constructor: the four cases after "leaves a canvas that was handed in where it stands"
@@ -299,7 +300,7 @@ describe('Display — the contract after dispose()', function () {
     expect(readWebGLBackend, 'the message names the state').to.throw(/disposed/);
   });
 
-  it('a dispose() before the renderer is ready leaves the frame loop empty', async () => {
+  it('a start() that dispose() lands in while it waits for the renderer rejects and leaves the frame loop empty', async () => {
     /** @type {(value?: unknown) => void} */
     let releaseInit;
     const initReleased = new Promise((resolve) => {
@@ -326,13 +327,25 @@ describe('Display — the contract after dispose()', function () {
 
     expect(display.frameLoop.subscriptionCount, 'before the display is up').to.equal(0);
 
+    const started = display.start();
+
     display.dispose();
     releaseInit();
-    // a display goes on its frame loop only once it starts, and this await lets every reaction
-    // the display attached to the init promise run before the count below is read
-    await initSettled;
 
-    expect(display.frameLoop.subscriptionCount, 'after the init promise settles').to.equal(0);
+    // start() comes back once the renderer is ready, after the display has given it up
+    /** @type {Error | undefined} */
+    let error;
+    try {
+      await started;
+    } catch (err) {
+      error = /** @type {Error} */ (err);
+    }
+
+    expect(error, 'start() with a dispose() while it waits').to.be.an.instanceOf(Error);
+    expect(error.message).to.contain('Display#start()');
+    expect(error.message).to.contain('disposed');
+    expect(display.frameLoop.subscriptionCount, 'after start() has come back').to.equal(0);
+    expect(display.isRunning, 'isRunning').to.equal(false);
   });
 
   it('releases the renderer once an init that dispose() landed in is through', async () => {

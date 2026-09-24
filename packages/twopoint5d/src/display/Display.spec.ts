@@ -307,6 +307,67 @@ describe('Display', () => {
       expect(display.isRunning).toBe(true);
     });
 
+    it('an init listener that throws rejects start(), and the next start() emits init to every listener', async () => {
+      const {display, events} = makeDisplay();
+
+      const error = new Error('init listener');
+      let fail = true;
+      on(display, OnDisplayInit, () => {
+        if (fail) throw error;
+      });
+
+      const after: string[] = [];
+      on(display, OnDisplayInit, () => {
+        after.push(OnDisplayInit);
+      });
+
+      await expect(display.start()).rejects.toBe(error);
+
+      expect(events).toEqual([OnDisplayInit]);
+      expect(after).toEqual([]);
+      expect(display.isRunning).toBe(false);
+      expect(display.frameLoop.subscriptionCount).toBe(0);
+
+      fail = false;
+      await display.start();
+
+      expect(events).toEqual([OnDisplayInit, OnDisplayInit, OnDisplayStart]);
+      expect(after).toEqual([OnDisplayInit]);
+      expect(display.isRunning).toBe(true);
+
+      // a start that went through leaves init retained for a listener attached afterwards
+      const late: string[] = [];
+      on(display, OnDisplayInit, () => {
+        late.push(OnDisplayInit);
+      });
+
+      expect(late).toEqual([OnDisplayInit]);
+    });
+
+    it('a restart listener that throws rejects start(), and the next start() emits restart again', async () => {
+      const {display, events} = makeDisplay();
+      await display.start();
+      display.pause = true;
+
+      const error = new Error('restart listener');
+      let fail = true;
+      on(display, OnDisplayRestart, () => {
+        if (fail) throw error;
+      });
+      events.length = 0;
+
+      await expect(display.start()).rejects.toBe(error);
+
+      expect(events).toEqual([OnDisplayRestart]);
+      expect(display.isRunning).toBe(false);
+
+      fail = false;
+      await display.start();
+
+      expect(events).toEqual([OnDisplayRestart, OnDisplayRestart, OnDisplayStart]);
+      expect(display.isRunning).toBe(true);
+    });
+
     it('rejects with the error of an init that fails, and the error event carries the same error', async () => {
       const failure = new Error('no adapter');
       const {display, events} = makeDisplay(undefined, () => Promise.reject(failure));

@@ -71,7 +71,7 @@ describe('Display — the constructor that adopts a renderer', function () {
 
     display.dispose();
     // the display releases its renderer after dispose() has returned, once the GPU has run dry
-    // and the page has drawn two more frames
+    // and, under WebGPU, the page has drawn two more frames
     await released;
 
     expect(disposeCalls, 'calls to renderer.dispose()').to.equal(1);

@@ -102,7 +102,7 @@ export class Stylesheets {
    *   that sits in neither for its document.
    * @throws when `root` lies in a document without a window — one from
    *   `document.implementation.createHTMLDocument()`, a `DOMParser` or the content of a
-   *   `<template>` —, since such a document adopts no constructed stylesheet. Nothing is cached for
+   *   `<template>` — since such a document adopts no constructed stylesheet. Nothing is cached for
    *   it, and every call throws again.
    */
   static getSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {

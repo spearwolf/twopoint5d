@@ -156,8 +156,10 @@ export class DisplayStateMachine {
 
   #initOrRestart = (): void => {
     if (this.#initMustBeCalled) {
-      this.#initMustBeCalled = false;
       emit(this, DisplayStateMachine.Init);
+      // cleared once every listener is through: a listener that throws leaves the init to the next
+      // start(). None of them gets back in here, since start() does nothing while they run
+      this.#initMustBeCalled = false;
     } else {
       emit(this, DisplayStateMachine.Restart);
     }

@@ -112,11 +112,13 @@ const ANIMATION_FRAMES_TIMEOUT_MS = 2000;
 // with '' label has been destroyed`), and the page gets no requestAnimationFrame callback after
 // that — every animation on the page stands still. Whether the queue has run dry makes no
 // difference; a canvas outside the document is not affected. A canvas handed to the constructor
-// and the canvas of an adopted renderer stay where their caller put them, so the release waits
-// for two animation frames of the page: the callbacks of the first run before the page presents
-// the frame the canvas was drawn into last (the "update the rendering" steps of HTML run them
-// before painting), those of the second after it. Under WebGL, and for a canvas without a
-// window, there is nothing to wait for
+// and the canvas of an adopted renderer stay where their caller put them, and the canvas of a
+// container the display built leaves the document with that container but can be put into one
+// again while the release runs. So the release waits for two animation frames of the page,
+// whatever the canvas: the callbacks of the first run before the page presents the frame the
+// canvas was drawn into last (the "update the rendering" steps of HTML run them before
+// painting), those of the second after it. Under WebGL, and for a canvas without a window,
+// there is nothing to wait for
 async function waitForTwoAnimationFrames(renderer: WebGPURenderer): Promise<void> {
   // the three.js typings leave the device off the backend, and the WebGL backend has none
   const device = (renderer.backend as {device?: object | null} | undefined)?.device;
@@ -379,18 +381,21 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    outside the viewport, from the first report of the observer on.
  * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
  *    (once), then `OnDisplayStart`, and begins emitting `OnDisplayRenderFrame`.
- *    While the tab is hidden — or, with {@link DisplayParameters.pauseOutsideViewport},
- *    once the observer has reported the canvas out of view before the start,
- *    see {@link Display.start} — the display goes into the pause instead and
- *    fires `OnDisplayPause`; `OnDisplayInit` and `OnDisplayStart` follow once
- *    it can run. A {@link Display.stop} or a `pause = true` that comes in
- *    while `start()` waits keeps the display from starting.
- *    The display stands on its {@link FrameLoop} only while it runs: it is
- *    subscribed when it starts and taken off again when it pauses. A
- *    listener of `OnDisplayInit` or `OnDisplayRestart` that pauses the
- *    display holds it in the pause: `OnDisplayPause` follows instead of
- *    `OnDisplayStart`. A renderer that fails to initialize fires
- *    `OnDisplayError` instead, and `start()` rejects with the same error.
+ *    While the tab is hidden — or, with
+ *    {@link DisplayParameters.pauseOutsideViewport}, once the observer has
+ *    reported the canvas out of view before the start, see
+ *    {@link Display.start} — the display goes into the pause instead and fires
+ *    `OnDisplayPause`; `OnDisplayInit` and `OnDisplayStart` follow once it can
+ *    run. A {@link Display.stop} or a `pause = true` that comes in while
+ *    `start()` waits keeps the display from starting. The display stands on its
+ *    {@link FrameLoop} only while it runs: it is subscribed when it starts and
+ *    taken off again when it pauses. A listener of `OnDisplayInit` or
+ *    `OnDisplayRestart` that pauses the display holds it in the pause:
+ *    `OnDisplayPause` follows instead of `OnDisplayStart`. A renderer that
+ *    fails to initialize fires `OnDisplayError` instead, and `start()` rejects
+ *    with the same error. A listener of `OnDisplayInit` that throws makes
+ *    `start()` reject with its error; the display does not start, and the next
+ *    `start()` emits `OnDisplayInit` again.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    gives up {@link Display.renderer} right away. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
@@ -405,37 +410,37 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    handed to the constructor carries a new display afterwards; one built on
  *    it while the release runs waits for it. Under WebGL only a display
  *    brings the context of that canvas back — see {@link Display.dispose}.
- * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
- *    answers `undefined` and {@link Display.isDisposed} answers `true`.
- *    {@link Display.canvas}, {@link Display.start}, {@link Display.getEventProps},
- *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend}
- *    throw. {@link Display.resize}, {@link Display.renderFrame},
- *    {@link Display.stop}, a write to {@link Display.pause} and a further
- *    `dispose()` do nothing.
+ * 4. After `dispose()` the instance is unusable, and says so.
+ *    {@link Display.renderer} answers `undefined` and
+ *    {@link Display.isDisposed} answers `true`. {@link Display.canvas},
+ *    {@link Display.start}, {@link Display.getEventProps},
+ *    {@link Display.isWebGPUBackend} and {@link Display.isWebGLBackend} throw.
+ *    {@link Display.resize}, {@link Display.renderFrame}, {@link Display.stop},
+ *    a write to {@link Display.pause} and a further `dispose()` do nothing.
  *    {@link Display.nextFrame} is rejected, and so is a promise it handed out
  *    earlier that is still pending. {@link Display.width},
  *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
- *    {@link Display.deltaTime} keep their last value, {@link Display.pixelRatio}
- *    keeps reading the window, {@link Display.isRunning} is `false` and
- *    {@link Display.pause} answers `true`. No further
- *    event is emitted — no `OnDisplayRenderFrame`, no `OnDisplayResize`, no
- *    `OnDisplayError` — and a listener attached afterwards receives nothing, not
- *    even a retained value.
+ *    {@link Display.deltaTime} keep their last value,
+ *    {@link Display.pixelRatio} keeps reading the window,
+ *    {@link Display.isRunning} is `false` and {@link Display.pause} answers
+ *    `true`. No further event is emitted — no `OnDisplayRenderFrame`, no
+ *    `OnDisplayResize`, no `OnDisplayError` — and a listener attached
+ *    afterwards receives nothing, not even a retained value.
  *
  * ## Resize model
  *
  * **There is no `window.resize` listener.** {@link Display.resize} is invoked
  * at the beginning of every frame from {@link Display.renderFrame} and measures
- * there, unless {@link Display.resizePollIntervalMs} holds the measurement back;
- * with every measurement the canvas size, the `THREE` renderer size and the
- * `pixelRatio` are re-evaluated against the current DOM/window state. This
- * is a deliberate design decision: it covers window resizes, container
- * reflows, devicePixelRatio changes, `resize-to` attribute mutations and
+ * there, unless {@link Display.resizePollIntervalMs} holds the measurement
+ * back; with every measurement the canvas size, the `THREE` renderer size and
+ * the `pixelRatio` are re-evaluated against the current DOM/window state. This
+ * is a deliberate design decision: it covers window resizes, container reflows,
+ * devicePixelRatio changes, `resize-to` attribute mutations and
  * `resizeToElement` swaps uniformly, without registering DOM listeners that
- * would have to be cleaned up. As long as size, pixel ratio and pixel zoom
- * stay the same, a `resize()` changes nothing on the renderer and emits
- * nothing. Apart from that, every call compares `image-rendering` against
- * the inline style of the canvas.
+ * would have to be cleaned up. As long as size, pixel ratio and pixel zoom stay
+ * the same, a `resize()` changes nothing on the renderer and emits nothing.
+ * Apart from that, every call compares `image-rendering` against the inline
+ * style of the canvas.
  *
  * The size source is resolved in this priority order, with every measurement:
  *
@@ -448,7 +453,7 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      attribute changes back to anything else.
  *    - `"self"` → measures {@link Display.resizeToElement} — by default the
  *      canvas, or the host element when the display built its own
- *      container —, just as without the attribute; with `resizeToElement`
+ *      container — just as without the attribute; with `resizeToElement`
  *      cleared, the canvas.
  *    - any other non-empty string is a CSS selector, looked up in the root
  *      node of {@link Display.resizeToAttributeEl} — the document, or the
@@ -460,11 +465,11 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      an element inserted in front of it later that matches as well does
  *      not take over. Once the found element leaves the root or stops
  *      matching, the next `resize()` looks the selector up again.
- * 2. If {@link Display.resizeToCallback} is set, it is called with every measurement and
- *    its `[width, height]` return value wins over any element-based size
- *    measurement (the `resize-to` attribute still controls the
- *    fullscreen-CSS toggle, but its measured size is discarded). A result of
- *    `undefined`, or a pair with a value that is not a finite number, counts
+ * 2. If {@link Display.resizeToCallback} is set, it is called with every
+ *    measurement and its `[width, height]` return value wins over any
+ *    element-based size measurement (the `resize-to` attribute still controls
+ *    the fullscreen-CSS toggle, but its measured size is discarded). A result
+ *    of `undefined`, or a pair with a value that is not a finite number, counts
  *    as no size: the display takes the window under `resize-to="window"` or
  *    `"fullscreen"`, and 300 × 150 otherwise.
  * 3. Otherwise the content-area of {@link Display.resizeToElement} is
@@ -587,7 +592,7 @@ export class Display {
    * `"auto"` otherwise. Set, it pins one of the two values.
    *
    * A change takes effect with the next {@link Display.resize} — at the start of the next
-   * frame, or right away with a call of your own —, whether or not the size changes, and
+   * frame, or right away with a call of your own — whether or not the size changes, and
    * regardless of {@link Display.resizePollIntervalMs}.
    *
    * see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/image-rendering}
@@ -604,7 +609,7 @@ export class Display {
 
   /**
    * The width of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
-   * above `0`, and rounded down —, as the last measurement of {@link Display.resize} left it. The
+   * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `width`. It follows the size source with every
    * measurement: at the start of every frame, or less often with
    * {@link Display.resizePollIntervalMs}.
@@ -615,7 +620,7 @@ export class Display {
 
   /**
    * The height of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
-   * above `0`, and rounded down —, as the last measurement of {@link Display.resize} left it. The
+   * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `height`. It follows the size source with every
    * measurement: at the start of every frame, or less often with
    * {@link Display.resizePollIntervalMs}.
@@ -1046,14 +1051,14 @@ export class Display {
   /**
    * Whether the display is paused: `true` while it holds in the pause — through `pause = true`,
    * {@link Display.stop}, a hidden tab or, with {@link DisplayParameters.pauseOutsideViewport}, a
-   * canvas outside the viewport —, and before the first start once `stop()` or `pause = true`
+   * canvas outside the viewport — and before the first start once `stop()` or `pause = true`
    * has been called and no `pause = false` since. A write sets the pause the caller asks for; see
    * {@link Display.start} for how it meets a pending start.
    *
    * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */
   get pause(): boolean {
-    // in RUNNING the user pause is never set — a write of it pauses right away —, and in PAUSED
+    // in RUNNING the user pause is never set — a write of it pauses right away — and in PAUSED
     // the answer is true anyway: only a display that has not started yet answers from it
     return this.#stateMachine.isPaused || this.#stateMachine.pausedByUser;
   }
@@ -1362,6 +1367,10 @@ export class Display {
    * `OnDisplayStart`. A `pause = false` after it in the same listener lets the display start,
    * with one `OnDisplayRestart` and no second one.
    *
+   * A listener of `OnDisplayInit` or `OnDisplayRestart` that throws makes this call reject with
+   * its error, and the display does not start. The next `start()` emits that event again, to
+   * every listener, those that received it before the throw included.
+   *
    * A {@link Display.stop} or a `pause = true` that comes in while `start()` waits wins: the
    * promise resolves with the display, which does not run. A `pause = false` after it lets the
    * start through.
@@ -1370,7 +1379,7 @@ export class Display {
    * `OnDisplayPause`; `OnDisplayInit` and `OnDisplayStart` follow once the tab is visible. With
    * {@link DisplayParameters.pauseOutsideViewport}, the observer reports asynchronously, and a
    * canvas outside the viewport takes one of two ways: if the first report lands before the
-   * display starts — often while this call still waits for the renderer —, the display goes
+   * display starts — often while this call still waits for the renderer — the display goes
    * into the pause as with a hidden tab, and `OnDisplayInit` and `OnDisplayStart` follow once
    * the canvas comes into view; if it lands after the start, the display starts first and
    * pauses with that report.

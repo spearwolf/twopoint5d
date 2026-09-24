@@ -23,7 +23,7 @@ set of `public-api.ts` files _is_ the package's API contract:
   type that was forgotten here.
 - Type-only exports go through `export type` — `export type * from './types.js'`, or a
   named `export type {…}` list in a module that names its exports one by one, as
-  `display/` does —, matching `@typescript-eslint/consistent-type-imports` on the import
+  `display/` does — matching `@typescript-eslint/consistent-type-imports` on the import
   side.
 
 ## 2. Layers

@@ -240,4 +240,32 @@ describe('DisplayStateMachine', () => {
     expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Pause]);
     expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);
   });
+
+  it('an init listener that throws leaves the state machine new, and the next start() emits init again', () => {
+    const stateMachine = new DisplayStateMachine();
+
+    // a listener ahead of the one that throws hears init on both attempts
+    const early: string[] = [];
+    on(stateMachine, DisplayStateMachine.Init, () => {
+      early.push(DisplayStateMachine.Init);
+    });
+
+    let fail = true;
+    on(stateMachine, DisplayStateMachine.Init, () => {
+      if (fail) throw new Error('init listener');
+    });
+
+    const events = recordEvents(stateMachine);
+
+    expect(() => stateMachine.start()).toThrow('init listener');
+    expect(stateMachine.state).toBe(DisplayStateMachine.NEW);
+    expect(events).toEqual([]);
+
+    fail = false;
+    stateMachine.start();
+
+    expect(events).toEqual([DisplayStateMachine.Init, DisplayStateMachine.Start]);
+    expect(early).toEqual([DisplayStateMachine.Init, DisplayStateMachine.Init]);
+    expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
+  });
 });
