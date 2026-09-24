@@ -212,11 +212,17 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    canvas, installs the required CSS rules, performs an initial
  *    {@link Display.resize} (no `OnDisplayResize` event yet — see below) and
  *    wires up `document.visibilitychange` so the loop pauses while the tab is
- *    hidden.
+ *    hidden — and, with {@link DisplayParameters.pauseOutsideViewport}, an
+ *    `IntersectionObserver` on the canvas so it pauses while the canvas is
+ *    outside the viewport, from the first report of the observer on.
  * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
- *    (once), `OnDisplayStart` and begins emitting `OnDisplayRenderFrame`. A
- *    renderer that fails to initialize fires `OnDisplayError` instead, and
- *    `start()` rejects with the same error.
+ *    (once), then `OnDisplayStart`, and begins emitting `OnDisplayRenderFrame`.
+ *    The display stands on its {@link FrameLoop} only while it runs: it is
+ *    subscribed when it starts and taken off again when it pauses. A
+ *    listener of `OnDisplayInit` or `OnDisplayRestart` that pauses the
+ *    display holds it in the pause: `OnDisplayPause` follows instead of
+ *    `OnDisplayStart`. A renderer that fails to initialize fires
+ *    `OnDisplayError` instead, and `start()` rejects with the same error.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    gives up {@link Display.renderer} right away. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
@@ -324,6 +330,11 @@ export class Display {
   #chronometer = new Chronometer(undefined, 1 / 30);
 
   #stateMachine = new DisplayStateMachine();
+
+  // counts stop() and every pause = true. start() reads it before its first await: a pause
+  // that came in while it waited for the renderer or for beforeStartCallback keeps the display
+  // from starting, unless a pause = false has lifted it again since
+  #pauseRequests = 0;
 
   #lastResizeHash = '';
 
@@ -555,8 +566,16 @@ export class Display {
 
     // the display-owned keys come off the options here, so what is left is exactly what a
     // WebGPURenderer takes — everything below reads its options from these constants
-    const {maxFps, resizeTo, resizeToElement, resizeToAttributeEl, styleSheetRoot, createRenderer, ...rendererOptions} =
-      options ?? {};
+    const {
+      maxFps,
+      pauseOutsideViewport,
+      resizeTo,
+      resizeToElement,
+      resizeToAttributeEl,
+      styleSheetRoot,
+      createRenderer,
+      ...rendererOptions
+    } = options ?? {};
 
     this.resizeToCallback = resizeTo;
     this.styleSheetRoot = styleSheetRoot ?? document.head;
@@ -655,17 +674,7 @@ export class Display {
     this.resize();
 
     on(this.#stateMachine, {
-      [DisplayStateMachine.Init]: async () => {
-        // emit() discards the promise this callback returns, so a rejected initialization would
-        // pass nobody on its way out of here
-        try {
-          await this.#waitForRenderer;
-        } catch (error) {
-          emit(this, OnDisplayError, error, this);
-          return;
-        }
-        this.#emit(OnDisplayInit);
-      },
+      [DisplayStateMachine.Init]: () => this.#emit(OnDisplayInit),
 
       [DisplayStateMachine.Restart]: () => this.#emit(OnDisplayRestart),
 
@@ -674,11 +683,21 @@ export class Display {
         this.#chronometer.start(t);
         this.#chronometer.update(t);
 
+        // on the loop before the event goes out: a start listener may set pause = true right
+        // away, the pause handler takes the display off the loop then, and a subscription after
+        // the emit would put a paused display back on it
+        this.frameLoop.start(this);
+
         this.#emit(OnDisplayStart);
       },
 
       [DisplayStateMachine.Pause]: () => {
         this.#chronometer.stop(performance.now() / 1000);
+
+        // off the loop before the event goes out, for the mirrored reason: a pause listener that
+        // sets pause = false starts the display again right away, and an unsubscription after the
+        // emit would take a running display off its loop
+        this.frameLoop.stop(this);
 
         retainClear(this, OnDisplayStart);
 
@@ -700,19 +719,26 @@ export class Display {
       onDocVisibilityChange();
     }
 
-    this.#waitForRenderer
-      .then(() => {
-        // a dispose() inside this await would otherwise put the display back into the subscriber
-        // list of the loop, where it stays until the page goes
-        if (this.#disposed) return;
-
-        this.frameLoop.start(this);
-      })
-      .catch((error) => {
-        // a renderer that never comes up is what the caller has to hear about; left here it
-        // would be an unhandled rejection and the display would simply stay dark
-        emit(this, OnDisplayError, error, this);
+    if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver((entries) => {
+        // the entries of one callback arrive in time order, and the last one is where the
+        // canvas is now
+        const entry = entries[entries.length - 1];
+        if (entry != null) {
+          this.#stateMachine.elementIsInsideViewport = entry.isIntersecting;
+        }
       });
+      observer.observe(canvas);
+      once(this, OnDisplayDispose, () => {
+        observer.disconnect();
+      });
+    }
+
+    this.#waitForRenderer.catch((error) => {
+      // a renderer that never comes up is what the caller has to hear about; left here it
+      // would be an unhandled rejection and the display would simply stay dark
+      emit(this, OnDisplayError, error, this);
+    });
   }
 
   /**
@@ -765,6 +791,7 @@ export class Display {
     // with it. There is nothing left to run, so a disposed display stays where dispose() put it
     if (this.#disposed) return;
 
+    if (pause) this.#pauseRequests += 1;
     this.#stateMachine.pausedByUser = pause;
   }
 
@@ -1015,8 +1042,27 @@ export class Display {
   }
 
   /**
-   * Awaits the renderer initialization, runs `beforeStartCallback` and starts the
-   * frame loop.
+   * Waits for the renderer initialization, runs `beforeStartCallback` and then starts the
+   * display.
+   *
+   * The first start emits `OnDisplayInit`, then `OnDisplayStart`, both within this call and in
+   * this order; a start after a pause emits `OnDisplayRestart`, then `OnDisplayStart`. A
+   * listener of `OnDisplayInit` or `OnDisplayRestart` that calls {@link Display.stop} or sets
+   * `pause = true` holds the display in the pause: `OnDisplayPause` follows instead of
+   * `OnDisplayStart`.
+   *
+   * A {@link Display.stop} or a `pause = true` that comes in while `start()` waits wins: the
+   * promise resolves with the display, which does not run. A `pause = false` after it lets the
+   * start through.
+   *
+   * If the tab is hidden when the display starts, the display goes into the pause and emits
+   * `OnDisplayPause`; `OnDisplayInit` and `OnDisplayStart` follow once the tab is visible. With
+   * {@link DisplayParameters.pauseOutsideViewport}, the observer reports asynchronously, and a
+   * canvas outside the viewport takes one of two ways: if the first report lands before the
+   * display starts — often while this call still waits for the renderer —, the display goes
+   * into the pause as with a hidden tab, and `OnDisplayInit` and `OnDisplayStart` follow once
+   * the canvas comes into view; if it lands after the start, the display starts first and
+   * pauses with that report.
    *
    * Throws after {@link Display.dispose}. A promise that resolves without a frame ever
    * following would be a dead end the caller cannot see, and the caller is waiting on
@@ -1024,6 +1070,8 @@ export class Display {
    */
   async start(beforeStartCallback?: (args: DisplayEventProps) => Promise<void> | void): Promise<Display> {
     if (this.#disposed) throw disposedError('start()');
+
+    const pauseRequests = this.#pauseRequests;
 
     await this.#waitForRenderer;
 
@@ -1040,13 +1088,26 @@ export class Display {
       if (this.#disposed) throw disposedError('start()');
     }
 
+    // a stop() or a pause = true that came in while this call waited wins over it, unless a
+    // pause = false has lifted it since — the last word the caller spoke is the one that counts
+    if (this.#pauseRequests !== pauseRequests && this.#stateMachine.pausedByUser) {
+      return this;
+    }
+
     this.#stateMachine.pausedByUser = false;
     this.#stateMachine.start();
 
     return this;
   }
 
+  /**
+   * Pauses the display, as `pause = true` does. {@link Display.start} or `pause = false` let it
+   * run again.
+   *
+   * Does nothing after {@link Display.dispose}.
+   */
   stop(): void {
+    this.#pauseRequests += 1;
     this.#stateMachine.pausedByUser = true;
   }
 

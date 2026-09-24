@@ -35,6 +35,24 @@ export interface DisplayParameters extends DisplayRendererParameters {
   maxFps?: number;
 
   /**
+   * Pause the display while its canvas is outside the viewport, and let it run again once
+   * the canvas is back in view — watched through an `IntersectionObserver` on the canvas.
+   * Leaving and coming back emit `OnDisplayPause`, then `OnDisplayRestart` and
+   * `OnDisplayStart`, as a hidden tab does.
+   *
+   * The observer reports asynchronously, never synchronously within the constructor. Where
+   * the canvas starts out of view, it depends on when the first report lands: one that lands
+   * before the display starts — often while `start()` still waits for the renderer — lets
+   * `start()` go straight into the pause with `OnDisplayPause`, as with a hidden tab, and
+   * `OnDisplayInit` and `OnDisplayStart` follow once the canvas comes into view. One that
+   * lands after the start lets the display start first and pauses it with that report.
+   *
+   * Off by default. Read once, by the constructor. Where `IntersectionObserver` does not
+   * exist, the option does nothing.
+   */
+  pauseOutsideViewport?: boolean;
+
+  /**
    * If a function is specified here, it is called for each frame
    * and expects the dimension (width and height) to be used for the display as the return value.
    *

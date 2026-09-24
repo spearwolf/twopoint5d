@@ -88,11 +88,17 @@ export class Chronometer {
    * While running, the elapsed delta is exposed as {@link deltaTime} (and
    * clamped against {@link maxDeltaTime} if set). While paused, the delta
    * is accumulated into the lost time instead.
+   *
+   * A `time` before the current one counts as no time passing: {@link deltaTime} is `0`, and
+   * {@link time} stays where it is.
    */
   update(time?: number): void {
     const previousTime = this.#currentTime;
-    this.#currentTime = getCurrentTime(time);
-    const deltaTime = this.#currentTime - previousTime;
+    // a time before the current one counts as no time passing: a rAF timestamp is taken at the
+    // vsync and can lie before a performance.now() read later in the same frame, and time does
+    // not run backwards
+    const deltaTime = Math.max(0, getCurrentTime(time) - previousTime);
+    this.#currentTime = previousTime + deltaTime;
     if (this.#isRunning) {
       if (this.maxDeltaTime > 0 && deltaTime > this.maxDeltaTime) {
         this.#lostTime += deltaTime - this.maxDeltaTime;

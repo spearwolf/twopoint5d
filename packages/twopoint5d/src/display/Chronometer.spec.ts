@@ -273,4 +273,31 @@ describe('Chronometer', () => {
       expect(chronus.deltaTime).toBe(50);
     });
   });
+
+  it('an update() with an earlier time lets no time pass while running', () => {
+    const chronus = new Chronometer(3000);
+    chronus.update(4000);
+    const time = chronus.time;
+
+    chronus.update(3990);
+
+    expect(chronus.deltaTime).toBe(0);
+    expect(chronus.time).toBe(time);
+
+    chronus.update(4010);
+
+    // measured from 4000, the latest time the chronometer has seen
+    expect(chronus.deltaTime).toBe(10);
+  });
+
+  it('an update() with an earlier time does not shrink the lost time while paused', () => {
+    const chronus = new Chronometer(3000);
+    chronus.update(4000);
+    chronus.stop(4000);
+    const lostTime = chronus.lostTime;
+
+    chronus.update(3990);
+
+    expect(chronus.lostTime).toBe(lostTime);
+  });
 });

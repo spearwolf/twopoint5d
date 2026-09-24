@@ -114,10 +114,41 @@ export class DisplayStateMachine {
 
   #pause = (): void => {
     if (this.state !== DisplayStateMachine.PAUSED) {
+      this.#transitions += 1;
       this.state = DisplayStateMachine.PAUSED;
       emit(this, DisplayStateMachine.Pause);
     }
   };
+
+  // counts every transition that emits Start or Pause, so start() can tell whether a listener of
+  // Init or Restart has already run a transition of its own
+  #transitions = 0;
+
+  #isPaused(): boolean {
+    return this.#pausedByUser || !this.#documentIsVisible || !this.#elementIsInsideViewport;
+  }
+
+  #initOrRestartThenStart(): void {
+    const transitions = this.#transitions;
+    this.#initOrRestart();
+
+    // the listeners of Init and Restart run while the state is still NEW or PAUSED, where a
+    // change of the inputs moves nothing. So the inputs are read again here: a pause one of them
+    // asked for holds, and whoever heard init or restart hears pause next. A listener that has
+    // started or paused the state machine itself (a pause and un-pause inside a restart listener
+    // restarts it nested) has already taken it where it belongs, and a second Start or Pause
+    // from here would repeat what went out
+    if (this.#transitions !== transitions) return;
+
+    this.#transitions += 1;
+    if (this.#isPaused()) {
+      this.state = DisplayStateMachine.PAUSED;
+      emit(this, DisplayStateMachine.Pause);
+    } else {
+      this.state = DisplayStateMachine.RUNNING;
+      emit(this, DisplayStateMachine.Start);
+    }
+  }
 
   #initMustBeCalled = true;
 
@@ -132,14 +163,12 @@ export class DisplayStateMachine {
 
   start(): void {
     if (this.state !== DisplayStateMachine.RUNNING) {
-      const isPaused = this.#pausedByUser || !this.#documentIsVisible || !this.#elementIsInsideViewport;
+      const isPaused = this.#isPaused();
 
       switch (this.state) {
         case DisplayStateMachine.NEW:
           if (!isPaused) {
-            this.#initOrRestart();
-            this.state = DisplayStateMachine.RUNNING;
-            emit(this, DisplayStateMachine.Start);
+            this.#initOrRestartThenStart();
           } else {
             this.#pause();
           }
@@ -147,9 +176,7 @@ export class DisplayStateMachine {
 
         case DisplayStateMachine.PAUSED:
           if (!isPaused) {
-            this.#initOrRestart();
-            this.state = DisplayStateMachine.RUNNING;
-            emit(this, DisplayStateMachine.Start);
+            this.#initOrRestartThenStart();
           }
           break;
       }

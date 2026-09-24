@@ -262,8 +262,8 @@ describe('Display — the contract after dispose()', function () {
 
     display.dispose();
     releaseInit();
-    // the display attached its handler to this very promise in its constructor, before this
-    // await; reactions run in the order they were attached, so that handler has run by now
+    // a display goes on its frame loop only once it starts, and this await lets every reaction
+    // the display attached to the init promise run before the count below is read
     await initSettled;
 
     expect(display.frameLoop.subscriptionCount, 'after the init promise settles').to.equal(0);
