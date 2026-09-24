@@ -297,4 +297,35 @@ describe('DisplayStateMachine', () => {
     expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Start]);
     expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
   });
+
+  it('a start listener and a pause listener that throw make start() throw an AggregateError of both, after every pause listener has run', () => {
+    const stateMachine = new DisplayStateMachine();
+
+    const startError = new Error('start listener');
+    const pauseError = new Error('pause listener');
+    on(stateMachine, DisplayStateMachine.Start, () => {
+      throw startError;
+    });
+    on(stateMachine, DisplayStateMachine.Pause, () => {
+      throw pauseError;
+    });
+    // attached behind the pause listener that throws, so it hears pause only if the emit runs on
+    let pauses = 0;
+    on(stateMachine, DisplayStateMachine.Pause, () => {
+      pauses += 1;
+    });
+
+    let thrown: unknown;
+    try {
+      stateMachine.start();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AggregateError);
+    expect((thrown as AggregateError).errors).toEqual([startError, pauseError]);
+    expect(pauses).toBe(1);
+    expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);
+    expect(stateMachine.pausedByUser).toBe(true);
+  });
 });

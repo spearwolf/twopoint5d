@@ -10,6 +10,7 @@ import {
   OnDisplayStart,
 } from '../events.js';
 import {Display} from './Display.js';
+import {FrameLoop} from './FrameLoop.js';
 import type {DisplayParameters} from './types.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
@@ -47,7 +48,7 @@ function makeCanvas() {
 /**
  * A renderer stub with what the display calls on it. `backend` stands in for `renderer.backend`.
  * `frame` calls the callback handed to `setAnimationLoop()` last, with a timestamp in ms; while
- * that callback is `null`, a frame reaches nobody.
+ * that callback is `null`, a frame reaches nobody. `getAnimationLoop()` answers that callback.
  */
 function makeRenderer(init: () => Promise<unknown> = () => Promise.resolve(), backend?: object) {
   const canvas = makeCanvas();
@@ -61,6 +62,7 @@ function makeRenderer(init: () => Promise<unknown> = () => Promise.resolve(), ba
     setAnimationLoop: vi.fn((callback: ((now: number) => unknown) | null) => {
       loop = callback;
     }),
+    getAnimationLoop: vi.fn(() => loop),
     dispose: vi.fn(),
   };
 
@@ -429,6 +431,118 @@ describe('Display', () => {
       expect(display.pause).toBe(true);
     });
 
+    it('a pause listener that throws: every pause listener hears pause, and pause = true throws its error', async () => {
+      const {display} = makeDisplay();
+      await display.start();
+
+      const error = new Error('pause listener');
+      on(display, OnDisplayPause, () => {
+        throw error;
+      });
+      const after: string[] = [];
+      on(display, OnDisplayPause, () => {
+        after.push(OnDisplayPause);
+      });
+
+      expect(() => {
+        display.pause = true;
+      }).toThrow(error);
+      expect(after).toEqual([OnDisplayPause]);
+      expect(display.isRunning).toBe(false);
+      expect(display.frameLoop.subscriptionCount).toBe(0);
+    });
+
+    it('two pause listeners that throw make pause = true throw an AggregateError of both errors', async () => {
+      const {display} = makeDisplay();
+      await display.start();
+
+      const first = new Error('first pause listener');
+      const second = new Error('second pause listener');
+      on(display, OnDisplayPause, () => {
+        throw first;
+      });
+      on(display, OnDisplayPause, () => {
+        throw second;
+      });
+
+      let thrown: unknown;
+      try {
+        display.pause = true;
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([first, second]);
+    });
+
+    it('a start listener and a pause listener that throw reject start() with an AggregateError of both errors, and every pause listener hears pause', async () => {
+      const {display, events} = makeDisplay();
+
+      const startError = new Error('start listener');
+      const pauseError = new Error('pause listener');
+      let fail = true;
+      on(display, OnDisplayStart, () => {
+        if (fail) throw startError;
+      });
+      on(display, OnDisplayPause, () => {
+        if (fail) throw pauseError;
+      });
+      const after: string[] = [];
+      on(display, OnDisplayPause, () => {
+        after.push(OnDisplayPause);
+      });
+
+      const rejection = await display.start().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+
+      expect(rejection).toBeInstanceOf(AggregateError);
+      expect((rejection as AggregateError).errors).toEqual([startError, pauseError]);
+      expect((rejection as AggregateError).cause).toBe(pauseError);
+      expect(after).toEqual([OnDisplayPause]);
+      expect(display.isRunning).toBe(false);
+      expect(display.pause).toBe(true);
+      expect(display.frameLoop.subscriptionCount).toBe(0);
+
+      fail = false;
+      events.length = 0;
+      await display.start();
+
+      expect(display.isRunning).toBe(true);
+      expect(events).toEqual([OnDisplayRestart, OnDisplayStart]);
+    });
+
+    it('two start listeners and a pause listener that throw reject start() with an AggregateError of the start errors and the pause error', async () => {
+      const {display} = makeDisplay();
+
+      const first = new Error('first start listener');
+      const second = new Error('second start listener');
+      const pauseError = new Error('pause listener');
+      on(display, OnDisplayStart, () => {
+        throw first;
+      });
+      on(display, OnDisplayStart, () => {
+        throw second;
+      });
+      on(display, OnDisplayPause, () => {
+        throw pauseError;
+      });
+
+      const rejection = await display.start().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+
+      expect(rejection).toBeInstanceOf(AggregateError);
+      const {errors} = rejection as AggregateError;
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBeInstanceOf(AggregateError);
+      expect((errors[0] as AggregateError).errors).toEqual([first, second]);
+      expect(errors[1]).toBe(pauseError);
+    });
+
     it('rejects with the error of an init that fails, and the error event carries the same error', async () => {
       const failure = new Error('no adapter');
       const {display, events} = makeDisplay(undefined, () => Promise.reject(failure));
@@ -471,6 +585,77 @@ describe('Display', () => {
       display.dispose();
 
       expect(display.frameLoop.subscriptionCount, 'disposed').toBe(0);
+    });
+
+    it('stops the animation loop of three as the display goes into the pause, and starts it again once as it runs', async () => {
+      const {display, renderer} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+
+      await display.start();
+
+      // three has started its loop in init() already
+      expect(animation.start, 'after start()').not.toHaveBeenCalled();
+      expect(animation.stop, 'after start()').not.toHaveBeenCalled();
+
+      display.pause = true;
+
+      expect(animation.stop, 'paused').toHaveBeenCalledTimes(1);
+
+      display.pause = false;
+
+      expect(animation.start, 'running again').toHaveBeenCalledTimes(1);
+      // three runs the first tick of a loop it starts right away, and the display is not on its
+      // frame loop yet then
+      expect(animation.start.mock.invocationCallOrder[0]).toBeLessThan(
+        renderer.setAnimationLoop.mock.invocationCallOrder.at(-1)!,
+      );
+
+      display.pause = false;
+
+      expect(animation.start, 'a second pause = false').toHaveBeenCalledTimes(1);
+      expect(animation.stop, 'a second pause = false').toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the animation loop of three running while another frame loop runs on the renderer', async () => {
+      const {display, renderer} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      await display.start();
+
+      const other = new FrameLoop(0, renderer);
+      const target = {[FrameLoop.OnFrame]() {}};
+      other.start(target);
+
+      display.pause = true;
+
+      expect(animation.stop).not.toHaveBeenCalled();
+
+      display.pause = false;
+
+      expect(animation.start).not.toHaveBeenCalled();
+
+      other.stop(target);
+    });
+
+    it('stops the animation loop of three for a display that goes into the pause as it starts', async () => {
+      // the constructor reads the visibility of the document
+      doc.hidden = true;
+      const {display, renderer, events} = makeDisplay();
+      const animation = {start: vi.fn(), stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+
+      await display.start();
+
+      expect(events).toEqual([OnDisplayPause]);
+      expect(animation.stop).toHaveBeenCalledTimes(1);
+
+      const [, listener] = doc.addEventListener.mock.calls.find(([type]) => type === 'visibilitychange')!;
+      doc.hidden = false;
+      listener();
+
+      expect(animation.start).toHaveBeenCalledTimes(1);
+      expect(display.isRunning).toBe(true);
     });
 
     it('lets no time pass for a frame whose timestamp lies before the start', async () => {

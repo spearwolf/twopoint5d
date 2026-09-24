@@ -118,6 +118,29 @@ describe('Display — lifecycle', function () {
     expect(display.frameLoop.subscriptionCount).to.equal(1);
   });
 
+  it('a paused display lets the animation loop of three stand still, and one that runs again starts it once', async () => {
+    host = makeContainer();
+    display = new Display(host);
+    await display.start();
+    await display.nextFrame();
+    // three counts the ticks of its own animation loop in info.frame, and nothing else writes it
+    const {info} = display.renderer;
+
+    display.pause = true;
+    const pausedAt = info.frame;
+    await animationFrames(5);
+    expect(info.frame, 'no tick of three while paused').to.equal(pausedAt);
+
+    display.pause = false;
+    await display.nextFrame();
+    const runningAt = info.frame;
+    await animationFrames(10);
+    const ticks = info.frame - runningAt;
+    expect(ticks, 'three ticks again').to.be.greaterThan(0);
+    // one loop ticks once per frame of the page; a second one started on top would tick twice
+    expect(ticks, 'one loop of three, not two').to.be.below(15);
+  });
+
   it('pauses while the tab is hidden and runs again once it is visible', async () => {
     host = makeContainer();
     display = new Display(host);

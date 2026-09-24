@@ -119,7 +119,8 @@ export class DisplayStateMachine {
   #pause = (): void => {
     if (this.#state !== DisplayStateMachine.PAUSED) {
       this.#state = DisplayStateMachine.PAUSED;
-      emit(this, DisplayStateMachine.Pause);
+      // every listener hears pause, even behind one that throws
+      emitStrict(this, DisplayStateMachine.Pause);
     }
   };
 
@@ -145,18 +146,27 @@ export class DisplayStateMachine {
     // a pause one of them asked for holds, and whoever heard init or restart hears pause next
     if (this.#isPaused()) {
       this.#state = DisplayStateMachine.PAUSED;
-      emit(this, DisplayStateMachine.Pause);
+      emitStrict(this, DisplayStateMachine.Pause);
     } else {
       this.#state = DisplayStateMachine.RUNNING;
       try {
         // every listener hears start, even behind one that throws
         emitStrict(this, DisplayStateMachine.Start);
-      } catch (error) {
+      } catch (startError) {
         // the listeners that heard start hear pause next, and the pause is the user's: a tab
         // that comes back does not start again what failed to start — the next start() does
         this.#pausedByUser = true;
-        this.#pause();
-        throw error;
+        try {
+          this.#pause();
+        } catch (pauseError) {
+          // neither error goes missing: the one of the start, and the one of the pause after it
+          throw new AggregateError(
+            [startError, pauseError],
+            'start(): a listener of start threw, and a listener of pause threw in the pause that followed',
+            {cause: pauseError},
+          );
+        }
+        throw startError;
       }
     }
   }

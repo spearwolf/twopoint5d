@@ -179,6 +179,23 @@ function dropContextLostListener(renderer: WebGPURenderer): void {
   }
 }
 
+// The animation loop three runs on a renderer of its own: renderer.init() starts it, it ticks on
+// every animation frame of the page until renderer.dispose(), and setAnimationLoop(null) only
+// takes the callback out of it. three stops and starts it only through renderer._animation,
+// private by convention; a renderer without that shape keeps its loop running
+interface AnimationOfThree {
+  start(): void;
+  stop(): void;
+}
+
+function getAnimationOfThree(renderer: WebGPURenderer): AnimationOfThree | undefined {
+  // the three.js typings leave the field off the renderer, and it is null until init() has run
+  const animation = (renderer as unknown as {_animation?: Partial<AnimationOfThree> | null})._animation;
+  return typeof animation?.start === 'function' && typeof animation.stop === 'function'
+    ? (animation as AnimationOfThree)
+    : undefined;
+}
+
 // A WebGL context the browser has not brought back after this long is not coming back for the
 // display waiting for the canvas, and that display starts on it anyway: a failed init reaches its
 // caller through start() and the error event, a wait without end reaches nobody
@@ -414,8 +431,10 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    run. A {@link Display.stop} or a `pause = true` that comes in while
  *    `start()` waits keeps the display from starting. The display stands on its
  *    {@link FrameLoop} only while it runs: it is subscribed when it starts and
- *    taken off again when it pauses. A listener of `OnDisplayInit` or
- *    `OnDisplayRestart` that pauses the display holds it in the pause:
+ *    taken off again when it pauses, and the animation loop of three rests
+ *    while it pauses as well, see {@link Display.pause}. A listener of
+ *    `OnDisplayInit` or `OnDisplayRestart` that pauses the display holds it
+ *    in the pause:
  *    `OnDisplayPause` follows instead of `OnDisplayStart`. A renderer that
  *    fails to initialize fires `OnDisplayError` instead, and `start()` rejects
  *    with the same error. A listener of `OnDisplayInit` that throws makes
@@ -423,7 +442,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    `start()` emits `OnDisplayInit` again. A listener of `OnDisplayStart`
  *    that throws makes `start()` reject as well, after every listener has
  *    heard the event; the display then pauses as a {@link Display.stop} would
- *    pause it and fires `OnDisplayPause`.
+ *    pause it and fires `OnDisplayPause`. If a listener of `OnDisplayPause`
+ *    throws as well, `start()` rejects with an `AggregateError` of both errors.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    gives up {@link Display.renderer} right away. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
@@ -563,6 +583,11 @@ export class Display {
   // that came in while it waited for the renderer or for beforeStartCallback keeps the display
   // from starting, unless a pause = false has lifted it again since
   #pauseRequests = 0;
+
+  // the animation loop of three this display has stopped as it went into the pause, and the only
+  // one it starts again: three's Animation.start() does not ask whether its loop runs already,
+  // and a second call would run a second rAF chain beside the first
+  #stoppedAnimationOfThree?: AnimationOfThree;
 
   #lastResizeHash = '';
 
@@ -984,6 +1009,10 @@ export class Display {
           this.#chronometer.start(t);
           this.#chronometer.update(t);
 
+          // three runs the first tick of a loop it starts right away and without a timestamp, and
+          // the display is not on its frame loop yet, so that tick finds no callback of it
+          this.#startAnimationOfThree();
+
           // on the loop before the event goes out: a start listener may set pause = true right
           // away, the pause handler takes the display off the loop then, and a subscription after
           // the emit would put a paused display back on it
@@ -1002,9 +1031,15 @@ export class Display {
           // emit would take a running display off its loop
           this.frameLoop.stop(this);
 
+          // after the frame loop, whose driver takes its callback off the renderer there, and
+          // before the event goes out: a pause listener that sets pause = false starts the loop again
+          this.#stopAnimationOfThree();
+
           retainClear(this, OnDisplayStart);
 
-          this.#emit(OnDisplayPause);
+          // every listener hears pause, even behind one that throws; the call that paused the
+          // display then throws the error, or an AggregateError when more than one listener throws
+          if (this.renderer != null) emitStrict(this, OnDisplayPause, this.getEventProps());
         },
       });
 
@@ -1086,6 +1121,19 @@ export class Display {
    * canvas outside the viewport — and before the first start once `stop()` or `pause = true`
    * has been called and no `pause = false` since. A write sets the pause the caller asks for; see
    * {@link Display.start} for how it meets a pending start.
+   *
+   * Every listener of `OnDisplayPause` hears the event, even behind one that throws; a write that
+   * pauses the display then throws the error, or an `AggregateError` when more than one listener
+   * throws.
+   *
+   * While the display holds in the pause, the animation loop of its renderer stands still as
+   * well. three runs that loop from `renderer.init()` on, on every animation frame of the page,
+   * and `setAnimationLoop(null)` only takes the callback out of it; so the display stops the loop
+   * as it goes into the pause and starts it again as it runs. three 0.185 offers no public way to
+   * do so, and the display reaches the loop through `renderer._animation`: a renderer without it
+   * keeps its loop running through the pause. So does a renderer another {@link FrameLoop} still
+   * runs on as the display goes into the pause, and before the first start the loop runs as three
+   * started it.
    *
    * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */
@@ -1409,6 +1457,11 @@ export class Display {
    * follows, `pause` answers `true`, and a tab that becomes visible again does not start it. The
    * next `start()` emits `OnDisplayRestart` and `OnDisplayStart`.
    *
+   * If a listener of `OnDisplayPause` throws as well in that pause, the call rejects with an
+   * `AggregateError` whose `errors` are the error it would have rejected with and the error of the
+   * pause — that of the one pause listener, or an `AggregateError` when more than one throws.
+   * Every listener of `OnDisplayPause` hears the event all the same.
+   *
    * A {@link Display.stop} or a `pause = true` that comes in while `start()` waits wins: the
    * promise resolves with the display, which does not run. A `pause = false` after it lets the
    * start through.
@@ -1460,7 +1513,8 @@ export class Display {
 
   /**
    * Pauses the display, as `pause = true` does. {@link Display.start} or `pause = false` let it
-   * run again.
+   * run again. What `pause = true` does with a listener of `OnDisplayPause` that throws, and with
+   * the animation loop of three, holds here as well — see {@link Display.pause}.
    *
    * Does nothing after {@link Display.dispose}.
    */
@@ -1590,6 +1644,27 @@ export class Display {
         if (canvasReleases.get(canvas) === released) canvasReleases.delete(canvas);
       });
     }
+  }
+
+  #stopAnimationOfThree(): void {
+    const renderer = this.renderer;
+    if (renderer == null || this.#stoppedAnimationOfThree != null) return;
+    const animation = getAnimationOfThree(renderer);
+    if (animation == null) return;
+    // the display is off its frame loop here, and the driver has taken its callback off the
+    // renderer unless another FrameLoop still holds it. A callback left on the loop belongs to
+    // such a FrameLoop, and its frames go on. One that starts on the renderer while the loop
+    // stands still gets its frames once the display runs again
+    if (renderer.getAnimationLoop() != null) return;
+    animation.stop();
+    this.#stoppedAnimationOfThree = animation;
+  }
+
+  #startAnimationOfThree(): void {
+    const animation = this.#stoppedAnimationOfThree;
+    if (animation == null) return;
+    this.#stoppedAnimationOfThree = undefined;
+    animation.start();
   }
 
   /**

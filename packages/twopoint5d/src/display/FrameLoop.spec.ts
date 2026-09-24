@@ -549,5 +549,26 @@ describe('FrameLoop', () => {
       expect(loop.measuredFps, 'measuredFps').toBe(60);
       expect(loop.measuredFps, 'measuredFps against the props').toBe(last.measuredFps);
     });
+
+    it('skips a tick of the renderer without a timestamp', () => {
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {events} = subscribe(loop);
+
+      renderer.callback!(undefined as unknown as number);
+
+      expect(events, 'after the tick without a timestamp').toHaveLength(0);
+      expect(loop.frameNo).toBe(0);
+
+      renderer.tick(1000);
+      renderer.tick(1016);
+
+      expect(events).toHaveLength(2);
+      expect(events[0]!.deltaTime).toBe(0);
+      expect(events[1]!.frameNo).toBe(2);
+      expect(Number.isFinite(events[1]!.now)).toBe(true);
+      // no measurement window has closed yet, and none is NaN
+      expect(loop.measuredFps).toBe(0);
+    });
   });
 });
