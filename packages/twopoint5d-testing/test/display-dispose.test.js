@@ -74,9 +74,12 @@ describe('Display — the contract after dispose()', function () {
   // its WebGL context stays lost as long as no display follows. The rest of this file is about
   // the contract afterwards.
 
-  // Assertion (b) — "does not touch what was handed in" — is turned around for a Display: a
-  // WebGPURenderer passed to the constructor is adopted and released with the display. That case
-  // needs a renderer of its own and lives in display-adopt-renderer.test.js.
+  // Assertion (b) — "does not touch what was handed in" — holds word for word for a canvas
+  // passed to the constructor: the two cases after "leaves a canvas that was handed in where it
+  // stands" watch dispose() give it back as the display found it — a bare canvas, and one with
+  // classes, styles and attributes of its caller. It is turned around for a WebGPURenderer passed
+  // to the constructor: that one is adopted and released with the display. That case needs a
+  // renderer of its own and lives in display-adopt-renderer.test.js.
 
   // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
   // what most of the cases below are: canvas, start(), getEventProps(), isWebGPUBackend
@@ -112,6 +115,57 @@ describe('Display — the contract after dispose()', function () {
     display.dispose();
 
     expect(canvas.parentNode, 'the canvas the caller put into the document').to.equal(host);
+  });
+
+  it('gives a canvas that was handed in back as it found it', async () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+    const before = canvas.outerHTML;
+
+    display = new Display(canvas);
+    await display.start();
+    await display.nextFrame();
+
+    // proves that the display has written on the canvas, so the comparison below means something
+    expect(canvas.outerHTML, 'the canvas while the display is alive').not.to.equal(before);
+
+    display.dispose();
+
+    expect(canvas.outerHTML, 'the canvas after dispose()').to.equal(before);
+  });
+
+  it('gives a canvas that was handed in its own classes, styles and attributes back, the fullscreen class included', async () => {
+    host = makeContainer();
+    const canvas = document.createElement('canvas');
+    canvas.className = 'caller';
+    canvas.setAttribute('style', 'display: block; width: 50%');
+    canvas.setAttribute('width', '64');
+    canvas.setAttribute('height', '32');
+    canvas.setAttribute('touch-action', 'pan-y');
+    canvas.setAttribute('resize-to', 'window');
+    host.appendChild(canvas);
+
+    display = new Display(canvas);
+    await display.start();
+    await display.nextFrame();
+
+    expect(
+      [...canvas.classList].some((c) => c.startsWith(Display.CssRulesPrefixFullscreen)),
+      'the fullscreen class while the display is alive',
+    ).to.equal(true);
+
+    display.dispose();
+
+    expect([...canvas.classList], 'classes').to.deep.equal(['caller']);
+    expect(canvas.style.getPropertyValue('display'), 'style display').to.equal('block');
+    expect(canvas.style.getPropertyValue('width'), 'style width').to.equal('50%');
+    expect(canvas.style.getPropertyValue('height'), 'style height').to.equal('');
+    expect(canvas.style.getPropertyValue('image-rendering'), 'style image-rendering').to.equal('');
+    expect(canvas.getAttribute('width'), 'attribute width').to.equal('64');
+    expect(canvas.getAttribute('height'), 'attribute height').to.equal('32');
+    expect(canvas.getAttribute('touch-action'), 'attribute touch-action').to.equal('pan-y');
+    expect(canvas.getAttribute('resize-to'), 'attribute resize-to').to.equal('window');
   });
 
   it('canvas throws after dispose()', () => {

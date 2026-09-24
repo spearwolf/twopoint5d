@@ -20,6 +20,17 @@ function collectWarnings(match) {
   return {warnings, restore: () => (console.warn = original)};
 }
 
+// devicePixelRatio is an own accessor of window, and a property defined over it shadows the
+// browser's value until the original descriptor goes back
+function emulateDevicePixelRatio(value) {
+  const own = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+  Object.defineProperty(window, 'devicePixelRatio', {configurable: true, get: () => value});
+  return () => {
+    if (own) Object.defineProperty(window, 'devicePixelRatio', own);
+    else delete window.devicePixelRatio;
+  };
+}
+
 function makeSizeRef(root, {id, width, height}) {
   const el = document.createElement('div');
   el.id = id;
@@ -297,6 +308,44 @@ describe('Display — resize behavior', () => {
 
     expect(warnings.length, 'warnings about the resolution limit').to.equal(1);
     expect(warnings[0][0]).to.contain(`(${oversized}x${oversized} was requested)`);
+  });
+
+  it('clamps the drawing buffer to Display.MaxResolution in device pixels at a device pixel ratio of 2', async () => {
+    // a small limit keeps the drawing buffer small; at 8192 and a ratio of 2 the case would ask
+    // for a buffer of 16384²
+    const maxResolution = Display.MaxResolution;
+    Display.MaxResolution = 256;
+    const restoreDevicePixelRatio = emulateDevicePixelRatio(2);
+    const {restore} = collectWarnings(String(256));
+    try {
+      host = makeContainer({width: 200, height: 100});
+      display = new Display(host);
+      await display.start();
+      await nextFrame(display);
+
+      expect(display.canvas.width, 'drawing buffer width').to.equal(256);
+      expect(display.canvas.height, 'drawing buffer height').to.equal(200);
+      expect(display.width).to.equal(128);
+      expect(display.height).to.equal(100);
+    } finally {
+      restore();
+      restoreDevicePixelRatio();
+      Display.MaxResolution = maxResolution;
+    }
+  });
+
+  it('applies styleImageRendering on the next frame without a size change', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    await display.start();
+    await nextFrame(display);
+
+    expect(display.canvas.style.imageRendering, 'before').to.equal('auto');
+
+    display.styleImageRendering = 'pixelated';
+    await nextFrame(display);
+
+    expect(display.canvas.style.imageRendering, 'after').to.equal('pixelated');
   });
 
   it('a canvas with a border on top only keeps the full width of its host', async () => {

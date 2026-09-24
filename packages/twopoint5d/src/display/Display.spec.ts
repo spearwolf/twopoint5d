@@ -57,8 +57,7 @@ function makeDisplay(options?: DisplayParameters, init: () => Promise<unknown> =
     isWebGPURenderer: true,
     domElement: canvas,
     init: vi.fn(init),
-    setPixelRatio: vi.fn(),
-    setSize: vi.fn(),
+    setDrawingBufferSize: vi.fn(),
     setAnimationLoop: vi.fn((callback: ((now: number) => unknown) | null) => {
       loop = callback;
     }),
@@ -345,6 +344,82 @@ describe('Display', () => {
       display.resize();
 
       expect(getComputedStyleStub.mock.calls.length, 'once the interval is over').toBeGreaterThan(measured);
+    });
+  });
+
+  describe('resize()', () => {
+    beforeEach(() => {
+      // the warning about MaxResolution goes out once per module instance and is not what these
+      // cases look at
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    // the constructor calls resize(), so the pixel ratio has to be in place before makeDisplay()
+    const stubDevicePixelRatio = (devicePixelRatio: number) => {
+      vi.stubGlobal('window', {devicePixelRatio, performance});
+    };
+
+    it('clamps the drawing buffer to MaxResolution in device pixels', () => {
+      stubDevicePixelRatio(2);
+      const {display, renderer} = makeDisplay({resizeTo: () => [5000, 100]});
+
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(4096, 100, 2);
+      expect(display.width).toBe(4096);
+      expect(display.height).toBe(100);
+    });
+
+    it('rounds a clamped size down, so the drawing buffer stays within MaxResolution at a fractional pixel ratio', () => {
+      stubDevicePixelRatio(3);
+      const {renderer} = makeDisplay({resizeTo: () => [5000, 50]});
+
+      // Math.floor(2730 * 3) is 8190
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(2730, 50, 3);
+    });
+
+    it('holds the CSS size to MaxResolution while pixelZoom is above 0', () => {
+      stubDevicePixelRatio(2);
+      const {display, renderer} = makeDisplay({resizeTo: () => [10000, 100]});
+
+      display.pixelZoom = 2;
+      display.resize();
+
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(4096, 50, 1);
+    });
+
+    it('applies styleImageRendering without a size change, also within resizePollIntervalMs', () => {
+      const {display, renderer, canvas} = makeDisplay();
+      const style = canvas.style as {imageRendering?: string};
+
+      expect(style.imageRendering).toBe('auto');
+      const drawingBufferSizeCalls = renderer.setDrawingBufferSize.mock.calls.length;
+
+      vi.spyOn(performance, 'now').mockReturnValue(5000);
+      display.resizePollIntervalMs = 1000;
+      // uses up the interval, so the next resize() does not measure
+      display.resize();
+
+      display.styleImageRendering = 'pixelated';
+      display.resize();
+
+      expect(style.imageRendering).toBe('pixelated');
+      expect(renderer.setDrawingBufferSize.mock.calls.length).toBe(drawingBufferSizeCalls);
+    });
+
+    it('treats a resizeTo result without two finite numbers as no size', () => {
+      const results: (() => [number, number] | undefined)[] = [() => [NaN, 100], () => [100, Infinity], () => undefined];
+
+      for (const resizeTo of results) {
+        const {display, renderer} = makeDisplay({resizeTo});
+
+        expect(display.width, String(resizeTo)).toBe(300);
+        expect(display.height, String(resizeTo)).toBe(150);
+        for (const args of renderer.setDrawingBufferSize.mock.calls) {
+          expect(
+            args.every((value: unknown) => Number.isFinite(value)),
+            String(resizeTo),
+          ).toBe(true);
+        }
+      }
     });
   });
 

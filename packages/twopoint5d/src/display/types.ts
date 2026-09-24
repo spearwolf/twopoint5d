@@ -12,7 +12,14 @@ export interface DisplayEventProps {
   frameNo: number;
 }
 
-export type ResizeDisplayToFn = (display: Display) => [width: number, height: number];
+/**
+ * Supplies the size of a display in CSS pixels, once per {@link Display.resize}. Return
+ * `undefined` while there is no size to report — an element that has not been laid out
+ * yet, for example. A pair in which either value is not a finite number counts as no size
+ * as well. Without a size the display takes the window under `resize-to="window"` or
+ * `"fullscreen"`, and 300 × 150 otherwise.
+ */
+export type ResizeDisplayToFn = (display: Display) => [width: number, height: number] | undefined;
 
 // The renderer's constructor parameter is optional, so `ConstructorParameters<…>[0]` is a union
 // with `undefined`; `keyof` of such a union is `never` and `Omit` would leave an empty type behind.
@@ -53,10 +60,11 @@ export interface DisplayParameters extends DisplayRendererParameters {
   pauseOutsideViewport?: boolean;
 
   /**
-   * If a function is specified here, it is called for each frame
-   * and expects the dimension (width and height) to be used for the display as the return value.
+   * If a function is specified here, it is called for each frame and returns the size of the
+   * display: width and height in CSS pixels.
    *
-   * In this case, no further attempt is made to automatically determine a size.
+   * With it, the display measures no element. What happens while the function reports no
+   * size is described at {@link ResizeDisplayToFn}.
    */
   resizeTo?: ResizeDisplayToFn;
 
@@ -72,8 +80,9 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * and read out. If nothing is specified, then this is the canvas element.
    *
    * The `resize-to` attribute can contain either `"fullscreen"` or `"window"` as a value,
-   * or alternatively `"self"`. With `"self"`, the size of the canvas element is used as
-   * the display size (this corresponds to the standard behavior if nothing is specified).
+   * or alternatively `"self"`. With `"self"`, the display measures its `resizeToElement` — by
+   * default the canvas, or the host element when the display built its own container — just
+   * as it does without the attribute; with `resizeToElement` cleared, it measures the canvas.
    * With `"fullscreen"` or `"window"`, the display element is synchronized with the
    * window size accordingly. Any other value is a CSS selector, looked up in the document or
    * in the shadow root this element sits in.

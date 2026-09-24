@@ -35,7 +35,7 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
     // eslint-disable-next-line no-console
     console.warn(
-      `Oops, the canvas width or height should not be bigger than ${Display.MaxResolution} pixels (${w}x${h} was requested).`,
+      `Oops, the canvas width or height should not be bigger than ${Display.MaxResolution} device pixels (${w}x${h} was requested).`,
       'If you need more, please set Display.MaxResolution before you create a Display!',
     );
     canvasMaxResolutionWarningWasShown = true;
@@ -199,6 +199,70 @@ async function takeOverCanvas(canvas: HTMLCanvasElement, release: Promise<void> 
   }
 }
 
+// What a display writes on a canvas handed to its constructor, as it was before, so
+// dispose() can give the canvas back as the display found it
+interface CanvasState {
+  // null where the attribute was absent. data-engine is the mark three puts on the canvas of
+  // its renderer
+  attributes: Record<CanvasStateAttribute, string | null>;
+  style: Record<CanvasStateStyleProperty, {value: string; priority: string}>;
+}
+
+type CanvasStateAttribute = 'class' | 'style' | 'touch-action' | 'width' | 'height' | 'data-engine';
+type CanvasStateStyleProperty = 'width' | 'height' | 'image-rendering';
+
+const CANVAS_STATE_ATTRIBUTES: readonly CanvasStateAttribute[] = [
+  'class',
+  'style',
+  'touch-action',
+  'width',
+  'height',
+  'data-engine',
+];
+const CANVAS_STATE_STYLE_PROPERTIES: readonly CanvasStateStyleProperty[] = ['width', 'height', 'image-rendering'];
+
+function readCanvasState(canvas: HTMLCanvasElement): CanvasState {
+  const attributes = {} as CanvasState['attributes'];
+  for (const name of CANVAS_STATE_ATTRIBUTES) {
+    attributes[name] = canvas.getAttribute(name);
+  }
+  const style = {} as CanvasState['style'];
+  for (const property of CANVAS_STATE_STYLE_PROPERTIES) {
+    style[property] = {value: canvas.style.getPropertyValue(property), priority: canvas.style.getPropertyPriority(property)};
+  }
+  return {attributes, style};
+}
+
+// classNames are the classes the display has handed out; a class the caller has set in the
+// meantime stays
+function restoreCanvasState(canvas: HTMLCanvasElement, state: CanvasState, classNames: readonly string[]): void {
+  canvas.classList.remove(...classNames);
+
+  for (const property of CANVAS_STATE_STYLE_PROPERTIES) {
+    const {value, priority} = state.style[property];
+    if (value === '') {
+      canvas.style.removeProperty(property);
+    } else {
+      canvas.style.setProperty(property, value, priority);
+    }
+  }
+
+  // class and style go back through the classes and properties above, not as a whole
+  for (const name of CANVAS_STATE_ATTRIBUTES) {
+    if (name === 'class' || name === 'style') continue;
+    const value = state.attributes[name];
+    if (value == null) {
+      canvas.removeAttribute(name);
+    } else {
+      canvas.setAttribute(name, value);
+    }
+  }
+
+  // a bare <canvas> goes back as <canvas></canvas>, without the empty attributes left behind
+  if (state.attributes.class == null && canvas.classList.length === 0) canvas.removeAttribute('class');
+  if (state.attributes.style == null && canvas.style.length === 0) canvas.removeAttribute('style');
+}
+
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
 /**
@@ -227,11 +291,12 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    gives up {@link Display.renderer} right away. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
  *    it; a canvas or a renderer handed to the constructor keeps its place in
- *    the document. The renderer itself is released after `dispose()` has
- *    returned, once its init is through and the GPU has run the work
- *    submitted to it. A canvas handed to the constructor carries a new
- *    display afterwards; one built on it while the release runs waits for
- *    it. Under WebGL only a display brings the context of that canvas
+ *    the document, and a canvas handed in gets back what the display wrote
+ *    on it — its classes, attributes and inline styles. The renderer itself
+ *    is released after `dispose()` has returned, once its init is through
+ *    and the GPU has run the work submitted to it. A canvas handed to the
+ *    constructor carries a new display afterwards; one built on it while the
+ *    release runs waits for it. Under WebGL only a display brings the context of that canvas
  *    back — see {@link Display.dispose}.
  * 4. After `dispose()` the instance is unusable, and says so. {@link Display.renderer}
  *    answers `undefined` and {@link Display.isDisposed} answers `true`.
@@ -258,11 +323,12 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * is a deliberate design decision: it covers window resizes, container
  * reflows, devicePixelRatio changes, `resize-to` attribute mutations and
  * `resizeToElement` swaps uniformly, without registering DOM listeners that
- * would have to be cleaned up. A `resize` is a no-op when nothing actually
- * changed (size + pixelRatio + pixelZoom are hashed in
- * `#lastResizeHash`).
+ * would have to be cleaned up. As long as size, pixel ratio and pixel zoom
+ * stay the same, a `resize()` changes nothing on the renderer and emits
+ * nothing. Apart from that, every call compares `image-rendering` against
+ * the inline style of the canvas.
  *
- * The size source is resolved in this priority order, evaluated each frame:
+ * The size source is resolved in this priority order, on every `resize()`:
  *
  * 1. If {@link Display.resizeToAttributeEl} carries a `resize-to` attribute,
  *    its value selects the source:
@@ -271,27 +337,41 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      `twopoint5d-canvas--fullscreen` CSS class to the canvas
  *      (`position:fixed; top:0; left:0`). The class is removed when the
  *      attribute changes back to anything else.
- *    - `"self"` → uses the canvas (or {@link Display.resizeToElement}) itself.
+ *    - `"self"` → measures {@link Display.resizeToElement} — by default the
+ *      canvas, or the host element when the display built its own
+ *      container —, just as without the attribute; with `resizeToElement`
+ *      cleared, the canvas.
  *    - any other non-empty string is a CSS selector, looked up in the root
  *      node of {@link Display.resizeToAttributeEl} — the document, or the
  *      shadow root it sits in; falls back to {@link Display.resizeToElement}
  *      or the canvas if the selector finds nothing. A value that is not a
  *      valid selector is reported once via `console.warn` and falls back the
- *      same way.
+ *      same way. The element a selector has found stays the size source for
+ *      as long as it sits in that root node and still matches the selector;
+ *      an element inserted in front of it later that matches as well does
+ *      not take over. Once the found element leaves the root or stops
+ *      matching, the next `resize()` looks the selector up again.
  * 2. If {@link Display.resizeToCallback} is set, it is called every frame and
  *    its `[width, height]` return value wins over any element-based size
  *    measurement (the `resize-to` attribute still controls the
- *    fullscreen-CSS toggle, but its measured size is discarded).
+ *    fullscreen-CSS toggle, but its measured size is discarded). A result of
+ *    `undefined`, or a pair with a value that is not a finite number, counts
+ *    as no size: the display takes the window under `resize-to="window"` or
+ *    `"fullscreen"`, and 300 × 150 otherwise.
  * 3. Otherwise the content-area of {@link Display.resizeToElement} is
  *    measured via `getBoundingClientRect()` minus padding/border.
  *
- * The resolved pixel size is then clamped to `[0, Display.MaxResolution]`
- * (per axis), padded/unpadded depending on the canvas `box-sizing`, and
- * passed to `renderer.setPixelRatio()` / `renderer.setSize()`. CSS
- * `width`/`height` and `image-rendering` are written to the canvas inline
- * style. {@link Display.pixelZoom} divides the device pixel size to produce
+ * From the size of the source in CSS pixels, the pipeline goes on like this:
+ * the canvas `box-sizing` decides whether its padding and border come off
+ * the size or onto its CSS size; both are clamped to `>= 0`;
+ * {@link Display.MaxResolution} bounds the drawing buffer — the CSS size times
+ * {@link Display.pixelRatio}, per axis; then `renderer.setDrawingBufferSize()`
+ * gets the size and the ratio, and the CSS `width`/`height` go into the inline
+ * style of the canvas. {@link Display.pixelZoom} divides the size to produce
  * the logical {@link Display.width} / {@link Display.height}, which is what
- * `OnDisplayResize` consumers see.
+ * `OnDisplayResize` consumers see. `image-rendering` is checked on every call
+ * and written only where the inline style differs, see
+ * {@link Display.styleImageRendering}.
  *
  * `OnDisplayResize` is emitted **exactly once** per frame. On the first
  * rendered frame the event always fires (so listeners attached before
@@ -307,9 +387,13 @@ export interface Display extends EventizedObject {}
 
 export class Display {
   /**
-   * Hard upper bound (per axis, in device pixels) for the canvas size
-   * computed by {@link Display.resize}. Sizes beyond this are clamped and a
-   * one-time `console.warn` is emitted.
+   * Upper bound per axis, in device pixels, for the drawing buffer that
+   * {@link Display.resize} gives the renderer: the CSS size times
+   * {@link Display.pixelRatio}; while {@link Display.pixelZoom} is above `0`
+   * the ratio is `1`, so the bound holds the CSS size itself. A larger size is
+   * clamped, and a one-time `console.warn` names the requested size in device
+   * pixels. The logical {@link Display.width} / {@link Display.height} is then
+   * at most `Math.floor(MaxResolution / pixelRatio)`.
    *
    * Adjust this _before_ constructing a `Display` if you genuinely need a
    * larger canvas (and the GPU supports it).
@@ -340,8 +424,9 @@ export class Display {
 
   /**
    * Minimum interval (in milliseconds) between the DOM measurements inside
-   * {@link Display.resize}. Defaults to `0` (no throttle — `resize()` runs
-   * every frame, matching the legacy behavior).
+   * {@link Display.resize}. Defaults to `0`: no throttle, and `resize()`
+   * measures on every frame. `image-rendering` is not subject to the
+   * interval.
    *
    * On high-refresh-rate displays the per-frame `getComputedStyle()` and
    * `getBoundingClientRect()` calls force a layout each frame and can
@@ -364,8 +449,10 @@ export class Display {
    */
   #didEmitResize = false;
 
-  #fullscreenCssRules?: string;
-  #fullscreenCssRulesMustBeRemoved = false;
+  // the class name of the fullscreen rule, installed with the first fullscreen resize()
+  #fullscreenClassName?: string;
+  // the fullscreen class sits on the canvas right now
+  #fullscreenClassApplied = false;
 
   // resize() runs every frame, and the resize-to value almost never changes: the element a
   // selector found is kept for as long as it still sits in the same root and still matches, so
@@ -384,11 +471,15 @@ export class Display {
   pixelZoom = 0;
 
   /**
-   * If set, will be used to set the `image-rendering` css style property on the canvas element.
+   * The value of the CSS property `image-rendering` that the display writes into the inline
+   * style of the canvas.
    *
-   * Otherwise will be set to `"pixelated"` if _pixelZoom_ greater than `0` or `"auto"` if pixelZoom is less or equal to `0`.
+   * `undefined` follows {@link Display.pixelZoom}: `"pixelated"` while it is above `0`,
+   * `"auto"` otherwise. Set, it pins one of the two values.
    *
-   * If you want to explicitly specify a value here, set.
+   * A change takes effect with the next {@link Display.resize} — at the start of the next
+   * frame, or right away with a call of your own —, whether or not the size changes, and
+   * regardless of {@link Display.resizePollIntervalMs}.
    *
    * see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/image-rendering}
    * for more information.
@@ -417,7 +508,8 @@ export class Display {
   }
 
   /**
-   * The current frame number. Starts at 1.
+   * The number of the frame being rendered: `0` until the first frame, `1` during the first
+   * one, and one more with every frame after it.
    */
   frameNo = 0;
 
@@ -458,7 +550,10 @@ export class Display {
    *
    * The `resize-to` attribute is still honored for its fullscreen-CSS
    * toggle, but the size it would compute is discarded in favor of the
-   * callback's return value.
+   * callback's return value. A result of `undefined`, or a pair with a value
+   * that is not a finite number, counts as no size: the display takes the
+   * window under `resize-to="window"` or `"fullscreen"`, and 300 × 150
+   * otherwise — see {@link ResizeDisplayToFn}.
    *
    * @see {@link DisplayParameters.resizeTo}
    */
@@ -541,6 +636,13 @@ export class Display {
   // release of the renderer hands it back able to carry the next display — see #releaseRenderer()
   #callersCanvas?: HTMLCanvasElement;
 
+  // What the canvas handed to the constructor looked like before this display wrote on it, kept
+  // only when the renderer draws into that canvas — see #giveBackCallersCanvas()
+  #callersCanvasBefore?: CanvasState;
+
+  // the class of the rule Stylesheets.addRule() has put on the canvas
+  #canvasClassName?: string;
+
   /**
    * Create a display around a canvas, around a container element that gets a canvas of its own,
    * or around a `WebGPURenderer` that is already built.
@@ -594,9 +696,12 @@ export class Display {
       this.resizeToElement = this.renderer.domElement;
     } else if (domElementOrRenderer instanceof HTMLElement) {
       let canvas: HTMLCanvasElement;
+      let callersCanvasBefore: CanvasState | undefined;
       if (domElementOrRenderer.tagName === 'CANVAS') {
         canvas = domElementOrRenderer as HTMLCanvasElement;
         this.#callersCanvas = canvas;
+        // read before the renderer is built: three marks the canvas in its constructor already
+        callersCanvasBefore = readCanvasState(canvas);
       } else {
         const container = document.createElement('div');
         Stylesheets.addRule(
@@ -643,6 +748,12 @@ export class Display {
         this.#ownContainer = undefined;
         throw error;
       }
+
+      // a createRenderer that ignores the canvas it was given leaves that canvas untouched, and
+      // writing the state back would overwrite what its caller has done with it since
+      if (callersCanvasBefore != null && this.renderer.domElement === canvas) {
+        this.#callersCanvasBefore = callersCanvasBefore;
+      }
     } else {
       // every wrong first argument gets the same answer, whatever it is: without this a null
       // would die inside init() with a TypeError that names neither this constructor nor what
@@ -665,7 +776,12 @@ export class Display {
     this.frameLoop = new FrameLoop(maxFps ?? 0, this.renderer);
 
     const {domElement: canvas} = this.renderer!;
-    Stylesheets.addRule(canvas, Display.CssRulesPrefixDisplay, 'touch-action: none;', this.styleSheetRoot);
+    this.#canvasClassName = Stylesheets.addRule(
+      canvas,
+      Display.CssRulesPrefixDisplay,
+      'touch-action: none;',
+      this.styleSheetRoot,
+    );
     canvas.setAttribute('touch-action', 'none'); // => PEP polyfill
 
     this.resizeToElement = resizeToElement ?? this.resizeToElement;
@@ -705,19 +821,17 @@ export class Display {
       },
     });
 
-    if (typeof document !== 'undefined') {
-      const onDocVisibilityChange = () => {
-        this.#stateMachine.documentIsVisible = !document.hidden;
-      };
+    const onDocVisibilityChange = () => {
+      this.#stateMachine.documentIsVisible = !document.hidden;
+    };
 
-      document.addEventListener('visibilitychange', onDocVisibilityChange, false);
+    document.addEventListener('visibilitychange', onDocVisibilityChange, false);
 
-      once(this, OnDisplayDispose, () => {
-        document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
-      });
+    once(this, OnDisplayDispose, () => {
+      document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
+    });
 
-      onDocVisibilityChange();
-    }
+    onDocVisibilityChange();
 
     if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
       const observer = new IntersectionObserver((entries) => {
@@ -762,8 +876,8 @@ export class Display {
    * delta exceeds this value the overflow is folded into the chronometer's
    * lost-time accumulator, so `now` stays continuous and `deltaTime` never
    * reports a spike. Useful against rAF throttling, GC pauses and
-   * debugger breakpoints — a single hiccup no longer cascades into
-   * physics jumps or animation glitches.
+   * debugger breakpoints: a single long frame reaches physics and
+   * animations as a step of at most `maxDeltaTime`.
    *
    * Defaults to `1 / 30` (~33ms). Set to `0` to disable the cap entirely.
    */
@@ -818,8 +932,10 @@ export class Display {
    * Called automatically at the start of every frame from
    * {@link Display.renderFrame}, so user code rarely needs to invoke this.
    * It is safe to call manually (e.g. immediately after a layout-affecting
-   * DOM mutation if you cannot wait for the next frame); the work is
-   * short-circuited via an internal hash when nothing actually changed.
+   * DOM mutation if you cannot wait for the next frame). As long as size,
+   * pixel ratio and pixel zoom stay the same, a call changes nothing on the
+   * renderer and emits nothing; `image-rendering` is checked against the
+   * inline style of the canvas on every call regardless.
    *
    * Resolution order for the size source: the `resize-to` attribute on
    * {@link Display.resizeToAttributeEl} (if present), then
@@ -828,8 +944,10 @@ export class Display {
    * size when nothing else applies is `300 × 150` (HTML's intrinsic canvas
    * size). See the class-level docs for the full priority table.
    *
-   * Emission of `OnDisplayResize` is deferred to
-   * {@link Display.renderFrame}; this method only mutates state and returns.
+   * A call that changes the size emits `OnDisplayResize` once the first frame
+   * has begun (`frameNo > 0`); the call inside the constructor emits nothing.
+   * The first frame emits the event in any case: where its `resize()` has not,
+   * {@link Display.renderFrame} does.
    *
    * Does nothing after {@link Display.dispose} — there is no canvas left to measure.
    */
@@ -837,6 +955,12 @@ export class Display {
     if (this.#disposed) return;
 
     this.#didEmitResize = false;
+
+    const canvas = this.canvas;
+
+    // image-rendering is not a size: it needs no measurement, so a change reaches the canvas
+    // with this call, whatever the poll interval says
+    this.#applyImageRendering(canvas);
 
     if (this.resizePollIntervalMs > 0) {
       const nowMs = performance.now();
@@ -846,77 +970,87 @@ export class Display {
       this.#lastResizePollMs = nowMs;
     }
 
-    let wPx = 300;
-    let hPx = 150;
+    const source = this.#resolveSizeSource(canvas);
+    this.#applyFullscreenClass(canvas, source.window);
+    this.#applyMeasuredSize(canvas, this.#measureSizeSource(source), source.element);
+  }
 
-    const canvasElement = this.canvas;
+  // Outside the resize hash on purpose: in it, every change would run through
+  // setDrawingBufferSize() and emit an OnDisplayResize without a change of size. Compared
+  // against the inline style, which is a read of the attribute and forces no layout
+  #applyImageRendering(canvas: HTMLCanvasElement): void {
+    const imageRendering = this.styleImageRendering ?? (this.pixelZoom > 0 ? 'pixelated' : 'auto');
+    if (canvas.style.imageRendering !== imageRendering) {
+      canvas.style.imageRendering = imageRendering;
+    }
+  }
 
-    let sizeRefElement: Element | undefined = this.resizeToElement;
+  // Where the size comes from, as the resize-to attribute says; reads the DOM and writes nothing
+  #resolveSizeSource(canvas: HTMLCanvasElement): {window: boolean; element: Element | undefined} {
+    const resizeTo = this.resizeToAttributeEl.getAttribute('resize-to')?.trim();
 
-    let fullscreenCssRulesMustBeRemoved = this.#fullscreenCssRulesMustBeRemoved;
+    if (!resizeTo) {
+      return {window: false, element: this.resizeToElement};
+    }
+    if (/^:?(fullscreen|window)$/.test(resizeTo)) {
+      return {window: true, element: undefined};
+    }
+    if (resizeTo === 'self') {
+      return {window: false, element: this.resizeToElement ?? canvas};
+    }
+    return {window: false, element: this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvas};
+  }
 
-    if (this.resizeToAttributeEl.hasAttribute('resize-to')) {
-      const resizeTo = this.resizeToAttributeEl.getAttribute('resize-to')!.trim();
-      if (resizeTo.match(/^:?(fullscreen|window)$/)) {
-        wPx = window.innerWidth;
-        hPx = window.innerHeight;
-        sizeRefElement = undefined;
+  #applyFullscreenClass(canvas: HTMLCanvasElement, wantsFullscreen: boolean): void {
+    if (wantsFullscreen === this.#fullscreenClassApplied) return;
 
-        let fullscreenCssRules = this.#fullscreenCssRules;
-        if (!fullscreenCssRules) {
-          fullscreenCssRules = Stylesheets.installRule(
-            Display.CssRulesPrefixFullscreen,
-            `position:fixed;top:0;left:0;`,
-            this.styleSheetRoot,
-          );
-          this.#fullscreenCssRules = fullscreenCssRules;
-        }
-        if (fullscreenCssRulesMustBeRemoved) {
-          fullscreenCssRulesMustBeRemoved = false;
-        } else {
-          canvasElement.classList.add(fullscreenCssRules);
-          this.#fullscreenCssRulesMustBeRemoved = true;
-        }
-      } else if (resizeTo === 'self') {
-        sizeRefElement = this.resizeToElement ?? canvasElement;
-      } else if (resizeTo) {
-        sizeRefElement = this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvasElement;
-      }
+    if (wantsFullscreen) {
+      this.#fullscreenClassName ??= Stylesheets.installRule(
+        Display.CssRulesPrefixFullscreen,
+        'position:fixed;top:0;left:0;',
+        this.styleSheetRoot,
+      );
+      canvas.classList.add(this.#fullscreenClassName);
+    } else if (this.#fullscreenClassName != null) {
+      canvas.classList.remove(this.#fullscreenClassName);
     }
 
-    if (fullscreenCssRulesMustBeRemoved) {
-      if (this.#fullscreenCssRules) {
-        canvasElement.classList.remove(this.#fullscreenCssRules);
-      }
-      this.#fullscreenCssRulesMustBeRemoved = false;
-    }
+    this.#fullscreenClassApplied = wantsFullscreen;
+  }
+
+  // The size of the source in CSS pixels
+  #measureSizeSource(source: {window: boolean; element: Element | undefined}): [width: number, height: number] {
+    const fallback: [number, number] = source.window ? [window.innerWidth, window.innerHeight] : [300, 150];
 
     if (this.resizeToCallback) {
+      // a callback that reports no size gets the fallback, and no element is measured in its place
       const size = this.resizeToCallback(this);
-      if (size) {
-        wPx = size[0];
-        hPx = size[1];
-      }
-    } else if (sizeRefElement) {
-      const area = getContentAreaSize(sizeRefElement);
-      wPx = area.width;
-      hPx = area.height;
+      return size != null && Number.isFinite(size[0]) && Number.isFinite(size[1]) ? [size[0], size[1]] : fallback;
     }
 
+    if (source.element) {
+      const area = getContentAreaSize(source.element);
+      return [area.width, area.height];
+    }
+
+    return fallback;
+  }
+
+  #applyMeasuredSize(canvas: HTMLCanvasElement, [wPx, hPx]: [number, number], sizeRefElement: Element | undefined): void {
     let cssWidth = wPx;
     let cssHeight = hPx;
 
-    const canvasStyle = getComputedStyle(canvasElement, null);
+    const canvasStyle = getComputedStyle(canvas, null);
     const canvasIsContentBox = getIsContentBox(canvasStyle);
     const canvasHorizontalInnerMargin = getHorizontalInnerMargin(canvasStyle);
     const canvasVerticalInnerMargin = getVerticalInnerMargin(canvasStyle);
 
-    if (canvasIsContentBox && canvasElement !== sizeRefElement) {
+    if (canvasIsContentBox && canvas !== sizeRefElement) {
       wPx -= canvasHorizontalInnerMargin;
       hPx -= canvasVerticalInnerMargin;
       cssWidth -= canvasHorizontalInnerMargin;
       cssHeight -= canvasVerticalInnerMargin;
-    } else if (!canvasIsContentBox && canvasElement === sizeRefElement) {
+    } else if (!canvasIsContentBox && canvas === sizeRefElement) {
       cssWidth += canvasHorizontalInnerMargin;
       cssHeight += canvasVerticalInnerMargin;
     }
@@ -935,14 +1069,16 @@ export class Display {
       cssHeight = 0;
     }
 
-    if (wPx > Display.MaxResolution || hPx > Display.MaxResolution) {
+    // pixelRatio is 1 while pixelZoom is above 0, so the limit then holds the CSS size itself
+    const {pixelRatio, pixelZoom} = this;
+
+    if (wPx * pixelRatio > Display.MaxResolution || hPx * pixelRatio > Display.MaxResolution) {
       // the warning names the size that was asked for, so it goes out before the clamp
-      showCanvasMaxResolutionWarning(wPx, hPx);
-      wPx = Math.min(wPx, Display.MaxResolution);
-      hPx = Math.min(hPx, Display.MaxResolution);
+      showCanvasMaxResolutionWarning(Math.round(wPx * pixelRatio), Math.round(hPx * pixelRatio));
+      wPx = Math.min(wPx, Display.MaxResolution / pixelRatio);
+      hPx = Math.min(hPx, Display.MaxResolution / pixelRatio);
     }
 
-    const {pixelRatio, pixelZoom} = this;
     const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio},${pixelZoom}`;
 
     if (resizeHash !== this.#lastResizeHash) {
@@ -956,15 +1092,18 @@ export class Display {
         this.#height = hPx;
       }
 
+      // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
+      // MaxResolution at a fractional pixel ratio as well
       this.#width = Math.floor(this.#width);
       this.#height = Math.floor(this.#height);
 
-      this.renderer!.setPixelRatio(pixelRatio);
-      this.renderer!.setSize(this.width, this.height, false);
+      // one call for size and ratio: setPixelRatio() on its own resizes the drawing buffer to the
+      // old size times the new ratio, and a change from a ratio of 1 to 2 at the limit would ask
+      // for a buffer of twice MaxResolution before setSize() brings it back
+      this.renderer!.setDrawingBufferSize(this.#width, this.#height, pixelRatio);
 
-      canvasElement.style.width = `${cssWidth}px`;
-      canvasElement.style.height = `${cssHeight}px`;
-      canvasElement.style.imageRendering = this.styleImageRendering ?? (pixelZoom > 0 ? 'pixelated' : 'auto');
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
 
       const isConstructing = this.frameNo === 0;
       if (!isConstructing) {
@@ -1014,7 +1153,7 @@ export class Display {
    * Renders one frame: advances the chronometer, runs {@link Display.resize}
    * to keep the canvas in sync with its environment, emits
    * `OnDisplayResize` (always on the first frame, otherwise only when the
-   * size or pixelRatio actually changed), and finally emits
+   * size, pixelRatio or pixelZoom actually changed), and finally emits
    * `OnDisplayRenderFrame` so listeners can draw.
    *
    * You normally do not call this yourself — the {@link FrameLoop} drives it
@@ -1119,16 +1258,20 @@ export class Display {
    * the DOM, with the canvas in it. The renderer itself is released after the return, with
    * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it.
    *
-   * A canvas handed to the constructor goes back to the caller able to carry a new display.
-   * Under the WebGL backend `renderer.dispose()` loses the context of that canvas, and a canvas
-   * keeps its one WebGL context for good, so the release keeps that context restorable and
-   * leaves it lost. Only a `Display` brings it back: a `WebGPURenderer` or a
-   * `getContext('webgl2')` of your own on that canvas gets the lost context. The next `Display`
-   * built on the same canvas — while the release runs or any time after — waits for the
-   * release, restores the context and then starts the init of its renderer. A context the
-   * browser has not brought back within two seconds ends the wait with a warning on the
-   * console; it stays lost and restorable, and the next `Display` built on the canvas tries
-   * again.
+   * A canvas handed to the constructor goes back to the caller as the display found it: its
+   * classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute
+   * and the `width` and `height` attributes of the drawing buffer return to what they were
+   * before the constructor ran, and so does the `data-engine` attribute three marks it with.
+   *
+   * That canvas is able to carry a new display. Under the WebGL backend `renderer.dispose()`
+   * loses the context of that canvas, and a canvas keeps its one WebGL context for good, so
+   * the release keeps that context restorable and leaves it lost. Only a `Display` brings it
+   * back: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets the
+   * lost context. The next `Display` built on the same canvas — while the release runs or any
+   * time after — waits for the release, restores the context and then starts the init of its
+   * renderer. A context the browser has not brought back within two seconds ends the wait with
+   * a warning on the console; it stays lost and restorable, and the next `Display` built on the
+   * canvas tries again.
    *
    * A `dispose()` while the renderer is still initializing waits for that init instead of
    * cutting it short. An init that fails has built nothing to release, and its rejection does
@@ -1145,6 +1288,10 @@ export class Display {
     emit(this, OnDisplayDispose, this);
     off(this);
 
+    // before the release, which lets go of the canvas; and synchronously, so a display built on
+    // the same canvas in this tick writes its values afterwards and nothing overwrites them
+    this.#giveBackCallersCanvas();
+
     const renderer = this.renderer;
     delete this.renderer;
     if (renderer != null) this.#releaseRenderer(renderer);
@@ -1153,6 +1300,17 @@ export class Display {
     // to its canvas itself and does not need it in the document to release it
     this.#ownContainer?.remove();
     this.#ownContainer = undefined;
+  }
+
+  #giveBackCallersCanvas(): void {
+    if (this.#callersCanvasBefore == null) return;
+
+    const classNames: string[] = [];
+    if (this.#canvasClassName != null) classNames.push(this.#canvasClassName);
+    if (this.#fullscreenClassName != null) classNames.push(this.#fullscreenClassName);
+
+    restoreCanvasState(this.#callersCanvas!, this.#callersCanvasBefore, classNames);
+    this.#callersCanvasBefore = undefined;
   }
 
   #releaseRenderer(renderer: WebGPURenderer): void {

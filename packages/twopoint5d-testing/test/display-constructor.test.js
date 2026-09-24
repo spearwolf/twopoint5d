@@ -15,8 +15,7 @@ function makeRendererStub(canvas, initResult) {
     /** @type {unknown} */ ({
       domElement: canvas,
       init: () => initResult,
-      setPixelRatio() {},
-      setSize() {},
+      setDrawingBufferSize() {},
       setAnimationLoop() {},
       dispose() {},
     })

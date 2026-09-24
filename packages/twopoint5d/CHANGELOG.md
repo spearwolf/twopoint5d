@@ -184,6 +184,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `IMapTileFactory#createTile()` answers `T | undefined | typeof noTileCapacity`. `undefined` says only that there is no tile at the coordinate; `noTileCapacity` says the factory is full right now, nothing was built and nothing has to be given back. `TileSpritesFactory#createTile()` answers `noTileCapacity` once the instanced pool of its geometry has no slot left, and when `tileSprites` has no `TileSpritesGeometry` and so no pool
 - `VOBufferPool#buffer` is read-only in the published types. Its setter is internal and belongs to `VertexObjectPool#resize()`, which swaps in a buffer of the new capacity and moves every vertex object over to it; a buffer assigned from outside left the pool's `capacity`, its vertex objects and any geometry on it disagreeing about which buffer they read
 - the `voInitialize` hook of a `basePrototype` runs only for the slot `VertexObjectPool#createVO()` hands out — once, with the new vertex object as `this`, before `onCreateVO`. `getVO()` no longer runs it for a slot filled through `createFromAttributes()`, `fromBuffersData()` or a snapshot handed to the constructor
+- `ResizeDisplayToFn` returns `[width: number, height: number] | undefined`
+- `Display` sizes its renderer with one call of `setDrawingBufferSize(width, height, pixelRatio)` and calls neither `setPixelRatio()` nor `setSize()`; a `createRenderer` that hands back a wrapper or a stub needs that method
 
 ### Deprecated
 
@@ -289,7 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a component named like its attribute (`foo: {components: ['foo', 'bar']}` with one vertex): it gets its accessor
 - fix the horizontal inner margin `getContentAreaSize()` and `Display#resize()` subtract: it is taken from the left and right border and padding, so a canvas or size element with a border on top or bottom only keeps its full width
 - fix a `resize-to` value that is not a valid CSS selector: it is reported once via `console.warn` and falls back to `resizeToElement` or the canvas, like a selector that finds nothing
-- fix the `Display.MaxResolution` warning: it names the canvas size that was requested, before the clamp, and goes out once when either side exceeds the limit
+- fix the `Display.MaxResolution` warning: it names the canvas size that was requested, in device pixels, before the clamp, and goes out once when either side exceeds the limit
 - fix the pointer handling of `PanControl2D`: a `pointercancel` ends a drag and drops what it collected, a `pointerdown` always anchors at its own position, a released pointer delivers the movement up to its release with the next `update()`, and a mouse drag ends where its pan button goes up, also while another button stays down, and the cursor comes back with it
 - fix `Dependencies#update()`: it writes every key the `Dependencies` was declared with, and a declared key the argument leaves out as absent — the reading `equals()` gives a missing key. `changed()` with a key left out reports the change once, and the call after it answers `false`
 - fix `findNextPowerOf2()` and `isPowerOf2()` for every number a double holds: `findNextPowerOf2()` answers the smallest power of two that is at least its argument, `1` for everything up to `1`, `Infinity` above `2 ** 1023` and `NaN` for `NaN`; `isPowerOf2()` answers `true` for the integer powers of two from `1` to `2 ** 1023` and `false` for every fraction, negative number, `Infinity` and `NaN`
@@ -311,6 +313,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `VertexObjects`: it accepts an `InstancedVOBufferGeometry` and not only the typed `InstancedVertexObjectGeometry` built on it, so the untyped layer can be rendered through the module's own `THREE.Mesh` as well
 - fix `VOBufferGeometry#update()` and `InstancedVOBufferGeometry#update()` once the geometry itself has been disposed: both are a no-op from there on, so a pool handed in and still alive afterwards no longer pulls the draw range — and, on the instanced geometry, `instanceCount` — back up on a geometry that has no attribute left to draw
 - fix `InstancedVOBufferGeometry#attachInstancedPool()` on a geometry that has been disposed: it throws instead of building a new route — attributes and a pool attachment included — that nothing ever releases again
+- fix `Display.MaxResolution`: it bounds the drawing buffer in device pixels — the CSS size times the pixel ratio, the CSS size itself while `pixelZoom` is above 0 —, so the drawing buffer stays within the limit at a device pixel ratio of 2 or 3 as well
+- fix `Display#styleImageRendering`: it takes effect with the next `resize()`, whether or not the size changes, and a change emits no `OnDisplayResize`
+- fix a `resizeTo` callback whose result is `undefined` or holds a value that is not a finite number: it counts as no size, and the display takes the window under `resize-to="window"` or `"fullscreen"`, and 300 × 150 otherwise; the renderer gets no `NaN`
+- fix `Display#dispose()` for a canvas handed to the constructor: the display gives it back as it found it — its classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute, the `width` and `height` attributes and the `data-engine` attribute of three go back to what they were; under the WebGL backend the context stays lost and restorable. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 
 ### Migration Guide
 
@@ -2252,6 +2258,25 @@ buffer.toAttributeArrays(['pos'], 0, buffer.capacity); // stay inside 0 … capa
 descriptor.getAttribute('pos'); // description names {type: 'float32', size: 1}
 geometry.dispose();
 // attachInstancedPool() throws here now — attach before dispose(), or build a new geometry
+```
+
+#### `ResizeDisplayToFn` may return `undefined`
+
+A `resizeTo` callback may report no size by returning `undefined`, and its type says so. A callback that always returns a pair stays valid as it is. Code that calls a `resizeTo` callback itself handles the `undefined` now.
+
+**Before**
+
+```ts
+const [width, height] = resizeTo(display);
+```
+
+**After**
+
+```ts
+const size = resizeTo(display);
+if (size != null) {
+  const [width, height] = size;
+}
 ```
 
 ## [0.21.2] - 2026-06-19
