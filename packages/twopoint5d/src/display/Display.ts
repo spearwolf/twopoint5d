@@ -1,5 +1,6 @@
 import {
   emit,
+  emitStrict,
   type EventizedObject,
   eventize,
   off,
@@ -103,8 +104,9 @@ async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
   }
 }
 
-// A page that has not drawn two frames after this long is hidden, and a hidden page presents no
-// canvas either; the release goes on. The same as SUBMITTED_WORK_TIMEOUT_MS
+// A visible page that has not drawn two frames after this long is not going to; the release goes
+// on. The same as SUBMITTED_WORK_TIMEOUT_MS. A hidden page does not end the wait: it presents the
+// canvas once it is visible again, and the device has to live until then
 const ANIMATION_FRAMES_TIMEOUT_MS = 2000;
 
 // On Firefox 155 under WebGPU, a renderer.dispose() on a canvas that is still in the document,
@@ -126,18 +128,41 @@ async function waitForTwoAnimationFrames(renderer: WebGPURenderer): Promise<void
   const view = renderer.domElement.ownerDocument?.defaultView;
   if (device == null || view == null) return;
 
-  await new Promise<void>((resolve) => {
+  const doc = view.document as Document | undefined;
+  for (;;) {
+    if (doc?.hidden) await untilVisible(doc);
+    if (await twoAnimationFrames(view)) return;
+    // no two frames within the wait: a page hidden meanwhile waits to be visible and tries again,
+    // a visible page that draws nothing lets the release go on
+    if (!doc?.hidden) return;
+  }
+}
+
+function untilVisible(doc: Document): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const onVisibilityChange = () => {
+      if (doc.hidden) return;
+      doc.removeEventListener('visibilitychange', onVisibilityChange);
+      resolve();
+    };
+    doc.addEventListener('visibilitychange', onVisibilityChange);
+  });
+}
+
+// true once the page has drawn two frames, false after ANIMATION_FRAMES_TIMEOUT_MS without them
+function twoAnimationFrames(view: Window): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     let request = 0;
     const timer = setTimeout(() => {
       view.cancelAnimationFrame(request);
-      resolve();
+      resolve(false);
     }, ANIMATION_FRAMES_TIMEOUT_MS);
     // the second frame is requested inside the callback of the first: two requests in the same
     // tick would come in the same frame
     request = view.requestAnimationFrame(() => {
       request = view.requestAnimationFrame(() => {
         clearTimeout(timer);
-        resolve();
+        resolve(true);
       });
     });
   });
@@ -395,7 +420,10 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    fails to initialize fires `OnDisplayError` instead, and `start()` rejects
  *    with the same error. A listener of `OnDisplayInit` that throws makes
  *    `start()` reject with its error; the display does not start, and the next
- *    `start()` emits `OnDisplayInit` again.
+ *    `start()` emits `OnDisplayInit` again. A listener of `OnDisplayStart`
+ *    that throws makes `start()` reject as well, after every listener has
+ *    heard the event; the display then pauses as a {@link Display.stop} would
+ *    pause it and fires `OnDisplayPause`.
  * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
  *    gives up {@link Display.renderer} right away. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
@@ -406,7 +434,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    and the GPU has run the work submitted to it, or for two seconds at
  *    most, and goes on with a warning on the console after that; under
  *    WebGPU it also waits until the page has drawn two more animation
- *    frames, or for two more seconds while the page draws none. A canvas
+ *    frames, or for two more seconds while the visible page draws none; a
+ *    hidden page holds the release until it is visible again. A canvas
  *    handed to the constructor carries a new display afterwards; one built on
  *    it while the release runs waits for it. Under WebGL only a display
  *    brings the context of that canvas back — see {@link Display.dispose}.
@@ -815,7 +844,8 @@ export class Display {
    * `domElement` as its own. {@link Display.dispose} releases it with `renderer.dispose()`, once
    * its init is through and the GPU has run the work submitted to it, or for two seconds at most,
    * and goes on with a warning on the console after that; under WebGPU also once the page has
-   * drawn two more animation frames, or two more seconds have passed without one. A renderer that
+   * drawn two more animation frames, or two more seconds have passed without one while the page
+   * is visible — a hidden page holds the release until it is visible again. A renderer that
    * has to outlive this display therefore does not belong in here.
    *
    * A constructor that throws after it has built or taken over the renderer — from a `resizeTo`
@@ -959,7 +989,9 @@ export class Display {
           // the emit would put a paused display back on it
           this.frameLoop.start(this);
 
-          this.#emit(OnDisplayStart);
+          // every listener hears start, even behind one that throws; the state machine then pauses
+          // the display, and the pause handler below takes it off the loop again
+          if (this.renderer != null) emitStrict(this, OnDisplayStart, this.getEventProps());
         },
 
         [DisplayStateMachine.Pause]: () => {
@@ -1371,6 +1403,12 @@ export class Display {
    * its error, and the display does not start. The next `start()` emits that event again, to
    * every listener, those that received it before the throw included.
    *
+   * A listener of `OnDisplayStart` that throws makes this call reject with its error — with an
+   * `AggregateError` when more than one throws — once every listener has heard the event. The
+   * display then goes into the pause as {@link Display.stop} would put it there: `OnDisplayPause`
+   * follows, `pause` answers `true`, and a tab that becomes visible again does not start it. The
+   * next `start()` emits `OnDisplayRestart` and `OnDisplayStart`.
+   *
    * A {@link Display.stop} or a `pause = true` that comes in while `start()` waits wins: the
    * promise resolves with the display, which does not run. A `pause = false` after it lets the
    * start through.
@@ -1442,7 +1480,9 @@ export class Display {
    * WebGPU the release then waits until the page has drawn two more animation frames, or for two
    * more seconds while it draws none: under Firefox with WebGPU the page otherwise stops its
    * `requestAnimationFrame` when the canvas stays in the document — a canvas handed to the
-   * constructor, or that of an adopted renderer.
+   * constructor, or that of an adopted renderer. The two seconds count only while the page is
+   * visible. A hidden page presents the canvas once it is visible again, so it holds the release
+   * — and a display built on a canvas handed in meanwhile — until then.
    *
    * A canvas handed to the constructor goes back to the caller as the display found it: its
    * classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute

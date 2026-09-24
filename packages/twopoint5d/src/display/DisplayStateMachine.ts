@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize} from '@spearwolf/eventize';
 
 export type DisplayStateName = 'new' | 'running' | 'paused';
 
@@ -148,7 +148,16 @@ export class DisplayStateMachine {
       emit(this, DisplayStateMachine.Pause);
     } else {
       this.#state = DisplayStateMachine.RUNNING;
-      emit(this, DisplayStateMachine.Start);
+      try {
+        // every listener hears start, even behind one that throws
+        emitStrict(this, DisplayStateMachine.Start);
+      } catch (error) {
+        // the listeners that heard start hear pause next, and the pause is the user's: a tab
+        // that comes back does not start again what failed to start — the next start() does
+        this.#pausedByUser = true;
+        this.#pause();
+        throw error;
+      }
     }
   }
 

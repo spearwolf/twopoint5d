@@ -368,6 +368,67 @@ describe('Display', () => {
       expect(display.isRunning).toBe(true);
     });
 
+    it('a start listener that throws rejects start(), pauses the display, and every start listener hears start', async () => {
+      const {display, events} = makeDisplay();
+
+      const error = new Error('start listener');
+      let fail = true;
+      on(display, OnDisplayStart, () => {
+        if (fail) throw error;
+      });
+
+      const after: string[] = [];
+      on(display, OnDisplayStart, () => {
+        after.push(OnDisplayStart);
+      });
+
+      await expect(display.start()).rejects.toBe(error);
+
+      expect(events).toEqual([OnDisplayInit, OnDisplayStart, OnDisplayPause]);
+      expect(after).toEqual([OnDisplayStart]);
+      expect(display.isRunning).toBe(false);
+      expect(display.pause).toBe(true);
+      expect(display.frameLoop.subscriptionCount).toBe(0);
+
+      // the display did not stay started, so a listener attached now hears no start
+      const late: string[] = [];
+      on(display, OnDisplayStart, () => {
+        late.push(OnDisplayStart);
+      });
+      expect(late).toEqual([]);
+
+      fail = false;
+      events.length = 0;
+      await display.start();
+
+      expect(events).toEqual([OnDisplayRestart, OnDisplayStart]);
+      expect(late).toEqual([OnDisplayStart]);
+      expect(display.isRunning).toBe(true);
+    });
+
+    it('two start listeners that throw reject start() with an AggregateError of both errors', async () => {
+      const {display} = makeDisplay();
+
+      const first = new Error('first start listener');
+      const second = new Error('second start listener');
+      on(display, OnDisplayStart, () => {
+        throw first;
+      });
+      on(display, OnDisplayStart, () => {
+        throw second;
+      });
+
+      const rejection = await display.start().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+
+      expect(rejection).toBeInstanceOf(AggregateError);
+      expect((rejection as AggregateError).errors).toEqual([first, second]);
+      expect(display.isRunning).toBe(false);
+      expect(display.pause).toBe(true);
+    });
+
     it('rejects with the error of an init that fails, and the error event carries the same error', async () => {
       const failure = new Error('no adapter');
       const {display, events} = makeDisplay(undefined, () => Promise.reject(failure));
@@ -575,6 +636,27 @@ describe('Display', () => {
       return {view, frame};
     };
 
+    // pageWithFrames() with a document whose visibility is switched by hand: setHidden() fires
+    // visibilitychange as a browser does
+    const pageWithVisibility = (hidden: boolean) => {
+      const {view, frame} = pageWithFrames();
+      const listeners = new Set<() => void>();
+      const document = {
+        hidden,
+        addEventListener: vi.fn((type: string, listener: () => void) => {
+          if (type === 'visibilitychange') listeners.add(listener);
+        }),
+        removeEventListener: vi.fn((type: string, listener: () => void) => {
+          if (type === 'visibilitychange') listeners.delete(listener);
+        }),
+      };
+      const setHidden = (value: boolean) => {
+        document.hidden = value;
+        for (const listener of [...listeners]) listener();
+      };
+      return {view: Object.assign(view, {document}), frame, setHidden, listeners};
+    };
+
     it('releases the renderer after a bounded wait when the queue never answers, with one warning', async () => {
       vi.useFakeTimers();
       try {
@@ -687,6 +769,71 @@ describe('Display', () => {
         expect(renderer.dispose, 'once the wait has run out').toHaveBeenCalledTimes(1);
         expect(view.cancelAnimationFrame).toHaveBeenCalledWith(view.requestAnimationFrame.mock.results[0]!.value);
         expect(warn).not.toHaveBeenCalled();
+        expect(vi.getTimerCount(), 'timers left').toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('holds the release of a WebGPU renderer while the page is hidden, and releases it once the page has drawn two frames after it is visible again', async () => {
+      vi.useFakeTimers();
+      try {
+        const {display, renderer, canvas} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => Promise.resolve()),
+        );
+        const {view, frame, setHidden, listeners} = pageWithVisibility(true);
+        Object.assign(canvas, {ownerDocument: {defaultView: view}});
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        // a hidden page presents the canvas once it is visible again, so the device has to live
+        expect(renderer.dispose, 'while the page is hidden').not.toHaveBeenCalled();
+
+        setHidden(false);
+        await vi.advanceTimersByTimeAsync(0);
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(renderer.dispose, 'after two frames of the visible page').toHaveBeenCalledTimes(1);
+        expect(listeners.size, 'visibilitychange listeners left').toBe(0);
+        expect(vi.getTimerCount(), 'timers left').toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('holds the release of a WebGPU renderer when the page is hidden while the release waits for its frames', async () => {
+      vi.useFakeTimers();
+      try {
+        const {display, renderer, canvas} = makeDisplay(
+          undefined,
+          undefined,
+          backendWith(() => Promise.resolve()),
+        );
+        const {view, frame, setHidden, listeners} = pageWithVisibility(false);
+        Object.assign(canvas, {ownerDocument: {defaultView: view}});
+
+        display.dispose();
+        await vi.advanceTimersByTimeAsync(0);
+        setHidden(true);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(renderer.dispose, 'while the page is hidden').not.toHaveBeenCalled();
+
+        setHidden(false);
+        await vi.advanceTimersByTimeAsync(0);
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+        frame();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(renderer.dispose, 'after two frames of the visible page').toHaveBeenCalledTimes(1);
+        expect(listeners.size, 'visibilitychange listeners left').toBe(0);
         expect(vi.getTimerCount(), 'timers left').toBe(0);
       } finally {
         vi.useRealTimers();

@@ -268,4 +268,33 @@ describe('DisplayStateMachine', () => {
     expect(early).toEqual([DisplayStateMachine.Init, DisplayStateMachine.Init]);
     expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
   });
+
+  it('a start listener that throws holds the state machine in a user pause, after every start listener has run', () => {
+    const stateMachine = new DisplayStateMachine();
+
+    let fail = true;
+    on(stateMachine, DisplayStateMachine.Start, () => {
+      if (fail) throw new Error('start listener');
+    });
+
+    // attached behind the listener that throws, so it hears start only if the emit runs on
+    const events = recordEvents(stateMachine);
+
+    expect(() => stateMachine.start()).toThrow('start listener');
+    expect(events).toEqual([DisplayStateMachine.Init, DisplayStateMachine.Start, DisplayStateMachine.Pause]);
+    expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);
+    expect(stateMachine.pausedByUser).toBe(true);
+
+    // the pause is the user's: a tab that comes back does not start the machine again
+    stateMachine.documentIsVisible = false;
+    stateMachine.documentIsVisible = true;
+    expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);
+
+    fail = false;
+    events.length = 0;
+    stateMachine.pausedByUser = false;
+
+    expect(events).toEqual([DisplayStateMachine.Restart, DisplayStateMachine.Start]);
+    expect(stateMachine.state).toBe(DisplayStateMachine.RUNNING);
+  });
 });
