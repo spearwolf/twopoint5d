@@ -29,6 +29,19 @@ describe('DisplayStateMachine', () => {
     expect(stateMachine.state).toBe(DisplayStateMachine.NEW);
   });
 
+  it('state is an accessor without a setter', () => {
+    const stateMachine = new DisplayStateMachine();
+
+    const descriptor = Object.getOwnPropertyDescriptor(DisplayStateMachine.prototype, 'state');
+    expect(descriptor?.get, 'state has a getter').toBeTypeOf('function');
+    expect(descriptor?.set, 'state has no setter').toBeUndefined();
+
+    expect(() => {
+      (stateMachine as unknown as Record<string, unknown>)['state'] = DisplayStateMachine.RUNNING;
+    }, 'a write to state').toThrow(TypeError);
+    expect(stateMachine.state, 'state after the write').toBe(DisplayStateMachine.NEW);
+  });
+
   it('start', () => {
     const stateMachine = new DisplayStateMachine();
 

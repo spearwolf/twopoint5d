@@ -15,18 +15,22 @@ export class DisplayStateMachine {
   static Pause = 'pause';
   static Restart = 'restart';
 
-  state: DisplayStateName = DisplayStateMachine.NEW;
+  #state: DisplayStateName = DisplayStateMachine.NEW;
+
+  get state(): DisplayStateName {
+    return this.#state;
+  }
 
   get isNew(): boolean {
-    return this.state === DisplayStateMachine.NEW;
+    return this.#state === DisplayStateMachine.NEW;
   }
 
   get isRunning(): boolean {
-    return this.state === DisplayStateMachine.RUNNING;
+    return this.#state === DisplayStateMachine.RUNNING;
   }
 
   get isPaused(): boolean {
-    return this.state === DisplayStateMachine.PAUSED;
+    return this.#state === DisplayStateMachine.PAUSED;
   }
 
   #pausedByUser = false;
@@ -71,7 +75,7 @@ export class DisplayStateMachine {
   }
 
   #pausedByUserChanged = (): void => {
-    switch (this.state) {
+    switch (this.#state) {
       case DisplayStateMachine.RUNNING:
         if (this.#pausedByUser) {
           this.#pause();
@@ -87,7 +91,7 @@ export class DisplayStateMachine {
   };
 
   #documentIsVisibleChanged = (): void => {
-    switch (this.state) {
+    switch (this.#state) {
       case DisplayStateMachine.RUNNING:
       case DisplayStateMachine.PAUSED:
         if (this.#documentIsVisible) {
@@ -100,7 +104,7 @@ export class DisplayStateMachine {
   };
 
   #elementIsInsideViewportChanged = (): void => {
-    switch (this.state) {
+    switch (this.#state) {
       case DisplayStateMachine.RUNNING:
       case DisplayStateMachine.PAUSED:
         if (this.#elementIsInsideViewport) {
@@ -113,8 +117,8 @@ export class DisplayStateMachine {
   };
 
   #pause = (): void => {
-    if (this.state !== DisplayStateMachine.PAUSED) {
-      this.state = DisplayStateMachine.PAUSED;
+    if (this.#state !== DisplayStateMachine.PAUSED) {
+      this.#state = DisplayStateMachine.PAUSED;
       emit(this, DisplayStateMachine.Pause);
     }
   };
@@ -140,10 +144,10 @@ export class DisplayStateMachine {
     // change of the inputs moves nothing and start() does nothing. So the inputs are read here:
     // a pause one of them asked for holds, and whoever heard init or restart hears pause next
     if (this.#isPaused()) {
-      this.state = DisplayStateMachine.PAUSED;
+      this.#state = DisplayStateMachine.PAUSED;
       emit(this, DisplayStateMachine.Pause);
     } else {
-      this.state = DisplayStateMachine.RUNNING;
+      this.#state = DisplayStateMachine.RUNNING;
       emit(this, DisplayStateMachine.Start);
     }
   }
@@ -161,10 +165,10 @@ export class DisplayStateMachine {
 
   start(): void {
     if (this.#emittingInitOrRestart) return;
-    if (this.state !== DisplayStateMachine.RUNNING) {
+    if (this.#state !== DisplayStateMachine.RUNNING) {
       const isPaused = this.#isPaused();
 
-      switch (this.state) {
+      switch (this.#state) {
         case DisplayStateMachine.NEW:
           if (!isPaused) {
             this.#initOrRestartThenStart();

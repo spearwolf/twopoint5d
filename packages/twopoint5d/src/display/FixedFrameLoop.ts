@@ -79,7 +79,7 @@ export interface FixedFrameLoop extends EventizedObject {}
  * render-budget problem — scene optimisation, `pixelZoom`, lower
  * `pixelRatio` or capping `Display`'s `maxFps` are the right tools.
  *
- * The loop pauses automatically when `Display` pauses (no `OnRenderFrame`
+ * The loop pauses automatically when `Display` pauses (no `OnDisplayRenderFrame`
  * events fire) and disposes when `Display` disposes (via `OnDisplayDispose`).
  */
 export class FixedFrameLoop {

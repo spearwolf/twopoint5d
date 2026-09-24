@@ -12,18 +12,30 @@ const getCurrentTime = (time?: number) => (typeof time === 'number' && !Number.i
 export class Chronometer {
   #timeStart: number;
 
-  /** The current time, which is set by calling the `update()` method */
+  /**
+   * The latest time the chronometer has seen. The constructor and `reset()` set it; `update()`
+   * and `start()` only ever move it forward
+   */
   #currentTime: number;
 
   #deltaTime: number;
 
-  /** Time lost due to pause before the previous time */
+  /**
+   * Time lost to the pauses `start()` has closed, and the part of an `update()` delta that
+   * `maxDeltaTime` cut off
+   */
   #lostTime: number;
 
-  /** Time lost due to pause after the previous time */
+  /**
+   * Time that `update()` has counted as lost since the most recent `stop()`; `start()` moves it
+   * into `#lostTime`
+   */
   #recentlyLostTime: number;
 
-  /** Wall-clock timestamp captured by the most recent `stop()` */
+  /**
+   * The time of the most recent `stop()`, never earlier than the latest time the chronometer had
+   * seen by then
+   */
   #pausedAt: number;
 
   #isRunning: boolean;
@@ -60,7 +72,9 @@ export class Chronometer {
     return this.#timeStart;
   }
 
-  /** Time lost due to pause */
+  /**
+   * Time lost due to pause, and the part of an `update()` delta that {@link maxDeltaTime} cut off
+   */
   get lostTime(): number {
     return this.#lostTime + this.#recentlyLostTime;
   }

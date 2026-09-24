@@ -69,20 +69,22 @@ describe('Display — resize behavior', () => {
     display = new Display(host);
     on(display, OnDisplayResize, onResize);
 
-    // The constructor's resize() must NOT emit OnDisplayResize (frameNo === 0).
-    // But: OnDisplayResize is retained, so a subscriber attached after the
-    // initial resize is invoked synchronously with the retained value. We
-    // cannot probe "no emit" from this side; instead we assert that width
-    // and height are non-zero, proving resize() ran.
-    expect(display.width, 'width after constructor').to.be.greaterThan(0);
-    expect(display.height, 'height after constructor').to.be.greaterThan(0);
+    try {
+      // The constructor's resize() must NOT emit OnDisplayResize (frameNo === 0).
+      // But: OnDisplayResize is retained, so a subscriber attached after the
+      // initial resize is invoked synchronously with the retained value. We
+      // cannot probe "no emit" from this side; instead we assert that width
+      // and height are non-zero, proving resize() ran.
+      expect(display.width, 'width after constructor').to.be.greaterThan(0);
+      expect(display.height, 'height after constructor').to.be.greaterThan(0);
 
-    // The subscriber may have been called once via `retain` replay — that's
-    // expected. We just want to make sure the constructor itself doesn't
-    // schedule extra emissions.
-    expect(resizeEmittedDuringConstruction).to.be.at.most(1);
-
-    off(display, OnDisplayResize, onResize);
+      // The subscriber may have been called once via `retain` replay — that's
+      // expected. We just want to make sure the constructor itself doesn't
+      // schedule extra emissions.
+      expect(resizeEmittedDuringConstruction).to.be.at.most(1);
+    } finally {
+      off(display, OnDisplayResize, onResize);
+    }
   });
 
   it('uses the host element size when constructed with an HTMLElement', async () => {
@@ -175,24 +177,26 @@ describe('Display — resize behavior', () => {
     };
     on(display, OnDisplayResize, onResize);
 
-    // No size change → no further emissions.
-    const baseline = observed.length;
-    await nextFrame(display);
-    await nextFrame(display);
-    expect(observed.length, 'no emit when nothing changed').to.equal(baseline);
+    try {
+      // No size change → no further emissions.
+      const baseline = observed.length;
+      await nextFrame(display);
+      await nextFrame(display);
+      expect(observed.length, 'no emit when nothing changed').to.equal(baseline);
 
-    // Size change → exactly one new emission with the new size.
-    host.style.width = '320px';
-    host.style.height = '240px';
-    await nextFrame(display);
-    await nextFrame(display);
+      // Size change → exactly one new emission with the new size.
+      host.style.width = '320px';
+      host.style.height = '240px';
+      await nextFrame(display);
+      await nextFrame(display);
 
-    const fresh = observed.slice(baseline);
-    expect(fresh.length, 'one emit after size change').to.equal(1);
-    expect(fresh[0].width).to.equal(320);
-    expect(fresh[0].height).to.equal(240);
-
-    off(display, OnDisplayResize, onResize);
+      const fresh = observed.slice(baseline);
+      expect(fresh.length, 'one emit after size change').to.equal(1);
+      expect(fresh[0].width).to.equal(320);
+      expect(fresh[0].height).to.equal(240);
+    } finally {
+      off(display, OnDisplayResize, onResize);
+    }
   });
 
   it('resize-to="self" on the canvas measures the canvas itself', async () => {
@@ -215,30 +219,23 @@ describe('Display — resize behavior', () => {
   it('resize-to=CSS-selector resolves the target element', async () => {
     host = makeContainer({width: 800, height: 600});
 
-    const sizeRef = document.createElement('div');
-    sizeRef.id = 'display-resize-selector-ref';
-    sizeRef.style.width = '128px';
-    sizeRef.style.height = '64px';
-    sizeRef.style.position = 'absolute';
-    sizeRef.style.left = '0';
-    sizeRef.style.top = '0';
-    document.body.appendChild(sizeRef);
-
-    const canvas = document.createElement('canvas');
-    canvas.style.display = 'block';
-    canvas.setAttribute('resize-to', '#display-resize-selector-ref');
-    host.appendChild(canvas);
-
-    display = new Display(canvas);
+    const sizeRef = makeSizeRef(document.body, {id: 'display-resize-selector-ref', width: 128, height: 64});
 
     try {
+      const canvas = document.createElement('canvas');
+      canvas.style.display = 'block';
+      canvas.setAttribute('resize-to', '#display-resize-selector-ref');
+      host.appendChild(canvas);
+
+      display = new Display(canvas);
+
       await display.start();
       await nextFrame(display);
 
       expect(display.width).to.equal(128);
       expect(display.height).to.equal(64);
     } finally {
-      sizeRef.parentNode.removeChild(sizeRef);
+      sizeRef.remove();
     }
   });
 
@@ -416,15 +413,15 @@ describe('Display — resize behavior', () => {
     const id = `display-resize-replaced-ref-${Math.random().toString(36).slice(2, 8)}`;
     const first = makeSizeRef(document.body, {id, width: 128, height: 64});
 
-    const canvas = document.createElement('canvas');
-    canvas.style.display = 'block';
-    canvas.setAttribute('resize-to', `#${id}`);
-    host.appendChild(canvas);
-
-    display = new Display(canvas);
-
     let second;
     try {
+      const canvas = document.createElement('canvas');
+      canvas.style.display = 'block';
+      canvas.setAttribute('resize-to', `#${id}`);
+      host.appendChild(canvas);
+
+      display = new Display(canvas);
+
       await display.start();
       await nextFrame(display);
 
@@ -476,16 +473,18 @@ describe('Display — resize behavior', () => {
     };
     on(display, OnDisplayResize, onResize);
 
-    await display.start();
-    await nextFrame(display);
-    await nextFrame(display);
+    try {
+      await display.start();
+      await nextFrame(display);
+      await nextFrame(display);
 
-    expect(emitsByFrame.get(1), 'frame 1 emits exactly once').to.equal(1);
-    // Frame 2 may emit if the host element size settled differently between
-    // frame 1 and frame 2, but it MUST NOT emit more than once.
-    expect(emitsByFrame.get(2) ?? 0, 'frame 2 emits at most once').to.be.at.most(1);
-
-    off(display, OnDisplayResize, onResize);
+      expect(emitsByFrame.get(1), 'frame 1 emits exactly once').to.equal(1);
+      // Frame 2 may emit if the host element size settled differently between
+      // frame 1 and frame 2, but it MUST NOT emit more than once.
+      expect(emitsByFrame.get(2) ?? 0, 'frame 2 emits at most once').to.be.at.most(1);
+    } finally {
+      off(display, OnDisplayResize, onResize);
+    }
   });
 
   it('does not double-emit OnDisplayResize on the first frame when the size differs from construction', async () => {
@@ -498,16 +497,21 @@ describe('Display — resize behavior', () => {
     host.style.height = '320px';
 
     const emits = [];
-    on(display, OnDisplayResize, (props) => {
+    const onResize = (props) => {
       emits.push({frameNo: props.frameNo, width: props.width, height: props.height});
-    });
+    };
+    on(display, OnDisplayResize, onResize);
 
-    await display.start();
-    await nextFrame(display);
+    try {
+      await display.start();
+      await nextFrame(display);
 
-    const frame1Emits = emits.filter((e) => e.frameNo === 1);
-    expect(frame1Emits.length, 'exactly one OnDisplayResize on frame 1').to.equal(1);
-    expect(frame1Emits[0].width).to.equal(480);
-    expect(frame1Emits[0].height).to.equal(320);
+      const frame1Emits = emits.filter((e) => e.frameNo === 1);
+      expect(frame1Emits.length, 'exactly one OnDisplayResize on frame 1').to.equal(1);
+      expect(frame1Emits[0].width).to.equal(480);
+      expect(frame1Emits[0].height).to.equal(320);
+    } finally {
+      off(display, OnDisplayResize, onResize);
+    }
   });
 });
