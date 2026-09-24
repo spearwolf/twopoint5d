@@ -1157,11 +1157,14 @@ export class Display {
    * and `setAnimationLoop(null)` only takes the callback out of it; so the display stops the loop
    * as it goes into the pause and starts it again as it runs. three 0.185 offers no public way to
    * do so, and the display reaches the loop through `renderer._animation`: a renderer without it
-   * keeps its loop running through the pause. So does a renderer another {@link FrameLoop} still
-   * runs on as the display goes into the pause. Before the first start the loop follows `pause`
-   * too: a `stop()` or `pause = true` stops it — one that comes while `renderer.init()` still
-   * runs stops it once the init has started it — also when that call keeps the first `start()`
-   * from starting the display, and a `pause = false` or the next `start()` runs it again.
+   * keeps its loop running through the pause. So does a renderer whose loop still carries a
+   * callback when the display would stop it — that of another {@link FrameLoop} on the renderer,
+   * say. Before the first start the loop follows `pause` too: a `stop()` or `pause = true` stops
+   * it — one that comes while `renderer.init()` still runs stops it once the init has started
+   * it — also when that call keeps the first `start()` from starting the display, and a
+   * `pause = false` or the next `start()` runs it again. A callback that goes on the renderer
+   * after the display has stopped the loop — through `renderer.setAnimationLoop()`, or through a
+   * {@link FrameLoop} that starts on the renderer — gets no frame while the loop stands still.
    *
    * After {@link Display.dispose} a write does nothing, and the getter answers `true`.
    */
@@ -1728,10 +1731,11 @@ export class Display {
     if (renderer == null || this.#stoppedAnimationOfThree != null) return;
     const animation = getAnimationOfThree(renderer);
     if (animation == null) return;
-    // the display is off its frame loop here, and the driver has taken its callback off the
-    // renderer unless another FrameLoop still holds it. A callback left on the loop belongs to
-    // such a FrameLoop, and its frames go on. One that starts on the renderer while the loop
-    // stands still gets its frames once the display runs again
+    // the display is off its frame loop here, and the rAF driver keeps its callback on the
+    // renderer only while a FrameLoop is still on the driver. A callback left on the loop — the
+    // driver's, or one the caller has set with renderer.setAnimationLoop() before the first
+    // start — keeps the loop running, and its frames go on. One that goes on the renderer after
+    // the display has stopped the loop gets no frame while it stands still
     if (renderer.getAnimationLoop() != null) return;
     animation.stop();
     this.#stoppedAnimationOfThree = animation;
