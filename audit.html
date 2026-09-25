@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.1.0",
-    "generatedAt": "2026-09-25T15:44:57.859Z"
+    "generatedAt": "2026-09-25T18:23:16.685Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,48 +198,47 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 74,
-        "penalty": 52.5,
+        "score": 77,
+        "penalty": 44,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 12,
-          "low": 37,
-          "info": 24
+          "medium": 11,
+          "low": 24,
+          "info": 14
         },
         "byCategory": {
-          "correctness": 15,
-          "api": 16,
-          "consistency": 9,
-          "performance": 6,
-          "completeness": 4,
+          "correctness": 11,
+          "performance": 3,
+          "completeness": 3,
+          "consistency": 6,
+          "api": 12,
           "security": 1,
           "resources": 1,
           "architecture": 2,
           "async": 1,
-          "readability": 5,
-          "types": 4,
-          "dx": 7,
-          "testing": 4
+          "readability": 3,
+          "dx": 5,
+          "testing": 3
         }
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 68,
-        "penalty": 28,
+        "score": 70,
+        "penalty": 26,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 6,
-          "low": 32,
-          "info": 17
+          "low": 28,
+          "info": 14
         },
         "byCategory": {
-          "dx": 28,
           "types": 3,
-          "testing": 13,
+          "testing": 12,
+          "dx": 23,
           "dependencies": 3,
-          "consistency": 3,
+          "consistency": 2,
           "completeness": 1,
           "readability": 3,
           "build": 1
@@ -251,8 +250,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 97,
-        "score": 79
+        "findings": 68,
+        "score": 82
       },
       {
         "name": "workspace",
@@ -265,20 +264,20 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 8,
+        "findings": 7,
         "score": 96.5
       },
       {
         "name": "lookbook",
         "path": "apps/lookbook",
         "reviewedLoc": 0,
-        "findings": 8,
-        "score": 95
+        "findings": 6,
+        "score": 95.5
       }
     ],
-    "resolvedCount": 88,
+    "resolvedCount": 122,
     "scoreModel": 2,
-    "score": 71,
+    "score": 73,
     "scoring": {
       "model": 2,
       "weights": {
@@ -295,41 +294,40 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 18,
-      "low": 69,
-      "info": 41
+      "medium": 17,
+      "low": 52,
+      "info": 28
     },
     "byCategory": {
-      "correctness": 15,
-      "api": 16,
-      "consistency": 12,
-      "performance": 6,
-      "dx": 35,
-      "completeness": 5,
+      "correctness": 11,
+      "performance": 3,
+      "completeness": 4,
+      "consistency": 8,
+      "api": 12,
       "security": 1,
       "resources": 1,
-      "types": 7,
+      "types": 3,
       "architecture": 2,
-      "testing": 17,
+      "testing": 15,
+      "dx": 28,
       "dependencies": 3,
       "async": 1,
-      "readability": 8,
+      "readability": 6,
       "build": 1
     },
     "byComponent": {
-      "map2d": 29,
       "texture": 27,
       "stage": 25,
       "controls": 4
     },
     "counts": {
-      "findings": 130,
-      "improvements": 15,
+      "findings": 99,
+      "improvements": 13,
       "byStatus": {
-        "new": 42,
-        "unchanged": 10,
-        "carried-over": 73,
-        "improved": 5
+        "new": 31,
+        "unchanged": 7,
+        "carried-over": 57,
+        "improved": 4
       }
     },
     "deltaBreakdown": {
@@ -507,212 +505,6 @@
     }
   },
   "findings": [
-    {
-      "id": "BUG-102",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Tiles eines abgehängten Tile-Renderers beim Entfernen räumen",
-      "location": "packages/twopoint5d/src/map2d/Map2D.ts:121-127",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.ts:114-116",
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.ts:128-136"
-      ],
-      "description": "`removeTileRenderer()` nimmt Node und Renderer heraus, lässt aber die Tiles im Renderer liegen. Solange er abgehängt ist, erreicht ihn kein `removeTiles` und kein Clear nach einem Grid-Wechsel. Nach `addTileRenderer()` kommen Tiles, die zwischendurch aus dem Blick gefallen sind, nie als `remove` an. Sie belegen Pool-Slots und verschärfen so die Pool-Erschöpfung. Nach einem Grid-Wechsel werden sie als `reuse` mit alter `quadSize` und alten `texCoords` weitergezeichnet.",
-      "recommendation": "In `removeTileRenderer()` `renderer.clearTiles()` aufrufen oder beim erneuten Anhängen clearen. Dazu ein Spec für Abhängen und Wiederanhängen.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-026",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "kind": "improvement",
-      "title": "Voll-Upload aller Instanzattribute bei bewegter Kamera vermeiden",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:548",
-      "locations": [
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:164",
-        "packages/twopoint5d/src/map2d/TileSprites/TileSpritesFactory.ts:66-70",
-        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:84"
-      ],
-      "description": "`computeVisibleTiles()` gibt fest `changed: true` zurück. Der Early-Return in `reuseTile()` greift deshalb bei bewegter Kamera nie. Jedes wiederverwendete Tile geht durch `updateTile()`, und `update()` touched `quadSize`, `texCoords` und `instancePosition` vollständig. Im Hauptanwendungsfall, dem kontinuierlichen Scrollen, bedeutet das pro Frame einen Upload aller Instanzdaten, obwohl sich die `view` eines Tiles nur bei einem Grid-Wechsel ändert.",
-      "recommendation": "`changed` nur bei einem Grid-Wechsel setzen und in `TileSpritesFactory.update()` nur die Attribute touchen, die seit dem letzten Frame geschrieben wurden.",
-      "effort": "M",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-037",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das lookAtCenter-TSDoc korrigieren, das den gegenteiligen Default nennt",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:114-119",
-      "description": "Laut TSDoc ist `true` der Default, der Code setzt `false`. Die Beschreibung »cumulated« erklärt das Verhalten auch nicht: tatsächlich wird der erste Probe-Punkt subtrahiert. Wer der Doku folgt, bekommt das andere Verhalten.",
-      "recommendation": "Default auf `false` korrigieren und die Semantik (Verschiebung um den Mittelpunkt-Probe-Punkt) ausformulieren.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-103",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "frustumBoxScale in beiden Achsen gleich skalieren",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:659-666",
-      "locations": [
-        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:22"
-      ],
-      "description": "`sw = width*scale - width` wird auf beiden Seiten abgezogen bzw. addiert. Die Box wird dadurch `width·(2·scale−1)` breit, beim Default 1,1 also 1,2-fach. Die Tiefe skaliert dagegen korrekt mit `scale`. Das widerspricht der TSDoc und macht den Parameter uneinheitlich.",
-      "recommendation": "`sw = (width*scale - width) / 2` (analog `sh`) oder die TSDoc auf »expands each side by (scale−1)·size« ändern.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-052",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "low",
-      "title": "Tile-Handles auf `!== undefined` statt auf Truthiness prüfen",
-      "location": "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:81",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:102"
-      ],
-      "description": "`IMapTileFactory\u003cT>` ist generisch. Eine Factory mit numerischen Handles, bei der `0` gültig ist, wird von `addTile` angenommen (`== null`). `removeTile()` und `reuseTile()` überspringen `0` aber: der Map-Eintrag bleibt, `destroyTile` läuft nicht, und der Slot leakt bis zum nächsten `clearTiles()`.",
-      "recommendation": "Überall `tile !== undefined` bzw. `this.#tiles.has(id)` verwenden.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-104",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Punkt-Renderables und mutierte AABBs im Spatial-Hash-Grid nicht verlieren",
-      "location": "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:32-49",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:51-69"
-      ],
-      "description": "Ein Renderable mit Fläche 0 genau auf einer Tile-Grenze bekommt `columns = 0` und wird nie indiziert, `findWithin()` findet es nie. `remove()` rechnet die Buckets aus der *aktuellen* `aabb`. Wurde sie seit `add` verändert, bleiben Einträge in den alten Buckets zurück. Beides ist nicht dokumentiert.",
-      "recommendation": "Mindestens eine Zelle erzwingen (`max(1, …)`), die gehashten Keys pro Renderable merken oder eine `update(renderable)`-Methode anbieten.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-027",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Nachgeladene Chunks im ChunkQuadTree wieder unterteilbar machen",
-      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts:208-245",
-      "locations": [
-        "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts:133-141"
-      ],
-      "description": "`appendChunk()` auf einem inneren Knoten legt Leaf-Kinder mit je einem Chunk an. `subdivide()` auf der Wurzel ist danach ein No-op, weil sie kein Leaf mehr ist, obwohl die TSDoc empfiehlt, `subdivide()` erneut aufzurufen. Bei inkrementell nachgeladenen Chunks degradiert `findChunks` in diesen Leaves zu O(n). `appendChunk`, `findChunksAt` und `clear` haben keine Specs.",
-      "recommendation": "`subdivide()` rekursiv an die Kinder weiterreichen oder das Kind nach `appendToNode` unterteilen. Specs ergänzen.",
-      "effort": "M",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-053",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "low",
-      "title": "width und height von RectangularVisibilityArea validieren",
-      "location": "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:51-67",
-      "locations": [
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:116-121"
-      ],
-      "description": "Negative Werte laufen durch, geprüft wird nur `=== 0`. `rows * columns` wird negativ, und `new Uint8Array(tilesLength)` wirft einen `RangeError` tief in `update()`. Streamer, Util und Grid prüfen ihre Maße dagegen mit `assertPositiveFinite`.",
-      "recommendation": "In den Settern `assertPositiveFinite` nutzen und 0 ausdrücklich als »aus« dokumentieren.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-029",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die vertauschten Bedeutungen von rows und columns in TilesWithinCoords richtigstellen",
-      "location": "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.ts:47-55",
-      "description": "`rows` ist als »number of tiles in a row« beschrieben, `columns` als »in a column«, also genau vertauscht. `top` und `left` heißen »world space«, sind aber grid-lokal ohne Offset. `TilesWithinCoords` ist öffentlich exportiert.",
-      "recommendation": "TSDoc korrigieren: rows = Anzahl Zeilen, top/left relativ zum Grid-Ursprung ohne Offset.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-051",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Festlegen, ob CameraBasedVisibility die Kamera des Aufrufers nachführen darf",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:314-315",
-      "locations": [
-        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:155",
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.ts:141"
-      ],
-      "description": "`camera.updateProjectionMatrix()` überschreibt pro Frame eine von außen gesetzte `projectionMatrix`, etwa bei Jitter oder einer eigenen Projektion. Außerdem legt `computeVisibleTiles` die private `#tileCoords`-Instanz des Streamers im öffentlichen, beschreibbaren Feld `map2dTileCoords` ab. Wer darüber schreibt, umgeht die Setter des Streamers, die bei einem Grid-Wechsel clearen.",
-      "recommendation": "Projektion nicht selbst aktualisieren und die Verantwortung in der TSDoc beim Aufrufer festhalten. `map2dTileCoords` nur lesend exponieren.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-028",
-      "category": "performance",
-      "domain": "code",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "Allokationen pro Sichtbarkeitsberechnung in Scratch-Felder verlegen",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:482-549",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.ts:140",
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:113-158",
-        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:83"
-      ],
-      "description": "Bei bewegter Kamera läuft die Berechnung jeden Frame und erzeugt dabei vier bis fünf Arrays und ein Result-Objekt, `findWithin` zusätzlich ein Set. Andere Scratch-Strukturen im Modul werden bewusst gepoolt. Das ist kein Defekt, aber GC-Druck im Frame-Loop.",
-      "recommendation": "Result-Objekt und Listen wiederverwenden, was der Vertrag in `types.ts:104-110` ausdrücklich erlaubt. `findWithin` mit `out`-Parameter anbieten.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-010",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "info",
-      "title": "Toten und unfertigen Code im chunk-quad-tree aufräumen",
-      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/IDataChunk2D.ts:15",
-      "locations": [
-        "packages/twopoint5d/src/map2d/chunk-quad-tree/DataIdsChunk2D.ts:32-44"
-      ],
-      "description": "Die Signatur `readDataIdAt` ist auskommentiert. Der öffentliche Parameter `compression` wirft immer. Die Länge von `uint32Arr` wird nicht gegen `width*height` geprüft, sodass `readDataIdAt` innerhalb der Bounds `undefined` liefern kann.",
-      "recommendation": "Kommentar entfernen oder ins Interface aufnehmen, `compression` aus dem Typ nehmen und die Array-Länge im Konstruktor prüfen.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
     {
       "id": "BUG-105",
       "category": "correctness",
@@ -998,9 +790,6 @@
       "severity": "low",
       "title": "Die verstreuten TODO-Marker in ausgelieferten Code-Pfaden auflösen",
       "location": "packages/twopoint5d/src/texture/TexturePackerJson.ts:19",
-      "locations": [
-        "packages/twopoint5d/src/map2d/chunk-quad-tree/DataIdsChunk2D.ts:39"
-      ],
       "description": "In ausgelieferten Typen und Code-Pfaden stehen offene TODOs ohne Verweis auf einen Tracker, etwa `// TODO add textureOptions: TextureClasses[]` im öffentlichen `TexturePackerMetaData`.",
       "recommendation": "Umsetzen oder als Issue erfassen und aus dem Code entfernen.",
       "effort": "S",
@@ -1479,21 +1268,6 @@
       "component": "controls"
     },
     {
-      "id": "TEST-015",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Testlücken um TileSpritesFactory, den Visibilitor-Wechsel und den Datenprovider schließen",
-      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesGeometry.ts:1",
-      "description": "Der Vorlauf führte die gesamte map2d-Orchestrierung als ungetestet; \u003ccode>Map2D.spec.ts\u003c/code>, \u003ccode>Map2DTileStreamer.spec.ts\u003c/code>, \u003ccode>Map2DTileRenderer.spec.ts\u003c/code> und \u003ccode>RectangularVisibilityArea.spec.ts\u003c/code> existieren inzwischen. Übrig ist \u003ccode>TileSpritesFactory\u003c/code> — die eine Klasse, die map2d an die Vertex-Object-Pools bindet (\u003ccode>createVO\u003c/code>/\u003ccode>freeVO\u003c/code>-Paarung, Tile-id 0 → declined, texCoords-Lookup, \u003ccode>update()\u003c/code>) — ohne Unit-Spec; \u003ccode>Map2DTileRenderer.spec.ts\u003c/code> übt das Protokoll nur gegen ein handgebautes Fake. Ungetestete öffentliche Verhalten beim Lesen gefunden: vertical Provider mit \u003ccode>0 &lt; left &lt; cols\u003c/code> (BUG-070); \u003ccode>Map2D.visibilitor\u003c/code>-Wechsel (BUG-072); \u003ccode>addTile()\u003c/code> für eine gehaltene id (MEM-003); \u003ccode>base64toUint32Arr\u003c/code> Endianness/Restbytes; \u003ccode>CameraBasedVisibility\u003c/code> mit translatierter oder rotierter \u003ccode>matrixWorld\u003c/code> (BUG-071).",
-      "recommendation": "\u003ccode>TileSpritesFactory.spec.ts\u003c/code> mit einer echten \u003ccode>TileSpritesGeometry\u003c/code> (keine GPU nötig): createTile/destroyTile-Rundweg assertiert \u003ccode>usedCount\u003c/code>, id 0 gibt \u003ccode>undefined\u003c/code> ohne Slot, fehlendes tileSet wirft ohne Slot; die vier genannten Fälle in ihre bestehenden Dateien.",
-      "effort": "M",
-      "status": "improved",
-      "previousSeverity": "medium",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-016",
       "category": "testing",
       "domain": "harness",
@@ -1607,20 +1381,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "READ-012",
-      "category": "readability",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die sechs Kopien des Wrap-Around-Modulos in RepeatingTilesProvider zusammenziehen",
-      "location": "packages/twopoint5d/src/map2d/RepeatingTilesProvider.ts:79",
-      "description": "Der Ausdruck »einen negativen Index in den Musterbereich heben« (\u003ccode>i &lt; 0 ? i + Math.ceil(-i / n) * n : i\u003c/code>) steht sechsmal, und die drei \u003ccode>getTileIdsWithin\u003c/code>-Zweige schreiben Zeilen jeweils anders (\u003ccode>'horizontal'\u003c/code> und \u003ccode>'none'\u003c/code> über \u003ccode>#writePatternRow\u003c/code>, \u003ccode>'vertical'\u003c/code> inline) — die Divergenz ist genau die Stelle, an der BUG-070 lebt.",
-      "recommendation": "\u003ccode>const wrap = (i: number, n: number) =&gt; ((i % n) + n) % n;\u003c/code> und alle drei Zweige durch einen Zeilen-Writer führen, der einen Spaltenbereich nimmt.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-017",
       "category": "testing",
       "domain": "harness",
@@ -1663,20 +1423,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "API-055",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Beim Streamer-Wechsel von Map2D keinen Visibilitor an zwei Streamer zugleich hängen",
-      "location": "packages/twopoint5d/src/map2d/Map2D.ts:29",
-      "description": "Der Setter \u003ccode>tileStreamer\u003c/code> reicht den Visibilitor des alten Streamers weiter. Bringt der neue Streamer einen eigenen Visibilitor B mit und hielt der alte A, überschreibt A still B, und alter wie neuer Streamer halten danach dieselbe A-Instanz — gegen die Regel, dass eine Visibilitor-Instanz genau einem Streamer dient. Verhalten wie vor dem Lauf, im Kommentar benannt. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Dem alten Streamer den Visibilitor beim Weiterreichen abnehmen (\u003ccode>previous.visibilitor = undefined\u003c/code>) und im TSDoc des Setters festhalten, welcher Visibilitor gewinnt, wenn beide einen mitbringen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-027",
       "category": "dx",
       "domain": "harness",
@@ -1702,20 +1448,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-036",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Rückgabewert und target im TSDoc von getTileIdsWithin() beschreiben",
-      "location": "packages/twopoint5d/src/map2d/RepeatingTilesProvider.ts:122",
-      "description": "Das TSDoc von \u003ccode>getTileIdsWithin()\u003c/code> nennt weder den Rückgabewert noch \u003ccode>target\u003c/code>: jede Zelle wird überschrieben, die Länge von \u003ccode>target\u003c/code> wird nicht geprüft. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "\u003ccode>@param target\u003c/code> (wird vollständig überschrieben, muss mindestens \u003ccode>width × height\u003c/code> fassen) und \u003ccode>@returns\u003c/code> ergänzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1789,20 +1521,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "DOC-024",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Vier Felder von IMap2DVisibleTiles ohne TSDoc zwischen dokumentierten Nachbarn",
-      "location": "packages/twopoint5d/src/map2d/types.ts:112",
-      "description": "\u003ccode>tiles\u003c/code>, \u003ccode>removeTiles\u003c/code>, \u003ccode>reuseTiles\u003c/code> und \u003ccode>createTiles\u003c/code> stehen ohne TSDoc, während \u003ccode>offset\u003c/code>, \u003ccode>translate\u003c/code> und \u003ccode>changed\u003c/code> direkt daneben dokumentiert sind. Re-Check: unverändert.",
-      "recommendation": "Je einen Satz an die vier Felder: was die Liste enthält und gegen welchen Vorzustand sie gebildet wurde.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "PERF-008",
       "category": "performance",
       "domain": "code",
@@ -1817,34 +1535,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "PERF-019",
-      "category": "performance",
-      "domain": "code",
-      "severity": "info",
-      "title": "ChunkQuadTreeNode.subdivide() bewertet jede Kante in O(n) — O(n²) pro Ebene",
-      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts:58",
-      "description": "\u003ccode>findAxis\u003c/code> sortiert und ruft für jeden Kandidaten \u003ccode>scoreAxis\u003c/code> über alle Chunks. Für die Load-once-Nutzung unproblematisch (die Extended-Spec budgetiert 1000 Chunks unter 1 s), aber der einzige superlineare Pfad im Modul — gut zu wissen, bevor jemand den Baum pro Frame neu baut.",
-      "recommendation": "So lassen. Sollte es je zählen, macht ein Präfixsummen-Lauf über die sortierten Kanten \u003ccode>scoreAxis\u003c/code> zu O(1) pro Kandidat.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-011",
-      "category": "types",
-      "domain": "code",
-      "severity": "info",
-      "title": "findVisibleTiles() deklariert ein undefined, das es nie zurückgibt",
-      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:430",
-      "description": "Die private Methode ist als \u003ccode>IMap2DVisibleTiles | undefined\u003c/code> deklariert, hat aber genau ein \u003ccode>return\u003c/code> mit einem Objektliteral. Die tote Breite zwingt den Aufrufer zu einer Prüfung, die nie greift. Re-Check: unverändert (Zeile verschoben von 418 nach 427).",
-      "recommendation": "Den Rückgabetyp auf \u003ccode>IMap2DVisibleTiles\u003c/code> verengen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-032",
       "category": "dx",
       "domain": "harness",
@@ -1856,20 +1546,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-037",
-      "category": "consistency",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Den falsch eingerückten Block im vertical-Test »4x1 pattern in-outside« richten",
-      "location": "packages/twopoint5d/src/map2d/RepeatingTilesProvider.spec.ts:381",
-      "description": "Der zweite \u003ccode>expect\u003c/code>-Block steht zwei Stellen zu weit links; \u003ccode>// prettier-ignore\u003c/code> verdeckt es vor dem Formatter. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Einrücken wie die Nachbarblöcke.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1970,34 +1646,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "DOC-048",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die TSDoc von IMap2DTileRenderer#addTile() bleibt hinter der ihres Nachbarn zurück",
-      "location": "packages/twopoint5d/src/map2d/types.ts:65",
-      "description": "Der Eintrag bleibt bei »Add a tile to the renderer«, während \u003ccode>reuseTile()\u003c/code> (\u003ccode>:71-82\u003c/code>) seine Regel ausschreibt. Dass eine schon gehaltene Koordinate das gehaltene Tile fortschreibt, steht nirgends — die Schnittstelle sagt weniger als ihre einzige Implementierung tut.",
-      "recommendation": "Einen Satz ergänzen, der den Fall der schon gehaltenen Koordinate benennt.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-028",
-      "category": "testing",
-      "domain": "code",
-      "severity": "low",
-      "title": "Der Gitter-Test belegt nur, dass der Konstruktor nicht wirft",
-      "location": "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.spec.ts:12",
-      "description": "Der Test »without arguments it is a 1x1 grid« prüft allein \u003ccode>getTile(0, 0) === undefined\u003c/code>; das gilt für jede Gittergröße. Die behauptete Kantenlänge prüft er nicht.",
-      "recommendation": "Eine 2×2-AABB über \u003ccode>add()\u003c/code> einhängen und mit \u003ccode>getTiles(0, 0, 2, 2)\u003c/code> vier belegte Zellen erwarten — das zeigt die Kantenlänge 1.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "CONS-048",
       "category": "consistency",
       "domain": "code",
@@ -2008,48 +1656,6 @@
       "recommendation": "\u003ccode>describeValue()\u003c/code> auch hier verwenden.",
       "effort": "S",
       "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-017",
-      "category": "types",
-      "domain": "code",
-      "severity": "info",
-      "title": "Zwei Definite-Assignment-Assertions verdecken, dass der Konstruktor die Felder über Setter füllt",
-      "location": "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.ts:65",
-      "description": "\u003ccode>#tileWidth!: number\u003c/code> und \u003ccode>#tileHeight!: number\u003c/code> schalten die Prüfung ab, obwohl der Konstruktor beide über die Setter belegt. Das \u003ccode>!\u003c/code> nimmt dem Typsystem genau die Kontrolle, die hier etwas zu sagen hätte.",
-      "recommendation": "Die Felder im Konstruktor direkt belegen oder mit einem Default initialisieren, dann fällt das \u003ccode>!\u003c/code> weg.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-049",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "info",
-      "title": "Interface-TSDoc und Migration Guide beschreiben dasselbe dispose() streng und locker zugleich",
-      "location": "packages/twopoint5d/src/map2d/types.ts:200",
-      "description": "Die TSDoc verlangt »Afterwards the set stays down: \u003ccode>show\u003c/code>, add, remove and update do nothing«, das Beispiel im Migration Guide zeigt \u003ccode>show = false\u003c/code> als schlichtes Feld und einen leeren \u003ccode>dispose()\u003c/code>-Rumpf. Beide Lesarten stehen jetzt nebeneinander, statt dass eine gewinnt.",
-      "recommendation": "Die Interface-TSDoc um »an implementation that holds nothing has nothing to keep down« erweitern — dann deckt die strenge Fassung den leeren Rumpf mit ab.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-057",
-      "category": "api",
-      "domain": "code",
-      "severity": "info",
-      "title": "isDisposed steht nicht im Interface der Visibility-Helfer",
-      "location": "packages/twopoint5d/src/map2d/types.ts:177",
-      "description": "Wer eine \u003ccode>IMap2DVisibilitorHelpers\u003c/code> übernimmt, ohne die konkrete Klasse zu kennen, kann »ausgeschaltet« und »tot« nicht auseinanderhalten. Entschärft dadurch, dass nach \u003ccode>dispose()\u003c/code> alle Member stille No-Ops sind und \u003ccode>dispose()\u003c/code> idempotent ist — eine Verzweigung ist nirgends nötig, sie wäre nur informativ.",
-      "recommendation": "Entscheiden, ob das Interface die Zustandsfrage überhaupt beantworten soll; wenn ja, \u003ccode>isDisposed\u003c/code> aufnehmen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2093,34 +1699,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-051",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die TSDoc an show verspricht einen Knoten, den erst das nächste update() baut",
-      "location": "packages/twopoint5d/src/map2d/RectangularVisibilityAreaHelpers.ts:35",
-      "description": "»switching it on builds it again, as soon as a scene is there to hold it« klingt, als käme der Knoten von allein hoch, sobald \u003ccode>add()\u003c/code> eine Szene nachreicht; gebaut wird er erst im nächsten \u003ccode>update()\u003c/code>.",
-      "recommendation": "So formulieren wie in \u003ccode>add()\u003c/code> (\u003ccode>:64-66\u003c/code>) — dort steht die Bedingung genau.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-018",
-      "category": "types",
-      "domain": "code",
-      "severity": "info",
-      "title": "Der Spec macht einen Knoten über eine anonyme Struktur statt über seinen Typ auf",
-      "location": "packages/twopoint5d/src/map2d/RectangularVisibilityAreaHelpers.spec.ts:79",
-      "description": "Der Zugriff läuft über \u003ccode>as unknown as {box: {max: {x: number}}; geometry: unknown}\u003c/code>, obwohl die Datei Typen aus \u003ccode>three/webgpu\u003c/code> importiert. Ein \u003ccode>as Box3Helper\u003c/code> trüge dieselbe Aussage und ließe einen Knoten anderer Bauart überhaupt erst auffallen.",
-      "recommendation": "Auf \u003ccode>as Box3Helper\u003c/code> umstellen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "map2d",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2230,19 +1808,6 @@
       "package": "lookbook"
     },
     {
-      "id": "DOC-026",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Metadaten-Drift in der Lookbook beheben: ein Tag nennt eine Klasse, die es nicht gibt, doppelte Tag-Einträge, Tippfehler, README-Zahlen",
-      "location": "apps/lookbook/src/pages/demos/_map2d-cam-visi.json:8",
-      "description": "\u003ccode>Map2DTileSpritesRenderer\u003c/code> matcht kein Symbol in \u003ccode>packages/twopoint5d/src\u003c/code> (die Demos nutzen \u003ccode>Map2DTileRenderer\u003c/code>); die Tag-Wolke bewirbt eine Klasse, nach der ein Leser vergeblich greppt. Jedes andere CamelCase-Tag löst auf eine Bibliotheksdeklaration auf. \u003ccode>RepeatingTilesProvoder\u003c/code> ist in beiden map2d-visi-Beschreibungen falsch geschrieben, \u003ccode>VertexObjcts\u003c/code> in crosses; \u003ccode>tag-categories.json\u003c/code> listet \u003ccode>TileSpritesGeometry\u003c/code> und \u003ccode>TileSpritesMaterial\u003c/code> je zweimal. Die tatsächlichen Zahlen sind 35 \u003ccode>.astro\u003c/code> und 21 \u003ccode>.ts\u003c/code> (README: 36/22). Die Paarung ist sonst sauber: 17 Seiten ↔ 17 JSON-Dateien, jede \u003ccode>url\u003c/code> gleich \u003ccode>/demos/&lt;file&gt;\u003c/code>, alle 14 referenzierten Vorschaubilder existieren. \u003ccode>showSource.github\u003c/code> ist in allen 17 Dateien eine handgeschriebene absolute URL, die nichts gegen den Seitenpfad prüft.",
-      "recommendation": "Die vier Strings korrigieren. \u003ccode>showSource.github\u003c/code> in \u003ccode>loadMetadataForDemos.ts\u003c/code> aus der id ableiten und aus der JSON streichen. Ein 10-Zeilen-Vitest (oder ein Build-Check), dass jedes CamelCase-Tag ein Key von \u003ccode>import * as lib from '@spearwolf/twopoint5d'\u003c/code> ist.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
       "id": "IMPL-004",
       "category": "completeness",
       "domain": "harness",
@@ -2306,19 +1871,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-008",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "map2d-Demos liegen unsortiert im Demo-Wurzelverzeichnis",
-      "location": "apps/lookbook/src/demos/map2d-cam-visi.ts",
-      "description": "Drei \u003ccode>map2d-*\u003c/code>-Dateien liegen flach in \u003ccode>src/demos/\u003c/code>, während jedes andere Thema einen eigenen Ordner hat. Re-Check: unverändert.",
-      "recommendation": "In ein \u003ccode>map2d/\u003c/code>-Unterverzeichnis verschieben. Kosmetik, aber billig.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
     },
     {
       "id": "DOC-040",
@@ -2546,45 +2098,6 @@
       }
     },
     {
-      "id": "BUG-123",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Map2DTileRenderer prüft gehaltene Tiles auf Truthiness statt auf Anwesenheit",
-      "location": "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:102",
-      "locations": [
-        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:123"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. \u003ccode>reuseTile()\u003c/code> und \u003ccode>removeTile()\u003c/code> fragen das gehaltene Tile mit einer Truthiness-Prüfung ab. Eine Factory, deren Tiles falsy sein können (etwa eine numerische ID \u003ccode>0\u003c/code>), verliert in \u003ccode>removeTile()\u003c/code> den Slot, ohne dass \u003ccode>destroyTile()\u003c/code> aufgerufen wird.",
-      "recommendation": "Auf Anwesenheit prüfen (\u003ccode>tiles.has(id)\u003c/code> bzw. \u003ccode>!== undefined\u003c/code>) statt auf Truthiness, dazu ein Spec mit einer Factory, die \u003ccode>0\u003c/code> als Tile liefert.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "map2d",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-23"
-      }
-    },
-    {
-      "id": "DOC-068",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Das TSDoc von TileSprites nennt noTileCapacity zweimal",
-      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSprites.ts:9",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. Der Klassenkommentar in den Zeilen 9 bis 15 erklärt die Antwort \u003ccode>noTileCapacity\u003c/code> zweimal mit fast gleichem Wortlaut.",
-      "recommendation": "Die beiden Sätze zu einem zusammenziehen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "map2d",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-23"
-      }
-    },
-    {
       "id": "TEST-045",
       "category": "testing",
       "severity": "low",
@@ -2653,27 +2166,6 @@
       "effort": "S"
     },
     {
-      "id": "READ-022",
-      "category": "readability",
-      "severity": "info",
-      "title": "Zwei map2d-Tests bauen die Kamera von makeCamera inline nach",
-      "location": "packages/twopoint5d-testing/test/map2d-tile-upload.test.js:24",
-      "locations": [
-        "packages/twopoint5d-testing/test/map2d-visibility-helpers.test.js:49",
-        "packages/twopoint5d-testing/test/map2d-placement.test.js"
-      ],
-      "description": "Beide Dateien bauen inline dieselbe Kamera wie `makeCamera` in `map2d-placement.test.js`. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "`makeCamera` in `test/helpers/fixtures.js` ziehen und in allen drei Dateien verwenden.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "code",
-      "status": "new",
-      "package": "twopoint5d-testing",
-      "effort": "S"
-    },
-    {
       "id": "TEST-047",
       "category": "testing",
       "domain": "harness",
@@ -2690,44 +2182,21 @@
       }
     },
     {
-      "id": "PERF-032",
-      "category": "performance",
+      "id": "DOC-070",
+      "category": "dx",
       "domain": "code",
-      "severity": "low",
-      "title": "TileSpritesMaterial.dispose() baut vor dem Löschen noch einen colorNode",
-      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesMaterial.ts:105-112",
+      "severity": "info",
+      "title": "Zwei neu umbrochene Absätze lassen ein einzelnes Wort auf einer eigenen Zeile stehen",
+      "location": "AGENTS.md:45",
       "locations": [
-        "packages/twopoint5d/src/map2d/TileSprites/TileSpritesMaterial.ts:83"
+        "apps/lookbook/README.md:56"
       ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. \u003ccode>dispose()\u003c/code> leert \u003ccode>colorMap\u003c/code>, solange der Farb-Effekt (\u003ccode>:83\u003c/code>) noch lebt. Der Effekt läuft deshalb erneut und baut direkt vor \u003ccode>SignalGroup.delete()\u003c/code> einen neuen \u003ccode>colorNode\u003c/code>, auf einem Material, das gerade weggeworfen wird. Die Sprite-Materialien zerstören ihre Effekt-Handles am Anfang von \u003ccode>dispose()\u003c/code>. Für die Korrektheit ist das harmlos, aber es ist vergeudete Arbeit bei jedem Teardown.",
-      "recommendation": "Wie in \u003ccode>TexturedSpritesMaterial\u003c/code>: das Handle aus \u003ccode>createEffect()\u003c/code> behalten, es am Anfang von \u003ccode>dispose()\u003c/code> zerstören, danach die Signale leeren. Dazu ein Spec, der prüft, dass \u003ccode>dispose()\u003c/code> weder \u003ccode>colorNode\u003c/code> noch \u003ccode>version\u003c/code> ändert.",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Nach dem Umbruch langer Zeilen steht in \u003ccode>AGENTS.md\u003c/code> das Wort \u003ccode>whether\u003c/code> und in \u003ccode>apps/lookbook/README.md\u003c/code> \u003ccode>lookbook and\u003c/code> allein auf einer Zeile vor der unveränderten Nachbarzeile. Reine Optik, Lint ist grün.",
+      "recommendation": "Beide Absätze durchgehend bei rund 90 Zeichen neu umbrechen.",
       "effort": "S",
       "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d",
       "origin": {
-        "kind": "discovered",
-        "run": "2026-09-25"
-      }
-    },
-    {
-      "id": "TYPE-024",
-      "category": "types",
-      "domain": "code",
-      "severity": "low",
-      "title": "TileSpritesGeometry deklariert basePool und instancedPool ohne readonly",
-      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesGeometry.ts:7-10",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/InstancedVertexObjectGeometry.ts:19-20"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Der Interface-Merge deklariert beide Pool-Felder ohne das \u003ccode>readonly\u003c/code>, das \u003ccode>InstancedVertexObjectGeometry\u003c/code> trägt. Damit sind Schreibzugriffe erlaubt, die die Geometrie nicht mitbekommt. \u003ccode>TexturedSpritesGeometry\u003c/code> und \u003ccode>AnimatedSpritesGeometry\u003c/code> deklarieren ihre Pool-Felder \u003ccode>readonly\u003c/code>.",
-      "recommendation": "Beide Felder \u003ccode>readonly\u003c/code> deklarieren, mit einem Typtest (\u003ccode>@ts-expect-error\u003c/code> auf die Zuweisung) wie in \u003ccode>TexturedSpritesGeometry.spec.ts\u003c/code>.",
-      "effort": "S",
-      "status": "new",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d",
-      "origin": {
-        "kind": "discovered",
+        "kind": "induced",
         "run": "2026-09-25"
       }
     }
@@ -2757,7 +2226,8 @@
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus einem Einzel-Fix auf `main` ohne Remediation-Plan: 1 Commit (`3d8bb8b1`). BUG-124 (werfender `OnDisplayStart`-Listener: alle Listener hören das Event, danach User-Pause wie `stop()`, `start()` rejected) und ASYNC-007 (bei verborgener Seite wartet die WebGPU-Freigabe bis zur Sichtbarkeit und zwei Frames) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 1 induzierter kleiner Befund ging als neues Finding ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -2896,12 +2366,12 @@
     },
     {
       "date": "2026-09-25",
-      "score": 71,
+      "score": 73,
       "source": "remediation",
       "scoreModel": 2,
       "domains": {
-        "code": 74,
-        "harness": 68
+        "code": 77,
+        "harness": 70
       },
       "coverage": 1
     }
@@ -2975,6 +2445,16 @@
       "inducedFixed": 4,
       "inducedOpen": 0,
       "discovered": 6,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-25",
+      "source": "remediation",
+      "ref": "2026-09-25",
+      "fixed": 34,
+      "inducedFixed": 14,
+      "inducedOpen": 1,
+      "discovered": 3,
       "attribution": "reviewed"
     }
   ],
