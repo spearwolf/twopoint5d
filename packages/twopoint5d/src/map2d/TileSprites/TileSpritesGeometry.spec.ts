@@ -6,7 +6,8 @@ import {TileSpritesGeometry} from './TileSpritesGeometry.js';
 
 describe('TileSpritesGeometry', () => {
   // basePool is read without `!` or `?.` on purpose: the line compiles only while the field is
-  // typed without `undefined`, which the geometry promises by building the pool itself
+  // typed without `undefined`, which the geometry promises by building the pool itself. That is
+  // checked by `pnpm typecheck`; Vitest strips the types and runs the line either way.
   test('builds an instanced pool of the capacity it is given and a base pool holding its one base sprite', () => {
     const geometry = new TileSpritesGeometry(4);
 

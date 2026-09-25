@@ -82,6 +82,18 @@ function makeCameraWithTheFarPlaneOnTheGround(): PerspectiveCamera {
   return camera;
 }
 
+function makeCameraWithTheNearPlaneOnTheGround(): PerspectiveCamera {
+  // Looks down at 45° like the camera above, from further away and with its near plane at 480:
+  // the lower edge of the view meets the ground at a depth of ≈ 359, so the near plane cuts off
+  // the ground in front of the camera, and the tiles it sees depend on where that plane lies.
+  const camera = new PerspectiveCamera(60, 1, 480, 1000);
+  camera.position.set(0, 400, 400);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
 function makeOrthoCameraLookingDown(): OrthographicCamera {
   const camera = new OrthographicCamera(-100, 100, 100, -100, 0.1, 500);
   camera.position.set(0, 100, 0);
@@ -725,6 +737,7 @@ describe('CameraBasedVisibility', () => {
 
     const cameras = [
       ['perspective', makeCameraWithTheFarPlaneOnTheGround],
+      ['perspective, near plane on the ground', makeCameraWithTheNearPlaneOnTheGround],
       ['orthographic', makeOrthoCameraLookingDown],
     ] as const;
 

@@ -174,9 +174,12 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
   /**
    * Splits a leaf into four quadrants, recursively, as long as a node holds more than
-   * `maxChunkNodes` chunks and an axis separates them. Chunks that cross an axis stay at the node
-   * of that axis; a chunk that touches an axis without crossing it — one of width or height 0
-   * whose edges lie on it — belongs to the west or north side.
+   * `maxChunkNodes` chunks and an axis separates them. A chunk with `right <= originX` goes west,
+   * otherwise one with `left >= originX` goes east, and any other chunk crosses the axis and stays
+   * at the node of that axis; north (`bottom <= originY`) and south (`top >= originY`) are chosen
+   * the same way. West and north come first, so a chunk of width or height 0 whose edges lie on an
+   * axis goes west or north, and so does a chunk of negative width or height whose right or bottom
+   * edge lies on the axis or before it.
    *
    * On a node that is already split, the call is passed on to its children, so the leaves that
    * `appendChunk()` has filled since are split too.

@@ -16,7 +16,8 @@ repo-root `README.md`.
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
 - `pages/demos/<name>.astro` — 17 demo pages, all built on `VanillaDemo.astro`
 - `pages/demos/_<name>.json` — 17 metadata files, one per demo page
-- `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos share `map2d/`
+- `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
+  share `map2d/`
 - `components/` — the lookbook UI: the card grid, the tag cloud, search
 - `layouts/`
 - `data/tag-categories.json` — the ordering of the tag cloud
@@ -39,13 +40,20 @@ in `tsconfig.json`. All 17 demo pages import through them.
    required — `url` must match the page's route, since the card links to it.
    `description`, `tags` and `previewImage` are optional, per the `IDemo` interface in the
    same file; without `previewImage`, `Card.astro` falls back to a default image, as in
-   `_stage-nested-pipelines.json` and `_stage-postprocessing.json`. The dialog of a demo page links to the page's own source on GitHub; `DemoNavBar.astro` builds that link from the route, so the JSON carries none. A tag that starts with a capital letter names an export of `@spearwolf/twopoint5d`. `scripts/lookbook/demoMetadata.test.mjs` (`pnpm test:scripts`) checks the tags, the tags of `data/tag-categories.json` and that `url` is the page's route; a class from three.js needs an entry with its reason there. `_textured-sprites.json` shows the full pattern.
+   `_stage-nested-pipelines.json` and `_stage-postprocessing.json`. The dialog of a demo
+   page links to the page's own source on GitHub; `DemoNavBar.astro` builds that link from
+   the route, so the JSON carries none. A tag that starts with a capital letter names an
+   export of `@spearwolf/twopoint5d`. `scripts/lookbook/demoMetadata.test.mjs`
+   (`pnpm test:scripts`) checks the tags, the tags of `data/tag-categories.json` and that
+   `url` is the page's route; a class from three.js needs an entry with its reason there.
+   `_textured-sprites.json` shows the full pattern.
 4. Drop the preview image into `public/images/demo-preview/`, referenced by its bare file
    name — `src/demos/utils/demoPreviewImageUrl.ts` prepends the path.
 
 ## Checks
 
-`pnpm nx typecheck lookbook` runs `astro check` over the `.astro` and `.ts` files of the lookbook and
+`pnpm nx typecheck lookbook` runs `astro check` over the `.astro` and `.ts` files of the
+lookbook and
 is part of the repo-wide `pnpm typecheck`. `pnpm nx build lookbook` builds the static site.
 The library is pulled in as `workspace:*`, so a change in `packages/twopoint5d` shows up here
 as soon as it's built.

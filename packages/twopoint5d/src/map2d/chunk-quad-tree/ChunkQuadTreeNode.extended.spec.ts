@@ -2,7 +2,7 @@ import {describe, expect, it, test} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
 import type {IDataChunk2D} from './IDataChunk2D.js';
-import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
+import {ChunkQuadTreeNode, Quadrant} from './ChunkQuadTreeNode.js';
 import {StringDataChunk2D} from './StringDataChunk2D.js';
 
 const sortedNames = (chunks: StringDataChunk2D[]) => chunks.map((c) => c.toString()).sort();
@@ -414,6 +414,25 @@ describe('ChunkQuadTreeNode (extended)', () => {
       expect(sortedNames(subtreeOf(root.nodes.northWest!))).toContain('W');
       expect(root.nodes.northEast).toBeNull();
     });
+
+    it.each([
+      ['west', {x: -5, y: 0, width: 3, height: 0}, Quadrant.NorthWest, Quadrant.SouthWest],
+      ['east', {x: 5, y: 0, width: 3, height: 0}, Quadrant.NorthEast, Quadrant.SouthEast],
+    ] as const)(
+      'appendChunk() puts a chunk of height 0 on the horizontal axis north of it: %s of the vertical axis',
+      (_side, rect, north, south) => {
+        // a tree built from chunks with an extent only, so that the test rests on appendChunk()
+        // alone and not on where subdivide() puts a chunk without extent
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>(Object.values(grid4x4()));
+        root.subdivide();
+        expect([root.originX, root.originY]).toEqual([0, 0]);
+
+        root.appendChunk(new StringDataChunk2D({...rect, data: 'Y'}));
+
+        expect(sortedNames(subtreeOf(root.nodes[north]!))).toContain('Y');
+        expect(sortedNames(subtreeOf(root.nodes[south]!))).not.toContain('Y');
+      },
+    );
   });
 
   describe('an edge that is NaN', () => {

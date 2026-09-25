@@ -16,6 +16,16 @@ export interface IMap2DRenderableArea {
  */
 export interface IMap2DTileDataProvider {
   getTileIdAt(col: number, row: number): number;
+
+  /**
+   * The tile ids of the rectangle of `width` × `height` tiles whose upper left corner is
+   * `(left, top)`, row by row: the id of the tile `(left + i, top + j)` is at index
+   * `j * width + i`, the value that {@link getTileIdAt} gives for that tile.
+   *
+   * @param target - takes the ids; its first `width * height` cells are overwritten, the cells
+   *   behind them stay as they are. A shorter one throws a `RangeError`.
+   * @returns `target`, or a new `Uint32Array` of `width * height` ids without one.
+   */
   getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array;
 }
 

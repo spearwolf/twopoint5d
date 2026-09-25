@@ -281,7 +281,11 @@ under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does
 `scripts/lookbook/rainbowLineScript.test.mjs`, which holds
 `apps/lookbook/public/js/` to the script `@spearwolf/astro-rainbow-line` loads at
 runtime — nothing in the repo references that file, so only a spec keeps it from being
-cleaned up. So does `scripts/lookbook/demoMetadata.test.mjs`, which holds the demo metadata of the lookbook to the library: every tag that starts with a capital letter names an export of `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from the sources, so the spec needs no build. Two specs start a script itself, as a child process:
+cleaned up. So does `scripts/lookbook/demoMetadata.test.mjs`, which holds the demo
+metadata of the lookbook to the library: every tag that starts with a capital letter names
+an export of `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from
+the sources, so the spec needs no build. Two specs start a script itself, as a child
+process:
 `makePackageJson.mjs` in a throwaway project directory and
 `checkPeerDependenciesOnly.mjs` against a throwaway manifest, because their exit codes,
 their messages and the manifest the first one does not write are wiring that no helper

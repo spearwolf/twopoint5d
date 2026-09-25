@@ -40,7 +40,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server and the docs' code block check (`scripts/**/*.test.mjs`), plus specs that
   start `makePackageJson.mjs` and `checkPeerDependenciesOnly.mjs` as child processes, one
-  that checks the lookbook's vendored `rainbow-line` script, one that holds the tags and routes of the lookbook's demo metadata to the library's exports, and one that asks Nx whether
+  that checks the lookbook's vendored `rainbow-line` script, one that holds the tags and
+  routes of the lookbook's demo metadata to the library's exports, and one that asks Nx
+  whether
   every tracked Markdown file is an input of the docs' type check; no Nx project owns
   them, so `pnpm test` does not run them
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
