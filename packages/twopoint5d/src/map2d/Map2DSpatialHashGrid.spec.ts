@@ -11,7 +11,21 @@ describe('Map2DSpatialHashGrid', () => {
 
   test('without arguments it is a 1x1 grid', () => {
     const grid = new Map2DSpatialHashGrid();
-    expect(grid.getTile(0, 0)).toBeUndefined();
+    const r: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 2, 2)};
+    grid.add(r);
+
+    // the right and the bottom edge of the aabb do not belong to it
+    for (const [x, y] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ] as const) {
+      expect(grid.getTile(x, y)?.has(r), `cell ${x},${y}`).toBe(true);
+    }
+    expect(grid.getTile(2, 0)).toBeUndefined();
+    expect(grid.getTile(0, 2)).toBeUndefined();
+    expect(grid.getTile(2, 2)).toBeUndefined();
   });
 
   test('a tile size that cannot be divided by is refused', () => {
@@ -118,5 +132,47 @@ describe('Map2DSpatialHashGrid', () => {
 
     expect(tileset).toBe(out);
     expect(out.size).toBe(0);
+  });
+
+  test('a renderable of zero size on a cell border lies in the cell of its corner', () => {
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const p: IMap2DRenderableArea = {aabb: new AABB2(100, 100, 0, 0)};
+    const l: IMap2DRenderableArea = {aabb: new AABB2(100, 0, 0, 50)};
+    grid.add(p, l);
+
+    expect(grid.getTile(1, 1)?.has(p)).toBe(true);
+    expect(grid.findWithin(new AABB2(50, 50, 100, 100))?.has(p)).toBe(true);
+    expect(grid.getTile(1, 0)?.has(l)).toBe(true);
+  });
+
+  test('remove() takes a renderable out of the cells it was added to after its aabb changed', () => {
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(10, 20, 150, 150)};
+    grid.add(a);
+
+    a.aabb.set(310, 310, 10, 10);
+    grid.remove(a);
+
+    expect(grid.getTiles(-1, -1, 6, 6)).toBeUndefined();
+  });
+
+  test('adding a renderable again moves it to the cells of its aabb now', () => {
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(10, 10, 10, 10)};
+    grid.add(a);
+
+    a.aabb.set(210, 210, 10, 10);
+    grid.add(a);
+
+    expect(grid.getTile(0, 0)).toBeUndefined();
+    expect(grid.getTile(2, 2)?.has(a)).toBe(true);
+  });
+
+  test('findWithin() with an aabb of zero size looks into the cell its corner lies in', () => {
+    const grid = new Map2DSpatialHashGrid(100, 100);
+    const p: IMap2DRenderableArea = {aabb: new AABB2(100, 100, 0, 0)};
+    grid.add(p);
+
+    expect(grid.findWithin(new AABB2(100, 100, 0, 0))?.has(p)).toBe(true);
   });
 });

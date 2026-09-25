@@ -6,6 +6,10 @@ import {tileKey} from './tileKeys.js';
 
 export type Map2DSpatialHashGridKeyType = string;
 
+/**
+ * A spatial index over a grid of tiles: every renderable lies in the cells its `aabb` reaches
+ * into when it is added, in one cell at the very least.
+ */
 export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   /**
    * The bucket key of the tile at these coordinates: the shared tile key, the same string the
@@ -17,6 +21,10 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   #tiles: Map<Map2DSpatialHashGridKeyType, Set<Renderable>>;
+
+  // The cells `add()` put a renderable into, so `remove()` finds them whatever the `aabb` of the
+  // renderable says by then.
+  readonly #cellKeys = new Map<Renderable, Map2DSpatialHashGridKeyType[]>();
   #tileCoordsUtil: Map2DTileCoordsUtil;
 
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
@@ -29,10 +37,19 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     this.#tileCoordsUtil = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
+  /**
+   * Puts the renderables into the cells their `aabb` reaches into right now — at least the cell
+   * the upper left corner lies in.
+   *
+   * The grid remembers those cells. Changing an `aabb` afterwards leaves the renderable where it
+   * lies, until it is added again (it then moves to the cells of its current `aabb`) or removed.
+   */
   add(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
     for (const renderable of renderables) {
-      const {left, top, width, height} = renderable.aabb;
-      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
+      this.#takeOut(renderable);
+
+      const [tileLeft, tileTop, tileColumns, tileRows] = this.#cellsOf(renderable.aabb);
+      const keys: Map2DSpatialHashGridKeyType[] = [];
       for (let y = 0; y < tileRows; y++) {
         for (let x = 0; x < tileColumns; x++) {
           const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
@@ -42,34 +59,53 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
             this.#tiles.set(key, tileSet);
           }
           tileSet.add(renderable);
+          keys.push(key);
         }
       }
-    }
-    return this;
-  }
-
-  remove(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
-    for (const renderable of renderables) {
-      const {left, top, width, height} = renderable.aabb;
-      const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
-      for (let y = 0; y < tileRows; y++) {
-        for (let x = 0; x < tileColumns; x++) {
-          const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
-          const tileSet = this.#tiles.get(key);
-          if (tileSet) {
-            tileSet.delete(renderable);
-            if (tileSet.size === 0) {
-              this.#tiles.delete(key);
-            }
-          }
-        }
-      }
+      this.#cellKeys.set(renderable, keys);
     }
     return this;
   }
 
   /**
-   * The renderables in the cells `aabb` reaches into. Without `out` the answer is a new set, or
+   * Takes the renderables out of the cells {@link add} put them into, whatever their `aabb` says
+   * by now. A renderable the grid does not hold is passed over.
+   */
+  remove(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
+    for (const renderable of renderables) {
+      this.#takeOut(renderable);
+    }
+    return this;
+  }
+
+  #takeOut(renderable: Renderable): void {
+    const keys = this.#cellKeys.get(renderable);
+    if (keys == null) return;
+
+    for (const key of keys) {
+      const tileSet = this.#tiles.get(key);
+      if (tileSet) {
+        tileSet.delete(renderable);
+        if (tileSet.size === 0) {
+          this.#tiles.delete(key);
+        }
+      }
+    }
+    this.#cellKeys.delete(renderable);
+  }
+
+  // An aabb reaches into the cell its upper left corner lies in at the very least — also with a
+  // width or height of 0 on a cell border, where the plain computation ends up with 0 columns
+  // or rows.
+  #cellsOf(aabb: AABB2): [tileLeft: number, tileTop: number, columns: number, rows: number] {
+    const {left, top, width, height} = aabb;
+    const [tileLeft, tileTop, columns, rows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
+    return [tileLeft, tileTop, Math.max(1, columns), Math.max(1, rows)];
+  }
+
+  /**
+   * The renderables in the cells `aabb` reaches into — the cell its upper left corner lies in at
+   * the very least, also with a width or height of 0. Without `out` the answer is a new set, or
    * `undefined` when nothing lies in those cells.
    *
    * With `out` that set is emptied, filled and handed back — empty rather than `undefined` when
@@ -78,8 +114,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   findWithin(aabb: AABB2): Set<Renderable> | undefined;
   findWithin(aabb: AABB2, out: Set<Renderable>): Set<Renderable>;
   findWithin(aabb: AABB2, out?: Set<Renderable>): Set<Renderable> | undefined {
-    const {left, top, width, height} = aabb;
-    const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
+    const [tileLeft, tileTop, tileColumns, tileRows] = this.#cellsOf(aabb);
     return out
       ? this.getTiles(tileLeft, tileTop, tileColumns, tileRows, out)
       : this.getTiles(tileLeft, tileTop, tileColumns, tileRows);

@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `IProjection#getZoom()` and both implementations, `ParallaxProjection` and `OrthographicProjection`, name their parameter `distanceToCamera` — it carries the distance a plane sits from the camera, while the `distanceToProjectionPlane` of the view specs carries the distance from the camera to the projection plane. Callers are unaffected, JavaScript having no named arguments; a type that writes the signature down sees the new name
 - `new FixedFrameLoop(display)` throws when the display handed to it has been disposed, with a message naming the class and the state. A loop over such a display subscribes to an emitter that never fires again: it reports `isDisposed === false`, emits neither `OnTick` nor `OnRender` and never disposes itself, because the `OnDisplayDispose` it waits for has already gone out. `Display#isDisposed` is the question to ask wherever a loop is built from a display that belongs to someone else
 - change a `tileWidth` or `tileHeight` that is not a finite number above 0 into a `RangeError` naming class, property and value, thrown where the value is set: the constructors and setters of `Map2DTileCoordsUtil`, `Map2DTileStreamer` and `Map2DSpatialHashGrid`, and through the streamer also `Map2D#tileWidth` and `#tileHeight`. Every mapping from 2D coordinates to tile coordinates divides by these two, and a grid of 0 carried `±Infinity` and `NaN` tile indices into the visibilitors, where the map went on rendering nothing without a word. The default grid of `Map2DTileStreamer` and `Map2DSpatialHashGrid` is 1x1, the one `Map2DTileCoordsUtil` has always had
+- change a `width` or `height` of `RectangularVisibilityArea` that is neither 0 nor a finite number above 0 into a `RangeError` naming class, property and value, thrown by the constructor and the setters; 0 stays the switch that turns the area off
 - `Map2DTileRenderer#addTile()` writes on the tile it already holds for a coordinate, through `IMapTileFactory#updateTile()`, instead of replacing it with a new one. The tile a renderer holds is a slot it owes the factory, and only `removeTile()`, `clearTiles()` and `dispose()` give one back
 - `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what they were, and releases the node built for the pair before it — and the render target behind that node — on the next `asPassNode()` after either of them has changed, or in `dispose()` if none comes. The node belongs to the stage and goes with its `dispose()`; a stage added to two `StageRenderer`s gives both the very same node, one that renders its scene once per frame and whose result both of them read
 - a `resize()` whose width or height is not a finite number above 0 leaves the view, the camera and `needsUpdate` as they are — the rule the projections already judge a container by, now also in `Stage2D` and in the pass-node composition of `StageRenderer`. A `needsUpdate` that was set stays set, so the next `updateProjection()` for a container with an area still carries it out
@@ -353,6 +354,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Map2DTileStreamer#removeTileRenderer()`, and with it `Map2D#removeTileRenderer()`: the renderer goes off empty, through `clearTiles()`. A renderer taken off and added again held tiles that had left the view in the meantime and occupied pool slots with them, and it went on drawing the tiles of a grid that had changed since with their old size and texture coordinates
 - fix `Map2DTileRenderer#removeTile()` and `#reuseTile()` for a tile factory whose tiles can be falsy, such as the numeric handle `0`: `removeTile()` gives the tile back through `destroyTile()` instead of losing its slot, and `reuseTile()` keeps to the `tilesChanged` rule
 - fix `CameraBasedVisibility#frustumBoxScale`: it scales the box a tile is tested with by the value in tile width and tile height as it already did in `depth` — each side moves out by `(scale - 1) / 2` of the tile size. A side used to move out by `(scale - 1)` of it, so the default 1.1 tested a box 1.2 times the tile; the tiles at the edge of the view are dropped a little earlier
+- fix `Map2DSpatialHashGrid`: a renderable of width or height 0 on a cell border lies in the cell of its upper left corner, where `findWithin()` finds it; `remove()` takes a renderable out of every cell `add()` put it into, also after its `aabb` changed; `add()` of a renderable the grid holds moves it to the cells of its current `aabb`; `findWithin()` with an `aabb` of width or height 0 looks into the cell its corner lies in
 
 ### Migration Guide
 
@@ -613,6 +615,24 @@ map.tileWidth = 256; // the size the map is meant to have
 map.tileHeight = 256;
 
 map.tileWidth = 0; // → RangeError: [Map2DTileStreamer] tileWidth must be a finite number above 0, got 0
+```
+
+#### The size of a `RectangularVisibilityArea` is checked
+
+The `width` and `height` of a `RectangularVisibilityArea` have to be 0 or a finite number above 0. 0 stays valid, the switch that turns the area off; a negative, `NaN` or infinite value throws a `RangeError` from the constructor and the setters, and the size stays what it was.
+
+**Before**
+
+```ts
+area.width = viewportWidth - margin; // negative in a narrow viewport, and the area fails later on
+```
+
+**After**
+
+```ts
+area.width = Math.max(0, viewportWidth - margin); // 0 switches the area off
+
+area.width = -1; // → RangeError: [RectangularVisibilityArea] width must be 0 or a finite number above 0, got -1
 ```
 
 #### `Map2DTileStreamer#update()` places the renderer nodes in the local space of its node

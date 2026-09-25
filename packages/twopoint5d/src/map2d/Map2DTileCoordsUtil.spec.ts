@@ -165,5 +165,18 @@ describe('Map2DTileCoordsUtil', () => {
         rows: 2,
       });
     });
+
+    test('rows counts along y, columns along x, and top and left leave the offset out', () => {
+      expect(new Map2DTileCoordsUtil(16, 16, 20, 20).computeTilesWithinCoords(52, 36, 48, 16)).toMatchObject({
+        tileLeft: 2,
+        tileTop: 1,
+        left: 32,
+        top: 16,
+        width: 48,
+        height: 16,
+        columns: 3,
+        rows: 1,
+      });
+    });
   });
 });

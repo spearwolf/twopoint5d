@@ -237,8 +237,15 @@ export interface IMap2DVisibilitorHelpers {
    * set are geometry and material on the gpu, and they hang on nothing but this instance —
    * whoever drops it without this call leaves them behind.
    *
-   * It may be called any number of times. Afterwards the set stays down: `show`, {@link add},
-   * {@link remove} and {@link update} do nothing.
+   * It may be called any number of times. Afterwards the set stays down: a write to
+   * `show`, {@link add}, {@link remove} and {@link update} build nothing and put nothing
+   * into a scene. What `show` answers from then on is up to the implementation: one that
+   * builds no nodes has nothing to keep down, fulfils all of this with an empty body, and
+   * may let `show` answer what the caller writes.
+   *
+   * The interface does not say whether a set has been disposed. After `dispose()` every
+   * member is a silent no-op, so a caller that holds a set has nothing to branch on; the
+   * implementations in this package carry an `isDisposed` of their own.
    *
    * Whatever was handed in — the scene of {@link add} and the visibilitor the set reads — is
    * the caller's and is left as it is.

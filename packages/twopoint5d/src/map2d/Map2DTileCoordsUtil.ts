@@ -5,22 +5,24 @@ import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
  */
 export interface TilesWithinCoords {
   /**
-   * the top coordinate of the area in _world space_
+   * the top edge of the area relative to the origin of the tile grid, `tileTop * tileHeight`,
+   * without the `yOffset` of the grid
    */
   top: number;
 
   /**
-   * the left coordinate of the area in _world space_
+   * the left edge of the area relative to the origin of the tile grid, `tileLeft * tileWidth`,
+   * without the `xOffset` of the grid
    */
   left: number;
 
   /**
-   * the height of the area in _world space_
+   * the height of the area in _world space_, `rows * tileHeight`
    */
   height: number;
 
   /**
-   * the width of the area in _world space_
+   * the width of the area in _world space_, `columns * tileWidth`
    */
   width: number;
 
@@ -45,12 +47,12 @@ export interface TilesWithinCoords {
   tileWidth: number;
 
   /**
-   * the number of tiles in a row
+   * the number of rows the area spans — tiles along the y-axis
    */
   rows: number;
 
   /**
-   * the number of tiles in a column
+   * the number of columns the area spans — tiles along the x-axis
    */
   columns: number;
 }
@@ -62,8 +64,8 @@ export interface TilesWithinCoords {
  * to be in the upper left corner (with the y-axis pointing down).
  */
 export class Map2DTileCoordsUtil {
-  #tileWidth!: number;
-  #tileHeight!: number;
+  #tileWidth = 1;
+  #tileHeight = 1;
 
   /**
    * The width of a tile in _world space_: a finite number above 0, because every mapping from

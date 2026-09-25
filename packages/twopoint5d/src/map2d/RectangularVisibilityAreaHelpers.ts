@@ -32,7 +32,8 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
   /**
    * Whether the helper node is built at all. Switching it off takes the current node down and
-   * releases it; switching it on builds it again, as soon as a scene is there to hold it.
+   * releases it. Switching it on builds the node right away when {@link add} has named a scene;
+   * without one, the first {@link update} after `add()` builds it.
    *
    * On a disposed helper this answers `false` and a write to it does nothing.
    */

@@ -169,4 +169,38 @@ describe('RectangularVisibilityArea', () => {
       expect(ids(second.tiles), 'the new grid is covered once').toEqual([...new Set(ids(second.tiles))]);
     });
   });
+
+  describe('width and height', () => {
+    test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a width of %s', (v) => {
+      expect(() => new RectangularVisibilityArea(v, 240)).toThrow(RangeError);
+    });
+
+    test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a height of %s', (v) => {
+      expect(() => new RectangularVisibilityArea(320, v)).toThrow(RangeError);
+    });
+
+    test('a refused width leaves the width as it was', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      expect(() => (area.width = -1)).toThrow(RangeError);
+      expect(area.width).toBe(320);
+    });
+
+    test('a refused height leaves the height as it was', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      expect(() => (area.height = -1)).toThrow(RangeError);
+      expect(area.height).toBe(240);
+    });
+
+    test('0 switches the area off and a size above 0 switches it on again', () => {
+      const tileCoords = new Map2DTileCoordsUtil(100, 100);
+      const matrixWorld = new Matrix4();
+      const area = new RectangularVisibilityArea(320, 240);
+
+      expect(() => (area.width = 0)).not.toThrow();
+      expect(area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)).toBeUndefined();
+
+      area.width = 320;
+      expect(area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)).toBeDefined();
+    });
+  });
 });

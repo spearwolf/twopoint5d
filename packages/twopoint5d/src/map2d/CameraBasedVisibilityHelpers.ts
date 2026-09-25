@@ -98,7 +98,8 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
   /**
    * Whether the helper nodes are built at all. Switching it off takes the current set down and
-   * releases every node in it; switching it on builds the set again.
+   * releases every node in it. Switching it on builds the set right away when {@link add} has
+   * named a scene; without one, the first {@link update} after `add()` builds it.
    *
    * On a disposed set this answers `false` and a write to it does nothing.
    */

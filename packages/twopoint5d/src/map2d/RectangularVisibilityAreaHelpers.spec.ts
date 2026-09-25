@@ -1,4 +1,4 @@
-import type {BufferGeometry, Material} from 'three/webgpu';
+import type {Box3Helper, BufferGeometry, Material} from 'three/webgpu';
 import {Object3D} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
@@ -76,7 +76,7 @@ describe('RectangularVisibilityAreaHelpers', () => {
     helpers.add(scene);
     helpers.show = true;
 
-    const node = scene.children[0] as unknown as {box: {max: {x: number}}; geometry: unknown};
+    const node = scene.children[0] as Box3Helper;
     const geometry = node.geometry;
 
     area.width = 800;
@@ -84,7 +84,7 @@ describe('RectangularVisibilityAreaHelpers', () => {
 
     expect(scene.children, 'no second node came up beside it').toHaveLength(1);
     expect(scene.children[0], 'the node that stands is the one that gets written').toBe(node);
-    expect((scene.children[0] as unknown as {geometry: unknown}).geometry, 'and it keeps its geometry').toBe(geometry);
+    expect((scene.children[0] as Box3Helper).geometry, 'and it keeps its geometry').toBe(geometry);
     expect(node.box.max.x, 'the box follows the area').toBe(400);
   });
 

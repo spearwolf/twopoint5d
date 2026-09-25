@@ -1,10 +1,18 @@
 import type {Matrix4} from 'three/webgpu';
 import {Vector2, Vector3} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
+
+// 0 is the off switch of an area, so it is as valid as a finite number above 0
+function assertAreaSize(value: number, name: 'width' | 'height'): void {
+  if (value !== 0 && !isPositiveFinite(value)) {
+    throw new RangeError(`[RectangularVisibilityArea] ${name} must be 0 or a finite number above 0, got ${String(value)}`);
+  }
+}
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;
@@ -53,22 +61,36 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     this.height = height;
   }
 
+  /**
+   * The width of the visible area in _world space_, around the center the streamer hands over.
+   * `0` switches the area off: {@link computeVisibleTiles} answers `undefined` while a side is 0.
+   * Any other value must be a finite number above 0, or a `RangeError` is thrown and the width
+   * stays what it was.
+   */
   get width(): number {
     return this.#width;
   }
 
   set width(width: number) {
+    assertAreaSize(width, 'width');
     if (this.#width !== width) {
       this.#width = width;
       this.needsUpdate = true;
     }
   }
 
+  /**
+   * The height of the visible area in _world space_, around the center the streamer hands over.
+   * `0` switches the area off: {@link computeVisibleTiles} answers `undefined` while a side is 0.
+   * Any other value must be a finite number above 0, or a `RangeError` is thrown and the height
+   * stays what it was.
+   */
   get height(): number {
     return this.#height;
   }
 
   set height(height: number) {
+    assertAreaSize(height, 'height');
     if (this.#height !== height) {
       this.#height = height;
       this.needsUpdate = true;
