@@ -115,14 +115,21 @@ describe('TexturedSpritesGeometry', () => {
     expectTypeOf(geometry.basePool).toEqualTypeOf<TexturedSpritesBasePool>();
     expect(geometry.basePool).toBeDefined();
 
-    // never called: it only has to compile, or not
+    geometry.dispose();
+  });
+
+  test('declares its pools read-only (a type-level check)', () => {
+    const geometry = new TexturedSpritesGeometry();
+
+    // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as a field takes a
+    // write; Vitest checks nothing here. The function is never called.
     const assignPools = (basePool: TexturedSpritesBasePool, instancedPool: TexturedSpritesGeometry['instancedPool']) => {
       // @ts-expect-error the pools are built by the constructor and are read-only
       geometry.basePool = basePool;
       // @ts-expect-error the pools are built by the constructor and are read-only
       geometry.instancedPool = instancedPool;
     };
-    expect(assignPools).toBeInstanceOf(Function);
+    void assignPools;
 
     geometry.dispose();
   });

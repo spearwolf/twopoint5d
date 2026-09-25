@@ -82,6 +82,8 @@ export const TexturedSpriteDescriptor: VertexObjectDescription = {
 
 export type TAttributeNodeQuadSize = Node<'vec2'>;
 export type TAttributeNodeTexCoords = Node<'vec4'>;
+/** The position of a vertex of the unit quad a sprite is drawn from, before scale, rotation and instance position. */
+export type TAttributeNodeVertexPosition = Node<'vec3'>;
 export type TAttributeNodeInstancePosition = Node<'vec3'>;
 export type TAttributeNodeRotation = Node<'float'>;
 export type TAttributeNodeColor = Node<'vec4'>;

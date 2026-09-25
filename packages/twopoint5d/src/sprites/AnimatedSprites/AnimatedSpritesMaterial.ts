@@ -4,7 +4,15 @@ import {type Texture} from 'three/webgpu';
 import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '../TexturedSprites/TexturedSpritesMaterial.js';
 import {texCoordsFromIndex} from '../node-utils.js';
 
+/**
+ * The options of an {@link AnimatedSpritesMaterial}: those of a
+ * {@link TexturedSpritesMaterialParameters} plus the animation lookup and its start time. Every
+ * three.js material parameter among them reaches the material through `setValues()`, and
+ * without an `alphaTest` or `alphaTestNode` the material drops every texel with an alpha of
+ * `0.001` or less.
+ */
 export interface AnimatedSpritesMaterialParameters extends TexturedSpritesMaterialParameters {
+  /** The animation lookup texture. It stays the caller's; {@link AnimatedSpritesMaterial.dispose} does not release it. */
   animsMap?: Texture;
   /** The animation time the material starts at, in seconds. Default is `0`. */
   time?: number;

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
 - add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
+- add the `TAttributeNodeVertexPosition` type, `Node<'vec3'>`, for the vertex position of the unit quad a sprite is drawn from: `TexturedSpritesMaterial#vertexPositionNode`, and with it that of `AnimatedSpritesMaterial`, is typed by it, beside `TAttributeNodeInstancePosition` for the position of the sprite
 - export 28 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
 - add `Display#isDisposed`: `true` once `dispose()` has run, so a caller holding a display it did not create has a question it can ask
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
@@ -1539,10 +1540,11 @@ if (sprites.material != null) {
 
 `VertexObjects<GeoType>`, `TileSprites<GeoType>` and `AnimatedSprites<GeoType>` take their
 geometry type from the constructor argument. Built without one, `geometry` is typed
-`BufferGeometry | undefined`, not `VOBufferGeometry`/`TileSpritesGeometry`/`AnimatedSpritesGeometry` — reading a member of the more specific geometry needs
-an `instanceof` check, or the mesh built with its geometry in the first place. The same holds for
-`tileSprites.material`, typed `TileSpritesMaterial | MeshBasicMaterial | undefined`, and for
-`animatedSprites.material`, typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined`.
+`BufferGeometry | undefined`, not `VOBufferGeometry`/`TileSpritesGeometry`/`AnimatedSpritesGeometry`
+— reading a member of the more specific geometry needs an `instanceof` check, or the mesh built
+with its geometry in the first place. The same holds for `tileSprites.material`, typed
+`TileSpritesMaterial | MeshBasicMaterial | undefined`, and for `animatedSprites.material`, typed
+`AnimatedSpritesMaterial | MeshBasicMaterial | undefined`.
 
 **Before**
 
@@ -1595,8 +1597,12 @@ if (sprites.material instanceof AnimatedSpritesMaterial) {
 }
 ```
 
+#### `TexturedSpritesGeometry` keeps the pools it was built with
+
 `TexturedSpritesGeometry#basePool` and `#instancedPool` are read-only. The geometry builds its
 attributes on the pools it was constructed with; a pool written there afterwards was never drawn.
+A geometry on other pools is a geometry of its own: build a new `TexturedSpritesGeometry` with
+the `capacity` and the `attributeUsage` it needs.
 
 #### `TexturedSprites#spritePool` and `#texture` can be `undefined`
 

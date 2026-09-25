@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {TextureNode} from 'three/webgpu';
+import type {Node, TextureNode, UniformNode} from 'three/webgpu';
 import {AdditiveBlending, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
@@ -12,6 +12,21 @@ const makeAnimsMap = (): Texture => {
   tex.image = {width: 4, height: 4} as unknown as HTMLImageElement;
   return tex;
 };
+
+// every node the graph below `root` is built from, `root` included
+const nodesOf = (root: Node): Set<Node> => {
+  const nodes = new Set<Node>();
+  root.traverse((node) => nodes.add(node));
+  return nodes;
+};
+
+// the uniforms of the graph below `root` that hold a number — a TextureNode is a uniform too
+const numberUniformsOf = (root: Node) =>
+  [...nodesOf(root)].filter(
+    (node): node is UniformNode<'float', number> =>
+      (node as UniformNode<'float', number>).isUniformNode === true &&
+      typeof (node as UniformNode<'float', number>).value === 'number',
+  );
 
 describe('AnimatedSpritesMaterial', () => {
   const sandbox = createSandbox();
@@ -103,9 +118,12 @@ describe('AnimatedSpritesMaterial', () => {
       const material = new AnimatedSpritesMaterial({colorMap, animsMap});
       const {texCoordsNode, colorNode, version} = material;
 
+      const uniforms = numberUniformsOf(texCoordsNode!);
+      expect(uniforms).toHaveLength(1);
+
       material.time = 3;
 
-      expect(material.time).toBe(3);
+      expect(uniforms[0]!.value).toBe(3);
       expect(material.texCoordsNode).toBe(texCoordsNode);
       expect(material.colorNode).toBe(colorNode);
       expect(material.version).toBe(version);

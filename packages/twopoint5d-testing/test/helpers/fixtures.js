@@ -173,11 +173,6 @@ export function makeMap(visibilitor) {
 
 // --- sprites and pixels ---
 
-// rgbAt() and coveredBox() read the pixels back at a row length of `size * 4` bytes. WebGPU
-// aligns every row it copies out of a texture to 256 bytes, so that holds for a target 64 pixels
-// wide (or a multiple of it) and nothing else: at another width the rows come back padded and
-// both helpers would read the wrong pixels without a word. Keep the targets of these tests at 64.
-
 /**
  * A texture of the given texels, row by row from the first, each an `[r, g, b, a]` of 0 … 255.
  * A `DataTexture` samples with `NearestFilter` and builds no mipmaps, so a texel comes out of the
@@ -208,7 +203,14 @@ export async function renderToPixels(renderer, scene, camera, target) {
   return renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height);
 }
 
-/** The `[r, g, b]` of the pixel at `x`, `y` of a read-back target `size` pixels wide. */
+/**
+ * The `[r, g, b]` of the pixel at `x`, `y` of a read-back target `size` pixels wide.
+ *
+ * The pixels are read at a row length of `size * 4` bytes. WebGPU aligns every row it copies
+ * out of a texture to 256 bytes, so that holds for a target 64 pixels wide, or a multiple of
+ * it, and nothing else: at another width the rows come back padded and this reads the wrong
+ * pixel without a word. Keep the targets of these tests at 64.
+ */
 export function rgbAt(pixels, size, x, y) {
   const i = (y * size + x) * 4;
   return [pixels[i], pixels[i + 1], pixels[i + 2]];
@@ -219,7 +221,12 @@ export function isNearColor(rgb, expected, tolerance = 2) {
   return rgb.every((value, i) => Math.abs(value - expected[i]) <= tolerance);
 }
 
-/** The width and height, in pixels, of the box around every pixel the sprite covered. */
+/**
+ * The width and height, in pixels, of the box around every pixel the sprite covered.
+ *
+ * It reads the pixels at a row length of `size * 4` bytes and needs a target 64 pixels wide,
+ * or a multiple of it — see {@link rgbAt}.
+ */
 export function coveredBox(pixels, size) {
   let minX = Infinity;
   let minY = Infinity;

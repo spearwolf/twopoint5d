@@ -4,6 +4,7 @@ import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/web
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 import type {
   TAttributeNodeInstancePosition,
+  TAttributeNodeVertexPosition,
   TAttributeNodeQuadSize,
   TAttributeNodeRotation,
   TAttributeNodeTexCoords,
@@ -31,7 +32,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
 
-  #vertexPositionNode = createSignal<TAttributeNodeInstancePosition>(
+  #vertexPositionNode = createSignal<TAttributeNodeVertexPosition>(
     attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName),
     {
       attach: this,
@@ -75,7 +76,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     return this.#vertexPositionNode.get();
   }
 
-  set vertexPositionNode(node: TAttributeNodeInstancePosition) {
+  set vertexPositionNode(node: TAttributeNodeVertexPosition) {
     this.#vertexPositionNode.set(node);
   }
 
