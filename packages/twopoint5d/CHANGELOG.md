@@ -111,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OrthographicProjection#viewSpecs` is typed `Partial<OrthographicProjectionSpecs>`, the same type `ParallaxProjection#viewSpecs` carries, and `projectionPlane` on both classes and on the `IProjection` interface is typed `ProjectionPlane | undefined`. Both constructor arguments are optional, and a projection built without them holds exactly what these types name. The `specs` constructor parameter of both classes takes the same `Partial<…Specs>` type, so a caller building a projection from a partial spec needs no cast
 - the `Map2D#visibilitor` getter is typed `IMap2DVisibilitor | undefined`: a map that has not been given a visibilitor answers with nothing. The setter still takes an `IMap2DVisibilitor`
 - `Map2DTileRenderer#tileFactory` is typed `IMapTileFactory | null` and holds `null` once `dispose()` has run. The six update-cycle methods — `beginUpdatingTiles()`, `addTile()`, `reuseTile()`, `removeTile()`, `clearTiles()` and `endUpdatingTiles()` — do nothing on a disposed renderer and none of them throws; `beginUpdatingTiles()` leaves `node` where it stands. `dispose()` gives every tile the renderer still holds back to the factory through `destroyTile()` and takes the factory content out of `node`; it releases nothing of its own, because the factory is handed to the constructor and stays the caller's. A second `dispose()` does nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
-- `Map2D#dispose()` releases nothing — the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to the constructor all belong to the caller, and a renderer that should go is disposed by whoever created it. The map takes every renderer off itself and leaves the scene graph; every one of its members answers afterwards as it did before, and a second call does nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `Map2D#dispose()` releases nothing — the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to the constructor all belong to the caller, and a renderer that should go is disposed by whoever created it. The map takes every renderer off itself, empty — the tiles laid out in it go back to its factory, and it is not disposed — and leaves the scene graph; every one of its members answers afterwards as it did before, and a second call does nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `TileSpritesMaterial#dispose()` gives up its `colorMap`, so it answers `undefined` afterwards; the texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - `CameraBasedVisibility#pointOnPlane` is typed `Vector3 | null | undefined`: `null` marks a plane the camera looks past, `undefined` a point that was never computed
 - change the return type of `DataIdsChunk2D#readDataIdAt()` and `#readDataIdAtLocal()` to `number | undefined` — coordinates outside the chunk have no data id
@@ -153,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
 - `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
 - `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
-- `Map2D#tileStreamer` hands the view center over to the streamer that takes over — `centerX` and `centerY` read the same values afterwards as before — and has the tiles built again: the renderers of the map are cleared on the next `update()` and the streamer taking over lays out the whole set. The tile grid stays with the streamer that carries it, `tileWidth`, `tileHeight`, `xOffset` and `yOffset` among it
+- `Map2D#tileStreamer` hands the view center over to the streamer that takes over — `centerX` and `centerY` read the same values afterwards as before — and has the tiles built again: the renderers come off the streamer that leaves empty, and the streamer taking over lays out the whole set in its own grid. The tile grid stays with the streamer that carries it, `tileWidth`, `tileHeight`, `xOffset` and `yOffset` among it. The visibilitor goes with the map: when the map has one, the streamer that leaves gives it up — its `visibilitor` answers `undefined` afterwards — and the streamer taking over holds it in place of one of its own; when the map has none, the streamer taking over keeps its own. A visibilitor instance serves exactly one streamer
 - `DataIdsChunk2D#prepareData()` names the compression it cannot handle in the error it throws and writes nothing to the console: the caller reads the reason off the error, in a message that cannot be silenced away
 - perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
 - perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
@@ -343,6 +343,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `PanControl2D#cursorPanStyle` and the `cursorPanStyle` option: they take only a value the browser accepts for the CSS property `cursor` (`CSS.supports()`); any other value is refused with a console warning, the control keeps its cursor style, and the option falls back to `'none'`
 - fix a `Display` constructor that throws after it has built or taken over its renderer: it releases the renderer, gives a canvas handed in back as it found it and takes its own container out of the host
 - fix the release of a renderer whose WebGL init failed: it takes the `webglcontextlost` listener of three off the canvas
+
+- fix `Map2DTileStreamer#removeTileRenderer()`, and with it `Map2D#removeTileRenderer()`: the renderer goes off empty, through `clearTiles()`. A renderer taken off and added again held tiles that had left the view in the meantime and occupied pool slots with them, and it went on drawing the tiles of a grid that had changed since with their old size and texture coordinates
+- fix `Map2DTileRenderer#removeTile()` and `#reuseTile()` for a tile factory whose tiles can be falsy, such as the numeric handle `0`: `removeTile()` gives the tile back through `destroyTile()` instead of losing its slot, and `reuseTile()` keeps to the `tilesChanged` rule
 
 ### Migration Guide
 
@@ -2401,6 +2404,27 @@ const material = new TexturedSpritesMaterial({colorMap, colorNode: myColorNode})
 
 ```ts
 const material = new TexturedSpritesMaterial({colorMap});
+```
+
+#### `Map2D#tileStreamer` takes the visibilitor off the streamer that leaves
+
+A visibilitor instance serves exactly one `Map2DTileStreamer`. When a map hands its visibilitor on to the streamer taking over, the streamer that leaves gives it up and its `visibilitor` answers `undefined`. Whoever goes on to drive that streamer on its own assigns it a visibilitor again.
+
+**Before**
+
+```ts
+const leaving = map.tileStreamer;
+map.tileStreamer = new Map2DTileStreamer();
+leaving.update(node); // still holds the visibilitor of the map, which the new streamer holds as well
+```
+
+**After**
+
+```ts
+const leaving = map.tileStreamer;
+map.tileStreamer = new Map2DTileStreamer();
+leaving.visibilitor = new RectangularVisibilityArea(640, 480); // an instance of its own
+leaving.update(node);
 ```
 
 ## [0.21.2] - 2026-06-19

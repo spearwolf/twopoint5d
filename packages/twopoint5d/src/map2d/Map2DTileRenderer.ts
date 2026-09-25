@@ -99,7 +99,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     if (tileFactory === null) return;
 
     const tile = this.#tiles.get(tileCoords.id);
-    if (tile) {
+    if (tile !== undefined) {
       // same tiles as last cycle: what updateTile() would write is already in the buffer, and
       // raising the serial for it costs a full attribute upload in endUpdatingTiles()
       if (!this.#tilesChanged) return;
@@ -120,7 +120,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     this.#declined.delete(tileCoords.id);
 
     const tile = this.#tiles.get(tileCoords.id);
-    if (tile) {
+    if (tile !== undefined) {
       this.#tiles.delete(tileCoords.id);
       tileFactory.destroyTile(tile);
       ++this.#dataSerial;

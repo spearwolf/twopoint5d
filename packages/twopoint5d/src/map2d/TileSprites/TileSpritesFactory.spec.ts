@@ -1,3 +1,4 @@
+import type {InterleavedBuffer, InterleavedBufferAttribute} from 'three/webgpu';
 import {Vector3} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
@@ -13,6 +14,30 @@ import type {TileSprite} from './descriptors.js';
 import {TileSprites} from './TileSprites.js';
 import {TileSpritesFactory} from './TileSpritesFactory.js';
 import {TileSpritesGeometry} from './TileSpritesGeometry.js';
+
+const makeTileSet = () => new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
+
+const bufferOf = (geometry: TileSpritesGeometry, attrName: string): InterleavedBuffer =>
+  (geometry.getAttribute(attrName) as InterleavedBufferAttribute).data;
+
+/** The state a delivered upload leaves a buffer in: without a renderer, ranges would stay and widen. */
+const uploaded = (buffer: InterleavedBuffer) => buffer.clearUpdateRanges();
+
+/** Whether the upload of `buffer` covers all elements of `slot` — no range at all means the whole array. */
+const uploadsSlot = (buffer: InterleavedBuffer, slot: number) =>
+  buffer.updateRanges.length === 0 ||
+  buffer.updateRanges.some(({start, count}) => start <= slot * buffer.stride && start + count >= (slot + 1) * buffer.stride);
+
+/** The four texture coordinates of the atlas frame of a tile id, as Float32 like the buffer holds them. */
+const texCoordsOfTile = (tileSet: TileSet, tileId: number): number[] => {
+  const c = tileSet.atlas.get(tileSet.frameId(tileId))!.coords;
+  return Array.from(new Float32Array([c.s, c.t, c.u, c.v]));
+};
+
+const attrAt = (geometry: TileSpritesGeometry, attrName: string, slot: number, size: number): number[] => {
+  const attr = geometry.getAttribute(attrName) as InterleavedBufferAttribute;
+  return [attr.getX(slot), attr.getY(slot), attr.getZ(slot), attr.getW(slot)].slice(0, size);
+};
 
 describe('TileSpritesFactory', () => {
   describe('createTile()', () => {
@@ -59,6 +84,15 @@ describe('TileSpritesFactory', () => {
       expect(factory.createTile(new Map2DTileCoords(1, 0))).toBeUndefined();
     });
 
+    test('a coordinate without a tile takes no slot', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(4));
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider([[1, 0]]));
+      const pool = tileSprites.geometry!.instancedPool;
+
+      expect(factory.createTile(new Map2DTileCoords(1, 0))).toBeUndefined();
+      expect(pool.usedCount).toBe(0);
+    });
+
     test('a TileSprites without a geometry answers noTileCapacity', () => {
       const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
       const factory = new TileSpritesFactory(new TileSprites(), tileSet, new RepeatingTilesProvider(1));
@@ -88,6 +122,106 @@ describe('TileSpritesFactory', () => {
 
       expect(tile.x).toBe(8);
       expect(tile.z).toBe(16);
+    });
+  });
+
+  describe('destroyTile()', () => {
+    test('gives the slot of a tile back to the instanced pool', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(4));
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider(1));
+      const pool = tileSprites.geometry!.instancedPool;
+
+      const first = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+      const second = factory.createTile(new Map2DTileCoords(1, 0)) as TileSprite;
+      expect(pool.usedCount, 'usedCount after two tiles were built').toBe(2);
+
+      factory.destroyTile(first);
+      expect(pool.usedCount, 'usedCount after the first was given back').toBe(1);
+      expect(pool.containsVO(first), 'the first tile sits in the pool').toBe(false);
+      expect(pool.containsVO(second), 'the second tile sits in the pool').toBe(true);
+
+      factory.destroyTile(second);
+      expect(pool.usedCount, 'usedCount after both were given back').toBe(0);
+    });
+  });
+
+  describe('update()', () => {
+    test('sets the instance count of the geometry to the tiles in use', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(new TileSprites(geometry), makeTileSet(), new RepeatingTilesProvider(1));
+
+      const first = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+      factory.createTile(new Map2DTileCoords(1, 0));
+      factory.update();
+      expect(geometry.instanceCount, 'instanceCount with two tiles').toBe(2);
+
+      factory.destroyTile(first);
+      factory.update();
+      expect(geometry.instanceCount, 'instanceCount with one tile').toBe(1);
+    });
+
+    test('a tile it builds reaches the buffer that goes to the gpu', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const tileSet = makeTileSet();
+      const factory = new TileSpritesFactory(new TileSprites(geometry), tileSet, new RepeatingTilesProvider(1));
+      const buffer = bufferOf(geometry, 'instancePosition');
+      const version = buffer.version;
+
+      factory.createTile(new Map2DTileCoords(0, 0, new AABB2(64, 32, 128, 96)));
+      factory.update();
+
+      expect(buffer.version, 'version of the buffer').toBeGreaterThan(version);
+      expect(attrAt(geometry, 'instancePosition', 0, 3), 'instancePosition').toEqual([64, 0, 32]);
+      expect(attrAt(geometry, 'quadSize', 0, 2), 'quadSize').toEqual([128, 96]);
+      expect(attrAt(geometry, 'texCoords', 0, 4), 'texCoords').toEqual(texCoordsOfTile(tileSet, 1));
+    });
+
+    test('a tile it moves reaches the buffer that goes to the gpu', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(new TileSprites(geometry), makeTileSet(), new RepeatingTilesProvider(1));
+      const buffer = bufferOf(geometry, 'instancePosition');
+
+      const tile = factory.createTile(new Map2DTileCoords(0, 0, new AABB2(64, 32, 128, 96))) as TileSprite;
+      factory.update();
+      uploaded(buffer);
+      const version = buffer.version;
+
+      factory.updateTile(tile, new Map2DTileCoords(0, 0, new AABB2(8, 16, 128, 96)));
+      factory.update();
+
+      expect(buffer.version, 'version of the buffer').toBeGreaterThan(version);
+      expect(uploadsSlot(buffer, 0), 'the upload covers slot 0').toBe(true);
+      expect(attrAt(geometry, 'instancePosition', 0, 3), 'instancePosition').toEqual([8, 0, 16]);
+    });
+
+    test('the tile that moves into a freed slot reaches the buffer that goes to the gpu with all of its attributes', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const tileSet = makeTileSet();
+      const factory = new TileSpritesFactory(new TileSprites(geometry), tileSet, new RepeatingTilesProvider([[1, 2]]));
+      const buffer = bufferOf(geometry, 'instancePosition');
+
+      const a = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+      factory.createTile(new Map2DTileCoords(1, 0, new AABB2(300, 400, 64, 48)));
+      factory.update();
+      uploaded(buffer);
+      const version = buffer.version;
+
+      // the pool copies the last slot into the one that became free
+      factory.destroyTile(a);
+      factory.update();
+
+      expect(buffer.version, 'version of the buffer').toBeGreaterThan(version);
+      expect(geometry.instanceCount, 'instanceCount').toBe(1);
+      expect(uploadsSlot(buffer, 0), 'the upload covers slot 0').toBe(true);
+      expect(attrAt(geometry, 'instancePosition', 0, 3), 'instancePosition').toEqual([300, 0, 400]);
+      expect(attrAt(geometry, 'quadSize', 0, 2), 'quadSize').toEqual([64, 48]);
+      expect(attrAt(geometry, 'texCoords', 0, 4), 'texCoords').toEqual(texCoordsOfTile(tileSet, 2));
+    });
+
+    test('leaves a TileSprites without a TileSpritesGeometry alone', () => {
+      const factory = new TileSpritesFactory(new TileSprites(), makeTileSet(), new RepeatingTilesProvider(1));
+
+      expect(() => factory.update()).not.toThrow();
     });
   });
 

@@ -77,6 +77,9 @@ function makeCachingVisibilitor(tiles: IMap2DTileCoords[]): IMap2DVisibilitor {
   };
 }
 
+const tileA = new Map2DTileCoords(0, 0);
+const tileB = new Map2DTileCoords(1, 0);
+
 describe('Map2DTileStreamer', () => {
   describe('new', () => {
     test('tileWidth, tileHeight', () => {
@@ -135,10 +138,31 @@ describe('Map2DTileStreamer', () => {
     });
   });
 
-  describe('update()', () => {
-    const tileA = new Map2DTileCoords(0, 0);
-    const tileB = new Map2DTileCoords(1, 0);
+  describe('removeTileRenderer()', () => {
+    test('gives the tiles back that the streamer laid out in the renderer it lets go', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
 
+      streamer.update(new Object3D());
+      streamer.removeTileRenderer(renderer);
+
+      expect(renderer.cleared, 'clearTiles() calls').toBe(1);
+      expect(renderer.held.size, 'tiles the renderer holds').toBe(0);
+    });
+
+    test('leaves a renderer alone that it does not hold', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+
+      streamer.removeTileRenderer(renderer);
+
+      expect(renderer.cleared).toBe(0);
+    });
+  });
+
+  describe('update()', () => {
     test('hands the changed flag of the visibilitor to every renderer', () => {
       const streamer = new Map2DTileStreamer(100, 100);
       const rendererOne = makeRecordingRenderer();

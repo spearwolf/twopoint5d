@@ -5,7 +5,7 @@ import {afterEach, describe, expect, test} from 'vitest';
 import {Map2D} from './Map2D.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
-import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer} from './types.js';
 
 function makeTileRenderer(): IMap2DTileRenderer {
   return {
@@ -53,16 +53,6 @@ function makePlacingTileRenderer(): IMap2DTileRenderer {
   };
 }
 
-// answers every call with an empty tile set, which is enough to let Map2DTileStreamer#update()
-// walk through its whole body
-function makeVisibilitor(): IMap2DVisibilitor {
-  return {
-    computeVisibleTiles() {
-      return {tiles: [], createTiles: [], reuseTiles: [], removeTiles: []};
-    },
-  };
-}
-
 describe('Map2D', () => {
   const sandbox = createSandbox();
 
@@ -85,17 +75,42 @@ describe('Map2D', () => {
 
     test('builds the tiles again when another streamer takes over', () => {
       const map = new Map2D();
-      const renderer = makeTileRenderer();
-      const clearTiles = sandbox.spy(renderer, 'clearTiles');
-
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      const renderer = makeHoldingTileRenderer();
       map.addTileRenderer(renderer);
-
-      map.tileStreamer = new Map2DTileStreamer();
-      map.visibilitor = makeVisibilitor();
+      map.visibilitor = new RectangularVisibilityArea(100, 100);
 
       map.update();
+      expect(renderer.held.size, 'tiles before the switch').toBeGreaterThan(0);
 
-      expect(clearTiles.calledOnce).toBe(true);
+      map.tileStreamer = new Map2DTileStreamer(50, 50);
+      expect(renderer.held.size, 'right after the switch').toBe(0);
+
+      map.update();
+      expect(renderer.held.size, 'tiles after the next update').toBeGreaterThan(0);
+    });
+  });
+
+  describe('removeTileRenderer()', () => {
+    test('a renderer taken off and added again holds only the tiles of the view it comes back to', () => {
+      const map = new Map2D();
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      const staying = makeHoldingTileRenderer();
+      const returning = makeHoldingTileRenderer();
+      map.addTileRenderer(staying);
+      map.addTileRenderer(returning);
+      map.visibilitor = new RectangularVisibilityArea(100, 100);
+      map.update();
+
+      map.removeTileRenderer(returning);
+      map.centerX = 1000;
+      map.update();
+      map.addTileRenderer(returning);
+      map.update();
+
+      expect([...returning.held].sort()).toEqual([...staying.held].sort());
     });
   });
 
@@ -158,6 +173,22 @@ describe('Map2D', () => {
       map.tileStreamer = new Map2DTileStreamer();
 
       expect(map.tileStreamer.visibilitor).toBe(a);
+      expect(map.visibilitor).toBe(a);
+    });
+
+    test('the streamer that leaves gives up the visibilitor the map hands on', () => {
+      const map = new Map2D();
+      const a = new RectangularVisibilityArea(100, 100);
+      const b = new RectangularVisibilityArea(300, 300);
+      map.visibilitor = a;
+      const leaving = map.tileStreamer;
+      const taking = new Map2DTileStreamer();
+      taking.visibilitor = b;
+
+      map.tileStreamer = taking;
+
+      expect(leaving.visibilitor, 'the streamer that left').toBeUndefined();
+      expect(taking.visibilitor, 'the streamer that took over').toBe(a);
       expect(map.visibilitor).toBe(a);
     });
 
@@ -269,8 +300,16 @@ describe('Map2D', () => {
 
     // (e) has no subject here: a Map2D creates neither signals nor effects.
 
-    // (f) has no subject here: a Map2D takes no slot from a pool and no tile from a factory.
-    // The tile renderers it holds arrive through addTileRenderer() and belong to the caller;
-    // the tiles live one layer further down, in the renderers themselves.
+    // (f) every tile laid out in a renderer goes back
+    test('has every tile renderer give back the tiles laid out in it', () => {
+      const renderer = makeTileRenderer();
+      const clearTiles = sandbox.spy(renderer, 'clearTiles');
+
+      const map = new Map2D();
+      map.addTileRenderer(renderer);
+      map.dispose();
+
+      expect(clearTiles.calledOnce).toBe(true);
+    });
   });
 });

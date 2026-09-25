@@ -266,6 +266,62 @@ describe('Map2DTileRenderer', () => {
     });
   });
 
+  describe('a factory whose tile is falsy', () => {
+    // hands out 0, 1, 2 … in the order of the createTile() calls, so the first tile is 0
+    function makeCountingFactory(): IMapTileFactory<number> {
+      let next = 0;
+      return {
+        addToNode(_node: Object3D) {},
+        removeFromNode(_node: Object3D) {},
+        createTile(_tileCoords: IMap2DTileCoords): number {
+          return next++;
+        },
+        updateTile(_tile: number, _tileCoords: IMap2DTileCoords) {},
+        destroyTile(_tile: number) {},
+        update() {},
+      };
+    }
+
+    test('removeTile() gives a tile 0 back to the factory', () => {
+      const tileFactory = makeCountingFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.addTile(tileCoords);
+
+      const destroyTile = sandbox.spy(tileFactory, 'destroyTile');
+      renderer.removeTile(tileCoords);
+
+      expect(destroyTile.calledOnceWithExactly(0), 'destroyTile() with tile 0').toBe(true);
+
+      // the coordinate was given up, so it is built anew
+      const createTile = sandbox.spy(tileFactory, 'createTile');
+      renderer.reuseTile(tileCoords);
+
+      expect(createTile.calledOnce, 'createTile()').toBe(true);
+    });
+
+    test('reuseTile() leaves a tile 0 alone while the signal says nothing changed', () => {
+      const tileFactory = makeCountingFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      const updateTile = sandbox.spy(tileFactory, 'updateTile');
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(tileCoords);
+      renderer.endUpdatingTiles();
+
+      expect(updateTile.called, 'updateTile()').toBe(false);
+      expect(update.called, 'factory.update()').toBe(false);
+    });
+  });
+
   describe('clearTiles()', () => {
     test('an empty renderer forces no upload', () => {
       const tileFactory = makeTileFactory();

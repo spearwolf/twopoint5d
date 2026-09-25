@@ -76,6 +76,11 @@ export interface IMap2DTileRenderer {
 
   /**
    * Add a tile to the renderer.
+   *
+   * A coordinate the renderer already holds a tile for gets no second one: the tile it holds is
+   * written on with the new coordinates, whatever `tilesChanged` said in
+   * {@link beginUpdatingTiles}.
+   *
    * Is called during the update cycle.
    */
   addTile(tileCoords: IMap2DTileCoords): void;
@@ -107,6 +112,8 @@ export interface IMap2DTileRenderer {
   /**
    * Clear all tiles from the renderer.
    * It will be called independently of the update cycle.
+   * `Map2DTileStreamer` calls it when it takes the renderer off, and before it lays out a whole
+   * new tile set.
    */
   clearTiles(): void;
 

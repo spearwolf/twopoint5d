@@ -111,8 +111,17 @@ export class Map2DTileStreamer {
     this.renderers.add(renderer);
   }
 
+  /**
+   * Takes a tile renderer off this streamer and has it give back the tiles this streamer laid out
+   * in it, through {@link IMap2DTileRenderer.clearTiles}. A renderer added again — here or to
+   * another streamer — therefore starts empty and gets its tiles built in the grid then in place.
+   * A renderer this streamer does not hold is left alone.
+   */
   removeTileRenderer(renderer: IMap2DTileRenderer): void {
-    this.renderers.delete(renderer);
+    // only update() takes a tile out of a renderer again: one let go with its tiles would keep
+    // those that leave the view while it is away, and bring back as a reuse the tiles of a grid
+    // that has changed since, with that grid's size and texture coordinates
+    if (this.renderers.delete(renderer)) renderer.clearTiles();
   }
 
   /**

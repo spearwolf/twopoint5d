@@ -6,6 +6,17 @@ export class Map2D extends Group {
   #renderers: Set<IMap2DTileRenderer> = new Set();
   #tileStreamer: Map2DTileStreamer;
 
+  /**
+   * The tile streamer that lays out the tiles of this map.
+   *
+   * Assigning another one moves the map onto it. Every tile renderer of the map comes off the
+   * streamer that leaves — empty, its tiles given back — and goes to the one taking over, and so
+   * does the view center. The visibilitor goes with the map as well and serves one streamer at a
+   * time: when the map has one, the streamer that leaves gives it up and the one taking over holds
+   * it, in place of any visibilitor it brought along; when the map has none, the streamer taking
+   * over keeps its own. The tile grid stays with the streamer that carries it, and the next
+   * {@link update} lays out the whole tile set in that grid.
+   */
   get tileStreamer(): Map2DTileStreamer {
     return this.#tileStreamer;
   }
@@ -26,10 +37,12 @@ export class Map2D extends Group {
     streamer.centerX = previous.centerX;
     streamer.centerY = previous.centerY;
 
-    // the visibilitor goes with the map as the view center does; a streamer taking over from one
-    // that had none keeps the visibilitor it brings along
+    // the visibilitor goes with the map as the view center does, and it serves one streamer at a
+    // time: the streamer that leaves gives it up. A streamer taking over from one that had none
+    // keeps the visibilitor it brings along
     const visibilitor = previous.visibilitor;
     if (visibilitor) {
+      previous.visibilitor = undefined;
       streamer.visibilitor = visibilitor;
     }
 
@@ -37,11 +50,10 @@ export class Map2D extends Group {
       streamer.addTileRenderer(renderer);
     }
 
-    // the renderers hold the tiles of the streamer that left, and every one of them carries the
-    // quad size and the texture coordinates of that streamer's grid. `IMapTileFactory#updateTile()`
-    // writes a position and nothing else, so no tile can be carried over into the grid of the
-    // streamer taking over — clearing is what has them built again in it. It is the same reason
-    // the four grid setters of `Map2DTileStreamer` clear.
+    // the renderers came off the streamer that left empty. The visibilitor handed on last answered
+    // for the tile list of that streamer, and the list of the streamer taking over is no ground for
+    // its answer: clearing has the next update() hand it an empty one and lay out the whole set in
+    // the grid of the streamer taking over
     streamer.clearTiles();
   }
 
@@ -118,6 +130,11 @@ export class Map2D extends Group {
     }
   }
 
+  /**
+   * Takes a tile renderer off this map: its node leaves the map, and the tile streamer has it give
+   * back the tiles laid out in it. The renderer comes off empty and is not disposed — it belongs
+   * to the caller, and it can be added again.
+   */
   removeTileRenderer(renderer: IMap2DTileRenderer): void {
     if (this.#renderers.has(renderer)) {
       this.remove(renderer.node);
@@ -141,7 +158,8 @@ export class Map2D extends Group {
   }
 
   /**
-   * Takes every tile renderer off this map and leaves the scene graph.
+   * Takes every tile renderer off this map and leaves the scene graph. Every renderer goes as
+   * {@link removeTileRenderer} leaves it — empty, its tiles given back to its factory, not disposed.
    *
    * Releases nothing: the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to
    * the constructor all belong to the caller, and whoever wants a renderer disposed disposes it.
