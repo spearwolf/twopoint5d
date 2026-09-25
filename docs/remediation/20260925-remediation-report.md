@@ -10,10 +10,10 @@ Scope-Regel: alles, was in den Feature-Domains »Sprites« (`packages/twopoint5d
 - Im Lauf behobene Nebenbefunde der Domain: der Typalias von `TexturedSpritesMaterial#vertexPositionNode` und das `readonly` der Pool-Felder von `TexturedSpritesGeometry`.
 - Das Sprite-Material bekommt pro Instanz einen Farbton (`TexturedSprite#setColor()` wirkt jetzt), Billboards transformierter Meshes zeigen korrekt zur Kamera, und die three.js-Materialparameter werden durchgereicht. `AnimatedSprites` ist generisch über die Geometrie und nimmt nur noch ein `AnimatedSpritesMaterial`.
 - Blockiert: keines.
-- Ins Audit zurück: 4 Nebenbefunde außerhalb der beiden Domains, keiner mit offener Architekturfrage. Es sind die Pixel-Tests für `Canvas2DStage`/`OrthographicProjection`, der Teardown von `TileSpritesMaterial`, das `readonly` an `TileSpritesGeometry` und ein rückblickender Absatz im Sprite-Proposal.
+- Ins Audit zurück: 3 Nebenbefunde außerhalb der beiden Domains, keiner mit offener Architekturfrage: Pixel-Tests für `Canvas2DStage`/`OrthographicProjection`, der Teardown von `TileSpritesMaterial` und das `readonly` an `TileSpritesGeometry`. Ein vierter Befund, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben.
 - Verify-Lücke: Die neuen Pixel-Tests liefen lokal in Firefox und in Chromium über den WebGL2-Fallback. Ein echtes WebGPU-Backend ist für sie nicht belegt.
 - Verify am Ende: `pnpm run ci` ✓, wie in der Baseline.
-- audit.html: Score 69 → 71 (Code 71 → 74, Harness 67 → 68). 9 Findings geschlossen, 4 neu. Sprites und Vertex Objects: 0 offene Findings.
+- audit.html: Score 69 → 71 (Code 71 → 74, Harness 67 → 68). 9 Findings geschlossen, 3 neu. Sprites und Vertex Objects: 0 offene Findings.
 
 ## Tokenverbrauch
 

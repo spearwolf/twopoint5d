@@ -49,12 +49,12 @@ A feature is written once and fits every sprite kind whose base satisfies its co
 Two observations from reading the current sprites:
 
 - **The order of the local transforms is easy to get wrong.** `TexturedSpritesMaterial`
-  used to rotate the unit quad and multiply the result by `vec3(quadSize, 1)` afterwards,
-  so a rotated sprite with `width !== height` came out as a parallelogram. It now scales
-  first and rotates second, and `packages/twopoint5d-testing/test/sprites-rotation.test.js`
-  holds it there. The order was a line in one effect, and nothing but a rendered picture
-  could tell it was wrong — which is why this proposal makes it part of the model (§4.2)
-  instead of leaving it to each material.
+  scales the unit quad by `vec3(quadSize, 1)` first and rotates it second; the other way
+  round, a rotated sprite with `width !== height` comes out as a parallelogram.
+  `packages/twopoint5d-testing/test/sprites-rotation.test.js` holds the order in place. It
+  is a line in one effect, and nothing but a rendered picture can tell it is wrong — which
+  is why this proposal makes it part of the model (§4.2) instead of leaving it to each
+  material.
 - **The tint is spread over two files.** `TexturedSprite` declares the `color` attribute
   and `[voInitialize]` fills it with white; `TexturedSpritesMaterial` multiplies by
   `vertexColor()` in its color effect, which answers white for a geometry without that
