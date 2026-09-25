@@ -102,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `getDescriptorOf()` to `VertexObjectDescriptor | undefined`: a vertex object without a buffer has no descriptor to answer with
 - `VertexObjects<GeoType extends BufferGeometry = BufferGeometry>` is generic over the geometry it holds: `geometry` is typed `GeoType | undefined` and `material` `Material | Material[] | undefined`. Built without a geometry, the mesh holds the plain `BufferGeometry` `THREE.Mesh` puts in its place and is `VertexObjects<BufferGeometry>`; `undefined` only after a caller writes it or `AnimatedSprites#dispose()`/`TexturedSprites#dispose()` gives it up
 - `TileSprites<GeoType extends TileSpritesGeometry | BufferGeometry = BufferGeometry>` is generic the same way: built with a `TileSpritesGeometry`, `geometry` is typed as exactly that; built without one, `BufferGeometry`. The constructor takes any `BufferGeometry`; with one that is not a `TileSpritesGeometry`, `TileSpritesFactory#createTile()` answers `noTileCapacity`. `material` is typed `TileSpritesMaterial | MeshBasicMaterial | undefined`
+- `AnimatedSprites<GeoType extends AnimatedSpritesGeometry | BufferGeometry = BufferGeometry>` is generic the same way: built with an `AnimatedSpritesGeometry`, `geometry` is typed as exactly that; built without one, `BufferGeometry`. `material` is typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined` — built without a material, the mesh holds the `MeshBasicMaterial` `THREE.Mesh` puts in its place — and the constructor takes an `AnimatedSpritesMaterial` as its material
+- `AnimatedSpritesGeometry#basePool` is typed `VertexObjectPool<BaseSprite>`, without `undefined`, as `TexturedSpritesGeometry#basePool` is: both geometries build their base pool in the constructor. `TexturedSpritesGeometry#basePool` and `#instancedPool` are read-only, as `InstancedVertexObjectGeometry` declares them
 - `VertexObjects` extends `THREE.Mesh<any, any>`: neither type parameter of `THREE.Mesh` can carry the `undefined` that the `geometry` and `material` declarations of this class need. Both slots are re-declared in the class itself, and those declarations are the types it shows
 - change the return types of `TextureAtlas#randomFrame()` and `#randomFrameName()` to `TextureAtlasFrame | undefined` and `TextureAtlasFrameName | undefined`, and those of `#randomFrames()` and `#randomFrameNames()` to arrays of the same: an atlas without frames, or without named frames, has nothing to draw
 - a lookup whose result an invariant guarantees — an attribute descriptor, the claim on an attribute slot, the buffers of a pool attached under a name — throws an error naming what was missing when that invariant is broken, at the place that relies on it
@@ -1535,11 +1537,12 @@ if (sprites.material != null) {
 
 #### A mesh built without a geometry is typed with the `BufferGeometry` it holds
 
-`VertexObjects<GeoType>` and `TileSprites<GeoType>` take their geometry type from the
-constructor argument. Built without one, `geometry` is typed `BufferGeometry | undefined`, not
-`VOBufferGeometry`/`TileSpritesGeometry` — reading a member of the more specific geometry needs
+`VertexObjects<GeoType>`, `TileSprites<GeoType>` and `AnimatedSprites<GeoType>` take their
+geometry type from the constructor argument. Built without one, `geometry` is typed
+`BufferGeometry | undefined`, not `VOBufferGeometry`/`TileSpritesGeometry`/`AnimatedSpritesGeometry` — reading a member of the more specific geometry needs
 an `instanceof` check, or the mesh built with its geometry in the first place. The same holds for
-`tileSprites.material`, typed `TileSpritesMaterial | MeshBasicMaterial | undefined`.
+`tileSprites.material`, typed `TileSpritesMaterial | MeshBasicMaterial | undefined`, and for
+`animatedSprites.material`, typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined`.
 
 **Before**
 
@@ -1565,6 +1568,35 @@ Or build the mesh with its geometry in the first place, which keeps `geometry` t
 const namedTileSprites = new TileSprites(new TileSpritesGeometry());
 namedTileSprites.geometry!.instancedPool.createVO();
 ```
+
+#### `AnimatedSprites` takes an `AnimatedSpritesMaterial`, and its `material` may be a `MeshBasicMaterial`
+
+The constructor of `AnimatedSprites` takes an `AnimatedSpritesMaterial` as its material. A mesh
+built without one holds the `MeshBasicMaterial` `THREE.Mesh` puts in its place, so
+`sprites.material` is typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined`: a member
+of `AnimatedSpritesMaterial` read through it needs an `instanceof` check — or the reference to
+the material you built.
+
+**Before**
+
+```ts
+const sprites = new AnimatedSprites(geometry, material);
+sprites.material!.time = now;
+```
+
+**After**
+
+```ts
+const sprites = new AnimatedSprites(geometry, material);
+material.time = now; // the reference you built the mesh with keeps its type
+
+if (sprites.material instanceof AnimatedSpritesMaterial) {
+  sprites.material.time = now;
+}
+```
+
+`TexturedSpritesGeometry#basePool` and `#instancedPool` are read-only. The geometry builds its
+attributes on the pools it was constructed with; a pool written there afterwards was never drawn.
 
 #### `TexturedSprites#spritePool` and `#texture` can be `undefined`
 

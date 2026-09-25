@@ -1,9 +1,17 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
+import {float, vec2, vec3, vec4} from 'three/tsl';
+import type {Node, OperatorNode, TextureNode, VarNode, VaryingNode, VertexColorNode} from 'three/webgpu';
 import {AdditiveBlending, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
+
+// three wraps the result of each TSL operator in a VarNode that holds the OperatorNode as `node`
+const operatorOf = (node: Node | null | undefined): OperatorNode => {
+  const varNode = node as unknown as VarNode<unknown, OperatorNode>;
+  return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);
+};
 
 describe('TexturedSpritesMaterial', () => {
   const sandbox = createSandbox();
@@ -52,6 +60,120 @@ describe('TexturedSpritesMaterial', () => {
 
       expect(material.alphaTest).toBe(0.5);
       expect(material.alphaTestNode).toBeNull();
+
+      material.dispose();
+    });
+  });
+
+  describe('node wiring', () => {
+    test('builds a flat positionNode by default, the instance position added last', () => {
+      const material = new TexturedSpritesMaterial();
+
+      const position = operatorOf(material.positionNode);
+      expect(position.op).toBe('+');
+      expect(position.bNode).toBe(material.instancePositionNode);
+
+      material.dispose();
+    });
+
+    test('builds a billboard positionNode once renderAsBillboards is set', () => {
+      const material = new TexturedSpritesMaterial();
+      const {positionNode, version} = material;
+
+      material.renderAsBillboards = true;
+
+      expect(material.positionNode).not.toBe(positionNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect(operatorOf(material.positionNode).aNode).toBe(material.instancePositionNode);
+
+      material.dispose();
+    });
+
+    test('builds no positionNode for a renderAsBillboards write of the value it holds', () => {
+      const material = new TexturedSpritesMaterial();
+      const {positionNode, version} = material;
+
+      material.renderAsBillboards = false;
+
+      expect(material.positionNode).toBe(positionNode);
+      expect(material.version).toBe(version);
+
+      material.dispose();
+    });
+
+    test.each([
+      ['vertexPositionNode', vec3(0, 0, 0)],
+      ['rotationNode', float(1)],
+      ['instancePositionNode', vec3(0, 0, 0)],
+      ['quadSizeNode', vec2(1, 1)],
+    ] as const)('builds a new positionNode for a write to %s', (name, node) => {
+      const material = new TexturedSpritesMaterial();
+      const {positionNode, version} = material;
+
+      (material as unknown as Record<string, unknown>)[name] = node;
+
+      expect(material.positionNode).not.toBe(positionNode);
+      expect(material.version).toBeGreaterThan(version);
+
+      material.dispose();
+    });
+
+    test('tints a grey default color by the sprite color while there is no colorMap', () => {
+      const material = new TexturedSpritesMaterial();
+
+      const color = operatorOf(material.colorNode);
+      expect(color.op).toBe('*');
+      expect((color.aNode as TextureNode).isTextureNode).toBeFalsy();
+      expect((color.bNode as VertexColorNode).isVertexColorNode).toBe(true);
+
+      material.dispose();
+    });
+
+    test('samples the colorMap once one is set, still tinted by the sprite color', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial();
+      const {colorNode, version} = material;
+
+      material.colorMap = colorMap;
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+
+      const color = operatorOf(material.colorNode);
+      const sample = color.aNode as TextureNode;
+      expect(color.op).toBe('*');
+      expect(sample.isTextureNode).toBe(true);
+      expect(sample.value).toBe(colorMap);
+      expect((sample.uvNode as unknown as VaryingNode<unknown>).isVaryingNode).toBe(true);
+      expect((color.bNode as VertexColorNode).isVertexColorNode).toBe(true);
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('builds a new colorNode for a texCoordsNode write while a colorMap is set', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap});
+      const {colorNode, version} = material;
+
+      material.texCoordsNode = vec4(0, 0, 1, 1);
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('leaves the colorNode alone for a texCoordsNode write without a colorMap', () => {
+      const material = new TexturedSpritesMaterial();
+      const {colorNode, version} = material;
+
+      // the color effect reads texCoordsNode only behind `if (this.colorMap)`, so it does not depend on it here
+      material.texCoordsNode = vec4(0, 0, 1, 1);
+
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
 
       material.dispose();
     });

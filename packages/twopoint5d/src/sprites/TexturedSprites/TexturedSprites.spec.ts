@@ -4,9 +4,20 @@ import {Color, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
+import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
+import type {TexturedSprite} from './TexturedSprite.js';
 import {TexturedSprites} from './TexturedSprites.js';
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
+
+// the values of one attribute of the object at `index`, read straight from the typed array of its buffer
+const readAttribute = (pool: VertexObjectPool<TexturedSprite>, name: string, index: number): number[] => {
+  const {bufferName, offset} = pool.buffer.bufferAttributes.get(name)!;
+  const {itemSize, typedArray} = pool.buffer.buffers.get(bufferName)!;
+  const {size} = pool.descriptor.getAttribute(name)!;
+  const start = index * pool.descriptor.vertexCount * itemSize + offset;
+  return Array.from(typedArray!.subarray(start, start + size));
+};
 
 describe('TexturedSprites', () => {
   const sandbox = createSandbox();
@@ -111,6 +122,42 @@ describe('TexturedSprites', () => {
     expect(() => {
       sprites.texture = undefined;
     }).not.toThrow();
+  });
+
+  test('getColor() answers the rgb of the sprite, in a new Color or in the target it is given', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+    sprite.setColor(new Color(0.5, 0.25, 0.125), 0.75);
+
+    const color = sprite.getColor();
+    expect(color).toBeInstanceOf(Color);
+    expect([color.r, color.g, color.b]).toEqual([0.5, 0.25, 0.125]);
+
+    const target = new Color();
+    expect(sprite.getColor(target)).toBe(target);
+    expect([target.r, target.g, target.b]).toEqual([0.5, 0.25, 0.125]);
+
+    sprites.dispose();
+  });
+
+  test('the sprite methods write through to the buffers of the sprite pool', () => {
+    const sprites = new TexturedSprites(4);
+    const first = sprites.createSprite()!;
+    first.setSize(4, 5);
+    first.setPosition(1, 2, 3);
+    first.setFrame({coords: {s: 0.25, t: 0.5, u: 0.75, v: 1}} as unknown as TextureAtlasFrame);
+    first.setColor(new Color(0.5, 0.25, 0.125), 0.75);
+    sprites.createSprite();
+
+    const pool = sprites.spritePool!;
+    expect(readAttribute(pool, 'quadSize', 0)).toEqual([4, 5]);
+    expect(readAttribute(pool, 'instancePosition', 0)).toEqual([1, 2, 3]);
+    expect(readAttribute(pool, 'texCoords', 0)).toEqual([0.25, 0.5, 0.75, 1]);
+    expect(readAttribute(pool, 'color', 0)).toEqual([0.5, 0.25, 0.125, 0.75]);
+    // the white default of [voInitialize], read from the buffer
+    expect(readAttribute(pool, 'color', 1)).toEqual([1, 1, 1, 1]);
+
+    sprites.dispose();
   });
 
   describe('dispose()', () => {

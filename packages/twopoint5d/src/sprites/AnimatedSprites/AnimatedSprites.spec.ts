@@ -1,6 +1,6 @@
 import {createSandbox} from 'sinon';
-import {Scene, Texture} from 'three/webgpu';
-import {afterEach, describe, expect, test} from 'vitest';
+import {BufferGeometry, MeshBasicMaterial, Scene, Texture} from 'three/webgpu';
+import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
 
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {AnimatedSprite} from './AnimatedSprite.js';
@@ -31,6 +31,40 @@ describe('AnimatedSprites', () => {
 
     sprite.setPosition(1, 2, 3);
     expect(sprite.z).toBe(3);
+  });
+
+  test('an AnimatedSprites built without a geometry or a material is typed with what THREE.Mesh puts there', () => {
+    const sprites = new AnimatedSprites();
+
+    expectTypeOf(sprites.geometry).toEqualTypeOf<BufferGeometry | undefined>();
+    expect(sprites.geometry).toBeInstanceOf(BufferGeometry);
+    expect(sprites.geometry).not.toBeInstanceOf(AnimatedSpritesGeometry);
+
+    expectTypeOf(sprites.material).toEqualTypeOf<AnimatedSpritesMaterial | MeshBasicMaterial | undefined>();
+    expect(sprites.material).toBeInstanceOf(MeshBasicMaterial);
+  });
+
+  test('an AnimatedSprites built with an AnimatedSpritesGeometry is typed with it', () => {
+    const geometry = new AnimatedSpritesGeometry(4);
+
+    expectTypeOf(new AnimatedSprites(geometry).geometry).toEqualTypeOf<AnimatedSpritesGeometry | undefined>();
+
+    geometry.dispose();
+  });
+
+  test('takes an AnimatedSpritesMaterial only', () => {
+    const material = new MeshBasicMaterial();
+    // @ts-expect-error the constructor takes an AnimatedSpritesMaterial only
+    const sprites = new AnimatedSprites(undefined, material);
+
+    // at run time THREE.Mesh keeps it
+    expect(sprites.material).toBe(material);
+
+    material.dispose();
+  });
+
+  test('is named twopoint5d.AnimatedSprites', () => {
+    expect(new AnimatedSprites().name).toBe('twopoint5d.AnimatedSprites');
   });
 
   describe('dispose()', () => {

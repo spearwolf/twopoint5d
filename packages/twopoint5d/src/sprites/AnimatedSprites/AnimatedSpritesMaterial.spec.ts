@@ -79,6 +79,43 @@ describe('AnimatedSpritesMaterial', () => {
     });
   });
 
+  describe('node wiring', () => {
+    test('an animsMap set through the setter drives the texture coordinates and the colorNode', () => {
+      const colorMap = new Texture();
+      const material = new AnimatedSpritesMaterial({colorMap});
+      const {colorNode} = material;
+
+      const animsMap = makeAnimsMap();
+      material.animsMap = animsMap;
+
+      expect((material.texCoordsNode as TextureNode).isTextureNode).toBe(true);
+      expect((material.texCoordsNode as TextureNode).value).toBe(animsMap);
+      expect(material.colorNode).not.toBe(colorNode);
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
+
+    test('a time write reaches the uniform and builds no node', () => {
+      const colorMap = new Texture();
+      const animsMap = makeAnimsMap();
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap});
+      const {texCoordsNode, colorNode, version} = material;
+
+      material.time = 3;
+
+      expect(material.time).toBe(3);
+      expect(material.texCoordsNode).toBe(texCoordsNode);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
+  });
+
   describe('dispose()', () => {
     // (a) has no subject here: this material builds no resource of its own — the animsMap
     // arrives through the constructor options or the setter, and the time uniform is a

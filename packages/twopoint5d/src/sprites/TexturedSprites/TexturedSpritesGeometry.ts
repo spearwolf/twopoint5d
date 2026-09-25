@@ -32,8 +32,9 @@ export interface TexturedSpritesGeometryParameters {
 export type TexturedSpriteGeometryParameters = TexturedSpritesGeometryParameters;
 
 export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<TexturedSprite, BaseSprite> {
-  declare basePool: TexturedSpritesBasePool;
-  declare instancedPool: TexturedSpritesPool;
+  // the constructor hands super() a base descriptor, never a BufferGeometry, so the base pool is always there
+  declare readonly basePool: TexturedSpritesBasePool;
+  declare readonly instancedPool: TexturedSpritesPool;
 
   readonly isTexturedSpritesGeometry = true;
 
@@ -59,7 +60,7 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
 
     this.name = 'twopoint5d.TexturedSpritesGeometry';
 
-    const baseSprite = this.basePool?.createVO();
+    const baseSprite = this.basePool.createVO();
     if (baseSprite == null) {
       throw new Error('TexturedSpritesGeometry: the base pool has no room for the base sprite');
     }

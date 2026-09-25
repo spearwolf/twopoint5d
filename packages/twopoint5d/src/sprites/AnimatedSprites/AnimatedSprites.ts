@@ -1,14 +1,24 @@
-import type {Material} from 'three/webgpu';
+import type {BufferGeometry, MeshBasicMaterial} from 'three/webgpu';
 
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
 import type {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
 
-export class AnimatedSprites extends VertexObjects<AnimatedSpritesGeometry> {
-  declare geometry: AnimatedSpritesGeometry | undefined;
-  declare material: AnimatedSpritesMaterial | undefined;
+/**
+ * The mesh that draws animated sprites, one instance of its `AnimatedSpritesGeometry` per sprite.
+ *
+ * `GeoType` is the geometry the mesh holds. Built without one, the mesh holds the plain
+ * `BufferGeometry` that `THREE.Mesh` puts in its place — `GeoType` is then `BufferGeometry`. A
+ * type argument named explicitly while the geometry is left out states a geometry the mesh does
+ * not hold.
+ */
+export class AnimatedSprites<
+  GeoType extends AnimatedSpritesGeometry | BufferGeometry = BufferGeometry,
+> extends VertexObjects<GeoType> {
+  // built without a material, the mesh holds the MeshBasicMaterial THREE.Mesh puts in its place
+  declare material: AnimatedSpritesMaterial | MeshBasicMaterial | undefined;
 
-  constructor(geometry?: AnimatedSpritesGeometry, material?: Material) {
+  constructor(geometry?: GeoType, material?: AnimatedSpritesMaterial) {
     super(geometry, material);
 
     this.name = 'twopoint5d.AnimatedSprites';
