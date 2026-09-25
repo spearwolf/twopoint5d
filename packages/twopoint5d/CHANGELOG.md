@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `noTileCapacity` (map2d): what `IMapTileFactory#createTile()` answers when the factory has no room for another tile right now. It is a registered symbol, `Symbol.for('twopoint5d:IMapTileFactory.noTileCapacity')`, so two copies of the library in one page answer with the same one
 - add the `{copy: true}` option to `VOBufferPool#toBuffersData()`: it hands out arrays the pool does not hold, `typedArray.slice()` of its own. That is the way to transfer buffers through `postMessage`, or to build a second pool that stays independent of this one — without it, every array is the pool's own, shared by reference with whatever takes the result in
 - add `Stylesheets.getSheet()`: the stylesheet of the document or shadow root that `root` stands for — the sheet `getGlobalSheet()` answers, under the name of what it is
+- add an optional `out` set to `Map2DSpatialHashGrid#findWithin()` and `#getTiles()`: it is emptied, filled and handed back, empty rather than `undefined` when nothing lies within. Without it both answer as before, with a new set or `undefined`
 
 ### Changed
 
@@ -149,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a value written to `Map2DTileStreamer#tileWidth`, `#tileHeight`, `#xOffset` or `#yOffset`, and with it to the same four properties of `Map2D`, builds the tiles again: the next `update()` clears every renderer and lets the visibilitor lay out the whole set in the new grid. A tile is recognised by its `(x, y)` id and would otherwise come back as a reuse, where `IMapTileFactory#updateTile()` writes only its position — the sprite would go on showing the size and the texture coordinates of the grid it was built in. Writing the value a property already holds costs nothing
 - `RectangularVisibilityArea#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
 - `CameraBasedVisibility#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before, and lays the new grid out on tile objects of its own. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
-- `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which reports `changed: true` and raises `serial`, instead of waiting for the camera to move
+- `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which recomputes and raises `serial`, instead of waiting for the camera to move
 - `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
 - `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
 - `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
@@ -197,6 +198,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Stylesheets` keeps its rules in a constructed stylesheet per document or shadow root and adopts it through `adoptedStyleSheets`; it puts no `<style>` element into the DOM. A shadow root carries its rules before its host is in the document and keeps them when the host moves. The sheet comes from the window of its document, so a document or shadow root inside an iframe carries rules as well. An element passed as root stands for the document or shadow root it sits in at each call, which a `releaseRule()` has to match. Adopted sheets come after the document's own sheets in the cascade. The selector of a rule carries the class name through `CSS.escape()`. A root in a document without a window — from `document.implementation.createHTMLDocument()`, a `DOMParser` or the content of a `<template>` — gets an error that says so, since such a document adopts no constructed stylesheet
 - a write to `Display#styleSheetRoot` installs the rules of the display in the new root, under the same class names; a write after `dispose()` does nothing
 - `TexturedSpritesMaterialParameters`, and with it `AnimatedSpritesMaterialParameters`, takes no `positionNode` and no `colorNode`: both materials build these nodes themselves
+- `CameraBasedVisibility` no longer calls `camera.updateProjectionMatrix()`: the projection belongs to the caller, and a projection matrix set by hand — jitter, an off-axis projection — is used as it stands. `computeVisibleTiles()` still brings the world matrix of the camera up to date — see the migration guide
+- `CameraBasedVisibility#map2dTileCoords` is a read-only getter answering a copy of the tile grid of the last `computeVisibleTiles()`; a value written on it reaches neither the tile streamer nor the tiles. The grid is set on `Map2D` or `Map2DTileStreamer` — see the migration guide
+- `IMap2DVisibleTiles#changed`: `CameraBasedVisibility` and `RectangularVisibilityArea` answer `false` for a view that moves while the tile grid stands, `true` on their first result and on a new grid. A custom `IMap2DTileRenderer` gets `tilesChanged: false` in `beginUpdatingTiles()` on such frames and may leave the tiles it holds alone; tiles that come and go still arrive through `addTile()` and `removeTile()`
+- perf `TileSpritesFactory` uploads the instance slots that were written and no others: `updateTile()` marks the slot of its tile, and `update()` no longer asks for a full upload of the instance attributes. Together with the line above, a view that scrolls without a tile coming or going sends no tile data to the gpu
+- perf `CameraBasedVisibility` and `RectangularVisibilityArea` hand back the same result object and the same lists on every call, as `IMap2DVisibleTiles` allows; a caller that keeps a list beyond the next call copies it. `Map2DTileStreamer` hands the visibilitor a view-center tuple it reuses
 
 ### Deprecated
 
@@ -346,6 +352,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - fix `Map2DTileStreamer#removeTileRenderer()`, and with it `Map2D#removeTileRenderer()`: the renderer goes off empty, through `clearTiles()`. A renderer taken off and added again held tiles that had left the view in the meantime and occupied pool slots with them, and it went on drawing the tiles of a grid that had changed since with their old size and texture coordinates
 - fix `Map2DTileRenderer#removeTile()` and `#reuseTile()` for a tile factory whose tiles can be falsy, such as the numeric handle `0`: `removeTile()` gives the tile back through `destroyTile()` instead of losing its slot, and `reuseTile()` keeps to the `tilesChanged` rule
+- fix `CameraBasedVisibility#frustumBoxScale`: it scales the box a tile is tested with by the value in tile width and tile height as it already did in `depth` — each side moves out by `(scale - 1) / 2` of the tile size. A side used to move out by `(scale - 1)` of it, so the default 1.1 tested a box 1.2 times the tile; the tiles at the edge of the view are dropped a little earlier
 
 ### Migration Guide
 
@@ -2425,6 +2432,41 @@ const leaving = map.tileStreamer;
 map.tileStreamer = new Map2DTileStreamer();
 leaving.visibilitor = new RectangularVisibilityArea(640, 480); // an instance of its own
 leaving.update(node);
+```
+
+#### `CameraBasedVisibility` leaves the projection to the caller
+
+`computeVisibleTiles()` reads the projection of the camera as it finds it. Whoever changes `fov`, `aspect`, `near`, `far` or `zoom` of a perspective camera, or the frustum of an orthographic one, calls `camera.updateProjectionMatrix()` before the next `Map2D#update()`. The world matrix of the camera is still brought up to date from its transform.
+
+**Before**
+
+```ts
+camera.far = 4000;
+map2d.visibilitor = new CameraBasedVisibility(camera); // the visibility updated the projection
+```
+
+**After**
+
+```ts
+camera.far = 4000;
+camera.updateProjectionMatrix();
+map2d.visibilitor = new CameraBasedVisibility(camera);
+```
+
+#### `CameraBasedVisibility#map2dTileCoords` is read-only
+
+The getter answers a copy of the tile grid of the last `computeVisibleTiles()`. The grid is set on the map or on its tile streamer.
+
+**Before**
+
+```ts
+visibility.map2dTileCoords.tileWidth = 256;
+```
+
+**After**
+
+```ts
+map2d.tileWidth = 256; // or tileHeight, xOffset, yOffset — on Map2D or on Map2DTileStreamer
 ```
 
 ## [0.21.2] - 2026-06-19

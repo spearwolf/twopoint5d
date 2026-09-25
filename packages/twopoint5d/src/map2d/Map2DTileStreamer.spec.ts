@@ -1,8 +1,10 @@
 import {Object3D, Vector2, Vector3} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
+import {Map2DTileRenderer} from './Map2DTileRenderer.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
-import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
+import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisibleTiles, IMapTileFactory} from './types.js';
 
 interface RecordingRenderer extends IMap2DTileRenderer {
   positions: Vector3[];
@@ -301,6 +303,37 @@ describe('Map2DTileStreamer', () => {
       streamer.update(node);
 
       expect([...renderer.held]).toEqual(['0,0']);
+    });
+
+    test('a view center that moves within the tiles it shows has the renderer write no tile', () => {
+      const factory = {
+        addToNode: vi.fn(),
+        removeFromNode: vi.fn(),
+        createTile: vi.fn((coords: IMap2DTileCoords) => ({coords})),
+        updateTile: vi.fn(),
+        destroyTile: vi.fn(),
+        update: vi.fn(),
+      } satisfies IMapTileFactory<{coords: IMap2DTileCoords}>;
+      const renderer = new Map2DTileRenderer(factory);
+
+      const streamer = new Map2DTileStreamer(100, 100);
+      streamer.visibilitor = new RectangularVisibilityArea(300, 300);
+      streamer.addTileRenderer(renderer);
+
+      const node = new Object3D();
+      streamer.update(node);
+      expect(factory.createTile, 'the tiles of the first frame').toHaveBeenCalled();
+      vi.clearAllMocks();
+
+      // columns -2 … 1 cover the view both around 0 and around 10
+      streamer.centerX = 10;
+      streamer.update(node);
+
+      expect(factory.createTile, 'createTile()').not.toHaveBeenCalled();
+      expect(factory.updateTile, 'updateTile()').not.toHaveBeenCalled();
+      expect(factory.destroyTile, 'destroyTile()').not.toHaveBeenCalled();
+      expect(factory.update, 'update()').not.toHaveBeenCalled();
+      expect(renderer.node.position.x, 'the renderer node follows the view').toBe(-10);
     });
 
     test('assigning the visibilitor it already holds costs nothing', () => {

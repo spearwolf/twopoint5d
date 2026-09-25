@@ -67,8 +67,10 @@ export interface IMap2DTileRenderer {
    * during the call and not kept by the caller's side of the contract: the streamer hands over
    * an instance it reuses, so a renderer that wants the value afterwards copies it.
    *
-   * `tilesChanged` says whether the tile coordinates of this cycle can differ from the last
-   * one's. On `false` a renderer may leave the data of a tile it already holds untouched. It
+   * `tilesChanged` says whether a tile the renderer already holds can come with other view
+   * coordinates than it was last written with — after a change of the tile grid. While the grid
+   * stands, a moving view keeps the view coordinates of every tile and moves only `position`.
+   * On `false` a renderer may leave the data of a tile it already holds untouched. It
    * still has to take on a tile it does not know yet, and it says nothing about the tiles
    * that arrive through {@link addTile} and {@link removeTile}. Left out, it counts as `true`.
    */
@@ -128,6 +130,10 @@ export interface IMap2DTileRenderer {
  * may be this very one.
  */
 export interface IMap2DVisibleTiles {
+  /**
+   * Every tile visible now — the tile set of this result, and the list a caller hands back as
+   * `previousTiles` in its next call.
+   */
   tiles: IMap2DTileCoords[];
 
   /**
@@ -149,14 +155,26 @@ export interface IMap2DVisibleTiles {
    */
   translate?: Vector3;
 
+  /** The tiles of `previousTiles` that are not visible any more, or all of them on a new tile grid. */
   removeTiles?: IMap2DTileCoords[];
+
+  /**
+   * The tiles of `previousTiles` that stay visible; the caller holds them already. Together with
+   * {@link createTiles} they hold the same tiles as {@link tiles}, not necessarily in its order.
+   */
   reuseTiles?: IMap2DTileCoords[];
+
+  /** The visible tiles that `previousTiles` did not hold. */
   createTiles?: IMap2DTileCoords[];
 
   /**
-   * `false` says that this result carries the same tiles, in the same order, with the same
-   * view coordinates as the result of the previous call. A consumer may then leave the data
-   * of a tile it already holds alone. Left out, it counts as `true`.
+   * Whether a tile in `reuseTiles` can carry other view coordinates than it carried in the
+   * previous result. `true` after a change of the tile grid, and on the first result a
+   * visibilitor computes, which has no grid before it to hold the tiles of `previousTiles`
+   * against. A view that moves while the grid stands leaves the view coordinates of every tile
+   * as they were — the move goes into `offset` — and the result says `false`; the tiles that come
+   * and go are in `createTiles` and `removeTiles` either way. A consumer may leave the data of a
+   * tile it already holds alone while this is `false`. Left out, it counts as `true`.
    */
   changed?: boolean;
 }
@@ -180,6 +198,9 @@ export interface IMap2DVisibilitor {
    * other than the one of the previous call, an implementation puts those tiles into
    * `removeTiles`. A first call has no earlier grid to hold against and takes `previousTiles` as
    * belonging to the grid it is given.
+   *
+   * `centerPoint` is read during the call: `Map2DTileStreamer` hands over a tuple it reuses, so a
+   * visibilitor that wants the values afterwards copies them.
    */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],

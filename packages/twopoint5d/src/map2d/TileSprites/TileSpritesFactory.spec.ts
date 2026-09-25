@@ -218,6 +218,44 @@ describe('TileSpritesFactory', () => {
       expect(attrAt(geometry, 'texCoords', 0, 4), 'texCoords').toEqual(texCoordsOfTile(tileSet, 2));
     });
 
+    test('a frame that moves one tile uploads the slot of that tile and no other', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(new TileSprites(geometry), makeTileSet(), new RepeatingTilesProvider(1));
+      const buffer = bufferOf(geometry, 'instancePosition');
+
+      factory.createTile(new Map2DTileCoords(0, 0, new AABB2(0, 0, 128, 128)));
+      factory.createTile(new Map2DTileCoords(1, 0, new AABB2(128, 0, 128, 128)));
+      const third = factory.createTile(new Map2DTileCoords(2, 0, new AABB2(256, 0, 128, 128))) as TileSprite;
+      factory.update();
+      uploaded(buffer);
+
+      factory.updateTile(third, new Map2DTileCoords(2, 0, new AABB2(512, 64, 128, 128)));
+      factory.update();
+
+      // no range at all would upload the whole array
+      expect(buffer.updateRanges.length, 'the upload names a range').toBeGreaterThan(0);
+      expect(uploadsSlot(buffer, 2), 'the upload covers slot 2').toBe(true);
+      expect(
+        buffer.updateRanges.every(({start}) => start >= 2 * buffer.stride),
+        'the upload leaves the slots before it alone',
+      ).toBe(true);
+    });
+
+    test('update() with nothing written sends nothing to the gpu', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(new TileSprites(geometry), makeTileSet(), new RepeatingTilesProvider(1));
+      const buffer = bufferOf(geometry, 'instancePosition');
+
+      factory.createTile(new Map2DTileCoords(0, 0));
+      factory.update();
+      uploaded(buffer);
+      const version = buffer.version;
+
+      factory.update();
+
+      expect(buffer.version, 'version of the buffer').toBe(version);
+    });
+
     test('leaves a TileSprites without a TileSpritesGeometry alone', () => {
       const factory = new TileSpritesFactory(new TileSprites(), makeTileSet(), new RepeatingTilesProvider(1));
 

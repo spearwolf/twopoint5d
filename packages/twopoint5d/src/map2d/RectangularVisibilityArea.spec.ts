@@ -52,24 +52,31 @@ describe('RectangularVisibilityArea', () => {
     test('a moved center recomputes', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstIds = ids(first.tiles);
       const second = area.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
       const third = area.computeVisibleTiles(second.tiles, [400, 0], tileCoords, matrixWorld)!;
 
-      expect(third).not.toBe(first);
-      expect(third.changed).toBe(true);
-      expect(ids(third.tiles)).not.toEqual(ids(first.tiles));
+      // the cache path answers without them
+      expect(third.createTiles, 'createTiles of a recomputation').toBeDefined();
+      expect(third.removeTiles, 'removeTiles of a recomputation').toBeDefined();
+      expect(third.changed, 'the tile grid stands').toBe(false);
+      expect(ids(third.tiles)).not.toEqual(firstIds);
     });
 
     test('a changed width recomputes', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
 
+      const firstLength = first.tiles.length;
+
       area.width = 640;
       const second = area.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
 
-      expect(second).not.toBe(first);
-      expect(second.changed).toBe(true);
-      expect(second.tiles.length).toBeGreaterThan(first.tiles.length);
+      // the cache path answers without them
+      expect(second.createTiles, 'createTiles of a recomputation').toBeDefined();
+      expect(second.removeTiles, 'removeTiles of a recomputation').toBeDefined();
+      expect(second.changed, 'the tile grid stands').toBe(false);
+      expect(second.tiles.length).toBeGreaterThan(firstLength);
     });
 
     test('needsUpdate forces exactly one recompute', () => {
@@ -82,12 +89,15 @@ describe('RectangularVisibilityArea', () => {
       area.needsUpdate = true;
       const third = area.computeVisibleTiles(second.tiles, [0, 0], tileCoords, matrixWorld)!;
 
-      expect(third, 'the forced recompute').not.toBe(first);
+      // the cache path answers without them
+      expect(third.createTiles, 'the forced recompute').toBeDefined();
+      expect(third.removeTiles, 'the forced recompute').toBeDefined();
       expect(area.needsUpdate, 'the flag is spent').toBe(false);
 
       const fourth = area.computeVisibleTiles(third.tiles, [0, 0], tileCoords, matrixWorld)!;
 
       expect(fourth, 'cached again').toBe(third);
+      expect(fourth.createTiles, 'cached again').toBeUndefined();
     });
 
     test('offset and translate are the same instances across calls', () => {
@@ -100,6 +110,26 @@ describe('RectangularVisibilityArea', () => {
 
       expect(second.offset).toBe(offsetRef);
       expect(second.translate).toBe(translateRef);
+    });
+
+    test('a recomputation handed the tiles of its own last result classifies against what they were', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const before = ids(first.tiles);
+      const second = area.computeVisibleTiles(first.tiles, [400, 0], tileCoords, matrixWorld)!;
+
+      expect(ids([...(second.reuseTiles ?? []), ...(second.removeTiles ?? [])])).toEqual(before);
+      expect(new Set(second.tiles).size, 'no tile twice').toBe(second.tiles.length);
+    });
+
+    test('hands back the same result object and lists on every recomputation', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstTiles = first.tiles;
+      const second = area.computeVisibleTiles(first.tiles, [200, 0], tileCoords, matrixWorld)!;
+
+      expect(second).toBe(first);
+      expect(second.tiles).toBe(firstTiles);
     });
 
     test('a tile that leaves the view is removed and one that stays is reused', () => {
@@ -128,12 +158,14 @@ describe('RectangularVisibilityArea', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       expect(first.tiles.length).toBeGreaterThan(0);
+      // the result is written again by the next call
+      const firstIds = ids(first.tiles);
 
       const otherGrid = new Map2DTileCoordsUtil(50, 50);
       const second = area.computeVisibleTiles(first.tiles, [0, 0], otherGrid, matrixWorld)!;
 
       expect(second.reuseTiles, 'nothing of the old grid is kept').toHaveLength(0);
-      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(ids(first.tiles));
+      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(firstIds);
       expect(ids(second.tiles), 'the new grid is covered once').toEqual([...new Set(ids(second.tiles))]);
     });
   });

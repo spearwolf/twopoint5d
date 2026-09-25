@@ -1,6 +1,7 @@
 import type {Object3D} from 'three/webgpu';
 import type {TileSet} from '../../texture/TileSet.js';
 import {expectDefined} from '../../utils/expectDefined.js';
+import {VOUtils} from '../../vertex-objects/VOUtils.js';
 import {noTileCapacity} from '../constants.js';
 import type {IMap2DTileCoords, IMap2DTileDataProvider, IMapTileFactory} from '../types.js';
 import type {TileSprite} from './descriptors.js';
@@ -65,11 +66,19 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
 
   updateTile(tile: TileSprite, tileCoords: IMap2DTileCoords): void {
     tile.setInstancePosition(tileCoords.view.left, 0, tileCoords.view.top);
+
+    // the instance attributes carry no `autoTouch`, so the factory says itself which slot it
+    // wrote, and update() uploads that slot and no other; createVO() and freeVO() mark theirs
+    const pool = this.#tileSpritesGeometry()?.instancedPool;
+    if (pool?.containsVO(tile)) {
+      const idx = VOUtils.getIndex(tile);
+      pool.buffer.touch(idx, idx);
+    }
   }
 
   // `THREE.Mesh` gives a TileSprites built without a geometry a plain `BufferGeometry`, which
-  // has neither an instanced pool to take a slot from nor a `touch()`; every method of this
-  // factory that reaches for the geometry goes through here
+  // has no instanced pool to take a slot from or to mark a slot in; every method of this factory
+  // that reaches for the geometry goes through here
   #tileSpritesGeometry(): TileSpritesGeometry | undefined {
     const geometry = this.tileSprites.geometry;
     return geometry instanceof TileSpritesGeometry ? geometry : undefined;
@@ -86,7 +95,6 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   update(): void {
     const geometry = this.#tileSpritesGeometry();
     if (geometry) {
-      geometry.touch('quadSize', 'texCoords', 'instancePosition');
       this.tileSprites.update();
     }
   }

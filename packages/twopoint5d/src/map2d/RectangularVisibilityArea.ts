@@ -39,6 +39,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   readonly #offset = new Vector2();
   readonly #translate = new Vector3();
 
+  // The lists and the object a recomputation hands out, written again by the next one. A
+  // recomputation writes the lists here and never through `#result`: the cache path puts `tiles`
+  // into `#result.reuseTiles`.
+  readonly #tiles: IMap2DTileCoords[] = [];
+  readonly #reuseTiles: IMap2DTileCoords[] = [];
+  readonly #createTiles: IMap2DTileCoords[] = [];
+  readonly #removeTiles: IMap2DTileCoords[] = [];
+  readonly #result: IMap2DVisibleTiles = {tiles: this.#tiles};
+
   constructor(width = 320, height = 240) {
     this.width = width;
     this.height = height;
@@ -110,8 +119,12 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     const tileCoords = map2dTileCoords.computeTilesWithinCoords(left, top, width, height);
     const fullViewArea = AABB2.from(tileCoords, this.#fullViewArea);
 
-    const removeTiles: IMap2DTileCoords[] = [];
-    const reuseTiles: IMap2DTileCoords[] = [];
+    const reuseTiles = this.#reuseTiles;
+    const removeTiles = this.#removeTiles;
+    const createTiles = this.#createTiles;
+    reuseTiles.length = 0;
+    removeTiles.length = 0;
+    createTiles.length = 0;
 
     const tilesLength = tileCoords.rows * tileCoords.columns;
 
@@ -123,7 +136,11 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       tileCreated.fill(0);
     }
 
-    previousTiles.forEach((tile) => {
+    // `previousTiles` can be the `tiles` list of the last result — the tile streamer hands it
+    // back — so it is read whole here, before that list is emptied below
+    for (let i = 0; i < previousTiles.length; ++i) {
+      // The loop bound is `previousTiles.length`.
+      const tile = previousTiles[i]!;
       if (!tileGridChanged && fullViewArea.isIntersecting(tile.view)) {
         reuseTiles.push(tile);
         const tx = tile.x - tileCoords.tileLeft;
@@ -132,9 +149,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       } else {
         removeTiles.push(tile);
       }
-    });
-
-    const createTiles: IMap2DTileCoords[] = [];
+    }
 
     for (let ty = 0; ty < tileCoords.rows; ty++) {
       for (let tx = 0; tx < tileCoords.columns; tx++) {
@@ -154,16 +169,23 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     const offset = this.#offset.set(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
     const translate = this.#translate.setFromMatrixPosition(matrixWorld);
 
-    this.#visibleTiles = {
-      tiles: reuseTiles.concat(createTiles),
-      offset,
-      translate,
-      removeTiles,
-      createTiles,
-      reuseTiles,
-      changed: true,
-    };
+    const tiles = this.#tiles;
+    tiles.length = 0;
+    for (let i = 0; i < reuseTiles.length; ++i) tiles.push(reuseTiles[i]!);
+    for (let i = 0; i < createTiles.length; ++i) tiles.push(createTiles[i]!);
 
-    return this.#visibleTiles;
+    const result = this.#result;
+    result.tiles = tiles;
+    result.offset = offset;
+    result.translate = translate;
+    result.removeTiles = removeTiles;
+    result.createTiles = createTiles;
+    result.reuseTiles = reuseTiles;
+    // the view of a tile hangs on the grid alone, so a reused tile carries the view it was handed
+    // out with unless the grid changed; a first call has no grid before it to say so
+    result.changed = storedTileCoords == null || tileGridChanged;
+
+    this.#visibleTiles = result;
+    return result;
   }
 }

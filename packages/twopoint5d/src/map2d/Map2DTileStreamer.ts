@@ -98,6 +98,9 @@ export class Map2DTileStreamer {
   // Per-frame scratch — handed to beginUpdatingTiles(), which reads it during the call.
   readonly #position = new Vector3();
 
+  // Per-frame scratch — handed to computeVisibleTiles(), which reads it during the call.
+  readonly #viewCenter: [number, number] = [0, 0];
+
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
     // checked here as well as in the util underneath, so the message names the class the caller
     // holds in its hands
@@ -146,8 +149,9 @@ export class Map2DTileStreamer {
 
     node.updateWorldMatrix(true, false);
 
-    const viewCenter: [number, number] = [this.centerX, this.centerY];
-    const visible = visibilitor.computeVisibleTiles(this.tiles, viewCenter, this.#tileCoords, node.matrixWorld);
+    this.#viewCenter[0] = this.centerX;
+    this.#viewCenter[1] = this.centerY;
+    const visible = visibilitor.computeVisibleTiles(this.tiles, this.#viewCenter, this.#tileCoords, node.matrixWorld);
 
     if (visible) {
       this.tiles = visible.tiles;

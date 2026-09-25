@@ -138,13 +138,77 @@ describe('CameraBasedVisibility', () => {
       expect(tileIds).toContain('0,0');
     });
 
+    test('leaves the projection matrix of the camera as the caller set it', () => {
+      const camera = makeTopDownCamera();
+      const custom = camera.projectionMatrix.clone().multiply(new Matrix4().makeScale(1.25, 1, 1));
+      camera.projectionMatrix.copy(custom);
+      camera.projectionMatrixInverse.copy(custom).invert();
+
+      visibility = new CameraBasedVisibility(camera);
+      visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(camera.projectionMatrix.elements).toEqual(custom.elements);
+    });
+
+    test('a recomputation handed the tiles of its own last result classifies against what they were', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const before = ids(first.tiles);
+      const second = visibility.computeVisibleTiles(first.tiles, [400, 0], tileCoords, matrixWorld)!;
+
+      expect(ids([...(second.reuseTiles ?? []), ...(second.removeTiles ?? [])])).toEqual(before);
+      expect(new Set(second.tiles).size, 'no tile twice').toBe(second.tiles.length);
+    });
+
+    test('a camera that turns away from the plane hands every tile of its own last result back for removal', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const before = ids(first.tiles);
+      expect(before.length).toBeGreaterThan(0);
+
+      visibility.camera = makeOrthoCameraLookingHorizontally();
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(second.tiles).toHaveLength(0);
+      expect(ids(second.removeTiles)).toEqual(before);
+    });
+
+    test('hands back the same result object and lists on every recomputation', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstTiles = first.tiles;
+      const second = visibility.computeVisibleTiles(first.tiles, [100, 0], tileCoords, matrixWorld)!;
+
+      expect(second).toBe(first);
+      expect(second.tiles).toBe(firstTiles);
+    });
+
+    test('map2dTileCoords is a copy of the grid of the last call, and read-only', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(visibility.map2dTileCoords).not.toBe(tileCoords);
+      expect(visibility.map2dTileCoords.equals(tileCoords)).toBe(true);
+
+      tileCoords.tileWidth = 50;
+      expect(visibility.map2dTileCoords.tileWidth, 'a write on the grid of the caller').toBe(100);
+
+      expect(() => {
+        // @ts-expect-error — a getter without a setter
+        visibility.map2dTileCoords = new Map2DTileCoordsUtil();
+      }).toThrow(TypeError);
+    });
+
     test('returns undefined on a fresh instance when the camera direction is parallel to the plane and there are no previousTiles', () => {
       visibility = new CameraBasedVisibility(makeOrthoCameraLookingHorizontally());
       const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, new Matrix4());
       expect(result).toBeUndefined();
     });
 
-    test('returns tiles=[] and removeTiles=previousTiles when the camera direction is parallel to the plane and previousTiles is populated', () => {
+    test('returns tiles=[] and removeTiles with the tiles of previousTiles when the camera direction is parallel to the plane and previousTiles is populated', () => {
       // Seed a previousTiles list with a separate visibility instance that does see the plane.
       const seeder = new CameraBasedVisibility(makeTopDownCamera());
       const seed = seeder.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4())!;
@@ -155,7 +219,7 @@ describe('CameraBasedVisibility', () => {
       const result = visibility.computeVisibleTiles(previous, [0, 0], tileCoords, new Matrix4());
       expect(result).toBeDefined();
       expect(result!.tiles).toEqual([]);
-      expect(result!.removeTiles).toBe(previous);
+      expect(result!.removeTiles).toEqual(previous);
     });
 
     test('empties visibles when the camera turns away from the plane', () => {
@@ -340,39 +404,50 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
-    test('marks a freshly computed result as changed and a cached one as unchanged', () => {
+    test('says changed on the first result and on a new grid, not for a moved view', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       expect(first.changed, 'first frame').toBe(true);
+      const firstViews = new Map(first.tiles.map(({id, view}) => [id, [view.left, view.top, view.width, view.height]]));
 
       const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
       expect(second.changed, 'second frame, nothing moved').toBe(false);
 
-      const third = visibility.computeVisibleTiles(second.tiles, [400, 0], tileCoords, matrixWorld)!;
-      expect(third.changed, 'third frame, center moved').toBe(true);
+      // one tile width, so a part of the tiles stays in the view and comes back for reuse
+      const third = visibility.computeVisibleTiles(second.tiles, [100, 0], tileCoords, matrixWorld)!;
+      expect(third.changed, 'third frame, center moved').toBe(false);
+      expect(third.reuseTiles!.length, 'tiles that stay in the view').toBeGreaterThan(0);
+      for (const {id, view} of third.reuseTiles!) {
+        expect([view.left, view.top, view.width, view.height], `view of the reused tile ${id}`).toEqual(firstViews.get(id));
+      }
+
+      const fourth = visibility.computeVisibleTiles(third.tiles, [100, 0], new Map2DTileCoordsUtil(50, 50), matrixWorld)!;
+      expect(fourth.changed, 'fourth frame, another grid').toBe(true);
     });
 
     test('a changed depth invalidates the cached tile set', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const serialAfterFirst = visibility.serial;
       visibility.depth = 200;
       const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
 
-      expect(second).not.toBe(first);
-      expect(second.changed).toBe(true);
+      expect(visibility.serial, 'the camera was evaluated again').toBe(serialAfterFirst + 1);
+      expect(second.changed, 'the tile grid stands').toBe(false);
     });
 
     test('a changed lookAtCenter invalidates the cached tile set', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const serialAfterFirst = visibility.serial;
       visibility.lookAtCenter = true;
       const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
 
-      expect(second).not.toBe(first);
-      expect(second.changed).toBe(true);
+      expect(visibility.serial, 'the camera was evaluated again').toBe(serialAfterFirst + 1);
+      expect(second.changed, 'the tile grid stands').toBe(false);
     });
 
     test('a tile of another grid is removed instead of reused', () => {
@@ -380,6 +455,8 @@ describe('CameraBasedVisibility', () => {
 
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       expect(first.tiles.length).toBeGreaterThan(0);
+      // the result is written again by the next call
+      const firstTiles = [...first.tiles];
 
       // half the tile size, so the ids of the two grids overlap: `0,0` names a tile in both,
       // and it is a different piece of the map in each
@@ -387,9 +464,9 @@ describe('CameraBasedVisibility', () => {
       const second = visibility.computeVisibleTiles(first.tiles, [0, 0], otherGrid, matrixWorld)!;
 
       expect(second.reuseTiles ?? [], 'nothing of the old grid is kept').toHaveLength(0);
-      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(ids(first.tiles));
+      expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(ids(firstTiles));
 
-      const ofTheOldGrid = new Set<unknown>(first.tiles);
+      const ofTheOldGrid = new Set<unknown>(firstTiles);
       for (const tile of second.tiles) {
         expect(ofTheOldGrid.has(tile), `tile ${tile.id} of the new grid is an object of its own`).toBe(false);
       }
@@ -595,8 +672,35 @@ describe('CameraBasedVisibility', () => {
       visibility.frustumBoxScale = 3;
       const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
 
-      expect(second.changed, 'the result says it is new').toBe(true);
+      expect(second.changed, 'the tile grid stands').toBe(false);
       expect(visibility.serial, 'the camera was evaluated again').toBe(serialAfterFirst + 1);
+    });
+
+    test('the frustum box of a tile is frustumBoxScale times the tile, around the tile', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.frustumBoxScale = 2;
+
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4());
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+      const size = new Vector3();
+      const center = new Vector3();
+      const tileCenter = new Vector3();
+      for (const tile of visibility.visibles) {
+        const where = `tile ${tile.x},${tile.y}`;
+        // tile width times two, depth (100) times two, tile height times two
+        expect(tile.frustumBox!.getSize(size).toArray(), where).toEqual([200, 200, 200]);
+        tile.frustumBox!.getCenter(center);
+        tile.box!.getCenter(tileCenter);
+        expect(Math.abs(center.x - tileCenter.x), `${where}, x`).toBeLessThan(1e-6);
+        expect(Math.abs(center.z - tileCenter.z), `${where}, z`).toBeLessThan(1e-6);
+      }
+    });
+  });
+
+  describe('lookAtCenter', () => {
+    test('defaults to false', () => {
+      expect(new CameraBasedVisibility().lookAtCenter).toBe(false);
     });
   });
 

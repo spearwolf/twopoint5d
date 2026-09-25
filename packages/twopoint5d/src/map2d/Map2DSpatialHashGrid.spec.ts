@@ -90,4 +90,33 @@ describe('Map2DSpatialHashGrid', () => {
     tileset = grid.findWithin(new AABB2(-40, 20, 50, 50))!;
     expect(tileset).toBeUndefined();
   });
+
+  test('findWithin fills the set it is handed and hands it back', () => {
+    const grid = new Map2DSpatialHashGrid(20, 20);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(-60, -60, 100, 80)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(30, 10, 80, 70)};
+    const c: IMap2DRenderableArea = {aabb: new AABB2(-90, 50, 50, 50)};
+    grid.add(a, b, c);
+
+    const stranger: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 1, 1)};
+    const out = new Set<IMap2DRenderableArea>([stranger]);
+
+    const tileset = grid.findWithin(new AABB2(-50, -50, 100, 90), out);
+
+    expect(tileset).toBe(out);
+    expect([...out]).toEqual(expect.arrayContaining([a, b]));
+    expect(out.size, 'the hits and nothing else').toBe(2);
+  });
+
+  test('findWithin hands back the empty set it is handed when nothing lies within', () => {
+    const grid = new Map2DSpatialHashGrid(20, 20);
+    grid.add({aabb: new AABB2(-60, -60, 100, 80)});
+
+    const out = new Set<IMap2DRenderableArea>([{aabb: new AABB2(0, 0, 1, 1)}]);
+
+    const tileset = grid.findWithin(new AABB2(200, 200, 50, 50), out);
+
+    expect(tileset).toBe(out);
+    expect(out.size).toBe(0);
+  });
 });

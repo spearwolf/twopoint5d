@@ -22,6 +22,7 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     camera.position.set(0, 350, 500);
     camera.far = 4000;
+    camera.updateProjectionMatrix();
 
     scene.fog = new Fog(0x001020, 300, 3000);
 

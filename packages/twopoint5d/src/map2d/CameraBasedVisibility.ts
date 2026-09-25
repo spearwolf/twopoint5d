@@ -105,16 +105,32 @@ const poolAt = <T>(pool: T[], index: number, create: () => T): T => {
  *
  * The _far_ value of the camera limits how far along a ray the plane is looked for. The _near_
  * value is where each ray starts.
+ *
+ * The camera is read as the caller keeps it. `computeVisibleTiles()` brings the world matrix of
+ * the camera up to date from its transform, but not its projection: whoever changes `fov`,
+ * `aspect`, `near`, `far` or `zoom` of a perspective camera, or the frustum of an orthographic
+ * one, calls `camera.updateProjectionMatrix()` before the next call. A projection matrix set by
+ * hand — jitter, an off-axis projection — is used as it stands, together with its
+ * `projectionMatrixInverse`.
  */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
 
+  /**
+   * How much larger than the tile the box is that the view frustum is tested against: the box is
+   * `frustumBoxScale` times the tile in width, height and depth, around the tile — each side moves
+   * out by `(frustumBoxScale - 1) / 2` of the tile size. `1` tests the tile itself; the default
+   * `1.1` gives a tile that only just leaves the view a margin before it is dropped.
+   */
   frustumBoxScale = 1.1;
 
   /**
-   * If `lookAtCenter` is set to *true* (default), then the center of the camera frustum
-   * always points exactly to the center of the map2d.
-   * Otherwise the center of the frustum and the center of the map2d are cumulated.
+   * Whether the view center of the map is where the camera looks. With `true`, the point where the
+   * first probe ray meets the map plane — the ray through the middle of the view, as long as it
+   * meets the plane — is taken as `(centerX, centerY)`: the tiles are laid out around the view
+   * center wherever the camera points. With `false` (the default), the view center shifts the map
+   * under the camera instead: the camera sees the map point that lies `(centerX, centerY)` away
+   * from where it looks on the plane.
    */
   lookAtCenter = false;
 
@@ -152,7 +168,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #tileBoxMatrix = new Matrix4();
 
-  map2dTileCoords = new Map2DTileCoordsUtil();
+  readonly #map2dTileCoords = new Map2DTileCoordsUtil();
+
+  /**
+   * The tile grid of the last `computeVisibleTiles()`, as a copy this visibility keeps for itself
+   * — the visibility helpers read it. A value written on it reaches neither the tile streamer nor
+   * the tiles, and the next call writes over it; the grid is set on `Map2D` or
+   * `Map2DTileStreamer`.
+   */
+  get map2dTileCoords(): Map2DTileCoordsUtil {
+    return this.#map2dTileCoords;
+  }
 
   readonly #deps = new Dependencies<{
     depth: number;
@@ -201,6 +227,16 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly #nextStack: TileBox[] = [];
   readonly #previousTilesById = new Map<number, IMap2DTileCoords>();
   readonly #withinHull: TileBox[] = [];
+  readonly #hullPoints: TilePoint[] = [];
+
+  // The lists and the object a recomputation hands out, written again by the next one, as
+  // `IMap2DVisibleTiles` allows. A recomputation writes the lists here and never through
+  // `#result`: the cache path puts `tiles` into `#result.reuseTiles`.
+  readonly #tiles: IMap2DTileCoords[] = [];
+  readonly #reuseTiles: IMap2DTileCoords[] = [];
+  readonly #createTiles: IMap2DTileCoords[] = [];
+  readonly #removeTiles: IMap2DTileCoords[] = [];
+  readonly #result: IMap2DVisibleTiles = {tiles: this.#tiles};
 
   // The tiles the probe rays of the current recomputation met, keyed by `packTileCoords()` —
   // what `TileBox#primary` is read from.
@@ -251,7 +287,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       frustumBoxScale: this.frustumBoxScale,
       lookAtCenter: this.lookAtCenter,
       centerPoint2D: this.#centerPoint2D,
-      map2dTileCoords: this.map2dTileCoords,
+      map2dTileCoords: this.#map2dTileCoords,
       matrixWorld,
       cameraMatrixWorld: camera.matrixWorld,
       cameraProjectionMatrix: camera.projectionMatrix,
@@ -263,7 +299,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * recomputation ran on. A first run has nothing to compare against and answers `false`.
    */
   private takeOverTileCoords(): boolean {
-    const current = this.map2dTileCoords;
+    const current = this.#map2dTileCoords;
 
     if (this.#cachedTileCoords == null) {
       this.#cachedTileCoords = current.clone();
@@ -308,11 +344,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       return undefined;
     }
 
-    this.map2dTileCoords = map2dTileCoords;
+    this.#map2dTileCoords.copy(map2dTileCoords);
     this.#centerPoint2D.set(centerX, centerY);
 
     this.camera.updateMatrixWorld();
-    this.camera.updateProjectionMatrix();
 
     if (!this.dependenciesChanged(matrixWorld)) {
       if (this.#visibleTiles) {
@@ -326,7 +361,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.#serial += 1;
 
+    // a first recomputation has no grid before it to hold the view of the tiles in
+    // `previousTiles` against — a caller may hand a fresh instance tiles of its own — so it counts
+    // as a change of the grid
+    const firstRecomputation = this.#cachedTileCoords === undefined;
     this.#tileGridChanged = this.takeOverTileCoords();
+    const changed = firstRecomputation || this.#tileGridChanged;
 
     this.matrixWorld.copy(matrixWorld);
     this.#matrixWorldInverse.copy(matrixWorld).invert();
@@ -350,8 +390,33 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       // this way out — and `visibles` is public: the visibility helpers read it and would go on
       // drawing tile boxes for a view that no longer exists
       this.visibles.length = 0;
-      this.#visibleTiles = previousTiles.length > 0 ? {tiles: [], removeTiles: previousTiles, changed: true} : undefined;
-      return this.#visibleTiles;
+
+      if (previousTiles.length === 0) {
+        this.#visibleTiles = undefined;
+        return undefined;
+      }
+
+      // `previousTiles` can be the `tiles` list of the last result — the tile streamer hands it
+      // back — so every entry is out of it before that list is emptied
+      this.#removeTiles.length = 0;
+      for (let i = 0; i < previousTiles.length; ++i) {
+        // The loop bound is `previousTiles.length`.
+        this.#removeTiles.push(previousTiles[i]!);
+      }
+      this.#tiles.length = 0;
+
+      const result = this.#result;
+      result.tiles = this.#tiles;
+      result.removeTiles = this.#removeTiles;
+      // nothing of the result before may stand: this way out has no tiles to place
+      result.createTiles = undefined;
+      result.reuseTiles = undefined;
+      result.offset = undefined;
+      result.translate = undefined;
+      result.changed = changed;
+
+      this.#visibleTiles = result;
+      return result;
     }
 
     for (let i = 0; i < hitCount; ++i) {
@@ -373,7 +438,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.planeCoords2D.copy(this.#probePlaneCoords[0]!);
 
-    this.#visibleTiles = this.findVisibleTiles(previousTiles, hitCount);
+    this.#visibleTiles = this.findVisibleTiles(previousTiles, hitCount, changed);
 
     return this.#visibleTiles;
   }
@@ -394,7 +459,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.planeWorld
       .copy(CameraBasedVisibility.Plane)
-      .applyMatrix4(_m.makeTranslation(this.map2dTileCoords.xOffset, 0, this.map2dTileCoords.yOffset))
+      .applyMatrix4(_m.makeTranslation(this.#map2dTileCoords.xOffset, 0, this.#map2dTileCoords.yOffset))
       .applyMatrix4(this.matrixWorld);
 
     this.pointsOnPlane.length = 0;
@@ -427,7 +492,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return tile;
   }
 
-  private findVisibleTiles(previousTiles: IMap2DTileCoords[], hitCount: number): IMap2DVisibleTiles | undefined {
+  private findVisibleTiles(previousTiles: IMap2DTileCoords[], hitCount: number, changed: boolean): IMap2DVisibleTiles {
     // Reset reusable working buffers.
     this.#visitedIds.clear();
     this.#nextStack.length = 0;
@@ -443,19 +508,24 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.#previousTilesById.set(packTileCoords(previousTile.x, previousTile.y), previousTile);
     }
 
+    // `previousTiles` can be the `tiles` list of the last result — the tile streamer hands it
+    // back — and is read whole by now; only from here on are the lists of the result emptied
+    this.#reuseTiles.length = 0;
+    this.#createTiles.length = 0;
+
     // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
     makeCameraFrustum(this.camera!, this.#cameraFrustum);
 
-    const {tileWidth, tileHeight} = this.map2dTileCoords;
+    const {tileWidth, tileHeight} = this.#map2dTileCoords;
 
     const translate = this.#scratchTranslate.setFromMatrixPosition(this.matrixWorld);
 
     // the tile boxes are built in the local space of the map node, where the renderers draw the
     // tiles; `matrixWorld` takes them into world space once, where the frustum is tested
     this.#tileBoxMatrix.makeTranslation(
-      this.map2dTileCoords.xOffset - this.#centerPoint2D.x,
+      this.#map2dTileCoords.xOffset - this.#centerPoint2D.x,
       0,
-      this.map2dTileCoords.yOffset - this.#centerPoint2D.y,
+      this.#map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
 
     // The tiles the probe rays met are where the search starts. Per ray that is the tile its
@@ -464,7 +534,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     for (let i = 0; i < hitCount; ++i) {
       // The loop bound is the number of points the probe rays found.
       const coords2D = this.#probePlaneCoords[i]!;
-      const around = this.map2dTileCoords.computeTilesWithinCoords(
+      const around = this.#map2dTileCoords.computeTilesWithinCoords(
         coords2D.x - tileWidth / 2,
         coords2D.y - tileHeight / 2,
         tileWidth,
@@ -479,16 +549,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       }
     }
 
-    const reuseTiles: IMap2DTileCoords[] = [];
-    const createTiles: IMap2DTileCoords[] = [];
-
     this.collectTilesWithinProbeHull(hitCount);
 
     for (let i = 0; i < this.#withinHull.length; ++i) {
       // The loop bound is `this.#withinHull.length`.
       const tile = this.#withinHull[i]!;
       this.prepareTile(tile);
-      this.acceptTile(tile, reuseTiles, createTiles);
+      this.acceptTile(tile, this.#reuseTiles, this.#createTiles);
       this.pushNeighbors(tile);
     }
 
@@ -500,7 +567,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       this.prepareTile(tile);
 
       if (this.#cameraFrustum.intersectsBox(tile.frustumBox!)) {
-        this.acceptTile(tile, reuseTiles, createTiles);
+        this.acceptTile(tile, this.#reuseTiles, this.#createTiles);
         this.pushNeighbors(tile);
       }
     }
@@ -526,27 +593,28 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.visibles.sort(sortByDistance);
 
-    const tiles: IMap2DTileCoords[] = new Array(this.visibles.length);
+    this.#tiles.length = 0;
     // The loop bound is `this.visibles.length`.
-    for (let i = 0; i < this.visibles.length; ++i) tiles[i] = this.visibles[i]!.map2dTile!;
+    for (let i = 0; i < this.visibles.length; ++i) this.#tiles.push(this.visibles[i]!.map2dTile!);
 
-    const removeTiles: IMap2DTileCoords[] = [];
-    for (const t of this.#previousTilesById.values()) removeTiles.push(t);
+    this.#removeTiles.length = 0;
+    for (const t of this.#previousTilesById.values()) this.#removeTiles.push(t);
 
     this.#scratchOffset.set(
-      this.map2dTileCoords.xOffset - this.#centerPoint2D.x,
-      this.map2dTileCoords.yOffset - this.#centerPoint2D.y,
+      this.#map2dTileCoords.xOffset - this.#centerPoint2D.x,
+      this.#map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
 
-    return {
-      tiles,
-      createTiles,
-      reuseTiles,
-      removeTiles,
-      offset: this.#scratchOffset,
-      translate,
-      changed: true,
-    };
+    const result = this.#result;
+    result.tiles = this.#tiles;
+    result.createTiles = this.#createTiles;
+    result.reuseTiles = this.#reuseTiles;
+    result.removeTiles = this.#removeTiles;
+    result.offset = this.#scratchOffset;
+    result.translate = translate;
+    result.changed = changed;
+
+    return result;
   }
 
   /**
@@ -565,11 +633,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   private collectTilesWithinProbeHull(hitCount: number): void {
     if (hitCount < MIN_PROBES_FOR_HULL) return;
 
-    const points: TilePoint[] = [];
+    const points = this.#hullPoints;
+    points.length = 0;
     for (let i = 0; i < hitCount; ++i) {
       // The loop bound is the number of points the probe rays found.
       const coords2D = this.#probePlaneCoords[i]!;
-      const [tileLeft, tileTop] = this.map2dTileCoords.getTileCoords(coords2D.x, coords2D.y, 0, 0);
+      const [tileLeft, tileTop] = this.#map2dTileCoords.getTileCoords(coords2D.x, coords2D.y, 0, 0);
       const point = poolAt(this.#probeTiles, i, (): [number, number] => [0, 0]);
       point[0] = tileLeft;
       point[1] = tileTop;
@@ -586,10 +655,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   /** The tile coordinates and the box the frustum test reads, both in the shape of this frame. */
   private prepareTile(tile: TileBox): void {
-    const {tileWidth, tileHeight, xOffset, yOffset} = this.map2dTileCoords;
+    const {tileWidth, tileHeight, xOffset, yOffset} = this.#map2dTileCoords;
 
     // the query reads world coordinates, so the tile coordinate is taken back into that space
-    tile.coords ??= this.map2dTileCoords.computeTilesWithinCoords(
+    tile.coords ??= this.#map2dTileCoords.computeTilesWithinCoords(
       tile.x * tileWidth + xOffset,
       tile.y * tileHeight + yOffset,
       1,
@@ -657,8 +726,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   private setBox(target: Box3, {top, left, width, height}: TilesWithinCoords, scale = 1): Box3 {
-    const sw = width * scale - width;
-    const sh = height * scale - height;
+    const sw = (width * scale - width) / 2;
+    const sh = (height * scale - height) / 2;
     const ground = this.depth * -0.5 * scale;
     const ceiling = this.depth * 0.5 * scale;
     target.min.set(left - sw, ground, top - sh);

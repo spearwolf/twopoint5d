@@ -68,14 +68,35 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     return this;
   }
 
-  findWithin(aabb: AABB2): Set<Renderable> | undefined {
+  /**
+   * The renderables in the cells `aabb` reaches into. Without `out` the answer is a new set, or
+   * `undefined` when nothing lies in those cells.
+   *
+   * With `out` that set is emptied, filled and handed back — empty rather than `undefined` when
+   * nothing lies within — so a caller that asks every frame keeps one set.
+   */
+  findWithin(aabb: AABB2): Set<Renderable> | undefined;
+  findWithin(aabb: AABB2, out: Set<Renderable>): Set<Renderable>;
+  findWithin(aabb: AABB2, out?: Set<Renderable>): Set<Renderable> | undefined {
     const {left, top, width, height} = aabb;
     const [tileLeft, tileTop, tileColumns, tileRows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
-    return this.getTiles(tileLeft, tileTop, tileColumns, tileRows);
+    return out
+      ? this.getTiles(tileLeft, tileTop, tileColumns, tileRows, out)
+      : this.getTiles(tileLeft, tileTop, tileColumns, tileRows);
   }
 
-  getTiles(tileX: number, tileY: number, width = 1, height = 1): Set<Renderable> | undefined {
-    let renderables: Set<Renderable> | undefined;
+  /**
+   * The renderables in the `width` × `height` cells from `(tileX, tileY)` on. Without `out` the
+   * answer is a new set, or `undefined` when nothing lies in those cells.
+   *
+   * With `out` that set is emptied, filled and handed back — empty rather than `undefined` when
+   * nothing lies within.
+   */
+  getTiles(tileX: number, tileY: number, width?: number, height?: number): Set<Renderable> | undefined;
+  getTiles(tileX: number, tileY: number, width: number, height: number, out: Set<Renderable>): Set<Renderable>;
+  getTiles(tileX: number, tileY: number, width = 1, height = 1, out?: Set<Renderable>): Set<Renderable> | undefined {
+    out?.clear();
+    let renderables: Set<Renderable> | undefined = out;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tileSet = this.getTile(tileX + x, tileY + y);

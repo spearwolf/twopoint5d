@@ -100,8 +100,8 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
 
     const tile = this.#tiles.get(tileCoords.id);
     if (tile !== undefined) {
-      // same tiles as last cycle: what updateTile() would write is already in the buffer, and
-      // raising the serial for it costs a full attribute upload in endUpdatingTiles()
+      // the grid stands, so the tile keeps its view coordinates: what updateTile() would write
+      // is already in the buffer, and the call would mark the slot for an upload for nothing
       if (!this.#tilesChanged) return;
 
       tileFactory.updateTile(tile, tileCoords);
