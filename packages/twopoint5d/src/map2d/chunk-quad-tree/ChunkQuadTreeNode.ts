@@ -19,24 +19,13 @@ interface IChunkAxis {
 
 type AABBPropKey = 'top' | 'right' | 'bottom' | 'left';
 
-const scoreAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey, origin: number): IChunkAxis | null => {
-  const chunksCount = chunks.length;
-  let beforeCount = 0;
-  let intersectCount = 0;
-  let afterCount = 0;
-
-  for (let i = 0; i < chunksCount; i++) {
-    // The loop bound is `chunks.length`.
-    const c = chunks[i]!;
-    if (c[beforeKey] <= origin) {
-      beforeCount++;
-    } else if (c[afterKey] >= origin) {
-      afterCount++;
-    } else {
-      intersectCount++;
-    }
-  }
-
+const scoreAxis = (
+  beforeCount: number,
+  intersectCount: number,
+  afterCount: number,
+  chunksCount: number,
+  origin: number,
+): IChunkAxis | null => {
   const noSubdivide =
     (beforeCount === 0 && intersectCount === 0) ||
     (beforeCount === 0 && afterCount === 0) ||
@@ -56,16 +45,43 @@ const scoreAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AAB
 };
 
 const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABBPropKey): IChunkAxis | undefined => {
-  // Sort once so duplicate origin candidates are adjacent and can be skipped.
+  // Sorted in place: `subdivide()` hands the chunks on to the quadrants in this order.
   chunks.sort((a, b) => a[beforeKey] - b[beforeKey]);
-  let best: IChunkAxis | undefined;
-  let lastOrigin = Number.NaN;
-  for (let i = 0; i < chunks.length; i++) {
+
+  const n = chunks.length;
+  // The `afterKey` edges of the chunks that extend along this axis, sorted once.
+  const afterEdges = new Float64Array(n);
+  let extentCount = 0;
+  for (let i = 0; i < n; i++) {
     // The loop bound is `chunks.length`.
+    const c = chunks[i]!;
+    if (c[afterKey] < c[beforeKey]) afterEdges[extentCount++] = c[afterKey];
+  }
+  const edges = afterEdges.subarray(0, extentCount).sort();
+
+  // A chunk that extends along the axis intersects `origin` when its `afterKey` edge lies below
+  // `origin` and its `beforeKey` edge above it. A chunk of width or height 0 (or a negative one)
+  // is never *intersect*: it is *before* from its `beforeKey` edge on and *after* up to there —
+  // so only the chunks with an extent count into `edges`. With the chunks sorted by their
+  // `beforeKey` edge, `before` is the number of chunks up to `origin`, `beforeWithExtent` the
+  // ones among them with an extent and `afterBelow` the number of edges below `origin`; every
+  // chunk with an extent whose `afterKey` edge is below `origin` is either before it or
+  // intersects it, so `afterBelow - beforeWithExtent` of them intersect.
+  let best: IChunkAxis | undefined;
+  let before = 0;
+  let beforeWithExtent = 0;
+  let afterBelow = 0;
+  for (let i = 0; i < n; i = before) {
     const origin = chunks[i]![beforeKey];
-    if (origin === lastOrigin) continue;
-    lastOrigin = origin;
-    const axis = scoreAxis(chunks, beforeKey, afterKey, origin);
+    while (before < n && chunks[before]![beforeKey] <= origin) {
+      const c = chunks[before]!;
+      if (c[afterKey] < c[beforeKey]) beforeWithExtent++;
+      before++;
+    }
+    while (afterBelow < extentCount && edges[afterBelow]! < origin) afterBelow++;
+    const intersect = afterBelow - beforeWithExtent;
+    const after = n - before - intersect;
+    const axis = scoreAxis(before, intersect, after, n, origin);
     if (axis !== null && (best === undefined || axis.distance < best.distance)) {
       best = axis;
     }
@@ -81,7 +97,8 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
  * Each chunk is positioned in a right-hand coordinate system on the XY plane.
  *
  * With `appendChunk()` chunks are added to the node.
- * With `subdivide()` the node is recursively subdivided into children if this is possible.
+ * With `subdivide()` the node is recursively subdivided into children if this is possible;
+ * call it again after `appendChunk()` to split the leaves that were filled since.
  * With `findChunks*()` all chunks in a certain area are found.
  */
 export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
@@ -130,6 +147,9 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     }
   }
 
+  /**
+   * Whether `subdivide()` can split this node itself: a leaf with more than one chunk.
+   */
   canSubdivide() {
     return this.isLeaf && this.chunks.length > 1;
   }
@@ -150,7 +170,19 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     this.nodes.southWest = null;
   }
 
+  /**
+   * Splits a leaf into four quadrants, recursively, as long as a node holds more than
+   * `maxChunkNodes` chunks and an axis separates them. Chunks that cross an axis stay at the node
+   * of that axis.
+   *
+   * On a node that is already split, the call is passed on to its children, so the leaves that
+   * `appendChunk()` has filled since are split too.
+   */
   subdivide(maxChunkNodes = 2): void {
+    if (!this.isLeaf) {
+      for (const child of Object.values(this.nodes)) child?.subdivide(maxChunkNodes);
+      return;
+    }
     if (!this.canSubdivide() || this.chunks.length <= maxChunkNodes) return;
 
     const chunks = this.chunks.slice(0);
@@ -205,6 +237,12 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     return child;
   }
 
+  /**
+   * Puts the chunk into the leaf of the quadrant it lies in (creating that leaf if the quadrant
+   * is empty), or keeps it at the first node whose axis it crosses.
+   *
+   * Splits no node — call `subdivide()` on the root after appending.
+   */
   appendChunk(chunk: ChunkType) {
     if (this.isLeaf) {
       this.chunks.push(chunk);

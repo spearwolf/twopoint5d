@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, test} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
@@ -212,6 +212,174 @@ describe('ChunkQuadTreeNode (extended)', () => {
       };
       walk(n);
       expect(seen.sort()).toEqual(chunks.map((c) => c.toString()).sort());
+    });
+
+    describe('after appendChunk() has filled the leaves', () => {
+      // NW, SW and SE are filled, so the split is at (-5, -5) and the north east is a quadrant
+      // that no chunk occupies yet
+      const buildWithEmptyNorthEast = () => {
+        const a = new StringDataChunk2D({x: -10, y: -10, width: 5, height: 5, data: 'A'});
+        const b = new StringDataChunk2D({x: 10, y: 10, width: 5, height: 5, data: 'B'});
+        const c = new StringDataChunk2D({x: -10, y: 10, width: 5, height: 5, data: 'C'});
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>([a, b, c]);
+        root.subdivide();
+        expect(root.nodes.northEast).toBeNull();
+        return root;
+      };
+
+      // five by five chunks in the north east, on different rows and different columns
+      const northEastChunks = (count: number) =>
+        [
+          new StringDataChunk2D({x: 0, y: -40, width: 5, height: 5, data: 'N1'}),
+          new StringDataChunk2D({x: 10, y: -30, width: 5, height: 5, data: 'N2'}),
+          new StringDataChunk2D({x: 20, y: -20, width: 5, height: 5, data: 'N3'}),
+          new StringDataChunk2D({x: 30, y: -10, width: 5, height: 5, data: 'N4'}),
+        ].slice(0, count);
+
+      const leavesOf = (node: ChunkQuadTreeNode<StringDataChunk2D>): ChunkQuadTreeNode<StringDataChunk2D>[] =>
+        node.isLeaf ? [node] : Object.values(node.nodes).flatMap((child) => (child ? leavesOf(child) : []));
+
+      it('splits the leaves appendChunk() has filled since the node was split', () => {
+        const root = buildWithEmptyNorthEast();
+        for (const chunk of northEastChunks(4)) root.appendChunk(chunk);
+        const northEast = root.nodes.northEast!;
+        expect(northEast.isLeaf).toBe(true);
+        expect(northEast.chunks.map((c) => c.toString())).toEqual(['N1', 'N2', 'N3', 'N4']);
+
+        root.subdivide();
+
+        expect(root.nodes.northEast!.isLeaf).toBe(false);
+        for (const leaf of leavesOf(root.nodes.northEast!)) {
+          expect(leaf.chunks.length).toBeLessThanOrEqual(2);
+        }
+        expect(sortedNames(root.nodes.northEast!.findChunks(new AABB2(0, -50, 100, 44)))).toEqual(['N1', 'N2', 'N3', 'N4']);
+      });
+
+      it('passes maxChunkNodes on to the leaves it splits', () => {
+        const root = buildWithEmptyNorthEast();
+        for (const chunk of northEastChunks(3)) root.appendChunk(chunk);
+        expect(root.nodes.northEast!.chunks.length).toBe(3);
+
+        root.subdivide(4);
+        expect(root.nodes.northEast!.isLeaf).toBe(true);
+
+        root.subdivide(2);
+        expect(root.nodes.northEast!.isLeaf).toBe(false);
+      });
+    });
+  });
+
+  describe('axis choice', () => {
+    type Key = 'top' | 'right' | 'bottom' | 'left';
+
+    // Deliberately naive: it writes the rule out candidate by candidate over all chunks, because
+    // it is the specification of the axis the tree picks, not a second implementation to keep fast.
+    const bruteForceAxis = (chunks: StringDataChunk2D[], beforeKey: Key, afterKey: Key): number | undefined => {
+      const n = chunks.length;
+      const candidates = [...new Set(chunks.map((c) => c[beforeKey]))].sort((a, b) => a - b);
+      let best: {origin: number; distance: number} | undefined;
+      for (const origin of candidates) {
+        let before = 0;
+        let intersect = 0;
+        let after = 0;
+        for (const c of chunks) {
+          if (c[beforeKey] <= origin) before++;
+          else if (c[afterKey] >= origin) after++;
+          else intersect++;
+        }
+        const zeros = Number(before === 0) + Number(intersect === 0) + Number(after === 0);
+        if (zeros >= 2) continue;
+        const beforeDistance = Math.abs(0.5 - before / n);
+        const afterDistance = Math.abs(0.5 - after / n);
+        const distance =
+          beforeDistance +
+          (intersect / n) * ChunkQuadTreeNode.IntersectDistanceFactor +
+          afterDistance +
+          Math.abs(afterDistance - beforeDistance) * ChunkQuadTreeNode.BeforeAfterDeltaFactor;
+        if (best === undefined || distance < best.distance) best = {origin, distance};
+      }
+      return best?.origin;
+    };
+
+    // a seed that keeps the layout with zero-sized chunks clear of the runaway recursion of
+    // `subdivide()` on chunks that sit on their own axis; every layout shares it
+    const makeRandom = () => {
+      let seed = 47514;
+      return () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+    };
+
+    type Layout = (i: number, rnd: () => number) => {x: number; y: number; width: number; height: number};
+
+    const free: Layout = (_i, rnd) => ({
+      x: rnd() * 200 - 100,
+      y: rnd() * 200 - 100,
+      width: 1 + rnd() * 20,
+      height: 1 + rnd() * 20,
+    });
+
+    const raster: Layout = (_i, rnd) => ({
+      x: Math.floor(rnd() * 40) * 5 - 100,
+      y: Math.floor(rnd() * 40) * 5 - 100,
+      width: (1 + Math.floor(rnd() * 4)) * 5,
+      height: (1 + Math.floor(rnd() * 4)) * 5,
+    });
+
+    const rasterWithNoExtent: Layout = (i, rnd) => {
+      const box = raster(i, rnd);
+      if (i % 10 === 3) box.width = 0;
+      if (i % 10 === 7) box.height = 0;
+      return box;
+    };
+
+    // `AABB2` does not check the size, so `right` lies to the left of `left` here
+    const rasterWithNegativeWidth: Layout = (i, rnd) => {
+      const box = raster(i, rnd);
+      if (i % 8 === 5) box.width = -3;
+      return box;
+    };
+
+    const subtreeOf = (node: ChunkQuadTreeNode<StringDataChunk2D>): StringDataChunk2D[] => [
+      ...node.chunks,
+      ...Object.values(node.nodes).flatMap((child) => (child ? subtreeOf(child) : [])),
+    ];
+
+    const allNodes = (node: ChunkQuadTreeNode<StringDataChunk2D>): ChunkQuadTreeNode<StringDataChunk2D>[] => [
+      node,
+      ...Object.values(node.nodes).flatMap((child) => (child ? allNodes(child) : [])),
+    ];
+
+    test.each([
+      ['free positions and sizes', free],
+      ['sizes and positions on a raster', raster],
+      ['a raster with chunks of width or height 0', rasterWithNoExtent],
+      ['a raster with chunks of negative width', rasterWithNegativeWidth],
+    ] as const)('picks the axes the rule of the candidates gives: %s', (_name, layout) => {
+      for (const count of [40, 97, 200]) {
+        const rnd = makeRandom();
+        const chunks = Array.from({length: count}, (_, i) => {
+          return new StringDataChunk2D({...layout(i, rnd), data: `c${i}`});
+        });
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);
+        root.subdivide(2);
+
+        let inner = 0;
+        for (const node of allNodes(root)) {
+          const subtree = subtreeOf(node);
+          const expectedX = bruteForceAxis(subtree, 'right', 'left');
+          const expectedY = bruteForceAxis(subtree, 'bottom', 'top');
+          if (node.isLeaf) {
+            if (subtree.length > 2) expect(expectedX === undefined || expectedY === undefined).toBe(true);
+          } else {
+            inner++;
+            expect(node.originX).toBe(expectedX);
+            expect(node.originY).toBe(expectedY);
+          }
+        }
+        expect(inner).toBeGreaterThan(0);
+      }
     });
   });
 
@@ -484,7 +652,7 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const t0 = performance.now();
       n.subdivide(8);
       const dt = performance.now() - t0;
-      // Loose budget — current O(n²) implementation can do ~1k chunks well under 250ms
+      // Loose budget — 1k chunks subdivide in a few milliseconds
       expect(dt).toBeLessThan(1000);
     });
 

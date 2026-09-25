@@ -244,6 +244,66 @@ describe('RepeatingTilesProvider', () => {
         expect(mismatches).toEqual([]);
       });
     });
+    describe('a target of another length than width × height', () => {
+      const providers = {
+        vertical: () =>
+          new RepeatingTilesProvider(
+            [
+              [1, 2],
+              [3, 4],
+            ],
+            'vertical',
+          ),
+        horizontal: () =>
+          new RepeatingTilesProvider(
+            [
+              [1, 2],
+              [3, 4],
+            ],
+            'horizontal',
+          ),
+        none: () =>
+          new RepeatingTilesProvider(
+            [
+              [1, 2],
+              [3, 4],
+            ],
+            'none',
+          ),
+        'a pattern without cells': () => new RepeatingTilesProvider(),
+      };
+
+      test.each(Object.keys(providers) as (keyof typeof providers)[])(
+        '%s: leaves the cells past width × height of a longer target as they are',
+        (name) => {
+          const provider = providers[name]();
+          // one rectangle that meets the pattern, one that lies wholly outside of it (for 'vertical'
+          // left of 10 is outside, for 'horizontal' top of 10)
+          for (const [left, top] of [
+            [-1, -1],
+            [10, 10],
+          ] as const) {
+            const width = 3;
+            const height = 2;
+            const target = new Uint32Array(width * height + 3).fill(666);
+
+            provider.getTileIdsWithin(left, top, width, height, target);
+
+            const expected = Array.from({length: width * height}, (_, i) =>
+              provider.getTileIdAt(left + (i % width), top + Math.floor(i / width)),
+            );
+            expect(Array.from(target)).toEqual([...expected, 666, 666, 666]);
+          }
+        },
+      );
+
+      test.each(Object.keys(providers) as (keyof typeof providers)[])(
+        '%s: refuses a target shorter than width × height',
+        (name) => {
+          expect(() => providers[name]().getTileIdsWithin(0, 0, 3, 2, new Uint32Array(5))).toThrow(RangeError);
+        },
+      );
+    });
     describe('a limitToAxis outside the type', () => {
       const pattern = [
         [1, 2, 3, 4],
@@ -380,13 +440,13 @@ describe('RepeatingTilesProvider', () => {
         ]);
         // prettier-ignore
         expect(
-        Array.from(
-          new RepeatingTilesProvider([1, 2, 3, 4], 'vertical').getTileIdsWithin(-1, 0, 3, 2, new Uint32Array(6).fill(666)),
-        ),
-      ).toEqual([
-        0, 1, 2,
-        0, 1, 2,
-      ]);
+          Array.from(
+            new RepeatingTilesProvider([1, 2, 3, 4], 'vertical').getTileIdsWithin(-1, 0, 3, 2, new Uint32Array(6).fill(666)),
+          ),
+        ).toEqual([
+          0, 1, 2,
+          0, 1, 2,
+        ]);
         // prettier-ignore
         expect(
           Array.from(

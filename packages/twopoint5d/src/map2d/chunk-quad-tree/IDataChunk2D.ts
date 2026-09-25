@@ -12,8 +12,6 @@ export interface IDataChunk2D {
   right: number;
   bottom: number;
 
-  // readDataIdAt(x: number, y: number): number;
-
   containsDataAt(x: number, y: number): boolean;
   isIntersecting(aabb: AABB2): boolean;
 }

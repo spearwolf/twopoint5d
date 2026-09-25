@@ -156,7 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
 - `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
 - `Map2D#tileStreamer` hands the view center over to the streamer that takes over — `centerX` and `centerY` read the same values afterwards as before — and has the tiles built again: the renderers come off the streamer that leaves empty, and the streamer taking over lays out the whole set in its own grid. The tile grid stays with the streamer that carries it, `tileWidth`, `tileHeight`, `xOffset` and `yOffset` among it. The visibilitor goes with the map: when the map has one, the streamer that leaves gives it up — its `visibilitor` answers `undefined` afterwards — and the streamer taking over holds it in place of one of its own; when the map has none, the streamer taking over keeps its own. A visibilitor instance serves exactly one streamer
-- `DataIdsChunk2D#prepareData()` names the compression it cannot handle in the error it throws and writes nothing to the console: the caller reads the reason off the error, in a message that cannot be silenced away
+- `DataIdsChunk2D#prepareData()` refuses data that names a compression — a field the type does not declare, but data from a map file can carry — at the first read, with an error that names the compression, and writes nothing to the console: the caller reads the reason off the error, in a message that cannot be silenced away
 - perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
 - perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
 - perf `Map2D#update()` leaves the world matrix to the tile streamer, which brings it up to date with `updateWorldMatrix(true, false)` — the parent chain first — on every update that has a visibilitor and a tile renderer to lay out tiles for. An update that is missing either of the two touches no matrix, and the three.js renderer brings the scene graph up to date before it draws
@@ -204,6 +204,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `IMap2DVisibleTiles#changed`: `CameraBasedVisibility` and `RectangularVisibilityArea` answer `false` for a view that moves while the tile grid stands, `true` on their first result and on a new grid. A custom `IMap2DTileRenderer` gets `tilesChanged: false` in `beginUpdatingTiles()` on such frames and may leave the tiles it holds alone; tiles that come and go still arrive through `addTile()` and `removeTile()`
 - perf `TileSpritesFactory` uploads the instance slots that were written and no others: `updateTile()` marks the slot of its tile, and `update()` no longer asks for a full upload of the instance attributes. Together with the line above, a view that scrolls without a tile coming or going sends no tile data to the gpu
 - perf `CameraBasedVisibility` and `RectangularVisibilityArea` hand back the same result object and the same lists on every call, as `IMap2DVisibleTiles` allows; a caller that keeps a list beyond the next call copies it. `Map2DTileStreamer` hands the visibilitor a view-center tuple it reuses
+- `ChunkQuadTreeNode#subdivide()` on a node that is already split passes the call on to its children: the leaves that `appendChunk()` has filled since are split too, with the `maxChunkNodes` of the call. After `appendChunk()`, call `subdivide()` on the root
+- perf `ChunkQuadTreeNode#subdivide()` picks the axes of a node of n chunks in O(n log n) from its edges, sorted once per axis
+- `DataIdsChunk2D` takes exactly `width × height` ids: a `uint32Arr` of another length throws a `RangeError` from the constructor, a base64 string of another length at the first read
+- `RepeatingTilesProvider#getTileIdsWithin()` writes the first `width × height` cells of a `target` and leaves the cells behind them as they are; a `target` shorter than that throws a `RangeError`
 
 ### Deprecated
 
@@ -221,6 +225,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove `meshCount` from `VertexObjectDescription`, and with it the `VertexObjectDescriptor#meshCount` getter and `VertexObjectDescriptor#getInstanceCount()`. Every instanced attribute of a geometry advances once per instance, and the `instanceCount` of an instanced geometry is the `usedCount` of its pool
 - remove the declaration maps and the source maps from the published package: both pointed at the TypeScript sources under `src/`, which the package does not contain, so neither "Go to definition" nor a debugger found anything behind them. The `.d.ts` and `.js` files only lose their `sourceMappingURL` comment
 - remove the exports `postFixID` and `globalStylesID`: the class name `Stylesheets` hands out comes whole from the return value of `installRule()`, `retainRule()` and `addRule()`, and `globalStylesID` named a `<style>` element the module does not create — see the migration guide
+- remove `compression` from `StringDataIdsChunk2DParams`: the chunk decodes plain base64 only. See the Migration Guide
 
 ### Fixed
 
@@ -651,6 +656,26 @@ streamer.update(mapNode); // node placed at mapNode's world position + offset
 ```ts
 mapNode.add(renderer.node);
 streamer.update(mapNode); // node placed at offset, carried into the world by mapNode
+```
+
+#### A `DataIdsChunk2D` takes plain base64 ids of its own size
+
+The field `compression` is gone from `StringDataIdsChunk2DParams`; the chunk decodes plain base64 only. It takes exactly `width × height` ids.
+
+**Before**
+
+```ts
+new DataIdsChunk2D({x: layer.x, y: layer.y, width: layer.width, height: layer.height, data: layer.data, compression: layer.compression});
+```
+
+**After**
+
+```ts
+if (layer.compression) throw new Error(`cannot read a ${layer.compression} layer`);
+new DataIdsChunk2D({x: layer.x, y: layer.y, width: layer.width, height: layer.height, data: layer.data});
+
+new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array(3)});
+// → RangeError: DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3
 ```
 
 #### `DependencyProp` is gone
