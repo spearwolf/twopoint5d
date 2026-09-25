@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="audit-template-version" content="2.0.0">
+<meta name="audit-template-version" content="2.1.0">
 <title>Audit</title>
 <script id="audit-data" type="application/json">{
   "schemaVersion": 2,
   "meta": {
     "generator": "js-ts-project-audit",
     "lang": "de",
-    "templateVersion": "2.0.0",
-    "generatedAt": "2026-09-24T20:42:39.656Z"
+    "templateVersion": "2.1.0",
+    "generatedAt": "2026-09-25T15:42:53.921Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,21 +198,21 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 71,
-        "penalty": 59.5,
+        "score": 74,
+        "penalty": 52.5,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 15,
-          "low": 39,
+          "medium": 12,
+          "low": 37,
           "info": 24
         },
         "byCategory": {
-          "correctness": 16,
-          "api": 19,
+          "correctness": 15,
+          "api": 16,
           "consistency": 9,
           "performance": 6,
-          "completeness": 5,
+          "completeness": 4,
           "security": 1,
           "resources": 1,
           "architecture": 2,
@@ -225,19 +225,19 @@
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 67,
-        "penalty": 30,
+        "score": 68,
+        "penalty": 28.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 7,
-          "low": 32,
+          "medium": 6,
+          "low": 33,
           "info": 17
         },
         "byCategory": {
-          "dx": 28,
+          "dx": 29,
           "types": 3,
-          "testing": 14,
+          "testing": 13,
           "dependencies": 3,
           "consistency": 3,
           "completeness": 1,
@@ -251,8 +251,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 103,
-        "score": 77
+        "findings": 98,
+        "score": 79
       },
       {
         "name": "workspace",
@@ -265,8 +265,8 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 9,
-        "score": 96
+        "findings": 8,
+        "score": 96.5
       },
       {
         "name": "lookbook",
@@ -276,9 +276,9 @@
         "score": 95
       }
     ],
-    "resolvedCount": 78,
+    "resolvedCount": 87,
     "scoreModel": 2,
-    "score": 69,
+    "score": 71,
     "scoring": {
       "model": 2,
       "weights": {
@@ -295,42 +295,41 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 22,
-      "low": 71,
+      "medium": 18,
+      "low": 70,
       "info": 41
     },
     "byCategory": {
-      "correctness": 16,
-      "api": 19,
+      "correctness": 15,
+      "api": 16,
       "consistency": 12,
       "performance": 6,
-      "dx": 35,
-      "completeness": 6,
+      "dx": 36,
+      "completeness": 5,
       "security": 1,
       "resources": 1,
       "types": 7,
       "architecture": 2,
-      "testing": 18,
+      "testing": 17,
       "dependencies": 3,
       "async": 1,
       "readability": 8,
       "build": 1
     },
     "byComponent": {
-      "map2d": 27,
+      "map2d": 29,
       "texture": 27,
       "stage": 25,
-      "sprites": 8,
       "controls": 4
     },
     "counts": {
-      "findings": 136,
+      "findings": 131,
       "improvements": 15,
       "byStatus": {
-        "new": 42,
-        "unchanged": 11,
-        "improved": 7,
-        "carried-over": 76
+        "new": 43,
+        "unchanged": 10,
+        "carried-over": 73,
+        "improved": 5
       }
     },
     "deltaBreakdown": {
@@ -340,8 +339,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-24",
-      "ref": "2026-09-24"
+      "date": "2026-09-25",
+      "ref": "2026-09-25"
     }
   },
   "portrait": {
@@ -1167,71 +1166,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "API-027",
-      "category": "api",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Die three.js-Materialparameter weiterreichen, die die Sprite-Materialien deklarieren",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.ts:115-124",
-      "locations": [
-        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.ts:12-16",
-        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:49-50"
-      ],
-      "description": "Der Parameter-Typ erweitert `NodeMaterialParameters`, der Konstruktor ruft aber `super()` ohne Argumente auf, liest nur `name`, `colorMap` und `renderAsBillboards` und ruft kein `setValues()` auf. `new AnimatedSpritesMaterial({transparent: true, blending: AdditiveBlending, depthWrite: false})` kompiliert und hat keine Wirkung.",
-      "recommendation": "Die eigenen Keys herausnehmen, den Rest per `this.setValues(rest)` anwenden und mit einem Spec prüfen, etwa auf `transparent` und `depthWrite`.",
-      "effort": "S",
-      "status": "improved",
-      "previousSeverity": "high",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-116",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Billboard-Rechnung in einem Raum führen, damit transformierte Meshes korrekt drehen",
-      "location": "packages/twopoint5d/src/sprites/node-utils.ts:47-56",
-      "description": "`look = normalize(cameraPosition - billboardPosition)` zieht eine Weltposition von einer Modellposition ab, `cameraUp` stammt aus der `modelViewMatrix`. Das stimmt nur mit einer Identitäts-Weltmatrix. Wird ein Sprite-Mesh mit `renderAsBillboards` verschoben, gedreht oder skaliert, zeigen die Billboards auf den falschen Punkt und stehen schief. Der Browser-Test prüft nur ein Mesh im Ursprung.",
-      "recommendation": "Kameraposition per `modelWorldMatrixInverse` in den Modellraum holen oder die Rechnung konsequent im View-Space führen. Dazu ein Browser-Test mit verschobenem Mesh.",
-      "effort": "S",
-      "status": "new",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-013",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Das Instanzattribut color von TexturedSprite im Shader auswerten oder entfernen",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:65",
-      "locations": [
-        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:33-35",
-        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.ts:148-159"
-      ],
-      "description": "Der Deskriptor legt pro Instanz vier Floats `r,g,b,a` an, `voInitialize` setzt sie auf Weiß, und die API bietet `setColor()`/`setColorValues()` an. Der `colorNode` des Materials besteht aber nur aus dem Textur-Sample, kein Shader liest `color`. Tint und Alpha wirken nicht, und jedes Sprite lädt 16 Byte umsonst hoch.",
-      "recommendation": "Im Farb-Effect mit `attribute('color')` multiplizieren oder Attribut und Methoden als Breaking Change entfernen.",
-      "effort": "S",
-      "status": "new",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-038",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Den AnimatedSprites-Materialparameter als das typisieren, was das Feld deklariert",
-      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:7-15",
-      "description": "Der Konstruktor nimmt `material?: Material`, das Feld deklariert `AnimatedSpritesMaterial | undefined`. Ein fremdes Material passt durch die Typprüfung, und die Deklaration stimmt dann nicht mehr.",
-      "recommendation": "Den Konstruktorparameter auf `AnimatedSpritesMaterial` verengen.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "BUG-121",
       "category": "correctness",
       "domain": "code",
@@ -1545,20 +1479,6 @@
       "component": "controls"
     },
     {
-      "id": "TEST-005",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Die Sprite-Geometrien, node-utils und die Effektpfade der Materialien mit Specs abdecken",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.spec.ts:20",
-      "description": "Das sprites-Verzeichnis hat vier Specs, und alle testen nur \u003ccode>dispose()\u003c/code>. Es gibt keine \u003ccode>TexturedSpritesGeometry.spec.ts\u003c/code>/\u003ccode>AnimatedSpritesGeometry.spec.ts\u003c/code> (der \u003ccode>attributeUsage\u003c/code>- + \u003ccode>size\u003c/code>/\u003ccode>position\u003c/code>-Alias-Pfad, der \u003ccode>make()\u003c/code>-Aufruf und der »base pool has no room«-Throw sind unausgeführt), keine \u003ccode>node-utils.spec.ts\u003c/code>, und \u003ccode>BaseSprite.make\u003c/code>, \u003ccode>TexturedSprite.setFrame/setColor/getColor\u003c/code> und der \u003ccode>[voInitialize]\u003c/code>-Weiß-Default sind ungetestet. Am Material assertiert nichts, dass \u003ccode>renderAsBillboards = true\u003c/code> den \u003ccode>positionNode\u003c/code> tauscht, dass \u003ccode>colorMap\u003c/code> den \u003ccode>colorNode\u003c/code> zu einem \u003ccode>TextureNode\u003c/code> macht oder dass ein \u003ccode>texCoordsNode\u003c/code>-Write den Farbeffekt erneut laufen lässt — genau die reaktive Verdrahtung, die der Remediation-Lauf gerade umgebaut hat. API-027 und BUG-089 sind die Art Regression, die solche Specs gefangen hätten.",
-      "recommendation": "Specs, die (1) die Geometrie mit \u003ccode>{capacity, attributeUsage: {dynamic: ['size']}}\u003c/code> bauen und \u003ccode>quadSize\u003c/code>-Usage am Descriptor assertieren; (2) ein Sprite anlegen, \u003ccode>setFrame\u003c/code>/\u003ccode>setColor\u003c/code>/\u003ccode>getColor\u003c/code>/\u003ccode>setSize\u003c/code> rufen und die Pool-Arrays lesen; (3) am Material \u003ccode>positionNode\u003c/code>/\u003ccode>colorNode\u003c/code>-Identitätswechsel und \u003ccode>version\u003c/code>-Inkremente assertieren; (4) für \u003ccode>node-utils\u003c/code> jeden Helfer konstruieren und Node-Typen prüfen.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-015",
       "category": "testing",
       "domain": "harness",
@@ -1656,20 +1576,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-023",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die Material-Effekte stoppen, bevor dispose() ihre Eingaben leert",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.ts:168",
-      "description": "signalize-Effekte laufen synchron bei einem Write auf ein Signal, das sie lesen. \u003ccode>AnimatedSpritesMaterial.dispose()\u003c/code> mit gesetzter colorMap nachvollzogen: \u003ccode>#animsMap.set(undefined)\u003c/code> lässt den anims-Effekt erneut laufen (baut \u003ccode>vec4\u003c/code>, setzt \u003ccode>texCoordsNode\u003c/code>, \u003ccode>needsUpdate = true\u003c/code>), der den colorNode-Effekt erneut laufen lässt (baut einen neuen \u003ccode>texture()\u003c/code>-Node), dann lässt \u003ccode>#colorMap.set(undefined)\u003c/code> den colorNode-Effekt noch einmal laufen. Drei Effekt-Läufe, zwei frische TSL-Teilgraphen und drei \u003ccode>version++\u003c/code> auf einem Material, das gerade weggeworfen wird — direkt bevor \u003ccode>SignalGroup.delete(this)\u003c/code> die Effekte ohnehin entfernt hätte. Für die Korrektheit harmlos, aber vergeudete Arbeit bei jedem Teardown.",
-      "recommendation": "Die Handles aus \u003ccode>createEffect()\u003c/code> behalten und deren \u003ccode>destroy()\u003c/code> am Anfang von \u003ccode>dispose()\u003c/code> rufen (oder die Effekt-Rümpfe mit einem \u003ccode>#disposing\u003c/code>-Flag guarden), dann die Signale leeren, damit die Getter \u003ccode>undefined\u003c/code> antworten, dann \u003ccode>SignalGroup.delete(this)\u003c/code>. Das hält die dokumentierte »release before delete«-Reihenfolge.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "sprites",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2246,20 +2152,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "API-059",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Den Optional-Chain auf basePool auflösen oder die Deklaration korrigieren",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesGeometry.ts:62",
-      "description": "\u003ccode>this.basePool?.createVO()\u003c/code> benutzt den Optional-Chain auf einem Feld, das als nicht-optional deklariert ist (\u003ccode>declare basePool: TexturedSpritesBasePool\u003c/code>). Entweder lügt die Deklaration — \u003ccode>InstancedVOBufferGeometry.ts:27\u003c/code> sagt, \u003ccode>basePool\u003c/code> sei optional, sobald eine \u003ccode>BufferGeometry\u003c/code> übergeben wird — oder das \u003ccode>?.\u003c/code> ist überflüssig. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Entscheiden, welche der beiden Aussagen gilt, und die andere anpassen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-003",
       "category": "dx",
       "domain": "harness",
@@ -2297,20 +2189,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "workspace"
-    },
-    {
-      "id": "TEST-009",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Browser-Suite kompiliert kein einziges Sprite-Material und liest nie ein Pixel zurück",
-      "location": "packages/twopoint5d-testing/test/sprites-rotation.test.js:91-108",
-      "description": "Was die 20 Browser-Testdateien (3374 Zeilen, beide Browser fahren jede Datei) prüfen, sind Verträge und Buchführung: Buffer-Versionen, Update-Ranges, \u003ccode>renderer.info.memory\u003c/code>, DOM-Nebenwirkungen, Dispose-Semantik — gut, und sie lesen GPU-Buffer zurück. Was sie nie tun: \u003ccode>TexturedSprites\u003c/code>, \u003ccode>AnimatedSprites\u003c/code>, ihre Materialien, \u003ccode>Canvas2DStage\u003c/code>, \u003ccode>OrthographicProjection\u003c/code> oder die TSL-Helfer \u003ccode>vertexByInstancePosition\u003c/code>/\u003ccode>colorFromTextureByTexCoords\u003c/code> instanziieren; nur \u003ccode>TileSpritesMaterial\u003c/code> wird kompiliert, ohne Textur. Kein Test liest ein gerendertes Pixel. Ein kaputter TSL-Graph in einem Sprite-Material passiert das volle Gate und wird nur von einem Menschen gefunden, der die Lookbook öffnet. Der Vorlauf führte daneben das Verhältnis 62 Specs zu 20 Browsertests als eigenen Punkt (TEST-003); die Zahl ist nicht das Problem, die Lücke ist es.",
-      "recommendation": "Eine Smoke-Datei pro Materialfamilie: Mesh mit 2×2-DataTexture bauen, einen Frame in ein \u003ccode>RenderTarget\u003c/code> rendern, \u003ccode>renderer.readRenderTargetPixelsAsync\u003c/code> und den Mittelpixel gegen die Texturfarbe assertieren. Die Assertion ist backend-agnostisch. Die Lookbook-Assets wiederverwenden, wie \u003ccode>texture-store-on.test.js\u003c/code> es schon tut.",
-      "effort": "M",
-      "status": "improved",
-      "previousSeverity": "medium",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "DEPS-004",
@@ -2689,27 +2567,6 @@
       }
     },
     {
-      "id": "TYPE-023",
-      "category": "types",
-      "domain": "code",
-      "severity": "low",
-      "title": "AnimatedSprites deklariert geometry und material enger, als three sie belegt",
-      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:8",
-      "locations": [
-        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:11"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-23. \u003ccode>declare geometry: AnimatedSpritesGeometry | undefined\u003c/code> und \u003ccode>declare material: AnimatedSpritesMaterial | undefined\u003c/code>: Ohne Argumente hält das Mesh die nackte \u003ccode>BufferGeometry\u003c/code> und das \u003ccode>MeshBasicMaterial\u003c/code> von \u003ccode>THREE.Mesh\u003c/code>. Der Konstruktor nimmt außerdem jedes \u003ccode>Material\u003c/code>, das die Deklaration dann \u003ccode>AnimatedSpritesMaterial\u003c/code> nennt. \u003ccode>VertexObjects\u003c/code> und \u003ccode>TileSprites\u003c/code> sind für dieselbe Ursache bereits generisch über die Geometrie.",
-      "recommendation": "Wie bei \u003ccode>TileSprites\u003c/code>: generisch über die Geometrie mit Default \u003ccode>BufferGeometry\u003c/code>, und das Material als \u003ccode>AnimatedSpritesMaterial | MeshBasicMaterial | undefined\u003c/code> typisieren. Dazu ein Typtest für den argumentlosen Konstruktor.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "component": "sprites",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-23"
-      }
-    },
-    {
       "id": "DOC-068",
       "category": "dx",
       "domain": "code",
@@ -2815,6 +2672,81 @@
       "status": "new",
       "package": "twopoint5d-testing",
       "effort": "S"
+    },
+    {
+      "id": "TEST-047",
+      "category": "testing",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Kein Browser-Test rendert Canvas2DStage oder OrthographicProjection und liest ein Pixel zurück",
+      "location": "packages/twopoint5d-testing/test/",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Die Sprite-Materialien haben inzwischen Pixel-Tests (\u003ccode>sprites-textured-material.test.js\u003c/code>, \u003ccode>sprites-animated-material.test.js\u003c/code>, \u003ccode>sprites-billboard.test.js\u003c/code>). \u003ccode>Canvas2DStage\u003c/code> und \u003ccode>OrthographicProjection\u003c/code> werden in der Browser-Suite dagegen nie instanziiert und nie gerendert. Ein kaputter Render-Pfad dort passiert das volle Gate. Das Finding hängt mit TEST-022 zusammen, dort fehlen die Specs der stage-Schicht.",
+      "recommendation": "Je eine Smoke-Datei: Stage mit bekannter Füllung in ein \u003ccode>RenderTarget\u003c/code> rendern und das Pixel über \u003ccode>renderToPixels\u003c/code>/\u003ccode>rgbAt\u003c/code> aus \u003ccode>test/helpers/fixtures.js\u003c/code> assertieren.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-25"
+      }
+    },
+    {
+      "id": "PERF-032",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "TileSpritesMaterial.dispose() baut vor dem Löschen noch einen colorNode",
+      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesMaterial.ts:105-112",
+      "locations": [
+        "packages/twopoint5d/src/map2d/TileSprites/TileSpritesMaterial.ts:83"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. \u003ccode>dispose()\u003c/code> leert \u003ccode>colorMap\u003c/code>, solange der Farb-Effekt (\u003ccode>:83\u003c/code>) noch lebt. Der Effekt läuft deshalb erneut und baut direkt vor \u003ccode>SignalGroup.delete()\u003c/code> einen neuen \u003ccode>colorNode\u003c/code>, auf einem Material, das gerade weggeworfen wird. Die Sprite-Materialien zerstören ihre Effekt-Handles am Anfang von \u003ccode>dispose()\u003c/code>. Für die Korrektheit ist das harmlos, aber es ist vergeudete Arbeit bei jedem Teardown.",
+      "recommendation": "Wie in \u003ccode>TexturedSpritesMaterial\u003c/code>: das Handle aus \u003ccode>createEffect()\u003c/code> behalten, es am Anfang von \u003ccode>dispose()\u003c/code> zerstören, danach die Signale leeren. Dazu ein Spec, der prüft, dass \u003ccode>dispose()\u003c/code> weder \u003ccode>colorNode\u003c/code> noch \u003ccode>version\u003c/code> ändert.",
+      "effort": "S",
+      "status": "new",
+      "component": "map2d",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-25"
+      }
+    },
+    {
+      "id": "TYPE-024",
+      "category": "types",
+      "domain": "code",
+      "severity": "low",
+      "title": "TileSpritesGeometry deklariert basePool und instancedPool ohne readonly",
+      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesGeometry.ts:7-10",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/InstancedVertexObjectGeometry.ts:19-20"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Der Interface-Merge deklariert beide Pool-Felder ohne das \u003ccode>readonly\u003c/code>, das \u003ccode>InstancedVertexObjectGeometry\u003c/code> trägt. Damit sind Schreibzugriffe erlaubt, die die Geometrie nicht mitbekommt. \u003ccode>TexturedSpritesGeometry\u003c/code> und \u003ccode>AnimatedSpritesGeometry\u003c/code> deklarieren ihre Pool-Felder \u003ccode>readonly\u003c/code>.",
+      "recommendation": "Beide Felder \u003ccode>readonly\u003c/code> deklarieren, mit einem Typtest (\u003ccode>@ts-expect-error\u003c/code> auf die Zuweisung) wie in \u003ccode>TexturedSpritesGeometry.spec.ts\u003c/code>.",
+      "effort": "S",
+      "status": "new",
+      "component": "map2d",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-25"
+      }
+    },
+    {
+      "id": "DOC-070",
+      "category": "dx",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Das Sprite-Feature-Proposal erzählt die Reihenfolge der lokalen Transformationen rückblickend",
+      "location": "packages/twopoint5d/docs/proposals/sprite-features.md:50-56",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Der Spiegelstrich zur Reihenfolge der lokalen Transformationen beschreibt den Vorzustand (»used to rotate the unit quad …«) statt der geltenden Reihenfolge. Sachlich ist er richtig, aber er zwingt den Leser, einen Stand zu rekonstruieren, den es nicht mehr gibt.",
+      "recommendation": "Den Absatz im Präsens formulieren: welche Transformation in welcher Reihenfolge gilt.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-25"
+      }
     }
   ],
   "openQuestions": [
@@ -2841,7 +2773,8 @@
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus einem Einzel-Fix auf `main` ohne Remediation-Plan: 1 Commit (`3d8bb8b1`). BUG-124 (werfender `OnDisplayStart`-Listener: alle Listener hören das Event, danach User-Pause wie `stop()`, `start()` rejected) und ASYNC-007 (bei verborgener Seite wartet die WebGPU-Freigabe bis zur Sichtbarkeit und zwei Frames) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 1 induzierter kleiner Befund ging als neues Finding ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. 4 Nebenbefunde außerhalb der beiden Domains gingen neu ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -2977,6 +2910,17 @@
         "harness": 67
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-25",
+      "score": 71,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 74,
+        "harness": 68
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -3038,6 +2982,16 @@
       "inducedFixed": 4,
       "inducedOpen": 0,
       "discovered": 5,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-25",
+      "source": "remediation",
+      "ref": "2026-09-25",
+      "fixed": 9,
+      "inducedFixed": 4,
+      "inducedOpen": 0,
+      "discovered": 6,
       "attribution": "reviewed"
     }
   ],
@@ -3185,9 +3139,13 @@
   try {
     var d = JSON.parse(document.getElementById('audit-data').textContent);
     window.__AUDIT__ = d;
+    // Vorrang: Wahl des Lesers in diesem Browser, dann ein im Datensatz festgelegtes
+    // Theme, sonst das Farbschema des Systems.
     var t = null;
     try { t = localStorage.getItem('audit-theme:' + d.summary.project); } catch (e) {}
-    document.documentElement.setAttribute('data-theme', t === 'light' || t === 'dark' ? t : (d.summary.theme === 'dark' ? 'dark' : 'light'));
+    var pinned = d.summary.theme === 'light' || d.summary.theme === 'dark' ? d.summary.theme : null;
+    var system = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t === 'light' || t === 'dark' ? t : pinned || system);
     document.documentElement.lang = d.meta && d.meta.lang === 'en' ? 'en' : 'de';
   } catch (e) {}
 })();
@@ -3229,7 +3187,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 400 1rem/1.65 ui-sans-serif, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
-  padding: clamp(16px, 3vw, 40px) clamp(16px, 4vw, 64px) 64px;
+  padding: clamp(16px, 3vw, 40px) clamp(16px, 7vw, 160px) 64px;
   overflow-wrap: break-word;
 }
 h1, h2, h3 { font-weight: 600; line-height: 1.25; margin: 0; }
@@ -3241,6 +3199,7 @@ code { font: 0.9em/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; back
 p { margin: 0 0 0.8em; }
 ul { margin: 0 0 0.8em; padding-left: 1.3em; }
 .prose { max-width: 72ch; }
+.prose.wide { max-width: none; }
 .prose > :last-child { margin-bottom: 0; }
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
@@ -3280,9 +3239,11 @@ section { margin-top: clamp(32px, 4vw, 52px); }
 /* Diagramme */
 figure { margin: 22px 0 0; }
 figcaption { font-size: 0.875rem; color: var(--muted); margin-top: 10px; max-width: 72ch; }
-.layered { position: relative; max-width: 960px; display: flex; flex-direction: column; gap: 44px; padding: 8px 0; }
+.diagram { margin-top: clamp(28px, 4vw, 48px); padding: clamp(20px, 3vw, 40px) clamp(0px, 3vw, 40px); }
+.diagram figcaption { margin: 18px auto 0; text-align: center; }
+.layered { position: relative; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 64px; padding: 8px 0; }
 .layer { position: relative; z-index: 1; }
-.layer-label { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.layer-label { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
 .layer-nodes { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .node { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 8px; padding: 8px 14px; text-align: center; font-size: 0.9rem; max-width: 260px; color: var(--text); font-family: inherit; line-height: 1.35; }
 .node small { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
@@ -3293,7 +3254,7 @@ button.node:hover { border-color: var(--accent); }
 .edges text { fill: var(--muted); font-size: 11px; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
 .edges marker path { fill: var(--chart-light); stroke: none; }
 .svg-diagram { overflow-x: auto; }
-.svg-diagram svg { width: 100%; height: auto; max-width: 720px; display: block; }
+.svg-diagram svg { width: 100%; height: auto; max-width: 900px; display: block; margin: 0 auto; }
 .svg-diagram text, .svg-diagram .label { fill: var(--text); font-family: inherit; }
 .svg-diagram .node { fill: var(--surface); stroke: var(--border-strong); }
 .svg-diagram .edge { fill: none; stroke: var(--chart-light); }
@@ -3301,10 +3262,14 @@ button.node:hover { border-color: var(--accent); }
 .svg-diagram .accent { stroke: var(--accent); }
 .svg-diagram text.accent { fill: var(--accent); stroke: none; }
 
-/* Domain-Blöcke */
-.domains { display: grid; gap: 16px; grid-template-columns: 1fr; }
-@media (min-width: 900px) { .domains { grid-template-columns: 1fr 1fr; } }
+/* Domain-Blöcke: je Domain eine Karte über die volle Breite, innen Zusammenfassung · Schweregrade · Kategorien */
+.domains { display: grid; gap: 20px; grid-template-columns: 1fr; }
 .domain-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.domain-cols { display: grid; gap: 4px clamp(24px, 3vw, 48px); grid-template-columns: 1fr; }
+.domain-cols > * { min-width: 0; }
+@media (min-width: 720px) { .domain-cols { grid-template-columns: 1fr 1fr; } .domain-cols > .col-summary { grid-column: 1 / -1; } }
+@media (min-width: 1100px) { .domain-cols { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); } .domain-cols > .col-summary { grid-column: auto; } }
+@media (min-width: 1100px) { .domain-cols .col-summary .prose { max-width: none; } .domain-cols h4 { margin-top: 4px; } }
 .domain-score { font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .domain h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin: 20px 0 8px; }
 .bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 6px 10px; align-items: center; font-size: 0.875rem; }
@@ -3345,33 +3310,43 @@ select, input[type="search"] { font: inherit; font-size: 0.9rem; color: var(--te
 input[type="search"] { flex: 1 1 220px; }
 .fstatus { font-size: 0.875rem; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 
-/* Backlog */
+/* Backlog und Optimierungspotenzial. Die Spaltenbreiten setzt findingTable() als
+   --cols-md/--cols-lg, weil Prio, Feature und Status je Tabelle entfallen können.
+   Ab 720 px Tabelle, ab 1200 px zusätzlich Feature und Kategorie als eigene Spalten;
+   darunter stehen sie in der Meta-Zeile unter dem Titel. */
 .rows { border-top: 1px solid var(--border); }
 .row-head-labels { display: none; }
 details.row { border-bottom: 1px solid var(--border); }
 details.row > summary { list-style: none; cursor: pointer; display: grid; gap: 4px 12px; padding: 12px 4px; min-height: 44px;
-  grid-template-columns: auto auto 1fr; grid-template-areas: "sev id dom" "title title title" "meta meta meta"; align-items: center; }
+  grid-template-columns: auto auto 1fr; grid-template-areas: "sev id dom" "desc desc desc"; align-items: center; }
+.no-prio details.row > summary { grid-template-columns: auto 1fr; grid-template-areas: "id dom" "desc desc"; }
 details.row > summary::-webkit-details-marker { display: none; }
 details.row > summary:hover { background: var(--surface-2); }
 details.row[open] > summary { background: var(--surface-2); }
 .c-sev { grid-area: sev; }
 .c-id { grid-area: id; font: 0.8125rem/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
 .c-dom { grid-area: dom; justify-self: end; }
-.c-title { grid-area: title; font-weight: 500; }
-.c-meta { grid-area: meta; font-size: 0.8125rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; }
-.c-effort, .c-status { display: none; }
-.c-meta .c-status-m { display: inline; }
+.c-desc { grid-area: desc; min-width: 0; display: grid; gap: 4px; }
+.c-title { font-weight: 500; }
+.c-meta { font-size: 0.8125rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.c-feat, .c-cat, .c-effort, .c-status { display: none; }
 @media (min-width: 720px) {
-  .row-head-labels { display: grid; grid-template-columns: 92px 92px minmax(0, 1fr) 150px 64px 118px; gap: 12px; padding: 0 4px 6px; font-size: 0.75rem; color: var(--faint); letter-spacing: 0.04em; text-transform: uppercase; }
-  .no-status .row-head-labels { grid-template-columns: 92px 92px minmax(0, 1fr) 150px 64px; }
-  details.row > summary { grid-template-columns: 92px 92px minmax(0, 1fr) 150px 64px 118px; grid-template-areas: "sev id title dom effort status" "sev id meta dom effort status"; align-items: start; }
-  .no-status details.row > summary { grid-template-columns: 92px 92px minmax(0, 1fr) 150px 64px; grid-template-areas: "sev id title dom effort" "sev id meta dom effort"; }
+  .row-head-labels { display: grid; grid-template-columns: var(--cols-md); gap: 12px; padding: 0 4px 6px; font-size: 0.75rem; color: var(--faint); letter-spacing: 0.04em; text-transform: uppercase; }
+  .row-head-labels .h-lg { display: none; }
+  details.row > summary, .no-prio details.row > summary { grid-template-columns: var(--cols-md); grid-template-areas: none; align-items: start; }
+  .c-sev, .c-id, .c-feat, .c-desc, .c-dom, .c-cat, .c-effort, .c-status { grid-area: auto; }
   .c-dom { justify-self: start; }
   .c-effort, .c-status { display: block; font-size: 0.875rem; }
-  .c-effort { grid-area: effort; color: var(--muted); }
-  .c-status { grid-area: status; }
-  .c-meta .c-status-m { display: none; }
+  .c-effort { color: var(--muted); }
+  .c-meta .m-md { display: none; }
   .c-sev, .c-id { padding-top: 2px; }
+}
+@media (min-width: 1200px) {
+  .row-head-labels, details.row > summary, .no-prio details.row > summary { grid-template-columns: var(--cols-lg); }
+  .row-head-labels .h-lg { display: block; }
+  .c-feat, .c-cat { display: block; font-size: 0.875rem; }
+  .c-cat { color: var(--muted); }
+  .c-meta .m-lg { display: none; }
 }
 .badge { display: inline-block; border-radius: 5px; padding: 1px 8px; font-size: 0.78rem; font-weight: 600; line-height: 1.6; white-space: nowrap;
   color: var(--b); background: color-mix(in srgb, var(--b) 13%, var(--surface)); }
@@ -3381,7 +3356,8 @@ details.row[open] > summary { background: var(--surface-2); }
 .st-unchanged { --b: var(--muted); font-weight: 500; }
 .st-carried-over { --b: var(--faint); font-weight: 500; background: transparent; border: 1px dashed var(--border-strong); }
 .row-body { padding: 4px 4px 20px; display: grid; gap: 12px; }
-@media (min-width: 720px) { .row-body { padding-left: 200px; } }
+@media (min-width: 720px) { .row-body { padding-left: var(--indent-md); } }
+@media (min-width: 1200px) { .row-body { padding-left: var(--indent-lg); } }
 .row-body h5 { font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); margin: 0 0 4px; font-weight: 600; }
 .locs { display: flex; flex-direction: column; gap: 2px; }
 .copy-btn { justify-self: start; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 6px 12px; min-height: 36px; font: inherit; font-size: 0.8125rem; cursor: pointer; }
@@ -3435,10 +3411,10 @@ var STRINGS = {
     domain: 'Bereich', severity: 'Schwere', category: 'Kategorie', status_: 'Status', search: 'Suche in Titel, ID, Fundstelle',
     allCategories: 'Alle Kategorien', reset: 'Filter zurücksetzen', shown: function (a, b) { return a + ' von ' + b + ' angezeigt'; },
     nothingMatches: 'Kein Finding passt zu diesen Filtern.',
-    colSev: 'Schwere', colId: 'ID', colTitle: 'Finding', colDom: 'Bereich', colEffort: 'Aufwand', colStatus: 'Status',
+    colSev: 'Prio', colId: 'ID', colFeat: 'Feature', colTitle: 'Description', colDom: 'Section', colCat: 'Type', colEffort: 'Size', colStatus: 'Status',
     effort: 'Aufwand', location: 'Fundstelle', locations: 'Fundstellen', description: 'Problem', evidence: 'Beleg', recommendation: 'Empfehlung',
     copy: 'Als Markdown kopieren', copied: 'Kopiert', induced: 'entstanden durch Fix', discoveredOrigin: 'bei Fix-Arbeit vorgefunden',
-    ghAssignee: 'Zugewiesen', closed: 'geschlossen', improvementBadge: 'Verbesserung',
+    ghAssignee: 'Zugewiesen', closed: 'geschlossen',
     scoreChart: 'Health-Score', scoreCaption: function (d) { return 'Verlauf der Health-Scores seit ' + d + '.'; },
     lgAudit: 'Audit', lgRemediation: 'nachgerechnet (Remediation, GitHub-Sync)', lgCoverage: 'Prüfabdeckung',
     fixChart: 'Fix-Bilanz', lgFixed: 'behoben', lgInducedOpen: 'durch Fix entstanden, offen', lgInducedFixed: 'durch Fix entstanden, im Lauf behoben',
@@ -3448,7 +3424,7 @@ var STRINGS = {
     fixSingle: function (e) { return 'Bisher ein Eintrag (' + e.date + '): ' + e.fixed + ' behoben, ' + (e.inducedFixed + e.inducedOpen) + ' durch Fixes entstanden. Das Diagramm erscheint ab dem zweiten Lauf.'; },
     fixCaption: 'Pro Lauf: geschlossene Findings nach oben, durch die Fixes entstandene nach unten. Vorgefundene Altlasten zählen nicht in die Rate.',
     formulaTitle: 'Score-Berechnung', scopeTitle: 'Prüfumfang', notesTitle: 'Anmerkungen zu diesem Lauf',
-    theme: function (t) { return 'Start-Theme: ' + (t === 'dark' ? 'dunkel' : 'hell') + '. Der Schalter oben rechts überschreibt es für diesen Browser.'; },
+    theme: function (t) { return (t === 'dark' || t === 'light' ? 'Start-Theme: ' + (t === 'dark' ? 'dunkel' : 'hell') + '.' : 'Das Farbschema folgt der Einstellung von System und Browser.') + ' Der Schalter oben rechts überschreibt es für diesen Browser.'; },
     sourceFiles: 'Quelldateien', sourceLoc: 'Quelltext', reviewedLoc: 'davon gelesen', exclusions: 'nicht gezählt',
     deltaBreakdown: function (b) { return 'Neue Findings nach Herkunft: ' + b.code + ' in schon zuvor gelesenen Dateien (Code), ' + b.coverage + ' in erstmals gelesenen Dateien (Prüftiefe)' + (b.unknown ? ', ' + b.unknown + ' ohne Vergleichsbasis' : '') + '.'; },
     formula2: function (s) {
@@ -3490,10 +3466,10 @@ var STRINGS = {
     domain: 'Domain', severity: 'Severity', category: 'Category', status_: 'Status', search: 'Search title, ID, location',
     allCategories: 'All categories', reset: 'Reset filters', shown: function (a, b) { return a + ' of ' + b + ' shown'; },
     nothingMatches: 'No finding matches these filters.',
-    colSev: 'Severity', colId: 'ID', colTitle: 'Finding', colDom: 'Domain', colEffort: 'Effort', colStatus: 'Status',
+    colSev: 'Prio', colId: 'ID', colFeat: 'Feature', colTitle: 'Description', colDom: 'Section', colCat: 'Type', colEffort: 'Size', colStatus: 'Status',
     effort: 'Effort', location: 'Location', locations: 'Locations', description: 'Problem', evidence: 'Evidence', recommendation: 'Recommendation',
     copy: 'Copy as Markdown', copied: 'Copied', induced: 'introduced by a fix', discoveredOrigin: 'found during fix work',
-    ghAssignee: 'Assignee', closed: 'closed', improvementBadge: 'Improvement',
+    ghAssignee: 'Assignee', closed: 'closed',
     scoreChart: 'Health score', scoreCaption: function (d) { return 'Health score history since ' + d + '.'; },
     lgAudit: 'Audit', lgRemediation: 'recalculated (remediation, GitHub sync)', lgCoverage: 'Review coverage',
     fixChart: 'Fix balance', lgFixed: 'resolved', lgInducedOpen: 'introduced by fixes, open', lgInducedFixed: 'introduced by fixes, fixed in run',
@@ -3503,7 +3479,7 @@ var STRINGS = {
     fixSingle: function (e) { return 'One entry so far (' + e.date + '): ' + e.fixed + ' resolved, ' + (e.inducedFixed + e.inducedOpen) + ' introduced by fixes. The chart appears from the second run on.'; },
     fixCaption: 'Per run: resolved findings up, findings introduced by the fixes down. Pre-existing issues found along the way do not count toward the rate.',
     formulaTitle: 'Score calculation', scopeTitle: 'Review scope', notesTitle: 'Notes on this run',
-    theme: function (t) { return 'Default theme: ' + t + '. The toggle at the top right overrides it for this browser.'; },
+    theme: function (t) { return (t === 'dark' || t === 'light' ? 'Default theme: ' + t + '.' : 'The color scheme follows the system and browser setting.') + ' The toggle at the top right overrides it for this browser.'; },
     sourceFiles: 'Source files', sourceLoc: 'Source', reviewedLoc: 'Read', exclusions: 'Not counted',
     deltaBreakdown: function (b) { return 'New findings by origin: ' + b.code + ' in files read before (code), ' + b.coverage + ' in files read for the first time (review depth)' + (b.unknown ? ', ' + b.unknown + ' without a baseline' : '') + '.'; },
     formula2: function (s) {
@@ -3659,16 +3635,36 @@ function fold(id, title, content, open) { return h('details', { id: id, 'class':
 var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 
+var THEME_KEY = 'audit-theme:' + S.project;
+var SYSTEM_DARK = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function baseTheme() {
+  if (S.theme === 'light' || S.theme === 'dark') return S.theme;
+  return SYSTEM_DARK && SYSTEM_DARK.matches ? 'dark' : 'light';
+}
+function storedTheme() {
+  var t = null;
+  try { t = localStorage.getItem(THEME_KEY); } catch (e) {}
+  return t === 'light' || t === 'dark' ? t : null;
+}
+
 function themeToggle() {
   var btn = h('button', { 'class': 'theme-toggle', type: 'button', 'aria-label': T.themeToggle, title: T.themeToggle });
   function paint() { btn.innerHTML = document.documentElement.getAttribute('data-theme') === 'dark' ? ICON_SUN : ICON_MOON; }
+  function apply(t) { document.documentElement.setAttribute('data-theme', t); paint(); drawEdges(); }
   btn.addEventListener('click', function () {
     var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('audit-theme:' + S.project, next); } catch (e) {}
-    paint();
-    drawEdges();
+    // Wer zurück auf die Vorgabe schaltet, folgt danach wieder dem System.
+    try {
+      if (next === baseTheme()) localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, next);
+    } catch (e) {}
+    apply(next);
   });
+  if (SYSTEM_DARK) {
+    var onSystem = function () { if (!storedTheme()) apply(baseTheme()); };
+    if (SYSTEM_DARK.addEventListener) SYSTEM_DARK.addEventListener('change', onSystem);
+    else if (SYSTEM_DARK.addListener) SYSTEM_DARK.addListener(onSystem);
+  }
   paint();
   return btn;
 }
@@ -3784,7 +3780,7 @@ function layeredDiagram(d) {
   else window.addEventListener('resize', draw);
   requestAnimationFrame(draw);
   var hasLinks = d.layers.some(function (l) { return l.nodes.some(function (n) { return n.component && COMP[n.component]; }); });
-  return h('figure', null, wrap, h('figcaption', null, inline(d.caption), hasLinks ? ' ' + T.diagramFilter : null));
+  return h('figure', { 'class': 'diagram' }, wrap, h('figcaption', null, inline(d.caption), hasLinks ? ' ' + T.diagramFilter : null));
 }
 
 // Zweite Prüfung neben build-report.mjs: nur erlaubte Elemente und Attribute gelangen ins DOM.
@@ -3814,7 +3810,7 @@ function sanitizeSvg(src) {
 function portrait() {
   var p = D.portrait || {};
   var box = h('div');
-  box.appendChild(md(p.description));
+  box.appendChild(md(p.description, 'wide'));
   if (COMPONENTS.length) {
     var byComp = S.byComponent || {};
     box.appendChild(h('div', { 'class': 'components' }, COMPONENTS.map(function (c) {
@@ -3829,7 +3825,7 @@ function portrait() {
   if (p.diagram && p.diagram.kind === 'layered') box.appendChild(layeredDiagram(p.diagram));
   if (p.diagram && p.diagram.kind === 'svg') {
     var el = sanitizeSvg(p.diagram.svg);
-    if (el) box.appendChild(h('figure', null, h('div', { 'class': 'svg-diagram' }, el), h('figcaption', null, inline(p.diagram.caption))));
+    if (el) box.appendChild(h('figure', { 'class': 'diagram' }, h('div', { 'class': 'svg-diagram' }, el), h('figcaption', null, inline(p.diagram.caption))));
   }
   return section('portrait', T.portrait, box);
 }
@@ -3841,29 +3837,29 @@ function domainBlock(d) {
   var block = h('div', { 'class': 'card domain' },
     h('div', { 'class': 'domain-head' }, h('h3', null, domLabel(d)), h('div', { 'class': 'domain-score' }, fmtScore(ds.score))));
   if (!list.length) {
-    block.appendChild(ds.executiveSummary ? md(ds.executiveSummary, 'muted') : h('p', { 'class': 'muted' }, T.noFindings(domLabel(d))));
+    block.appendChild(ds.executiveSummary ? md(ds.executiveSummary, 'muted wide') : h('p', { 'class': 'muted' }, T.noFindings(domLabel(d))));
     return block;
   }
-  block.appendChild(md(ds.executiveSummary));
+  var cols = h('div', { 'class': 'domain-cols' });
+  block.appendChild(cols);
+  cols.appendChild(h('div', { 'class': 'col-summary' }, md(ds.executiveSummary)));
   var bs = ds.bySeverity || {};
   var max = Math.max.apply(null, SEVS.map(function (x) { return bs[x] || 0; }).concat([1]));
-  block.appendChild(h('h4', null, T.severities));
-  block.appendChild(h('div', { 'class': 'bars' }, SEVS.map(function (x) {
+  cols.appendChild(h('div', null, h('h4', null, T.severities), h('div', { 'class': 'bars' }, SEVS.map(function (x) {
     var n = bs[x] || 0;
     return [h('span', null, T.sev[x]),
       h('div', { 'class': 'bar' }, h('span', { style: 'width:' + (100 * n / max) + '%;background:var(--sev-' + x + ')' })),
       h('span', { 'class': 'n' }, n)];
-  })));
+  }))));
   var bc = ds.byCategory || {};
   var cats = Object.keys(CAT_DOMAIN).filter(function (c) { return CAT_DOMAIN[c] === d || bc[c]; })
     .sort(function (a, b) { return (bc[b] || 0) - (bc[a] || 0) || T.cat[a].localeCompare(T.cat[b]); });
-  block.appendChild(h('h4', null, T.categories));
-  block.appendChild(h('ul', { 'class': 'cats' }, cats.map(function (c) {
+  cols.appendChild(h('div', null, h('h4', null, T.categories), h('ul', { 'class': 'cats' }, cats.map(function (c) {
     var n = bc[c] || 0;
     return h('li', { 'class': n ? '' : 'zero' },
       n ? h('button', { 'class': 'linkish', type: 'button', onclick: function () { setFilter({ dom: [d], cat: c }); } }, T.cat[c]) : h('span', null, T.cat[c]),
       h('span', { 'class': 'n' }, n || '–'));
-  })));
+  }))));
   return block;
 }
 
@@ -4067,25 +4063,27 @@ function ghMeta(g) {
 }
 
 var ROWS = {};
-function row(f) {
+// cfg: { prio, feat, status } — welche optionalen Spalten die Tabelle führt.
+function row(f, cfg) {
   var comp = f.component && COMP[f.component];
   var meta = h('div', { 'class': 'c-meta' },
     h('span', { 'class': 'mono' }, f.location + (f.locations && f.locations.length ? ' +' + f.locations.length : '')),
-    h('span', null, T.cat[f.category]),
-    comp ? h('span', null, comp.label) : null,
+    h('span', { 'class': 'm-lg' }, T.cat[f.category]),
+    comp ? h('span', { 'class': 'm-lg' }, comp.label) : null,
     f['package'] ? h('span', null, f['package']) : null,
-    f.effort ? h('span', { 'class': 'c-status-m' }, T.effort + ' ' + f.effort) : null,
-    f.status ? h('span', { 'class': 'c-status-m' }, statusBadge(f)) : null,
+    f.effort ? h('span', { 'class': 'm-md' }, T.effort + ' ' + f.effort) : null,
+    cfg.status && f.status ? h('span', { 'class': 'm-md' }, statusBadge(f)) : null,
     f.origin ? h('span', null, f.origin.kind === 'induced' ? T.induced : T.discoveredOrigin) : null,
     ghMeta(f.github));
   var summary = h('summary', null,
-    h('span', { 'class': 'c-sev' }, f.kind === 'improvement' ? h('span', { 'class': 'badge soft' }, T.improvementBadge) : sevBadge(f.severity)),
+    cfg.prio ? h('span', { 'class': 'c-sev' }, sevBadge(f.severity)) : null,
     h('span', { 'class': 'c-id' }, f.id),
-    h('span', { 'class': 'c-title' }, inline(f.title)),
-    meta,
+    cfg.feat ? h('span', { 'class': 'c-feat' + (comp ? '' : ' faint') }, comp ? comp.label : '–') : null,
+    h('span', { 'class': 'c-desc' }, h('span', { 'class': 'c-title' }, inline(f.title)), meta),
     h('span', { 'class': 'c-dom' }, h('span', { 'class': 'badge soft' }, domLabel(f.domain))),
+    h('span', { 'class': 'c-cat' }, T.cat[f.category]),
     h('span', { 'class': 'c-effort' }, f.effort || '–'),
-    h('span', { 'class': 'c-status' }, statusBadge(f)));
+    cfg.status ? h('span', { 'class': 'c-status' }, statusBadge(f)) : null);
   var copyBtn = h('button', { 'class': 'copy-btn', type: 'button' }, T.copy);
   copyBtn.addEventListener('click', function () { copyText(toMarkdown(f), copyBtn); });
   var body = h('div', { 'class': 'row-body' },
@@ -4103,6 +4101,41 @@ function row(f) {
   });
   ROWS[f.id] = d;
   return d;
+}
+
+// Spalten in Anzeigereihenfolge; lg: erst ab 1200 px eine eigene Spalte.
+function tableColumns(cfg) {
+  var c = [];
+  if (cfg.prio) c.push({ w: 92, label: T.colSev });
+  c.push({ w: 92, label: T.colId });
+  if (cfg.feat) c.push({ w: 140, label: T.colFeat, lg: true });
+  c.push({ w: 0, label: T.colTitle, desc: true });
+  c.push({ w: 140, label: T.colDom });
+  c.push({ w: 180, label: T.colCat, lg: true });
+  c.push({ w: 56, label: T.colEffort });
+  if (cfg.status) c.push({ w: 118, label: T.colStatus });
+  return c;
+}
+
+function findingTable(list, cfg, extra) {
+  var cols = tableColumns(cfg);
+  function vars(lg) {
+    var shown = cols.filter(function (c) { return lg || !c.lg; });
+    var indent = 0;
+    for (var i = 0; !shown[i].desc; i++) indent += shown[i].w + 12;
+    return { cols: shown.map(function (c) { return c.desc ? 'minmax(0, 1fr)' : c.w + 'px'; }).join(' '), indent: indent };
+  }
+  var md_ = vars(false), lg = vars(true);
+  var labels = h('div', { 'class': 'row-head-labels', 'aria-hidden': 'true' },
+    cols.map(function (c) { return h('span', { 'class': c.lg ? 'h-lg' : null }, c.label); }));
+  var rows = h('div', { 'class': 'rows' }, list.map(function (f) { return row(f, cfg); }));
+  return {
+    rows: rows,
+    el: h('div', {
+      'class': cfg.prio ? null : 'no-prio',
+      style: '--cols-md:' + md_.cols + ';--cols-lg:' + lg.cols + ';--indent-md:' + md_.indent + 'px;--indent-lg:' + lg.indent + 'px'
+    }, extra, labels, rows)
+  };
 }
 
 function chipGroup(label, key, values, labelOf, counts) {
@@ -4157,11 +4190,11 @@ function backlog() {
   ui.reset.addEventListener('click', function () { setFilter({}); });
   filters.appendChild(h('div', { 'class': 'fstatus' }, ui.count, ui.reset));
 
-  ui.rows = h('div', { 'class': 'rows' }, DEFECTS.map(row));
+  var table = findingTable(DEFECTS, { prio: true, feat: COMPONENTS.length > 0, status: FOLLOWUP }, filters);
+  ui.rows = table.rows;
   ui.empty = h('div', { 'class': 'empty', hidden: true }, T.nothingMatches);
-  var labels = h('div', { 'class': 'row-head-labels', 'aria-hidden': 'true' },
-    h('span', null, T.colSev), h('span', null, T.colId), h('span', null, T.colTitle), h('span', null, T.colDom), h('span', null, T.colEffort), FOLLOWUP ? h('span', null, T.colStatus) : null);
-  return section('backlog', T.backlog, h('div', { 'class': FOLLOWUP ? '' : 'no-status' }, filters, labels, ui.rows, ui.empty));
+  table.el.appendChild(ui.empty);
+  return section('backlog', T.backlog, table.el);
 }
 
 function matches(f) {
@@ -4212,17 +4245,15 @@ function openFinding(id) {
 function openQuestions() {
   var q = D.openQuestions || [];
   if (!q.length) return null;
-  return section('open-questions', T.openQuestions, h('ul', { 'class': 'prose' }, q.map(function (x) { return h('li', null, md(x)); })));
+  return section('open-questions', T.openQuestions, h('ul', { 'class': 'prose wide' }, q.map(function (x) { return h('li', null, md(x, 'wide')); })));
 }
 
 function improvements() {
   if (!IMPROVEMENTS.length) return null;
-  return section('improvements', T.improvements, h('div', { 'class': 'rows no-status' }, IMPROVEMENTS.map(function (f) {
-    var d = row(f);
-    delete ROWS[f.id];
-    d.id = 'f-' + f.id;
-    return d;
-  })));
+  var table = findingTable(IMPROVEMENTS, { prio: false, feat: COMPONENTS.length > 0, status: false });
+  // Nicht in ROWS: die Backlog-Filter gelten nur für Defekte. openFinding() findet sie über die id.
+  IMPROVEMENTS.forEach(function (f) { delete ROWS[f.id]; });
+  return section('improvements', T.improvements, table.el);
 }
 
 function methodology() {
