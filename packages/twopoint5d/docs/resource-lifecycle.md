@@ -141,13 +141,18 @@ Attach every signal and effect to the instance, so one call tears them all down 
 ```ts
 #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
 
-createEffect(() => {
+this.#colorEffect = createEffect(() => {
   // …
 }, {attach: this});
 ```
 
 ```ts
 override dispose() {
+  // the effects go first: a write to a signal runs every effect that reads it on the spot, and
+  // clearing the two references below would build nodes for a material on its way out
+  this.#positionEffect.destroy();
+  this.#colorEffect.destroy();
+
   // both references are given up while their signals are still live — a write after
   // SignalGroup.delete() would land in a destroyed signal and notify nobody
   this.#colorMap.set(undefined);
@@ -157,6 +162,12 @@ override dispose() {
   super.dispose();
 }
 ```
+
+An effect that builds something out of the values `dispose()` clears is destroyed before
+they are cleared: a write runs every effect that reads the signal right away, and an effect
+still alive at that point does its work once more for an instance that is going away. Keep
+the handle `createEffect()` returns for such an effect and call its `destroy()` first;
+`SignalGroup.delete(this)` removes the rest afterwards.
 
 `SignalGroup.delete(this)` is the entire teardown of the signal side. Never
 `SignalGroup.destroy()` — deprecated in `@spearwolf/signalize`.

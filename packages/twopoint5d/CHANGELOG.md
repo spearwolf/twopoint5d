@@ -193,6 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Display` sizes its renderer with one call of `setDrawingBufferSize(width, height, pixelRatio)` and calls neither `setPixelRatio()` nor `setSize()`; a `createRenderer` that hands back a wrapper or a stub needs that method
 - `Stylesheets` keeps its rules in a constructed stylesheet per document or shadow root and adopts it through `adoptedStyleSheets`; it puts no `<style>` element into the DOM. A shadow root carries its rules before its host is in the document and keeps them when the host moves. The sheet comes from the window of its document, so a document or shadow root inside an iframe carries rules as well. An element passed as root stands for the document or shadow root it sits in at each call, which a `releaseRule()` has to match. Adopted sheets come after the document's own sheets in the cascade. The selector of a rule carries the class name through `CSS.escape()`. A root in a document without a window — from `document.implementation.createHTMLDocument()`, a `DOMParser` or the content of a `<template>` — gets an error that says so, since such a document adopts no constructed stylesheet
 - a write to `Display#styleSheetRoot` installs the rules of the display in the new root, under the same class names; a write after `dispose()` does nothing
+- `TexturedSpritesMaterialParameters`, and with it `AnimatedSpritesMaterialParameters`, takes no `positionNode` and no `colorNode`: both materials build these nodes themselves
 
 ### Deprecated
 
@@ -225,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Display#pause` before the first start: once `stop()` or `pause = true` has been called it answers `true` — also when that call keeps a pending `start()` from starting the display — until a `pause = false` or the next `start()` lets the display run
 - fix `Chronometer#update()`, `#start()` and `#stop()` with a time before the latest one the chronometer has seen: `deltaTime` is `0` and `time` stays where it is, across a pause as well, so `FixedFrameLoop#alpha` stays in `[0, 1)` when a frame timestamp lies before the start of the display
 - fix `TexturedSpritesMaterial` (and `AnimatedSpritesMaterial`, which builds on it): a sprite is scaled to its `quadSize` before it is rotated, so a sprite that is not square turns as the rectangle it is. The unit quad used to be rotated first and stretched afterwards, which drew a rotated sprite of 4 × 1 at a quarter turn as 4 × 1 again and every other angle as a parallelogram; flat sprites and billboards alike. Sprites without rotation, and square ones, draw exactly as before
+- fix `billboardVertexByInstancePosition()`, and with it `TexturedSpritesMaterial` and `AnimatedSpritesMaterial` with `renderAsBillboards`: a billboard faces the camera position also when its mesh or a parent of it is moved, turned or scaled evenly on all axes
+- fix the color of a `TexturedSprite`: `TexturedSpritesMaterial` multiplies what it draws by it, alpha included, so `setColor()` and `setColorValues()` tint the sprite; white, the color every sprite starts with, leaves it as it is. `AnimatedSpritesMaterial` does the same for a geometry with a `color` attribute; `AnimatedSprite` has none, so its sprites draw untinted
+- fix the options of `TexturedSpritesMaterial` and `AnimatedSpritesMaterial`: every three.js material parameter among them — `transparent`, `blending`, `depthWrite` and the rest — reaches the material, as it does through `TexturedSprites` for options handed in as its material argument; an `alphaTest` or `alphaTestNode` among them takes the place of the default alpha test at `0.001`
 - fix `VertexObjectBuffer#copy()`: it judges every buffer before it writes the first of them — the source has a buffer of that name, and its elements fit their target at `targetObjectOffset` — so a copy that is refused leaves the target exactly as it was. Both throws used to come from inside the writing loop, with everything written before them left standing: the `Error` for a buffer name the source does not have, and the bare `RangeError` reading `offset is out of bounds` that the typed array raises. Two descriptions that agree on a `bufferName` while sizing it differently are what reaches the second of those — the object counts match, one buffer fits and the next overruns
 - fix `VertexObjectBuffer#copyArray()`: it measures the source against the buffer before writing and throws a `RangeError` naming the class, the method, the buffer and the numbers, where the overrun used to surface as `offset is out of bounds` and named nothing. A source array shorter than the buffer is taken as it always was
 - fix the `targetObjectOffset` of `VertexObjectBuffer#copy()` and `#copyArray()`: on a buffer that has something to write into, a value that is no integer of 0 or more throws a `RangeError` naming the method and the value. A buffer that has nothing — that of a disposed pool, or one over a description without attributes — is met earlier: `copy()` returns without looking at the offset, and `copyArray()` throws for the buffer it lacks. A fraction used to reach the typed array as an element offset, and the write landed inside an object instead of on its boundary, shifting every value of the copy against the layout without a word
@@ -2343,6 +2347,22 @@ const size = resizeTo(display);
 if (size != null) {
   const [width, height] = size;
 }
+```
+
+#### The sprite material options take no `positionNode` or `colorNode`
+
+`TexturedSpritesMaterial` and `AnimatedSpritesMaterial` build their `positionNode` and `colorNode` in effects of their own, which replace a node handed in through the options before it is ever rendered. The two keys are gone from `TexturedSpritesMaterialParameters` and `AnimatedSpritesMaterialParameters`, so options that carry one no longer compile. Drop the key; to change what a sprite draws, set the input nodes the material builds from — `vertexPositionNode`, `instancePositionNode`, `quadSizeNode`, `rotationNode`, `texCoordsNode` — or the `colorMap`.
+
+**Before**
+
+```ts
+const material = new TexturedSpritesMaterial({colorMap, colorNode: myColorNode});
+```
+
+**After**
+
+```ts
+const material = new TexturedSpritesMaterial({colorMap});
 ```
 
 ## [0.21.2] - 2026-06-19

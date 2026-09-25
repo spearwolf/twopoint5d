@@ -55,9 +55,11 @@ Two observations from reading the current sprites:
   holds it there. The order was a line in one effect, and nothing but a rendered picture
   could tell it was wrong — which is why this proposal makes it part of the model (§4.2)
   instead of leaving it to each material.
-- **`TexturedSprite` writes a `color` attribute that no shader reads.** The descriptor
-  declares it and `[voInitialize]` fills it with white, but `TexturedSpritesMaterial` only
-  samples the color map. It is a tint feature with the shader half missing.
+- **The tint is spread over two files.** `TexturedSprite` declares the `color` attribute
+  and `[voInitialize]` fills it with white; `TexturedSpritesMaterial` multiplies by
+  `vertexColor()` in its color effect, which answers white for a geometry without that
+  attribute. Descriptor and material agree on nothing but the name `color`, and a `Tint`
+  feature would hold both halves in one place.
 
 ## 3. The decisive choice: compose descriptors, not pools
 
@@ -373,5 +375,6 @@ This is deliberately out of scope here: it touches the pool core, and nothing in
 4. **`map2d` tiles.** `TileSpritesGeometry` has its own base and descriptor; whether it
    becomes a sprite kind is a separate decision.
 5. **`color` vs. `tint`.** The textured preset either keeps `color` through a `Tint` variant
-   with that attribute name, or renames it. No shader reads `color` today, so a rename only
-   breaks callers that `touch('color')` by hand.
+   with that attribute name, or renames it. `TexturedSpritesMaterial` reads `color` through
+   `vertexColor()`, so a rename breaks that material, custom materials that read the
+   attribute, and callers that `touch('color')` by hand.

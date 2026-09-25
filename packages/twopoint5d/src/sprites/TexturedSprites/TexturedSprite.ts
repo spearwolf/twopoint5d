@@ -29,6 +29,7 @@ export interface TexturedSprite extends VO {
   setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
   setInstancePosition(x: number, y: number, z: number): void;
   setInstancePosition(position: [x: number, y: number, z: number]): void;
+  /** Sets the color that tints the sprite, alpha included — see {@link TexturedSprite.setColor}. */
   setColorValues(r: number, g: number, b: number, a: number): void;
   setColorValues(color: [r: number, g: number, b: number, a: number]): void;
 }
@@ -51,6 +52,13 @@ export class TexturedSprite {
     this.setTexCoords(coords.s, coords.t, coords.u, coords.v);
   }
 
+  /**
+   * Sets the color that tints the sprite. The sprite materials multiply what they draw by it,
+   * alpha included; white, the color every sprite starts with, leaves the sprite as it is.
+   *
+   * An alpha between 0 and 1 blends only on a material with `transparent: true`, and under the
+   * default alpha test a sprite with an alpha of 0 is not drawn at all.
+   */
   setColor(color: Color, a = 1): void {
     this.setColorValues(color.r, color.g, color.b, a);
   }

@@ -10,6 +10,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
+import {DataTexture} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -168,4 +169,73 @@ export function makeMap(visibilitor) {
   map2d.addTileRenderer(tileRenderer);
 
   return {map2d, tileSprites, tileRenderer};
+}
+
+// --- sprites and pixels ---
+
+// rgbAt() and coveredBox() read the pixels back at a row length of `size * 4` bytes. WebGPU
+// aligns every row it copies out of a texture to 256 bytes, so that holds for a target 64 pixels
+// wide (or a multiple of it) and nothing else: at another width the rows come back padded and
+// both helpers would read the wrong pixels without a word. Keep the targets of these tests at 64.
+
+/**
+ * A texture of the given texels, row by row from the first, each an `[r, g, b, a]` of 0 … 255.
+ * A `DataTexture` samples with `NearestFilter` and builds no mipmaps, so a texel comes out of the
+ * shader as it went in.
+ *
+ * @param {number[][]} texels
+ * @param {number} [width]
+ * @param {number} [height]
+ */
+export function makeColorTexture(texels, width = texels.length, height = 1) {
+  const texture = new DataTexture(new Uint8Array(texels.flat()), width, height);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Renders `scene` through `camera` into `target` on an opaque black background and reads the
+ * target back: four bytes per pixel, red, green, blue, alpha.
+ */
+export async function renderToPixels(renderer, scene, camera, target) {
+  renderer.setClearColor(0x000000, 1);
+  renderer.setRenderTarget(target);
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    renderer.setRenderTarget(null);
+  }
+  return renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height);
+}
+
+/** The `[r, g, b]` of the pixel at `x`, `y` of a read-back target `size` pixels wide. */
+export function rgbAt(pixels, size, x, y) {
+  const i = (y * size + x) * 4;
+  return [pixels[i], pixels[i + 1], pixels[i + 2]];
+}
+
+/** Whether every channel of `rgb` lies within `tolerance` of the one in `expected`. */
+export function isNearColor(rgb, expected, tolerance = 2) {
+  return rgb.every((value, i) => Math.abs(value - expected[i]) <= tolerance);
+}
+
+/** The width and height, in pixels, of the box around every pixel the sprite covered. */
+export function coveredBox(pixels, size) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      // the clear color is black, and every sprite these tests measure draws brighter than that
+      if (pixels[(y * size + x) * 4] > 16) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  if (maxX < minX) return {width: 0, height: 0};
+  return {width: maxX - minX + 1, height: maxY - minY + 1};
 }

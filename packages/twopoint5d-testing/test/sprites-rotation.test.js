@@ -1,32 +1,11 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, TexturedSprites} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
+import {coveredBox, makeContainer, disposeDisplay, renderToPixels} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
 const PIXELS_PER_UNIT = 8;
-
-/** The width and height, in pixels, of the box around every pixel the sprite covered. */
-function coveredBox(pixels, size) {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      // the sprite has no color map and draws in flat grey; the clear color is black
-      if (pixels[(y * size + x) * 4] > 16) {
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-  }
-  if (maxX < minX) return {width: 0, height: 0};
-  return {width: maxX - minX + 1, height: maxY - minY + 1};
-}
 
 describe('sprites — rotation of a sprite that is not square', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -74,13 +53,7 @@ describe('sprites — rotation of a sprite that is not square', function () {
     scene.add(sprites);
     sprites.update();
 
-    const {renderer} = display;
-    renderer.setClearColor(0x000000, 1);
-    renderer.setRenderTarget(target);
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(null);
-
-    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, TARGET_SIZE, TARGET_SIZE);
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
 
     sprites.dispose();
 

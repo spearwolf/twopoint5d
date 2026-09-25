@@ -1,4 +1,4 @@
-import {createEffect, createSignal} from '@spearwolf/signalize';
+import {createEffect, createSignal, type Effect} from '@spearwolf/signalize';
 import {add, attribute, div, mod, mul, texture, uniform, vec2, vec4} from 'three/tsl';
 import {type Texture} from 'three/webgpu';
 import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '../TexturedSprites/TexturedSpritesMaterial.js';
@@ -33,6 +33,8 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
 
   #timeUniform = uniform(0);
 
+  readonly #texCoordsEffect: Effect;
+
   /**
    * The animation time, in seconds. Backed by a shader uniform rather than a signal: reads and
    * writes keep working once the material has been disposed, they just reach nothing that still
@@ -47,13 +49,17 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
   }
 
   constructor(options?: AnimatedSpritesMaterialParameters) {
-    super(options);
+    // animsMap and time belong to this class; left in the options of the base class they would
+    // reach the accessors below through setValues() before their private fields exist
+    const {animsMap, time, ...texturedSpritesOptions} = options ?? {};
 
-    if (options?.time != null) this.time = options.time;
+    super(texturedSpritesOptions);
 
-    this.animsMap = options?.animsMap;
+    if (time != null) this.time = time;
 
-    createEffect(
+    this.animsMap = animsMap;
+
+    this.#texCoordsEffect = createEffect(
       () => {
         const animsImage = this.animsMap?.image as {width?: number; height?: number} | null | undefined;
 
@@ -110,6 +116,10 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
    * released here. Afterwards {@link animsMap} answers `undefined`. A second call does nothing.
    */
   override dispose(): void {
+    // the own effect goes before the write below, which would run it and, through
+    // texCoordsNode, the color effect of the base class as well
+    this.#texCoordsEffect.destroy();
+
     // the animsMap texture was handed in and stays the caller's; the reference is cleared
     // here, before super.dispose() tears the signal group down, so the getter answers
     // undefined without a write to an already destroyed signal

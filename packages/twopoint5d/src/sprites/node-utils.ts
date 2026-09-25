@@ -7,6 +7,7 @@ import {
   float,
   mod,
   modelViewMatrix,
+  modelWorldMatrixInverse,
   mul,
   normalize,
   sub,
@@ -14,6 +15,7 @@ import {
   varying,
   vec2,
   vec3,
+  vec4,
 } from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
@@ -35,6 +37,15 @@ export const vertexByInstancePosition = (params?: {
   }
 };
 
+/**
+ * Builds the position of a vertex of a quad that turns about its instance position to face the
+ * camera position.
+ *
+ * The result lies in the local space of the mesh, which is what a `positionNode` expects; the
+ * camera position is brought into that space through the inverse world matrix of the mesh. So a
+ * mesh — or any of its parents — may be moved, turned and scaled evenly on all axes, and its
+ * billboards still face the camera. A scale that differs from axis to axis skews the quads.
+ */
 export const billboardVertexByInstancePosition = (params?: {
   vertexPosition?: Node<'vec3'>;
   instancePosition?: Node<'vec3'>;
@@ -44,8 +55,13 @@ export const billboardVertexByInstancePosition = (params?: {
   const billboardSize = params?.scale ?? attribute('quadSize');
   const vertexPosition = params?.vertexPosition ?? attribute('position');
 
-  const look = normalize(sub(cameraPosition, billboardPosition));
+  // the instance position lives in the local space of the mesh, the camera position in world
+  // space; the look vector needs both ends in one space
+  const cameraPositionLocal = mul(modelWorldMatrixInverse, vec4(cameraPosition, 1)).xyz;
+  const look = normalize(sub(cameraPositionLocal, billboardPosition));
 
+  // the second row of the model-view rotation is the up axis of the camera, expressed in the
+  // local space of the mesh — exact as long as the mesh is scaled evenly on all axes
   const cameraUp = vec3(
     matrixColumn(modelViewMatrix, 0).y,
     matrixColumn(modelViewMatrix, 1).y,

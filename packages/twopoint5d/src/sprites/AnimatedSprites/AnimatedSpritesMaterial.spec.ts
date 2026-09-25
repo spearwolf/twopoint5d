@@ -1,7 +1,7 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import type {TextureNode} from 'three/webgpu';
-import {Texture} from 'three/webgpu';
+import {AdditiveBlending, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
@@ -52,6 +52,31 @@ describe('AnimatedSpritesMaterial', () => {
     expect(material.time).toBe(0);
 
     material.dispose();
+  });
+
+  describe('parameters', () => {
+    test('applies the three.js material parameters it is given, beside its own', () => {
+      const warn = sandbox.spy(console, 'warn');
+      const animsMap = makeAnimsMap();
+
+      const material = new AnimatedSpritesMaterial({
+        animsMap,
+        time: 2,
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      });
+
+      expect(material.transparent).toBe(true);
+      expect(material.depthWrite).toBe(false);
+      expect(material.blending).toBe(AdditiveBlending);
+      expect(material.animsMap).toBe(animsMap);
+      expect(material.time).toBe(2);
+      expect(warn.called).toBe(false);
+
+      material.dispose();
+      animsMap.dispose();
+    });
   });
 
   describe('dispose()', () => {
@@ -121,6 +146,22 @@ describe('AnimatedSpritesMaterial', () => {
       // The texture belongs to the caller, so neither call may release it.
       expect(animsMapDispose.called).toBe(false);
 
+      animsMap.dispose();
+    });
+
+    // the teardown builds no node: the effects are gone before dispose() clears what they read
+    test('builds no node on the way out', () => {
+      const colorMap = new Texture();
+      const animsMap = makeAnimsMap();
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap});
+      const {version, colorNode} = material;
+
+      material.dispose();
+
+      expect(material.version).toBe(version);
+      expect(material.colorNode).toBe(colorNode);
+
+      colorMap.dispose();
       animsMap.dispose();
     });
 

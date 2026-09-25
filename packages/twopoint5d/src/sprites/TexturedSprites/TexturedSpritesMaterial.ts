@@ -1,5 +1,5 @@
-import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
-import {attribute, float, mul, rotate, vec3, vec4} from 'three/tsl';
+import {createEffect, createSignal, type Effect, SignalGroup} from '@spearwolf/signalize';
+import {attribute, float, mul, rotate, vec3, vec4, vertexColor} from 'three/tsl';
 import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 import type {
@@ -9,7 +9,15 @@ import type {
   TAttributeNodeTexCoords,
 } from './TexturedSprite.js';
 
-export interface TexturedSpritesMaterialParameters extends NodeMaterialParameters {
+/**
+ * The options of a {@link TexturedSpritesMaterial}. Every three.js material parameter among them
+ * reaches the material through `setValues()`. `positionNode` and `colorNode` are not among them:
+ * the material builds both nodes itself.
+ *
+ * Without an `alphaTest` or `alphaTestNode` the material drops every texel with an alpha of
+ * `0.001` or less. Either of the two takes the place of that default alpha test.
+ */
+export interface TexturedSpritesMaterialParameters extends Omit<NodeMaterialParameters, 'positionNode' | 'colorNode'> {
   name?: string;
   colorMap?: Texture;
   renderAsBillboards?: boolean;
@@ -48,6 +56,10 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   #renderAsBillboards = createSignal(false, {attach: this});
 
   #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
+
+  readonly #positionEffect: Effect;
+
+  readonly #colorEffect: Effect;
 
   /** The color map texture — `undefined` once the material has been disposed. */
   get colorMap(): Texture | undefined {
@@ -115,15 +127,27 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   constructor(options?: TexturedSpritesMaterialParameters) {
     super();
 
-    this.name = options?.name ?? 'twopoint5d.TexturedSpritesMaterial';
+    // the options of this material stay out of setValues(): Material.setValues() skips each key
+    // whose current value is undefined with a warning — colorMap before its first assignment —
+    // and name and renderAsBillboards bring defaults of their own
+    const {name, colorMap, renderAsBillboards, ...materialParameters} = options ?? {};
 
-    this.renderAsBillboards = options?.renderAsBillboards ?? this.#renderAsBillboards.value;
+    this.name = name ?? 'twopoint5d.TexturedSpritesMaterial';
 
-    this.alphaTestNode = float(0.001);
+    this.renderAsBillboards = renderAsBillboards ?? this.#renderAsBillboards.value;
 
-    this.colorMap = options?.colorMap;
+    // the default alpha test drops the fully transparent texels of a color map; an alphaTest or
+    // alphaTestNode of the caller takes its place, since three no longer looks at alphaTest once
+    // an alphaTestNode is set
+    if (materialParameters.alphaTest == null && materialParameters.alphaTestNode == null) {
+      this.alphaTestNode = float(0.001);
+    }
 
-    createEffect(
+    this.setValues(materialParameters);
+
+    this.colorMap = colorMap;
+
+    this.#positionEffect = createEffect(
       () => {
         const rotationEulerNode = vec3(0, 0, this.rotationNode.toFloat());
         const scale = vec3(this.quadSizeNode.xy, 1.0);
@@ -145,12 +169,16 @@ export class TexturedSpritesMaterial extends NodeMaterial {
       {attach: this},
     );
 
-    createEffect(
+    this.#colorEffect = createEffect(
       () => {
+        // every sprite is tinted by its color attribute, alpha included; vertexColor() answers
+        // white for a geometry without that attribute, so sprites that carry none draw as they are
+        const spriteColor = vertexColor();
+
         if (this.colorMap) {
-          this.colorNode = colorFromTextureByTexCoords(this.colorMap, {texCoords: this.texCoordsNode});
+          this.colorNode = mul(colorFromTextureByTexCoords(this.colorMap, {texCoords: this.texCoordsNode}), spriteColor);
         } else {
-          this.colorNode = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
+          this.colorNode = mul(vec4(0.5, 0.5, 0.5, 1), spriteColor); // Default color if no texture is provided
         }
 
         this.needsUpdate = true;
@@ -163,9 +191,15 @@ export class TexturedSpritesMaterial extends NodeMaterial {
    * Tears down the signals and effects of this material and gives up its optional members:
    * {@link colorMap} and {@link texCoordsNode} answer `undefined` afterwards. A `colorMap`
    * handed in belongs to the caller and is not released here. The node accessors keep their
-   * last node. A second call does nothing.
+   * last node, and so do `colorNode` and `positionNode`: `dispose()` builds no new one. A second
+   * call does nothing.
    */
   override dispose() {
+    // the effects go first: a write to a signal runs every effect that reads it on the spot, and
+    // clearing the two references below would build nodes for a material on its way out
+    this.#positionEffect.destroy();
+    this.#colorEffect.destroy();
+
     // both references are given up while their signals are still live — a write after
     // SignalGroup.delete() would land in a destroyed signal and notify nobody
     this.#colorMap.set(undefined);

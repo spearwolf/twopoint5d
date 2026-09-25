@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {Texture} from 'three/webgpu';
+import {AdditiveBlending, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
@@ -10,6 +10,51 @@ describe('TexturedSpritesMaterial', () => {
 
   afterEach(() => {
     sandbox.restore();
+  });
+
+  describe('parameters', () => {
+    test('applies the three.js material parameters it is given', () => {
+      const material = new TexturedSpritesMaterial({transparent: true, depthWrite: false, blending: AdditiveBlending});
+
+      expect(material.transparent).toBe(true);
+      expect(material.depthWrite).toBe(false);
+      expect(material.blending).toBe(AdditiveBlending);
+
+      material.dispose();
+    });
+
+    test('keeps its own options apart from them', () => {
+      const warn = sandbox.spy(console, 'warn');
+      const colorMap = new Texture();
+
+      const material = new TexturedSpritesMaterial({name: 'sprites', colorMap, renderAsBillboards: true, transparent: true});
+
+      expect(material.name).toBe('sprites');
+      expect(material.colorMap).toBe(colorMap);
+      expect(material.renderAsBillboards).toBe(true);
+      expect(material.transparent).toBe(true);
+      expect(warn.called).toBe(false);
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('drops fully transparent texels by default', () => {
+      const material = new TexturedSpritesMaterial();
+
+      expect(material.alphaTestNode).not.toBeNull();
+
+      material.dispose();
+    });
+
+    test('leaves the alpha test to an alphaTest it is given', () => {
+      const material = new TexturedSpritesMaterial({alphaTest: 0.5});
+
+      expect(material.alphaTest).toBe(0.5);
+      expect(material.alphaTestNode).toBeNull();
+
+      material.dispose();
+    });
   });
 
   describe('dispose()', () => {
@@ -90,6 +135,21 @@ describe('TexturedSpritesMaterial', () => {
 
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
+    });
+
+    // the teardown builds no node: the effects are gone before dispose() clears what they read
+    test('builds no node on the way out', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap, renderAsBillboards: true});
+      const {version, colorNode, positionNode} = material;
+
+      material.dispose();
+
+      expect(material.version).toBe(version);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.positionNode).toBe(positionNode);
+
+      colorMap.dispose();
     });
 
     // (f) has no subject here: this material takes no slot from a pool and no tile from a
