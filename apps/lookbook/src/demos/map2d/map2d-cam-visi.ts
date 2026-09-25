@@ -12,8 +12,8 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {Fog} from 'three/webgpu';
-import assetsUrl from './utils/assetsUrl';
-import type {PerspectiveOrbitDemo} from './utils/PerspectiveOrbitDemo';
+import assetsUrl from '../utils/assetsUrl';
+import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 import {on} from '@spearwolf/eventize';
 
 export const run = (demo: PerspectiveOrbitDemo) =>

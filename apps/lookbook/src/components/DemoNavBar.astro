@@ -7,13 +7,15 @@ import GitHubInvertocatIcon from './icons/GitHubInvertocatIcon.astro';
 
 export interface Props {
   title: string;
-  showSource?: Record<string, string>;
   description?: string;
 }
 
-const {title, showSource = {}, description = ''} = Astro.props;
+const {title, description = ''} = Astro.props;
 
-const githubUrl = showSource?.['github'] ?? 'https://github.com/spearwolf/twopoint5d/tree/main';
+// every demo page lives at pages/demos/<id>.astro and is served at <base>/demos/<id>/, so the
+// last segment of its path names the file its source link points at
+const id = Astro.url.pathname.split('/').filter(Boolean).at(-1);
+const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/${id}.astro`;
 
 // TODO create and display a qr-code with link to demo (for mobile)
 //      see https://github.com/danielgjackson/qrcodejs

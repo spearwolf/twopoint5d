@@ -2,10 +2,10 @@
 import CrossHair from '~components/CrossHair.astro';
 import RadioButtons from '~components/RadioButtons.astro';
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_map2d-cam-visi.json';
+import {description, title} from './_map2d-cam-visi.json';
 ---
 
-<Layout title={title} showSource={showSource} description={description}>
+<Layout title={title} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 
   <CrossHair />
@@ -41,7 +41,7 @@ import {description, showSource, title} from './_map2d-cam-visi.json';
 <script>
   import {emit} from '@spearwolf/eventize';
   import {queryRadioButtons} from '~components/RadioButtonsApi';
-  import {run} from '~demos/map2d-cam-visi';
+  import {run} from '~demos/map2d/map2d-cam-visi';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
   // the <canvas id="canvas-container"> is written by the markup of this very page

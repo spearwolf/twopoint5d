@@ -3,8 +3,5 @@
   "description": "A minimal example of how to use the Display helper class",
   "url": "/demos/display-minimal",
   "tags": ["Display", "ParallaxProjection", "Stage2D", "StageRenderer", "TextureFactory", "vanilla"],
-  "previewImage": "minimal-display.png",
-  "showSource": {
-    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/display-minimal.astro"
-  }
+  "previewImage": "minimal-display.png"
 }

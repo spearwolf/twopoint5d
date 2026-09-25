@@ -48,13 +48,10 @@
         "Map2D",
         "Map2DTileCoords",
         "Map2DTileRenderer",
-        "Map2DTileSpritesRenderer",
         "RectangularVisibilityArea",
         "RepeatingTilesProvider",
         "TileSprites",
         "TileSpritesGeometry",
-        "TileSpritesGeometry",
-        "TileSpritesMaterial",
         "TileSpritesMaterial",
         "map2d"
       ]
@@ -62,7 +59,7 @@
     {
       "name": "Display, Stage and Projections",
       "tagId": "display-stage-projections",
-      "includeTags": ["Display", "Stage", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer"]
+      "includeTags": ["Display", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer"]
     },
     {
       "name": "Vertex Objects",

@@ -1,9 +1,9 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_animated-sprites.json';
+import {description, title} from './_animated-sprites.json';
 ---
 
-<Layout title={title} showSource={showSource} description={description}>
+<Layout title={title} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
   <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
     <div class="actionBtn lessSprites">less</div>

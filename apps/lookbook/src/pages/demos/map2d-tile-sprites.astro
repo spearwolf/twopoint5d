@@ -1,9 +1,9 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_map2d-tile-sprites.json';
+import {description, title} from './_map2d-tile-sprites.json';
 ---
 
-<Layout title={title} showSource={showSource} description={description}>
+<Layout title={title} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 
@@ -18,7 +18,7 @@ import {description, showSource, title} from './_map2d-tile-sprites.json';
 </style>
 
 <script>
-  import {run} from '~demos/map2d-tile-sprites';
+  import {run} from '~demos/map2d/map2d-tile-sprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
 
   // the <canvas id="canvas-container"> is written by the markup of this very page

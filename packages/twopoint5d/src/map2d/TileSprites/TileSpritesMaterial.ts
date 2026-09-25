@@ -1,4 +1,4 @@
-import {createEffect, createSignal, SignalGroup} from '@spearwolf/signalize';
+import {createEffect, createSignal, type Effect, SignalGroup} from '@spearwolf/signalize';
 import {attribute, float, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type Texture} from 'three/webgpu';
 import {colorFromTextureByTexCoords, vertexByInstancePosition} from '../../sprites/node-utils.js';
@@ -23,6 +23,10 @@ export class TileSpritesMaterial extends NodeMaterial {
   #quadSizeNode = createShaderAttributeNodeSignal<'vec2'>(TileSpritesMaterial.QuadSizeAttributeName, this);
 
   #colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
+
+  readonly #positionEffect: Effect;
+
+  readonly #colorEffect: Effect;
 
   /** The color map texture — `undefined` once the material has been disposed. */
   get colorMap(): Texture | undefined {
@@ -63,7 +67,7 @@ export class TileSpritesMaterial extends NodeMaterial {
 
     this.name = options?.name ?? 'twopoint5d.TileSpritesMaterial';
 
-    createEffect(
+    this.#positionEffect = createEffect(
       () => {
         const vertexPosition = this.vertexPositionNode;
         const instancePosition = this.instancePositionNode;
@@ -80,7 +84,7 @@ export class TileSpritesMaterial extends NodeMaterial {
       {attach: this},
     );
 
-    createEffect(
+    this.#colorEffect = createEffect(
       () => {
         const colorMap = this.colorMap;
 
@@ -100,9 +104,15 @@ export class TileSpritesMaterial extends NodeMaterial {
    * Tears down the signals and effects of this material and gives up its optional member:
    * {@link colorMap} answers `undefined` afterwards. The `colorMap` texture itself is handed in
    * and belongs to the caller, so it is not released here. The node accessors keep their last
-   * node. A second call does nothing.
+   * node, and so do `colorNode` and `positionNode`: `dispose()` builds no new one. A second call
+   * does nothing.
    */
   override dispose() {
+    // the effects go first: a write to a signal runs every effect that reads it on the spot, and
+    // clearing the reference below would build a node for a material on its way out
+    this.#positionEffect.destroy();
+    this.#colorEffect.destroy();
+
     // the reference is given up while its signal is still live — a write after
     // SignalGroup.delete() would land in a destroyed signal and notify nobody
     this.#colorMap.set(undefined);

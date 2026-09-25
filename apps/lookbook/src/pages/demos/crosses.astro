@@ -1,9 +1,9 @@
 ---
 import Layout from '~layouts/VanillaDemo.astro';
-import {description, showSource, title} from './_crosses.json';
+import {description, title} from './_crosses.json';
 ---
 
-<Layout title={title} showSource={showSource} description={description}>
+<Layout title={title} description={description}>
   <canvas id="canvas-container" resize-to="window"></canvas>
 </Layout>
 

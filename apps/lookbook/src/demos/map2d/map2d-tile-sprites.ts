@@ -11,8 +11,8 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {BoxGeometry, EdgesGeometry, Fog, LineBasicMaterial, LineSegments, Vector3} from 'three/webgpu';
-import assetsUrl from './utils/assetsUrl';
-import type {PerspectiveOrbitDemo} from './utils/PerspectiveOrbitDemo';
+import assetsUrl from '../utils/assetsUrl';
+import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
   demo.start(async () => {

@@ -90,6 +90,21 @@ describe('TileSpritesMaterial', () => {
       expect(getEffectsCount()).toBe(baselineEffects);
     });
 
+    // the teardown builds no node: the effects are gone before dispose() clears what they read
+    test('builds no node on the way out', () => {
+      const colorMap = new Texture();
+      const material = new TileSpritesMaterial({colorMap});
+      const {version, colorNode, positionNode} = material;
+
+      material.dispose();
+
+      expect(material.version).toBe(version);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.positionNode).toBe(positionNode);
+
+      colorMap.dispose();
+    });
+
     // (f) has no subject here: this material takes no slot from a pool and no tile from a
     // factory. The colorMap it is handed is the only resource it ever touches.
   });

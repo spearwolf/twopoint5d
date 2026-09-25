@@ -1,10 +1,7 @@
 {
   "title": "crosses",
-  "description": "A minimal example of how to use the VertexObjcts mesh",
+  "description": "A minimal example of how to use the VertexObjects mesh",
   "url": "/demos/crosses",
   "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "vanilla"],
-  "previewImage": "crosses.png",
-  "showSource": {
-    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/pages/demos/crosses.astro"
-  }
+  "previewImage": "crosses.png"
 }

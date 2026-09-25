@@ -10,7 +10,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
-import {DataTexture} from 'three/webgpu';
+import {DataTexture, PerspectiveCamera} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -149,6 +149,14 @@ export const instancedDescription = {
 };
 
 // --- map2d ---
+
+/** The tilted camera the map is watched through, looking at `x` on the ground plane from behind and above. */
+export function makeCamera(x = 0) {
+  const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
+  camera.position.set(x, 350, 500);
+  camera.lookAt(x, 0, 0);
+  return camera;
+}
 
 /** A map on the XZ ground plane, seen through `visibilitor`, without a loaded texture: the tile set builds its own atlas. */
 export function makeMap(visibilitor) {

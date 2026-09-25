@@ -4,11 +4,6 @@ import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {TileBaseSprite} from './descriptors.js';
 import {TileBaseSpriteDescriptor, TileSpriteDescriptor, type TileSprite} from './descriptors.js';
 
-export interface TileSpritesGeometry {
-  basePool: VertexObjectPool<TileBaseSprite>;
-  instancedPool: VertexObjectPool<TileSprite>;
-}
-
 /**
  * The instanced geometry of the tile sprites of a map: one base quad, and one instance per tile.
  *
@@ -19,6 +14,10 @@ export interface TileSpritesGeometry {
  * warns once. Size it for the most tiles the view can show at once.
  */
 export class TileSpritesGeometry extends InstancedVertexObjectGeometry<TileSprite, TileBaseSprite> {
+  // the constructor hands super() a base descriptor, never a BufferGeometry, so the base pool is always there
+  declare readonly basePool: VertexObjectPool<TileBaseSprite>;
+  declare readonly instancedPool: VertexObjectPool<TileSprite>;
+
   constructor(capacity = 100) {
     super(TileSpriteDescriptor, capacity, TileBaseSpriteDescriptor);
 

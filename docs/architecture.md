@@ -99,7 +99,8 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   publish pipeline's helpers and of `makePackageJson.mjs` and
   `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server, of the
   helpers of the code block check, the check that every tracked Markdown file is an
-  input of `twopoint5d-testing:typecheck`, and the check that the lookbook serves the
+  input of `twopoint5d-testing:typecheck`, the check that every capitalised tag of the
+  lookbook demos names an export of the library, and the check that the lookbook serves the
   script `RainbowLine` loads at runtime.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the
   thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
@@ -280,7 +281,7 @@ under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does
 `scripts/lookbook/rainbowLineScript.test.mjs`, which holds
 `apps/lookbook/public/js/` to the script `@spearwolf/astro-rainbow-line` loads at
 runtime — nothing in the repo references that file, so only a spec keeps it from being
-cleaned up. Two specs start a script itself, as a child process:
+cleaned up. So does `scripts/lookbook/demoMetadata.test.mjs`, which holds the demo metadata of the lookbook to the library: every tag that starts with a capital letter names an export of `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from the sources, so the spec needs no build. Two specs start a script itself, as a child process:
 `makePackageJson.mjs` in a throwaway project directory and
 `checkPeerDependenciesOnly.mjs` against a throwaway manifest, because their exit codes,
 their messages and the manifest the first one does not write are wiring that no helper

@@ -1,15 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {CameraBasedVisibility, Display} from '@spearwolf/twopoint5d';
-import {PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
-import {makeContainer, disposeDisplay, makeMap} from './helpers/fixtures.js';
-
-/** The tilted camera the map is watched through, looking at `x` on the ground plane from behind and above. */
-function makeCamera(x = 0) {
-  const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
-  camera.position.set(x, 350, 500);
-  camera.lookAt(x, 0, 0);
-  return camera;
-}
+import {Scene, Vector3} from 'three/webgpu';
+import {makeContainer, disposeDisplay, makeCamera, makeMap} from './helpers/fixtures.js';
 
 describe('map2d — placement of a moved map', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget

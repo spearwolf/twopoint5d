@@ -1,7 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {CameraBasedVisibility, Display, RectangularVisibilityArea} from '@spearwolf/twopoint5d';
-import {PerspectiveCamera, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay, bufferOf, makeMap} from './helpers/fixtures.js';
+import {Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, bufferOf, makeCamera, makeMap} from './helpers/fixtures.js';
 
 describe('map2d — tile attribute upload', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -20,9 +20,7 @@ describe('map2d — tile attribute upload', function () {
     await display.start();
     scene = new Scene();
     // the camera belongs to the test and not to the display, so a resize does not move it
-    camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
-    camera.position.set(0, 350, 500);
-    camera.lookAt(0, 0, 0);
+    camera = makeCamera();
   });
 
   afterEach(() => {

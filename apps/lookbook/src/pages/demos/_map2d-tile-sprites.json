@@ -16,8 +16,5 @@
     "map2d",
     "vanilla"
   ],
-  "previewImage": "map2d-tile-sprites.png",
-  "showSource": {
-    "github": "https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbook/src/demos/map2d-tile-sprites.ts"
-  }
+  "previewImage": "map2d-tile-sprites.png"
 }

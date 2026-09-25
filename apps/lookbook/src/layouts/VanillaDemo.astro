@@ -4,11 +4,10 @@ import '../styles/global.css';
 
 export interface Props {
   title: string;
-  showSource?: Record<string, string>;
   description: string;
 }
 
-const {title, showSource, description} = Astro.props;
+const {title, description} = Astro.props;
 ---
 
 <!doctype html>
@@ -21,7 +20,7 @@ const {title, showSource, description} = Astro.props;
     <title>2.5d lookbook &#x2022; {title} demo</title>
   </head>
   <body>
-    <DemoNavBar title={title} showSource={showSource} description={description} />
+    <DemoNavBar title={title} description={description} />
     <slot />
   </body>
 </html>

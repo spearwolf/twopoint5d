@@ -6,8 +6,8 @@ import {
   RectangularVisibilityArea,
   RectangularVisibilityAreaHelpers,
 } from '@spearwolf/twopoint5d';
-import {PerspectiveCamera, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay, makeMap} from './helpers/fixtures.js';
+import {Scene} from 'three/webgpu';
+import {makeContainer, disposeDisplay, makeCamera, makeMap} from './helpers/fixtures.js';
 
 /** Every node the helpers put into the scene graph carries the mark HelpersManager sets. */
 function helperNodes(...roots) {
@@ -45,9 +45,7 @@ describe('map2d — visibility helper nodes', function () {
     await display.start();
     scene = new Scene();
     // the camera belongs to the test and not to the display, so a resize does not move it
-    camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
-    camera.position.set(0, 350, 500);
-    camera.lookAt(0, 0, 0);
+    camera = makeCamera();
   });
 
   afterEach(() => {
