@@ -4,10 +4,10 @@ import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/web
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 import type {
   TAttributeNodeInstancePosition,
-  TAttributeNodeVertexPosition,
   TAttributeNodeQuadSize,
   TAttributeNodeRotation,
   TAttributeNodeTexCoords,
+  TAttributeNodeVertexPosition,
 } from './TexturedSprite.js';
 
 /**
