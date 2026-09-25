@@ -1,5 +1,5 @@
 import type {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
-import {Box3, Frustum, Line3, Matrix4, Plane, Vector2, Vector3} from 'three/webgpu';
+import {Box3, Frustum, Line3, Matrix4, Plane, Vector2, Vector3, WebGPUCoordinateSystem} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
 import {AABB2} from './AABB2.js';
 import {convexTileHull, forEachTileWithinConvexHull, type TilePoint} from './convexTileHull.js';
@@ -78,7 +78,11 @@ const MIN_PROBES_FOR_HULL = 3;
 const setAABB2 = (target: AABB2, {top, left, width, height}: TilesWithinCoords): AABB2 => target.set(left, top, width, height);
 
 const makeCameraFrustum = (camera: PerspectiveCamera | OrthographicCamera, target = new Frustum()): Frustum =>
-  target.setFromProjectionMatrix(_m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
+  target.setFromProjectionMatrix(
+    _m.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse),
+    camera.coordinateSystem,
+    camera.reversedDepth,
+  );
 
 const sortByDistance = (a: TileBox, b: TileBox): number => a.distanceToCamera! - b.distanceToCamera!;
 
@@ -104,7 +108,14 @@ const poolAt = <T>(pool: T[], index: number, create: () => T): T => {
  * the plane is nothing visible.
  *
  * The _far_ value of the camera limits how far along a ray the plane is looked for. The _near_
- * value is where each ray starts.
+ * value is where each ray starts. Both are read in the coordinate system and the depth direction
+ * of the camera — `camera.coordinateSystem` and `camera.reversedDepth`, which the renderer sets on
+ * a camera the first time it renders with it, together with a new projection. The projection maps
+ * the near and far plane to these depths:
+ *
+ * - WebGL coordinate system: `-1` to `1`
+ * - WebGPU coordinate system: `0` to `1`
+ * - reversed depth, in either: `1` to `0`
  *
  * The camera is read as the caller keeps it. `computeVisibleTiles()` brings the world matrix of
  * the camera up to date from its transform, but not its projection: whoever changes `fov`,
@@ -462,14 +473,19 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       .applyMatrix4(_m.makeTranslation(this.#map2dTileCoords.xOffset, 0, this.#map2dTileCoords.yOffset))
       .applyMatrix4(this.matrixWorld);
 
+    // the depth the projection of the camera maps its near and far plane to — see the table in the
+    // docs of this class
+    const nearZ = camera.reversedDepth ? 1 : camera.coordinateSystem === WebGPUCoordinateSystem ? 0 : -1;
+    const farZ = camera.reversedDepth ? 0 : 1;
+
     this.pointsOnPlane.length = 0;
 
     for (let i = 0; i < FRUSTUM_PROBES_NDC.length; ++i) {
       // The loop bound is `FRUSTUM_PROBES_NDC.length`.
       const [ndcX, ndcY] = FRUSTUM_PROBES_NDC[i]!;
 
-      this.#scratchLineOfSight.start.set(ndcX, ndcY, -1).unproject(camera);
-      this.#scratchLineOfSight.end.set(ndcX, ndcY, 1).unproject(camera);
+      this.#scratchLineOfSight.start.set(ndcX, ndcY, nearZ).unproject(camera);
+      this.#scratchLineOfSight.end.set(ndcX, ndcY, farZ).unproject(camera);
 
       const hit = this.planeWorld.intersectLine(this.#scratchLineOfSight, this.#scratchPlaneIntersection);
       if (hit == null) continue;

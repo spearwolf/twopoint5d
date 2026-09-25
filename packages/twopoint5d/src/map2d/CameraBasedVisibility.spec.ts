@@ -1,5 +1,14 @@
-import type {Box3} from 'three/webgpu';
-import {Euler, Frustum, Matrix4, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
+import type {Box3, CoordinateSystem} from 'three/webgpu';
+import {
+  Euler,
+  Frustum,
+  Matrix4,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Vector3,
+  WebGLCoordinateSystem,
+  WebGPUCoordinateSystem,
+} from 'three/webgpu';
 import type {MockInstance} from 'vitest';
 import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import type {TileBox} from './CameraBasedVisibility.js';
@@ -61,9 +70,59 @@ function makeTiltedCamera(): PerspectiveCamera {
   return camera;
 }
 
+function makeCameraWithTheFarPlaneOnTheGround(): PerspectiveCamera {
+  // Looks down at 45°; the upper edge of the view stays below the horizon, so the ground it covers
+  // is bounded even without a far plane, and the far plane at 200 cuts it short of where the upper
+  // edge meets the ground (≈ 386).
+  const camera = new PerspectiveCamera(60, 1, 0.1, 200);
+  camera.position.set(0, 100, 100);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+function makeOrthoCameraLookingDown(): OrthographicCamera {
+  const camera = new OrthographicCamera(-100, 100, 100, -100, 0.1, 500);
+  camera.position.set(0, 100, 0);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+function makeCameraCloserToThePlaneThanItsNearPlane(): PerspectiveCamera {
+  const camera = new PerspectiveCamera(90, 1, 10, 500);
+  camera.position.set(0, 7, 0);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+/**
+ * Puts the camera into a coordinate system and a depth direction the way the renderer does on its
+ * first frame: both fields set, the projection built again from them. three exposes
+ * `reversedDepth` as a getter only; the renderer writes `_reversedDepth`, and so does this helper.
+ */
+function inCoordinateSystem<C extends PerspectiveCamera | OrthographicCamera>(
+  camera: C,
+  coordinateSystem: CoordinateSystem,
+  reversedDepth: boolean,
+): C {
+  camera.coordinateSystem = coordinateSystem;
+  (camera as unknown as {_reversedDepth: boolean})._reversedDepth = reversedDepth;
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
 /** The camera frustum of the visibility, built the second time and from the outside. */
 function makeFrustum(camera: PerspectiveCamera | OrthographicCamera): Frustum {
-  return new Frustum().setFromProjectionMatrix(new Matrix4().copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse));
+  return new Frustum().setFromProjectionMatrix(
+    new Matrix4().copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse),
+    camera.coordinateSystem,
+    camera.reversedDepth,
+  );
 }
 
 /**
@@ -654,6 +713,49 @@ describe('CameraBasedVisibility', () => {
         expect(tile.y, `y of ${tile.x},${tile.y}`).toBeLessThanOrEqual(bottom);
       }
     });
+  });
+
+  describe('the coordinate system and the depth direction of the camera', () => {
+    const combinations = [
+      ['WebGL', WebGLCoordinateSystem, false],
+      ['WebGPU', WebGPUCoordinateSystem, false],
+      ['WebGL with reversed depth', WebGLCoordinateSystem, true],
+      ['WebGPU with reversed depth', WebGPUCoordinateSystem, true],
+    ] as const;
+
+    const cameras = [
+      ['perspective', makeCameraWithTheFarPlaneOnTheGround],
+      ['orthographic', makeOrthoCameraLookingDown],
+    ] as const;
+
+    const tileCoords = new Map2DTileCoordsUtil(100, 100);
+
+    test.each(combinations)(
+      'finds the tiles the camera sees in the WebGL coordinate system: %s',
+      (_name, coordinateSystem, reversedDepth) => {
+        for (const [cameraName, makeCamera] of cameras) {
+          const reference = new CameraBasedVisibility(makeCamera()).computeVisibleTiles([], [0, 0], tileCoords, new Matrix4());
+          const result = new CameraBasedVisibility(
+            inCoordinateSystem(makeCamera(), coordinateSystem, reversedDepth),
+          ).computeVisibleTiles([], [0, 0], tileCoords, new Matrix4());
+
+          expect(ids(reference?.tiles).length, cameraName).toBeGreaterThan(0);
+          expect(ids(result?.tiles), cameraName).toEqual(ids(reference?.tiles));
+        }
+      },
+    );
+
+    test.each(combinations)(
+      'sees nothing of a plane that lies before its near plane: %s',
+      (_name, coordinateSystem, reversedDepth) => {
+        const visibility = new CameraBasedVisibility(
+          inCoordinateSystem(makeCameraCloserToThePlaneThanItsNearPlane(), coordinateSystem, reversedDepth),
+        );
+
+        expect(visibility.computeVisibleTiles([], [0, 0], tileCoords, new Matrix4())).toBeUndefined();
+        expect(visibility.pointsOnPlane).toHaveLength(0);
+      },
+    );
   });
 
   describe('frustumBoxScale', () => {

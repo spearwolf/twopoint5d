@@ -73,11 +73,13 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
   let afterBelow = 0;
   for (let i = 0; i < n; i = before) {
     const origin = chunks[i]![beforeKey];
-    while (before < n && chunks[before]![beforeKey] <= origin) {
+    // the chunk at `i` lies on `origin` by construction and is taken whatever the comparison says —
+    // an edge that is `NaN` fails every comparison and would hold the sweep in place
+    do {
       const c = chunks[before]!;
       if (c[afterKey] < c[beforeKey]) beforeWithExtent++;
       before++;
-    }
+    } while (before < n && chunks[before]![beforeKey] <= origin);
     while (afterBelow < extentCount && edges[afterBelow]! < origin) afterBelow++;
     const intersect = afterBelow - beforeWithExtent;
     const after = n - before - intersect;
@@ -173,7 +175,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   /**
    * Splits a leaf into four quadrants, recursively, as long as a node holds more than
    * `maxChunkNodes` chunks and an axis separates them. Chunks that cross an axis stay at the node
-   * of that axis.
+   * of that axis; a chunk that touches an axis without crossing it — one of width or height 0
+   * whose edges lie on it — belongs to the west or north side.
    *
    * On a node that is already split, the call is passed on to its children, so the leaves that
    * `appendChunk()` has filled since are split too.
@@ -204,16 +207,20 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     const sw: ChunkType[] = [];
     const straddlers: ChunkType[] = [];
 
+    // An axis lies on the right (bottom) edge of a chunk, and `findAxis` counts every chunk whose
+    // right (bottom) edge is on or before it as *before*. West and north are tested first so that
+    // a chunk of width or height 0 on the axis lands on the side it was counted on — a split that
+    // disagrees with the count can hand every chunk to one quadrant and split it again without end.
     for (let i = 0, n = chunks.length; i < n; i++) {
       // The loop bound is `n`, taken from `chunks.length`.
       const chunk = chunks[i]!;
-      if (chunk.left >= originX) {
-        if (chunk.top >= originY) se.push(chunk);
-        else if (chunk.bottom <= originY) ne.push(chunk);
+      if (chunk.right <= originX) {
+        if (chunk.bottom <= originY) nw.push(chunk);
+        else if (chunk.top >= originY) sw.push(chunk);
         else straddlers.push(chunk);
-      } else if (chunk.right <= originX) {
-        if (chunk.top >= originY) sw.push(chunk);
-        else if (chunk.bottom <= originY) nw.push(chunk);
+      } else if (chunk.left >= originX) {
+        if (chunk.bottom <= originY) ne.push(chunk);
+        else if (chunk.top >= originY) se.push(chunk);
         else straddlers.push(chunk);
       } else {
         straddlers.push(chunk);
@@ -239,7 +246,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
   /**
    * Puts the chunk into the leaf of the quadrant it lies in (creating that leaf if the quadrant
-   * is empty), or keeps it at the first node whose axis it crosses.
+   * is empty), or keeps it at the first node whose axis it crosses. It places a chunk on the side
+   * `subdivide()` places it, so a chunk that touches an axis without crossing it goes west or north.
    *
    * Splits no node — call `subdivide()` on the root after appending.
    */
@@ -252,19 +260,21 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     const originX = this.originX!;
     const originY = this.originY!;
 
-    if (chunk.left >= originX) {
-      if (chunk.top >= originY) {
-        this.appendToNode(Quadrant.SouthEast, chunk);
-      } else if (chunk.bottom <= originY) {
-        this.appendToNode(Quadrant.NorthEast, chunk);
+    // the same order as the distribution in `subdivide()`, so that a chunk lands where `subdivide()`
+    // would have put it
+    if (chunk.right <= originX) {
+      if (chunk.bottom <= originY) {
+        this.appendToNode(Quadrant.NorthWest, chunk);
+      } else if (chunk.top >= originY) {
+        this.appendToNode(Quadrant.SouthWest, chunk);
       } else {
         this.chunks.push(chunk);
       }
-    } else if (chunk.right <= originX) {
-      if (chunk.top >= originY) {
-        this.appendToNode(Quadrant.SouthWest, chunk);
-      } else if (chunk.bottom <= originY) {
-        this.appendToNode(Quadrant.NorthWest, chunk);
+    } else if (chunk.left >= originX) {
+      if (chunk.bottom <= originY) {
+        this.appendToNode(Quadrant.NorthEast, chunk);
+      } else if (chunk.top >= originY) {
+        this.appendToNode(Quadrant.SouthEast, chunk);
       } else {
         this.chunks.push(chunk);
       }

@@ -1,10 +1,16 @@
 import {describe, expect, it, test} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
+import type {IDataChunk2D} from './IDataChunk2D.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
 import {StringDataChunk2D} from './StringDataChunk2D.js';
 
 const sortedNames = (chunks: StringDataChunk2D[]) => chunks.map((c) => c.toString()).sort();
+
+const subtreeOf = <T extends IDataChunk2D>(node: ChunkQuadTreeNode<T>): T[] => [
+  ...node.chunks,
+  ...Object.values(node.nodes).flatMap((child) => (child ? subtreeOf(child) : [])),
+];
 
 const grid4x4 = () => ({
   A: new StringDataChunk2D({x: -10, y: -10, width: 5, height: 5, data: 'A'}),
@@ -301,10 +307,10 @@ describe('ChunkQuadTreeNode (extended)', () => {
       return best?.origin;
     };
 
-    // a seed that keeps the layout with zero-sized chunks clear of the runaway recursion of
-    // `subdivide()` on chunks that sit on their own axis; every layout shares it
-    const makeRandom = () => {
-      let seed = 47514;
+    // fixed seeds, so that every run builds the same layouts
+    const SEEDS = [47514, 2, 3];
+
+    const makeRandom = (seed: number) => {
       return () => {
         seed = (seed * 9301 + 49297) % 233280;
         return seed / 233280;
@@ -341,11 +347,6 @@ describe('ChunkQuadTreeNode (extended)', () => {
       return box;
     };
 
-    const subtreeOf = (node: ChunkQuadTreeNode<StringDataChunk2D>): StringDataChunk2D[] => [
-      ...node.chunks,
-      ...Object.values(node.nodes).flatMap((child) => (child ? subtreeOf(child) : [])),
-    ];
-
     const allNodes = (node: ChunkQuadTreeNode<StringDataChunk2D>): ChunkQuadTreeNode<StringDataChunk2D>[] => [
       node,
       ...Object.values(node.nodes).flatMap((child) => (child ? allNodes(child) : [])),
@@ -357,29 +358,105 @@ describe('ChunkQuadTreeNode (extended)', () => {
       ['a raster with chunks of width or height 0', rasterWithNoExtent],
       ['a raster with chunks of negative width', rasterWithNegativeWidth],
     ] as const)('picks the axes the rule of the candidates gives: %s', (_name, layout) => {
-      for (const count of [40, 97, 200]) {
-        const rnd = makeRandom();
-        const chunks = Array.from({length: count}, (_, i) => {
-          return new StringDataChunk2D({...layout(i, rnd), data: `c${i}`});
-        });
-        const root = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);
-        root.subdivide(2);
+      for (const seed of SEEDS)
+        for (const count of [40, 97, 200]) {
+          const rnd = makeRandom(seed);
+          const chunks = Array.from({length: count}, (_, i) => {
+            return new StringDataChunk2D({...layout(i, rnd), data: `c${i}`});
+          });
+          const root = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);
+          root.subdivide(2);
 
-        let inner = 0;
-        for (const node of allNodes(root)) {
-          const subtree = subtreeOf(node);
-          const expectedX = bruteForceAxis(subtree, 'right', 'left');
-          const expectedY = bruteForceAxis(subtree, 'bottom', 'top');
-          if (node.isLeaf) {
-            if (subtree.length > 2) expect(expectedX === undefined || expectedY === undefined).toBe(true);
-          } else {
-            inner++;
-            expect(node.originX).toBe(expectedX);
-            expect(node.originY).toBe(expectedY);
+          let inner = 0;
+          for (const node of allNodes(root)) {
+            const subtree = subtreeOf(node);
+            const expectedX = bruteForceAxis(subtree, 'right', 'left');
+            const expectedY = bruteForceAxis(subtree, 'bottom', 'top');
+            if (node.isLeaf) {
+              if (subtree.length > 2) expect(expectedX === undefined || expectedY === undefined).toBe(true);
+            } else {
+              inner++;
+              expect(node.originX).toBe(expectedX);
+              expect(node.originY).toBe(expectedY);
+            }
           }
+          expect(inner).toBeGreaterThan(0);
         }
-        expect(inner).toBeGreaterThan(0);
-      }
+    });
+  });
+
+  describe('chunks without extent', () => {
+    const withoutExtentOnTheAxes = () =>
+      new ChunkQuadTreeNode<StringDataChunk2D>([
+        new StringDataChunk2D({x: 0, y: 0, width: 0, height: 0, data: 'Z'}),
+        new StringDataChunk2D({x: 10, y: 10, width: 5, height: 5, data: 'B'}),
+        new StringDataChunk2D({x: 20, y: 20, width: 5, height: 5, data: 'C'}),
+      ]);
+
+    it('splits a node whose axes run along a chunk of width and height 0', () => {
+      const root = withoutExtentOnTheAxes();
+      root.subdivide(1);
+
+      expect(root.originX).toBe(0);
+      expect(root.originY).toBe(0);
+      expect(root.chunks).toEqual([]);
+      expect(sortedNames(root.nodes.northWest!.chunks)).toEqual(['Z']);
+      expect(sortedNames(subtreeOf(root.nodes.southEast!))).toEqual(['B', 'C']);
+    });
+
+    it('appendChunk() puts a chunk without extent on an axis where subdivide() puts it', () => {
+      const root = withoutExtentOnTheAxes();
+      root.subdivide(1);
+
+      // its right edge lies on `originX`, its bottom edge at -2
+      root.appendChunk(new StringDataChunk2D({x: 0, y: -5, width: 0, height: 3, data: 'W'}));
+
+      expect(sortedNames(subtreeOf(root.nodes.northWest!))).toContain('W');
+      expect(root.nodes.northEast).toBeNull();
+    });
+  });
+
+  describe('an edge that is NaN', () => {
+    // `subdivide()` runs synchronously, so a sweep that stands still would hang the test run instead
+    // of failing it; the chunk counts the reads of its edges and throws once they pass any number a
+    // finished run needs.
+    const MAX_EDGE_READS = 10_000;
+
+    const makeChunkWithNaNRightEdge = (): IDataChunk2D => {
+      let reads = 0;
+      const read = (value: number) => {
+        if (++reads > MAX_EDGE_READS) throw new Error('subdivide() does not come to an end');
+        return value;
+      };
+      return {
+        get left() {
+          return read(0);
+        },
+        get top() {
+          return read(0);
+        },
+        get right() {
+          return read(NaN);
+        },
+        get bottom() {
+          return read(5);
+        },
+        containsDataAt: () => false,
+        isIntersecting: () => false,
+      };
+    };
+
+    it('subdivide() comes to an end for a chunk whose right edge is NaN', () => {
+      const nan = makeChunkWithNaNRightEdge();
+      const b = new StringDataChunk2D({x: 10, y: 10, width: 5, height: 5, data: 'B'});
+      const c = new StringDataChunk2D({x: 20, y: 20, width: 5, height: 5, data: 'C'});
+      const root = new ChunkQuadTreeNode<IDataChunk2D>([nan, b, c]);
+
+      expect(() => root.subdivide(1)).not.toThrow();
+
+      const held = subtreeOf(root);
+      expect(held).toHaveLength(3);
+      expect(held).toEqual(expect.arrayContaining([nan, b, c]));
     });
   });
 

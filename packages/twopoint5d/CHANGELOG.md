@@ -361,6 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Map2DTileRenderer#removeTile()` and `#reuseTile()` for a tile factory whose tiles can be falsy, such as the numeric handle `0`: `removeTile()` gives the tile back through `destroyTile()` instead of losing its slot, and `reuseTile()` keeps to the `tilesChanged` rule
 - fix `CameraBasedVisibility#frustumBoxScale`: it scales the box a tile is tested with by the value in tile width and tile height as it already did in `depth` — each side moves out by `(scale - 1) / 2` of the tile size. A side used to move out by `(scale - 1)` of it, so the default 1.1 tested a box 1.2 times the tile; the tiles at the edge of the view are dropped a little earlier
 - fix `Map2DSpatialHashGrid`: a renderable of width or height 0 on a cell border lies in the cell of its upper left corner, where `findWithin()` finds it; `remove()` takes a renderable out of every cell `add()` put it into, also after its `aabb` changed; `add()` of a renderable the grid holds moves it to the cells of its current `aabb`; `findWithin()` with an `aabb` of width or height 0 looks into the cell its corner lies in
+- fix `CameraBasedVisibility`: the probe rays and the frustum test take the near and far plane from `camera.coordinateSystem` and `camera.reversedDepth`. This matters for a camera a WebGPU renderer has rendered with and for a renderer with `reversedDepthBuffer`; a perspective camera with reversed depth finds the map plane.
+- fix `ChunkQuadTreeNode#subdivide()` and `#appendChunk()`: a chunk of width or height 0 whose edge lies on an axis goes to the west or north side of it, and `subdivide()` comes to an end for such chunks.
 
 ### Migration Guide
 
