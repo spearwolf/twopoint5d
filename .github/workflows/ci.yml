@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Nx shows the output of failed tasks only; static prints every task's log, one after the other
+  NX_DEFAULT_OUTPUT_STYLE: static
+
 concurrency:
   # on main each commit gets a group of its own, so none is cancelled or displaced from the
   # queue and the deploy workflow has a result to follow; on other branches a newer push
@@ -18,7 +22,7 @@ concurrency:
 jobs:
   ci:
     name: Build, Lint and Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

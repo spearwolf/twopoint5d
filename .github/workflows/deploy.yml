@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Nx shows the output of failed tasks only; static prints every task's log, one after the other
+  NX_DEFAULT_OUTPUT_STYLE: static
+
 concurrency:
   group: deploy
   cancel-in-progress: false
@@ -16,7 +20,7 @@ concurrency:
 jobs:
   version:
     name: Check whether npm has this version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # both jobs check out the commit the CI run names, so only a push to this repository may name it
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success'
@@ -62,7 +66,7 @@ jobs:
     name: Deploy NPM Packages
     needs: version
     if: ${{ needs.version.outputs.publish == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write # Required for OIDC
       contents: read
