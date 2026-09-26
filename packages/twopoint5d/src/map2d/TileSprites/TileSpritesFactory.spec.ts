@@ -39,6 +39,19 @@ const attrAt = (geometry: TileSpritesGeometry, attrName: string, slot: number, s
   return [attr.getX(slot), attr.getY(slot), attr.getZ(slot), attr.getW(slot)].slice(0, size);
 };
 
+/**
+ * Calls `fn` once and answers what it threw, `undefined` when it returned. A test that counts the
+ * slots of the pool after a throw calls through this, since every `toThrow()` would call again.
+ */
+const catchError = (fn: () => void): unknown => {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+};
+
 describe('TileSpritesFactory', () => {
   describe('createTile()', () => {
     test('a factory without a tile set throws an Error naming the method, the field and the tile, and leaves the instanced pool as it found it', () => {
@@ -46,9 +59,11 @@ describe('TileSpritesFactory', () => {
       const factory = new TileSpritesFactory(tileSprites, undefined, new RepeatingTilesProvider(1));
       const pool = tileSprites.geometry!.instancedPool;
 
-      const call = () => factory.createTile(new Map2DTileCoords(0, 0));
-      expect(call).toThrow(Error);
-      expect(call).toThrow(
+      const error = catchError(() => factory.createTile(new Map2DTileCoords(0, 0)));
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toHaveProperty(
+        'message',
         'TileSpritesFactory#createTile() has no tileSet to look up tile id 1 of tile 0,0 in: set TileSpritesFactory#tileSet before the factory builds tiles',
       );
       expect(pool.usedCount, 'usedCount after a throw').toBe(0);
@@ -59,9 +74,11 @@ describe('TileSpritesFactory', () => {
       const factory = new TileSpritesFactory(tileSprites, makeTileSet());
       const pool = tileSprites.geometry!.instancedPool;
 
-      const call = () => factory.createTile(new Map2DTileCoords(2, 3));
-      expect(call).toThrow(Error);
-      expect(call).toThrow(
+      const error = catchError(() => factory.createTile(new Map2DTileCoords(2, 3)));
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toHaveProperty(
+        'message',
         'TileSpritesFactory#createTile() has no tileDataProvider to read tile 2,3 from: set TileSpritesFactory#tileDataProvider before the factory builds tiles',
       );
       expect(pool.usedCount, 'usedCount after a throw').toBe(0);
@@ -86,9 +103,10 @@ describe('TileSpritesFactory', () => {
         const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider(tileId));
         const pool = tileSprites.geometry!.instancedPool;
 
-        const call = () => factory.createTile(new Map2DTileCoords(0, 0));
-        expect(call).toThrow(RangeError);
-        expect(call).toThrow(`[TileSet] tileId must be a whole number, got ${shown}`);
+        const error = catchError(() => factory.createTile(new Map2DTileCoords(0, 0)));
+
+        expect(error).toBeInstanceOf(RangeError);
+        expect(error).toHaveProperty('message', `[TileSet] tileId must be a whole number, got ${shown}`);
         expect(pool.usedCount, 'usedCount after a throw').toBe(0);
       },
     );

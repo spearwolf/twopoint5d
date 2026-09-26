@@ -271,6 +271,7 @@ describe('CameraBasedVisibility', () => {
         // @ts-expect-error — a getter without a setter
         visibility.map2dTileCoords = new Map2DTileCoordsUtil();
       };
+
       expect(write).toThrow(TypeError);
       // the rest of the wording is the engine's, not the library's
       expect(write).toThrow(/map2dTileCoords/);

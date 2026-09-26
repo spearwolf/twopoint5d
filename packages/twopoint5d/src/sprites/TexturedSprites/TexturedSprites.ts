@@ -59,8 +59,8 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
    * Takes a sprite from the sprite pool. Answers `undefined` once the pool has reached its
    * capacity or the sprites have been disposed.
    *
-   * The sprite starts with its size, tex coords, trim margins, position and rotation at 0, upright,
-   * and white as its color, whatever the sprite that stood in its slot before carried.
+   * The sprite starts with its size, tex coords, `texFlipDiagonal`, trim margins, position and
+   * rotation at 0, and white as its color, whatever the sprite that stood in its slot before carried.
    */
   createSprite(): TexturedSprite | undefined {
     return this.geometry?.instancedPool.createVO();
