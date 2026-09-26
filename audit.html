@@ -11,7 +11,7 @@
     "generator": "js-ts-audit-remediation",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-26T14:11:00.594Z"
+    "generatedAt": "2026-09-26T14:18:26.914Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,7 +205,7 @@
           "high": 2,
           "medium": 5,
           "low": 11,
-          "info": 13
+          "info": 12
         },
         "byCategory": {
           "correctness": 6,
@@ -214,7 +214,7 @@
           "completeness": 1,
           "readability": 2,
           "performance": 2,
-          "consistency": 3,
+          "consistency": 2,
           "dx": 6,
           "testing": 2
         }
@@ -247,7 +247,7 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 43,
+        "findings": 42,
         "score": 88
       },
       {
@@ -272,7 +272,7 @@
         "score": 95.5
       }
     ],
-    "resolvedCount": 159,
+    "resolvedCount": 160,
     "scoreModel": 2,
     "score": 78,
     "scoring": {
@@ -293,7 +293,7 @@
       "high": 2,
       "medium": 11,
       "low": 34,
-      "info": 27
+      "info": 26
     },
     "byCategory": {
       "correctness": 6,
@@ -305,20 +305,19 @@
       "completeness": 2,
       "readability": 5,
       "performance": 2,
-      "consistency": 4,
+      "consistency": 3,
       "types": 2,
       "build": 1
     },
     "byComponent": {
       "stage": 27,
-      "controls": 4,
-      "texture": 1
+      "controls": 4
     },
     "counts": {
-      "findings": 74,
+      "findings": 73,
       "improvements": 11,
       "byStatus": {
-        "new": 26,
+        "new": 25,
         "unchanged": 1,
         "carried-over": 44,
         "improved": 3
@@ -332,7 +331,7 @@
     "lastRun": {
       "source": "remediation",
       "date": "2026-09-26",
-      "ref": "2026-09-26"
+      "ref": "main"
     }
   },
   "portrait": {
@@ -1745,24 +1744,6 @@
       }
     },
     {
-      "id": "CONS-058",
-      "category": "consistency",
-      "domain": "code",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "getBufferSize() trägt die maximale Texturgröße als eigenes Literal",
-      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:104",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `getBufferSize()` setzt `16384` als eigenen Default neben `FrameBasedAnimations.MaxTextureSize`. Heute wirkungslos, weil der einzige Aufrufer den statischen Wert übergibt; ändert jemand die Konstante, driften beide auseinander.",
-      "recommendation": "Den Default aus `FrameBasedAnimations.MaxTextureSize` lesen.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-26"
-      }
-    },
-    {
       "id": "DOC-072",
       "category": "dx",
       "domain": "code",
@@ -1811,7 +1792,8 @@
       "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-26 (Feature texture; Scope-Regel: die Feature-Domain texture vollständig, jede Severity einschließlich info und Optimierungspotenzial, samt Specs, Doku und den Stellen in Lookbook und Browser-Tests, die texture benutzen; dazu IMPL-001, CONS-048 und die acknowledged Umbenennungen API-019, API-020, API-023): 12 Commits (`dff733ff` bis `9ec5944e`). Alle 29 texture-Findings, IMPL-001, CONS-048 sowie API-019, API-020 und API-023 sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-016, IMPL-011 und ARCH-005, die über zwei oder mehr Pakete verteilt waren, erst mit allen Teilen. Kein Finding blieb mangels Beleg offen; BUG-020, DOC-013, CONS-005 und CONS-007 bleiben acknowledged. Von 29 Nebenbefunden wurden 23 im Lauf behoben, 4 gingen als neue Findings ins Backlog, zwei davon (BUG-125, BUG-126) mit offener Frage zur Scope-Grenze texture/sprites; 2 deckten sich mit TYPE-019 und DOC-060 und sind nicht doppelt eingetragen. Die kleinen Review-Befunde auf die Diffs des Laufs hat das Nachtragspaket 12 behoben; offen blieb davon nur ein Formulierungshinweis im CHANGELOG (DOC-071). Die offene Frage zu relativen `meta.image`-URLs ist mit der Entscheidung vom 2026-09-26 beantwortet (Auflösung gegen die URL der JSON-Datei). Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf der Domains sprites und map2d vom 2026-09-26 (sechs Commits, 324ab4a1..840e2c0e): drei Findings geschlossen, eines auf den Anteil außerhalb von sprites eingeengt, zwei Nebenbefunde aus texture und stage neu aufgenommen. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt aus dem Remediation-Lauf der Domains sprites und map2d vom 2026-09-26 (sechs Commits, 324ab4a1..840e2c0e): drei Findings geschlossen, eines auf den Anteil außerhalb von sprites eingeengt, zwei Nebenbefunde aus texture und stage neu aufgenommen. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus einem Einzel-Fix auf main vom 2026-09-26 (ein Commit, 810eb4c7, ohne Remediation-Plan): der Default der Texturgrößenprüfung von FrameBasedAnimations liest jetzt FrameBasedAnimations.MaxTextureSize, ein Finding geschlossen, vom Reviewer bestätigt. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -2070,6 +2052,16 @@
       "inducedFixed": 7,
       "inducedOpen": 0,
       "discovered": 9,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-26",
+      "source": "remediation",
+      "ref": "main",
+      "fixed": 1,
+      "inducedFixed": 0,
+      "inducedOpen": 0,
+      "discovered": 0,
       "attribution": "reviewed"
     }
   ],
