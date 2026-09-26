@@ -46,7 +46,7 @@ describe('TileSpritesFactory', () => {
       const factory = new TileSpritesFactory(tileSprites, undefined, new RepeatingTilesProvider(1));
       const pool = tileSprites.geometry!.instancedPool;
 
-      expect(() => factory.createTile(new Map2DTileCoords(0, 0))).toThrow();
+      expect(() => factory.createTile(new Map2DTileCoords(0, 0))).toThrow('expected the tile set of this factory to be defined');
       expect(pool.usedCount, 'usedCount after a throw').toBe(0);
     });
 

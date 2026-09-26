@@ -300,7 +300,10 @@ describe('RepeatingTilesProvider', () => {
       test.each(Object.keys(providers) as (keyof typeof providers)[])(
         '%s: refuses a target shorter than width × height',
         (name) => {
-          expect(() => providers[name]().getTileIdsWithin(0, 0, 3, 2, new Uint32Array(5))).toThrow(RangeError);
+          const read = () => providers[name]().getTileIdsWithin(0, 0, 3, 2, new Uint32Array(5));
+
+          expect(read).toThrow(RangeError);
+          expect(read).toThrow('RepeatingTilesProvider: a target for 3x2 tile ids needs 6 cells, got 5');
         },
       );
     });

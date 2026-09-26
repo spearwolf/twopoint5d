@@ -29,7 +29,10 @@ describe('Map2DSpatialHashGrid', () => {
   });
 
   test('a tile size that cannot be divided by is refused', () => {
-    expect(() => new Map2DSpatialHashGrid(0, 100)).toThrow(RangeError);
+    const create = () => new Map2DSpatialHashGrid(0, 100);
+
+    expect(create).toThrow(RangeError);
+    expect(create).toThrow('[Map2DSpatialHashGrid] tileWidth must be a finite number above 0, got 0');
   });
 
   test('add', () => {

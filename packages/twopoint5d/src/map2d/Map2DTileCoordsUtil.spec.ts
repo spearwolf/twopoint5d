@@ -33,19 +33,31 @@ describe('Map2DTileCoordsUtil', () => {
 
   describe('a tile size that cannot be divided by', () => {
     test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileWidth', (width) => {
-      expect(() => new Map2DTileCoordsUtil(width, 16)).toThrow(RangeError);
+      const create = () => new Map2DTileCoordsUtil(width, 16);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`[Map2DTileCoordsUtil] tileWidth must be a finite number above 0, got ${width}`);
     });
     test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileHeight', (height) => {
-      expect(() => new Map2DTileCoordsUtil(16, height)).toThrow(RangeError);
+      const create = () => new Map2DTileCoordsUtil(16, height);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`[Map2DTileCoordsUtil] tileHeight must be a finite number above 0, got ${height}`);
     });
     test.each([0, -1, NaN, Infinity])('the tileWidth setter refuses %p', (width) => {
       const view = new Map2DTileCoordsUtil(16, 16);
-      expect(() => (view.tileWidth = width)).toThrow(RangeError);
+      const write = () => (view.tileWidth = width);
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow(`[Map2DTileCoordsUtil] tileWidth must be a finite number above 0, got ${width}`);
       expect(view.tileWidth, 'tileWidth after a refused write').toBe(16);
     });
     test.each([0, -1, NaN, Infinity])('the tileHeight setter refuses %p', (height) => {
       const view = new Map2DTileCoordsUtil(16, 16);
-      expect(() => (view.tileHeight = height)).toThrow(RangeError);
+      const write = () => (view.tileHeight = height);
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow(`[Map2DTileCoordsUtil] tileHeight must be a finite number above 0, got ${height}`);
       expect(view.tileHeight, 'tileHeight after a refused write').toBe(16);
     });
   });

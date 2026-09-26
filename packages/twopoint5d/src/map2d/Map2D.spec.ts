@@ -117,7 +117,11 @@ describe('Map2D', () => {
   describe('the tile grid', () => {
     test('a tile size that cannot be divided by is refused', () => {
       const map = new Map2D();
-      expect(() => (map.tileWidth = 0)).toThrow(RangeError);
+      const write = () => (map.tileWidth = 0);
+
+      expect(write).toThrow(RangeError);
+      // the tile grid is the one of map.tileStreamer, whose setter refuses the value and names itself
+      expect(write).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
     });
   });
 

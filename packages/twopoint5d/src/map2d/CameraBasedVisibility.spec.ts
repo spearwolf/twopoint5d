@@ -267,10 +267,13 @@ describe('CameraBasedVisibility', () => {
       tileCoords.tileWidth = 50;
       expect(visibility.map2dTileCoords.tileWidth, 'a write on the grid of the caller').toBe(100);
 
-      expect(() => {
+      const write = () => {
         // @ts-expect-error — a getter without a setter
         visibility.map2dTileCoords = new Map2DTileCoordsUtil();
-      }).toThrow(TypeError);
+      };
+      expect(write).toThrow(TypeError);
+      // the rest of the wording is the engine's, not the library's
+      expect(write).toThrow(/map2dTileCoords/);
     });
 
     test('returns undefined on a fresh instance when the camera direction is parallel to the plane and there are no previousTiles', () => {

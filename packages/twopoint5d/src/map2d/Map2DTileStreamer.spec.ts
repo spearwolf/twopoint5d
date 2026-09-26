@@ -99,10 +99,14 @@ describe('Map2DTileStreamer', () => {
       expect(layer.tileHeight).toBe(1);
     });
     test('a tile size that cannot be divided by is refused', () => {
-      expect(() => new Map2DTileStreamer(0, 16)).toThrow(RangeError);
+      const create = () => new Map2DTileStreamer(0, 16);
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
 
       const layer = new Map2DTileStreamer(8, 16);
-      expect(() => (layer.tileWidth = 0)).toThrow(RangeError);
+      const write = () => (layer.tileWidth = 0);
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
       expect(layer.tileWidth, 'tileWidth after a refused write').toBe(8);
     });
     test('xOffset, yOffset', () => {

@@ -172,11 +172,17 @@ describe('RectangularVisibilityArea', () => {
 
   describe('width and height', () => {
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a width of %s', (v) => {
-      expect(() => new RectangularVisibilityArea(v, 240)).toThrow(RangeError);
+      const create = () => new RectangularVisibilityArea(v, 240);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`[RectangularVisibilityArea] width must be 0 or a finite number above 0, got ${v}`);
     });
 
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a height of %s', (v) => {
-      expect(() => new RectangularVisibilityArea(320, v)).toThrow(RangeError);
+      const create = () => new RectangularVisibilityArea(320, v);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`[RectangularVisibilityArea] height must be 0 or a finite number above 0, got ${v}`);
     });
 
     test('a width that is a string is quoted in the message', () => {
@@ -188,13 +194,19 @@ describe('RectangularVisibilityArea', () => {
 
     test('a refused width leaves the width as it was', () => {
       const area = new RectangularVisibilityArea(320, 240);
-      expect(() => (area.width = -1)).toThrow(RangeError);
+      const write = () => (area.width = -1);
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow('[RectangularVisibilityArea] width must be 0 or a finite number above 0, got -1');
       expect(area.width).toBe(320);
     });
 
     test('a refused height leaves the height as it was', () => {
       const area = new RectangularVisibilityArea(320, 240);
-      expect(() => (area.height = -1)).toThrow(RangeError);
+      const write = () => (area.height = -1);
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow('[RectangularVisibilityArea] height must be 0 or a finite number above 0, got -1');
       expect(area.height).toBe(240);
     });
 
