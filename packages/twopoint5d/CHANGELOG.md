@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `TextureCoords#getTexCoords(target?)`: `s`, `t`, `u` and `v` in one walk up the parents, where each getter walks on its own. Without a `target` it answers a new tuple; with a typed array or a plain array it writes the four values to the indices 0 to 3 and answers the `target`, without allocating. A `target` shorter than four values throws a `RangeError` and stays unchanged
 - add the option `flipDiagonal` of `colorFromTextureByTexCoords()`: a node above 0.5 swaps the two components of the lookup, the lookup `TextureCoords` describes for a frame with `FLIP_DIAGONAL`; without the option the lookup swaps nothing
 - add the instance attribute `texFlipDiagonal` of `TexturedSprite` and `TileSprite`: `1` for a frame with `FLIP_DIAGONAL`, `0` otherwise, written by `TexturedSprite#setFrame()` and `TileSpritesFactory#createTile()` together with the tex coords, and taking the usage the `attributeUsage` of a `TexturedSpritesGeometry` names for `texCoords`. `TexturedSpritesMaterial#texFlipDiagonalNode` puts another node in its place; `TexturedSpritesMaterial.TexFlipDiagonalAttributeName`, `TileSpritesMaterial.TexFlipDiagonalAttributeName` and the type `TAttributeNodeTexFlipDiagonal` name it
+- add the instance attribute `texTrim` of `TexturedSprite` (the fields `trimLeft`, `trimTop`, `trimRight` and `trimBottom` and `setTexTrim()`): the margins a packer cut off a trimmed frame, as fractions of the untrimmed sprite, written by `TexturedSprite#setFrame()` out of `spriteSourceSize` and `sourceSize` of the frame data and 0 at every side for an untrimmed frame. `TexturedSpritesMaterial` moves the corners of the quad by them, so a trimmed frame lies where its untrimmed sprite has it and the quad stands for the untrimmed sprite. The corners move by the measure of the unit quad both sprite geometries build by default; a base quad of another side length is moved by that measure all the same. `TexturedSpritesMaterial#texTrimNode` puts another node in place of the attribute; `TexturedSpritesMaterial.TexTrimAttributeName` and the type `TAttributeNodeTexTrim` name it. An animation that `FrameBasedAnimations#add()` builds from a `TextureAtlas` carries the margins of its frames into the `animsMap`, and `AnimatedSpritesMaterial` lays the quad by them
 - add `TextureResource#activate()`: it registers the effects of the resource and fetches nothing by itself
 - add `TextureStore#loadAsync()`, the static `TextureStore.loadAsync()` and `TextureStoreLoadOptions` with its `signal`. The instance method resolves with the store once the catalog has parsed. It rejects on a fetch that fails, a response that answers with a status, a body that is no JSON and a `parse()` that throws — each of them goes out as an `error` event as well —, with an `AbortError` once `signal` aborts, and with the error of a disposed store once `dispose()` cuts it short; an item that builds no resource and a texture class name no `TextureFactory` knows stay `error` events, and the promise resolves. Once the parse has begun the load is done: a listener inside `parse()` that aborts `signal` or disposes the store leaves the promise resolving with the store. An `error` listener that throws while it hears one of the failures above does not change how the promise settles: every listener hears the event, and eventize reports the throw on the console. On a disposed store it rejects right away and fetches nothing. The static method builds a store for the attempt, counts every error the attempt reports as a failure — nobody can listen to that store before the method returns it —, names the url, the item or, for a texture class in `defaultTextureClasses`, the url of the catalog in its rejection, and disposes the store before it rejects
 - add `TextureStore#getAsync()`: it answers as `get()` does, and its messages name `getAsync()`
@@ -236,6 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TileSet#options` is `{}` when the constructor gets no options
 - the last field of the header texel of an animation in the `animsMap` of `FrameBasedAnimations#bakeDataTexture()` is the number of texels a frame takes. A bake with a frame under `FLIP_DIAGONAL` gives every frame a second texel, as `includeTextureSize` does, and that texel is `[width, height, flipDiagonal, 0]`. The TSDoc of `bakeDataTexture()` lays the whole layout out; `AnimatedSpritesMaterial` reads a `0` in that field as one texel per frame
 - the instance buffers of `TexturedSprites` and `TileSprites` carry one value more, `texFlipDiagonal`: a `toBuffersData()` snapshot of a layout without it does not fit, and a class of one's own that implements `TexturedSprite` or `TileSprite` needs the field. See the Migration Guide
+- a bake of `FrameBasedAnimations#bakeDataTexture()` with a trimmed frame gives every frame three texels, the third `[left, top, right, bottom]` — the trim margins, four zeros for an untrimmed frame of the same bake —, and its headers name 3 texels per frame. A bake without a trimmed frame keeps its layout. See the Migration Guide
+- the instance buffers of `TexturedSprites` carry four values more, `texTrim`, and the `attributeUsage` a `TexturedSpritesGeometry` names for `texCoords` reaches them as it reaches `texFlipDiagonal`. See the Migration Guide
 
 ### Deprecated
 
@@ -266,6 +269,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the error `TextureResource` reports for an atlas json that names no image: it names the url the json came from, whatever `atlasUrl` names by then
 - fix the messages of `TextureAtlasLoader` about a response that is no atlas json and about a json that names no image: they name the `path` of the `fileLoader` and the `url`, the url the json came from
 - fix `FrameBasedAnimations#add()` for an array of frames: it copies the array, so a change the caller makes to it after the call leaves the animation as it was registered
+- fix `AnimatedSpritesMaterial` for an animation whose duration is 0: it shows the first frame of that still image at every time and divides nothing by the duration
+- fix `TexturedSprites#createSprite()`: the sprite starts with `texFlipDiagonal` 0 and without trim margins, whatever the sprite that stood in its slot before carried
 - fix `TextureImageLoader`: the texture it hands out is named by the url of its image, as the one of `TileSetLoader` is; the texture of a `TextureAtlasLoader` is named by the resolved url of the image
 - fix the order of `OnDisplayInit` and `OnDisplayStart`: `Display#start()` emits `OnDisplayInit` before `OnDisplayStart`, both within the call, and a listener attached afterwards receives the two in the same order
 - fix a `stop()` or a `pause = true` inside a listener of `OnDisplayRestart`, and likewise inside one of `OnDisplayInit`: it holds the display in the pause, `OnDisplayPause` follows instead of `OnDisplayStart`, and a later `pause = false` starts the display again; a `pause = false` after it inside the same listener lets the display start with a single `OnDisplayRestart`
@@ -2740,6 +2745,29 @@ material.colorNode = colorFromTextureByTexCoords(colorMap, {flipDiagonal: attrib
 sprite.setTexCoords(coords.getTexCoords());
 sprite.texFlipDiagonal = coords.flipD ? 1 : 0;
 ```
+
+#### `TexturedSprite` carries `texTrim`
+
+`TexturedSprite#setFrame()` lays a trimmed frame into the part of the quad the packer cut it out of, so the quad stands for the untrimmed sprite: a sprite that shows trimmed frames is sized by the `sourceSize` of its frames, not by `coords.width` and `coords.height`.
+
+**Before**
+
+```ts
+const frame = atlas.frame('walk.1')!;
+sprite.setSize(frame.coords.width, frame.coords.height);
+sprite.setFrame(frame);
+```
+
+**After**
+
+```ts
+const frame = atlas.frame('walk.1')!;
+const {w, h} = frame.data?.['sourceSize'] ?? {w: frame.coords.width, h: frame.coords.height};
+sprite.setSize(w, h);
+sprite.setFrame(frame);
+```
+
+Code that reads the `animsMap` of `bakeDataTexture()` itself takes the number of texels a frame takes from the fourth field of the header of its animation, and finds the trim margins in the third texel of a frame when that number is 3. A class of one's own that implements `TexturedSprite` declares the fields `trimLeft`, `trimTop`, `trimRight` and `trimBottom: number` and both overloads of `setTexTrim()`, and buffers data taken with `toBuffersData()` from a pool without `texTrim` has to be taken again. A material of one's own that draws a `TexturedSpritesGeometry` with trimmed frames applies the margins itself: `TexturedSpritesMaterial` moves each corner of the unit quad by the difference between its `uv` on the untrimmed and on the trimmed sprite.
 
 #### The texture module names what its methods do
 

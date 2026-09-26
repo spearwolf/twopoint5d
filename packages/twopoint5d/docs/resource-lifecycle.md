@@ -171,6 +171,7 @@ override dispose() {
   this.#colorMap.set(undefined);
   this.#texCoordsNode.set(undefined);
   this.#texFlipDiagonalNode.set(undefined);
+  this.#texTrimNode.set(undefined);
 
   SignalGroup.delete(this);
   super.dispose();

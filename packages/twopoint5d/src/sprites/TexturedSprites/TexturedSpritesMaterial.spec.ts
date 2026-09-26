@@ -223,6 +223,34 @@ describe('TexturedSpritesMaterial', () => {
       colorMap.dispose();
     });
 
+    test('reads the trim from the texTrim attribute while no texTrimNode is set', () => {
+      const material = new TexturedSpritesMaterial();
+
+      expect(material.texTrimNode).toBeUndefined();
+      expect(attributeNamesOf(material.positionNode!)).toContain(TexturedSpritesMaterial.TexTrimAttributeName);
+      // the corners of the quad move by where they lie on it
+      expect(attributeNamesOf(material.positionNode!)).toContain('uv');
+      expect(TexturedSpritesMaterial.TexTrimAttributeName).toBe('texTrim');
+
+      material.dispose();
+    });
+
+    test('builds a new positionNode for a texTrimNode write, reading that node', () => {
+      const material = new TexturedSpritesMaterial();
+      const {positionNode, version} = material;
+      const trim = vec4(0.25, 0, 0, 0.5);
+
+      material.texTrimNode = trim;
+
+      expect(material.texTrimNode).toBe(trim);
+      expect(material.positionNode).not.toBe(positionNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect(nodesOf(material.positionNode!).has(trim)).toBe(true);
+      expect(attributeNamesOf(material.positionNode!)).not.toContain('texTrim');
+
+      material.dispose();
+    });
+
     test('leaves the colorNode alone for a texFlipDiagonalNode write without a colorMap', () => {
       const material = new TexturedSpritesMaterial();
       const {colorNode, version} = material;
@@ -271,6 +299,7 @@ describe('TexturedSpritesMaterial', () => {
     test('behaves as documented after dispose()', () => {
       const material = new TexturedSpritesMaterial({colorMap: new Texture()});
       material.texFlipDiagonalNode = float(1);
+      material.texTrimNode = vec4(0, 0, 0, 0);
       const {vertexPositionNode, rotationNode, instancePositionNode, quadSizeNode} = material;
 
       material.dispose();
@@ -278,6 +307,7 @@ describe('TexturedSpritesMaterial', () => {
       expect(material.colorMap).toBeUndefined();
       expect(material.texCoordsNode).toBeUndefined();
       expect(material.texFlipDiagonalNode).toBeUndefined();
+      expect(material.texTrimNode).toBeUndefined();
 
       // the node accessors are typed as always present and keep their last node
       expect(material.vertexPositionNode).toBe(vertexPositionNode);

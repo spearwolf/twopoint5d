@@ -1,6 +1,7 @@
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
+import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
@@ -17,7 +18,8 @@ export interface FrameBasedAnimDef {
 export interface BakeTextureOptions {
   /**
    * Gives every frame a second texel, `[width, height, flipDiagonal, 0]`. A bake with a frame under
-   * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option.
+   * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake with a
+   * trimmed frame.
    */
   includeTextureSize: boolean;
 }
@@ -94,7 +96,10 @@ const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: nu
 
 const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
-type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
+// the trim margins of the frames, in the order of `frames`, travel beside the definition
+type AnimEntry = FrameBasedAnimDef & {trims: FrameTrimMargins[]};
+
+type AnimationsMap = Map<AnimName, AnimEntry>;
 
 const getBufferSize = (animationsMap: AnimationsMap, texelsPerFrame = 1, maxTextureSize = 16384) => {
   const anims = Array.from(animationsMap.values());
@@ -111,7 +116,12 @@ const getBufferSize = (animationsMap: AnimationsMap, texelsPerFrame = 1, maxText
   return bufSize;
 };
 
-const renderFloatsBuffer = (floatsBuffer: Float32Array, names: AnimName[], animations: AnimationsMap, texelsPerFrame: 1 | 2) => {
+const renderFloatsBuffer = (
+  floatsBuffer: Float32Array,
+  names: AnimName[],
+  animations: AnimationsMap,
+  texelsPerFrame: 1 | 2 | 3,
+) => {
   let curOffset = names.length;
 
   floatsBuffer.set(
@@ -124,13 +134,15 @@ const renderFloatsBuffer = (floatsBuffer: Float32Array, names: AnimName[], anima
   );
 
   floatsBuffer.set(
-    texelsPerFrame === 2
-      ? names.flatMap((name) =>
-          animations
-            .get(name)!
-            .frames.flatMap((coords) => [...coords.getTexCoords(), coords.width, coords.height, coords.flipD ? 1 : 0, 0]),
-        )
-      : names.flatMap((name) => animations.get(name)!.frames.flatMap((coords) => coords.getTexCoords())),
+    names.flatMap((name) => {
+      const {frames, trims} = animations.get(name)!;
+      return frames.flatMap((coords, i) => {
+        const texels: number[] = coords.getTexCoords();
+        if (texelsPerFrame >= 2) texels.push(coords.width, coords.height, coords.flipD ? 1 : 0, 0);
+        if (texelsPerFrame === 3) texels.push(...trims[i]!);
+        return texels;
+      });
+    }),
     names.length * 4,
   );
 
@@ -159,6 +171,9 @@ export class FrameBasedAnimations {
    * registered them in. A `frameNameQuery`, a pattern as a string or as a `RegExp`, narrows
    * the set to the names it matches. An array of frames is copied: a change to it after the call
    * leaves the animation as it was registered.
+   *
+   * The frames out of an atlas bring their trim margins along, read from `spriteSourceSize` and
+   * `sourceSize` of their data; frames out of a `TileSet` or a list of `TextureCoords` are untrimmed.
    *
    * An animation carries at least one frame and a duration that is a finite number at or above
    * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
@@ -207,6 +222,7 @@ export class FrameBasedAnimations {
     }
 
     let frames: TextureCoords[];
+    let trims: FrameTrimMargins[] | undefined;
 
     if (Array.isArray(args[2])) {
       // the caller keeps its array and may change it later; the checks below and the bake see what
@@ -237,7 +253,9 @@ export class FrameBasedAnimations {
         .filter((frameName) => typeof frameName === 'string')
         .sort(FRAME_NAME_ORDER.compare);
       // every name here came out of `frameNames()` of this very atlas, so it is registered there
-      frames = frameNames.map((frameName) => atlas.frame(frameName)!.coords);
+      const atlasFrames = frameNames.map((frameName) => atlas.frame(frameName)!);
+      frames = atlasFrames.map(({coords}) => coords);
+      trims = atlasFrames.map(({data}) => frameTrimMargins(data));
     } else if (args[2] instanceof TileSet) {
       const tileSet = args[2];
       if (Array.isArray(args[3])) {
@@ -280,6 +298,9 @@ export class FrameBasedAnimations {
       );
     }
 
+    // only the frames of an atlas carry data to read margins from
+    trims ??= frames.map((): FrameTrimMargins => [0, 0, 0, 0]);
+
     const id = this.#names.length;
 
     // an animation of no frames writes a frame count of 0 into the data texture, which no shader
@@ -314,6 +335,7 @@ export class FrameBasedAnimations {
       name,
       frames,
       duration,
+      trims,
     });
 
     return id;
@@ -361,17 +383,24 @@ export class FrameBasedAnimations {
    *   after the other: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them, and with
    *   two texels a second one, `[width, height, flipDiagonal, 0]` — `width` and `height` the
    *   measures of the area in the image as `TextureCoords` holds them, `flipDiagonal` `1` for a
-   *   frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise
-   * - `texelsPerFrame` is `2` when `includeTextureSize` is set or a registered frame carries
-   *   `FLIP_DIAGONAL`, and `1` otherwise — the same for every animation of a bake
+   *   frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise — and with three texels a third
+   *   one, `[left, top, right, bottom]`: the trim margins of the frame as fractions of the
+   *   untrimmed sprite — `left` and `right` of its width, `top` and `bottom` of its height, `top`
+   *   counted from the top — and `0` at every side for an untrimmed frame of the same bake
+   * - `texelsPerFrame` is `3` when a registered frame is trimmed, else `2` when
+   *   `includeTextureSize` is set or a registered frame carries `FLIP_DIAGONAL`, and `1` otherwise
+   *   — the same for every animation of a bake
    *
    * Every call builds a new `DataTexture` and keeps no reference to it: the caller owns it and
    * disposes it. A material it is handed to as `animsMap` borrows it and does not dispose it.
    */
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {
+    const anims = Array.from(this.#animations.values());
     // a turned frame needs the second texel to carry its diagonal flip to the shader
-    const hasTurnedFrame = Array.from(this.#animations.values()).some(({frames}) => frames.some((coords) => coords.flipD));
-    const texelsPerFrame = options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
+    const hasTurnedFrame = anims.some(({frames}) => frames.some((coords) => coords.flipD));
+    // a trimmed frame needs the third texel for its margins, and brings the second along with it
+    const hasTrimmedFrame = anims.some(({trims}) => trims.some((margins) => margins.some((margin) => margin !== 0)));
+    const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
 
     const bufSize = getBufferSize(this.#animations, texelsPerFrame, FrameBasedAnimations.MaxTextureSize);
 

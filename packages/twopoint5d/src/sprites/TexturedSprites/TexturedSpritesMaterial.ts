@@ -1,5 +1,5 @@
 import {createEffect, createSignal, type Effect, SignalGroup} from '@spearwolf/signalize';
-import {attribute, float, mul, rotate, vec3, vec4, vertexColor} from 'three/tsl';
+import {add, attribute, float, mul, rotate, sub, vec3, vec4, vertexColor} from 'three/tsl';
 import {NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {billboardVertexByInstancePosition, colorFromTextureByTexCoords, vertexByInstancePosition} from '../node-utils.js';
 import type {
@@ -8,6 +8,7 @@ import type {
   TAttributeNodeRotation,
   TAttributeNodeTexCoords,
   TAttributeNodeTexFlipDiagonal,
+  TAttributeNodeTexTrim,
   TAttributeNodeVertexPosition,
 } from './TexturedSprite.js';
 
@@ -31,10 +32,13 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly RotationAttributeName = 'rotation';
   static readonly QuadSizeAttributeName = 'quadSize';
   static readonly TexFlipDiagonalAttributeName = 'texFlipDiagonal';
+  static readonly TexTrimAttributeName = 'texTrim';
 
   #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
 
   #texFlipDiagonalNode = createSignal<TAttributeNodeTexFlipDiagonal | undefined>(undefined, {attach: this});
+
+  #texTrimNode = createSignal<TAttributeNodeTexTrim | undefined>(undefined, {attach: this});
 
   #vertexPositionNode = createSignal<TAttributeNodeVertexPosition>(
     attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName),
@@ -106,6 +110,23 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.#texFlipDiagonalNode.set(node);
   }
 
+  /**
+   * The node the trim margins of the frame come from, `[left, top, right, bottom]`; `undefined`
+   * stands for the `texTrim` attribute of the geometry, and it is what the getter answers once the
+   * material has been disposed.
+   *
+   * The margins move the corners of the quad by the measure of the unit quad, the base quad both
+   * sprite geometries build by default; a base quad of another side length is moved by that
+   * measure all the same.
+   */
+  get texTrimNode() {
+    return this.#texTrimNode.get();
+  }
+
+  set texTrimNode(node: TAttributeNodeTexTrim | undefined) {
+    this.#texTrimNode.set(node);
+  }
+
   get rotationNode() {
     return this.#rotationNode.get();
   }
@@ -169,9 +190,20 @@ export class TexturedSpritesMaterial extends NodeMaterial {
       () => {
         const rotationEulerNode = vec3(0, 0, this.rotationNode.toFloat());
         const scale = vec3(this.quadSizeNode.xy, 1.0);
+
+        // uv is where the vertex lies on the untrimmed sprite, x to the right and y downwards. A
+        // trimmed frame covers the part between its margins, so every corner moves to its corner
+        // of that part; y is negated because the position counts upwards. The shift is measured in
+        // the unit quad. It comes before scale and rotation, so that it turns with the sprite
+        const trim = this.texTrimNode ?? attribute<'vec4'>(TexturedSpritesMaterial.TexTrimAttributeName);
+        const uv = attribute<'vec2'>('uv');
+        const trimmedUv = add(trim.xy, mul(uv, sub(float(1), add(trim.xy, trim.zw))));
+        const shift = sub(trimmedUv, uv);
+        const trimmedVertexPosition = add(this.vertexPositionNode, vec3(shift.x, shift.y.negate(), 0));
+
         // scale before rotate: the other way round turns the unit quad and stretches the result,
         // and a sprite that is not square comes out as a parallelogram
-        const vertexPosition = rotate(mul(this.vertexPositionNode, scale), rotationEulerNode);
+        const vertexPosition = rotate(mul(trimmedVertexPosition, scale), rotationEulerNode);
         const instancePosition = this.instancePositionNode;
 
         this.positionNode = (this.renderAsBillboards ? billboardVertexByInstancePosition : vertexByInstancePosition)({
@@ -215,10 +247,10 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   /**
    * Tears down the signals and effects of this material and gives up its optional members:
-   * {@link colorMap}, {@link texCoordsNode} and {@link texFlipDiagonalNode} answer `undefined`
-   * afterwards. A `colorMap` handed in belongs to the caller and is not released here. The node
-   * accessors keep their last node, and so do `colorNode` and `positionNode`: `dispose()` builds
-   * no new one. A second call does nothing.
+   * {@link colorMap}, {@link texCoordsNode}, {@link texFlipDiagonalNode} and {@link texTrimNode}
+   * answer `undefined` afterwards. A `colorMap` handed in belongs to the caller and is not released
+   * here. The node accessors keep their last node, and so do `colorNode` and `positionNode`:
+   * `dispose()` builds no new one. A second call does nothing.
    */
   override dispose() {
     // the effects go first: a write to a signal runs every effect that reads it on the spot, and
@@ -231,6 +263,7 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.#colorMap.set(undefined);
     this.#texCoordsNode.set(undefined);
     this.#texFlipDiagonalNode.set(undefined);
+    this.#texTrimNode.set(undefined);
 
     SignalGroup.delete(this);
     super.dispose();

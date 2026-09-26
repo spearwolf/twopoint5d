@@ -160,7 +160,22 @@ describe('AnimatedSpritesMaterial', () => {
       animsMap.dispose();
     });
 
-    test('an animsMap write builds the colorNode once for the two nodes it takes out of the animsMap', () => {
+    test('takes the trim of a frame out of the animsMap, not from the texTrim attribute', () => {
+      const colorMap = new Texture();
+      const animsMap = makeAnimsMap();
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap});
+
+      expect(material.texTrimNode, 'texTrimNode').toBeDefined();
+      expect(samples(material.texTrimNode!, animsMap), 'texTrimNode samples the animsMap').toBe(true);
+      expect(nodesOf(material.positionNode!).has(material.texTrimNode!), 'the positionNode reads it').toBe(true);
+      expect(attributeNamesOf(material.positionNode!), 'the attributes of the positionNode').not.toContain('texTrim');
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
+
+    test('an animsMap write builds the colorNode and the positionNode once for the three nodes it takes out of the animsMap', () => {
       const colorMap = new Texture();
       const material = new AnimatedSpritesMaterial({colorMap});
       let colorNode = material.colorNode;
@@ -172,15 +187,26 @@ describe('AnimatedSpritesMaterial', () => {
           colorNodeWrites++;
         },
       });
+      let positionNode = material.positionNode;
+      let positionNodeWrites = 0;
+      Object.defineProperty(material, 'positionNode', {
+        get: () => positionNode,
+        set: (node) => {
+          positionNode = node;
+          positionNodeWrites++;
+        },
+      });
 
       const animsMap = makeAnimsMap();
       material.animsMap = animsMap;
 
       expect(colorNodeWrites).toBe(1);
+      expect(positionNodeWrites).toBe(1);
       expect(nodesOf(material.colorNode!).has(material.texCoordsNode!), 'the colorNode reads texCoordsNode').toBe(true);
       expect(nodesOf(material.colorNode!).has(material.texFlipDiagonalNode!), 'the colorNode reads texFlipDiagonalNode').toBe(
         true,
       );
+      expect(nodesOf(material.positionNode!).has(material.texTrimNode!), 'the positionNode reads texTrimNode').toBe(true);
 
       material.dispose();
       colorMap.dispose();
@@ -290,13 +316,15 @@ describe('AnimatedSpritesMaterial', () => {
       material.dispose();
     });
 
-    test('uses the neutral texture coordinates and no diagonal flip while the image is missing', () => {
+    test('uses the neutral texture coordinates, no diagonal flip and no trim while the image is missing', () => {
       const animsMap = new Texture();
       const material = new AnimatedSpritesMaterial({animsMap});
 
       expect((material.texCoordsNode as TextureNode | undefined)?.isTextureNode).toBeFalsy();
       expect(material.texFlipDiagonalNode, 'texFlipDiagonalNode').toBeDefined();
       expect(samples(material.texFlipDiagonalNode!, animsMap), 'texFlipDiagonalNode samples the animsMap').toBe(false);
+      expect(material.texTrimNode, 'texTrimNode').toBeDefined();
+      expect(samples(material.texTrimNode!, animsMap), 'texTrimNode samples the animsMap').toBe(false);
 
       material.dispose();
     });

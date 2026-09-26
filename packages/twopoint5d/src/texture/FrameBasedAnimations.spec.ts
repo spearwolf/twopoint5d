@@ -2,6 +2,7 @@ import {describe, expect, test} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
+import {TexturePackerJson} from './TexturePackerJson.js';
 import {TileSet} from './TileSet.js';
 
 const AnimSymbol = Symbol('anim');
@@ -468,6 +469,106 @@ describe('FrameBasedAnimations', () => {
       expect(texelAt(buffer, 2), 'the header of run').toEqual([1, 0.25, 9, 2]);
       // 3 headers and 4 frames of two texels: 11 texels, and the next power of 2 is 16
       expect(buffer.length).toBe(16 * 4);
+    });
+
+    describe('trimmed frames', () => {
+      // a sprite of 5 × 4 trimmed to 2 × 1 at (1, 2): its margins are 1/5, 2/4, 2/5 and 1/4 — four
+      // different values, so that a mix-up of two sides shows
+      const trim = {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}};
+      // an untrimmed frame as TexturePacker writes it: the first rectangle fills the second
+      const noTrim = {trimmed: false, spriteSourceSize: {x: 0, y: 0, w: 5, h: 4}, sourceSize: {w: 5, h: 4}};
+
+      const expectCloseTo = (actual: number[], expected: number[], label: string) => {
+        expect(actual, label).toHaveLength(expected.length);
+        expected.forEach((value, i) => expect(actual[i], `${label}, value ${i}`).toBeCloseTo(value, 6));
+      };
+
+      test('a trimmed frame gives every frame three texels, the third its margins and four zeros for an untrimmed one', () => {
+        const [atlas] = TexturePackerJson.parse({
+          frames: {
+            still: {frame: {x: 0, y: 0, w: 5, h: 4}, ...noTrim},
+            'trimmed.1': {frame: {x: 5, y: 0, w: 2, h: 1}, ...trim},
+            'trimmed.2': {frame: {x: 8, y: 0, w: 5, h: 4}, ...noTrim},
+          },
+          meta: {image: 'sheet.png', size: {w: 16, h: 4}},
+        });
+        const animations = new FrameBasedAnimations();
+
+        animations.add('still', 1.0, atlas, '^still$');
+        animations.add('trimmed', 0.5, atlas, '^trimmed');
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        expect(texelAt(buffer, 0), 'the header of still').toEqual([1, 1, 2, 3]);
+        expect(texelAt(buffer, 1), 'the header of trimmed').toEqual([2, 0.5, 5, 3]);
+
+        expect(texelAt(buffer, 2), 'the tex coords of the frame of still').toEqual(
+          Array.from(new Float32Array(atlas.frame('still')!.coords.getTexCoords())),
+        );
+        expect(texelAt(buffer, 3), 'the second texel of the frame of still').toEqual([5, 4, 0, 0]);
+        expect(texelAt(buffer, 4), 'the margins of the frame of still').toEqual([0, 0, 0, 0]);
+
+        expect(texelAt(buffer, 5), 'the tex coords of the trimmed frame').toEqual(
+          Array.from(new Float32Array(atlas.frame('trimmed.1')!.coords.getTexCoords())),
+        );
+        expect(texelAt(buffer, 6), 'the second texel of the trimmed frame').toEqual([2, 1, 0, 0]);
+        expectCloseTo(texelAt(buffer, 7), [0.2, 0.5, 0.4, 0.25], 'the margins of the trimmed frame');
+
+        expect(texelAt(buffer, 10), 'the margins of the untrimmed frame of trimmed').toEqual([0, 0, 0, 0]);
+
+        // 2 headers and 3 frames of three texels: 11 texels, and the next power of 2 is 16
+        expect(buffer.length).toBe(16 * 4);
+      });
+
+      test('a trimmed frame the packer turned carries its diagonal flip in the second texel and its margins in the third', () => {
+        const [atlas] = TexturePackerJson.parse({
+          frames: {'trimmed-turned': {frame: {x: 0, y: 0, w: 2, h: 1}, rotated: true, ...trim}},
+          meta: {image: 'sheet.png', size: {w: 4, h: 4}},
+        });
+        const animations = new FrameBasedAnimations();
+
+        animations.add('turned', 1.0, atlas);
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        expect(texelAt(buffer, 0), 'the header').toEqual([1, 1, 1, 3]);
+        expect(texelAt(buffer, 2), 'the second texel: the area in the sheet, turned').toEqual([1, 2, 1, 0]);
+        expectCloseTo(texelAt(buffer, 3), [0.2, 0.5, 0.4, 0.25], 'the margins');
+      });
+
+      test('a bake of atlas frames without a trimmed one keeps one texel per frame, and two with FLIP_DIAGONAL', () => {
+        const [atlas] = TexturePackerJson.parse({
+          frames: {
+            still: {frame: {x: 0, y: 0, w: 5, h: 4}, ...noTrim},
+            turned: {frame: {x: 5, y: 0, w: 5, h: 4}, rotated: true, ...noTrim},
+          },
+          meta: {image: 'sheet.png', size: {w: 16, h: 8}},
+        });
+
+        const upright = new FrameBasedAnimations();
+        upright.add('still', 1.0, atlas, '^still$');
+        expect(texelAt(upright.bakeDataTexture().image.data as Float32Array, 0), 'the header of the upright bake').toEqual([
+          1, 1, 1, 1,
+        ]);
+
+        const withTurned = new FrameBasedAnimations();
+        withTurned.add('all', 1.0, atlas);
+        expect(
+          texelAt(withTurned.bakeDataTexture().image.data as Float32Array, 0),
+          'the header of the bake with a turned frame',
+        ).toEqual([2, 1, 1, 2]);
+      });
+
+      test('the frames out of a list of TextureCoords and out of a TileSet are untrimmed', () => {
+        const animations = new FrameBasedAnimations();
+        animations.add('list', 1.0, [new TextureCoords(0, 0, 32, 32)]);
+        animations.add('tiles', 1.0, new TileSet(new TextureCoords(0, 0, 64, 32), {tileWidth: 32, tileHeight: 32}));
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        expect(texelAt(buffer, 0), 'the header of list').toEqual([1, 1, 2, 1]);
+        expect(texelAt(buffer, 1), 'the header of tiles').toEqual([2, 1, 3, 1]);
+      });
     });
 
     test('bake DataTexture with multiple animations', () => {

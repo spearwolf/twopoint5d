@@ -24,13 +24,14 @@ export type TexturedSpriteMakeBaseSpriteArgs = TexturedSpritesMakeBaseSpriteArgs
 export interface TexturedSpritesGeometryParameters {
   capacity: number;
   // no `alias`: the geometry sets the aliases itself (`size` -> `quadSize`, `position` ->
-  // `instancePosition`, `texCoords` -> `texFlipDiagonal`), and one set by the caller would
-  // replace exactly that mapping
+  // `instancePosition`, `texCoords` -> `texFlipDiagonal` and `texTrim`), and one set by the caller
+  // would replace exactly that mapping
   /**
    * The attributes that take another usage type than the sprite description declares;
-   * `texFlipDiagonal` takes the usage named for `texCoords`, since `setFrame()` writes the two together.
-   * A list that names `texFlipDiagonal` itself does not simply override that: of `dynamic`, `stream` and
-   * `static`, the first that names it — directly or through `texCoords` — decides.
+   * `texFlipDiagonal` and `texTrim` take the usage named for `texCoords`, since `setFrame()` writes the
+   * three together. A list that names `texFlipDiagonal` or `texTrim` itself does not simply override
+   * that: of `dynamic`, `stream` and `static`, the first that names it — directly or through
+   * `texCoords` — decides.
    */
   attributeUsage?: Omit<VertexAttributeUsageOverrides, 'alias'>;
 }
@@ -45,6 +46,11 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
 
   readonly isTexturedSpritesGeometry = true;
 
+  /**
+   * @param makeBaseSpriteArgs the half width, the half height and the offset of the base quad every
+   *   sprite is drawn from; the default `[0.5, 0.5]` is the unit quad. The trim margins of a frame move
+   *   the corners by the measure of the unit quad, also on a base quad of another side length.
+   */
   constructor(
     capacity: number | TexturedSpritesGeometryParameters = 100,
     makeBaseSpriteArgs: TexturedSpritesMakeBaseSpriteArgs = [0.5, 0.5],
@@ -60,8 +66,9 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
             alias: {
               size: ['quadSize'],
               position: ['instancePosition'],
-              // a buffer that uploads the new tex coords of a frame has to upload its diagonal flip as well
-              texCoords: ['texFlipDiagonal'],
+              // setFrame() writes the tex coords, the diagonal flip and the trim margins of a frame
+              // together, so a buffer that uploads the new tex coords has to upload the other two as well
+              texCoords: ['texFlipDiagonal', 'texTrim'],
             },
           });
 

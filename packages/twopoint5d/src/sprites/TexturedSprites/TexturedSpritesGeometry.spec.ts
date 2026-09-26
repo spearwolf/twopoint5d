@@ -92,17 +92,21 @@ describe('TexturedSpritesGeometry', () => {
   });
 
   test.each(['dynamic', 'stream'] as const)(
-    'gives texFlipDiagonal the %s usage and the buffer of texCoords when attributeUsage names texCoords',
+    'gives texFlipDiagonal and texTrim the %s usage and the buffer of texCoords when attributeUsage names texCoords',
     (usage) => {
       const geometry = new TexturedSpritesGeometry({capacity: 8, attributeUsage: {[usage]: ['texCoords']}});
       const texCoords = geometry.instancedPool.descriptor.getAttribute('texCoords')!;
       const texFlipDiagonal = geometry.instancedPool.descriptor.getAttribute('texFlipDiagonal')!;
+      const texTrim = geometry.instancedPool.descriptor.getAttribute('texTrim')!;
 
       expect(texCoords.usageType).toBe(usage);
       expect(texFlipDiagonal.usageType).toBe(usage);
-      // setFrame() writes both, so a buffer that uploads on its own has to carry both
+      expect(texTrim.usageType).toBe(usage);
+      // setFrame() writes all three, so a buffer that uploads on its own has to carry all three
       expect(texFlipDiagonal.autoTouch).toBe(true);
       expect(texFlipDiagonal.bufferName).toBe(texCoords.bufferName);
+      expect(texTrim.autoTouch).toBe(true);
+      expect(texTrim.bufferName).toBe(texCoords.bufferName);
 
       geometry.dispose();
     },

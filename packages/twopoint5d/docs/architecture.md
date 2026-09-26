@@ -122,7 +122,10 @@ tex coords carry where the frame lies and its horizontal and vertical flip, and 
 diagonal flip of a turned frame travels as `texFlipDiagonal` — an instance attribute of
 `TexturedSprites` and of the `TileSprites` in `map2d/`, and the second texel of a frame
 in the `animsMap` of `AnimatedSprites`. `colorFromTextureByTexCoords()` swaps the two
-components of its lookup by that value.
+components of its lookup by that value. Where a trimmed frame lies in its untrimmed sprite
+travels as `texTrim`, the margins the packer cut off — an instance attribute of
+`TexturedSprites` and the third texel of a frame in the `animsMap` of `AnimatedSprites` —
+and the sprite materials move the corners of the quad by them.
 
 ### `map2d/`
 

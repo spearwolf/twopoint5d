@@ -14,6 +14,15 @@ import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
 // s, t, u, v of the coords come out as 0.25, 0.5, 0.75, 1
 const frame: TextureAtlasFrame = {coords: new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2)};
 
+// the frame data TexturePacker writes for a sprite of 5 × 4 trimmed to 2 × 1 at (1, 2): its margins are
+// 1/5, 2/4, 2/5 and 1/4 — four different values, so that a mix-up of two sides shows
+const trimmedFrame: TextureAtlasFrame = {
+  coords: new TextureCoords(new TextureCoords(0, 0, 8, 4), 5, 0, 2, 1),
+  data: {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}},
+};
+// the buffers hold float32, and a field reads out of them
+const TRIMMED_MARGINS = Array.from(new Float32Array([0.2, 0.5, 0.4, 0.25]));
+
 // the values of one attribute of the object at `index`, read straight from the typed array of its buffer
 const readAttribute = (pool: VertexObjectPool<TexturedSprite>, name: string, index: number): number[] => {
   const {bufferName, offset} = pool.buffer.bufferAttributes.get(name)!;
@@ -102,6 +111,49 @@ describe('TexturedSprites', () => {
     sprite.setFrame(frame);
     expect(sprite.texFlipDiagonal, 'texFlipDiagonal of the upright frame').toBe(0);
     expect(readAttribute(sprites.spritePool!, 'texFlipDiagonal', 0), 'texFlipDiagonal in the buffer').toEqual([0]);
+
+    sprites.dispose();
+  });
+
+  test('setFrame() writes the margins of a trimmed frame to texTrim and four zeros for an untrimmed one after it', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+
+    sprite.setFrame(trimmedFrame);
+    expect([sprite.trimLeft, sprite.trimTop, sprite.trimRight, sprite.trimBottom], 'the margins of the trimmed frame').toEqual(
+      TRIMMED_MARGINS,
+    );
+    expect(readAttribute(sprites.spritePool!, 'texTrim', 0), 'texTrim in the buffer').toEqual(TRIMMED_MARGINS);
+
+    sprite.setFrame(frame);
+    expect([sprite.trimLeft, sprite.trimTop, sprite.trimRight, sprite.trimBottom], 'the margins of the untrimmed frame').toEqual([
+      0, 0, 0, 0,
+    ]);
+    expect(readAttribute(sprites.spritePool!, 'texTrim', 0), 'texTrim in the buffer').toEqual([0, 0, 0, 0]);
+
+    sprites.dispose();
+  });
+
+  test('createSprite() hands out a sprite that starts upright and untrimmed, whatever its slot held before', () => {
+    const sprites = new TexturedSprites(4);
+    const upright = sprites.createSprite()!;
+    upright.setFrame(frame);
+
+    const turnedCoords = new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2);
+    turnedCoords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
+    const turned = sprites.createSprite()!;
+    turned.setFrame({coords: turnedCoords, data: trimmedFrame.data});
+
+    // the last sprite of the pool goes back, and the next createSprite() takes its slot again
+    sprites.freeSprite(turned);
+    const fresh = sprites.createSprite()!;
+
+    expect(fresh.texFlipDiagonal, 'texFlipDiagonal of the new sprite').toBe(0);
+    expect(readAttribute(sprites.spritePool!, 'texFlipDiagonal', 1), 'texFlipDiagonal in the buffer').toEqual([0]);
+    expect([fresh.trimLeft, fresh.trimTop, fresh.trimRight, fresh.trimBottom], 'the margins of the new sprite').toEqual([
+      0, 0, 0, 0,
+    ]);
+    expect(readAttribute(sprites.spritePool!, 'texTrim', 1), 'texTrim in the buffer').toEqual([0, 0, 0, 0]);
 
     sprites.dispose();
   });

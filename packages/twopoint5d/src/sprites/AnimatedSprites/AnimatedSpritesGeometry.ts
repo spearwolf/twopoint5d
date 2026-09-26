@@ -9,6 +9,11 @@ export class AnimatedSpritesGeometry extends InstancedVertexObjectGeometry<Anima
   // the constructor hands super() a base descriptor, never a BufferGeometry, so the base pool is always there
   declare readonly basePool: VertexObjectPool<BaseSprite>;
 
+  /**
+   * @param makeBaseSpriteArgs the half width, the half height and the offset of the base quad every
+   *   sprite is drawn from; the default `[0.5, 0.5]` is the unit quad. The trim margins of a frame move
+   *   the corners by the measure of the unit quad, also on a base quad of another side length.
+   */
   constructor(
     capacity = 100,
     makeBaseSpriteArgs: [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number] = [
