@@ -8,10 +8,10 @@
 <script id="audit-data" type="application/json">{
   "schemaVersion": 2,
   "meta": {
-    "generator": "js-ts-project-audit",
+    "generator": "js-ts-audit-remediation",
     "lang": "de",
     "templateVersion": "2.1.0",
-    "generatedAt": "2026-09-25T18:23:16.685Z"
+    "generatedAt": "2026-09-26T12:22:08.008Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -198,50 +198,47 @@
     "domains": {
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 77,
-        "penalty": 44,
+        "score": 85,
+        "penalty": 26.5,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 11,
-          "low": 24,
-          "info": 14
+          "medium": 5,
+          "low": 13,
+          "info": 11
         },
         "byCategory": {
-          "correctness": 11,
-          "performance": 3,
-          "completeness": 3,
-          "consistency": 6,
-          "api": 12,
-          "security": 1,
-          "resources": 1,
-          "architecture": 2,
-          "async": 1,
-          "readability": 3,
+          "correctness": 8,
+          "architecture": 1,
+          "api": 8,
+          "completeness": 1,
+          "readability": 2,
+          "performance": 2,
+          "consistency": 2,
           "dx": 5,
-          "testing": 3
+          "testing": 2
         }
       },
       "harness": {
         "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 70,
-        "penalty": 26,
+        "score": 72,
+        "penalty": 23.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 6,
-          "low": 28,
-          "info": 14
+          "low": 23,
+          "info": 15
         },
         "byCategory": {
-          "types": 3,
-          "testing": 12,
-          "dx": 23,
+          "testing": 11,
+          "dx": 22,
           "dependencies": 3,
-          "consistency": 2,
           "completeness": 1,
           "readability": 3,
-          "build": 1
+          "types": 2,
+          "build": 1,
+          "consistency": 1
         }
       }
     },
@@ -250,8 +247,8 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 68,
-        "score": 82
+        "findings": 44,
+        "score": 88
       },
       {
         "name": "workspace",
@@ -275,9 +272,9 @@
         "score": 95.5
       }
     ],
-    "resolvedCount": 122,
+    "resolvedCount": 156,
     "scoreModel": 2,
-    "score": 73,
+    "score": 78,
     "scoring": {
       "model": 2,
       "weights": {
@@ -294,40 +291,38 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 17,
-      "low": 52,
-      "info": 28
+      "medium": 11,
+      "low": 36,
+      "info": 26
     },
     "byCategory": {
-      "correctness": 11,
-      "performance": 3,
-      "completeness": 4,
-      "consistency": 8,
-      "api": 12,
-      "security": 1,
-      "resources": 1,
-      "types": 3,
-      "architecture": 2,
-      "testing": 15,
-      "dx": 28,
+      "correctness": 8,
+      "architecture": 1,
+      "api": 8,
+      "testing": 13,
+      "dx": 27,
       "dependencies": 3,
-      "async": 1,
-      "readability": 6,
+      "completeness": 2,
+      "readability": 5,
+      "performance": 2,
+      "consistency": 3,
+      "types": 2,
       "build": 1
     },
     "byComponent": {
-      "texture": 27,
-      "stage": 25,
-      "controls": 4
+      "stage": 26,
+      "controls": 4,
+      "map2d": 1,
+      "sprites": 2
     },
     "counts": {
-      "findings": 99,
-      "improvements": 13,
+      "findings": 75,
+      "improvements": 11,
       "byStatus": {
-        "new": 31,
-        "unchanged": 7,
-        "carried-over": 57,
-        "improved": 4
+        "new": 27,
+        "unchanged": 1,
+        "carried-over": 44,
+        "improved": 3
       }
     },
     "deltaBreakdown": {
@@ -337,8 +332,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-25",
-      "ref": "2026-09-25"
+      "date": "2026-09-26",
+      "ref": "2026-09-26"
     }
   },
   "portrait": {
@@ -505,297 +500,6 @@
     }
   },
   "findings": [
-    {
-      "id": "BUG-105",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Bild-URLs aus Atlas- und Katalog-JSON relativ zur JSON-URL auflösen",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:754",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureResource.ts:784",
-        "packages/twopoint5d/src/texture/TextureAtlasLoader.ts:55",
-        "packages/twopoint5d/src/texture/TextureStore.ts:431-432"
-      ],
-      "description": "`meta.image` geht unverändert an `ImageLoader` bzw. `fetch`. TexturePacker schreibt dort einen relativen Dateinamen, das gilt für alle Atlanten im Lookbook. Liegt der Atlas unter `/assets/x.json` und die Seite unter `/demos/y`, wird `/demos/lab-walls-tiles.png` geladen. Das Lookbook umgeht das mit `overrideImageUrl`. Dasselbe gilt für `imageUrl`/`atlasUrl` der Katalog-Items.",
-      "recommendation": "`new URL(meta.image, new URL(atlasUrl, document.baseURI)).href` verwenden, die Katalog-Items analog gegen die Katalog-URL auflösen. Das Verhalten in der TSDoc festhalten und mit einem Spec absichern.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-018",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Bilder nicht neu laden, wenn der Image-Effekt einer Resource neu läuft",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:244-249",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureResource.ts:547",
-        "packages/twopoint5d/src/texture/TextureResource.ts:591-597",
-        "packages/twopoint5d/src/texture/TextureStore.ts:257-265"
-      ],
-      "description": "signalize führt den Cleanup vor dem Re-Run aus. `release(url)` bringt den refCount auf 0 und löscht den Eintrag, das folgende `acquire(url)` startet ein neues `ImageLoader().loadAsync`. Das passiert bei jeder Änderung von `textureClasses` und bei jedem Wechsel des `renderer`. Ein Renderer-Wechsel lädt damit jedes Bild des Stores neu (`THREE.Cache` ist per Default aus). Der Kommentar »One fetch per url for as long as at least one resource wants it« verspricht das Gegenteil. Ein noch ladendes Bild fliegt auf demselben Weg aus dem Cache.",
-      "recommendation": "Erst `acquire` des neuen Laufs, dann `release` des alten, oder das Release auf einen Microtask verschieben. Dazu ein Spec »class change does not refetch«.",
-      "effort": "M",
-      "status": "unchanged",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-106",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "firstTileId und tileCount aus Katalogdaten in FrameBasedAnimations validieren",
-      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:213-219",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureResource.ts:677"
-      ],
-      "description": "Die Werte kommen ungeprüft aus dem Katalog-JSON. Mit `tileCount: 1e9` pusht die Schleife synchron, bis der Tab einfriert oder der Speicher ausgeht, denn die Größenprüfung greift erst in `bakeDataTexture`. Mit `\"tileCount\": \"5\"` entsteht `1 + \"5\"` = `\"15\"`, also 14 statt 5 Frames. `TileSet` prüft dieselben Optionen genau aus diesem Grund.",
-      "recommendation": "`Number.isInteger` und `tileCount >= 1` prüfen, die Obergrenze an die maximale Texturgröße koppeln und die Elemente von `tileIds` ebenfalls als Integer validieren.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-011",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "TexturePacker »JSON Array« und rotierte Frames im Atlas-Guard ablehnen oder unterstützen",
-      "location": "packages/twopoint5d/src/texture/isAtlasJsonResponse.ts:22-24",
-      "locations": [
-        "packages/twopoint5d/src/texture/TexturePackerJson.ts:39-41"
-      ],
-      "description": "Bei `frames` als Array (TexturePacker »JSON Array«, Default in Phaser) besteht jedes Element den Guard. `Object.entries` liefert dann die Namen `\"0\"`, `\"1\"` … statt `filename`, und `frame('walk_01.png')` findet nichts. `rotated: true` wird ohne Meldung ignoriert, rotierte Frames werden verzerrt gezeichnet.",
-      "recommendation": "Das Array-Format unterstützen (Name aus `filename`) oder im Guard ablehnen. `rotated === true` ablehnen oder auswerten.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-107",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Image-Cache-Einträge per Identität freigeben, nicht per URL",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:235-237",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureStore.ts:244-249"
-      ],
-      "description": "Schlägt ein Load fehl, löscht der `catch` den Eintrag, obwohl Resource A ihn noch hält. Resource B legt für dieselbe URL einen neuen Eintrag an. Der Cleanup von A dekrementiert dann den Eintrag von B auf 0 und löscht ihn. Die Zählung bleibt danach dauerhaft verschoben.",
-      "recommendation": "`acquire` gibt den Eintrag zurück, `release` prüft `this.#images.get(url) === entry`.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-108",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "defaultTextureClasses in parse() erst nach der Konfliktprüfung schreiben",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:421-423",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureStore.ts:443-445"
-      ],
-      "description": "Laut TSDoc ist bei einem Typkonflikt »nothing has been written«. Tatsächlich stehen die neuen Default-Klassen bereits im Store, bevor `parse()` wirft, und ein späteres `parse()` ohne eigene Defaults übernimmt sie.",
-      "recommendation": "Die Zuweisung hinter die Konfliktprüfung verschieben und mit einem Spec absichern.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-054",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "low",
-      "title": "Den Setter defaultTextureClasses wirksam machen oder als Feld dokumentieren",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:189-191",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureStore.ts:461"
-      ],
-      "description": "Das Signal hat keinen Abonnenten, gelesen wird der Wert nur in `parse()`. Eine Zuweisung erreicht bestehende Resources nie, wirkt erst beim nächsten `parse()` und wird dort bei nicht-leeren Katalog-Defaults überschrieben. Der Spec »as signal« belegt kein reaktives Verhalten.",
-      "recommendation": "Entweder ein Effect, der die zusammengeführten Klassen in alle Resources schreibt, oder die Semantik »gilt ab dem nächsten parse()« dokumentieren und das Signal durch ein Feld ersetzen.",
-      "effort": "M",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-055",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "low",
-      "title": "Doppelte Zustellung in TextureStore.on() bei wiederholtem parse() verhindern",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:281-288",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureStore.ts:522-524",
-        "packages/twopoint5d/src/texture/TextureStore.ts:596-600"
-      ],
-      "description": "Existiert die Resource beim Abo noch nicht, bleibt ein dauerhafter `resource:\u003cid>`-Listener aktiv. Jedes `parse()` emittiert das Event neu, `clearSubTypeSubscriptions()` setzt `lastValues` zurück, und der Callback bekommt die unveränderte Texture erneut. Wer nach dem Ready abonniert, bekommt keine Duplikate. Das Verhalten hängt also vom Abo-Zeitpunkt ab.",
-      "recommendation": "Dieselbe Resource-Instanz nach der ersten Zustellung nicht erneut abonnieren oder `lastValues` über Resubscribes hinweg behalten.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-109",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Den ersten Tile eines TileSet gegen die Bildgröße prüfen",
-      "location": "packages/twopoint5d/src/texture/TileSet.ts:196-205",
-      "description": "Die Grenzprüfung läuft erst für den nächsten Tile. Mit `tileWidth: 64` auf einem 32-px-Bild entsteht ohne Meldung `tileCount = 1` mit UVs über 1, obwohl der Rest der Optionen streng validiert wird.",
-      "recommendation": "Vor der Schleife `margin*2 + tileOuterWidth \u003c= baseWidth` (analog die Höhe) prüfen und sonst einen `RangeError` werfen.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-046",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "refCount kapseln",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:292",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureResource.ts:425",
-        "packages/twopoint5d/src/texture/TextureStore.ts:605-608",
-        "packages/twopoint5d/src/texture/TextureStore.ts:747"
-      ],
-      "description": "`refCount` entscheidet in `clearUnused`/`evictMissing` über Eviction, ist aber ein öffentliches, beschreibbares Feld. Wer es ändert oder für eine Nutzungszählung hält (es zählt nur `on()`-Abos), löst ein Dispose auf einer noch verwendeten Texture aus. `imageLoader` ist ebenfalls öffentlich erreichbar.",
-      "recommendation": "`refCount` als Getter über ein privates Feld exponieren, das `TextureStore` über ein modulinternes Symbol ändert. `imageLoader` genauso behandeln.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "SEC-001",
-      "category": "security",
-      "domain": "code",
-      "severity": "low",
-      "title": "Das Katalog-JSON validieren, bevor parse() es durchläuft",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:381-383",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureStore.ts:431-432",
-        "packages/twopoint5d/src/texture/TextureFactory.ts:160-161"
-      ],
-      "description": "Anders als der Atlas bekommt der Katalog keinen Guard. Fehlt `items`, kommt ein nichtssagender TypeError. Ein Tippfehler wie `\"nearset\"` ergibt eine unbekannte Klasse, die Sortierung wird durch NaN-Prioritäten unbestimmt, und die Klasse fällt ohne Meldung weg. `frameNameQuery` wird ungeprüft zu `new RegExp`, was bei fremden Katalogen ReDoS erlaubt.",
-      "recommendation": "Einen Guard `isTextureStoreData` mit sprechenden Fehlern einbauen und unbekannte Klassennamen als `error`-Event mit `source: 'parse'` melden.",
-      "effort": "M",
-      "status": "unchanged",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-015",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "title": "Ownership herausgegebener Texturen in Loadern und FrameBasedAnimations dokumentieren",
-      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:292",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureImageLoader.ts:28",
-        "packages/twopoint5d/src/texture/TileSetLoader.ts:30",
-        "packages/twopoint5d/src/texture/TextureAtlasLoader.ts:37"
-      ],
-      "description": "Laut resource-lifecycle.md §1 überträgt das Herausgeben einer Ressource keine Ownership. `FrameBasedAnimations` und die Loader haben aber kein `dispose()`, damit ist implizit der Aufrufer Owner, und das steht nirgends. `bakeDataTexture` erzeugt bei jedem Aufruf eine neue `DataTexture`, und das Lookbook gibt die alten nie frei.",
-      "recommendation": "An jeder Methode »the caller owns the returned texture and disposes it« ergänzen. Optional die gebackene Textur cachen und `FrameBasedAnimations.dispose()` anbieten.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ASYNC-003",
-      "category": "async",
-      "domain": "code",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "AbortSignal für die Loader und TextureStore.load anbieten",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:365",
-      "locations": [
-        "packages/twopoint5d/src/texture/TextureAtlasLoader.ts:37",
-        "packages/twopoint5d/src/texture/TextureImageLoader.ts:28",
-        "packages/twopoint5d/src/texture/TileSetLoader.ts:30",
-        "packages/twopoint5d/src/texture/PowerOf2ImageLoader.ts:28"
-      ],
-      "description": "`TextureStore.get` und der Atlas-Fetch lassen sich abbrechen, die übrigen Ladewege nicht. Ein Katalog-Fetch läuft nach `store.dispose()` weiter, bis `parse` ihn verwirft. Eine Texture, die nach dem Unmount einer Komponente ankommt, muss der Aufrufer selbst erkennen und disposen.",
-      "recommendation": "Optionales `{signal}` in `loadAsync`/`load` einführen, bei Abort eine bereits gebaute Texture disposen, und `TextureStore.load` beim eigenen Dispose abbrechen.",
-      "effort": "M",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-036",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "TextureCoords.root als nie-undefined typisieren",
-      "location": "packages/twopoint5d/src/texture/TextureCoords.ts:71",
-      "description": "`root` ist als `TextureCoords | undefined` deklariert, kann aber nie `undefined` sein. Aufrufer müssen deshalb unnötig `?.` schreiben, der eigene Spec eingeschlossen.",
-      "recommendation": "`root: TextureCoords` deklarieren.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-016",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "TileSet#options optional typisieren oder immer ein Objekt ablegen",
-      "location": "packages/twopoint5d/src/texture/TileSet.ts:67",
-      "locations": [
-        "packages/twopoint5d/src/texture/TileSet.ts:83-91"
-      ],
-      "description": "`options` ist als `TileSetOptions` deklariert, ist ohne zweites Konstruktorargument aber `undefined`. Die Klasse liest es selbst defensiv mit `?.`, externe Leser verlassen sich dagegen auf den Typ.",
-      "recommendation": "`options` auf `{}` defaulten, damit der Typ stimmt.",
-      "effort": "S",
-      "status": "unchanged",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-029",
-      "category": "performance",
-      "domain": "code",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "Absolute UV-Koordinaten in TextureCoords einmal statt pro Zugriff berechnen",
-      "location": "packages/twopoint5d/src/texture/TextureCoords.ts:121-155",
-      "description": "Die Getter `u` und `v` laufen bei jedem Zugriff die Parent-Kette ab. `{s,t,u,v}` zu destrukturieren kostet sechs Kettenläufe. Heute ist das unkritisch, es skaliert aber mit der Sprite-Zahl und der Verschachtelungstiefe.",
-      "recommendation": "Lazy berechnen und bei Mutation invalidieren oder `getUV(out)` anbieten.",
-      "effort": "S",
-      "status": "new",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-001",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die verstreuten TODO-Marker in ausgelieferten Code-Pfaden auflösen",
-      "location": "packages/twopoint5d/src/texture/TexturePackerJson.ts:19",
-      "description": "In ausgelieferten Typen und Code-Pfaden stehen offene TODOs ohne Verweis auf einen Tracker, etwa `// TODO add textureOptions: TextureClasses[]` im öffentlichen `TexturePackerMetaData`.",
-      "recommendation": "Umsetzen oder als Issue erfassen und aus dem Code entfernen.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
     {
       "id": "BUG-113",
       "category": "correctness",
@@ -1225,34 +929,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "ARCH-005",
-      "category": "architecture",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Zwei Lade-Stacks im texture-Modul mit unterschiedlichem Verhalten für dasselbe Asset",
-      "location": "packages/twopoint5d/src/texture/public-api.ts:1",
-      "description": "Das Modul exportiert zwei Generationen: die Callback-Loader \u003ccode>PowerOf2ImageLoader\u003c/code>, \u003ccode>TextureImageLoader\u003c/code>, \u003ccode>TextureAtlasLoader\u003c/code> und \u003ccode>TileSetLoader\u003c/code> (\u003ccode>load(cb, errCb)\u003c/code> plus \u003ccode>loadAsync\u003c/code>) und den signal-basierten \u003ccode>TextureStore\u003c/code> mit \u003ccode>TextureResource\u003c/code>. Die Loader polstern jedes Nicht-Zweierpotenz-Bild über einen Canvas auf und liefern \u003ccode>texCoords\u003c/code> als Kind eines größeren Root; die Resource lädt roh über \u003ccode>ImageLoader\u003c/code>. Dasselbe PNG ergibt je nach Weg eine andere Textur und andere UV-Wurzeln. Die Lookbook nutzt beide Wege nebeneinander. Re-Check dieses Laufs: unverändert, beide Stacks sind exportiert und dokumentieren ihr Verhältnis nirgends.",
-      "recommendation": "Entscheiden, welcher Stack die Zukunft ist. Naheliegend: die Callback-Loader als \u003ccode>@deprecated\u003c/code> markieren, das POT-Padding als Option in \u003ccode>TextureResource\u003c/code> anbieten oder ganz streichen, und die map2d-Demos auf den Store umstellen. Bis dahin ein Absatz im Modul, der die beiden Wege und ihren Unterschied benennt.",
-      "effort": "L",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ASYNC-001",
-      "category": "async",
-      "domain": "code",
-      "severity": "medium",
-      "title": "TextureStore.get() einen Fehlerpfad geben, wenn die Resource nicht laden kann",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts:664",
-      "description": "\u003ccode>get()\u003c/code> settelt auf einen Wert, auf Store-Dispose, auf Abort oder auf eine fehlende id nach dem ersten \u003ccode>ready\u003c/code>. Eine Resource, deren Bild mit 404 antwortet, deren Atlas-JSON ungültig ist oder deren Texturerzeugung wirft, emittiert \u003ccode>error\u003c/code> nur an der Resource selbst (so steht es im TSDoc des Stores). Nichts verbindet das mit dem wartenden \u003ccode>get()\u003c/code>: \u003ccode>await store.get('hero', 'texture')\u003c/code> hängt bei einer kaputten URL unbegrenzt — genau das, was \u003ccode>whenResource()\u003c/code> laut Doku vermeiden soll. Ohne \u003ccode>AbortSignal\u003c/code> bleibt dem Aufrufer nur, den Store zu disposen.",
-      "recommendation": "In \u003ccode>get()\u003c/code>, sobald \u003ccode>onResource\u003c/code> die Resource liefert, \u003ccode>once(resource, TextureResourceEvents.Error, …)\u003c/code> für die ladeabschließenden Quellen (\u003ccode>image\u003c/code>, \u003ccode>atlas\u003c/code>, \u003ccode>texture\u003c/code>) abonnieren und mit einem Fehler samt Payload rejecten; \u003ccode>frameBasedAnimations\u003c/code>-Fehler bleiben nicht-fatal. Alternativ Resource-Fehler am Store weiterreichen und dort hören. Spec mit dem vorhandenen \u003ccode>ImageLoader.prototype.loadAsync\u003c/code>-Rejection-Mock.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-004",
       "category": "testing",
       "domain": "harness",
@@ -1266,21 +942,6 @@
       "previousSeverity": "medium",
       "package": "twopoint5d-testing",
       "component": "controls"
-    },
-    {
-      "id": "TEST-016",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Spec-Lücken um die Loader und die Fehlerpfade des texture-Moduls schließen",
-      "location": "packages/twopoint5d/src/texture/TexturePackerJson.ts:1",
-      "description": "Der Vorlauf zählte sechs ungetestete Dateien; \u003ccode>TextureFactory.spec.ts\u003c/code> und \u003ccode>TextureAtlasLoader.spec.ts\u003c/code> existieren inzwischen, vier Loader-Dateien (55–63 Zeilen) haben weiter keine Spec, \u003ccode>isAtlasJsonResponse.ts\u003c/code> nur indirekt. Ohne Test sind zudem: \u003ccode>TileSet\u003c/code> mit degenerierten Optionen (BUG-067); \u003ccode>store.get()\u003c/code> auf einer Resource, deren Bild-Load rejected (ASYNC-001 — die Spec in TextureStore.spec.ts:1058-1155 deckt das Rennen, nicht den Fehlschlag); ein werfender \u003ccode>texture\u003c/code>-Subscriber (MEM-001); Nicht-Objekt-Animationseinträge (BUG-068); \u003ccode>new TextureResource(id, 'atlas')\u003c/code> (API-047); \u003ccode>parse()\u003c/code> mit fehlendem \u003ccode>items\u003c/code> oder unbekanntem Klassennamen; \u003ccode>overrideImageUrl\u003c/code> zurück auf \u003ccode>undefined\u003c/code> (BUG-069); \u003ccode>dispose()\u003c/code> während der Atlas-\u003ccode>fetch\u003c/code> in Flight ist (der \u003ccode>AbortController\u003c/code> in TextureResource.ts:629-684 wird nie geübt).",
-      "recommendation": "Eine Spec-Datei pro Loader mit den \u003ccode>ImageLoader.prototype.loadAsync\u003c/code>/\u003ccode>fetch\u003c/code>-Mocks, die die bestehenden Suiten schon nutzen, plus ein Test pro Punkt oben in den Resource-/Store-Suiten.",
-      "effort": "M",
-      "status": "improved",
-      "previousSeverity": "medium",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
     },
     {
       "id": "TEST-022",
@@ -1309,20 +970,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-047",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die Shape einer TextureResource im Konstruktor entscheiden, nicht in den statischen Factories",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:443",
-      "description": "Der Konstruktor ist öffentlich und exportiert, aber \u003ccode>#atlasUrl\u003c/code>, \u003ccode>#atlasJson\u003c/code>, \u003ccode>#overrideImageUrl\u003c/code>, \u003ccode>#atlas\u003c/code>, \u003ccode>#tileSetOptions\u003c/code> und \u003ccode>#tileSet\u003c/code> entstehen nur in \u003ccode>fromAtlas()\u003c/code>/\u003ccode>fromTileSet()\u003c/code>. \u003ccode>new TextureResource('x', 'atlas')\u003c/code> wirft deshalb beim Setter, den sein Typ verspricht (\u003ccode>… has no \"atlasUrl\"\u003c/code>), und \u003ccode>load()\u003c/code> registriert keine Atlas- oder TileSet-Effekte, weil die Guards die noch undefinierten Werte lesen. Die Klasse trägt einen \u003ccode>type\u003c/code>, den sie nicht einlösen kann.",
-      "recommendation": "Die shape-spezifischen Signale im Konstruktor anhand von \u003ccode>type\u003c/code> anlegen (die Factories weisen dann nur noch Werte zu), oder den Konstruktor privat machen und die drei Factories als einzige Einstiege dokumentieren. Die Guards in Zeile 565/618 sollten auf \u003ccode>this.type\u003c/code> prüfen, nicht auf das Vorhandensein eines Werts.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1367,62 +1014,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "READ-011",
-      "category": "readability",
-      "domain": "code",
-      "severity": "low",
-      "title": "TextureResource.load() in Registrierer pro Shape aufteilen",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:500",
-      "description": "Eine Methode trägt den Bild-Effekt (mit Promise-Kette und Cleanup), das TileSet-Paar, das Atlas-Quartett (Fetch + URL + Parse + Animationen) und den Standalone-Renderer-Fallback — rund 290 Zeilen, drei Closure-Ebenen tief, mit sechs Non-Null-Assertions auf die Shape-Signale, deren Rechtfertigung ein Kommentar ist. Die beiden Animationsschleifen (589-610 und 726-742) sind Fast-Duplikate. Es ist die Datei, in der die subtilen Befunde dieses Laufs (MEM-001, BUG-068, BUG-069) liegen, und ihre Größe ist der Grund, warum sie leicht zu übersehen sind.",
-      "recommendation": "\u003ccode>#registerImageEffect()\u003c/code>, \u003ccode>#registerTileSetEffects(signals)\u003c/code>, \u003ccode>#registerAtlasEffects(signals)\u003c/code> und einen gemeinsamen \u003ccode>#buildAnimations(add)\u003c/code>-Helfer extrahieren; die Shape-Signale als typisierte Parameter übergeben, damit die \u003ccode>!\u003c/code> verschwinden.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-017",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Vier describe-Namen verweisen auf Abschnitte eines Dokuments, das es nicht gibt",
-      "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:319",
-      "description": "Vier \u003ccode>describe\u003c/code>-Namen tragen Abschnittsverweise (\u003ccode>§4.6\u003c/code>, \u003ccode>§6.4\u003c/code>, \u003ccode>§3.3, §6.1\u003c/code>, \u003ccode>§4.3, §4.7\u003c/code>) auf ein Dokument, das im Repo nicht existiert. Re-Check: unverändert (Zeilen verschoben).",
-      "recommendation": "Die Verweise durch den Satz ersetzen, den sie meinen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-018",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Rund zehn TextureResource-Tests liegen in TextureStore.spec.ts",
-      "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:1026",
-      "description": "Tests im \u003ccode>describe('TextureStore')\u003c/code> prüfen ausschließlich \u003ccode>TextureResource\u003c/code>: \u003ccode>TextureResource.load() initial firing\u003c/code>, \u003ccode>TextureResource.load() image race\u003c/code>, \u003ccode>TextureResource.fromX input safety\u003c/code>. Neben der Datei liegt \u003ccode>TextureResource.spec.ts\u003c/code>, in die sie gehören. Die Datei ist mit 1504 Zeilen die größte Spec des Repos. Re-Check: unverändert.",
-      "recommendation": "Die Blöcke nach \u003ccode>TextureResource.spec.ts\u003c/code> verschieben.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-054",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Festlegen, was eine TextureResource mit geleertem imageUrl anbietet",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:538",
-      "description": "\u003ccode>imageUrl = undefined\u003c/code> lässt Textur, \u003ccode>imageCoords\u003c/code> und alles daraus Gebaute (TileSet, Atlas, Animationen) stehen; der Bild-Effekt kehrt nur zurück (\u003ccode>if (!factory || !url) return;\u003c/code>). Erreichbar über \u003ccode>TextureStore#parse()\u003c/code> mit einem \u003ccode>tileSet\u003c/code>-Item ohne \u003ccode>imageUrl\u003c/code>. Die übrigen Eingaben der Resource nehmen ihre abgeleiteten Werte inzwischen zurück, wenn sie geleert werden; das Bild ist die Ausnahme. Aufgefallen im Remediation-Lauf vom 2026-09-19, dort als Rückfrage offen geblieben: Ob ein geleertes Bild die Textur zurücknimmt und freigibt (ein Aufrufer kann sie noch halten) oder die letzte Textur stehen bleibt, ist nirgends festgelegt.",
-      "recommendation": "Entscheiden und in der Klassen-TSDoc festhalten. Zurücknehmen: Textur und Abgeleitetes auf \u003ccode>undefined\u003c/code>, retained Events räumen, die eigene Textur nach dem Ownership-Vertrag in \u003ccode>docs/resource-lifecycle.md\u003c/code> freigeben. Stehen lassen: den Satz ergänzen, dass ein geleertes \u003ccode>imageUrl\u003c/code> die letzte Textur hält.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-027",
       "category": "dx",
       "domain": "harness",
@@ -1462,34 +1053,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-042",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "TSDoc von TextureResourceEvents um das Räumen der retained Events ergänzen",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:66",
-      "description": "Das TSDoc sagt nur »retained — late subscribers see the latest value«. Dass ein zurückgenommener Wert das retained Event räumt, ein später Abonnent dann also auf den nächsten Wert wartet, steht nur in der Klassen-TSDoc. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Den Satz aus der Klassen-TSDoc (»rather than announcing \u003ccode>undefined\u003c/code> the retained events are cleared«) hier wiederholen oder verlinken.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-043",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "In der Klassen-TSDoc von TextureResource sagen, wann eine unlesbare atlasJson den Atlas zurücknimmt",
-      "location": "packages/twopoint5d/src/texture/TextureResource.ts:189",
-      "description": "»while its \u003ccode>atlasJson\u003c/code> … cannot be read« gilt erst, wenn das genannte Bild geladen ist; Getter- und Events-TSDoc sagen es richtig, die Klassen-TSDoc nicht. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "»… cannot be read once the image it names is there«.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1546,20 +1109,6 @@
       "effort": "S",
       "status": "carried-over",
       "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-042",
-      "category": "consistency",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die toten try/catch-Gerüste in den TextureResource-Specs streichen",
-      "location": "packages/twopoint5d/src/texture/TextureResource.spec.ts:922",
-      "description": "Die Helfer \u003ccode>writeUnreadable\u003c/code> und \u003ccode>refuse\u003c/code> fangen einen Throw, den der Setter nicht mehr wirft; ihre Kommentare beschreiben den Übergang von der roten zur grünen Phase (»either way«) statt des heutigen Verhaltens. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Direkte Zuweisung, Kommentare streichen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1646,19 +1195,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "CONS-048",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die Fehlermeldung folgt dem Format von TileSet, aber nicht dessen describeValue()",
-      "location": "packages/twopoint5d/src/utils/assertPositiveFinite.ts:9",
-      "description": "Ein String steht bei \u003ccode>TileSet\u003c/code> in Anführungszeichen, hier nackt (\u003ccode>got abc\u003c/code> statt \u003ccode>got \"abc\"\u003c/code>). Da \u003ccode>value\u003c/code> als \u003ccode>unknown\u003c/code> typisiert ist, ist der Fall erreichbar.",
-      "recommendation": "\u003ccode>describeValue()\u003c/code> auch hier verwenden.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "DOC-050",
       "category": "dx",
       "domain": "code",
@@ -1685,34 +1221,6 @@
       "status": "improved",
       "previousSeverity": "low",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-030",
-      "category": "testing",
-      "domain": "code",
-      "severity": "info",
-      "title": "Ein nacktes toThrow() prüft nicht, woher der Wurf kommt",
-      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.spec.ts:67",
-      "description": "Die Zeile belegt nur, dass \u003ccode>add()\u003c/code> wirft — nicht, dass die \u003ccode>frameRate\u003c/code> der Grund ist. Das benachbarte \u003ccode>animId('anim_0')\u003c/code> fängt einen Teil davon ab.",
-      "recommendation": "Auf die Meldung prüfen, nicht nur auf den Wurf.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-051",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die Fehlermeldung nennt die duration, wo die frameRate schuld ist",
-      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:242",
-      "description": "Bei \u003ccode>{frameRate: NaN}\u003c/code> meldet \u003ccode>add()\u003c/code> »got a duration of NaN«. Für einen Aufrufer, der eine \u003ccode>frameRate\u003c/code> gesetzt hat, zeigt die Meldung auf den falschen Knopf.",
-      "recommendation": "Einen Zusatz »(from a frameRate of …)« anhängen, wenn die Dauer aus einer \u003ccode>frameRate\u003c/code> gerechnet wurde.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "texture",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -2199,15 +1707,128 @@
         "kind": "induced",
         "run": "2026-09-25"
       }
+    },
+    {
+      "id": "TEST-048",
+      "category": "testing",
+      "domain": "harness",
+      "component": "stage",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "low",
+      "title": "describe-Namen der StageRenderer-Spec verweisen auf Abschnitte eines Dokuments, das nicht im Repo liegt",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:526",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:546",
+        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:759"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Drei describe-Namen tragen `§6.2`, `§6.3` und `§6.4` (»outputRenderTarget (§6.4 RT only, no pipeline)«, »pipeline without buildOutputNode (§6.4 Mode C)«, »asPassNode + buildOutputNode (§6.2 / §6.3)«). Ein Dokument mit diesen Abschnitten liegt nicht im Repo; wer einen roten Test liest, erfährt nicht, welche Zusage gemeint ist. Dieselben Verweise in `src/stage/README.md` führt DOC-066.",
+      "recommendation": "Die Verweise durch den Satz ersetzen, den sie meinen, etwa den Namen des Modus oder die Zusage selbst.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
+    },
+    {
+      "id": "TEST-049",
+      "category": "testing",
+      "domain": "harness",
+      "component": "map2d",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "Die Grenzprüfungen der map2d-Specs prüfen nur die Fehlerklasse, nicht die Meldung",
+      "location": "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:175",
+      "locations": [
+        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:179",
+        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:185",
+        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:191",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:36",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:39",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:43",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:48",
+        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.spec.ts:32",
+        "packages/twopoint5d/src/map2d/Map2DTileStreamer.spec.ts:102",
+        "packages/twopoint5d/src/map2d/Map2DTileStreamer.spec.ts:105"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `toThrow(RangeError)` prüft nur die Klasse. Die Meldung, die Klasse, Eigenschaft und Wert nennt, kann sich ändern oder aus einer anderen Prüfung kommen, ohne dass ein Test rot wird.",
+      "recommendation": "Auf die Meldung prüfen (`toThrow(/…/)` oder den vollen Text), wie es die texture-Specs tun.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
+    },
+    {
+      "id": "BUG-125",
+      "category": "correctness",
+      "domain": "code",
+      "component": "sprites",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "low",
+      "title": "AnimatedSpritesMaterial teilt durch die duration, die FrameBasedAnimations als 0 zulässt",
+      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:90",
+      "locations": [
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:34-35",
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:296-298"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Der Shader rechnet den Frame-Index als `(time + animOffset) / duration` mit der `duration` aus dem `animsMap`. `FrameBasedAnimations#add()` lässt eine `duration` von 0 als Standbild zu; bei `time + animOffset = 0` ergibt das 0/0 = NaN und einen undefinierten Frame-Index. Aus dem Code abgeleitet, nicht im Browser gesehen. Zu entscheiden ist, auf welcher Seite der Scope-Grenze texture/sprites der Fix liegt: die Stelle liegt in `sprites/`, das gebrochene Versprechen gibt `FrameBasedAnimations#add()` in texture.",
+      "recommendation": "Im Shader eine `duration` von 0 als Standbild behandeln (Frame 0), oder `bakeDataTexture()` schreibt für ein Standbild einen Wert, den der Shader ohne Division liest; dazu ein Test mit `duration: 0`.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
+    },
+    {
+      "id": "BUG-126",
+      "category": "correctness",
+      "domain": "code",
+      "component": "sprites",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "low",
+      "title": "Getrimmte TexturePacker-Frames werden nach dem getrimmten Bereich gezeichnet",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:60",
+      "locations": [
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:88-99",
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:370"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Ein getrimmter Frame (`trimmed: true`, TexturePackers Voreinstellung) wird nach seinen `coords` gezeichnet, also nach dem beschnittenen Bereich. Wo er im ungetrimmten Sprite liegt (`spriteSourceSize`) und wie groß dieses ist (`sourceSize`), liest kein Konsument: `TexturedSprite#setFrame()` nicht, `AnimatedSpritesMaterial` nicht, und das Layout, das `bakeDataTexture()` ins `animsMap` schreibt, hat keinen Platz dafür. Die Frames einer getrimmten Animation springen, ein Sprite nach `coords.width`/`height` ist zu klein. Seit dem Lauf trägt jeder Frame aus `TexturePackerJson.parse()` die drei Werte als `TextureAtlasFrame#data`. Zu entscheiden ist, ob und in welchem Rahmen der Umbau kommt: er hat die Größe eines eigenen Pakets (Layout des `animsMap` in texture, Shader und Deskriptoren in sprites) und liegt zur Hälfte außerhalb der Domain texture.",
+      "recommendation": "Das `animsMap`-Layout um Versatz und Quellgröße je Frame erweitern, `AnimatedSpritesMaterial` und `TexturedSprite#setFrame()` legen den Quad danach; ein Browser-Test mit Pixelprobe hält es fest. Alternativ in der Doku festhalten, dass Atlanten ohne Trimming exportiert werden müssen.",
+      "effort": "L",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
+    },
+    {
+      "id": "DOC-071",
+      "category": "dx",
+      "domain": "harness",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "Der CHANGELOG-Eintrag zu loadAsync() bezieht »the failures above« nicht eindeutig",
+      "location": "packages/twopoint5d/CHANGELOG.md:54",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Der Eintrag zu `TextureStore#loadAsync()` sagt, ein werfender `error`-Listener ändere nicht, wie das Promise settlet, »while it hears one of the failures above«. Unmittelbar davor stehen die Item-Events, die nicht rejecten; »the failures above« lässt sich zur Not auch auf sie beziehen, gemeint sind nur die vier Fehlschläge, die rejecten.",
+      "recommendation": "»one of the four failures that reject« statt »one of the failures above« schreiben.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-26"
+      }
     }
   ],
   "openQuestions": [
     "Soll `IMapTileFactory.createTile() → undefined` ausschließlich »kein Tile an dieser Koordinate« bedeuten? Davon hängt ab, ob die Pool-Erschöpfung im Factory- oder im Renderer-Vertrag behoben wird.",
     "Hängt `PanControl2D` seine Listener bewusst an `document`, etwa für Vollbild-Apps? Dann ist die fehlende Input-Begrenzung eine Doku-Lücke und kein Defekt.",
-    "Ist es gewollt, dass relative `meta.image`-URLs eines Atlas gegen das Dokument statt gegen die Atlas-URL aufgelöst werden? Bisher ist der `overrideImageUrl`-Workaround im Lookbook der einzige Hinweis darauf.",
     "Wird Mode E (verschachtelte Renderer mit eigener Pipeline unter einem komponierenden Parent) mit sRGB-Output produktiv genutzt? Der doppelte Output-Transform ist aus dem three-Quelltext abgeleitet, aber nicht per Pixel-Test bestätigt.",
     "`PanControl2D.update()` teilt den Pointer-Pan durch `devicePixelRatio`, die Tastatur-Speeds aber nicht. Ist es gewollt, dass die Karte auf Retina nur halb so schnell wie die Maus folgt?",
-    "Ist Mode D mit einem `outputRenderTarget`, dessen Größe vom Drawing Buffer abweicht, ein unterstützter Fall? `pass()` dimensioniert sein RT nach dem Drawing Buffer."
+    "Ist Mode D mit einem `outputRenderTarget`, dessen Größe vom Drawing Buffer abweicht, ein unterstützter Fall? `pass()` dimensioniert sein RT nach dem Drawing Buffer.",
+    "Gehören BUG-125 (`duration` 0 im `AnimatedSpritesMaterial`) und BUG-126 (getrimmte TexturePacker-Frames in den Sprite-Konsumenten) in einen Lauf der Domain texture oder der Domain sprites? Beide brechen ein Versprechen aus texture, der Fix liegt aber ganz oder zur Hälfte in `sprites/`; BUG-126 ist ein Umbau in der Größe eines eigenen Pakets (Layout des `animsMap`, Shader, Deskriptoren)."
   ],
   "methodology": {
     "text": "**Vollständig gelesen** wurde der gesamte Produktcode: alle 134 Nicht-Spec-Dateien unter `packages/twopoint5d/src/` (Module `vertex-objects`, `map2d`, `texture`, `stage`, `sprites`, `display`, `controls`, `utils`, dazu `index.ts` und `events.ts`), alle Nicht-Test-Skripte unter `scripts/` sowie `eslint.config.mjs` und `vite.config.ts`. Gelesen wurde modulweise, wie es `AGENTS.md` verlangt, jeweils mit `resource-lifecycle.md` und dem passenden Abschnitt der Architektur-Doku daneben. Die `high`-Befunde und mehrere `medium`-Befunde wurden gegen den Code und gegen den Quelltext von three 0.185.1 (`Renderer.js`, `RenderPipeline.js`) nachgeprüft. Einzelne Befunde (`voInitialize`, `VOBufferPool#buffer`, `toAttributeArrays`, `checkNameableTypes`) wurden per Skript gegen `dist/lib` bzw. mit einer Fixture im Scratchpad nachgestellt.\n\n**Stichproben** gab es aus den 71 Vitest-Specs (rund 1300 Tests) und den 25 Browser-Testdateien (rund 147 Tests), dazu aus allen Konfigurationen, Workflows, READMEs, dem CHANGELOG-Aufbau und der Library-Doku. **Nicht gelesen** wurden das Lookbook (`apps/lookbook`) und die Browser-Tests als Quelltext. Ihre Befunde stammen aus dem Vorlauf und wurden nur punktuell an der Fundstelle nachgeprüft.\n\n**Ausgeführt** wurden `pnpm lint` (Exit 0), `pnpm typecheck` (Exit 0), `pnpm test:scripts` (76/76 grün), `pnpm audit` und `pnpm audit --prod` (keine bekannten Schwachstellen) sowie `pnpm outdated -r`: three/@types/three 0.186, nx 23.2.1, TypeScript 7.0.2 und prettier-plugin-astro 1.0.1 sind verfügbar. `pnpm run ci` lief nicht, weil es `dist` leert und die Browser-Suite braucht.",
@@ -2227,7 +1848,8 @@
       "Nachgeführt aus einem Einzel-Fix auf `main` ohne Remediation-Plan: 1 Commit (`3d8bb8b1`). BUG-124 (werfender `OnDisplayStart`-Listener: alle Listener hören das Event, danach User-Pause wie `stop()`, `start()` rejected) und ASYNC-007 (bei verborgener Seite wartet die WebGPU-Freigabe bis zur Sichtbarkeit und zwei Frames) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 1 induzierter kleiner Befund ging als neues Finding ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Remediation-Lauf vom 2026-09-26 (Feature texture; Scope-Regel: die Feature-Domain texture vollständig, jede Severity einschließlich info und Optimierungspotenzial, samt Specs, Doku und den Stellen in Lookbook und Browser-Tests, die texture benutzen; dazu IMPL-001, CONS-048 und die acknowledged Umbenennungen API-019, API-020, API-023): 12 Commits (`dff733ff` bis `9ec5944e`). Alle 29 texture-Findings, IMPL-001, CONS-048 sowie API-019, API-020 und API-023 sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-016, IMPL-011 und ARCH-005, die über zwei oder mehr Pakete verteilt waren, erst mit allen Teilen. Kein Finding blieb mangels Beleg offen; BUG-020, DOC-013, CONS-005 und CONS-007 bleiben acknowledged. Von 29 Nebenbefunden wurden 23 im Lauf behoben, 4 gingen als neue Findings ins Backlog, zwei davon (BUG-125, BUG-126) mit offener Frage zur Scope-Grenze texture/sprites; 2 deckten sich mit TYPE-019 und DOC-060 und sind nicht doppelt eingetragen. Die kleinen Review-Befunde auf die Diffs des Laufs hat das Nachtragspaket 12 behoben; offen blieb davon nur ein Formulierungshinweis im CHANGELOG (DOC-071). Die offene Frage zu relativen `meta.image`-URLs ist mit der Entscheidung vom 2026-09-26 beantwortet (Auflösung gegen die URL der JSON-Datei). Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -2374,6 +1996,17 @@
         "harness": 70
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-26",
+      "score": 78,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 85,
+        "harness": 72
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -2456,6 +2089,16 @@
       "inducedOpen": 1,
       "discovered": 3,
       "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-26",
+      "source": "remediation",
+      "ref": "2026-09-26",
+      "fixed": 34,
+      "inducedFixed": 23,
+      "inducedOpen": 1,
+      "discovered": 29,
+      "attribution": "reviewed"
     }
   ],
   "acknowledged": [
@@ -2466,30 +2109,6 @@
       "reason": "Bewusst so belassen — seit dem Signal-Umbau (API-022) per store.defaultTextureClasses = [] direkt leerbar.",
       "acknowledgedDate": "2026-05-14",
       "id": "BUG-020"
-    },
-    {
-      "title": "Drei load()-Methoden mit drei verschiedenen Bedeutungen",
-      "category": "api",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts, TextureResource.ts",
-      "reason": "Zurückgestellt auf den nächsten Major: Breaking Change, Umbenennung nach activate()/loadAsync().",
-      "acknowledgedDate": "2026-05-14",
-      "id": "API-019"
-    },
-    {
-      "title": "get(id, type) heißt wie Map.get, ist aber ein einmaliges Promise",
-      "category": "api",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
-      "reason": "Zurückgestellt auf den nächsten Major, gebündelt mit API-019 (Umbenennung nach getAsync()).",
-      "acknowledgedDate": "2026-05-14",
-      "id": "API-020"
-    },
-    {
-      "title": "TextureFactory.anisotrophy — Tippfehler in der öffentlichen API",
-      "category": "api",
-      "location": "packages/twopoint5d/src/texture/TextureFactory.ts",
-      "reason": "Zurückgestellt auf den nächsten Major (Umbenennung mit Übergangs-Alias).",
-      "acknowledgedDate": "2026-05-14",
-      "id": "API-023"
     },
     {
       "title": "renderOrder akzeptiert nur einen String, kein String-Array",
