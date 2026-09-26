@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
+import {emit, emitSafe, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -113,8 +113,9 @@ const noResourceError = (id: string): Error =>
 const disposedError = (what: string): Error => new Error(`[TextureStore] ${what} was cancelled: this store has been disposed`);
 
 // one message for a load that never got as far as a parse, naming the step that failed and
-// whatever the failure can be pinned to — the url that was being fetched, or the id of the
-// item that is at fault; an item without a source has no url of its own
+// whatever the failure can be pinned to — the url that was being fetched, the id of the item
+// that is at fault — an item without a source has no url of its own —, or the url of the catalog
+// for what belongs to it as a whole
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
   new Error(`[TextureStore] load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
 
@@ -155,7 +156,8 @@ export interface TextureStoreParseOptions {
 export interface TextureStoreLoadOptions extends TextureStoreParseOptions {
   /**
    * Cuts the load short: the fetch is aborted, nothing is parsed, and the promise rejects
-   * with an `AbortError`. A signal that aborts once the data is parsed changes nothing.
+   * with an `AbortError`. A signal that aborts once the parse has begun — from a listener inside
+   * it among others — changes nothing: the promise resolves with the store.
    */
   signal?: AbortSignal;
 }
@@ -190,8 +192,11 @@ export class TextureStore {
    * builds no resource or a texture class name no `TextureFactory` knows, which the instance
    * method {@link TextureStore.loadAsync} leaves to the `error` event. Nobody can listen to
    * that event on a store before this method hands it out, so this is where they are said
-   * out loud. The promise rejects with the first of them, and with an `AbortError` once
-   * `options.signal` aborts; the store built for the attempt is disposed by then.
+   * out loud. The promise rejects with the first of them — naming the url that failed, the id of
+   * the item at fault or, for what belongs to the catalog as a whole such as a texture class in its
+   * `defaultTextureClasses`, the url of the catalog, with the reported error as its `cause` —, and
+   * with an `AbortError` once `options.signal` aborts; the store built for the attempt is disposed
+   * by then.
    *
    * The relative urls of the items are resolved against `url`, and a `baseUrl` in `options`
    * takes its place, as in the instance method.
@@ -205,7 +210,9 @@ export class TextureStore {
       store,
       OnError,
       ({source, url: failedUrl, id, error}: {source: string; url?: string | URL; id?: string; error: unknown}) => {
-        failure ??= loadFailedError(source, failedUrl ?? id, error);
+        // a failure that names neither a url nor an item — a texture class in the
+        // defaultTextureClasses of the catalog — belongs to the catalog as a whole
+        failure ??= loadFailedError(source, failedUrl ?? id ?? url, error);
       },
     );
 
@@ -439,14 +446,18 @@ export class TextureStore {
    * The promise rejects when the catalog never gets as far as the parse: a `fetch` that
    * fails, a response that answers with a status, a body that is no JSON, a `parse()` that
    * throws. Each of these goes out as an `error` event as well, and the rejection names the
-   * step and the url and carries the reported error as its `cause`. A catalog item that
+   * step and the url and carries the reported error as its `cause`. An `error` listener that
+   * throws changes nothing of this: every listener hears the event, eventize reports the throw
+   * on the console, and the promise rejects as described. A catalog item that
    * builds no resource and a texture class name no `TextureFactory` knows are `error` events
    * only: the rest of the catalog is parsed, and the promise resolves.
    *
    * `options.signal` cuts the load short, and so does {@link TextureStore.dispose}: the fetch
    * is aborted, nothing is parsed, and no `error` event goes out. The promise rejects with an
    * `AbortError` for the signal and with the error of a disposed store for `dispose()`. On a
-   * store that is already disposed it rejects right away and fetches nothing.
+   * store that is already disposed it rejects right away and fetches nothing. Once the parse has
+   * begun the load is done: a listener inside `parse()` that aborts the signal or disposes the
+   * store changes nothing, and the promise resolves with the store.
    *
    * With `{evictMissing: true}` the parse step also disposes and removes every resource
    * the new data no longer names and whose `refCount` is 0 — see
@@ -490,9 +501,11 @@ export class TextureStore {
       signal?.addEventListener('abort', onAbort, {once: true});
       disposal.addEventListener('abort', onDispose, {once: true});
 
-      // a step that fails is reported twice: to whoever listens to the store, and to this caller
+      // A step that fails is reported twice: to whoever listens to the store, and to this caller.
+      // emitSafe(): every listener hears it, and one that throws is reported on the console by
+      // eventize instead of taking the place of the rejection this caller is owed
       const failed = (source: 'fetch' | 'parse', error: unknown, status?: number): Error => {
-        emit(this, OnError, status === undefined ? {source, url, error} : {source, url, status, error});
+        emitSafe(this, OnError, status === undefined ? {source, url, error} : {source, url, status, error});
         return loadFailedError(source, url, error);
       };
 
@@ -525,25 +538,27 @@ export class TextureStore {
           throw failed('parse', error);
         }
         if (settled) return;
+        // Once the parse begins, the load is done: parse() runs through in one go, and a listener
+        // inside it — of `ready`, of a resource, of `error` — that aborts the signal or disposes the
+        // store finds the data parsed. So the promise settles here, before the parse, and not a
+        // microtask after it, by when such an abort would already have rejected it
+        settle();
         try {
           this.parse(data, {...parseOptions, baseUrl: parseOptions.baseUrl ?? url});
         } catch (error) {
-          throw failed('parse', error);
+          reject(failed('parse', error));
+          return;
         }
+        resolve(this);
       };
 
-      attempt().then(
-        () => {
-          if (settled) return;
-          settle();
-          resolve(this);
-        },
-        (error: unknown) => {
-          if (settled) return;
-          settle();
-          reject(error);
-        },
-      );
+      // a step before the parse that fails throws out of attempt(); the parse settles the promise
+      // itself
+      attempt().catch((error: unknown) => {
+        if (settled) return;
+        settle();
+        reject(error);
+      });
     });
   }
 
@@ -1071,10 +1086,10 @@ export class TextureStore {
    *
    * Every promise handed out by {@link TextureStore.getAsync},
    * {@link TextureStore.whenReady} and {@link TextureStore.whenResource} that is still
-   * pending is rejected. So is every {@link TextureStore.loadAsync} still under way, and its
-   * fetch is aborted: once this call returns, no catalog fetch of this store runs any more.
-   * The renderer belongs to whoever handed it in and is not disposed. A second call does
-   * nothing.
+   * pending is rejected. So is every {@link TextureStore.loadAsync} still under way — one whose
+   * parse has begun is done and resolves —, and its fetch is aborted: once this call returns, no
+   * catalog fetch of this store runs any more. The renderer belongs to whoever handed it in and
+   * is not disposed. A second call does nothing.
    *
    * The dispose event is the last event this store emits. Afterwards
    * {@link TextureStore.renderer} and {@link TextureStore.textureFactory} answer

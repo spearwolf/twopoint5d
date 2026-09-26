@@ -96,11 +96,15 @@ describe('FrameBasedAnimations', () => {
       expect(animations.hasAnimation('endless')).toBe(false);
     });
 
-    test('a duration that is a string is quoted in the message', () => {
+    test.each([
+      ['duration', {duration: '1'}, /got a duration of "1" for the animation `text`/],
+      ['frameRate', {frameRate: '4'}, /got a frameRate of "4" for the animation `text`/],
+    ] as const)('a %s that is a string is quoted in the message', (_field, timing, message) => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
-      expect(() => animations.add('text', {duration: '1' as unknown as number}, frames)).toThrow(/got a duration of "1"/);
+      expect(() => animations.add('text', timing as never, frames)).toThrow(message);
+      expect(animations.hasAnimation('text')).toBe(false);
     });
 
     test('timing without a duration and without a frameRate names the animation', () => {
@@ -182,16 +186,23 @@ describe('FrameBasedAnimations', () => {
       expect(texelAt(2), 'the second frame').toEqual(Array.from(new Float32Array(second.getTexCoords())));
     });
 
-    test('a third argument that is no TextureAtlas, no TileSet and no array is refused with the value and the animation', () => {
-      const animations = new FrameBasedAnimations();
+    test.each([
+      [5, '5'],
+      ['frames', '"frames"'],
+      [{}, '[object Object]'],
+    ] as const)(
+      'a third argument of %s that is no TextureAtlas, no TileSet and no array is refused with the value and the animation',
+      (value, described) => {
+        const animations = new FrameBasedAnimations();
 
-      expect(() => {
-        animations.add('odd', 1, 5 as never);
-      }).toThrow(
-        'FrameBasedAnimations: add() got a third argument of 5 for the animation `odd` — the third argument is a TextureAtlas, a TileSet or an array of frames',
-      );
-      expect(animations.hasAnimation('odd')).toBe(false);
-    });
+        expect(() => {
+          animations.add('odd', 1, value as never);
+        }).toThrow(
+          `FrameBasedAnimations: add() got a third argument of ${described} for the animation \`odd\` — the third argument is a TextureAtlas, a TileSet or an array of frames`,
+        );
+        expect(animations.hasAnimation('odd')).toBe(false);
+      },
+    );
   });
 
   describe('add with TextureAtlas', () => {

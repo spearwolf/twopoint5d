@@ -38,13 +38,14 @@ import {description, title} from './_textured-quads.json';
 
 <script>
   import type {TextureCoords} from '@spearwolf/twopoint5d';
-  import {colorFromTextureByTexCoords, TextureStore, vertexByInstancePosition, VertexObjects} from '@spearwolf/twopoint5d';
+  import {colorFromTextureByTexCoords, vertexByInstancePosition, VertexObjects} from '@spearwolf/twopoint5d';
   import {attribute, vec3} from 'three/tsl';
   import type {Texture} from 'three/webgpu';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import assetsUrl from '~demos/utils/assetsUrl';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
   // +================================================================================+
   //
@@ -123,20 +124,14 @@ import {description, title} from './_textured-quads.json';
     renderer.toneMapping = AgXToneMapping;
     renderer.toneMappingExposure = 1.1;
 
-    const store = new TextureStore(renderer);
-    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
-    await store.loadAsync(assetsUrl('textures.json'));
+    const store = await loadTextureCatalog(renderer);
     const [texCoords, texture] = await store.getAsync('ballPatternRot', ['imageCoords', 'texture']);
 
     // eslint-disable-next-line no-console
     console.log('loaded texture-image', {texCoords, texture});
 
-    // a copy: an <img> in the layout answers width and height as its CSS sizes it, and three.js
-    // reads the size of the texture from there
-    if (texture.image instanceof HTMLImageElement) {
-      // the <div id="texture-preview"> is written by the markup of this very page
-      document.getElementById('texture-preview')!.appendChild(texture.image.cloneNode());
-    }
+    // the <div id="texture-preview"> is written by the markup of this very page
+    showTexturePreview(texture);
 
     demo.scene.add(await createMesh(16, 32, 3.7, 1, texCoords, texture));
   });

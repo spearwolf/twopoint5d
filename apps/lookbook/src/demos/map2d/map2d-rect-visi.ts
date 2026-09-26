@@ -8,14 +8,13 @@ import {
   RectangularVisibilityArea,
   RectangularVisibilityAreaHelpers,
   RepeatingTilesProvider,
-  TextureStore,
   TileSprites,
   TileSpritesFactory,
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {Fog} from 'three/webgpu';
-import assetsUrl from '../utils/assetsUrl';
+import {loadTextureCatalog} from '../utils/loadTextureCatalog';
 import {makePoints} from '../utils/makePoints';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
@@ -72,9 +71,7 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     map2d.centerX = 0;
     map2d.centerY = 0;
 
-    const store = new TextureStore(renderer);
-    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
-    await store.loadAsync(assetsUrl('textures.json'));
+    const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('map2dDebugTiles', ['tileSet', 'texture']);
 
     const tileData = new RepeatingTilesProvider([

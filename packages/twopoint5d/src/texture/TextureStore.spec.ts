@@ -566,6 +566,48 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
+    test('a signal that a ready listener aborts inside the parse leaves the promise resolving with the store', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+      const store = new TextureStore();
+      const ac = new AbortController();
+      on(store, TextureStoreEvents.Ready, () => ac.abort());
+
+      expect(await settleWithin(store.loadAsync(catalogUrl, {signal: ac.signal}))).toBe(store);
+      expect(await store.whenResource('a')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test('a dispose() from a ready listener inside the parse leaves the promise resolving with the store', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+      const store = new TextureStore();
+      on(store, TextureStoreEvents.Ready, () => store.dispose());
+
+      expect(await settleWithin(store.loadAsync(catalogUrl))).toBe(store);
+    });
+
+    test('an error listener that throws leaves the rejection to the failure it was told about, and the listeners after it hear the event', async () => {
+      const fetchError = new Error('boom');
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(fetchError);
+      const store = new TextureStore();
+      // eventize reports the throw with a console.warn line that shows up in the test output. It is
+      // not asserted: eventize binds console.warn when it loads, so a spy set here never sees the call
+      on(store, TextureStoreEvents.Error, () => {
+        throw new Error('a listener that throws');
+      });
+      const errors: Array<{source: string}> = [];
+      on(store, TextureStoreEvents.Error, (payload: {source: string}) => errors.push(payload));
+
+      const settled = await settleWithin(store.loadAsync(catalogUrl));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe(`[TextureStore] load failed at the fetch step: "${catalogUrl}"`);
+      expect((settled as Error).cause).toBe(fetchError);
+      expect(errors).toMatchObject([{source: 'fetch'}]);
+
+      store.dispose();
+    });
+
     test.each([
       ['a fetch that fails', 'fetch', () => Promise.reject(new Error('boom'))],
       ['a response with a status', 'fetch', () => Promise.resolve(new Response('{"items":{}}', {status: 404}))],
@@ -794,21 +836,6 @@ describe('TextureStore', () => {
         store.dispose();
 
         expect(await store.load('http://example.test/data.json')).toBe(store);
-        expect(fetchMock).not.toHaveBeenCalled();
-      } finally {
-        fetchMock.mockRestore();
-      }
-    });
-
-    test('on a disposed store it does not fetch', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
-      try {
-        const store = new TextureStore();
-        store.dispose();
-
-        store.load('http://example.test/data.json');
-        await flushMicrotasks();
-
         expect(fetchMock).not.toHaveBeenCalled();
       } finally {
         fetchMock.mockRestore();
@@ -1882,7 +1909,7 @@ describe('TextureStore', () => {
   });
 
   describe('static loadAsync()', () => {
-    test('awaits whenReady() before resolving — resource is present after await', async () => {
+    test('resolves with a store that already holds the resources of the catalog', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
           JSON.stringify({
@@ -2506,6 +2533,20 @@ describe('TextureStore', () => {
 
       expect(settled).toBeInstanceOf(Error);
       expect((settled as Error).message).toBe('[TextureStore] load failed at the parse step: "a"');
+    });
+
+    test('TextureStore.loadAsync() rejects a catalog whose defaultTextureClasses name an unknown texture class, naming the catalog url, with the class in the cause', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({defaultTextureClasses: ['nearset'], items: {}})),
+      );
+
+      const settled = await settleWithin(TextureStore.loadAsync('http://example.test/data.json'));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe('[TextureStore] load failed at the parse step: "http://example.test/data.json"');
+      expect(((settled as Error).cause as Error).message).toBe(
+        '[TextureStore] defaultTextureClasses names "nearset", which no TextureFactory knows — left out',
+      );
     });
   });
 

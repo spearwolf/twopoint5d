@@ -5,6 +5,7 @@ import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {loadFailureFor} from './internals.js';
 import {TextureResource} from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
 import type {TextureAtlas} from './TextureAtlas.js';
@@ -1080,6 +1081,7 @@ describe('TextureResource', () => {
       await flushMicrotasks();
 
       expect(errors).toMatchObject([{source: 'texture', id: 'sprites'}]);
+      expect(resource[loadFailureFor](['atlas']), 'no record holds the atlas back').toBeUndefined();
       expect(resource.atlas!.frameNames()).toEqual(['b']);
 
       resource.dispose();

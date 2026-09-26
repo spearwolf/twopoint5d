@@ -664,7 +664,7 @@ export class TextureResource {
     // `TextureStore` around — builds a factory that starts from no texture class, as the factory
     // of a store does. A new renderer brings a new factory with its anisotropy maximum; a factory
     // written from outside, the shared one of a store among them, stays.
-    //
+
     // the factory this fallback built and the renderer it built it for
     let fallback: {renderer: WebGPURenderer; factory: TextureFactory} | undefined;
     createEffect(
@@ -699,8 +699,7 @@ export class TextureResource {
     // post-registration.
     createEffect(
       () => {
-        // a new run is a new attempt; a run without a factory is a "not yet", one without a url
-        // takes the image back
+        // a new run is a new attempt at the image step
         this.#loadFailures.delete('image');
         const factory = this.#textureFactory.get();
         const url = this.#imageUrl.get();
@@ -719,8 +718,11 @@ export class TextureResource {
         // swapped in between cannot make this run give back what it never took
         const lease: ImageLease | undefined = this[imageSource]?.acquire(url);
 
-        // No closing .catch(): what either handler below still throws can only come from an
-        // error listener that throws itself, and that is no failure of this step
+        // No closing .catch(): what either handler below still throws comes from a listener, is no
+        // failure of this step and ends as an unhandled rejection — an error listener that throws,
+        // or a dispose listener of the texture this run replaces. The latter throws out of the
+        // `finally` below before a throw that the batch handed back has gone out as an `error`
+        // event, and takes its place
         (lease?.image ?? new ImageLoader().loadAsync(url)).then(
           (image) => {
             if (aborted) return;
@@ -893,6 +895,10 @@ export class TextureResource {
         if (!atlasUrl) return;
         const ac = new AbortController();
         this.#atlasFetch = ac;
+        // No closing .catch() here either: once the try below is over, what still throws — the
+        // #fail() of a fetch without a result, or the emit() of a throw while publishing — comes
+        // from an error listener that throws itself, is no failure of this step and ends as an
+        // unhandled rejection, as in the image effect
         (async () => {
           // the try holds the fetch and nothing else: writing the json publishes whatever it
           // brings — with its image already there, the atlas within this very call — and a

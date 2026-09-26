@@ -29,6 +29,8 @@ export interface TexturedSpritesGeometryParameters {
   /**
    * The attributes that take another usage type than the sprite description declares;
    * `texFlipDiagonal` takes the usage named for `texCoords`, since `setFrame()` writes the two together.
+   * A list that names `texFlipDiagonal` itself does not simply override that: of `dynamic`, `stream` and
+   * `static`, the first that names it — directly or through `texCoords` — decides.
    */
   attributeUsage?: Omit<VertexAttributeUsageOverrides, 'alias'>;
 }

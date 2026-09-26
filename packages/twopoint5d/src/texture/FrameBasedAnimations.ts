@@ -57,10 +57,11 @@ const animNameInError = (name: AnimName | undefined): string => name?.toString()
  * @throws Error if frameRate is not a number above 0, `NaN` among them
  */
 const calculateDurationFromFrameRate = (frameCount: number, frameRate: number, name: AnimName | undefined): number => {
-  // `!(frameRate > 0)` rather than `frameRate <= 0` — every comparison with `NaN` is false, and
-  // only this form refuses a `NaN` here, where the error can name the frameRate instead of the
-  // duration it would turn into
-  if (!(frameRate > 0)) {
+  // The type first: a string such as `"12"` passes `> 0` by coercion and would divide as a number,
+  // where a duration of `"1"` is refused. And `!(frameRate > 0)` rather than `frameRate <= 0` —
+  // every comparison with `NaN` is false, and only this form refuses a `NaN` here, where the error
+  // can name the frameRate instead of the duration it would turn into
+  if (typeof frameRate !== 'number' || !(frameRate > 0)) {
     throw new Error(
       `FrameBasedAnimations: add() got a frameRate of ${describeValue(frameRate)} for the animation \`${animNameInError(name)}\` — a frameRate is a number above zero`,
     );

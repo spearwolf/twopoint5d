@@ -36,11 +36,11 @@ import {description, title} from './_textured-sprites.json';
 </style>
 
 <script>
-  import {TexturedSprites, TextureStore} from '@spearwolf/twopoint5d';
+  import {TexturedSprites} from '@spearwolf/twopoint5d';
   import {LessEqualDepth} from 'three/webgpu';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import assetsUrl from '~demos/utils/assetsUrl';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
   const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 
@@ -48,9 +48,7 @@ import {description, title} from './_textured-sprites.json';
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
 
   demo.onInit(async ({renderer}) => {
-    const store = new TextureStore(renderer);
-    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
-    await store.loadAsync(assetsUrl('textures.json'));
+    const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('skinballTiles', ['tileSet', 'texture']);
 
     const CAPACITY = 256;

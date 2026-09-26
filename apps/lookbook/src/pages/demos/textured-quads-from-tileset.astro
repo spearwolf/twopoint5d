@@ -56,14 +56,14 @@ import {description, title} from './_textured-quads-from-tileset.json';
 
 <script>
   import type {TileSet} from '@spearwolf/twopoint5d';
-  import {TextureStore} from '@spearwolf/twopoint5d';
   import {float} from 'three/tsl';
   import type {Texture} from 'three/webgpu';
   import {DoubleSide, MeshBasicNodeMaterial, NeutralToneMapping} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import assetsUrl from '~demos/utils/assetsUrl';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
   // +================================================================================+
   //
@@ -117,20 +117,14 @@ import {description, title} from './_textured-quads-from-tileset.json';
   await demo.start(async ({renderer}) => {
     renderer.toneMapping = NeutralToneMapping;
 
-    const store = new TextureStore(renderer);
-    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
-    await store.loadAsync(assetsUrl('textures.json'));
+    const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('glaskugelnTiles', ['tileSet', 'texture']);
 
     // eslint-disable-next-line no-console
     console.log('loaded tileset', {tileSet, texture});
 
-    // a copy: an <img> in the layout answers width and height as its CSS sizes it, and three.js
-    // reads the size of the texture from there
-    if (texture.image instanceof HTMLImageElement) {
-      // the <div id="texture-preview"> is written by the markup of this very page
-      document.getElementById('texture-preview')!.appendChild(texture.image.cloneNode());
-    }
+    // the <div id="texture-preview"> is written by the markup of this very page
+    showTexturePreview(texture);
 
     demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
 
