@@ -1027,6 +1027,53 @@ describe('TextureStore', () => {
       unsubHeld();
       store.dispose();
     });
+
+    test('a tile set item without an imageUrl takes the texture of its resource back, and a get() waits for the next image', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({width: 64, height: 64, url}) as unknown as HTMLImageElement);
+
+      const textures: Array<{url: string; disposed: boolean}> = [];
+      const factory = {
+        create(img: {url: string}) {
+          const texture = {
+            url: img.url,
+            name: '',
+            disposed: false,
+            dispose() {
+              texture.disposed = true;
+            },
+          };
+          textures.push(texture);
+          return texture;
+        },
+      };
+
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {t: {imageUrl: 'tiles.png', tileSet: {tileWidth: 16, tileHeight: 16}}}});
+
+      const resource = await store.whenResource('t');
+      resource.textureFactory = factory as never;
+
+      await store.get('t', 'texture');
+
+      store.parse({defaultTextureClasses: [], items: {t: {tileSet: {tileWidth: 16, tileHeight: 16}}}});
+
+      expect(resource.texture).toBeUndefined();
+      expect(textures[0]!.disposed).toBe(true);
+
+      const next = store.get('t', 'texture');
+      expect(await settleWithin(next)).toBe('pending');
+
+      store.parse({defaultTextureClasses: [], items: {t: {imageUrl: 'tiles2.png', tileSet: {tileWidth: 16, tileHeight: 16}}}});
+
+      const texture = await next;
+      expect(texture).toBe(resource.texture);
+      expect((texture as unknown as {url: string}).url).toBe('tiles2.png');
+
+      store.dispose();
+      loadSpy.mockRestore();
+    });
   });
 
   describe('an image is fetched once for every resource that names it', () => {

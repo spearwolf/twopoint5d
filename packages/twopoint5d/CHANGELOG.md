@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` of `TextureResource` are read-only. They are what the effects of `TextureResource#load()` produce out of the values that were written to the resource; the class documentation says which properties are input and which are output
 - `TextureResource#atlasUrl`, `#atlasJson`, `#overrideImageUrl` and `#tileSetOptions` belong to one kind of resource each and throw a `TypeError` naming resource, kind and property when they are written on another kind. On a disposed resource a write to any of them still does nothing
 - `TextureResource#imageUrl` is input on an image and a tile set resource and output on an atlas resource, where it follows `overrideImageUrl ?? atlasJson.meta.image`. A write on an atlas resource throws a `TypeError` that names the resource and points at `overrideImageUrl` — the way to send such a resource to another image without leaving its atlas behind on the one before. On a disposed resource the write does nothing, as with every other setter
+- an image or a tile set `TextureResource` whose `imageUrl` is cleared — directly, or by a `TextureStore#parse()` whose tile set item carries none — takes back its `imageCoords`, its `texture` and what was built from them: the `tileSet`, its `atlas` and the `frameBasedAnimations`. It releases the texture it built. The getters answer `undefined`, the retained events are cleared, and a later `TextureStore#on()` or `TextureStore#get()` waits for the next image. A `textureFactory` that is cleared takes nothing back
 - change the return type of `TextureStore#load()` to `Promise<TextureStore>`. It resolves with the store once the attempt is over and never rejects: every failure along the way goes out as an `error` event. Resolving says the attempt is done, not that it worked — `whenReady()` is what answers that
 - `TextureStore#on()` delivers only values that are there: a subtype that is cleared and announces it does not reach the callback, and for several subtypes the callback waits until each of them has a value again. `TextureStore#get()` inherits this and cannot resolve with an `undefined` where its type promises a value. For several subtypes the callback is called once per tuple: the values that belong together change in one go, and a tuple in which every value is the one the last call carried is not delivered again
 - both fetch paths check the status of the response before they parse it: `TextureStore#load()` for the catalog and the atlas effect of `TextureResource` for the atlas json. A response that answers with a status becomes an `error` event carrying the new `status` field — `source: 'fetch'` at the store, `source: 'atlas'` at the resource
@@ -341,6 +342,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix an atlas `TextureResource` whose `atlasJson` is written while the fetch of its `atlasUrl` is under way: the write aborts that fetch, and neither its json nor its failure arrives after the write
 - fix `TextureResource#load()` on a tile set or atlas resource whose `tileSetOptions` or `atlasUrl` are empty at the call: the effects of its shape are registered all the same, and a value set later builds the tile set or the atlas
 - fix `TextureResource`: it owns a texture before it publishes it, so a subscriber that throws or disposes the resource leaves no texture behind that is never released
+- fix `new TextureResource(id, type)`: the resource carries the setters and the effects of its `type` — an `'atlas'` resource takes `atlasUrl`, `atlasJson` and `overrideImageUrl`, a `'tileset'` resource `tileSetOptions`, and `load()` registers the effects of that shape. The static factories write the first values and nothing more
+- fix an atlas `TextureResource` whose `atlasJson` is written before `load()`: it builds its atlas once the image it names is there, and the fetch of the `atlasUrl` it was written after does not start and does not replace it. An `atlasUrl` written after the json is fetched
 - fix `PowerOf2ImageLoader`, `TextureImageLoader` and `TileSetLoader`: a throw in the `load` event of the image goes to the error callback, so `loadAsync()` rejects; a missing 2d context is reported as an error, and a texture that was already built is disposed
 - fix the index buffer of a `VertexObjectGeometry`: the indices of object `i` start at `i × vertexCount`, also for a description whose `indices` leave a vertex unused (`vertexCount: 4, indices: [0, 1, 2]`)
 - fix `VertexObjectPool#clear()` and a lower `usedCount`, `fromBuffersData()` included: every vertex object in a slot the count gives up is let go of, as `freeVO()` does. A vertex object created afterwards shares its slot with none of them, and freeing one of them leaves the live objects where they are
@@ -857,6 +860,28 @@ resource.texture = myTexture; // overwritten by the next effect run, and never r
 
 ```ts
 resource.textureFactory = myFactory; // the resource builds — and owns — its texture
+```
+
+#### A TextureResource whose imageUrl is cleared releases its texture
+
+An image or a tile set resource releases the texture it built once its `imageUrl` is cleared, and
+the `texture` getter answers `undefined`. A caller that needs the texture past that point does not
+hold it through the resource; it builds the texture with a `TextureFactory` of its own and owns it.
+
+**Before**
+
+```ts
+const texture = resource.texture;
+resource.imageUrl = undefined;
+material.map = texture; // still alive, the resource kept it
+```
+
+**After**
+
+```ts
+const texture = new TextureFactory(renderer).create(image);
+resource.imageUrl = undefined;
+material.map = texture; // built and owned by the caller, who disposes it
 ```
 
 #### A setter that does not fit the kind of a resource throws

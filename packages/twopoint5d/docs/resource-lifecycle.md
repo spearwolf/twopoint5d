@@ -22,7 +22,8 @@ The loaders of the texture module — [`TextureImageLoader`](../src/texture/Text
 [`FrameBasedAnimations`](../src/texture/FrameBasedAnimations.ts)`#bakeDataTexture()`
 build a new texture on every call and have no `dispose()` of their own: whoever called
 them disposes what came back. [`TextureResource`](../src/texture/TextureResource.ts) is
-the other case — it keeps the texture it built and disposes it itself, and a subscriber
+the other case — it keeps the texture it built and disposes it itself — when a successor
+takes its place, when its `imageUrl` is cleared and on `dispose()` —, and a subscriber
 of `TextureStore` only borrows it.
 
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
