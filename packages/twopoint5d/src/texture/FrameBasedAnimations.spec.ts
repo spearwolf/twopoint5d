@@ -341,30 +341,92 @@ describe('FrameBasedAnimations', () => {
   });
 
   describe('bakeDataTexture', () => {
-    test('bake DataTexture without includeTextureSize option', () => {
+    // the texel at `index` of a baked animsMap: four floats, red, green, blue, alpha
+    const texelAt = (buffer: Float32Array, index: number): number[] => Array.from(buffer.subarray(index * 4, index * 4 + 4));
+
+    const turned = (coords: TextureCoords): TextureCoords => {
+      coords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
+      return coords;
+    };
+
+    test('without an option and without a turned frame a frame takes one texel, [s, t, u, v]', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)];
+      const sheet = new TextureCoords(0, 0, 128, 32);
+      const frames = [
+        new TextureCoords(sheet, 0, 0, 32, 32),
+        new TextureCoords(sheet, 32, 0, 32, 32),
+        new TextureCoords(sheet, 64, 0, 32, 32),
+      ];
 
       animations.add('walk', 1.0, frames);
 
-      const dataTexture = animations.bakeDataTexture();
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
 
-      expect(dataTexture).toBeDefined();
-      expect(dataTexture.image).toBeDefined();
-      expect(dataTexture.image.data).toBeInstanceOf(Float32Array);
+      expect(texelAt(buffer, 0), 'the header: frame count, duration, first frame texel, texels per frame').toEqual([3, 1, 1, 1]);
+      expect(texelAt(buffer, 1), 'the first frame').toEqual(Array.from(new Float32Array(frames[0]!.getTexCoords())));
+      expect(texelAt(buffer, 2), 'the second frame').toEqual(Array.from(new Float32Array(frames[1]!.getTexCoords())));
+      expect(texelAt(buffer, 3), 'the third frame').toEqual(Array.from(new Float32Array(frames[2]!.getTexCoords())));
     });
 
-    test('bake DataTexture with includeTextureSize option', () => {
+    test('with includeTextureSize a frame takes two texels, the second [width, height, 0, 0] for an upright frame', () => {
       const animations = new FrameBasedAnimations();
-      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
+      const sheet = new TextureCoords(0, 0, 128, 32);
+      const frames = [new TextureCoords(sheet, 0, 0, 32, 16), new TextureCoords(sheet, 32, 0, 24, 32)];
 
       animations.add('walk', 1.0, frames);
 
-      const dataTexture = animations.bakeDataTexture({includeTextureSize: true});
+      const buffer = animations.bakeDataTexture({includeTextureSize: true}).image.data as Float32Array;
 
-      expect(dataTexture).toBeDefined();
-      expect(dataTexture.image).toBeDefined();
-      expect(dataTexture.image.data).toBeInstanceOf(Float32Array);
+      expect(texelAt(buffer, 0), 'the header').toEqual([2, 1, 1, 2]);
+      expect(texelAt(buffer, 1), 'the tex coords of the first frame').toEqual(
+        Array.from(new Float32Array(frames[0]!.getTexCoords())),
+      );
+      expect(texelAt(buffer, 2), 'the size of the first frame').toEqual([32, 16, 0, 0]);
+      expect(texelAt(buffer, 3), 'the tex coords of the second frame').toEqual(
+        Array.from(new Float32Array(frames[1]!.getTexCoords())),
+      );
+      expect(texelAt(buffer, 4), 'the size of the second frame').toEqual([24, 32, 0, 0]);
+    });
+
+    test('a frame with FLIP_DIAGONAL gives every frame of the bake a second texel, [width, height, 1, 0] for the turned one', () => {
+      const animations = new FrameBasedAnimations();
+      const sheet = new TextureCoords(0, 0, 128, 32);
+      const upright = new TextureCoords(sheet, 0, 0, 32, 16);
+      const turnedFrame = turned(new TextureCoords(sheet, 32, 0, 16, 32));
+
+      animations.add('idle', 1.0, [upright]);
+      animations.add('spin', 0.5, [upright, turnedFrame]);
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+      // two headers, then two texels for each of the three frames
+      expect(texelAt(buffer, 0), 'the header of idle').toEqual([1, 1, 2, 2]);
+      expect(texelAt(buffer, 1), 'the header of spin').toEqual([2, 0.5, 4, 2]);
+      expect(texelAt(buffer, 3), 'the second texel of the frame of idle').toEqual([32, 16, 0, 0]);
+      expect(texelAt(buffer, 4), 'the tex coords of the first frame of spin').toEqual(
+        Array.from(new Float32Array(upright.getTexCoords())),
+      );
+      expect(texelAt(buffer, 5), 'the second texel of the first frame of spin').toEqual([32, 16, 0, 0]);
+      expect(texelAt(buffer, 6), 'the tex coords of the turned frame').toEqual(
+        Array.from(new Float32Array(turnedFrame.getTexCoords())),
+      );
+      expect(texelAt(buffer, 7), 'the second texel of the turned frame').toEqual([16, 32, 1, 0]);
+    });
+
+    test('the headers count two texels for each frame of an animation before them', () => {
+      const animations = new FrameBasedAnimations();
+
+      animations.add('idle', 1.0, [new TextureCoords(0, 0, 32, 32)]);
+      animations.add('walk', 0.5, [new TextureCoords(32, 0, 32, 32), new TextureCoords(64, 0, 32, 32)]);
+      animations.add('run', 0.25, [new TextureCoords(0, 32, 32, 32)]);
+
+      const buffer = animations.bakeDataTexture({includeTextureSize: true}).image.data as Float32Array;
+
+      expect(texelAt(buffer, 0), 'the header of idle').toEqual([1, 1, 3, 2]);
+      expect(texelAt(buffer, 1), 'the header of walk').toEqual([2, 0.5, 5, 2]);
+      expect(texelAt(buffer, 2), 'the header of run').toEqual([1, 0.25, 9, 2]);
+      // 3 headers and 4 frames of two texels: 11 texels, and the next power of 2 is 16
+      expect(buffer.length).toBe(16 * 4);
     });
 
     test('bake DataTexture with multiple animations', () => {

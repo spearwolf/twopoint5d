@@ -17,6 +17,7 @@ const CENTER = TARGET_SIZE / 2;
 
 const RED = [255, 0, 0, 255];
 const GREEN = [0, 255, 0, 255];
+const BLUE = [0, 0, 255, 255];
 
 describe('sprites — AnimatedSpritesMaterial draws the frame the time points at', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -48,20 +49,24 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
   });
 
   /**
-   * One animation of two frames over one second, on a color map of two texels: the left one red,
-   * the right one green. Draws one sprite of 4 × 4 units over the middle of the target at `time`
-   * and answers the color of the middle pixel.
+   * One animation over one second, a frame for each texel of a color map one texel high — the
+   * first frame on the left texel. Draws one sprite of 4 × 4 units over the middle of the target
+   * at `time` and answers the color of the middle pixel. `bakeOptions` go to `bakeDataTexture()`.
    */
-  async function renderAt(time) {
+  async function renderAt(time, texels = [RED, GREEN], bakeOptions = undefined) {
     const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const colorMap = makeColorTexture([RED, GREEN]);
-    const frames = new TextureCoords(0, 0, 2, 1);
+    const colorMap = makeColorTexture(texels);
+    const frames = new TextureCoords(0, 0, texels.length, 1);
     const anims = new FrameBasedAnimations();
-    anims.add('blink', 1, [new TextureCoords(frames, 0, 0, 1, 1), new TextureCoords(frames, 1, 0, 1, 1)]);
-    const animsMap = anims.bakeDataTexture();
+    anims.add(
+      'blink',
+      1,
+      texels.map((_, i) => new TextureCoords(frames, i, 0, 1, 1)),
+    );
+    const animsMap = anims.bakeDataTexture(bakeOptions);
 
     const geometry = new AnimatedSpritesGeometry(1);
     const material = new AnimatedSpritesMaterial({colorMap, animsMap, time});
@@ -98,6 +103,15 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
 
   it('shows the second frame three quarters into the animation', async function () {
     const rgb = await renderAt(0.75);
+
+    expect(rgb, 'the green of the second frame').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
+  });
+
+  // three frames, not two: read one texel too early, the second frame hits the size texel
+  // [1, 1, 0, 0] of the first, whose corner (1, 1) lies on the last texel of the color map — blue
+  // here, and with two frames the very green that is expected
+  it('shows the second frame of an animsMap baked with includeTextureSize in the middle of that frame', async function () {
+    const rgb = await renderAt(0.5, [RED, GREEN, BLUE], {includeTextureSize: true});
 
     expect(rgb, 'the green of the second frame').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
   });

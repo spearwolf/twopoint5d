@@ -42,7 +42,7 @@ import {description, title} from './_textured-quads.json';
   import {attribute, vec3} from 'three/tsl';
   import type {Texture} from 'three/webgpu';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
-  import {InstancedQuadsGeometry} from '~demos/instanced-quads/InstancedQuadsGeometry';
+  import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -81,7 +81,7 @@ import {description, title} from './_textured-quads.json';
           0,
         ]);
 
-        quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+        setQuadTexCoords(quad, texCoords);
       }
     }
 
@@ -105,7 +105,7 @@ import {description, title} from './_textured-quads.json';
 
     material.positionNode = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
 
-    material.colorNode = colorFromTextureByTexCoords(texture);
+    material.colorNode = colorFromTextureByTexCoords(texture, {flipDiagonal: attribute<'float'>('texFlipDiagonal')});
 
     return material;
   }

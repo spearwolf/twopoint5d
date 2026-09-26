@@ -1,7 +1,7 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {Node, TextureNode, UniformNode} from 'three/webgpu';
-import {AdditiveBlending, Texture} from 'three/webgpu';
+import type {Node, NodeBuilder, TextureNode, UniformNode} from 'three/webgpu';
+import {AdditiveBlending, AttributeNode, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
@@ -19,6 +19,18 @@ const nodesOf = (root: Node): Set<Node> => {
   root.traverse((node) => nodes.add(node));
   return nodes;
 };
+
+// the names of the attributes the graph below `root` reads — AttributeNode answers its name
+// without looking at the builder it is typed to take
+const attributeNamesOf = (root: Node): string[] =>
+  [...nodesOf(root)]
+    .filter((node): node is AttributeNode => node instanceof AttributeNode)
+    .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
+    .sort();
+
+// whether the graph below `root` samples `texture`
+const samples = (root: Node, texture: Texture): boolean =>
+  [...nodesOf(root)].some((node) => (node as TextureNode).isTextureNode === true && (node as TextureNode).value === texture);
 
 // the uniforms of the graph below `root` that hold a number — a TextureNode is a uniform too
 const numberUniformsOf = (root: Node) =>
@@ -132,6 +144,48 @@ describe('AnimatedSpritesMaterial', () => {
       colorMap.dispose();
       animsMap.dispose();
     });
+
+    test('takes the diagonal flip of a frame out of the animsMap, not from the texFlipDiagonal attribute', () => {
+      const colorMap = new Texture();
+      const animsMap = makeAnimsMap();
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap});
+
+      expect(material.texFlipDiagonalNode, 'texFlipDiagonalNode').toBeDefined();
+      expect(samples(material.texFlipDiagonalNode!, animsMap), 'texFlipDiagonalNode samples the animsMap').toBe(true);
+      expect(nodesOf(material.colorNode!).has(material.texFlipDiagonalNode!), 'the colorNode reads it').toBe(true);
+      expect(attributeNamesOf(material.colorNode!), 'the attributes of the colorNode').not.toContain('texFlipDiagonal');
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
+
+    test('an animsMap write builds the colorNode once for the two nodes it takes out of the animsMap', () => {
+      const colorMap = new Texture();
+      const material = new AnimatedSpritesMaterial({colorMap});
+      let colorNode = material.colorNode;
+      let colorNodeWrites = 0;
+      Object.defineProperty(material, 'colorNode', {
+        get: () => colorNode,
+        set: (node) => {
+          colorNode = node;
+          colorNodeWrites++;
+        },
+      });
+
+      const animsMap = makeAnimsMap();
+      material.animsMap = animsMap;
+
+      expect(colorNodeWrites).toBe(1);
+      expect(nodesOf(material.colorNode!).has(material.texCoordsNode!), 'the colorNode reads texCoordsNode').toBe(true);
+      expect(nodesOf(material.colorNode!).has(material.texFlipDiagonalNode!), 'the colorNode reads texFlipDiagonalNode').toBe(
+        true,
+      );
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
   });
 
   describe('dispose()', () => {
@@ -236,10 +290,13 @@ describe('AnimatedSpritesMaterial', () => {
       material.dispose();
     });
 
-    test('uses the neutral texture coordinates while the image is missing', () => {
-      const material = new AnimatedSpritesMaterial({animsMap: new Texture()});
+    test('uses the neutral texture coordinates and no diagonal flip while the image is missing', () => {
+      const animsMap = new Texture();
+      const material = new AnimatedSpritesMaterial({animsMap});
 
       expect((material.texCoordsNode as TextureNode | undefined)?.isTextureNode).toBeFalsy();
+      expect(material.texFlipDiagonalNode, 'texFlipDiagonalNode').toBeDefined();
+      expect(samples(material.texFlipDiagonalNode!, animsMap), 'texFlipDiagonalNode samples the animsMap').toBe(false);
 
       material.dispose();
     });

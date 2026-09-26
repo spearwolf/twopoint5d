@@ -24,7 +24,12 @@ export type TexturedSpriteMakeBaseSpriteArgs = TexturedSpritesMakeBaseSpriteArgs
 export interface TexturedSpritesGeometryParameters {
   capacity: number;
   // no `alias`: the geometry sets the aliases itself (`size` -> `quadSize`, `position` ->
-  // `instancePosition`), and one set by the caller would replace exactly that mapping
+  // `instancePosition`, `texCoords` -> `texFlipDiagonal`), and one set by the caller would
+  // replace exactly that mapping
+  /**
+   * The attributes that take another usage type than the sprite description declares;
+   * `texFlipDiagonal` takes the usage named for `texCoords`, since `setFrame()` writes the two together.
+   */
   attributeUsage?: Omit<VertexAttributeUsageOverrides, 'alias'>;
 }
 
@@ -53,6 +58,8 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
             alias: {
               size: ['quadSize'],
               position: ['instancePosition'],
+              // a buffer that uploads the new tex coords of a frame has to upload its diagonal flip as well
+              texCoords: ['texFlipDiagonal'],
             },
           });
 

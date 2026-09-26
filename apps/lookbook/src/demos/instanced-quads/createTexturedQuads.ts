@@ -6,7 +6,7 @@ import {InstancedQuadsGeometry, type InstancedQuad} from './InstancedQuadsGeomet
 
 const createMaterial = (texture: Texture, material = new NodeMaterial()) => {
   material.positionNode = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
-  material.colorNode = colorFromTextureByTexCoords(texture);
+  material.colorNode = colorFromTextureByTexCoords(texture, {flipDiagonal: attribute<'float'>('texFlipDiagonal')});
   return material;
 };
 

@@ -15,6 +15,7 @@ export class TileSpritesMaterial extends NodeMaterial {
   static readonly PositionAttributeName = 'position';
   static readonly InstancePositionAttributeName = 'instancePosition';
   static readonly QuadSizeAttributeName = 'quadSize';
+  static readonly TexFlipDiagonalAttributeName = 'texFlipDiagonal';
 
   static readonly DefaultColor = vec4(0.5, 0.5, 0.5, 1); // Default color if no texture is provided
 
@@ -88,7 +89,11 @@ export class TileSpritesMaterial extends NodeMaterial {
       () => {
         const colorMap = this.colorMap;
 
-        this.colorNode = colorMap ? colorFromTextureByTexCoords(colorMap) : TileSpritesMaterial.DefaultColor;
+        this.colorNode = colorMap
+          ? colorFromTextureByTexCoords(colorMap, {
+              flipDiagonal: attribute<'float'>(TileSpritesMaterial.TexFlipDiagonalAttributeName),
+            })
+          : TileSpritesMaterial.DefaultColor;
 
         this.needsUpdate = true;
       },

@@ -61,6 +61,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   import type {Texture} from 'three/webgpu';
   import {DoubleSide, MeshBasicNodeMaterial, NeutralToneMapping} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
+  import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -98,7 +99,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
           // the tileset is loaded before makeMesh() runs, so its atlas has frames to draw from
           const texCoords = tileset.atlas.randomFrame()!.coords;
 
-          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+          setQuadTexCoords(quad, texCoords);
         }
       }
     });

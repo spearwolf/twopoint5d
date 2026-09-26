@@ -7,6 +7,7 @@ import type {
   TAttributeNodeQuadSize,
   TAttributeNodeRotation,
   TAttributeNodeTexCoords,
+  TAttributeNodeTexFlipDiagonal,
   TAttributeNodeVertexPosition,
 } from './TexturedSprite.js';
 
@@ -29,8 +30,11 @@ export class TexturedSpritesMaterial extends NodeMaterial {
   static readonly InstancePositionAttributeName = 'instancePosition';
   static readonly RotationAttributeName = 'rotation';
   static readonly QuadSizeAttributeName = 'quadSize';
+  static readonly TexFlipDiagonalAttributeName = 'texFlipDiagonal';
 
   #texCoordsNode = createSignal<TAttributeNodeTexCoords | undefined>(undefined, {attach: this});
+
+  #texFlipDiagonalNode = createSignal<TAttributeNodeTexFlipDiagonal | undefined>(undefined, {attach: this});
 
   #vertexPositionNode = createSignal<TAttributeNodeVertexPosition>(
     attribute<'vec3'>(TexturedSpritesMaterial.PositionAttributeName),
@@ -87,6 +91,19 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   set texCoordsNode(node: TAttributeNodeTexCoords | undefined) {
     this.#texCoordsNode.set(node);
+  }
+
+  /**
+   * The node the diagonal flip of the frame comes from; `undefined` stands for the
+   * `texFlipDiagonal` attribute of the geometry, and it is what the getter answers once the
+   * material has been disposed.
+   */
+  get texFlipDiagonalNode() {
+    return this.#texFlipDiagonalNode.get();
+  }
+
+  set texFlipDiagonalNode(node: TAttributeNodeTexFlipDiagonal | undefined) {
+    this.#texFlipDiagonalNode.set(node);
   }
 
   get rotationNode() {
@@ -176,8 +193,16 @@ export class TexturedSpritesMaterial extends NodeMaterial {
         // white for a geometry without that attribute, so sprites that carry none draw as they are
         const spriteColor = vertexColor();
 
+        // texCoordsNode and texFlipDiagonalNode are read only behind the colorMap: without one, a
+        // write to either of them has nothing to rebuild
         if (this.colorMap) {
-          this.colorNode = mul(colorFromTextureByTexCoords(this.colorMap, {texCoords: this.texCoordsNode}), spriteColor);
+          this.colorNode = mul(
+            colorFromTextureByTexCoords(this.colorMap, {
+              texCoords: this.texCoordsNode,
+              flipDiagonal: this.texFlipDiagonalNode ?? attribute<'float'>(TexturedSpritesMaterial.TexFlipDiagonalAttributeName),
+            }),
+            spriteColor,
+          );
         } else {
           this.colorNode = mul(vec4(0.5, 0.5, 0.5, 1), spriteColor); // Default color if no texture is provided
         }
@@ -190,21 +215,22 @@ export class TexturedSpritesMaterial extends NodeMaterial {
 
   /**
    * Tears down the signals and effects of this material and gives up its optional members:
-   * {@link colorMap} and {@link texCoordsNode} answer `undefined` afterwards. A `colorMap`
-   * handed in belongs to the caller and is not released here. The node accessors keep their
-   * last node, and so do `colorNode` and `positionNode`: `dispose()` builds no new one. A second
-   * call does nothing.
+   * {@link colorMap}, {@link texCoordsNode} and {@link texFlipDiagonalNode} answer `undefined`
+   * afterwards. A `colorMap` handed in belongs to the caller and is not released here. The node
+   * accessors keep their last node, and so do `colorNode` and `positionNode`: `dispose()` builds
+   * no new one. A second call does nothing.
    */
   override dispose() {
     // the effects go first: a write to a signal runs every effect that reads it on the spot, and
-    // clearing the two references below would build nodes for a material on its way out
+    // clearing the references below would build nodes for a material on its way out
     this.#positionEffect.destroy();
     this.#colorEffect.destroy();
 
-    // both references are given up while their signals are still live — a write after
+    // the references are given up while their signals are still live — a write after
     // SignalGroup.delete() would land in a destroyed signal and notify nobody
     this.#colorMap.set(undefined);
     this.#texCoordsNode.set(undefined);
+    this.#texFlipDiagonalNode.set(undefined);
 
     SignalGroup.delete(this);
     super.dispose();

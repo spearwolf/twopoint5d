@@ -125,6 +125,55 @@ describe('TileSpritesFactory', () => {
     });
   });
 
+  describe('createTile() writes the diagonal flip of the frame', () => {
+    // tile 1 upright, tile 2 turned the way a rotated TexturePacker frame is
+    const makeTurnedTileSet = () => {
+      const tileSet = makeTileSet();
+      tileSet.atlas.get(tileSet.frameId(2))!.coords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
+      return tileSet;
+    };
+
+    test('a tile carries texFlipDiagonal 1 for a frame with FLIP_DIAGONAL and 0 for an upright one', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(
+        new TileSprites(geometry),
+        makeTurnedTileSet(),
+        new RepeatingTilesProvider([[1, 2]]),
+      );
+
+      const upright = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+      const turned = factory.createTile(new Map2DTileCoords(1, 0)) as TileSprite;
+      factory.update();
+
+      expect(upright.texFlipDiagonal, 'texFlipDiagonal of the upright tile').toBe(0);
+      expect(turned.texFlipDiagonal, 'texFlipDiagonal of the turned tile').toBe(1);
+      expect(attrAt(geometry, 'texFlipDiagonal', 1, 1), 'texFlipDiagonal of slot 1 in the buffer').toEqual([1]);
+    });
+
+    test('a slot that held a turned tile carries 0 once an upright tile takes it', () => {
+      const geometry = new TileSpritesGeometry(4);
+      const factory = new TileSpritesFactory(
+        new TileSprites(geometry),
+        makeTurnedTileSet(),
+        new RepeatingTilesProvider([[1, 2]]),
+      );
+
+      const turned = factory.createTile(new Map2DTileCoords(1, 0)) as TileSprite;
+      factory.destroyTile(turned);
+      const upright = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+      factory.update();
+
+      expect(upright.texFlipDiagonal, 'texFlipDiagonal of the upright tile').toBe(0);
+      expect(attrAt(geometry, 'texFlipDiagonal', 0, 1), 'texFlipDiagonal of slot 0 in the buffer').toEqual([0]);
+    });
+
+    test('texFlipDiagonal shares the buffer of texCoords, which the factory uploads', () => {
+      const geometry = new TileSpritesGeometry(4);
+
+      expect(bufferOf(geometry, 'texFlipDiagonal')).toBe(bufferOf(geometry, 'texCoords'));
+    });
+  });
+
   describe('destroyTile()', () => {
     test('gives the slot of a tile back to the instanced pool', () => {
       const tileSprites = new TileSprites(new TileSpritesGeometry(4));

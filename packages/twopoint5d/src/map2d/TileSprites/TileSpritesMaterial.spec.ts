@@ -1,15 +1,40 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {Texture} from 'three/webgpu';
+import type {Node, NodeBuilder} from 'three/webgpu';
+import {AttributeNode, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TileSpritesMaterial} from './TileSpritesMaterial.js';
+
+// the names of the attributes the graph below `root` reads — AttributeNode answers its name
+// without looking at the builder it is typed to take
+const attributeNamesOf = (root: Node): string[] => {
+  const nodes = new Set<Node>();
+  root.traverse((node) => nodes.add(node));
+  return [...nodes]
+    .filter((node): node is AttributeNode => node instanceof AttributeNode)
+    .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
+    .sort();
+};
 
 describe('TileSpritesMaterial', () => {
   const sandbox = createSandbox();
 
   afterEach(() => {
     sandbox.restore();
+  });
+
+  describe('node wiring', () => {
+    test('samples the colorMap with the diagonal flip of the texFlipDiagonal attribute', () => {
+      const colorMap = new Texture();
+      const material = new TileSpritesMaterial({colorMap});
+
+      expect(TileSpritesMaterial.TexFlipDiagonalAttributeName).toBe('texFlipDiagonal');
+      expect(attributeNamesOf(material.colorNode!)).toEqual(['texCoords', 'texFlipDiagonal', 'uv']);
+
+      material.dispose();
+      colorMap.dispose();
+    });
   });
 
   describe('dispose()', () => {

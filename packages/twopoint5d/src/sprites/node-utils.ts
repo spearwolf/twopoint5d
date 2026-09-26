@@ -10,6 +10,7 @@ import {
   modelWorldMatrixInverse,
   mul,
   normalize,
+  select,
   sub,
   texture,
   varying,
@@ -77,14 +78,29 @@ export const billboardVertexByInstancePosition = (params?: {
   );
 };
 
-export const colorFromTextureByTexCoords = (colorMap: Texture, params?: {texCoords?: Node<'vec4'>; uv?: Node<'vec2'>}) => {
+/**
+ * Samples `colorMap` at the texture coordinates of a sprite frame.
+ *
+ * At the quad position `uv = (a, b)` it reads `(s + a·u, t + b·v)`, with `s`, `t`, `u` and `v` out
+ * of `texCoords`. With a `flipDiagonal` above 0.5 it swaps the two components of that lookup — the
+ * lookup `TextureCoords` describes for a frame with `FLIP_DIAGONAL`, a rotated TexturePacker frame
+ * among them. Without a `flipDiagonal` it swaps nothing: whoever draws frames out of an atlas that
+ * may hold turned frames hands the value in, typically the `texFlipDiagonal` attribute.
+ */
+export const colorFromTextureByTexCoords = (
+  colorMap: Texture,
+  params?: {texCoords?: Node<'vec4'>; uv?: Node<'vec2'>; flipDiagonal?: Node<'float'>},
+) => {
   const texCoords = params?.texCoords ?? attribute('texCoords');
   const uv = params?.uv ?? attribute('uv');
+  const flipDiagonal = params?.flipDiagonal;
 
-  // vTexCoords = vec2(texCoords.x + (uv.x * texCoords.z), texCoords.y + (uv.y * texCoords.w));
-  const vTexCoords = varying(vec2(add(texCoords.xy, mul(uv.xy, texCoords.zw))));
+  const st = vec2(add(texCoords.xy, mul(uv.xy, texCoords.zw)));
 
-  // gl_FragColor = texture2D(colorMap, vTexCoords);
+  // the flip is the same for every vertex of an instance, so swapping before the interpolation
+  // is the same as swapping after it
+  const vTexCoords = varying(flipDiagonal ? select(flipDiagonal.greaterThan(0.5), st.yx, st) : st);
+
   return texture(colorMap, vTexCoords);
 };
 

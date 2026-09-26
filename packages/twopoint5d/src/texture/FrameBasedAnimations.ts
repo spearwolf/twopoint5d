@@ -15,6 +15,10 @@ export interface FrameBasedAnimDef {
 }
 
 export interface BakeTextureOptions {
+  /**
+   * Gives every frame a second texel, `[width, height, flipDiagonal, 0]`. A bake with a frame under
+   * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option.
+   */
   includeTextureSize: boolean;
 }
 
@@ -91,10 +95,10 @@ const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
 type AnimationsMap = Map<AnimName, FrameBasedAnimDef>;
 
-const getBufferSize = (animationsMap: AnimationsMap, sizePerTexture = 1, maxTextureSize = 16384) => {
+const getBufferSize = (animationsMap: AnimationsMap, texelsPerFrame = 1, maxTextureSize = 16384) => {
   const anims = Array.from(animationsMap.values());
   const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
-  const minBufSize = anims.length + totalFramesCount * sizePerTexture;
+  const minBufSize = anims.length + totalFramesCount * texelsPerFrame;
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
@@ -106,27 +110,24 @@ const getBufferSize = (animationsMap: AnimationsMap, sizePerTexture = 1, maxText
   return bufSize;
 };
 
-const renderFloatsBuffer = (
-  floatsBuffer: Float32Array,
-  names: AnimName[],
-  animations: AnimationsMap,
-  includeTextureSize: boolean,
-) => {
+const renderFloatsBuffer = (floatsBuffer: Float32Array, names: AnimName[], animations: AnimationsMap, texelsPerFrame: 1 | 2) => {
   let curOffset = names.length;
 
   floatsBuffer.set(
     names.flatMap((name) => {
       const {frames, duration} = animations.get(name)!;
       const offset = curOffset;
-      curOffset += frames.length * (includeTextureSize ? 2 : 1);
-      return [frames.length, duration, offset, 0];
+      curOffset += frames.length * texelsPerFrame;
+      return [frames.length, duration, offset, texelsPerFrame];
     }),
   );
 
   floatsBuffer.set(
-    includeTextureSize
+    texelsPerFrame === 2
       ? names.flatMap((name) =>
-          animations.get(name)!.frames.flatMap((coords) => [...coords.getTexCoords(), coords.width, coords.height, 0, 0]),
+          animations
+            .get(name)!
+            .frames.flatMap((coords) => [...coords.getTexCoords(), coords.width, coords.height, coords.flipD ? 1 : 0, 0]),
         )
       : names.flatMap((name) => animations.get(name)!.frames.flatMap((coords) => coords.getTexCoords())),
     names.length * 4,
@@ -343,15 +344,30 @@ export class FrameBasedAnimations {
    * Bake every registered animation into a `DataTexture`, the `animsMap` a material reads the
    * frames from.
    *
+   * The texture is one row of RGBA float texels, as many as the smallest power of 2 that holds
+   * the texels the animations take. Its layout is the contract between this method and every reader:
+   *
+   * - texels `0` to `n - 1`, one for each of the `n` animations in the order of their ids:
+   *   `[frameCount, duration, first frame texel, texelsPerFrame]`
+   * - from texel `n` on, `texelsPerFrame` texels for each frame, the frames of an animation one
+   *   after the other: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them, and with
+   *   two texels a second one, `[width, height, flipDiagonal, 0]` — `width` and `height` the
+   *   measures of the area in the image as `TextureCoords` holds them, `flipDiagonal` `1` for a
+   *   frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise
+   * - `texelsPerFrame` is `2` when `includeTextureSize` is set or a registered frame carries
+   *   `FLIP_DIAGONAL`, and `1` otherwise — the same for every animation of a bake
+   *
    * Every call builds a new `DataTexture` and keeps no reference to it: the caller owns it and
    * disposes it. A material it is handed to as `animsMap` borrows it and does not dispose it.
    */
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {
-    const includeTextureSize = Boolean(options?.includeTextureSize);
+    // a turned frame needs the second texel to carry its diagonal flip to the shader
+    const hasTurnedFrame = Array.from(this.#animations.values()).some(({frames}) => frames.some((coords) => coords.flipD));
+    const texelsPerFrame = options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
 
-    const bufSize = getBufferSize(this.#animations, includeTextureSize ? 2 : 1, FrameBasedAnimations.MaxTextureSize);
+    const bufSize = getBufferSize(this.#animations, texelsPerFrame, FrameBasedAnimations.MaxTextureSize);
 
-    const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations, includeTextureSize);
+    const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations, texelsPerFrame);
 
     const dataTexture = new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);
     dataTexture.needsUpdate = true;

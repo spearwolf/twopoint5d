@@ -1,5 +1,5 @@
-import {createEffect, createSignal, type Effect} from '@spearwolf/signalize';
-import {add, attribute, div, mod, mul, texture, uniform, vec2, vec4} from 'three/tsl';
+import {batch, createEffect, createSignal, type Effect} from '@spearwolf/signalize';
+import {add, attribute, div, float, max, mod, mul, select, texture, uniform, vec2, vec4} from 'three/tsl';
 import {type Texture} from 'three/webgpu';
 import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '../TexturedSprites/TexturedSpritesMaterial.js';
 import {texCoordsFromIndex} from '../node-utils.js';
@@ -85,16 +85,37 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
           const animId = anim.x;
           const animOffset = anim.y;
 
+          // the header texel of an animation: [frameCount, duration, first frame texel, texelsPerFrame]
           const animMetaData = texture(this.animsMap, texCoordsFromIndex(animsMapSize, animId.toInt()));
           const frameIndex = mod(mul(div(add(time, animOffset), animMetaData.y), animMetaData.x), animMetaData.x)
             .floor()
             .toInt();
-          this.texCoordsNode = texture(
-            this.animsMap,
-            texCoordsFromIndex(animsMapSize, add(animMetaData.z.toInt(), frameIndex).toInt()),
+
+          // an animsMap built by hand with a 0 in the last field of the header reads as one texel
+          // per frame, the layout it was written for
+          const texelsPerFrame = max(animMetaData.w, float(1));
+          const frameTexel = add(animMetaData.z.toInt(), mul(frameIndex, texelsPerFrame.toInt())).toInt();
+
+          const texCoordsNode = texture(this.animsMap, texCoordsFromIndex(animsMapSize, frameTexel));
+
+          // the second texel of a frame is [width, height, flipDiagonal, 0]; a frame of one texel
+          // is never turned
+          const texFlipDiagonalNode = select(
+            texelsPerFrame.greaterThan(1.5),
+            texture(this.animsMap, texCoordsFromIndex(animsMapSize, add(frameTexel, 1).toInt())).z,
+            float(0),
           );
+
+          // one batch, so that the color effect of the base class builds once for both writes
+          batch(() => {
+            this.texCoordsNode = texCoordsNode;
+            this.texFlipDiagonalNode = texFlipDiagonalNode;
+          });
         } else {
-          this.texCoordsNode = vec4(0, 0, 1, 1);
+          batch(() => {
+            this.texCoordsNode = vec4(0, 0, 1, 1);
+            this.texFlipDiagonalNode = float(0);
+          });
         }
 
         this.needsUpdate = true;
@@ -125,7 +146,7 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
    */
   override dispose(): void {
     // the own effect goes before the write below, which would run it and, through
-    // texCoordsNode, the color effect of the base class as well
+    // texCoordsNode and texFlipDiagonalNode, the color effect of the base class as well
     this.#texCoordsEffect.destroy();
 
     // the animsMap texture was handed in and stays the caller's; the reference is cleared

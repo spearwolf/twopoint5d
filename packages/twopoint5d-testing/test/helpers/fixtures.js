@@ -1,4 +1,4 @@
-/** @import {Display, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 import {
   Map2D,
   Map2DTileRenderer,
@@ -194,6 +194,46 @@ export function makeColorTexture(texels, width = texels.length, height = 1) {
   const texture = new DataTexture(new Uint8Array(texels.flat()), width, height);
   texture.needsUpdate = true;
   return texture;
+}
+
+/**
+ * A sheet that holds an image twice: upright at `(0, 0)`, and right beside it at `(width, 0)` turned by 90°
+ * clockwise, the way TexturePacker lays a sprite with `rotated: true` into its sheet — the pixel `(px, py)`
+ * of the image lies at `(width + height - 1 - py, px)` there, so the top edge of the image runs down the
+ * right column of the turned copy. The sheet is `width + height` texels wide and `max(width, height)`
+ * high, a texel neither copy covers is black with an alpha of 0, and it samples as
+ * {@link makeColorTexture} does.
+ *
+ * `json` is the TexturePacker json of the sheet, for `TexturePackerJson.parse()`: the frame `upright`
+ * and the frame `turned`, which carries `rotated: true` and — as TexturePacker writes it — the measures
+ * of the image in `w` and `h`, while its area in the sheet is `h` wide and `w` high.
+ *
+ * @param {number[][]} texels the image, row by row from the first, each an `[r, g, b, a]` of 0 … 255
+ * @param {number} width
+ * @param {number} height
+ * @returns {{texture: DataTexture, json: TexturePackerJsonData}}
+ */
+export function makeSheetWithTurnedCopy(texels, width, height) {
+  const sheetWidth = width + height;
+  const sheetHeight = Math.max(width, height);
+  const sheet = Array.from({length: sheetWidth * sheetHeight}, () => [0, 0, 0, 0]);
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
+      const texel = texels[py * width + px];
+      sheet[py * sheetWidth + px] = texel;
+      sheet[px * sheetWidth + (width + height - 1 - py)] = texel;
+    }
+  }
+  return {
+    texture: makeColorTexture(sheet, sheetWidth, sheetHeight),
+    json: {
+      frames: {
+        upright: {frame: {x: 0, y: 0, w: width, h: height}},
+        turned: {frame: {x: width, y: 0, w: width, h: height}, rotated: true},
+      },
+      meta: {image: 'sheet.png', size: {w: sheetWidth, h: sheetHeight}},
+    },
+  };
 }
 
 /**

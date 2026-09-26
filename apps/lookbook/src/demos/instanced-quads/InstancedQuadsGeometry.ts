@@ -1,3 +1,4 @@
+import type {TextureCoords} from '@spearwolf/twopoint5d';
 import {InstancedVertexObjectGeometry, type VO} from '@spearwolf/twopoint5d';
 
 export interface BaseQuad extends VO {
@@ -71,6 +72,12 @@ export interface InstancedQuad extends VO {
   z: number;
 
   setTexCoords(coords: [number, number, number, number]): void;
+
+  /**
+   * `1` while the frame on the quad is drawn with `TextureCoords.FLIP_DIAGONAL`, `0` otherwise —
+   * {@link setQuadTexCoords} writes it together with the tex coords.
+   */
+  texFlipDiagonal: number;
 }
 
 export const InstancedQuadDescriptor = {
@@ -78,7 +85,21 @@ export const InstancedQuadDescriptor = {
     quadSize: {components: ['width', 'height']},
     instancePosition: {components: ['x', 'y', 'z']},
     texCoords: {size: 4},
+    texFlipDiagonal: {size: 1},
   },
+};
+
+// setTexCoords() copies the four values into the buffer of the quad, so one tuple serves every call
+const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0, 0];
+
+/**
+ * Puts the frame of `coords` on `quad`: its tex coords and, for a frame with
+ * `TextureCoords.FLIP_DIAGONAL`, the diagonal flip that `colorFromTextureByTexCoords()` reads from
+ * the `texFlipDiagonal` attribute.
+ */
+export const setQuadTexCoords = (quad: InstancedQuad, coords: TextureCoords): void => {
+  quad.setTexCoords(coords.getTexCoords(texCoordsScratch));
+  quad.texFlipDiagonal = coords.flipD ? 1 : 0;
 };
 
 export class InstancedQuadsGeometry extends InstancedVertexObjectGeometry<InstancedQuad, BaseQuad> {

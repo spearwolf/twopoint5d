@@ -1,8 +1,8 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {float, vec2, vec3, vec4} from 'three/tsl';
-import type {Node, OperatorNode, TextureNode, VarNode, VaryingNode, VertexColorNode} from 'three/webgpu';
-import {AdditiveBlending, Texture} from 'three/webgpu';
+import type {Node, NodeBuilder, OperatorNode, TextureNode, VarNode, VaryingNode, VertexColorNode} from 'three/webgpu';
+import {AdditiveBlending, AttributeNode, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
@@ -12,6 +12,21 @@ const operatorOf = (node: Node | null | undefined): OperatorNode => {
   const varNode = node as unknown as VarNode<unknown, OperatorNode>;
   return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);
 };
+
+// every node the graph below `root` is built from, `root` included
+const nodesOf = (root: Node): Set<Node> => {
+  const nodes = new Set<Node>();
+  root.traverse((node) => nodes.add(node));
+  return nodes;
+};
+
+// the names of the attributes the graph below `root` reads — AttributeNode answers its name
+// without looking at the builder it is typed to take
+const attributeNamesOf = (root: Node): string[] =>
+  [...nodesOf(root)]
+    .filter((node): node is AttributeNode => node instanceof AttributeNode)
+    .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
+    .sort();
 
 describe('TexturedSpritesMaterial', () => {
   const sandbox = createSandbox();
@@ -177,6 +192,49 @@ describe('TexturedSpritesMaterial', () => {
 
       material.dispose();
     });
+
+    test('reads the diagonal flip from the texFlipDiagonal attribute while no texFlipDiagonalNode is set', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap});
+
+      expect(material.texFlipDiagonalNode).toBeUndefined();
+      expect(attributeNamesOf(material.colorNode!)).toContain(TexturedSpritesMaterial.TexFlipDiagonalAttributeName);
+      expect(TexturedSpritesMaterial.TexFlipDiagonalAttributeName).toBe('texFlipDiagonal');
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('builds a new colorNode for a texFlipDiagonalNode write while a colorMap is set, reading that node', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap});
+      const {colorNode, version} = material;
+      const flipDiagonal = float(1);
+
+      material.texFlipDiagonalNode = flipDiagonal;
+
+      expect(material.texFlipDiagonalNode).toBe(flipDiagonal);
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect(nodesOf(material.colorNode!).has(flipDiagonal)).toBe(true);
+      expect(attributeNamesOf(material.colorNode!)).not.toContain('texFlipDiagonal');
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('leaves the colorNode alone for a texFlipDiagonalNode write without a colorMap', () => {
+      const material = new TexturedSpritesMaterial();
+      const {colorNode, version} = material;
+
+      // the color effect reads texFlipDiagonalNode only behind `if (this.colorMap)`, so it does not depend on it here
+      material.texFlipDiagonalNode = float(1);
+
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
+
+      material.dispose();
+    });
   });
 
   describe('dispose()', () => {
@@ -212,12 +270,14 @@ describe('TexturedSpritesMaterial', () => {
     // (c) every public member behaves after dispose() as its TSDoc says
     test('behaves as documented after dispose()', () => {
       const material = new TexturedSpritesMaterial({colorMap: new Texture()});
+      material.texFlipDiagonalNode = float(1);
       const {vertexPositionNode, rotationNode, instancePositionNode, quadSizeNode} = material;
 
       material.dispose();
 
       expect(material.colorMap).toBeUndefined();
       expect(material.texCoordsNode).toBeUndefined();
+      expect(material.texFlipDiagonalNode).toBeUndefined();
 
       // the node accessors are typed as always present and keep their last node
       expect(material.vertexPositionNode).toBe(vertexPositionNode);

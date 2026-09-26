@@ -63,6 +63,9 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
     sprite.setQuadSize(tileCoords.view.width, tileCoords.view.height);
     sprite.setInstancePosition(tileCoords.view.left, 0, tileCoords.view.top);
     sprite.setTexCoords(texCoords.getTexCoords(texCoordsScratch));
+    // written for an upright frame too: a slot that comes back out of the pool still holds the
+    // value of the tile before it
+    sprite.texFlipDiagonal = texCoords.flipD ? 1 : 0;
 
     return sprite;
   }

@@ -161,14 +161,15 @@ this.#colorEffect = createEffect(() => {
 ```ts
 override dispose() {
   // the effects go first: a write to a signal runs every effect that reads it on the spot, and
-  // clearing the two references below would build nodes for a material on its way out
+  // clearing the references below would build nodes for a material on its way out
   this.#positionEffect.destroy();
   this.#colorEffect.destroy();
 
-  // both references are given up while their signals are still live — a write after
+  // the references are given up while their signals are still live — a write after
   // SignalGroup.delete() would land in a destroyed signal and notify nobody
   this.#colorMap.set(undefined);
   this.#texCoordsNode.set(undefined);
+  this.#texFlipDiagonalNode.set(undefined);
 
   SignalGroup.delete(this);
   super.dispose();

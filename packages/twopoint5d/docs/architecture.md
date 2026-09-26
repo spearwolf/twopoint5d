@@ -109,6 +109,12 @@ Ready-made vertex-object descriptions plus their geometry and `ShaderMaterial`:
 `TexturedSprites` for static atlas frames, `AnimatedSprites` for frame-based
 animation. Each comes as a triple — descriptor, `*Geometry`, `*Material` — and
 `BaseSprite` holds what they share. New sprite types follow that same triple.
+The orientation of a frame reaches the shader in two parts: `s`, `t`, `u` and `v` of the
+tex coords carry where the frame lies and its horizontal and vertical flip, and the
+diagonal flip of a turned frame travels as `texFlipDiagonal` — an instance attribute of
+`TexturedSprites` and of the `TileSprites` in `map2d/`, and the second texel of a frame
+in the `animsMap` of `AnimatedSprites`. `colorFromTextureByTexCoords()` swaps the two
+components of its lookup by that value.
 
 ### `map2d/`
 

@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturePackerJson.parse()`, and with it `TextureAtlasLoader` and the atlas resources of `TextureStore`, reads the "JSON Array" format of TexturePacker as well as the "JSON Hash" format: a frame is named by its `filename`. The frame type of the array is the exported `TexturePackerArrayFrameData`, and `isAtlasJsonResponse()` lets both formats through and refuses a `rotated` that is no boolean
 - a rotated frame (`rotated: true`) of a TexturePacker json becomes `TextureCoords` over the area it takes in the sheet, `frame.h` wide and `frame.w` high, with `FLIP_DIAGONAL | FLIP_VERTICAL`, which turns it back when it is drawn. `TexturePackerFrameData` carries the optional `rotated`. The class documentation of `TextureCoords` says how the three flip bits lay a rectangle down and how a lookup reads it
 - add `TextureCoords#getTexCoords(target?)`: `s`, `t`, `u` and `v` in one walk up the parents, where each getter walks on its own. Without a `target` it answers a new tuple; with a typed array or a plain array it writes the four values to the indices 0 to 3 and answers the `target`, without allocating. A `target` shorter than four values throws a `RangeError` and stays unchanged
+- add the option `flipDiagonal` of `colorFromTextureByTexCoords()`: a node above 0.5 swaps the two components of the lookup, the lookup `TextureCoords` describes for a frame with `FLIP_DIAGONAL`; without the option the lookup swaps nothing
+- add the instance attribute `texFlipDiagonal` of `TexturedSprite` and `TileSprite`: `1` for a frame with `FLIP_DIAGONAL`, `0` otherwise, written by `TexturedSprite#setFrame()` and `TileSpritesFactory#createTile()` together with the tex coords, and taking the usage the `attributeUsage` of a `TexturedSpritesGeometry` names for `texCoords`. `TexturedSpritesMaterial#texFlipDiagonalNode` puts another node in its place; `TexturedSpritesMaterial.TexFlipDiagonalAttributeName`, `TileSpritesMaterial.TexFlipDiagonalAttributeName` and the type `TAttributeNodeTexFlipDiagonal` name it
 
 ### Changed
 
@@ -224,6 +226,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturePackerJsonData#frames` is a union of the "JSON Hash" record and the "JSON Array" of `TexturePackerArrayFrameData`: whoever reads `frames` tells the two apart. See the Migration Guide
 - `TextureCoords#root` is typed `TextureCoords`, never `undefined`
 - `TileSet#options` is `{}` when the constructor gets no options
+- the last field of the header texel of an animation in the `animsMap` of `FrameBasedAnimations#bakeDataTexture()` is the number of texels a frame takes. A bake with a frame under `FLIP_DIAGONAL` gives every frame a second texel, as `includeTextureSize` does, and that texel is `[width, height, flipDiagonal, 0]`. The TSDoc of `bakeDataTexture()` lays the whole layout out; `AnimatedSpritesMaterial` reads a `0` in that field as one texel per frame
+- the instance buffers of `TexturedSprites` and `TileSprites` carry one value more, `texFlipDiagonal`: a `toBuffersData()` snapshot of a layout without it does not fit, and a class of one's own that implements `TexturedSprite` or `TileSprite` needs the field. See the Migration Guide
 
 ### Deprecated
 
@@ -388,6 +392,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TileSet` with a first tile that does not fit into the `baseCoords` with its `margin` and `padding`: the constructor throws a `RangeError`, because the tile would carry texture coordinates above 1. See the Migration Guide
 - fix `TileSet#frameId()` and `TileSet#frame()` with a `tileId` that is no whole number: they throw a `RangeError`, so `frame()` always answers a `TextureAtlasFrame`
 - fix `TexturePackerJson.parse()` with a frame name that appears twice in the json or that the `target` atlas already holds: it throws before it adds a frame, so the `target` stays as it was
+- fix `TexturedSprites`, `AnimatedSprites` and `TileSprites` for a frame with `FLIP_DIAGONAL`: they draw it as `TextureCoords` describes it, so a rotated TexturePacker frame stands upright
+- fix `AnimatedSpritesMaterial` with an `animsMap` baked with `includeTextureSize`: it reads every frame at the texel `bakeDataTexture()` writes it to, the second frame of an animation and those after it included
 
 ### Migration Guide
 
@@ -2666,6 +2672,27 @@ for (const [name, {frame}] of entries) {
 #### `TileSet` refuses a first tile that does not fit
 
 A `TileSet` whose first tile does not fit into the `baseCoords` together with `margin` and `padding` — a `tileWidth` of 256 and a `margin` of 1 on an image 256 pixels wide — throws a `RangeError` from its constructor. Shrink the tile or the `margin`, or leave the `margin` out.
+
+#### `TexturedSprite` and `TileSprite` carry `texFlipDiagonal`
+
+A class of one's own that implements `TexturedSprite` or `TileSprite` declares the field `texFlipDiagonal: number`, and buffers data taken with `toBuffersData()` from a pool without it has to be taken again. A material of one's own that draws these geometries through `colorFromTextureByTexCoords()` hands the attribute in, and code that writes the tex coords of a `TextureCoords` writes the flip with them:
+
+**Before**
+
+```ts
+material.colorNode = colorFromTextureByTexCoords(colorMap);
+
+sprite.setTexCoords(coords.getTexCoords());
+```
+
+**After**
+
+```ts
+material.colorNode = colorFromTextureByTexCoords(colorMap, {flipDiagonal: attribute<'float'>('texFlipDiagonal')});
+
+sprite.setTexCoords(coords.getTexCoords());
+sprite.texFlipDiagonal = coords.flipD ? 1 : 0;
+```
 
 ## [0.21.2] - 2026-06-19
 

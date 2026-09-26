@@ -38,6 +38,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
   import {TextureAtlasLoader} from '@spearwolf/twopoint5d';
   import type {Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
+  import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -73,7 +74,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
           ]);
 
           const texCoords = sample(frames);
-          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+          setQuadTexCoords(quad, texCoords);
         }
       }
     });

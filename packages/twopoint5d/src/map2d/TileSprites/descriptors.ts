@@ -73,6 +73,7 @@ export const TileSpriteDescriptor: VertexObjectDescription = {
   attributes: {
     instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: false},
     texCoords: {size: 4, usage: 'dynamic', autoTouch: false},
+    texFlipDiagonal: {size: 1, usage: 'dynamic', autoTouch: false},
     quadSize: {components: ['width', 'height'], usage: 'dynamic', autoTouch: false},
   },
 };
@@ -87,6 +88,14 @@ export interface TileSprite extends VO {
 
   setTexCoords(s: number, t: number, u: number, v: number): void;
   setTexCoords(texCoords: [s: number, t: number, u: number, v: number]): void;
+
+  /**
+   * `1` while the frame on the tile is drawn with `TextureCoords.FLIP_DIAGONAL` (the lookup swaps
+   * its two components), `0` otherwise. `TileSpritesFactory#createTile()` writes it together with
+   * the tex coords, and a caller who writes the tex coords of a `TextureCoords` through
+   * `setTexCoords()` writes it as well.
+   */
+  texFlipDiagonal: number;
 
   setQuadSize(width: number, height: number): void;
   setQuadSize(size: [width: number, height: number]): void;

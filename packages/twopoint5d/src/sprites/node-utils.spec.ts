@@ -1,4 +1,4 @@
-import {int, vec2, vec3, vec4} from 'three/tsl';
+import {float, int, vec2, vec3, vec4} from 'three/tsl';
 import type {
   ConstNode,
   JoinNode,
@@ -133,6 +133,20 @@ describe('node-utils', () => {
       expect(nodesOf(uvNode).has(texCoords)).toBe(true);
       expect(nodesOf(uvNode).has(uv)).toBe(true);
       expect(attributeNamesOf(uvNode)).toEqual([]);
+
+      texture.dispose();
+    });
+
+    test('swaps the two components of the lookup inside the varying by the flipDiagonal it is given', () => {
+      const texture = new Texture();
+      const flipDiagonal = float(1);
+
+      const node = colorFromTextureByTexCoords(texture, {flipDiagonal}) as TextureNode;
+      const uvNode = node.uvNode as unknown as Node;
+
+      expect((node.uvNode as unknown as VaryingNode<unknown>).isVaryingNode).toBe(true);
+      expect(nodesOf(uvNode).has(flipDiagonal)).toBe(true);
+      expect(attributeNamesOf(uvNode)).toEqual(['texCoords', 'uv']);
 
       texture.dispose();
     });

@@ -16,6 +16,13 @@ export interface TexturedSprite extends VO {
   u: number;
   v: number;
 
+  /**
+   * `1` while the frame on the sprite is drawn with `TextureCoords.FLIP_DIAGONAL` (the lookup swaps
+   * its two components), `0` otherwise. `setFrame()` writes it together with the tex coords, and a
+   * caller who writes the tex coords of a `TextureCoords` through `setTexCoords()` writes it as well.
+   */
+  texFlipDiagonal: number;
+
   rotation: number;
 
   r: number;
@@ -52,6 +59,7 @@ export class TexturedSprite {
 
   setFrame(frame: TextureAtlasFrame): void {
     this.setTexCoords(frame.coords.getTexCoords(texCoordsScratch));
+    this.texFlipDiagonal = frame.coords.flipD ? 1 : 0;
   }
 
   /**
@@ -74,6 +82,7 @@ export const TexturedSpriteDescriptor: VertexObjectDescription = {
   attributes: {
     quadSize: {components: ['width', 'height']},
     texCoords: {components: ['s', 't', 'u', 'v']},
+    texFlipDiagonal: {size: 1},
     instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'},
     rotation: {size: 1, usage: 'dynamic'},
     color: {components: ['r', 'g', 'b', 'a'], setter: 'setColorValues', getter: false},
@@ -84,6 +93,8 @@ export const TexturedSpriteDescriptor: VertexObjectDescription = {
 
 export type TAttributeNodeQuadSize = Node<'vec2'>;
 export type TAttributeNodeTexCoords = Node<'vec4'>;
+/** Whether the lookup of a frame swaps its two components: above 0.5 for a frame with `TextureCoords.FLIP_DIAGONAL`. */
+export type TAttributeNodeTexFlipDiagonal = Node<'float'>;
 /** The position of a vertex of the unit quad a sprite is drawn from, before scale, rotation and instance position. */
 export type TAttributeNodeVertexPosition = Node<'vec3'>;
 export type TAttributeNodeInstancePosition = Node<'vec3'>;

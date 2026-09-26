@@ -38,6 +38,7 @@ import {description, title} from './_textured-quads-po2image-loader.json';
   import {PowerOf2ImageLoader} from '@spearwolf/twopoint5d';
   import {DoubleSide, MeshBasicNodeMaterial, NearestFilter, NeutralToneMapping, Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
+  import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
 
@@ -72,7 +73,7 @@ import {description, title} from './_textured-quads-po2image-loader.json';
             0,
           ]);
 
-          quad.setTexCoords([texCoords.s, texCoords.t, texCoords.u, texCoords.v]);
+          setQuadTexCoords(quad, texCoords);
         }
       }
     });

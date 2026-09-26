@@ -89,6 +89,23 @@ describe('TexturedSprites', () => {
     sprites.dispose();
   });
 
+  test('setFrame() writes texFlipDiagonal 1 for a frame with FLIP_DIAGONAL and 0 for an upright one after it', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+    const turnedCoords = new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2);
+    turnedCoords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
+
+    sprite.setFrame({coords: turnedCoords});
+    expect(sprite.texFlipDiagonal, 'texFlipDiagonal of the turned frame').toBe(1);
+    expect(readAttribute(sprites.spritePool!, 'texFlipDiagonal', 0), 'texFlipDiagonal in the buffer').toEqual([1]);
+
+    sprite.setFrame(frame);
+    expect(sprite.texFlipDiagonal, 'texFlipDiagonal of the upright frame').toBe(0);
+    expect(readAttribute(sprites.spritePool!, 'texFlipDiagonal', 0), 'texFlipDiagonal in the buffer').toEqual([0]);
+
+    sprites.dispose();
+  });
+
   test('freeSprite() gives a sprite back to the pool', () => {
     const sprites = new TexturedSprites(4);
 
