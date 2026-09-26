@@ -64,7 +64,9 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
-      expect(() => animations.add(undefined, {frameRate: 0}, frames)).toThrow();
+      expect(() => animations.add(undefined, {frameRate: 0}, frames)).toThrow(
+        /got a frameRate of 0 for the animation `\(no name\)`/,
+      );
 
       const id = animations.add(undefined, 1.0, frames);
 
@@ -84,7 +86,9 @@ describe('FrameBasedAnimations', () => {
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
       expect(() => animations.add('negative', -1, frames), 'a negative duration').toThrow(/-1/);
-      expect(() => animations.add('not-a-number', {frameRate: NaN}, frames), 'a frameRate of NaN').toThrow(/NaN/);
+      expect(() => animations.add('not-a-number', {frameRate: NaN}, frames), 'a frameRate of NaN').toThrow(
+        /got a frameRate of NaN for the animation `not-a-number`/,
+      );
       expect(() => animations.add('endless', Infinity, frames), 'a duration of Infinity').toThrow(/Infinity/);
 
       expect(animations.hasAnimation('negative')).toBe(false);
@@ -92,10 +96,26 @@ describe('FrameBasedAnimations', () => {
       expect(animations.hasAnimation('endless')).toBe(false);
     });
 
+    test('a duration that is a string is quoted in the message', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      expect(() => animations.add('text', {duration: '1' as unknown as number}, frames)).toThrow(/got a duration of "1"/);
+    });
+
+    test('timing without a duration and without a frameRate names the animation', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      expect(() => animations.add('bare', {} as never, frames)).toThrow(
+        /got neither a duration nor a frameRate for the animation `bare`/,
+      );
+    });
+
     test('an add refused for its frames spends no name of the counter', () => {
       const animations = new FrameBasedAnimations();
 
-      expect(() => animations.add(undefined, 1.0, [])).toThrow();
+      expect(() => animations.add(undefined, 1.0, [])).toThrow(/no frames/);
 
       const id = animations.add(undefined, 1.0, [new TextureCoords(0, 0, 32, 32)]);
 
@@ -641,7 +661,7 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => {
         animations.add('invalid', {frameRate: 0}, frames);
-      }).toThrow('frameRate must be greater than 0');
+      }).toThrow(/got a frameRate of 0 for the animation `invalid`/);
     });
 
     test('throw error for negative frameRate', () => {
@@ -650,7 +670,7 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => {
         animations.add('invalid', {frameRate: -5}, frames);
-      }).toThrow('frameRate must be greater than 0');
+      }).toThrow(/got a frameRate of -5 for the animation `invalid`/);
     });
   });
 });

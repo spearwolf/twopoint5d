@@ -179,6 +179,13 @@ describe('RectangularVisibilityArea', () => {
       expect(() => new RectangularVisibilityArea(320, v)).toThrow(RangeError);
     });
 
+    test('a width that is a string is quoted in the message', () => {
+      const create = () => new RectangularVisibilityArea('5' as unknown as number, 240);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow('[RectangularVisibilityArea] width must be 0 or a finite number above 0, got "5"');
+    });
+
     test('a refused width leaves the width as it was', () => {
       const area = new RectangularVisibilityArea(320, 240);
       expect(() => (area.width = -1)).toThrow(RangeError);

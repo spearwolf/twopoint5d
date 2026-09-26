@@ -1,3 +1,4 @@
+import {describeValue} from './describeValue.js';
 import {isPositiveFinite} from './isPositiveFinite.js';
 
 /**
@@ -6,6 +7,6 @@ import {isPositiveFinite} from './isPositiveFinite.js';
  */
 export function assertPositiveFinite(value: unknown, subject: string, name: string): void {
   if (!isPositiveFinite(value)) {
-    throw new RangeError(`[${subject}] ${name} must be a finite number above 0, got ${String(value)}`);
+    throw new RangeError(`[${subject}] ${name} must be a finite number above 0, got ${describeValue(value)}`);
   }
 }

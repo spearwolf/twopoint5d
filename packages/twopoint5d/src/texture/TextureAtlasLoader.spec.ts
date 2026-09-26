@@ -185,4 +185,69 @@ describe('TextureAtlasLoader', () => {
 
     parseSpy.mockRestore();
   });
+
+  test('a file loader that fails rejects the promise with its error and loads no image', async () => {
+    const failure = new Error('404');
+    const imageLoad = vi.fn();
+    const loader = new TextureAtlasLoader({
+      fileLoader: {
+        load(_url: string, _onLoad: unknown, _onProgress: unknown, onError: (error: unknown) => void) {
+          onError(failure);
+        },
+      } as unknown as FileLoader,
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json')).rejects.toBe(failure);
+
+    expect(imageLoad).not.toHaveBeenCalled();
+  });
+
+  test('an image that fails to load rejects the promise with its error', async () => {
+    const failure = new Error('404');
+    const imageLoad = vi.fn((_url: string, _textureClasses: unknown, _onLoad: unknown, onError: (error: unknown) => void) =>
+      onError(failure),
+    );
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJsonNamingAnImage),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json')).rejects.toBe(failure);
+  });
+
+  test('the texture classes reach the image loader', async () => {
+    const imageLoad = imageLoaderAnswering();
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJsonWithoutImage),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    await loader.loadAsync('atlas.json', ['nearest'], {overrideImageUrl: 'sprites.png'});
+
+    expect(imageLoad.mock.calls[0]![1]).toEqual(['nearest']);
+  });
+
+  test('an atlas json that names an image loads that image and lays its frames inside it', async () => {
+    // an absolute url, so it reaches the image loader as the json wrote it
+    const atlasJson = {
+      frames: {'walk.1': {frame: {x: 8, y: 0, w: 8, h: 8}}},
+      meta: {image: 'http://example.test/sprites.png', size: {w: 16, h: 16}},
+    };
+    const texCoords = new TextureCoords(0, 0, 16, 16);
+    const imageLoad = vi.fn((_url: string, _textureClasses: unknown, onLoad: TextureImageLoadCallback) => {
+      onLoad({texture: {} as Texture, imgEl: {} as TextureSource, texCoords});
+    });
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering(atlasJson),
+      textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+    });
+
+    const {atlas} = await loader.loadAsync('atlas.json');
+
+    expect(imageLoad.mock.calls[0]![0]).toBe('http://example.test/sprites.png');
+    const coords = atlas.frame('walk.1')!.coords;
+    expect(coords.parent).toBe(texCoords);
+    expect(coords).toMatchObject({s: 0.5, t: 0, u: 0.5, v: 0.5});
+  });
 });

@@ -107,14 +107,19 @@ describe('TileSet', () => {
     // without a tileCount the layout loop has nothing but the step to end it
     test('a tileWidth of 0 without a tileCount is refused', () => {
       expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(RangeError);
+      expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(/tileWidth must be a finite number above 0, got 0/);
     });
 
     test('a tileHeight of 0 without a tileCount is refused', () => {
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 0})).toThrow(RangeError);
+      expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 0})).toThrow(
+        /tileHeight must be a finite number above 0, got 0/,
+      );
     });
 
     test('a baseCoords of 0 x 0 without options is refused', () => {
       expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(RangeError);
+      expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(/tileWidth must be a finite number above 0, got 0/);
     });
 
     test('a tile wider than the image still ends the layout', () => {

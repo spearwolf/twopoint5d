@@ -316,7 +316,7 @@ describe('TextureStore', () => {
     // textures rather than lending them — nothing it hands out is ever given back.
   });
 
-  describe('defaultTextureClasses as signal (§4.6)', () => {
+  describe('defaultTextureClasses, held as a signal and handed to the resources by parse()', () => {
     test('changing defaultTextureClasses propagates merged classes into existing resources on next parse()', () => {
       const store = new TextureStore();
       store.parse({
@@ -348,7 +348,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('parse() batching (§6.4)', () => {
+  describe('parse() emits ready once, after every resource of the data is in place', () => {
     test('OnReady fires once after all resources are added', () => {
       const store = new TextureStore();
       let readyCount = 0;
@@ -373,7 +373,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('central TextureFactory (§3.3, §6.1)', () => {
+  describe('one TextureFactory for every resource of the store', () => {
     test('TextureStore exposes a `textureFactory` that all resources share', () => {
       const store = new TextureStore();
       store.renderer = makeRendererStub();
@@ -449,14 +449,14 @@ describe('TextureStore', () => {
       const ac = new AbortController();
       ac.abort();
       const pAborted = store.get('a', ['texture', 'imageCoords'], {signal: ac.signal});
-      await expect(pAborted).rejects.toThrow();
+      await expect(pAborted).rejects.toThrow('get() aborted before subscription');
       // no image loader runs here, so `p` is still pending when the store goes away
       store.dispose();
       await expect(p).rejects.toThrow(/this store has been disposed/);
     });
   });
 
-  describe('event constants (§4.3, §4.7)', () => {
+  describe('the event and subtype constants match what is emitted', () => {
     test('TextureStoreEvents constants match emitted event names', () => {
       const store = new TextureStore();
       const ready = vi.fn();
@@ -888,7 +888,9 @@ describe('TextureStore', () => {
           defaultTextureClasses: [],
           items: {a: {imageUrl: 'a2.png'}, b: {tileSet: {tileWidth: 8, tileHeight: 8}}},
         }),
-      ).toThrow();
+      ).toThrow(
+        '[TextureStore] parse() found 1 item(s) of a conflicting type: "b" is a "image" resource and cannot become "tileset"',
+      );
 
       expect(a.imageUrl).toBe('a.png');
       expect(readyCount).toBe(0);
@@ -1004,150 +1006,6 @@ describe('TextureStore', () => {
 
       unsubHeld();
       store.dispose();
-    });
-
-    test('TextureResource.fromAtlas accepts initial frameBasedAnimations data', () => {
-      const resource = TextureResource.fromAtlas('a', 'atlas.json', undefined, undefined, {
-        idle: {duration: 1, frameNameQuery: 'idle.*'},
-      });
-      expect(resource.frameBasedAnimationsData).toEqual({idle: {duration: 1, frameNameQuery: 'idle.*'}});
-    });
-
-    test('TextureResource.fromImage accepts (but ignores) frameBasedAnimationsData setter without a signal', () => {
-      const resource = TextureResource.fromImage('i', 'img.png');
-      resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
-      expect(resource.frameBasedAnimationsData).toEqual({x: {duration: 1, tileIds: [1]}});
-    });
-  });
-
-  describe('TextureResource.load() initial firing (lookbook regression)', () => {
-    test('image-load effect runs even when factory + imageUrl are already set before load()', async () => {
-      let resolveLoad!: (img: unknown) => void;
-      const loadP = new Promise<unknown>((r) => {
-        resolveLoad = r;
-      });
-      const loadSpy = vi
-        .spyOn(ImageLoader.prototype, 'loadAsync')
-        .mockImplementationOnce(() => loadP as Promise<HTMLImageElement>);
-
-      const factory = {
-        create(img: {width: number; height: number; tag: string}) {
-          return {tag: img.tag, name: '', disposed: false, dispose() {}};
-        },
-      };
-
-      const resource = TextureResource.fromImage('rx', 'first.png');
-      // mimic the store flow: both factory and url are set BEFORE load() registers effects
-      resource.textureFactory = factory as never;
-      resource.load();
-
-      resolveLoad({width: 10, height: 10, tag: 'live'});
-      await flushMicrotasks();
-      await flushMicrotasks();
-
-      expect((resource.texture as unknown as {tag: string} | undefined)?.tag).toBe('live');
-
-      loadSpy.mockRestore();
-      resource.dispose();
-    });
-  });
-
-  describe('TextureResource.load() image race', () => {
-    test('stale image result after imageUrl change does not overwrite fresh texture', async () => {
-      let resolveFirst!: (img: unknown) => void;
-      let resolveSecond!: (img: unknown) => void;
-      const firstP = new Promise<unknown>((r) => {
-        resolveFirst = r;
-      });
-      const secondP = new Promise<unknown>((r) => {
-        resolveSecond = r;
-      });
-
-      const loadSpy = vi
-        .spyOn(ImageLoader.prototype, 'loadAsync')
-        .mockImplementationOnce(() => firstP as Promise<HTMLImageElement>)
-        .mockImplementationOnce(() => secondP as Promise<HTMLImageElement>);
-
-      const stubTextures: Array<{tag: string; disposed: boolean; dispose: () => void; name: string}> = [];
-      const factory = {
-        create(img: {width: number; height: number; tag: string}) {
-          const tex = {
-            tag: img.tag,
-            disposed: false,
-            name: '',
-            dispose() {
-              this.disposed = true;
-            },
-          };
-          stubTextures.push(tex);
-          return tex;
-        },
-      };
-
-      const resource = TextureResource.fromImage('rx', 'first.png');
-      resource.load();
-      // setting the factory after load() triggers the image-loading effect
-      resource.textureFactory = factory as never;
-      // change imageUrl while first.png is still pending → forces a second load + abort
-      resource.imageUrl = 'second.png';
-
-      resolveFirst({width: 100, height: 50, tag: 'first'});
-      await flushMicrotasks();
-
-      expect(stubTextures.some((t) => t.tag === 'first')).toBe(false);
-      expect(resource.texture).toBeUndefined();
-
-      resolveSecond({width: 200, height: 100, tag: 'second'});
-      await flushMicrotasks();
-
-      expect((resource.texture as unknown as {tag: string} | undefined)?.tag).toBe('second');
-
-      loadSpy.mockRestore();
-      resource.dispose();
-    });
-
-    test('texture is disposed when load resolves after dispose', async () => {
-      let resolveLoad!: (img: unknown) => void;
-      const loadP = new Promise<unknown>((r) => {
-        resolveLoad = r;
-      });
-      const loadSpy = vi
-        .spyOn(ImageLoader.prototype, 'loadAsync')
-        .mockImplementationOnce(() => loadP as Promise<HTMLImageElement>);
-
-      const createdTextures: Array<{tag: string; disposed: boolean; dispose: () => void; name: string}> = [];
-      const factory = {
-        create(img: {width: number; height: number; tag: string}) {
-          const tex = {
-            tag: img.tag,
-            disposed: false,
-            name: '',
-            dispose() {
-              this.disposed = true;
-            },
-          };
-          createdTextures.push(tex);
-          return tex;
-        },
-      };
-
-      const resource = TextureResource.fromImage('ry', 'pending.png');
-      resource.load();
-      resource.textureFactory = factory as never;
-
-      resource.dispose();
-
-      resolveLoad({width: 10, height: 10, tag: 'pending'});
-      await flushMicrotasks();
-
-      // either the load was aborted before factory.create was called,
-      // or the created texture was disposed afterwards — neither must leak.
-      for (const t of createdTextures) {
-        expect(t.disposed).toBe(true);
-      }
-      expect(resource.texture).toBeUndefined();
-
-      loadSpy.mockRestore();
     });
   });
 
@@ -1310,9 +1168,12 @@ describe('TextureStore', () => {
       // the image of an atlas resource is the one its json names — naming another one here
       // would leave the atlas describing a file the texture is not made of, and no later
       // json would ever bring the two back together
-      expect(() => {
+      const write = () => {
         resource.imageUrl = 'other.png';
-      }).toThrow(TypeError);
+      };
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
 
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1620,26 +1481,6 @@ describe('TextureStore', () => {
 
       const settled = await settleWithin(store.whenReady().then(() => 'ready' as const));
       expect(settled).toBe('ready');
-    });
-  });
-
-  describe('TextureResource.fromX input safety', () => {
-    test('fromImage does not mutate textureClasses', () => {
-      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
-      TextureResource.fromImage('a', 'img.png', cls);
-      expect(cls).toEqual(['nearest', 'flipy']);
-    });
-
-    test('fromTileSet does not mutate textureClasses', () => {
-      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
-      TextureResource.fromTileSet('a', 'img.png', {tileWidth: 16, tileHeight: 16}, cls);
-      expect(cls).toEqual(['nearest', 'flipy']);
-    });
-
-    test('fromAtlas does not mutate textureClasses', () => {
-      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
-      TextureResource.fromAtlas('a', 'atlas.json', undefined, cls);
-      expect(cls).toEqual(['nearest', 'flipy']);
     });
   });
 });

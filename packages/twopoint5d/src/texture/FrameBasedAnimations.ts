@@ -1,4 +1,5 @@
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
@@ -28,6 +29,7 @@ export interface BakeTextureOptions {
  *
  * Whichever way it is reached, the duration is a finite number at or above zero: a duration of
  * zero is a still image, a negative, infinite or `NaN` duration is refused by `add()`.
+ * A `frameRate` that is not a number above zero — `NaN` among them — is refused by `add()` as well.
  *
  * @example
  * // Using duration (animation takes 0.5 seconds total)
@@ -38,16 +40,26 @@ export interface BakeTextureOptions {
  */
 export type AnimationTimingOptions = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
 
+// the name is what tells one entry of an animation map from the next in an error message, and an
+// add() that was given none has nothing else to be recognized by
+const animNameInError = (name: AnimName | undefined): string => name?.toString() ?? '(no name)';
+
 /**
  * Calculates the duration of an animation based on frame count and frame rate.
  * @param frameCount Number of frames in the animation
  * @param frameRate Frames per second (must be greater than 0)
+ * @param name The name of the animation, for the error
  * @returns Duration in seconds
- * @throws Error if frameRate is not greater than 0
+ * @throws Error if frameRate is not a number above 0, `NaN` among them
  */
-const calculateDurationFromFrameRate = (frameCount: number, frameRate: number): number => {
-  if (frameRate <= 0) {
-    throw new Error('frameRate must be greater than 0');
+const calculateDurationFromFrameRate = (frameCount: number, frameRate: number, name: AnimName | undefined): number => {
+  // `!(frameRate > 0)` rather than `frameRate <= 0` — every comparison with `NaN` is false, and
+  // only this form refuses a `NaN` here, where the error can name the frameRate instead of the
+  // duration it would turn into
+  if (!(frameRate > 0)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a frameRate of ${describeValue(frameRate)} for the animation \`${animNameInError(name)}\` — a frameRate is a number above zero`,
+    );
   }
   return frameCount / frameRate;
 };
@@ -56,25 +68,24 @@ const calculateDurationFromFrameRate = (frameCount: number, frameRate: number): 
  * Extracts the duration from timing options, calculating from frameRate if necessary.
  * @param timing Either a duration number or AnimationTimingOptions object
  * @param frameCount Number of frames (required when using frameRate)
+ * @param name The name of the animation, for the error
  * @returns Duration in seconds
  * @throws Error if neither duration nor frameRate is provided
  */
-const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: number): number => {
+const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: number, name: AnimName | undefined): number => {
   if (typeof timing === 'number') {
     return timing;
   }
   if ('frameRate' in timing && timing.frameRate !== undefined) {
-    return calculateDurationFromFrameRate(frameCount, timing.frameRate);
+    return calculateDurationFromFrameRate(frameCount, timing.frameRate, name);
   }
   if ('duration' in timing && timing.duration !== undefined) {
     return timing.duration;
   }
-  throw new Error('Either duration or frameRate must be provided');
+  throw new Error(
+    `FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation \`${animNameInError(name)}\``,
+  );
 };
-
-// the name is what tells one entry of an animation map from the next in an error message, and an
-// add() that was given none has nothing else to be recognized by
-const animNameInError = (name: AnimName | undefined): string => name?.toString() ?? '(no name)';
 
 const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
@@ -149,7 +160,8 @@ export class FrameBasedAnimations {
    * An animation carries at least one frame and a duration that is a finite number at or above
    * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
    * matches nothing among them, and a duration that is negative, `NaN` or infinite are each
-   * refused with an error naming the case.
+   * refused with an error naming the case, as are a `frameRate` that is not a number above zero
+   * and timing that carries neither a `duration` nor a `frameRate`.
    *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
@@ -233,13 +245,13 @@ export class FrameBasedAnimations {
     }
 
     const timing = args[1];
-    const duration = resolveDuration(timing, frames.length);
+    const duration = resolveDuration(timing, frames.length, name);
 
     // the duration divides the animation time in the shader: zero is a still image, everything
     // below it and everything that is no number at all is a configuration error
     if (!Number.isFinite(duration) || duration < 0) {
       throw new Error(
-        `FrameBasedAnimations: add() got a duration of ${duration} for the animation \`${animNameInError(name)}\` — a duration is a finite number at or above zero`,
+        `FrameBasedAnimations: add() got a duration of ${describeValue(duration)} for the animation \`${animNameInError(name)}\` — a duration is a finite number at or above zero`,
       );
     }
 

@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -47,8 +48,6 @@ export interface TileSetOptions {
 
   firstId?: number;
 }
-
-const describeValue = (value: unknown): string => (typeof value === 'string' ? `"${value}"` : String(value));
 
 const assertOption = (valid: boolean, name: string, rule: string, value: unknown): void => {
   if (!valid) {

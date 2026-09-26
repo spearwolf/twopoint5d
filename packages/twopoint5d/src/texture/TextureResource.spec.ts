@@ -313,7 +313,9 @@ describe('TextureResource', () => {
 
       // an animation that was registered answers with its id; a name that never made it in
       // has no entry to read one from
-      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow();
+      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow(
+        'FrameBasedAnimations: there is no animation named "walk"',
+      );
 
       resource.dispose();
     });
@@ -346,7 +348,9 @@ describe('TextureResource', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]!.source).toBe('frameBasedAnimations');
       expect(errors[0]!.animation).toBe('walk');
-      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow();
+      expect(() => resource.frameBasedAnimations!.animId('walk')).toThrow(
+        'FrameBasedAnimations: there is no animation named "walk"',
+      );
 
       resource.dispose();
       fetchMock.mockRestore();
@@ -617,6 +621,19 @@ describe('TextureResource', () => {
 
       resource.dispose();
     });
+
+    test('fromAtlas accepts initial frameBasedAnimations data', () => {
+      const resource = TextureResource.fromAtlas('a', 'atlas.json', undefined, undefined, {
+        idle: {duration: 1, frameNameQuery: 'idle.*'},
+      });
+      expect(resource.frameBasedAnimationsData).toEqual({idle: {duration: 1, frameNameQuery: 'idle.*'}});
+    });
+
+    test('fromImage accepts (but ignores) frameBasedAnimationsData setter without a signal', () => {
+      const resource = TextureResource.fromImage('i', 'img.png');
+      resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
+      expect(resource.frameBasedAnimationsData).toEqual({x: {duration: 1, tileIds: [1]}});
+    });
   });
 
   describe('what a subscriber sees', () => {
@@ -782,6 +799,82 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
+    // `fetch` as the tests below need it: every call keeps the signal it was given and answers
+    // when the test says so — or rejects with an AbortError once that signal is aborted, which is
+    // what a real `fetch` does
+    const stubAbortableFetch = () => {
+      const calls: Array<{signal: AbortSignal; resolve: (response: Response) => void}> = [];
+      vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+        const signal = init!.signal!;
+        return new Promise<Response>((resolve, reject) => {
+          calls.push({signal, resolve});
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      });
+      return calls;
+    };
+
+    test('dispose() while the atlas fetch is in flight aborts the fetch and loads no image', async () => {
+      const calls = stubAbortableFetch();
+      const loadAsyncSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync');
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      resource.load();
+      resource.textureFactory = makeTextureFactory().factory;
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.signal.aborted).toBe(false);
+
+      resource.dispose();
+
+      expect(calls[0]!.signal.aborted).toBe(true);
+
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(loadAsyncSpy).not.toHaveBeenCalled();
+    });
+
+    test('an atlasUrl that changes while its fetch is in flight aborts that fetch, and the json of the new url builds the atlas', async () => {
+      const calls = stubAbortableFetch();
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async (url) => ({width: 16, height: 16, tag: url}) as unknown as HTMLImageElement,
+      );
+
+      const resource = TextureResource.fromAtlas('sprites', 'first.json');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => {
+        errors.push(payload);
+      });
+
+      resource.load();
+      resource.textureFactory = makeTextureFactory().factory;
+
+      resource.atlasUrl = 'second.json';
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0]!.signal.aborted).toBe(true);
+      expect(calls[1]!.signal.aborted).toBe(false);
+
+      calls[1]!.resolve(
+        new Response(
+          JSON.stringify({
+            frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+            meta: {image: 'second.png', size: {w: 16, h: 16}},
+          }),
+        ),
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toEqual([]);
+      expect(resource.imageUrl).toBe('second.png');
+      expect(resource.atlas!.frameNames()).toEqual(['idle.1']);
+
+      resource.dispose();
+    });
+
     describe('an overrideImageUrl that is cleared again', () => {
       const atlasJson = {
         frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
@@ -919,16 +1012,6 @@ describe('TextureResource', () => {
       return {resource, errors, fetchMock};
     };
 
-    // the write does not throw once an unreadable json is reported instead; the guard keeps the
-    // tests that follow it reaching their own assertions either way
-    const writeUnreadable = (resource: TextureResource, image: string) => {
-      try {
-        resource.atlasJson = unreadableJson(image);
-      } catch {
-        // the test that cares whether the write throws does not use this
-      }
-    };
-
     test('clearing the atlasJson takes the atlas and its animations back and keeps the texture', async () => {
       const {resource, errors, fetchMock} = await loadedAtlasResource();
       const texture = resource.texture;
@@ -972,7 +1055,7 @@ describe('TextureResource', () => {
       const {resource, errors, fetchMock} = await loadedAtlasResource();
       const atlas = resource.atlas;
 
-      writeUnreadable(resource, 'other.png');
+      resource.atlasJson = unreadableJson('other.png');
 
       // the image the json names is still on its way: the atlas of the one before stays
       expect(resource.atlas).toBe(atlas);
@@ -993,7 +1076,7 @@ describe('TextureResource', () => {
     test('a readable atlasJson after an unreadable one brings the atlas back', async () => {
       const {resource, fetchMock} = await loadedAtlasResource();
 
-      writeUnreadable(resource, 'atlas.png');
+      resource.atlasJson = unreadableJson('atlas.png');
       resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta}};
 
       expect(resource.atlas).toBeDefined();
@@ -1119,16 +1202,6 @@ describe('TextureResource', () => {
       return {resource};
     };
 
-    // the write does not throw once a refusal is reported instead; the guard keeps the tests
-    // that follow it reaching their own assertions either way
-    const refuse = (resource: TextureResource) => {
-      try {
-        resource.tileSetOptions = refusedOptions;
-      } catch {
-        // the tests that care whether the write throws do not use this
-      }
-    };
-
     test('options that are refused take the tile set, the atlas and the animations back', async () => {
       const {resource} = await loadedResource();
 
@@ -1157,7 +1230,7 @@ describe('TextureResource', () => {
     test('a subscriber that arrives after the refusal is handed nothing built from other options', async () => {
       const {resource} = await loadedResource();
 
-      refuse(resource);
+      resource.tileSetOptions = refusedOptions;
 
       const tileSetSpy = vi.fn();
       const atlasSpy = vi.fn();
@@ -1183,7 +1256,7 @@ describe('TextureResource', () => {
       const before = delivered.length;
       expect(before).toBe(3);
 
-      refuse(resource);
+      resource.tileSetOptions = refusedOptions;
 
       expect(delivered).toHaveLength(before);
       expect(delivered.every((value) => value !== undefined)).toBe(true);
@@ -1197,7 +1270,7 @@ describe('TextureResource', () => {
       const tileSets: Array<{tileWidth: number}> = [];
       on(resource, 'tileSet', (tileSet: {tileWidth: number}) => tileSets.push(tileSet));
 
-      refuse(resource);
+      resource.tileSetOptions = refusedOptions;
       resource.tileSetOptions = {tileWidth: 32, tileHeight: 32};
 
       expect(resource.tileSet).toBeDefined();
@@ -1251,9 +1324,12 @@ describe('TextureResource', () => {
     test('an image resource refuses tileSetOptions', () => {
       const resource = TextureResource.fromImage('hero', 'hero.png');
 
-      expect(() => {
+      const write = () => {
         resource.tileSetOptions = {tileWidth: 16};
-      }).toThrow(TypeError);
+      };
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "tileSetOptions"');
       expect(resource.tileSetOptions).toBeUndefined();
 
       resource.dispose();
@@ -1262,9 +1338,12 @@ describe('TextureResource', () => {
     test('a tileset resource refuses an atlasUrl', () => {
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
 
-      expect(() => {
+      const write = () => {
         resource.atlasUrl = 'x.json';
-      }).toThrow(TypeError);
+      };
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"');
       expect(resource.atlasUrl).toBeUndefined();
 
       resource.dispose();
@@ -1273,9 +1352,12 @@ describe('TextureResource', () => {
     test('an atlas resource refuses a write to imageUrl', () => {
       const resource = TextureResource.fromAtlas('deco', 'deco.json');
 
-      expect(() => {
+      const write = () => {
         resource.imageUrl = 'other.png';
-      }).toThrow(TypeError);
+      };
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
       expect(resource.imageUrl).toBeUndefined();
 
       resource.dispose();
@@ -1403,6 +1485,123 @@ describe('TextureResource', () => {
       expect(resource.atlas).toBeDefined();
 
       resource.dispose();
+    });
+
+    test('image-load effect runs even when factory + imageUrl are already set before load()', async () => {
+      let resolveLoad!: (img: unknown) => void;
+      const loadP = new Promise<unknown>((r) => {
+        resolveLoad = r;
+      });
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementationOnce(() => loadP as Promise<HTMLImageElement>);
+
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('rx', 'first.png');
+      // mimic the store flow: both factory and url are set BEFORE load() registers effects
+      resource.textureFactory = factory;
+      resource.load();
+
+      resolveLoad({width: 10, height: 10, tag: 'live'});
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(asStub(resource.texture)?.tag).toBe('live');
+
+      loadSpy.mockRestore();
+      resource.dispose();
+    });
+  });
+
+  describe('an imageUrl that changes while its image loads', () => {
+    test('stale image result after imageUrl change does not overwrite fresh texture', async () => {
+      let resolveFirst!: (img: unknown) => void;
+      let resolveSecond!: (img: unknown) => void;
+      const firstP = new Promise<unknown>((r) => {
+        resolveFirst = r;
+      });
+      const secondP = new Promise<unknown>((r) => {
+        resolveSecond = r;
+      });
+
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementationOnce(() => firstP as Promise<HTMLImageElement>)
+        .mockImplementationOnce(() => secondP as Promise<HTMLImageElement>);
+
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('rx', 'first.png');
+      resource.load();
+      // setting the factory after load() triggers the image-loading effect
+      resource.textureFactory = factory;
+      // change imageUrl while first.png is still pending → forces a second load + abort
+      resource.imageUrl = 'second.png';
+
+      resolveFirst({width: 100, height: 50, tag: 'first'});
+      await flushMicrotasks();
+
+      expect(textures.some((t) => t.tag === 'first')).toBe(false);
+      expect(resource.texture).toBeUndefined();
+
+      resolveSecond({width: 200, height: 100, tag: 'second'});
+      await flushMicrotasks();
+
+      expect(asStub(resource.texture)?.tag).toBe('second');
+
+      loadSpy.mockRestore();
+      resource.dispose();
+    });
+
+    test('texture is disposed when load resolves after dispose', async () => {
+      let resolveLoad!: (img: unknown) => void;
+      const loadP = new Promise<unknown>((r) => {
+        resolveLoad = r;
+      });
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementationOnce(() => loadP as Promise<HTMLImageElement>);
+
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('ry', 'pending.png');
+      resource.load();
+      resource.textureFactory = factory;
+
+      resource.dispose();
+
+      resolveLoad({width: 10, height: 10, tag: 'pending'});
+      await flushMicrotasks();
+
+      // either the load was aborted before factory.create was called,
+      // or the created texture was disposed afterwards — neither must leak.
+      for (const t of textures) {
+        expect(t.disposed).toBe(true);
+      }
+      expect(resource.texture).toBeUndefined();
+
+      loadSpy.mockRestore();
+    });
+  });
+
+  describe('the static factories leave the textureClasses they are given alone', () => {
+    test('fromImage does not mutate textureClasses', () => {
+      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
+      TextureResource.fromImage('a', 'img.png', cls);
+      expect(cls).toEqual(['nearest', 'flipy']);
+    });
+
+    test('fromTileSet does not mutate textureClasses', () => {
+      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
+      TextureResource.fromTileSet('a', 'img.png', {tileWidth: 16, tileHeight: 16}, cls);
+      expect(cls).toEqual(['nearest', 'flipy']);
+    });
+
+    test('fromAtlas does not mutate textureClasses', () => {
+      const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
+      TextureResource.fromAtlas('a', 'atlas.json', undefined, cls);
+      expect(cls).toEqual(['nearest', 'flipy']);
     });
   });
 });
