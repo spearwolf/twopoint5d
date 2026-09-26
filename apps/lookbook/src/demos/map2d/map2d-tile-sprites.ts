@@ -1,8 +1,10 @@
 /* eslint-disable no-console */
+import {once} from '@spearwolf/eventize';
 import {
   AABB2,
   Map2DTileCoords,
   Map2DTileRenderer,
+  OnDisplayDispose,
   RepeatingTilesProvider,
   TextureStore,
   TileSprites,
@@ -66,4 +68,19 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     // ------------------------------------------------------
 
     console.log('tileRenderer', tiles);
+
+    // the display carries the lifetime of everything this demo built, so its end is where they go
+    once(demo, OnDisplayDispose, () => {
+      // in this order: the renderer gives its tile slots back to the factory, and only then do the
+      // geometry and the material behind those slots fall
+      tiles.dispose();
+      tileSprites.geometry?.dispose();
+      tileSprites.material?.dispose();
+      // the texture belongs to the store, which releases it with its resource
+      store.dispose();
+      // the frame around the map
+      edges.dispose();
+      geometry.dispose();
+      line.material.dispose();
+    });
   });

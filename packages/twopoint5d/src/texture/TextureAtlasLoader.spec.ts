@@ -2,8 +2,9 @@ import {FileLoader, type Texture} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 import {TextureAtlasLoader} from './TextureAtlasLoader.js';
 import {TextureCoords} from './TextureCoords.js';
-import type {TextureImageLoadCallback, TextureImageLoader} from './TextureImageLoader.js';
-import type {TextureOptionClasses} from './TextureFactory.js';
+import type {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
+import type {TextureFactory, TextureOptionClasses} from './TextureFactory.js';
+import {TextureImageLoader, type TextureImageLoadCallback} from './TextureImageLoader.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
 import type {TextureSource} from './types.js';
 
@@ -302,5 +303,63 @@ describe('TextureAtlasLoader', () => {
       expect(imageLoad.mock.calls[0]![0]).toBe('http://example.test/assets/sprites.png');
       expect(meta.image).toBe('http://example.test/assets/sprites.png');
     });
+  });
+
+  describe('a load that fails names the url the json came from, path of the file loader included', () => {
+    const fileLoaderWithPath = (body: unknown) => {
+      const fileLoader = new FileLoader().setPath('assets/');
+      fileLoader.load = ((_url: string, onLoad: (data: unknown) => void) => {
+        onLoad(body);
+      }) as unknown as FileLoader['load'];
+      return fileLoader;
+    };
+
+    test('a response that is no texture atlas json', async () => {
+      const loader = new TextureAtlasLoader({
+        fileLoader: fileLoaderWithPath({}),
+        textureImageLoader: {load: vi.fn()} as unknown as TextureImageLoader,
+      });
+
+      await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/"assets\/atlas\.json" is no texture atlas json/);
+    });
+
+    test('an atlas json that names no image, without an overrideImageUrl', async () => {
+      const loader = new TextureAtlasLoader({
+        fileLoader: fileLoaderWithPath(atlasJsonWithoutImage),
+        textureImageLoader: {load: vi.fn()} as unknown as TextureImageLoader,
+      });
+
+      await expect(loader.loadAsync('atlas.json')).rejects.toThrow(/"assets\/atlas\.json" names no image/);
+    });
+  });
+
+  test('a path a caller set to undefined at runtime leaves the bare url in the message', async () => {
+    const fileLoader = fileLoaderAnswering({});
+    (fileLoader as unknown as {path: string | undefined}).path = undefined;
+    const loader = new TextureAtlasLoader({
+      fileLoader,
+      textureImageLoader: {load: vi.fn()} as unknown as TextureImageLoader,
+    });
+
+    await expect(loader.loadAsync('atlas.json')).rejects.toThrow('the response of "atlas.json" is no texture atlas json');
+  });
+
+  test('the texture of a loaded atlas is named by the resolved url of the image', async () => {
+    const imageLoader = {
+      load(_url: string, onLoad: (image: unknown) => void) {
+        onLoad({imgEl: {} as HTMLImageElement, texCoords: new TextureCoords(0, 0, 16, 16)});
+      },
+    } as unknown as PowerOf2ImageLoader;
+    const loader = new TextureAtlasLoader({
+      fileLoader: fileLoaderAnswering({
+        frames: {'walk.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'sprites.png', size: {w: 16, h: 16}},
+      }),
+      textureImageLoader: new TextureImageLoader({update() {}} as unknown as TextureFactory, imageLoader),
+    });
+
+    const {texture} = await loader.loadAsync('http://example.test/atlases/sprites.json');
+
+    expect(texture.name).toBe('http://example.test/atlases/sprites.png');
   });
 });

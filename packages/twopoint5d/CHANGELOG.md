@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add `TexturePackerFrameData#trimmed`, `#spriteSourceSize` and `#sourceSize`: the entry of a frame in the json says whether the packer cut the transparent border off, where the area that is left lies in the untrimmed sprite, and how large that sprite is. Every frame `TexturePackerJson.parse()` registers carries its entry of the json as `data`, those fields included; the `coords` of a trimmed frame stay the trimmed area. A json that carries one of the three fields in another form than TexturePacker writes it is no atlas json: `TextureAtlasLoader` and `TextureResource` refuse it
 - add the `pauseOutsideViewport` option of `Display`: the display pauses while its canvas is outside the viewport and runs again once the canvas is back in view, watched through an `IntersectionObserver` on the canvas. Leaving and coming back emit `OnDisplayPause`, then `OnDisplayRestart` and `OnDisplayStart`, as a hidden tab does. The observer reports asynchronously, so a display whose canvas is out of view at the start takes one of two ways: a first report that lands before the display starts — often while `start()` still waits for the renderer — sends it straight into the pause with `OnDisplayPause`, and `OnDisplayInit` and `OnDisplayStart` follow once the canvas comes into view; a first report that lands after the start lets the display start first and pauses it. The option is off by default, is read once by the constructor, stays with the display instead of reaching `createRenderer`, and does nothing where `IntersectionObserver` does not exist
 - the generated `get…()` method of an attribute takes an optional target — a typed array or a plain array — writes the attribute's values into it and answers the target, without allocating anything; without a target it answers a new typed array as before. A target shorter than the attribute throws a `RangeError` and is left unchanged. `VOAttrGetter` carries both call signatures
 - add `CameraBasedVisibility#pointsOnPlane`: the points where the probe rays of the view frustum met the map plane, in probe order. It is empty for a recomputation in which the camera looked past the plane, and its first entry is the point `pointOnPlane` carries. The `Vector3`s belong to the visibility and are written again on the next recomputation. `CameraBasedVisibilityHelpers` marks each of them, the first one as before and the further ones smaller and in blue
@@ -56,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- a `TextureResource` on its own — no `TextureStore` around it — builds its `TextureFactory` from its `renderer` with no texture class to start from, as the factory of a store does, and builds a new one whenever another renderer is written, with the anisotropy maximum of that renderer; a `textureFactory` written from outside stays
 - the `error` a `TextureResource` reports for an animation entry that carries neither a `duration` nor a `frameRate` is the error `FrameBasedAnimations#add()` throws for it, which names the animation. `add()` refuses a name that another animation already carries and a third argument that is no `TextureAtlas`, no `TileSet` and no array of frames with an error that starts with `FrameBasedAnimations: add()` and names the animation, as every other refusal of `add()` does; the one for the third argument names the value it got
 - a `Display` stands on its `FrameLoop` only while it runs: it subscribes when it starts and unsubscribes when it pauses — through `pause = true`, `stop()`, a hidden tab or, with `pauseOutsideViewport`, a canvas outside the viewport — and in `dispose()`. `display.frameLoop.subscriptionCount` is `0` before the first start and during a pause. A `FrameLoop` left without a subscriber lets go of the rAF driver of its renderer, and the driver takes its callback out of `renderer.setAnimationLoop()` once no `FrameLoop` of that renderer is left on it
 - a paused `Display` lets the animation loop of its renderer rest. three runs that loop from `renderer.init()` on, on every animation frame of the page, and `setAnimationLoop(null)` only takes the callback out of it; the display stops the loop through `renderer._animation` as it goes into the pause and starts it again as it runs. A renderer without that field, and one whose loop still carries a callback when the display would stop it — that of another `FrameLoop` on the renderer, say — keep their loop running. Before the first start the loop follows `pause` as well: a `stop()` or `pause = true` stops it — one that comes while `renderer.init()` still runs stops it once the init has started it — also when that call keeps the first `start()` from starting the display, and `pause = false` or the next `start()` runs it again. A callback that is set on the renderer after the display has stopped the loop — through `renderer.setAnimationLoop()`, or through a `FrameLoop` that starts on the renderer — gets no frame while the loop stands still
@@ -260,6 +262,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `TextureStore#onResource()`: it calls its callback once — right away if the resource is there, otherwise with the first `parse()` that brings it — and no longer with every later `parse()` that names the id again, nor with a resource that takes the place of an evicted one
+- fix the error `TextureResource` reports for an atlas json that names no image: it names the url the json came from, whatever `atlasUrl` names by then
+- fix the messages of `TextureAtlasLoader` about a response that is no atlas json and about a json that names no image: they name the `path` of the `fileLoader` and the `url`, the url the json came from
+- fix `FrameBasedAnimations#add()` for an array of frames: it copies the array, so a change the caller makes to it after the call leaves the animation as it was registered
+- fix `TextureImageLoader`: the texture it hands out is named by the url of its image, as the one of `TileSetLoader` is; the texture of a `TextureAtlasLoader` is named by the resolved url of the image
 - fix the order of `OnDisplayInit` and `OnDisplayStart`: `Display#start()` emits `OnDisplayInit` before `OnDisplayStart`, both within the call, and a listener attached afterwards receives the two in the same order
 - fix a `stop()` or a `pause = true` inside a listener of `OnDisplayRestart`, and likewise inside one of `OnDisplayInit`: it holds the display in the pause, `OnDisplayPause` follows instead of `OnDisplayStart`, and a later `pause = false` starts the display again; a `pause = false` after it inside the same listener lets the display start with a single `OnDisplayRestart`
 - fix a listener of `OnDisplayInit` that throws: `Display#start()` rejects with its error and the display does not start, and the next `start()` emits `OnDisplayInit` again, to every listener, those that received it before the throw included; once a start goes through, a listener attached afterwards receives it as well
@@ -2789,6 +2796,28 @@ store.parse({
 const [tileSet, texture] = await store.getAsync('tiles', ['tileSet', 'texture']);
 // …
 store.dispose(); // releases the texture
+```
+
+#### A `TextureResource` on its own starts from no texture class
+
+A `TextureResource` that gets a `renderer` and no `textureFactory` builds a `TextureFactory` for it that starts
+from no texture class, as the factory of a `TextureStore` does, so its texture is filtered as three.js filters a
+texture by default. Whoever wants `nearest` names it in `textureClasses`.
+
+**Before**
+
+```ts
+const resource = TextureResource.fromImage('hero', 'hero.png');
+resource.renderer = renderer; // the texture was filtered `nearest`
+resource.activate();
+```
+
+**After**
+
+```ts
+const resource = TextureResource.fromImage('hero', 'hero.png', ['nearest']);
+resource.renderer = renderer;
+resource.activate();
 ```
 
 ## [0.21.2] - 2026-06-19

@@ -63,6 +63,7 @@ export class TextureImageLoader {
         let texture: Texture | undefined;
         try {
           texture = new Texture(imageData.imgEl);
+          texture.name = url;
           this.textureFactory.update(texture, ...(textureClasses ?? []));
         } catch (error) {
           texture?.dispose();

@@ -53,7 +53,8 @@ export class TextureAtlasLoader {
    * atlas, the `meta` of the json, the texture and the image. A relative `meta.image` is
    * resolved against the url the json came from — the `path` of the `fileLoader` followed by
    * `url` —, so it names the file next to the json; an `overrideImageUrl` is taken as written.
-   * A load that fails reaches the caller through `onErrorCallback`.
+   * A load that fails reaches the caller through `onErrorCallback`; a message about the json names the
+   * url it came from, so `path` and `url` together.
    *
    * A directory both files lie in belongs on the `fileLoader`, as its `path`. The image loader
    * behind `textureImageLoader` stays without one: three.js puts a loader's `path` in front of
@@ -75,20 +76,22 @@ export class TextureAtlasLoader {
       // `(data: string | ArrayBuffer)`, and narrowing that declaration leaves an intersection with
       // `string` standing, out of which no object can be built
       (jsonData: unknown) => {
+        // the json came from here: three.js puts the `path` of a loader in front of the url it
+        // is asked for, and that `path` is an empty string unless one was set — or `undefined`
+        // once a caller wrote it so at runtime
+        const jsonUrl = (this.fileLoader.path ?? '') + url;
+
         if (!isAtlasJsonResponse(jsonData)) {
-          onErrorCallback?.(new Error(`TextureAtlasLoader: the response of "${url}" is no texture atlas json`));
+          onErrorCallback?.(new Error(`TextureAtlasLoader: the response of "${jsonUrl}" is no texture atlas json`));
           return;
         }
 
-        // the json came from here: three.js puts the `path` of a loader in front of the url it
-        // is asked for, and that `path` is an empty string unless one was set
-        const jsonUrl = this.fileLoader.path + url;
         const imageUrl =
           options?.overrideImageUrl ??
           (typeof jsonData.meta.image === 'string' ? resolveRelativeUrl(jsonData.meta.image, jsonUrl) : undefined);
         if (typeof imageUrl !== 'string') {
           onErrorCallback?.(
-            new Error(`TextureAtlasLoader: the response of "${url}" names no image and no overrideImageUrl was given`),
+            new Error(`TextureAtlasLoader: the response of "${jsonUrl}" names no image and no overrideImageUrl was given`),
           );
           return;
         }

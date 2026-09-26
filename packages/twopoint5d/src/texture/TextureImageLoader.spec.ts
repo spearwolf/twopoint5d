@@ -72,6 +72,19 @@ describe('TextureImageLoader', () => {
     expect(update).toHaveBeenCalledExactlyOnceWith(result.texture, 'nearest');
   });
 
+  test('a loaded image comes back as a texture named by the url', async () => {
+    const imageLoader = {
+      load(_url: string, onLoad: (image: unknown) => void) {
+        onLoad({imgEl: {} as HTMLImageElement, texCoords: new TextureCoords(0, 0, 16, 16)});
+      },
+    } as unknown as PowerOf2ImageLoader;
+    const textureFactory = {update() {}} as unknown as TextureFactory;
+
+    const {texture} = await new TextureImageLoader(textureFactory, imageLoader).loadAsync('image.png');
+
+    expect(texture.name).toBe('image.png');
+  });
+
   test('an image that fails to load rejects the promise with its error and builds no texture', async () => {
     const failure = new Error('404');
     const imageLoader = {

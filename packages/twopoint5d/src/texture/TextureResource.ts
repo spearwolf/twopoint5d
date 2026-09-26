@@ -176,7 +176,8 @@ const wrongShapeError = (resource: TextureResource, property: string): TypeError
 // the atlas effect finds no reason to publish again and no error is raised either.
 const derivedImageUrlError = (resource: TextureResource): TypeError =>
   new TypeError(
-    `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead`,
+    `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json ` +
+      `— write "overrideImageUrl" instead`,
   );
 
 // the inputs only an atlas resource carries
@@ -185,8 +186,14 @@ interface AtlasSignals {
   readonly atlasJson: Signal<TexturePackerJsonData | undefined>;
   // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
   // but without the `overrideImageUrl` put in its place
-  readonly fetchedAtlasJson: Signal<AtlasJsonResponse | undefined>;
+  readonly fetchedAtlasJson: Signal<FetchedAtlasJson | undefined>;
   readonly overrideImageUrl: Signal<string | undefined>;
+}
+
+// `url` is the url this json came from — `atlasUrl` may already name the next one
+interface FetchedAtlasJson {
+  readonly json: AtlasJsonResponse;
+  readonly url: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -486,6 +493,12 @@ export class TextureResource {
    */
   [imageSource]?: TextureImageSource;
 
+  /**
+   * The renderer a resource on its own builds its textures with. While no `textureFactory` was
+   * written from outside — a `TextureStore` writes its shared one — the resource builds a
+   * `TextureFactory` for it that starts from no texture class, as the factory of a store does,
+   * and a new one whenever another renderer is written; the texture follows the new factory.
+   */
   get renderer(): WebGPURenderer | undefined {
     return this.#disposed ? undefined : this.#renderer.value;
   }
@@ -537,7 +550,7 @@ export class TextureResource {
       this.#atlasSignals = {
         atlasUrl: createSignal<string | undefined>(undefined, {attach: this}),
         atlasJson: createSignal<TexturePackerJsonData | undefined>(undefined, {attach: this}),
-        fetchedAtlasJson: createSignal<AtlasJsonResponse | undefined>(undefined, {attach: this}),
+        fetchedAtlasJson: createSignal<FetchedAtlasJson | undefined>(undefined, {attach: this}),
         overrideImageUrl: createSignal<string | undefined>(undefined, {attach: this}),
       };
     }
@@ -647,16 +660,21 @@ export class TextureResource {
     if (this.#tileSetOptions) this.#registerTileSetEffects(this.#tileSetOptions);
     if (this.#atlasSignals) this.#registerAtlasEffects(this.#atlasSignals);
 
-    // Standalone fallback: if a user assigns `renderer` directly on this resource
-    // (i.e. without going through a `TextureStore`), spin up a per-resource
-    // `TextureFactory`. When the resource is managed by a store, the store
-    // injects its shared factory and this branch never fires.
+    // Standalone fallback: a resource on its own — its renderer written directly, with no
+    // `TextureStore` around — builds a factory that starts from no texture class, as the factory
+    // of a store does. A new renderer brings a new factory with its anisotropy maximum; a factory
+    // written from outside, the shared one of a store among them, stays.
+    //
+    // the factory this fallback built and the renderer it built it for
+    let fallback: {renderer: WebGPURenderer; factory: TextureFactory} | undefined;
     createEffect(
       () => {
         const renderer = this.#renderer.get();
-        if (renderer && !this.#textureFactory.value) {
-          this.textureFactory = new TextureFactory(renderer);
-        }
+        if (!renderer || renderer === fallback?.renderer) return;
+        const factory = this.#textureFactory.value;
+        if (factory && factory !== fallback?.factory) return;
+        fallback = {renderer, factory: new TextureFactory(renderer, [])};
+        this.textureFactory = fallback.factory;
       },
       {attach: this},
     );
@@ -929,7 +947,7 @@ export class TextureResource {
             return;
           }
           try {
-            fetchedAtlasJsonSignal.set(result.json);
+            fetchedAtlasJsonSignal.set({json: result.json, url: atlasUrl});
           } catch (error) {
             // signalize hands the throw of a subscriber to the writer once every effect has
             // run: the json and what is built from it are published, so no record is kept
@@ -950,16 +968,15 @@ export class TextureResource {
         this.#loadFailures.delete('atlasImage');
         const fetched = fetchedAtlasJsonSignal.value;
         if (!fetched) return;
-        const imageUrl = this.overrideImageUrl ?? fetched.meta.image;
+        const {json, url} = fetched;
+        const imageUrl = this.overrideImageUrl ?? json.meta.image;
         if (typeof imageUrl !== 'string') {
           // the json that is published stays as it was: a subscriber would get an `undefined`
           // where the event type promises a value
           this.#fail('atlasImage', {
             source: 'atlas',
-            url: this.atlasUrl,
-            error: new Error(
-              `[TextureResource] the response of "${this.atlasUrl}" names no image and no overrideImageUrl was given`,
-            ),
+            url,
+            error: new Error(`[TextureResource] the response of "${url}" names no image and no overrideImageUrl was given`),
           });
           return;
         }
@@ -970,7 +987,7 @@ export class TextureResource {
         // cleared again gives the image back to the one the json names. Written straight onto the
         // signal, because the public setter treats a write as a json from outside and drops the
         // fetched one
-        atlasJsonSignal.set({...fetched, meta: {...fetched.meta, image: imageUrl}});
+        atlasJsonSignal.set({...json, meta: {...json.meta, image: imageUrl}});
       },
       [fetchedAtlasJsonSignal, overrideImageUrlSignal],
       {attach: this},

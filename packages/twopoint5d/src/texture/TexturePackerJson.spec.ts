@@ -67,6 +67,43 @@ describe('TexturePackerJson.parse()', () => {
     expect(atlas.frameNames()).toEqual(['walk_01.png', 'walk_02.png']);
   });
 
+  describe('a trimmed frame carries its entry of the json as data, spriteSourceSize and sourceSize among it', () => {
+    const trimmed = {
+      frame: {x: 4, y: 2, w: 6, h: 7},
+      rotated: false,
+      trimmed: true,
+      spriteSourceSize: {x: 1, y: 3, w: 6, h: 7},
+      sourceSize: {w: 8, h: 12},
+    };
+    const meta = {image: 'a.png', size: {w: 16, h: 16}};
+
+    test('JSON Hash', () => {
+      const [atlas] = TexturePackerJson.parse({frames: {walk: trimmed}, meta});
+
+      const {data, coords} = atlas.frame('walk')!;
+
+      expect(data).toBe(trimmed);
+      expect(data).toMatchObject({trimmed: true, spriteSourceSize: {x: 1, y: 3, w: 6, h: 7}, sourceSize: {w: 8, h: 12}});
+      expect(coords).toMatchObject({x: 4, y: 2, width: 6, height: 7});
+    });
+
+    test('JSON Array', () => {
+      const entry = {...trimmed, filename: 'walk.png'};
+
+      const [atlas] = TexturePackerJson.parse({frames: [entry], meta});
+
+      const {data} = atlas.frame('walk.png')!;
+
+      expect(data).toBe(entry);
+      expect(data).toMatchObject({
+        filename: 'walk.png',
+        trimmed: true,
+        spriteSourceSize: {x: 1, y: 3, w: 6, h: 7},
+        sourceSize: {w: 8, h: 12},
+      });
+    });
+  });
+
   describe('a rotated frame', () => {
     const makeRotated = (): TexturePackerJsonData => ({
       frames: {r: {frame: {x: 16, y: 32, w: 64, h: 32}, rotated: true}},

@@ -1,7 +1,7 @@
 import {emit, getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURenderer} from 'three/webgpu';
-import {afterEach, describe, expect, test, vi} from 'vitest';
+import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
 import {TextureStore, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
@@ -424,8 +424,7 @@ describe('TextureStore', () => {
 
       // single — type assertion would fail at build if literal narrowing broke
       const u1 = store.on('a', 'texture', (val) => {
-        // val should be typed as `Texture | undefined`
-        void val;
+        expectTypeOf(val).toEqualTypeOf<Texture>();
       });
       // tuple — should narrow each slot to its type
       const u2 = store.on('a', ['atlas', 'imageCoords'], ([atlas, coords]) => {
@@ -1028,6 +1027,45 @@ describe('TextureStore', () => {
       expect(resourceBSeen).toBeUndefined();
 
       unsubA();
+    });
+  });
+
+  describe('onResource() calls its callback once', () => {
+    const dataWith = (id: string): TextureStoreData => ({defaultTextureClasses: [], items: {[id]: {imageUrl: `${id}.png`}}});
+
+    test('a callback that waits for its resource is called once, whatever parse() names the id afterwards', () => {
+      const store = new TextureStore();
+      const callback = vi.fn();
+
+      store.onResource('a', callback);
+      store.parse(dataWith('a'));
+      store.parse(dataWith('a'));
+
+      expect(callback).toHaveBeenCalledOnce();
+      expect(callback).toHaveBeenCalledWith(expect.any(TextureResource));
+    });
+
+    test('a callback that waits for its resource does not hear a resource that takes the place of an evicted one', () => {
+      const store = new TextureStore();
+      const callback = vi.fn();
+
+      store.onResource('a', callback);
+      store.parse(dataWith('a'));
+      store.parse(dataWith('other'), {evictMissing: true});
+      store.parse(dataWith('a'));
+
+      expect(callback).toHaveBeenCalledOnce();
+    });
+
+    test('the function onResource() returns takes back a callback that is still waiting', () => {
+      const store = new TextureStore();
+      const callback = vi.fn();
+
+      const unsubscribe = store.onResource('a', callback);
+      unsubscribe();
+      store.parse(dataWith('a'));
+
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 

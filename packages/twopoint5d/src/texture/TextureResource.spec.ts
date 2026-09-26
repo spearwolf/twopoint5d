@@ -1,7 +1,7 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {ImageLoader, type Texture} from 'three/webgpu';
+import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -1185,6 +1185,37 @@ describe('TextureResource', () => {
         loadAsyncSpy.mockRestore();
         fetchMock.mockRestore();
       });
+
+      test('an atlas json that names no image is reported with the url it came from, not with an atlasUrl written after it', async () => {
+        const withoutImage = {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}}, meta: {size: {w: 16, h: 16}}};
+        const fetchMock = vi
+          .spyOn(globalThis, 'fetch')
+          .mockImplementation((input) =>
+            String(input) === 'A' ? Promise.resolve(new Response(JSON.stringify(withoutImage))) : new Promise<Response>(() => {}),
+          );
+
+        const resource = TextureResource.fromAtlas('sprites', 'A', 'override.png');
+        const errors: Array<{source: string; url: string; error: Error}> = [];
+        on(resource, 'error', (payload: {source: string; url: string; error: Error}) => {
+          errors.push(payload);
+        });
+
+        resource.activate();
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        resource.atlasUrl = 'B';
+        resource.overrideImageUrl = undefined;
+        await flushMicrotasks();
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0]!.source).toBe('atlas');
+        expect(errors[0]!.url).toBe('A');
+        expect(errors[0]!.error.message).toContain('"A"');
+
+        resource.dispose();
+        fetchMock.mockRestore();
+      });
     });
   });
 
@@ -1889,6 +1920,65 @@ describe('TextureResource', () => {
 
       resource.dispose();
       fetchMock.mockRestore();
+    });
+  });
+
+  describe('a resource on its own builds its texture factory from its renderer', () => {
+    // the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer enough
+    const makeRendererStub = (maxAnisotropy: number) => ({getMaxAnisotropy: () => maxAnisotropy}) as unknown as WebGPURenderer;
+
+    const stubImage = () =>
+      vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 16, height: 16, tag: 'hero'}) as unknown as HTMLImageElement);
+
+    test('starts from no texture class, as the factory of a store does', async () => {
+      const loadAsyncSpy = stubImage();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      resource.renderer = makeRendererStub(16);
+      resource.activate();
+      await flushMicrotasks();
+
+      expect(resource.textureFactory!.getOptions([]).magFilter).toBeUndefined();
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('a new renderer brings a new factory with the anisotropy of that renderer', async () => {
+      const loadAsyncSpy = stubImage();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      resource.renderer = makeRendererStub(4);
+      resource.activate();
+      await flushMicrotasks();
+      const first = resource.textureFactory;
+
+      resource.renderer = makeRendererStub(16);
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).not.toBe(first);
+      expect(resource.textureFactory!.getOptions(['anisotropy']).anisotropy).toBe(16);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('a factory written from outside stays when a renderer is written', async () => {
+      const loadAsyncSpy = stubImage();
+      const {factory} = makeTextureFactory();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      resource.activate();
+      resource.textureFactory = factory;
+      resource.renderer = makeRendererStub(16);
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).toBe(factory);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
     });
   });
 

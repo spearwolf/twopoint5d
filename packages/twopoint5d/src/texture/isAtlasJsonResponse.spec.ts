@@ -21,11 +21,28 @@ describe('isAtlasJsonResponse', () => {
     expect(isAtlasJsonResponse({frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, rotated: true}}, meta: {size}})).toBe(true);
   });
 
+  test('a frame with trimmed, spriteSourceSize and sourceSize in the form of TexturePacker passes', () => {
+    const frame = {
+      frame: {x: 0, y: 0, w: 6, h: 8},
+      trimmed: true,
+      spriteSourceSize: {x: 1, y: 0, w: 6, h: 8},
+      sourceSize: {w: 8, h: 8},
+    };
+
+    expect(isAtlasJsonResponse({frames: {a: frame}, meta: {size}})).toBe(true);
+  });
+
   test.each([
     ['null', null],
     ['a JSON Array entry without a filename', {frames: [{frame: {x: 0, y: 0, w: 8, h: 8}}], meta: {size}}],
     ['a JSON Array entry whose filename is a number', {frames: [{filename: 5, frame: {x: 0, y: 0, w: 8, h: 8}}], meta: {size}}],
     ['a frame whose rotated is a string', {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, rotated: 'true'}}, meta: {size}}],
+    ['a frame whose trimmed is a string', {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, trimmed: 'true'}}, meta: {size}}],
+    [
+      'a frame whose spriteSourceSize has no h',
+      {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, spriteSourceSize: {x: 0, y: 0, w: 8}}}, meta: {size}},
+    ],
+    ['a frame whose sourceSize is a string', {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, sourceSize: '8x8'}}, meta: {size}}],
     ['a string', 'atlas'],
     ['a json without frames', {meta: {size}}],
     ['frames that are null', {frames: null, meta: {size}}],

@@ -12,6 +12,10 @@ export type AtlasJsonResponse = Omit<TexturePackerJsonData, 'meta'> & {
   meta: Omit<TexturePackerMetaData, 'image'> & {image?: string};
 };
 
+// an object whose named properties are all numbers
+const isRect = (value: unknown, keys: string[]): boolean =>
+  typeof value === 'object' && value != null && keys.every((key) => typeof (value as Record<string, unknown>)[key] === 'number');
+
 // `setResponseType('json')` hands the callback a parsed object, and what that object carries is
 // whatever the url answered with — so it is checked before it is read. Every property the check
 // lets through is one the loader and its callers may rely on afterwards.
@@ -27,8 +31,13 @@ const isFrameData = (value: unknown): value is TexturePackerFrameData => {
   )) {
     return false;
   }
-  const {rotated} = value as Partial<TexturePackerFrameData>;
-  return rotated === undefined || typeof rotated === 'boolean';
+  const {rotated, trimmed, spriteSourceSize, sourceSize} = value as Partial<TexturePackerFrameData>;
+  return (
+    (rotated === undefined || typeof rotated === 'boolean') &&
+    (trimmed === undefined || typeof trimmed === 'boolean') &&
+    (spriteSourceSize === undefined || isRect(spriteSourceSize, ['x', 'y', 'w', 'h'])) &&
+    (sourceSize === undefined || isRect(sourceSize, ['w', 'h']))
+  );
 };
 
 const isArrayFrameData = (value: unknown): value is TexturePackerArrayFrameData =>

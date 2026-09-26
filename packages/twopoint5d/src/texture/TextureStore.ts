@@ -63,8 +63,11 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  *   Payload: the `TextureStore` instance.
  * - `RendererChanged` (retained): fires whenever `renderer` is reassigned (incl. `undefined`).
  *   Payload: the new `WebGPURenderer | undefined`.
- * - `Resource`: prefix for per-id events emitted as `resource:<id>` after `parse()` —
- *   subscribe via the `onResource(id, cb)` helper.
+ * - `Resource`: prefix for per-id events emitted as `resource:<id>` with every `parse()` that
+ *   names the id. `onResource(id, cb)` gives the resource once, as soon as it is there;
+ *   `on(id, type, cb)` follows its values across every `parse()`, a resource that takes the
+ *   place of an evicted one included. Whoever wants the raw event subscribes to `resource:<id>`
+ *   on the store directly.
  * - `Dispose`: fires once when `dispose()` is called.
  * - `Error`: fires with `{source: 'fetch'|'parse', url?, id?, status?, error}`.
  *   `fetch` covers a request that failed and a response that answered with a status;
@@ -238,8 +241,8 @@ export class TextureStore {
    * {@link TextureStore.parse} reads it: an assignment reaches a resource with the next
    * `parse()` that names that resource, and a `parse()` whose data carries a
    * `defaultTextureClasses` with a known texture class name left in it replaces this value
-   * before it reads it. A resource that no
-   * later `parse()` names keeps the classes it was given.
+   * before it reads it. A resource that no later `parse()` names keeps the classes it was
+   * given.
    *
    * Keeps its last value once {@link TextureStore.dispose} has run: a configuration array
    * is no resource, and the answer stays right.
@@ -343,13 +346,31 @@ export class TextureStore {
   }
 
   /**
-   * Call `callback` with the resource `id` — right away if it is already there, otherwise
-   * as soon as a {@link TextureStore.parse} brings it.
+   * Call `callback` once with the resource `id` — right away if it is already there, otherwise
+   * with the first {@link TextureStore.parse} that brings it. A later `parse()` that names the
+   * id again does not call it, nor does a resource that takes the place of an evicted one;
+   * {@link TextureStore.on} follows the values of a resource. The returned function takes back
+   * a callback that is still waiting.
    *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
    */
   onResource(id: string, callback: (resource: TextureResource) => void): () => void {
+    if (this.#disposed) return () => {};
+
+    const resource = this.#resources.get(id);
+    if (resource) {
+      callback(resource);
+      return () => {};
+    }
+    return once(this, `${OnResource}:${id}`, (resource: TextureResource) => callback(resource));
+  }
+
+  // Call `callback` with the resource `id` right away and once, if it is already there, otherwise
+  // with every `parse()` that brings it for as long as the subscription stands — the same instance
+  // again included. `on()` and `getAsync()` need that, so that a resource which takes the place of
+  // an evicted one reaches them; both skip an instance they already hold.
+  #followResource(id: string, callback: (resource: TextureResource) => void): () => void {
     if (this.#disposed) return () => {};
 
     const resource = this.#resources.get(id);
@@ -816,7 +837,7 @@ export class TextureStore {
 
     const onReadyHandler = () => {
       if (isActiveSubscription) {
-        unsubscribeFromResource = this.onResource(id, (resource) => {
+        unsubscribeFromResource = this.#followResource(id, (resource) => {
           // a subscription whose resource was still missing at the first ready listens for it
           // on the store for good, and every parse() that names the resource announces it
           // again; subscribing to the same instance anew would deliver its retained values a
@@ -988,7 +1009,7 @@ export class TextureStore {
       const subTypes = (Array.isArray(type) ? type : [type]) as readonly TextureResourceSubType[];
       let watchedResource: TextureResource | undefined;
       track(
-        this.onResource(id, (resource) => {
+        this.#followResource(id, (resource) => {
           if (resource === watchedResource) return;
           watchedResource = resource;
           const rejectIfHeldBack = () => {

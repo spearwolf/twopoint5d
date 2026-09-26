@@ -165,6 +165,23 @@ describe('FrameBasedAnimations', () => {
       );
     });
 
+    test('an array of frames is copied: emptying it after add() leaves the animation its frames', () => {
+      const animations = new FrameBasedAnimations();
+      const first = new TextureCoords(0, 0, 32, 32);
+      const second = new TextureCoords(32, 0, 32, 32);
+      const frames = [first, second];
+
+      animations.add('walk', 1, frames);
+      frames.length = 0;
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      const texelAt = (index: number) => Array.from(buffer.subarray(index * 4, index * 4 + 4));
+
+      expect(texelAt(0), 'the header: frame count, duration, first frame texel, texels per frame').toEqual([2, 1, 1, 1]);
+      expect(texelAt(1), 'the first frame').toEqual(Array.from(new Float32Array(first.getTexCoords())));
+      expect(texelAt(2), 'the second frame').toEqual(Array.from(new Float32Array(second.getTexCoords())));
+    });
+
     test('a third argument that is no TextureAtlas, no TileSet and no array is refused with the value and the animation', () => {
       const animations = new FrameBasedAnimations();
 

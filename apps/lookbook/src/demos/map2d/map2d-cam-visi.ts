@@ -3,6 +3,7 @@ import {
   CameraBasedVisibility,
   Map2D,
   Map2DTileRenderer,
+  OnDisplayDispose,
   PanControl2D,
   RepeatingTilesProvider,
   TextureStore,
@@ -14,7 +15,7 @@ import {
 import {Fog} from 'three/webgpu';
 import assetsUrl from '../utils/assetsUrl';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
-import {on} from '@spearwolf/eventize';
+import {on, once} from '@spearwolf/eventize';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
   demo.start(async ({renderer}) => {
@@ -105,4 +106,17 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     (window as any).tileRenderer = tileRenderer;
     console.log('tileRenderer', tileRenderer);
+
+    // the display carries the lifetime of everything this demo built, so its end is where they go
+    once(demo, OnDisplayDispose, () => {
+      // in this order: the renderer gives its tile slots back to the factory, the map lets the
+      // renderer go, and only then do the geometry and the material behind those slots fall
+      tileRenderer.dispose();
+      map2d.dispose();
+      tileSprites.geometry?.dispose();
+      tileSprites.material?.dispose();
+      // the texture belongs to the store, which releases it with its resource
+      store.dispose();
+      panControl.dispose();
+    });
   });

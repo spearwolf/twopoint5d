@@ -156,7 +156,8 @@ export class FrameBasedAnimations {
    * run in the order a numeric collation puts their names in: `walk.2` before `walk.10`.
    * Names that collation ranks equal — `walk.01` beside `walk.1` — keep the order the atlas
    * registered them in. A `frameNameQuery`, a pattern as a string or as a `RegExp`, narrows
-   * the set to the names it matches.
+   * the set to the names it matches. An array of frames is copied: a change to it after the call
+   * leaves the animation as it was registered.
    *
    * An animation carries at least one frame and a duration that is a finite number at or above
    * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
@@ -207,7 +208,9 @@ export class FrameBasedAnimations {
     let frames: TextureCoords[];
 
     if (Array.isArray(args[2])) {
-      frames = args[2];
+      // the caller keeps its array and may change it later; the checks below and the bake see what
+      // was registered, so the animation gets a copy
+      frames = args[2].slice();
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
       const query: unknown = args[3];

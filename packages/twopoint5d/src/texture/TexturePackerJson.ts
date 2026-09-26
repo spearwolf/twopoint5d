@@ -13,6 +13,12 @@ export interface TexturePackerFrameData {
    * are the measures of the sprite as it is drawn, and in the sheet it takes `h` × `w` pixels from `frame.x`/`frame.y`.
    */
   rotated?: boolean;
+  /** `true` if the packer cut the transparent border off the sprite: `frame` is then the area that is left. */
+  trimmed?: boolean;
+  /** Where the area `frame` names lies in the sprite before it was trimmed. */
+  spriteSourceSize?: {x: number; y: number; w: number; h: number};
+  /** The size of the sprite before it was trimmed. */
+  sourceSize?: {w: number; h: number};
 }
 
 /** A frame of the "JSON Array" format, which names itself by `filename`. */
@@ -38,6 +44,10 @@ export interface TexturePackerJsonData {
 
 export class TexturePackerJson {
   /**
+   * Every frame carries its entry of the json as `data`, `trimmed`, `spriteSourceSize` and `sourceSize`
+   * included. The `coords` of a trimmed frame are the trimmed area; laying it where the untrimmed sprite
+   * would stand is up to the caller.
+   *
    * @throws {Error} if a frame name appears more than once in the json or is already taken in the `target`;
    * the `target` stays as it was.
    */
@@ -66,15 +76,16 @@ export class TexturePackerJson {
       names.add(name);
     }
 
-    for (const [name, {frame, rotated}] of entries) {
+    for (const [name, frameData] of entries) {
+      const {frame, rotated} = frameData;
       if (rotated === true) {
         // the sprite lies in the sheet turned by 90°: the area there is `h` wide and `w` high. The diagonal
         // plus the vertical flip turns it back when it is drawn.
         const coords = new TextureCoords(parentCoords, frame.x, frame.y, frame.h, frame.w);
         coords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
-        target.add(name, coords);
+        target.add(name, coords, frameData);
       } else {
-        target.add(name, new TextureCoords(parentCoords, frame.x, frame.y, frame.w, frame.h));
+        target.add(name, new TextureCoords(parentCoords, frame.x, frame.y, frame.w, frame.h), frameData);
       }
     }
 
