@@ -9,7 +9,7 @@
     "PanControl2D",
     "CameraBasedVisibility",
     "RepeatingTilesProvider",
-    "TileSetLoader",
+    "TextureStore",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
     "tilesets",

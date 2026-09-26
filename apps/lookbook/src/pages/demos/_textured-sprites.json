@@ -6,7 +6,7 @@
     "TexturedSprites",
     "TexturedSpritesGeometry",
     "TexturedSpritesMaterial",
-    "TileSetLoader",
+    "TextureStore",
     "tilesets",
     "textures",
     "vanilla"

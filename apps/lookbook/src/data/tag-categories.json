@@ -28,14 +28,10 @@
         "textures",
         "texture-atlas",
         "TextureAtlas",
-        "TextureAtlasLoader",
         "TextureCoords",
         "TextureFactory",
-        "TextureImageLoader",
         "TextureStore",
-        "TileSet",
-        "TileSetLoader",
-        "PowerOf2ImageLoader"
+        "TileSet"
       ]
     },
     {

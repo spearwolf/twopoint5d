@@ -4,7 +4,7 @@ import {
   Map2DTileCoords,
   Map2DTileRenderer,
   RepeatingTilesProvider,
-  TileSetLoader,
+  TextureStore,
   TileSprites,
   TileSpritesFactory,
   TileSpritesGeometry,
@@ -15,7 +15,7 @@ import assetsUrl from '../utils/assetsUrl';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
-  demo.start(async () => {
+  demo.start(async ({renderer}) => {
     const {scene, camera} = demo;
 
     camera.position.set(0, 350, 500);
@@ -31,14 +31,10 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     // ------------------------------------------------------
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(
-      assetsUrl('map2d-debug-tiles_4x256x256.png'),
-      {
-        tileWidth: 256,
-        tileHeight: 256,
-      },
-      ['srgb'],
-    );
+    const store = new TextureStore(renderer);
+    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
+    await store.loadAsync(assetsUrl('textures.json'));
+    const [tileSet, texture] = await store.getAsync('map2dDebugTiles', ['tileSet', 'texture']);
 
     const tileDataProvider = new RepeatingTilesProvider([
       [1, 2],

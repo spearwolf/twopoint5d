@@ -82,12 +82,12 @@ import {description, title} from './_animated-sprites.json';
       console.error(`[animated-sprites] TextureStore ${source} failed for ${url ?? id}`, error);
     });
 
-    store.load(assetsUrl('nobingers.json'));
-
     // eslint-disable-next-line no-console
     console.log('loading textures...', store);
 
-    const [texture, frameBasedAnimations] = await store.get('nobingers', ['texture', 'frameBasedAnimations']);
+    await store.loadAsync(assetsUrl('nobingers.json'));
+
+    const [texture, frameBasedAnimations] = await store.getAsync('nobingers', ['texture', 'frameBasedAnimations']);
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, 500, 75, 7);
 

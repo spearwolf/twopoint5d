@@ -5,7 +5,7 @@ import {
   Map2DTileRenderer,
   PanControl2D,
   RepeatingTilesProvider,
-  TileSetLoader,
+  TextureStore,
   TileSprites,
   TileSpritesFactory,
   TileSpritesGeometry,
@@ -17,7 +17,7 @@ import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 import {on} from '@spearwolf/eventize';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
-  demo.start(async () => {
+  demo.start(async ({renderer}) => {
     const {scene, camera} = demo;
 
     camera.position.set(0, 350, 500);
@@ -44,14 +44,10 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     map2d.centerX = 0;
     map2d.centerY = 0;
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(
-      assetsUrl('ball-patterns.png'),
-      {
-        tileWidth: 128,
-        tileHeight: 128,
-      },
-      ['srgb'],
-    );
+    const store = new TextureStore(renderer);
+    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
+    await store.loadAsync(assetsUrl('textures.json'));
+    const [tileSet, texture] = await store.getAsync('ballPatternTiles', ['tileSet', 'texture']);
 
     const tileData = new RepeatingTilesProvider([
       [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],

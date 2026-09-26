@@ -8,7 +8,7 @@ import {
   RectangularVisibilityArea,
   RectangularVisibilityAreaHelpers,
   RepeatingTilesProvider,
-  TileSetLoader,
+  TextureStore,
   TileSprites,
   TileSpritesFactory,
   TileSpritesGeometry,
@@ -20,7 +20,7 @@ import {makePoints} from '../utils/makePoints';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
-  demo.start(async () => {
+  demo.start(async ({renderer}) => {
     const {scene, camera} = demo;
 
     camera.position.set(0, 350, 500);
@@ -72,14 +72,10 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     map2d.centerX = 0;
     map2d.centerY = 0;
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(
-      assetsUrl('map2d-debug-tiles_4x256x256.png'),
-      {
-        tileWidth: 256,
-        tileHeight: 256,
-      },
-      ['srgb'],
-    );
+    const store = new TextureStore(renderer);
+    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
+    await store.loadAsync(assetsUrl('textures.json'));
+    const [tileSet, texture] = await store.getAsync('map2dDebugTiles', ['tileSet', 'texture']);
 
     const tileData = new RepeatingTilesProvider([
       [1, 2],
@@ -131,7 +127,8 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       map2d.dispose();
       tileSprites.geometry?.dispose();
       tileSprites.material?.dispose();
-      texture.dispose();
+      // the texture belongs to the store, which releases it with its resource
+      store.dispose();
       panControl.dispose();
     });
   });

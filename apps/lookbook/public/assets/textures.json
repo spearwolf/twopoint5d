@@ -1,15 +1,44 @@
 {
   "items": {
     "ballPatternRot": {
-      "imageUrl": "/lookbook/assets/ball-pattern-rot--not-power-of-2.png",
-      "texture": ["nearest", "flipy", "srgb"]
+      "imageUrl": "ball-pattern-rot--not-power-of-2.png",
+      "texture": ["nearest", "srgb"]
+    },
+    "ballPatternTiles": {
+      "imageUrl": "ball-patterns.png",
+      "tileSet": {"tileWidth": 128, "tileHeight": 128},
+      "texture": ["nearest", "srgb"]
+    },
+    "glaskugelnTiles": {
+      "imageUrl": "glaskugeln-2-256x.png",
+      "tileSet": {"tileWidth": 256, "tileHeight": 256},
+      "texture": ["nearest", "srgb"]
     },
     "happyWurmFace": {
-      "imageUrl": "/lookbook/assets/happy-wurm-face.png",
+      "imageUrl": "happy-wurm-face.png",
       "texture": ["linear", "flipy", "srgb"]
     },
+    "labWallsAtlas": {
+      "atlasUrl": "lab-walls-tiles.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "map2dDebugTiles": {
+      "imageUrl": "map2d-debug-tiles_4x256x256.png",
+      "tileSet": {"tileWidth": 256, "tileHeight": 256},
+      "texture": ["nearest", "srgb"]
+    },
+    "nobingerTiles": {
+      "imageUrl": "nobinger-anim-sheet.png",
+      "tileSet": {"tileWidth": 64, "tileHeight": 64, "margin": 1},
+      "texture": ["nearest", "srgb"]
+    },
+    "skinballTiles": {
+      "imageUrl": "skinball-256.png",
+      "tileSet": {"tileWidth": 256, "tileHeight": 256},
+      "texture": ["nearest", "srgb"]
+    },
     "splotchs": {
-      "atlasUrl": "/lookbook/assets/splotchs-256x.json",
+      "atlasUrl": "splotchs-256x.json",
       "texture": ["srgb"]
     }
   }

@@ -40,7 +40,7 @@ import {description, title} from './_animated-billboards.json';
     AnimatedSpritesMaterial,
     FrameBasedAnimations,
     OnDisplayRenderFrame,
-    TileSetLoader,
+    TextureStore,
   } from '@spearwolf/twopoint5d';
   import {Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader} from 'three/webgpu';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
@@ -50,22 +50,17 @@ import {description, title} from './_animated-billboards.json';
   // the <canvas id="canvas-container"> is written by the markup of this very page
   const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
 
-  await demo.start(async () => {
+  await demo.start(async ({renderer}) => {
     demo.camera.position.set(0, 70, -220);
 
     const CAPACITY = 400;
 
     const geometry = new AnimatedSpritesGeometry(CAPACITY);
 
-    const {tileSet, texture} = await new TileSetLoader().loadAsync(
-      assetsUrl('nobinger-anim-sheet.png'),
-      {
-        tileWidth: 64,
-        tileHeight: 64,
-        margin: 1,
-      },
-      ['srgb'],
-    );
+    const store = new TextureStore(renderer);
+    // the catalog of the lookbook, public/assets/textures.json, names the image, tile set and texture classes of each item
+    await store.loadAsync(assetsUrl('textures.json'));
+    const [tileSet, texture] = await store.getAsync('nobingerTiles', ['tileSet', 'texture']);
 
     const anims = new FrameBasedAnimations();
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);

@@ -7,7 +7,7 @@
     "Map2DTileCoords",
     "Map2DTileRenderer",
     "RepeatingTilesProvider",
-    "TileSetLoader",
+    "TextureStore",
     "TileSprites",
     "TileSpritesGeometry",
     "TileSpritesMaterial",

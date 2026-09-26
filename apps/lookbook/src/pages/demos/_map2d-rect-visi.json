@@ -9,7 +9,7 @@
     "PanControl2D",
     "RectangularVisibilityArea",
     "RepeatingTilesProvider",
-    "TileSetLoader",
+    "TextureStore",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
     "tilesets",
