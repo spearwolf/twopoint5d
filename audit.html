@@ -8,10 +8,10 @@
 <script id="audit-data" type="application/json">{
   "schemaVersion": 2,
   "meta": {
-    "generator": "js-ts-audit-remediation",
+    "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-26T14:18:26.914Z"
+    "generatedAt": "2026-09-26T14:41:58.654Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -24,12 +24,11 @@
       "Astro (Lookbook)",
       "Node 24, ESM only"
     ],
-    "date": "2026-09-21",
-    "previousDate": "2026-09-19",
+    "date": "2026-09-26",
     "theme": "light",
     "scope": {
-      "sourceFiles": 152,
-      "sourceLoc": 18605,
+      "sourceFiles": 160,
+      "sourceLoc": 22141,
       "reviewedFiles": [
         "eslint.config.mjs",
         "packages/twopoint5d/src/controls/InputControlBase.ts",
@@ -75,6 +74,7 @@
         "packages/twopoint5d/src/map2d/chunk-quad-tree/StringDataChunk2D.ts",
         "packages/twopoint5d/src/map2d/chunk-quad-tree/base64toUint32Arr.ts",
         "packages/twopoint5d/src/map2d/chunk-quad-tree/public-api.ts",
+        "packages/twopoint5d/src/map2d/constants.ts",
         "packages/twopoint5d/src/map2d/convexTileHull.ts",
         "packages/twopoint5d/src/map2d/public-api.ts",
         "packages/twopoint5d/src/map2d/tileKeys.ts",
@@ -118,11 +118,16 @@
         "packages/twopoint5d/src/texture/TextureStore.ts",
         "packages/twopoint5d/src/texture/TileSet.ts",
         "packages/twopoint5d/src/texture/TileSetLoader.ts",
+        "packages/twopoint5d/src/texture/checkTextureStoreData.ts",
+        "packages/twopoint5d/src/texture/frameTrimMargins.ts",
+        "packages/twopoint5d/src/texture/internals.ts",
         "packages/twopoint5d/src/texture/isAtlasJsonResponse.ts",
         "packages/twopoint5d/src/texture/public-api.ts",
+        "packages/twopoint5d/src/texture/resolveRelativeUrl.ts",
         "packages/twopoint5d/src/texture/types.ts",
         "packages/twopoint5d/src/utils/Dependencies.ts",
         "packages/twopoint5d/src/utils/assertPositiveFinite.ts",
+        "packages/twopoint5d/src/utils/describeValue.ts",
         "packages/twopoint5d/src/utils/expectDefined.ts",
         "packages/twopoint5d/src/utils/findNextPowerOf2.ts",
         "packages/twopoint5d/src/utils/findRootNode.ts",
@@ -171,6 +176,8 @@
         "scripts/checkDocSnippets/compileSnippets.mjs",
         "scripts/checkDocSnippets/extractSnippets.mjs",
         "scripts/checkNameableTypes.mjs",
+        "scripts/checkPeerDependenciesOnly.mjs",
+        "scripts/checkPeerDependenciesOnly/findRuntimeDependencies.mjs",
         "scripts/ci/nxCacheServer.mjs",
         "scripts/ci/nxCacheServer/createCacheServer.mjs",
         "scripts/makePackageJson.mjs",
@@ -184,7 +191,7 @@
         "scripts/publishNpmPkg/publishedVersions.mjs",
         "scripts/publishNpmPkg/releaseFiles.mjs"
       ],
-      "reviewedLoc": 18605,
+      "reviewedLoc": 22141,
       "exclusions": [
         "**/*.spec.*",
         "**/*.test.*",
@@ -197,72 +204,77 @@
     },
     "domains": {
       "code": {
-        "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
-        "score": 85,
-        "penalty": 25.5,
+        "executiveSummary": "Zwei `high`-Befunde aus dem Vorlauf sind noch offen. Ein verschachtelter `StageRenderer` ohne eigene Pipeline löscht sein asPassNode-RenderTarget nie, bewegte Sprites ziehen deshalb Schlieren (BUG-113). `PanControl2D` pannt nach einem Fokuswechsel mit gehaltener Taste endlos weiter (BUG-121).\n\nIm rAF-Hot-Path von vertex-objects, sprites und map2d gibt es keine Allokationslawine. Die spürbaren Kosten stecken im Upload-Modell: `autoTouch` lädt Position und Rotation *aller* Sprites jeden Frame über `0 … usedCount − 1` hoch (PERF-006, PERF-003). Ein `freeVO()` mitten im Pool weitet die Dirty-Range bis ans Pool-Ende, auch für static-Buffer (PERF-005). `Display.resize()` misst das DOM in jedem Frame (PERF-001), und `CameraBasedVisibility` hat keine Obergrenze für abzulaufende Tiles (PERF-002). Darunter liegen rund zwei Dutzend kleine Posten pro Frame oder Aufruf, etwa ein string-keyed `Map.get` in jedem generierten Accessor, Generator-Iteratoren im Upload-Pfad und eager gebaute `expectDefined`-Meldungen. Einzeln kosten sie Nanosekunden, bei vielen Layern summieren sie sich.",
+        "score": 72,
+        "penalty": 69.5,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 5,
-          "low": 11,
+          "medium": 19,
+          "low": 43,
           "info": 12
         },
         "byCategory": {
-          "correctness": 6,
+          "correctness": 17,
+          "performance": 25,
+          "api": 10,
+          "resources": 2,
+          "completeness": 3,
+          "consistency": 5,
+          "async": 2,
+          "security": 1,
           "architecture": 1,
-          "api": 8,
-          "completeness": 1,
           "readability": 2,
-          "performance": 2,
-          "consistency": 2,
           "dx": 6,
           "testing": 2
         }
       },
       "harness": {
-        "executiveSummary": "Lint, Typecheck, `pnpm audit` und die 76 Skript-Tests laufen grün, die Actions sind per SHA gepinnt, und publiziert wird per OIDC ohne Token. Die Lücken sitzen in den Gates selbst: Ein Push, der nur Markdown ändert, **überspringt den Check der `ts check`-Blöcke**, `checkNameableTypes` übersieht `import(\"…\").T`-Referenzen, und der Publish-Job führt die komplette Dev-Toolchain mit `id-token: write` aus. Die Browser-Suite deckt ausgerechnet die GPU- und Lifecycle-Pfade nicht ab, in denen die schwersten Code-Defekte liegen. Hinzu kommt ein langer Schwanz mitgeführter Doku- und Test-Kleinigkeiten, fast alle auf `low` oder `info`.",
-        "score": 72,
-        "penalty": 23.5,
+        "executiveSummary": "Für den Hot Path gibt es keine automatische Absicherung. Der CHANGELOG verspricht allokationsfreie Setter und schmale Uploads, aber kein `bench()` und keine Allokations-Assertion hält das fest, obwohl der Browser-Runner Chromium bereits mit `--expose-gc` startet (TEST-001). `checkNameableTypes.mjs` ist das einzige Gate-Skript ohne Test und übersieht weiterhin `import(\"…\")`-Typen (TEST-002, TEST-044). Aus dem Vorlauf bleiben vor allem Doku- und Einstiegslücken offen. Grün sind `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` und `pnpm audit --prod`.",
+        "score": 66,
+        "penalty": 30.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 6,
-          "low": 23,
+          "medium": 8,
+          "low": 29,
           "info": 14
         },
         "byCategory": {
-          "testing": 10,
-          "dx": 22,
+          "testing": 12,
           "dependencies": 3,
+          "types": 5,
+          "dx": 23,
+          "build": 3,
           "completeness": 1,
           "readability": 3,
-          "types": 2,
-          "build": 1,
           "consistency": 1
         }
       }
     },
+    "previousDate": "2026-09-21",
+    "resolvedCount": 0,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
-        "reviewedLoc": 17542,
-        "findings": 42,
-        "score": 88
+        "reviewedLoc": 21021,
+        "findings": 89,
+        "score": 80
       },
       {
         "name": "workspace",
         "path": ".",
-        "reviewedLoc": 1063,
-        "findings": 16,
-        "score": 93
+        "reviewedLoc": 1120,
+        "findings": 23,
+        "score": 88
       },
       {
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 7,
-        "score": 96.5
+        "findings": 9,
+        "score": 94
       },
       {
         "name": "lookbook",
@@ -272,9 +284,8 @@
         "score": 95.5
       }
     ],
-    "resolvedCount": 160,
     "scoreModel": 2,
-    "score": 78,
+    "score": 69,
     "scoring": {
       "model": 2,
       "weights": {
@@ -291,51 +302,53 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 11,
-      "low": 34,
+      "medium": 27,
+      "low": 72,
       "info": 26
     },
     "byCategory": {
-      "correctness": 6,
-      "architecture": 1,
-      "api": 8,
-      "testing": 12,
-      "dx": 28,
+      "correctness": 17,
+      "performance": 25,
+      "testing": 14,
+      "api": 10,
+      "resources": 2,
+      "completeness": 4,
+      "consistency": 6,
+      "async": 2,
       "dependencies": 3,
-      "completeness": 2,
-      "readability": 5,
-      "performance": 2,
-      "consistency": 3,
-      "types": 2,
-      "build": 1
+      "types": 5,
+      "dx": 29,
+      "build": 3,
+      "security": 1,
+      "architecture": 1,
+      "readability": 5
     },
     "byComponent": {
-      "stage": 27,
-      "controls": 4
+      "stage": 35,
+      "controls": 5,
+      "display": 7,
+      "map2d": 8,
+      "sprites": 4,
+      "texture": 8,
+      "vertex-objects": 9
     },
     "counts": {
-      "findings": 73,
-      "improvements": 11,
+      "findings": 127,
+      "improvements": 18,
       "byStatus": {
-        "new": 25,
-        "unchanged": 1,
-        "carried-over": 44,
-        "improved": 3
+        "unchanged": 6,
+        "new": 54,
+        "carried-over": 67
       }
     },
     "deltaBreakdown": {
-      "code": 0,
-      "coverage": 0,
-      "unknown": 50
-    },
-    "lastRun": {
-      "source": "remediation",
-      "date": "2026-09-26",
-      "ref": "main"
+      "code": 51,
+      "coverage": 3,
+      "unknown": 0
     }
   },
   "portrait": {
-    "description": "`@spearwolf/twopoint5d` ist ein TypeScript-Toolkit für 2.5D-Echtzeitgrafik mit three.js: sehr viele 2D-Sprites, Billboards und Tile-Karten in einer 3D-Szene, gerendert über den `WebGPURenderer` und TSL-Materialien. Die Library ergänzt bestehende three.js-Projekte, statt sie zu kapseln. Ihr Kern ist ein Vertex-Object-System, das tausende Objekte in einem geteilten Typed-Array-Pool hält und in einem Draw Call instanziert zeichnet. Das Monorepo liefert dazu eine Browser-Testsuite und ein Astro-Lookbook als lebende Dokumentation.",
+    "description": "Die TypeScript-Bibliothek `@spearwolf/twopoint5d` rendert 2.5D-Echtzeitgrafik auf three.js mit `WebGPURenderer` und TSL: sehr viele Sprites, Billboards und Tile-Karten, die per Instanced Rendering in einem Draw Call auf die GPU gehen. Kern ist das Vertex-Object-Modell. Ein deklarativer Deskriptor erzeugt JS-Objekte, deren generierte Accessoren direkt in gepoolte Typed Arrays schreiben. Darauf setzen fertige Sprite-Meshes, ein referenzgezählter `TextureStore`, ein `Display` mit Frame-Loop und ein `StageRenderer` mit Post-Processing auf. Das Nx/pnpm-Monorepo enthält dazu eine Playwright-Browsersuite und das Astro-Lookbook als lebende Doku.",
     "components": [
       {
         "id": "vertex-objects",
@@ -503,18 +516,1296 @@
       "category": "correctness",
       "domain": "code",
       "severity": "high",
-      "title": "Das Pass-RT eines verschachtelten StageRenderer ohne Pipeline jeden Frame löschen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:585-596",
+      "title": "Verschachtelten StageRenderer ohne eigene Pipeline vor dem Vorab-Rendern in sein asPassNode-RenderTarget leeren",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:588",
+      "component": "stage",
       "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:512-523",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:560-569"
+        "packages/twopoint5d/src/stage/StageRenderer.ts:512",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:560"
       ],
-      "description": "Im komponierenden Pfad wird ein Kind über `#renderToCurrentTarget` in sein `#asPassNodeRT` vorgerendert. Hat das Kind keine Pipeline, läuft das über `#renderStagesInline`. Dort gibt es kein Clear, solange `clear` nicht gesetzt ist, und `autoClear` ist false. Farbe und Depth des Vorframes bleiben stehen. Das HUD aus dem README-Beispiel (`new StageRenderer(root)` unter einer `RootRenderPipeline`) zieht damit Schlieren, und der Depth-Test verwirft Geometrie gegen den alten Depth-Buffer. Mode C löscht sein internes RT dagegen jeden Frame.",
-      "evidence": "`if (this.clear) this.#applyClear(renderer); renderer.autoClear = false;` — kein `#clearForInternalRT` in der Pre-Render-Schleife",
-      "recommendation": "In der Pre-Render-Schleife von `#renderPipelineComposed` wie in Mode C `#clearForInternalRT` auf das Kind-RT anwenden. Dazu ein Browser-Test mit zwei Frames und bewegtem Objekt.",
+      "description": "Im komponierten Modus (`pipeline` mit `buildOutputNode` oder `RootRenderPipeline`) rendert der Parent jedes Kind-`StageRenderer` pro Frame in dessen `#asPassNodeRT`: `setRenderTarget(childRT)` und dann direkt `stage.#renderToCurrentTarget(renderer)` (Zeile 588–595). Hat das Kind keine eigene Pipeline, landet das in `#renderStagesInline()`, das nur bei `clear === true` löscht und sonst `autoClear = false` setzt (Zeile 514–516). Mit dem Default `clear = false` wird das RenderTarget also nie gelöscht: Farbe und Depth des Vorframes bleiben stehen, bewegte Sprites ziehen Schlieren, und die Depth-Werte des Vorframes verdecken neue Geometrie. Modus C schützt sein internes RT genau dagegen mit `#clearForInternalRT()` (Zeile 560–569, README: »so frame content does not accumulate«); der Pfad für verschachtelte Kinder hat kein Gegenstück. Aufrufpfad: Display.onRenderFrame → Parent.renderTo → #renderToCurrentTarget → #renderPipelineComposed → child.#renderToCurrentTarget → #renderStagesInline. Der Test »nested StageRenderer is pre-rendered into its asPassNode-RT« in StageRenderer.spec.ts:1011 prüft nur das Ziel, nicht das Löschen.",
+      "evidence": "`renderer.setRenderTarget(childRT);\\n  try {\\n    stage.#renderToCurrentTarget(renderer);` — ohne vorheriges `clear`",
+      "recommendation": "Vor dem Vorab-Rendern das `childRT` pro Frame löschen wie in `#clearForInternalRT()` (mit `child.clear` die Farbe/Alpha des Kindes, sonst transparentes Schwarz inklusive Depth). Einen Test ergänzen, der zwei Frames mit bewegtem Inhalt rendert und `renderer.clear` auf dem Kind-RT erwartet.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-121",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "high",
+      "title": "Gehaltene Pan-Tasten bei Fokusverlust des Fensters freigeben",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:624",
+      "component": "controls",
+      "locations": [
+        "packages/twopoint5d/src/controls/PanControl2D.ts:357",
+        "packages/twopoint5d/src/controls/PanControl2D.ts:406"
+      ],
+      "description": "`#onKeyDown` setzt das Speed-Feld auf `pixelsPerSecond`, nur `#onKeyUp` nimmt es zurück. Hält der Nutzer W/A/S/D und wechselt per Alt-Tab, Tab-Wechsel oder einen Browser-Shortcut (Strg+S, Strg+D öffnen Dialoge) den Fokus, erreicht das `keyup` das Dokument nie. `update()` verschiebt `panView` dann in jedem Frame weiter, bis dieselbe Taste erneut gedrückt und losgelassen wird. Die Klasse kennt das Problem — `unsubscribe()` und `keyboardDisabled` rufen `#releaseKeyedSpeeds()` genau aus diesem Grund (Kommentar Zeile 401–403: »the view would keep moving by a key nobody is pressing«) —, es fehlt aber ein Listener auf `window` `blur` bzw. `document` `visibilitychange`.",
+      "evidence": "`#onKeyDown = (event) => { … this[field] = this.pixelsPerSecond; this.#keyedSpeeds.add(field); }` — kein blur-Handler in src/controls",
+      "recommendation": "Über `addEventListener()` der Basisklasse einen `blur`-Listener auf `window` und einen `visibilitychange`-Listener auf `document` registrieren (nur solange die Tastatur aktiv ist), die `#releaseKeyedSpeeds()` aufrufen. Test: keydown, dann blur, dann `update(1)` bewegt nichts mehr.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-001",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "DOM-Messung in `resize()` nicht mehr pro Frame per Polling ausführen",
+      "location": "packages/twopoint5d/src/display/Display.ts:1250",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:1331",
+        "packages/twopoint5d/src/display/Display.ts:1460",
+        "packages/twopoint5d/src/display/Display.ts:613",
+        "packages/twopoint5d/src/display/styleUtils.ts:35",
+        "packages/twopoint5d/src/display/styleUtils.ts:37"
+      ],
+      "description": "Jeder rAF-Tick läuft three-Animation-Loop → `RAF#onAnimationFrame` (FrameLoop.ts:79) → `FrameLoop#onRAF` (FrameLoop.ts:318) → `Display[FrameLoop.OnFrame]` (Display.ts:1436) → `renderFrame()` → `resize()` (Display.ts:1460). Mit dem Default `resizePollIntervalMs = 0` misst `resize()` in jedem Frame: `getContentAreaSize()` ruft `getComputedStyle(element)` und `getBoundingClientRect()` samt 8× `getPropertyValue`+`parseFloat` auf (styleUtils.ts:35-40), danach holt `#applyMeasuredSize()` ein zweites `getComputedStyle(canvas)` und parst Box-Sizing, Padding und Border erneut (Display.ts:1331-1334). Im Standardfall `new Display(canvas)` ist `resizeToElement` der Canvas selbst, das zweite `getComputedStyle` betrifft also dasselbe Element, und das `style`, das `getContentAreaSize()` zurückgibt, wird bei Display.ts:1321 verworfen. Hat vorher im selben Frame irgendetwas das DOM verändert (andere rAF-Callbacks, Input-Handler, Timer), erzwingt `getBoundingClientRect()` ein synchrones Layout, zusätzlich zum Layout des Rendering-Schritts. Bei 120 bis 240 Hz summiert sich das. Das JSDoc bei Display.ts:605-612 räumt die Kosten selbst ein, lässt den Default aber auf 0. Die Begründung »ohne DOM-Listener, die aufgeräumt werden müssten« (Display.ts:492) trägt nicht weit, denn der Konstruktor räumt `visibilitychange` und `IntersectionObserver` bereits über `once(this, OnDisplayDispose, …)` ab.",
+      "evidence": "`const canvasStyle = getComputedStyle(canvas, null);` (Display.ts:1331) nach `const area = getContentAreaSize(source.element);` (Display.ts:1320), beide in jedem Frame",
+      "recommendation": "Die Größe über einen `ResizeObserver` auf die aufgelöste Größenquelle beobachten (mit `devicePixelContentBoxSize`, wo verfügbar) und `devicePixelRatio`-Wechsel per `matchMedia('(resolution: …dppx)')` abfangen; im Frame dann nur ein Dirty-Flag prüfen. Das Polling bleibt als Fallback für `resizeToCallback` und Selektorwechsel. Kurzfristig: die live `CSSStyleDeclaration` pro Element cachen statt `getComputedStyle()` pro Frame neu aufzurufen, das `style` aus `getContentAreaSize()` weiterreichen, wenn Quelle und Canvas identisch sind, und einen Default > 0 für `resizePollIntervalMs` erwägen.",
       "effort": "M",
       "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-24"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-003",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`FixedFrameLoop` gegen die `maxDeltaTime`-Kappung des Displays entkoppeln",
+      "location": "packages/twopoint5d/src/display/FixedFrameLoop.ts:216",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:582",
+        "packages/twopoint5d/src/display/FixedFrameLoop.ts:43",
+        "packages/twopoint5d/src/display/Chronometer.ts:118"
+      ],
+      "description": "`FixedFrameLoop` addiert `props.deltaTime` aus `OnDisplayRenderFrame` (FixedFrameLoop.ts:216), also `Chronometer#deltaTime`, das `Display` per Default auf `1/30` s kappt (Display.ts:582, Chronometer.ts:118-120). Die Kappung unterscheidet einen einzelnen Ausreißer nicht von einer dauerhaft niedrigen Framerate. Rendert ein schwaches Gerät konstant mit 20 fps (50 ms pro Frame), kommen nur 33 ms pro Frame an: Simulation und `display.now` laufen dann mit rund 67 % der Wanduhr, bei 15 fps mit 50 %. Das JSDoc der Klasse verspricht dagegen »accumulating real wall-clock deltas« (FixedFrameLoop.ts:43-44). Gleichzeitig kann der eigene Spiral-of-Death-Guard `maxStepsPerFrame = 5` bei 60 Hz nie greifen, weil die gekappte Zeit höchstens 2 Ticks pro Frame nachliefert.",
+      "evidence": "`this.#accumulator += props.deltaTime;` (FixedFrameLoop.ts:216) mit `#chronometer = new Chronometer(undefined, 1 / 30)` (Display.ts:582)",
+      "recommendation": "Den `FixedFrameLoop` mit einem ungekappten Delta füttern (z. B. das Roh-Delta des Chronometers oder `FrameLoop`-`deltaTime` zusätzlich in den Props) und das Begrenzen seinem eigenen `maxStepsPerFrame` überlassen, oder den Default von `maxDeltaTime` so weit anheben (etwa 0,1 bis 0,25 s), dass er nur echte Ausreißer trifft. In beiden Fällen das JSDoc von `Display.maxDeltaTime` und `FixedFrameLoop` um das Verhalten bei dauerhaft niedriger Framerate ergänzen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "TEST-001",
+      "category": "testing",
+      "domain": "harness",
+      "severity": "medium",
+      "title": "Performance-Regressionstests für den rAF-Hot-Path (vertex-objects, sprites, map2d) ergänzen",
+      "location": "packages/twopoint5d-testing/test/map2d-tile-upload.test.js:1",
+      "locations": [
+        "packages/twopoint5d-testing/web-test-runner.config.js:17",
+        "packages/twopoint5d/package.json:50",
+        "package.json:13",
+        "nx.json:7"
+      ],
+      "description": "Für den performancekritischen rAF-Hot-Path (vertex-objects, sprites, map2d) gibt es in der Harness keine automatisierte Absicherung gegen Allokations- oder Timing-Regressionen. Weder das Root-package.json (Scripts build/test/test:ci/test:coverage/test:browser/test:scripts/test:affected) noch packages/twopoint5d/package.json (compile/typecheck/build/test/coverage/watch/...) noch nx.json (targetDefaults: build/test/typecheck/checkPkgTypes/checkNameableTypes/lintPkg/publishNpmPkg) kennen ein bench- oder perf-Target; Vitest wird nirgends im `bench()`-Modus verwendet. Die Vitest-Stichprobe (VertexObjectPool.spec.ts, FrameLoop.spec.ts, Map2DTileStreamer.spec.ts, TexturedSprites.spec.ts) prüft ausschließlich Korrektheit und Dispose-Lifecycle, nie Allokationszahl oder Zeitbudget pro Frame. Bemerkenswert: web-test-runner.config.js:17-20 startet Chromium bereits mit `--enable-precise-memory-info` und `--js-flags=--expose-gc` — die Infrastruktur für heap-basierte Messungen existiert also —, aber die beiden gesampelten Browsertests (map2d-tile-upload.test.js, sprites-textured-material.test.js) nutzen `performance.memory` oder `gc()` an keiner Stelle; sie prüfen nur, ob ein Buffer-Upload (Versionszähler) passiert oder nicht, nie wie viel dabei alloziert wird. Der CHANGELOG dokumentiert mehrfach handverlesene Allokationsoptimierungen in genau diesem Hot-Path (z. B. \"the generated multi-component setters ... allocate nothing per vertex\", \"an upload ... carries only the objects that were written\") — die Einhaltung dieser Eigenschaft hängt aktuell allein von Code-Review ab, nicht von einem Test, der bei einer Regression fehlschlägt.",
+      "recommendation": "Für vertex-objects/sprites/map2d gezielte Vitest-`bench()`-Suiten oder einfache Allokations-Assertions (z. B. Objektzahl vor/nach einem simulierten Frame-Update über `--expose-gc` und `performance.memory` im Browser-Testrunner, der das bereits aktiviert) ergänzen, die bei einer Regression im Hot-Path (neue Allokation pro Frame, O(n)-Verschlechterung) sichtbar fehlschlagen oder zumindest einen Kennwert für den Menschen sichtbar machen. Mindestens einen CI-Schritt vorsehen, der ein solches Bench-Ergebnis archiviert (wie schon für Coverage in ci.yml geschehen), damit Regressionen über die Zeit auffallen.",
+      "effort": "M",
+      "status": "new",
+      "package": "twopoint5d-testing"
+    },
+    {
+      "id": "BUG-004",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Kamera-Weltmatrix in `computeVisibleTiles()` samt Elternkette aktualisieren",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:361",
+      "component": "map2d",
+      "description": "`computeVisibleTiles()` ruft `this.camera.updateMatrixWorld()` auf. Das rechnet die Weltmatrix der Kamera aus ihrer lokalen Matrix und dem `matrixWorld` des Elternknotens so, wie er gerade steht — der Elternknoten selbst wird nicht aktualisiert. Hängt die Kamera an einem Rig oder Spielerobjekt, das im Frame vor dem Rendern bewegt wird, liest die Sichtbarkeit die Elternmatrix des Vorframes: Die Tiles laufen der Kamera einen Frame hinterher, bei schneller Bewegung reißt am Rand der Sicht ein Streifen ohne Tiles auf (die 1.1-Marge von `frustumBoxScale` deckt nur langsame Bewegung ab). Aufrufpfad pro Frame: `Map2D.update()` (Map2D.ts:153) → `Map2DTileStreamer.update()` (Map2DTileStreamer.ts:154) → `computeVisibleTiles()`. Der Streamer macht es für den Map-Knoten richtig (`node.updateWorldMatrix(true, false)`, Map2DTileStreamer.ts:150) — Kamera und Karte werden also mit unterschiedlich frischem Stand verglichen.",
+      "evidence": "`this.camera.updateMatrixWorld();` gegenüber `node.updateWorldMatrix(true, false);` in Map2DTileStreamer.ts:150",
+      "recommendation": "`this.camera.updateWorldMatrix(true, false)` verwenden (Camera überschreibt diese Methode und hält `matrixWorldInverse` mit), damit die Elternkette der Kamera vor dem Frustum-Test auf den aktuellen Frame gebracht wird; einen Test mit Kamera in einer bewegten Gruppe ergänzen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-002",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Zahl der Tiles begrenzen, die `CameraBasedVisibility` pro Neuberechnung ablaufen kann",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:578",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:664",
+        "packages/twopoint5d/src/map2d/convexTileHull.ts:90",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:505"
+      ],
+      "description": "Die sichtbare Fläche ist nur durch `camera.far` begrenzt. Neigt sich eine perspektivische Kamera Richtung Horizont, wächst die Schnittfläche von Frustum und Kartenebene grob mit far² / (tileWidth·tileHeight): bei far = 10000 und Tiles von 16×16 sind das Hunderttausende Tiles. Hull-Füllung (`forEachTileWithinConvexHull`) und Flood-Fill (`while (this.#nextStack.length > 0)`) laufen diese Fläche vollständig ab — pro Tile ein Pool-Slot mit zwei `Box3`, einem `Vector3`, einem `Map2DTileCoords` samt String-Id und rund 26 Matrix-Vektor-Transformationen. Das passiert in jedem Frame, in dem sich die Kamera bewegt (Aufrufpfad `Map2D.update()` → `Map2DTileStreamer.update()` → `computeVisibleTiles()` → `findVisibleTiles()`), und der Pool behält all diese Slots. Hinter der Sichtbarkeit fragt `Map2DTileRenderer.reuseTile()` jedes Tile, das über die Kapazität der Geometrie hinausgeht, in jedem Frame erneut an (siehe Map2DTileRenderer.ts:109). Ein Kippen der Kamera kann so einen Frame-Drop bis zum Einfrieren auslösen, ohne dass eine Warnung kommt.",
+      "evidence": "kein Limit in `findVisibleTiles()`/`collectTilesWithinProbeHull()`; der Test in CameraBasedVisibility.spec.ts:74 hält die Fläche nur über `far = 200` klein",
+      "recommendation": "Eine Obergrenze einführen (etwa `maxVisibleTiles` oder `maxDistance` in Tile-Einheiten, Default passend zur üblichen Geometrie-Kapazität): Die Flood-Fill bricht ab, sobald sie erreicht ist, und nimmt Tiles vorzugsweise nach Nähe zur Kamera auf (Priority Queue statt Stack); beim Kappen einmal warnen. Die Grenze in der Klassendoku zusammen mit `far` erklären.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-003",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`AnimatedSpritesGeometry` eine Usage-Wahl für `instancePosition` und `rotation` geben",
+      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesGeometry.ts:17",
+      "component": "sprites",
+      "locations": [
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprite.ts:47",
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprite.ts:48"
+      ],
+      "description": "Der `AnimatedSpriteDescriptor` deklariert `instancePosition` und `rotation` als `usage: 'dynamic'`; `VertexAttributeDescriptor#autoTouch` ist für jede nicht-statische Usage `true`. Damit markiert jedes `mesh.update()` → `InstancedVOBufferGeometry#update()` → `GeometryRoutes#autoTouch()` den dynamischen Buffer für einen Voll-Upload über `usedCount` — in jedem Frame, auch wenn kein einziges Sprite sich bewegt hat. Bei animierten Sprites ist das der Normalfall: die Frame-Animation läuft komplett im Shader über das `time`-Uniform, die CPU muss pro Frame nichts schreiben. Anders als `TexturedSpritesGeometry` (Parameterobjekt mit `attributeUsage`, `TexturedSpritesGeometry.ts:55-73`) nimmt der Konstruktor nur `capacity` und `makeBaseSpriteArgs`; der Descriptor ist fest verdrahtet, ein Opt-out gibt es nur über eine selbstgebaute `InstancedVertexObjectGeometry`. Kosten: 16 Byte pro Sprite und Frame Upload plus `needsUpdate`-Pfad in three.js — bei 50 000 stehenden, animierten Sprites 800 KB pro Frame für nichts.",
+      "evidence": "`instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'},\\n rotation: {size: 1, usage: 'dynamic'},` und `constructor(capacity = 100, makeBaseSpriteArgs = [0.5, 0.5]) { super(AnimatedSpriteDescriptor, capacity, BaseSpriteDescriptor);`",
+      "recommendation": "Den Konstruktor wie bei `TexturedSpritesGeometry` auch ein Parameterobjekt `{capacity, attributeUsage}` annehmen lassen und den Descriptor über `cloneVertexObjectDescription()` mit den Aliasen `size`/`position` ableiten. So kann ein Aufrufer mit ortsfesten animierten Sprites `static: ['position']` wählen und per `touch('instancePosition')` nur dann hochladen, wenn er wirklich bewegt.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "API-001",
+      "category": "api",
+      "domain": "code",
+      "severity": "medium",
+      "title": "An den Sprite-Settern für statische Attribute dokumentieren, dass eine spätere Änderung ein `touch()` braucht",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:95",
+      "component": "sprites",
+      "locations": [
+        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:108",
+        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:80",
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprite.ts:8"
+      ],
+      "description": "`setFrame()`, `setColor()`/`setColorValues()`, `setSize()` und bei `AnimatedSprite` `animId`/`animOffset` schreiben Attribute ohne `usage` — also `static` und ohne `autoTouch`. Die generierten Setter markieren nichts als geschrieben; hochgeladen wird ein statischer Buffer nur beim ersten `update()` (`firstAutoTouch`) und für frisch per `createVO()` vergebene Slots. Ändert ein Aufrufer später den Frame eines bestehenden Sprites (Klick, Zustandswechsel, handgemachte Flipbook-Animation pro Frame), bleibt das Bild ohne `geometry.touch('texCoords')` bzw. `touch('color')` unverändert — `VertexObjects#update()` allein reicht nicht, obwohl dessen Doku »Must be called after any changes« nahelegt. Weder die JSDoc von `setFrame()`/`setColor()` noch die von `TexturedSprites` nennen diesen Schritt oder die Alternative `attributeUsage: {dynamic: ['texCoords']}` für Frame-Wechsel pro Frame. Wer es trotzdem richtig macht und jedes Frame `touch('texCoords')` ruft, lädt den gesamten statischen Buffer hoch (quadSize, texCoords, texFlipDiagonal, texTrim, color = 15 Floats pro Sprite) statt nur der geänderten 9.",
+      "evidence": "`setFrame(frame: TextureAtlasFrame): void { this.setTexCoords(frame.coords.getTexCoords(texCoordsScratch)); … }` — JSDoc erwähnt Upload/touch nicht; `texCoords: {components: ['s', 't', 'u', 'v']}` ohne `usage`",
+      "recommendation": "In der JSDoc von `setFrame()`, `setColor()`, `setSize()` und an `AnimatedSprite.animId` einen Satz ergänzen: nach dem ersten Frame erreicht eine Änderung die GPU erst mit `geometry.touch('\u003cattribut>')`; wer pro Frame wechselt, deklariert das Attribut über `attributeUsage.dynamic` als dynamisch. Optional `TexturedSprites#touch(...)` als Durchreiche anbieten, damit der Aufrufer nicht über `geometry` greifen muss.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-005",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Default-Parameter von `setPosition()` und `setColor()` nicht still auf `z` bzw. Alpha schreiben lassen",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:84",
+      "component": "sprites",
+      "locations": [
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprite.ts:38",
+        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:108"
+      ],
+      "description": "`setPosition(x, y, z = 0)` reicht immer drei Werte an `setInstancePosition()` weiter. Der generierte Setter lässt eine Komponente, die `undefined` ankommt, bewusst unangetastet — der Default `0` hebelt genau das aus. Ein Sprite, dessen Tiefe in einer 2.5D-Szene einmal über `sprite.z` oder `setPosition(x, y, z)` gesetzt wurde, springt beim ersten `setPosition(x, y)` im Update-Loop auf `z = 0` und damit in eine andere Ebene bzw. Zeichenreihenfolge. Ohne JSDoc ist das nirgends festgehalten.",
+      "evidence": "`setPosition(x: number, y: number, z = 0): void { this.setInstancePosition(x, y, z); }`",
+      "recommendation": "Den Default streichen (`z?: number`) und `undefined` an `setInstancePosition()` durchreichen, sodass `setPosition(x, y)` die Tiefe behält; falls der Reset gewollt ist, ihn in einer JSDoc ausdrücklich benennen. Einen Test ergänzen, der `z` über ein `setPosition(x, y)` hinweg prüft.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-004",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Canvas-Textur in `Canvas2DStage` wiederverwenden statt pro Inhaltsänderung neu zu bauen",
+      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:135",
       "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/Canvas2DStage.ts:127"
+      ],
+      "description": "Jedes `render()` mit `needsUpdate === true` ruft `makeTexture()`, das über `TextureFactory.create()` eine neue `THREE.Texture` baut (TextureFactory.ts:237–239), setzt sie als `sprite.material.map`, markiert das Material mit `material.needsUpdate = true` und disposed die Vorgängertextur. Für eine animierte 2D-Canvas — der Zweck der Klasse, und die Lookbook-Demo `QuadTreeVisualization.render()` setzt `needsUpdate` bei jedem Aufruf — heißt das pro Frame: eine neue GPU-Textur allozieren und hochladen, die alte zerstören, und den Node-Material-Build samt Pipeline-Lookup erneut anstoßen. Nötig wäre pro Frame nur ein Re-Upload in dieselbe Textur. Aufrufpfad: Anwendung → Canvas2DStage.render → updateTexture → makeTexture → TextureFactory.create.",
+      "evidence": "`this.sprite.material.map = this.makeTexture();\\nthis.sprite.material.needsUpdate = true;` … `previous?.dispose();`",
+      "recommendation": "Die Textur einmal bauen (bzw. nach einem `setCanvasSize()`, weil sich die GPU-Größe ändert) und bei `needsUpdate` nur `this.texture.needsUpdate = true` setzen; `material.needsUpdate` nur beim Wechsel der Textur selbst. Den Vertrag zu `texture` (Stage besitzt, was im Feld steht) beibehalten.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-006",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Ausgabeknoten des komponierten Modus bei einem Wechsel von `Stage2D.scene` neu bauen",
+      "location": "packages/twopoint5d/src/stage/Stage2D.ts:44",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:876",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:599",
+        "packages/twopoint5d/src/stage/Stage2D.ts:332"
+      ],
+      "description": "`Stage2D.scene` ist ein frei beschreibbares Feld ohne Setter und ohne Event. `StageRenderer` markiert seinen `pipeline.outputNode` nur bei `OnStageAfterCameraChanged` als dirty (StageRenderer.ts:876–878) und fragt `asPassNode()` nur, solange `#outputDirty` gilt (StageRenderer.ts:599–605). Die Doku von `asPassNode()` verspricht, dass ein Szenenwechsel den alten Knoten »on the next call of this method« ersetzt — dieser Aufruf kommt im komponierten Modus aber nicht. Folge: Nach `stage.scene = otherScene` rendert der Plain-Modus und Modus C die neue Szene (über `renderTo()` → `renderer.render(this.scene, …)`), Modus D und E zeigen weiter den `pass(alteSzene, camera)`, bis zufällig ein `add()`, `remove()` oder Kamerawechsel den Knoten neu baut.",
+      "evidence": "`on(stage, OnStageAfterCameraChanged, () => this.invalidateOutputNode())` — kein Pendant für die Szene",
+      "recommendation": "`scene` als Accessor mit Setter führen, der bei Änderung ein Event (z. B. das bestehende `OnStageAfterCameraChanged` verallgemeinert oder ein eigenes) auslöst, auf das `StageRenderer.add()` ebenfalls `invalidateOutputNode()` legt. Alternativ im komponierten Pfad pro Frame Szene und Kamera jeder `Stage2D` gegen den gebauten Knoten vergleichen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-122",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Tastatur-Panning bei Eingabe in editierbare Elemente und bei Modifier-Kombinationen überspringen",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:606",
+      "component": "controls",
+      "locations": [
+        "packages/twopoint5d/src/controls/PanControl2D.ts:624"
+      ],
+      "description": "Die Key-Listener hängen an `document` und prüfen nur `event.code`/`event.keyCode` (`#speedFieldFor`, Zeile 606–615). Tippt der Nutzer in ein `\u003cinput>`, `\u003ctextarea>` oder `contenteditable` derselben Seite ein »w« oder »a«, pant die Ansicht mit; ebenso Strg+S/Strg+D/Strg+A, die zusätzlich den Fokus-Fall aus dem blur-Befund auslösen können.",
+      "evidence": "`holdsDefault(this.keys, DEFAULT_KEYS) && … ? this.keyCodes.indexOf(event.keyCode) : this.keys.indexOf(event.code)` — kein Blick auf `event.target`, `ctrlKey`, `metaKey`, `altKey`",
+      "recommendation": "In `#onKeyDown` Ereignisse mit `ctrlKey`/`metaKey`/`altKey` und solche, deren `event.target` editierbar ist (`isContentEditable`, `input`, `textarea`, `select`), ignorieren; optional als Option abschaltbar. `#onKeyUp` weiter jede passende Taste freigeben lassen.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-115",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`ProjectionPlane.getForward()` als Richtung aus der Normalen berechnen statt aus einem Punkt",
+      "location": "packages/twopoint5d/src/stage/ProjectionPlane.ts:69",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/ProjectionPlane.ts:73",
+        "packages/twopoint5d/src/stage/ProjectionPlane.ts:77"
+      ],
+      "description": "`getForward()` gibt `getPointByDistance(1).negate()` zurück, also `-(origin + normal)` — einen negierten Punkt, keine Richtung. Das stimmt nur für Ebenen durch den Ursprung (`constant === 0`), was für die vier Presets gilt. Der Konstruktor nimmt aber ausdrücklich eigene `THREE.Plane` an (Zeile 29–36). Mit `constant = c` ist `coplanarPoint = -c·normal`, `getForward()` liefert `(c − 1)·normal`: bei `c = 1` den Nullvektor, bei `c > 1` die umgekehrte Richtung. `getRight()` (Kreuzprodukt damit) wird dann null bzw. gespiegelt, und `getPoint(x, y)` ignoriert bei `c = 1` den x-Anteil (setLength auf einem Nullvektor) und spiegelt ihn bei `c > 1`. `applyRotation()` ist nicht betroffen, weil es die Differenz zweier Punkte nutzt. ProjectionPlane.spec.ts testet diese Methoden nur mit den Presets.",
+      "evidence": "`getForward(target?: Vector3): Vector3 {\\n  return this.getPointByDistance(1, target).negate();\\n}`",
+      "recommendation": "`getForward(target)` als `(target ?? new Vector3()).copy(this.plane.normal).negate()` schreiben; Tests für eine eigene Ebene mit `constant` 1 und 5 ergänzen, die Richtung und Länge von `getForward`, `getRight` und `getPoint` prüfen.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-009",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`lastIndex` eines RegExp mit `g`/`y`-Flag in `TextureAtlas#frameNames()` neutralisieren",
+      "location": "packages/twopoint5d/src/texture/TextureAtlas.ts:74",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:257"
+      ],
+      "description": "`frameNames(match)` filtert mit `regex.test(name)` über alle Namen und reicht einen übergebenen RegExp unverändert durch. Trägt er das Flag `g` oder `y`, ist `test()` zustandsbehaftet: nach jedem Treffer beginnt die nächste Suche bei `lastIndex`, und Namen werden übersprungen. `frameNames(/walk/g)` über `walk.1`…`walk.4` liefert nur `walk.1` und `walk.3` (mit Node nachgestellt). Über `FrameBasedAnimations#add(name, timing, atlas, /walk/g)` entsteht so still eine Animation mit jedem zweiten Frame; ein zweiter Aufruf mit demselben RegExp-Objekt startet zudem bei einem Rest-`lastIndex`.",
+      "evidence": "`return frameNames.filter((name) => typeof name === 'string' && regex.test(name));`",
+      "recommendation": "Vor dem Filtern `regex.lastIndex = 0` setzen und pro Name zurücksetzen, oder bei `g`/`y` einen Klon ohne diese Flags bauen (`new RegExp(match.source, match.flags.replace(/[gy]/g, ''))`). Einen Test mit `/walk/g` ergänzen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "MEM-001",
+      "category": "resources",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Aufräumen in `TextureResource#dispose()` gegen einen werfenden `dispose`-Listener absichern",
+      "location": "packages/twopoint5d/src/texture/TextureResource.ts:577",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/TextureStore.ts:1110",
+        "packages/twopoint5d/src/texture/TextureStore.ts:1117"
+      ],
+      "description": "`dispose()` setzt zuerst `#disposed = true` und ruft dann `emit(this, OnDispose)` mit dem einfachen `emit` von eventize, das beim ersten werfenden Listener abbricht und den Fehler durchreicht. Wirft ein Subscriber des `dispose`-Events, verlässt die Exception `dispose()` vor Zeile 582: die eigene Textur (`#ownTexture`) wird nie freigegeben, `SignalGroup.delete(this)` läuft nicht, die Effects bleiben registriert und reagieren weiter auf Signalwrites, `off(this)` entfernt keine Listener. Weil `#disposed` schon gesetzt ist, kehrt jeder weitere `dispose()`-Aufruf — auch der aus `TextureStore` — sofort zurück; die GPU-Textur bleibt bis zum Seitenende liegen. Nachfolgende Listener des Events hören es gar nicht.",
+      "evidence": "`this.#disposed = true;\\n\\n    emit(this, OnDispose);\\n    ...\\n    this.#ownTexture?.dispose();`",
+      "recommendation": "Das Event mit `emitStrict` (alle Listener werden gerufen) in ein `try` legen und das Aufräumen (Textur freigeben, `SignalGroup.delete`, `off`) in den `finally`-Block ziehen; den Fehler danach weiterwerfen. Einen Test mit einem werfenden `dispose`-Listener ergänzen, der prüft, dass die Textur dennoch disposed wird.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-010",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`ready`- und `resource:\u003cid>`-Events in `TextureStore#parse()` gegen werfende Listener absichern",
+      "location": "packages/twopoint5d/src/texture/TextureStore.ts:776",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/TextureStore.ts:779",
+        "packages/twopoint5d/src/texture/TextureStore.ts:665",
+        "packages/twopoint5d/src/texture/TextureStore.ts:677"
+      ],
+      "description": "`parse()` sendet `ready`, `resource:\u003cid>` und die Item-Fehler mit dem abbrechenden `emit`. Laut eventize-Typings schreibt `emit` bei einem werfenden Listener den retained Wert nicht und ruft die Listener dahinter nicht auf. Wirft ein früh registrierter `ready`-Listener der Anwendung, (1) bleibt der retained `ready`-Wert ungeschrieben — ein späteres `whenReady()`, `on()` oder `getAsync()` wartet bis zum nächsten `parse()`; (2) laufen die `once(OnReady)`-Handler bereits wartender `on()`-/`getAsync()`-Aufrufe nicht, deren Promises hängen; (3) entfallen alle `resource:\u003cid>`-Ankündigungen und das `evictMissing`-Aufräumen, obwohl die Resources im Batch schon geschrieben sind; (4) meldet `loadAsync()` den Listener-Fehler als `parse`-Fehlschlag (Zeile 549) für einen Katalog, der tatsächlich geparst wurde. Ein werfender `error`-Listener in Zeile 665/677 bricht `parse()` sogar vor dem Batch ab, nachdem `defaultTextureClasses` in Zeile 662 bereits ersetzt wurde. `loadAsync()` selbst nutzt für denselben Fall bewusst `emitSafe` (Zeile 508).",
+      "evidence": "`emit(this, OnReady, this);\\n\\n    updatedResources.forEach((resource) => {\\n      emit(this, `${OnResource}:${resource.id}`, resource);\\n    });`",
+      "recommendation": "Die Events aus `parse()` mit `emitStrict` senden (alle Listener laufen, retained Wert wird geschrieben) und den Fehler erst nach Ankündigungen und `evictMissing` weiterwerfen, oder konsequent `emitSafe` wie in `loadAsync()` nutzen. Die Item-`error`-Events ebenso. Test: werfender `ready`-Listener vor einem wartenden `getAsync()`.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-011",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "medium",
+      "title": "`FrameBasedAnimations.MaxTextureSize` an das Texturlimit des Devices binden",
+      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:158",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:115",
+        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:414"
+      ],
+      "description": "`bakeDataTexture()` baut eine einzeilige `DataTexture` von `bufSize × 1` Texeln und prüft `bufSize` nur gegen `MaxTextureSize = 16384`. three.js' `WebGPUBackend` fordert ohne Zutun keine erhöhten Limits an (`requiredLimits` default `{}`, node_modules/three/src/renderers/webgpu/WebGPUBackend.js:93), das Device läuft also mit dem WebGPU-Default `maxTextureDimension2D = 8192`; WebGL2-Geräte garantieren nur 2048. Eine Bake mit 8193–16384 Texeln — bei getrimmten Frames (3 Texel/Frame) schon ab rund 2730 Frames — besteht die Prüfung, die Texturerzeugung scheitert aber auf der GPU mit einem Validierungsfehler statt mit der sprechenden Fehlermeldung aus Zeile 117, und die Animationen lesen nichts.",
+      "evidence": "`static MaxTextureSize = 16384;` · `const dataTexture = new DataTexture(floatsBuffer, bufSize, 1, RGBAFormat, FloatType);`",
+      "recommendation": "Default auf 8192 (WebGPU-Mindestgarantie) senken oder `bakeDataTexture()` ein optionales Limit bzw. den Renderer übergeben lassen und dessen Limit (`device.limits.maxTextureDimension2D` bzw. `capabilities.maxTextureSize`) nutzen. Langfristig die Daten zweidimensional auslegen (Breite ≤ Limit, mehrere Zeilen), dann reicht auch ein kleines Limit für große Atlanten.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "TEST-002",
+      "category": "testing",
+      "domain": "harness",
+      "severity": "medium",
+      "title": "Unit-Tests für `checkNameableTypes.mjs` ergänzen",
+      "location": "scripts/checkNameableTypes.mjs:1",
+      "description": "Jedes andere Script in `scripts/` zerlegt seine Logik in kleine, pur funktionale Module mit eigener `*.test.mjs` (z. B. `findRuntimeDependencies`, `removeDistPathPrefix`, `resolveDependencies`, `releaseFiles`, `parseArguments`). `checkNameableTypes.mjs` bleibt ein monolithisches 138-Zeilen-Script mit der algorithmisch anspruchsvollsten Logik des Slices — transitive Symbolauflösung über den TypeScript-Checker, Root-Auflösung qualifizierter Namen, Alias-Dereferenzierung — und hat keine einzige Testdatei. `grep -rl checkNameableTypes` findet außer dem Script selbst keine weitere Datei. Das Script ist Teil des blockierenden `publishNpmPkg`-Gates (`packages/twopoint5d/package.json`), ein stiller Fehler dort lässt entweder einen unbenennbaren Typ unbemerkt in die öffentliche API oder blockiert einen validen Release.",
+      "recommendation": "Die Kernlogik (Root-Auflösung, Dereferenzierung, den transitiven Walk) wie bei den Nachbarscripts in testbare Funktionen auslagern und mit ein paar `.d.ts`-Fixtures (benennbar/nicht benennbar, `ACCEPTED`-Eintrag, qualifizierter Name) über `node --test` absichern.",
+      "effort": "M",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "PERF-005",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Dirty-Range bei Pool-Churn nicht auf ein einziges Intervall zusammenziehen",
+      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:245",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:201",
+        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:137",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:187"
+      ],
+      "description": "#markDirty() führt pro Buffer genau ein Intervall dirtyFrom … dirtyTo und weitet es mit Math.min/Math.max. freeVO() auf ein Objekt aus der Mitte schreibt per copyWithin(idx, last, last + 1) den Slot idx in allen Buffern, auch in den static-Buffern; createVO() markiert den neuen Slot am Ende. Beide landen im selben Intervall, das dann von idx bis ans Pool-Ende reicht, und syncUploads() lädt diesen Bereich für jeden Buffer hoch, auch für static-Buffer, die sonst nie wieder hochgeladen würden. So kommt es in den Frame: Map2DTileRenderer beim Scrollen → TileSpritesFactory.destroyTile() → freeVO() und createTile() → createVO() → tileFactory.update() → VertexObjects.update() → InstancedVOBufferGeometry.update() → GeometryRoutes.syncUploads() → pickUpDirtyRange() → setUploadRange(). Genauso bei jeder Partikel- oder Spawn-Logik, die pro Frame Objekte freigibt und neu anlegt. Zwei geänderte Slots kosten dann den Upload von (usedCount − idx) Objekten je Buffer, im schlimmsten Fall den ganzen Pool.",
+      "evidence": "`buf.dirtyFrom = Math.min(buf.dirtyFrom, from); buf.dirtyTo = Math.max(buf.dirtyTo, to);`",
+      "recommendation": "Pro Buffer mehrere disjunkte Intervalle führen, mit kleiner fester Obergrenze (etwa 4–8); erst darüber zusammenfassen. syncUploads()/setUploadRange() setzen dann je Intervall ein addUpdateRange(), denn three.js verarbeitet mehrere updateRanges pro Attribut nativ, sowohl im WebGPU- als auch im WebGL-Backend. Absichern mit einem Test, der auf einem vollen Pool freeVO(ersterSlot) + createVO() ausführt und die Summe der updateRanges.count prüft.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-006",
+      "category": "performance",
+      "domain": "code",
+      "severity": "medium",
+      "title": "Schmalen, VO-bezogenen Upload-Pfad in der API anbieten und dokumentieren",
+      "location": "packages/twopoint5d/src/vertex-objects/types.ts:60",
+      "component": "vertex-objects",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:200",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:288"
+      ],
+      "description": "Die generierten Setter markieren nichts. autoTouch, der Default für dynamic/stream, und touch()/touchAttributes()/touchBuffers() der Geometrie laden immer 0 … usedCount − 1 hoch: #touch() räumt vorhandene schmale Ranges sogar ab, und syncUploads() setzt für angeforderte Buffer die volle Range. Für TexturedSprite und AnimatedSprite (instancePosition und rotation sind dynamic und damit autoTouch) heißt das: Jeder Frame lädt Position und Rotation aller Sprites hoch, auch wenn sich nur eine bewegt hat. Einen schmalen Pfad gibt es bereits: pool.buffer.touch(idx, idx) bzw. touchBuffer() füttern #markDirty(), und syncUploads() lädt dann nur diese Objekte hoch. map2d nutzt genau das (TileSpritesFactory.updateTile()). Die Doku zu autoTouch (types.ts:67–68) nennt aber nur den breiten touch() der Geometrie, und eine VO-bezogene Variante fehlt.",
+      "recommendation": "`VertexObjectPool#touchVO(vo, ...attrNames)` anbieten, das für die Buffer der genannten Attribute (oder für alle) buffer.touchBuffer(bufferName, idx, idx) aufruft. Diesen Weg in types.ts:60–69 als Alternative zu autoTouch beschreiben. Optional einen Descriptor-Modus wie `autoTouch: 'written'`, in dem die generierten Setter selbst den Dirty-Range pflegen; das kostet pro Schreibzugriff zwei Min/Max und ein Inkrement und wäre mit der Empfehlung zu mehreren Intervallen pro Buffer kombinierbar.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "IMPL-001",
+      "category": "completeness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Schichtbild und Material-Angabe in der Library-Architektur-Doku an den Code angleichen",
+      "location": "packages/twopoint5d/docs/architecture.md:34",
+      "locations": [
+        "packages/twopoint5d/docs/architecture.md:116"
+      ],
+      "description": "Das Schichtbild in §2 zeichnet `utils/` in die oberste Reihe und sagt dazu »A lower layer never imports from a higher one«. Im Code ist `utils/` die unterste Schicht: `vertex-objects`, `texture`, `stage`, `map2d` und `controls` importieren daraus (z. B. `vertex-objects/initializeAttributes.ts` → `../utils/expectDefined.js`), `utils/` selbst importiert nichts. Wer das Bild wörtlich nimmt, hält jeden dieser Imports für einen Schichtbruch. Dazu nennt der Abschnitt `sprites/` die Materialien `ShaderMaterial`, während `TexturedSpritesMaterial` und `TileSpritesMaterial` von `NodeMaterial` erben und im Quelltext kein `ShaderMaterial` mehr vorkommt.",
+      "evidence": "`controls/  utils/          (input, helpers — no rendering state)` über `vertex-objects/   the buffer core everything else stands on`",
+      "recommendation": "`utils/` im Schichtbild unter `vertex-objects/` setzen (oder als querliegende Basis kennzeichnen) und in §2 `sprites/` »`NodeMaterial` (TSL)« statt `ShaderMaterial` schreiben.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "CONS-001",
+      "category": "consistency",
+      "domain": "code",
+      "severity": "low",
+      "title": "Lokale Kopie von `isFiniteNumber` in `frameTrimMargins.ts` durch den Helfer aus `utils/` ersetzen",
+      "location": "packages/twopoint5d/src/texture/frameTrimMargins.ts:6",
+      "component": "texture",
+      "description": "`frameTrimMargins.ts` definiert `isFiniteNumber` als eigene Arrow-Function, obwohl `utils/isFiniteNumber.ts` denselben Type Guard wortgleich exportiert und `stage/` sowie `texture/` sonst aus `utils/` importieren. Zwei Kopien derselben Prüfung laufen auseinander, sobald eine davon geändert wird, etwa beim Umgang mit `-0` oder mit Boxed Numbers.",
+      "evidence": "`const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);`",
+      "recommendation": "Die lokale Definition löschen und `import {isFiniteNumber} from '../utils/isFiniteNumber.js';` verwenden.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-26"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-007",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Kurzlebige Objekte im Frame-Hot-Path wiederverwenden",
+      "location": "packages/twopoint5d/src/display/FrameLoop.ts:318",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:1268",
+        "packages/twopoint5d/src/display/Display.ts:1311",
+        "packages/twopoint5d/src/display/Display.ts:1321",
+        "packages/twopoint5d/src/display/styleUtils.ts:42",
+        "packages/twopoint5d/src/display/Display.ts:1370",
+        "packages/twopoint5d/src/display/Display.ts:1761",
+        "packages/twopoint5d/src/display/FixedFrameLoop.ts:220",
+        "packages/twopoint5d/src/display/FixedFrameLoop.ts:238"
+      ],
+      "description": "Pro rAF-Tick entstehen mehrere Wegwerfobjekte: das `OnFrame`-Props-Objekt mit 5 Feldern (FrameLoop.ts:318), von dem `Display` nur `now` liest (Display.ts:1436); das Quellobjekt `{window, element}` aus `#resolveSizeSource()` (Display.ts:1268); das Fallback-Tupel, das `#measureSizeSource()` anlegt, bevor klar ist, ob es gebraucht wird (Display.ts:1311); das Messergebnis-Objekt aus `getContentAreaSize()` samt `DOMRect` (styleUtils.ts:37/42) und ein weiteres `[w, h]`-Tupel (Display.ts:1321); der Resize-Hash als Template-String mit sechs Number-zu-String-Konvertierungen, nur für einen Gleichheitsvergleich (Display.ts:1370); das `DisplayEventProps`-Objekt je `#emit` (Display.ts:1761). Mit `FixedFrameLoop` kommen ein Objekt je Tick (FixedFrameLoop.ts:220) und eine Spread-Kopie der Display-Props je Frame dazu (FixedFrameLoop.ts:238). Einzeln sind die Objekte billig, in Summe erzeugen sie aber konstanten Young-Gen-GC-Druck genau in dem Pfad, in dem jede Millisekunde zählt.",
+      "evidence": "`const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio},${pixelZoom}`;` (Display.ts:1370)",
+      "recommendation": "Rein interne Zwischenergebnisse (Quelle, Fallback, Messung) in Instanzfeldern halten oder als Skalare zurückgeben, und den Hash durch einen Vergleich der sechs Zahlen gegen gespeicherte Felder ersetzen. Für die Event-Props wird nichts stillschweigend wiederverwendet, weil Listener sie behalten dürfen (`nextFrame()` resolved mit ihnen, Display.ts:1806). Ein wiederverwendetes Props-Objekt braucht einen dokumentierten Vertrag, oder die Allokation bleibt bewusst.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "ASYNC-001",
+      "category": "async",
+      "domain": "code",
+      "severity": "low",
+      "title": "Promise von `renderer.setAnimationLoop()` im rAF-Treiber behandeln",
+      "location": "packages/twopoint5d/src/display/FrameLoop.ts:99",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/FrameLoop.ts:112",
+        "packages/twopoint5d/src/display/FrameLoop.ts:5"
+      ],
+      "description": "`Renderer#setAnimationLoop()` von three ist `async` und ruft auf einem noch nicht initialisierten Renderer erst `await this.init()` auf (three/src/renderers/common/Renderer.js:1921-1925). `RAF#start()` und `RAF#stop()` verwerfen das zurückgegebene Promise, und das Interface `ISetAnimationLoop` typisiert es als `unknown`. Wer die öffentliche `FrameLoop` direkt mit einem Renderer baut (`new FrameLoop(0, renderer).start(obj)`) und `start()` vor dem Abschluss des Inits aufruft, bekommt bei einem fehlgeschlagenen Init eine unbehandelte Rejection ohne Bezug zur `FrameLoop`. `Display` selbst ist nicht betroffen: Es startet seine Loop erst nach `#waitForRenderer`. Den gleichen Effekt beschreibt Display.ts:1695-1698 für `renderer.dispose()` und umgeht ihn dort bewusst.",
+      "evidence": "`this.renderer.setAnimationLoop(this.#onAnimationFrame);` (FrameLoop.ts:99)",
+      "recommendation": "Das Ergebnis als `unknown` annehmen und, wenn es thenable ist, mit einem `.catch()` versehen, das den Fehler als Warnung meldet (oder über ein Event der `FrameLoop` weiterreicht). Das Interface auf `unknown | Promise\u003cunknown>` präzisieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-012",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "`FrameLoop#lastNow` beim Wiederanlaufen nach einer Pause zurücksetzen",
+      "location": "packages/twopoint5d/src/display/FrameLoop.ts:306",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/FrameLoop.ts:192",
+        "packages/twopoint5d/src/display/FrameLoop.ts:287"
+      ],
+      "description": "Nimmt `stop(target)` den letzten Abonnenten von der Loop, hängt sich die `FrameLoop` vom Treiber ab (FrameLoop.ts:287), behält aber `#lastNow`. Das erste `OnFrame` nach dem nächsten `start()` meldet deshalb als `deltaTime` die ganze Pausendauer und als `lastNow` den Zeitstempel von vor der Pause (FrameLoop.ts:306/320). Der Treiber `RAF` setzt bei seinem Stop genau aus diesem Grund den Messanker neu (FrameLoop.ts:117-120, »a window anchored … across the span in which nobody asked for a frame reports an fps the renderer never ran at«); für das Delta der `FrameLoop` fehlt dieselbe Behandlung. `Display` ist nicht betroffen, weil es seine Zeit aus dem `Chronometer` nimmt. Direkte Nutzer der öffentlichen `FrameLoop` bekommen dagegen eine Delta-Spitze. `FrameLoop.spec.ts` prüft nur das erste Frame überhaupt, nicht das erste nach einem Wiederanlauf.",
+      "evidence": "`this.#deltaTime = prevNow == null ? 0 : now - prevNow;` (FrameLoop.ts:306)",
+      "recommendation": "`#lastNow = undefined` und `#nextEmitAt = 0` setzen, sobald `subscriptionCount` in `stop()` auf 0 fällt, damit das erste Frame nach dem Wiederanlauf `deltaTime === 0` trägt; dazu ein Test »stop all, start again«.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-24"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "API-002",
+      "category": "api",
+      "domain": "code",
+      "severity": "low",
+      "title": "Manuellen `resize()`-Aufruf vom `resizePollIntervalMs`-Throttle ausnehmen",
+      "location": "packages/twopoint5d/src/display/Display.ts:1240",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:1209"
+      ],
+      "description": "Das JSDoc von `resize()` empfiehlt den manuellen Aufruf »immediately after a layout-affecting DOM mutation if you cannot wait for the next frame« (Display.ts:1209-1211). Der Throttle bei Display.ts:1240-1246 greift aber bei jedem Aufruf. Ist `resizePollIntervalMs > 0` und hat der Frame kurz vorher gemessen, kehrt der manuelle Aufruf still ohne Messung zurück. Genau der dokumentierte Anwendungsfall liefert dann die alte Größe. Umgekehrt verschiebt ein manueller Aufruf, der misst, die nächste Messung im Frame.",
+      "evidence": "`if (nowMs - this.#lastResizePollMs \u003c this.resizePollIntervalMs) { return; }` (Display.ts:1242-1244)",
+      "recommendation": "Den Throttle nur auf den Aufruf aus `renderFrame()` anwenden, etwa über einen privaten `#resize(fromFrame: boolean)`, oder `resize({force: true})` anbieten und das JSDoc von `resize()` um die Wechselwirkung ergänzen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "CONS-002",
+      "category": "consistency",
+      "domain": "code",
+      "severity": "low",
+      "title": "Dokument und Fenster des Canvas statt der globalen `document`/`window` verwenden",
+      "location": "packages/twopoint5d/src/display/Display.ts:1052",
+      "component": "display",
+      "locations": [
+        "packages/twopoint5d/src/display/Display.ts:1055",
+        "packages/twopoint5d/src/display/Display.ts:1199",
+        "packages/twopoint5d/src/display/Display.ts:1311",
+        "packages/twopoint5d/src/display/Display.ts:909",
+        "packages/twopoint5d/src/display/Display.ts:932"
+      ],
+      "description": "Die Release-Logik und `Stylesheets` arbeiten bewusst Realm-genau: `waitForTwoAnimationFrames()` nimmt `renderer.domElement.ownerDocument.defaultView` (Display.ts:128), und `newSheetFor()` baut das Sheet mit dem `CSSStyleSheet` des eigenen Fensters (Stylesheets.ts:25-35). Der Rest von `Display` greift dagegen auf die globalen Objekte zu: `visibilitychange` und `document.hidden` des globalen Dokuments (Display.ts:1052/1055), `window.devicePixelRatio` (Display.ts:1199), `window.innerWidth/innerHeight` für `resize-to=\"window\"` (Display.ts:1311), `document.head` als Default-Root (Display.ts:909) und `document.createElement` für den Container (Display.ts:932). Liegt der Canvas in einem same-origin-iframe, während der Code im Parent läuft, dann misst `resize-to=\"window\"` das falsche Fenster, und die Stylesheet-Regeln landen im Parent-Dokument.",
+      "evidence": "`document.addEventListener('visibilitychange', onDocVisibilityChange, false);` (Display.ts:1055) neben `const view = renderer.domElement.ownerDocument?.defaultView;` (Display.ts:128)",
+      "recommendation": "Im Konstruktor einmal `const doc = canvas.ownerDocument; const view = doc.defaultView ?? window;` ermitteln und für Visibility, Pixel Ratio, Fenstergröße und den Default von `styleSheetRoot` (`doc.head`) nutzen.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-24"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "DEPS-004",
+      "category": "dependencies",
+      "domain": "harness",
+      "severity": "low",
+      "title": "devDependencies nachziehen und die zurückgehaltenen Major-Sprünge von TypeScript und `prettier-plugin-astro` begründen",
+      "location": "package.json:60",
+      "locations": [
+        "package.json:54",
+        "package.json:37"
+      ],
+      "description": "`pnpm outdated` (2026-09-26) meldet sechs Patch-/Minor-Rückstände in den devDependencies (`@types/node`, `@vitest/coverage-v8`, `nx` 23.2.0 → 23.2.1, `prettier`, `typescript-eslint`, `vitest` 5.0.1 → 5.0.2) und zwei Major-Sprünge, die der Caret-Range ausschließt: `typescript` `^5.9.3` gegenüber 7.0.2 und `prettier-plugin-astro` `^0.14.1` gegenüber 1.1.0. `typescript` 7 ist zudem durch den Peer-Range von `typescript-eslint` 8.70 (`>=4.8.4 \u003c6.1.0`) gesperrt, 6.0 wäre erreichbar. Beim TypeScript-Sprung wiegt, dass `scripts/checkNameableTypes.mjs` und `scripts/checkDocSnippets/compileSnippets.mjs` die Compiler-API direkt benutzen. Nichts im Repo sagt, ob die Zurückhaltung gewollt ist; `pnpm audit` meldet keine bekannte Schwachstelle, die Wirkung ist gering.",
+      "evidence": "`typescript 5.9.3 → 7.0.2`, `prettier-plugin-astro 0.14.1 → 1.1.0`",
+      "recommendation": "Die Patch-/Minor-Stände in einem Routine-Update mitziehen. `typescript` auf 6.0 heben, soweit `typescript-eslint` es zulässt; für 7.x und `prettier-plugin-astro` 1.x entweder ein Upgrade-Fenster einplanen (die beiden Gate-Skripte gegen die neue Compiler-API prüfen) oder die Zurückhaltung mit einem Satz in `docs/architecture.md` §5 festhalten.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "workspace"
+    },
+    {
+      "id": "DOC-061",
+      "category": "dx",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Release aus dem stark angewachsenen CHANGELOG-Unreleased-Block schneiden",
+      "location": "packages/twopoint5d/CHANGELOG.md:8",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/CHANGELOG.md:2856",
+        "packages/twopoint5d/package.json:4"
+      ],
+      "description": "Der Abschnitt \"## [Unreleased]\" des CHANGELOG erstreckt sich über rund 2850 der insgesamt 3738 Zeilen (Zeile 8 bis 2855, vor dem nächsten Versionskopf \"## [0.21.2] - 2026-06-19\") und enthält bereits eigene Added/Changed/Deprecated/Removed/Fixed/Migration-Guide-Abschnitte mit vielen benannten Breaking Changes. packages/twopoint5d/package.json steht unverändert auf Version 0.21.2 — exakt der zuletzt veröffentlichten Version vom 2026-06-19, gut drei Monate vor dem heutigen Datum —, ohne \"-dev\"-Suffix, wie ihn deploy.yml als Signal für \"noch nicht reif\" auswertet. Wer das Paket heute von npm installiert, sieht keine der dokumentierten Änderungen; wer sie liest, muss einen der größten Abschnitte der Projektgeschichte auf einmal durcharbeiten, sobald doch veröffentlicht wird.",
+      "recommendation": "Den nächsten Release früher schneiden, oder zumindest bewusst entscheiden und kurz festhalten, dass die Ansammlung beabsichtigt ist (z. B. weil erst alle zusammengehörigen Breaking Changes gemeinsam mit einer Migration Guide veröffentlicht werden sollen), damit der Umfang nicht als Versehen wirkt.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-032",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Kurzlebige Allokationen pro Neuberechnung aus `CameraBasedVisibility` herausnehmen",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:553",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:657",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:664",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:296",
+        "packages/twopoint5d/src/map2d/convexTileHull.ts:22",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.ts:163",
+        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.ts:175",
+        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:122"
+      ],
+      "description": "Die Klasse hält ihre Arbeitspuffer ausdrücklich über Frames hinweg (»Per-frame scratch buffers — reused across calls to keep GC pressure low«, Z. 236), trotzdem entstehen in jedem Frame mit bewegter Kamera rund 30 kurzlebige Objekte, unabhängig von der Zahl der Tiles: pro Probe-Strahl `computeTilesWithinCoords()` mit Tupel und Ergebnisobjekt (Z. 553, bis zu 9×) und `getTileCoords()` mit Tupel (Z. 657), dazu die Closure an `forEachTileWithinConvexHull` (Z. 664) und in `convexTileHull()` fünf Arrays (`[...points]`, `unique`, `lower`, `upper`, `concat`). Das Objektliteral für `this.#deps.changed({...})` (Z. 296) entsteht in jedem Frame, auch wenn die Kamera still steht; dasselbe gilt für `RectangularVisibilityArea` (Z. 122). Aufrufpfad: `Map2D.update()` → `Map2DTileStreamer.update()` → `computeVisibleTiles()`. Einzeln ist das billig; im rAF-Takt bleibt es aber ein stetiger Minor-GC-Zufluss in genau der Klasse, die ihn vermeiden will.",
+      "evidence": "`const around = this.#map2dTileCoords.computeTilesWithinCoords(...)`; `const sorted = [...points].sort(byXThenY);` … `return lower.concat(upper);`",
+      "recommendation": "`computeTilesWithinCoords()` und `getTileCoords()` einen optionalen `target`-Parameter geben (wie `AABB2.from`), `convexTileHull()` mit wiederverwendeten Arbeits-Arrays und einem Ziel-Array aufrufbar machen, die Hull-Closure einmal als Feld binden und das Deps-Objekt als Scratch-Feld halten, das pro Frame nur beschrieben wird.",
+      "effort": "M",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-25"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-009",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Verdrängte TileBox-Slots über eine Free-List wiederverwenden",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:595",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:505",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:684",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:704",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:708"
+      ],
+      "description": "Ein Pool-Slot, den eine Neuberechnung nicht besucht, wird aus `#tileBoxPool` gelöscht und dem GC überlassen. Beim Schwenken verlassen also in jedem Frame Reihen von Tiles die Sicht, während am anderen Rand gleich viele neu hinzukommen — und für jedes neue Tile entstehen der Slot `{id, x, y}`, ein `TilesWithinCoords` samt Tupel, zwei `Box3` (je drei Objekte), ein `Vector3` und ein `Map2DTileCoords` mit `AABB2` und String-Id (`tileKey`): etwa ein Dutzend Allokationen pro Tile, genau in den Frames, in denen die Kamera sich bewegt. Aufrufpfad: `Map2D.update()` → `Map2DTileStreamer.update()` → `findVisibleTiles()` → `acquireTileBox()`/`prepareTile()`/`acceptTile()`.",
+      "evidence": "`for (const id of this.#tileBoxPool.keys()) { if (!this.#visitedIds.has(id)) { this.#tileBoxPool.delete(id); } }`",
+      "recommendation": "Verdrängte Slots in eine Free-List legen, deren Länge auf die Größe der letzten sichtbaren Menge begrenzt ist, und `acquireTileBox()` daraus bedienen (`x`, `y`, `id` neu setzen, `coords` neu berechnen). Der `map2dTile`-Shell bekommt bei Wiederverwendung eine neue Id — entweder `Map2DTileCoords` mutierbar machen oder nur Box3/Vector3 recyceln. Das hält den Speicher weiter an die Sicht gebunden und nimmt den GC aus dem Schwenk.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-010",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Unveränderte Tile-Sets im Streamer ohne Durchlauf über alle Tiles abschließen",
+      "location": "packages/twopoint5d/src/map2d/Map2DTileStreamer.ts:169",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:366",
+        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.ts:126",
+        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:101"
+      ],
+      "description": "Die Sichtbarkeiten brechen bei stehender Kamera früh ab, legen dann aber die komplette Tile-Liste als `reuseTiles` in das Ergebnis (`this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles`). `Map2DTileStreamer.update()` läuft diese Liste in jedem Frame für jeden Renderer ab, und `Map2DTileRenderer.reuseTile()` macht pro Tile einen `Map.get` mit String-Key, bevor es an `#tilesChanged` abbricht. Ein statisches Bild kostet damit O(Tiles × Renderer) pro Frame, obwohl nichts zu tun ist. Der Durchlauf ist heute das Sicherheitsnetz für zwei Fälle: einen Renderer, der nach der letzten Neuberechnung hinzukam, und Tiles, die auf `noTileCapacity` warten.",
+      "evidence": "`if (visible.reuseTiles) for (const tile of visible.reuseTiles) tileRenderer.reuseTile(tile);`",
+      "recommendation": "Den Leerlauf explizit machen: Die Visibilitor-Ergebnisse tragen eine Seriennummer (bei `CameraBasedVisibility` gibt es `serial` schon), und der Streamer überspringt die Renderer-Schleife, wenn sich Seriennummer und `offset` nicht bewegt haben, seit `addTileRenderer()`/`clearTiles()` nichts markiert hat und kein Renderer offene Kapazitätsanfragen meldet (etwa über ein `hasPendingTiles` am Renderer).",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-011",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "In `TileSpritesFactory#createTile()` die Kapazität vor den Lookups prüfen und die Fehlermeldung nicht eager bauen",
+      "location": "packages/twopoint5d/src/map2d/TileSprites/TileSpritesFactory.ts:68",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/Map2DTileRenderer.ts:109",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibilityHelpers.ts:168"
+      ],
+      "description": "`createTile()` baut bei jedem Aufruf den Template-String `` `the atlas frame of tile ${tileDataId}` `` als Argument von `expectDefined()`, auch wenn der Frame da ist — also bei jedem neuen Tile. Die Freiheit im Pool wird erst danach über `createVO()` erfragt. Ist die Geometrie voll, fragt `Map2DTileRenderer.reuseTile()` jedes überzählige Tile in jedem Frame erneut an (gewollt, damit frei werdende Slots genutzt werden), und jede dieser Anfragen macht `getTileIdAt()`, `tileSet.frameId()`, `atlas.get()` und den String, nur um mit `noTileCapacity` zu enden. Aufrufpfad: `Map2DTileStreamer.update()` (Z. 169) → `Map2DTileRenderer.reuseTile()` → `addTile()` → `createTile()`. Dasselbe Muster eager gebauter Meldungen steckt in `CameraBasedVisibilityHelpers.updateTileHelpers()` (drei Strings pro sichtbarem Tile und Neubau, Debug-Pfad).",
+      "evidence": "`const texCoords = expectDefined(tileSet.atlas.get(frameId), `the atlas frame of tile ${tileDataId}`).coords;`",
+      "recommendation": "Vor den Lookups prüfen, ob `instancedPool.usedCount \u003c instancedPool.capacity`, und sonst sofort `noTileCapacity` zurückgeben (die Reihenfolge »erst alles, was werfen kann, dann den Slot nehmen« bleibt erhalten, weil die Prüfung keinen Slot nimmt). Für `expectDefined` eine Variante mit lazy Meldung (`() => string`) anbieten oder den Null-Check inline schreiben.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-012",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Bucket-Keys von `Map2DSpatialHashGrid` numerisch statt als String bilden",
+      "location": "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:150",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:55",
+        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.ts:102"
+      ],
+      "description": "Jede Abfrage über `findWithin()`/`getTiles()` baut pro Zelle einen String (`tileKey(x, y)` → `` `${x},${y}` ``) nur für den `Map.get`, dazu zwei Tupel in `#cellsOf()`. Die Klasse ist ausdrücklich für Abfragen in jedem Frame gedacht (»so a caller that asks every frame keeps one set«, Z. 112) — dort fallen dann pro Frame so viele Strings an, wie die Abfrage Zellen überdeckt. Das Modul hat mit `packTileCoords()` genau für diesen Zweck einen kollisionsfreien numerischen Key (tileKeys.ts:17-19), den `CameraBasedVisibility` bereits nutzt; der Grid bleibt beim String, damit er dieselbe Id wie `Map2DTileCoords.id` trägt — die aber bei `getTile(x, y)` gar nicht hereingereicht wird.",
+      "evidence": "`const key = Map2DSpatialHashGrid.getKey(tileX, tileY); return this.#tiles.get(key);`",
+      "recommendation": "Intern `Map\u003cnumber, Set\u003cRenderable>>` mit `packTileCoords()` führen; `getKey()` für die öffentliche String-Sicht behalten oder deprecaten. `#cellsOf()` in vier Scratch-Felder schreiben lassen statt Tupel zurückzugeben.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-013",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "`ChunkQuadTreeNode#findChunksAt()` mit Ausgabe-Array statt `filter`/`concat` pro Ebene",
+      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts:336",
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.ts:348"
+      ],
+      "description": "Die Punktabfrage legt auf jeder Ebene des Baums ein neues Array per `filter` mit Closure an und verkettet die Ergebnisse per `concat` nach oben — bei Tiefe d sind das 2·d Arrays pro Abfrage. Ein Tile-Data-Provider, der pro Tile `findChunksAt(x, y)` fragt, zahlt das für jedes Tile, das in die Sicht kommt (über `TileSpritesFactory#createTile()` → `getTileIdAt()`), und beim Kapazitätsengpass in jedem Frame. `findChunks()` daneben bietet für denselben Zweck schon ein `out`-Array an (Z. 305).",
+      "evidence": "`const chunks: ChunkType[] = this.chunks.filter((chunk: ChunkType) => chunk.containsDataAt(x, y));` … `chunks.concat(child.findChunksAt(x, y))`",
+      "recommendation": "`findChunksAt(x, y, out: ChunkType[] = [])` analog zu `findChunks()`: iterativ absteigen und Treffer an `out` anhängen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-014",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Die pro Atlas-Frame konstanten Werte von `setFrame()` einmal vorberechnen",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:95",
+      "component": "sprites",
+      "kind": "improvement",
+      "description": "`setFrame()` ist allokationsfrei (Scratch-Tupel in Zeile 61/64), rechnet aber bei jedem Aufruf alles neu, was für einen Atlas-Frame fest ist: `frame.coords.getTexCoords()` läuft über `computeBounds()` die Parent-Kette der `TextureCoords` hoch, `frameTrimMargins()` liest sechs Felder aus den rohen TexturePacker-Daten (`spriteSourceSize`, `sourceSize`), prüft jedes auf `Number.isFinite` und dividiert viermal. Wer Frames auf CPU-Seite pro Frame wechselt (Flipbook ohne `AnimatedSprites`, Partikel mit zufälligem Frame), zahlt das pro Sprite und Frame; bei 10 000 Sprites sind das 10 000 Kettenläufe und 60 000 Property-Reads auf JSON-Objekten, die sich nie ändern.",
+      "evidence": "`this.setTexCoords(frame.coords.getTexCoords(texCoordsScratch));\\n this.texFlipDiagonal = frame.coords.flipD ? 1 : 0;\\n this.setTexTrim(frameTrimMargins(frame.data, trimScratch));`",
+      "recommendation": "Die neun Werte (s, t, u, v, flipD, vier Trim-Ränder) pro Frame einmal berechnen und cachen — etwa in einer `WeakMap\u003cTextureAtlasFrame, Float32Array>` in diesem Modul, invalidiert über eine Version der `TextureCoords`, oder als vom Atlas vorberechnetes Feld —, und `setFrame()` kopiert nur noch neun Zahlen.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-015",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Einen Texturwechsel über den `value` des `TextureNode` führen statt den Color-Graph neu zu bauen",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesMaterial.ts:222",
+      "component": "sprites",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprites.ts:31",
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:70"
+      ],
+      "description": "`#colorEffect` liest `this.colorMap`; jede Zuweisung einer anderen Textur (`material.colorMap = t` oder `TexturedSprites#texture = t`) baut den kompletten `colorNode`-Graph neu und setzt `needsUpdate = true`. three.js verwirft daraufhin das RenderObject und lässt den NodeBuilder den Shader-Quelltext erneut generieren; Programm und Pipeline kommen zwar aus dem Cache, der Node-Build selbst kostet aber pro Wechsel einen spürbaren Teil eines Frames. Die Doku von `touchAnimsMap()` warnt für die animsMap bereits vor genau diesem Effekt; für `colorMap` fehlt die Warnung, und ein Umschalten zwischen zwei Sheets im Update-Loop (Tag/Nacht, Hit-Flash) landet unbemerkt im Hot Path. Die animsMap-Variante baut zusätzlich alle vier Lookups neu, weil ihre Größe als Konstante `vec2(width, height)` im Graph steht.",
+      "evidence": "`if (this.colorMap) { this.colorNode = mul(colorFromTextureByTexCoords(this.colorMap, {...}), spriteColor); } … this.needsUpdate = true;`",
+      "recommendation": "Den `texture()`-Node einmal anlegen und bei einem Wechsel zwischen zwei vorhandenen Texturen nur `textureNode.value = colorMap` setzen; den Graph nur neu bauen, wenn `colorMap` zwischen `undefined` und gesetzt wechselt. Für die animsMap die Kartengröße als `uniform(vec2)` führen, dann braucht auch ein neues animsMap-Bild keinen Neubau. Ersatzweise mindestens an `colorMap`/`texture` den Hinweis aus `touchAnimsMap()` ergänzen: nicht pro Frame wechseln.",
+      "effort": "M",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-25"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-016",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "`TexturedSprite#getColor()` ohne Ziel nicht pro Aufruf eine `Color` allokieren lassen",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:112",
+      "component": "sprites",
+      "kind": "improvement",
+      "description": "`getColor(target = new Color())` legt bei jedem Aufruf ohne Ziel ein neues `Color`-Objekt an. In einer Farbanimation im Update-Loop (lesen, mischen, `setColor()`) entsteht so pro Sprite und Frame Garbage — genau das, was die übrigen Accessoren dieses Slices mit Scratch-Tupeln und die generierten Setter mit festen Parametern vermeiden.",
+      "evidence": "`getColor(target: Color = new Color()): Color { return target.set(this.r, this.g, this.b); }`",
+      "recommendation": "In der JSDoc festhalten, dass im Update-Loop ein wiederverwendetes `target` gehört, oder `target` wie bei three.js' `getWorldPosition(target)` verpflichtend machen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "CONS-003",
+      "category": "consistency",
+      "domain": "code",
+      "severity": "low",
+      "title": "`AnimatedSprites` und `TexturedSprites` beim Bau und Besitz von Geometry und Material angleichen",
+      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSprites.ts:21",
+      "component": "sprites",
+      "locations": [
+        "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprites.ts:37",
+        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesGeometry.ts:17"
+      ],
+      "description": "Die beiden Mesh-Klassen desselben Tripel-Musters folgen zwei Modellen: `TexturedSprites` nimmt Kapazität, Parameterobjekt oder Geometry bzw. Textur, Parameter oder Material, baut fehlende Teile selbst, besitzt und entsorgt sie und bietet `createSprite()`, `freeSprite()`, `spritePool` und `texture`. `AnimatedSprites` ist generisch über `GeoType`, baut nichts (ohne Argumente hält es die `BufferGeometry`/`MeshBasicMaterial` von `THREE.Mesh`), entsorgt nichts und hat keinen der Helfer. Dazu kommt `isTexturedSpritesGeometry` ohne Gegenstück und das fehlende Parameterobjekt bei `AnimatedSpritesGeometry`. Wer von einer Klasse zur anderen wechselt, muss Besitz und Aufrufmuster neu lernen; `sprites.dispose()` bedeutet in beiden etwas anderes.",
+      "evidence": "`constructor(geometry?: GeoType, material?: AnimatedSpritesMaterial) { super(geometry, material); … }` gegen `super(geometry instanceof TexturedSpritesGeometry ? geometry : new TexturedSpritesGeometry(geometry), …)`",
+      "recommendation": "`AnimatedSprites` dieselbe Konstruktor-Signatur und Besitzregel wie `TexturedSprites` geben (Kapazität/Parameter/Geometry, Parameter/Material; eigene Teile besitzen und entsorgen) samt `createSprite()`/`freeSprite()`/`spritePool`, oder den Unterschied in beiden Klassen-JSDocs ausdrücklich begründen. Der Vorschlag in `docs/proposals/sprite-features.md` §5 wäre der natürliche Ort dafür.",
+      "effort": "M",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-25"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "TYPE-001",
+      "category": "types",
+      "domain": "harness",
+      "severity": "low",
+      "title": "`any` aus den öffentlichen Typen von `Dependencies` entfernen",
+      "location": "packages/twopoint5d/src/utils/Dependencies.ts:3",
+      "locations": [
+        "packages/twopoint5d/src/utils/Dependencies.ts:7",
+        "packages/twopoint5d/src/utils/Dependencies.ts:38",
+        "packages/twopoint5d/src/utils/Dependencies.ts:40",
+        "packages/twopoint5d/src/utils/Dependencies.ts:65"
+      ],
+      "description": "`EqualityCallback\u003cT = any>` und `DependencyCallbacks\u003cT = any>` sind exportierte Typen mit `any` als Default; `DependencyDeclaration` bindet die Callbacks jeder Deklaration an `DependencyCallbacks\u003cany>` bzw. `EqualityCallback\u003cany>`. Ein `equals`-Callback, der für einen Schlüssel vom Typ `Matrix4` einen `Vector2` erwartet, kompiliert deshalb, obwohl der Shape den Werttyp je Schlüssel kennt. Die Klasse ist über `utils/public-api.ts` Teil der Paket-API.",
+      "evidence": "`[name: K, equals: EqualityCallback\u003cany>] | [name: K, callbacks: DependencyCallbacks\u003cany>];`",
+      "recommendation": "Die Callbacks einer benannten Deklaration an `Shape[K]` binden (`EqualityCallback\u003cShape[K]>`, `DependencyCallbacks\u003cShape[K]>`) und die Defaults auf `unknown` setzen; intern genügt `DependencyCallbacks\u003cunknown>` mit einem Cast an der einen Stelle, an der die Werte aus der `Map` kommen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "API-006",
+      "category": "api",
+      "domain": "code",
+      "severity": "low",
+      "title": "`Stage2D.needsUpdate` im Frame-Pfad auswerten oder als reinen Merker für manuelles `updateProjection()` dokumentieren",
+      "location": "packages/twopoint5d/src/stage/Stage2D.ts:50",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/Stage2D.ts:195",
+        "packages/twopoint5d/src/stage/Stage2D.ts:257"
+      ],
+      "description": "Das öffentliche Flag `needsUpdate` wird nur in `updateProjection(false)` gelesen. Im ganzen Paket ruft niemand `updateProjection()` ohne `forceUpdate` auf (`Canvas2DStage` und der `projection`-/`camera`-Setter immer mit `true`), und weder `updateFrame()` noch `renderTo()` noch `StageRenderer` schauen auf das Flag. Wer nach einer Änderung an `projection.viewSpecs` (z. B. `pixelZoom`) `stage.needsUpdate = true` setzt, sieht bis zur nächsten Änderung der Containergröße keine Wirkung. Das spart zwar pro Frame jede Projektionsrechnung, lässt das Flag aber ohne Verbraucher.",
+      "evidence": "`if ((forceUpdate || this.needsUpdate) && this.projection) {` — einzige Lesestelle",
+      "recommendation": "In `updateFrame()` vor dem Emit `this.updateProjection()` aufrufen: ohne gesetztes Flag kostet das einen Boolean-Check, mit Flag genau eine Neuberechnung. Alternativ JSDoc des Flags ausdrücklich auf »wird nur von einem manuellen `updateProjection()` gelesen« setzen.",
+      "effort": "S",
+      "status": "unchanged",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-017",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Allokationen pro Frame im Stage-Render-Pfad vermeiden",
+      "location": "packages/twopoint5d/src/stage/Stage2D.ts:273",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:652"
+      ],
+      "description": "`Stage2D.updateFrame()` baut in jedem Frame für jede Stage ein neues `StageUpdateFrameProps`-Objekt und emittiert `OnStageUpdateFrame` auch dann, wenn niemand zuhört (Zeile 273–285). Bei vielen Stages bzw. verschachtelten Renderern summiert sich das zu N Objekten pro Frame für den GC. Im Pipeline-Modus C und für Kind-Renderer ruft `#ensureRT()` → `#resizeRenderTarget()` pro Frame `#renderTargetSize()`, das jedes Mal ein neues Tupel `[w, h]` zurückgibt. Projektions- und Kamera-Updates selbst laufen dagegen nicht pro Frame, sondern nur bei Größen- oder Spezifikationswechseln.",
+      "evidence": "`const updateFrameProps: StageUpdateFrameProps = {stage: this, now, deltaTime, frameNo};`",
+      "recommendation": "Pro Stage ein Props-Objekt halten und je Frame nur `now`, `deltaTime`, `frameNo` überschreiben; für `OnStageFirstFrame` ein eigenes Objekt verwenden, weil `retain()` es für späte Abonnenten aufbewahrt. In der JSDoc der Props festhalten, dass sie nur während des Aufrufs gelten. `#renderTargetSize()` in zwei Felder oder einen wiederverwendeten Scratch-Vektor schreiben.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-018",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Array-Allokationen über `#pointersDown` in `update()` und im Pointermove-Pfad vermeiden",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:431",
+      "component": "controls",
+      "locations": [
+        "packages/twopoint5d/src/controls/PanControl2D.ts:30",
+        "packages/twopoint5d/src/controls/PanControl2D.ts:536",
+        "packages/twopoint5d/src/controls/PanControl2D.ts:573"
+      ],
+      "description": "`update()` läuft pro Frame und ruft `mergePan(Array.from(this.#pointersDown.values()))`: ein neues Array plus über `reduce` ein Akkumulator-Objekt pro gedrücktem Pointer und das Startobjekt — auch wenn gar kein Pointer unten ist. `#restoreCursorUnlessMouseDown()` kopiert die Map-Werte ebenfalls per `Array.from(...).some(...)`; es läuft über Zeile 573–575 bei jedem `pointermove` einer Maus ohne gedrückten Pan-Button, also bei jeder Hover-Bewegung über die gesamte Seite. Wirkung: dauernder kleiner GC-Druck im rAF- und Input-Pfad.",
+      "evidence": "`let {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));`",
+      "recommendation": "Mit `for (const state of this.#pointersDown.values())` direkt in zwei lokale Zahlen summieren und die States dabei nullen; für den Maus-Check eine Schleife mit frühem `return` verwenden bzw. einen Zähler gedrückter Maus-Pointer führen. Bei leerer Map `update()` den Pointer-Zweig ganz überspringen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-019",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Pipeline im Modus C nur beim Wechsel von Pipeline oder RenderTarget neu aufbauen",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:549",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:871",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:877",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:900",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:757"
+      ],
+      "description": "Im Modus C (Pipeline ohne `buildOutputNode`) hängt der Ausgabeknoten von keiner Stage ab — er ist immer `texture(#internalRT.texture)`. Trotzdem setzt jedes `add()`, `remove()`, jeder Kamerawechsel einer Stage, jede Umbenennung unter explizitem `renderOrder` und jede Änderung von `renderOrder` `#outputDirty`, und der nächste Frame baut einen neuen `texture()`-Knoten und setzt `pipeline.needsUpdate = true`. Das stößt einen neuen Node-Build des Fullscreen-Quads an. Bei Szenenwechseln, die Stages zur Laufzeit hinzufügen oder entfernen, oder bei häufig getauschten Kameras entsteht so ein vermeidbarer Hitch.",
+      "evidence": "`if (this.#outputDirty) { this.pipeline!.outputNode = texture(rt.texture); this.pipeline!.needsUpdate = true; … }`",
+      "recommendation": "Im Modus C den gebauten Knoten zusammen mit der Pipeline und dem RenderTarget merken und nur neu bauen, wenn sich eines davon geändert hat; `#outputDirty` bleibt dem komponierten Modus vorbehalten.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "MEM-002",
+      "category": "resources",
+      "domain": "code",
+      "severity": "low",
+      "title": "Interne RenderTargets beim Verlassen ihres Modus freigeben",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:399",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:437",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:894",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:736"
+      ],
+      "description": "`#internalRT` (Modus C) und `#asPassNodeRT` (Kind in einem komponierenden Parent) werden lazy in voller Containergröße × Pixel Ratio gebaut und erst in `dispose()` freigegeben. Setzt der Aufrufer `pipeline = undefined` oder `buildOutputNode`, bleibt `#internalRT` ungenutzt allokiert und wird bei jedem `resize()` sogar weiter mitskaliert (Zeile 320–321). Ebenso behält ein per `remove()` aus dem Parent genommenes Kind sein `#asPassNodeRT`. Bei 4K und DPR 2 sind das je RenderTarget rund 130 MB Farbe plus Depth auf der GPU.",
+      "evidence": "`if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);` — auch ohne Pipeline",
+      "recommendation": "Im `pipeline`- und `buildOutputNode`-Setter das `#internalRT` disposen, wenn der neue Zustand nicht mehr Modus C ist; in `#removeFromParent()` das `#asPassNodeRT` freigeben. Beide werden beim nächsten Bedarf wieder lazy gebaut.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "ASYNC-002",
+      "category": "async",
+      "domain": "code",
+      "severity": "low",
+      "title": "Stage-Liste in `updateFrame()` und `renderTo()` über einen Schnappschuss iterieren",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:762",
+      "component": "stage",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:372",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:896"
+      ],
+      "description": "Mit dem Default `renderOrder = '*'` gibt `orderedStages` das interne, veränderliche `this.stages`-Array selbst zurück (Zeile 762–764). Ruft ein `OnStageUpdateFrame`-Listener während `updateFrame()` `renderer.remove(stage)` auf — etwa eine Stage, die sich nach einer Überblendung selbst entfernt —, spliced `remove()` das Array mitten in der `for…of`-Schleife, und die nachfolgende Stage bekommt in diesem Frame kein `updateFrame()`, wird aber gerendert. Mit explizitem `renderOrder` iteriert die Schleife dagegen das alte Cache-Array, und die entfernte Stage bekommt ihr `updateFrame()` noch. Das Verhalten beim Reentrancy-Fall hängt so vom Sortiermodus ab; außerdem kann jeder Aufrufer über den öffentlichen Getter die interne Liste verändern.",
+      "evidence": "`if (renderOrder.length === 0 || (renderOrder.length === 1 && renderOrder[0] === '*')) { return this.stages; }`",
+      "recommendation": "Im `'*'`-Fall ebenfalls ein gecachtes Array (`this.stages.slice()`, bei `add`/`remove` invalidiert) liefern, sodass beide Modi während eines Frames einen stabilen Schnappschuss iterieren; die Reentrancy-Regel (Änderungen wirken ab dem nächsten Frame) in der JSDoc festhalten.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-013",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Interne RenderTargets mit HalfFloat und den Samples des Renderers anlegen",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:666",
+      "component": "stage",
+      "description": "`#ensureRT()` baut `#internalRT` und `#asPassNodeRT` als `new RenderTarget(w, h)` mit den three.js-Defaults: `UnsignedByteType`, `samples = 0`. Die `pass()`-Knoten der Stages im komponierten Modus nutzen dagegen `HalfFloatType` und `renderer.samples` (three PassNode.js:246, :766). Wer von Modus D auf Modus C oder auf einen verschachtelten Renderer wechselt, bekommt dadurch ein lineares 8-Bit-Zwischenbild mit sichtbarem Banding in dunklen Verläufen und verliert das MSAA, das der Plain-Modus auf dem Canvas hatte.",
+      "evidence": "`return new RenderTarget(w, h);`",
+      "recommendation": "`new RenderTarget(w, h, {type: HalfFloatType, samples: renderer.samples})` verwenden (oder die Optionen konfigurierbar machen) und bei einem geänderten `renderer.samples` in `#ensureRT()` nachziehen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "IMPL-002",
+      "category": "completeness",
+      "domain": "code",
+      "severity": "low",
+      "title": "`Canvas2DStage.render()` den Frame-Tick an seine Stage weitergeben lassen",
+      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:173",
+      "component": "stage",
+      "description": "`render()` emittiert `render`, aktualisiert die Textur und ruft `stageRenderer.renderTo()` — aber nie `stageRenderer.updateFrame()`. Die `Stage2D` hinter `canvas2DStage.stage` bekommt dadurch kein `updateFrame()`: `OnStageFirstFrame` und `OnStageUpdateFrame` feuern nie, und die Warnung nach 100 Frames ohne Kamera (Stage2D.ts:262–269) greift nicht. Ruft der Aufrufer nie `setContainerSize()` — die Lookbook-Demo `QuadTreeVisualization` tut das nicht —, hat die Stage keine Kamera und `render()` zeichnet stumm nichts.",
+      "evidence": "`this.dispatchEvent('render');\\nthis.updateTexture();\\nthis.stageRenderer.renderTo(this.renderer);`",
+      "recommendation": "`render()` um die Frame-Parameter (`now`, `deltaTime`, `frameNo`) erweitern oder einen eigenen Zähler führen und vor `renderTo()` `this.stageRenderer.updateFrame(…)` aufrufen; in der JSDoc festhalten, dass ohne `setContainerSize()` keine Kamera entsteht.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-014",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Seed-Defaults von `TextureFactory` mit übergebenen `defaultOptions` zusammenführen",
+      "location": "packages/twopoint5d/src/texture/TextureFactory.ts:187",
+      "component": "texture",
+      "description": "Ohne `defaultOptions` startet die Factory von `{anisotropy: 0, flipY: false}`. Wer `defaultOptions` übergibt — etwa nur `{colorSpace: SRGBColorSpace}` —, ersetzt diesen Seed vollständig: `flipY` wird dann nie gesetzt, und `update()` lässt den three.js-Default `Texture#flipY = true` stehen. Dieselbe Klassenliste liefert so je nach Vorhandensein eines unbeteiligten Options-Objekts gespiegelte oder ungespiegelte Texturen. Im Repo übergibt derzeit niemand `defaultOptions`, die öffentliche Signatur lädt aber dazu ein.",
+      "evidence": "`const seedOptions: Partial\u003cTextureOptions> = defaultOptions ?? {anisotropy: 0, flipY: false};`",
+      "recommendation": "`{anisotropy: 0, flipY: false, ...defaultOptions}` als Seed verwenden oder das Ersetzungsverhalten im TSDoc der Konstruktorparameter ausdrücklich dokumentieren.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-26"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "BUG-015",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "`TileSet#options` beim Konstruieren kopieren statt per Referenz halten",
+      "location": "packages/twopoint5d/src/texture/TileSet.ts:93",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/TileSet.ts:115",
+        "packages/twopoint5d/src/texture/TileSet.ts:153"
+      ],
+      "description": "`TileSet` speichert das übergebene Options-Objekt unverändert und liest `firstId`, `tileWidth`, `margin` usw. bei jedem Zugriff live daraus; das Layout der Frames entsteht aber einmalig im Konstruktor, wo auch die Validierung läuft. Über `TextureStore#parse()` → `TextureResource.fromTileSet()` ist dieses Objekt das `tileSet`-Objekt des Katalogs selbst. Mutiert der Aufrufer es danach (z. B. `firstId`), verschiebt `frameId()` sofort die Zuordnung tileId → frameId ohne Neulayout und ohne Prüfung; ein `firstId` als String würde in Zeile 153 konkateniert. Ein erneutes Setzen desselben Objekts erkennt `cmpShallow` als unverändert (`a === b`), der TileSet wird nicht neu gebaut.",
+      "evidence": "`this.options = options ?? {};` · `get firstId(): number { return this.options.firstId ?? 1; }`",
+      "recommendation": "Im Konstruktor `this.options = Object.freeze({...options})` ablegen (und im `TextureResource`-Setter ebenso kopieren), sodass Layout, Validierung und Getter auf demselben Stand bleiben.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-26"
+      },
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-020",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Zufallsnamen in `TextureAtlas#randomFrameName()` ohne linearen Map-Durchlauf ziehen",
+      "location": "packages/twopoint5d/src/texture/TextureAtlas.ts:89",
+      "component": "texture",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/src/texture/TextureAtlas.ts:121"
+      ],
+      "description": "`randomFrameName()` iteriert pro Aufruf über die Keys der `#frameNames`-Map bis zum Zufallsindex, also O(n) je Name; `randomFrameNames(count)` ruft das `count`-mal auf und wird O(n·count). Beim Spawnen vieler Sprites mit zufälligem Frame-Namen aus einem großen Atlas (z. B. 10 000 Sprites × 1 000 Namen = 10⁷ Iterator-Schritte) landet das in einem einzigen Frame. `randomFrameId()`/`randomFrame()` sind dagegen O(1).",
+      "evidence": "`for (const name of this.#frameNames.keys()) { if (idx === randomIdx) { return name; } ++idx; }`",
+      "recommendation": "Die Namen zusätzlich in einem Array in Einfügereihenfolge halten (in `add()` pflegen) und per Index ziehen; `frameNames()` ohne Argument kann dasselbe Array kopieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "TYPE-002",
+      "category": "types",
+      "domain": "harness",
+      "severity": "low",
+      "title": "`TextureAtlasFrameData` als `Record\u003cstring, unknown>` oder als TexturePacker-Typ deklarieren",
+      "location": "packages/twopoint5d/src/texture/TextureAtlas.ts:3",
+      "component": "texture",
+      "locations": [
+        "packages/twopoint5d/src/texture/frameTrimMargins.ts:29"
+      ],
+      "description": "Das öffentliche `TextureAtlasFrameData = Record\u003cstring, any>` macht `frame.data` zu einem ungeprüften `any`-Beutel: `frame.data.spriteSourceSize.w` kompiliert ohne Null-Check. `frameTrimMargins()` fängt das nur ab, weil es die Werte händisch nach `unknown` zieht; jeder andere Konsument (etwa App-Code, der Pivot oder `sourceSize` liest) bekommt keine Hilfe vom Compiler. `TexturePackerJson.parse()` legt dort stets ein `TexturePackerFrameData` ab.",
+      "evidence": "`export type TextureAtlasFrameData = Record\u003cstring, any>;`",
+      "recommendation": "Auf `Record\u003cstring, unknown>` umstellen (oder generisch `TextureAtlas\u003cD = TexturePackerFrameData | undefined>`) und die Stellen, die heute implizit auf `any` bauen, explizit narrowen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "TYPE-003",
+      "category": "types",
+      "domain": "harness",
+      "severity": "low",
+      "title": "`no-explicit-any` und `no-non-null-assertion` für den Library-Code wieder einschalten",
+      "location": "eslint.config.mjs:37",
+      "locations": [
+        "eslint.config.mjs:38"
+      ],
+      "description": "Der `.ts`/`.astro`-Block von `eslint.config.mjs` setzt `@typescript-eslint/no-explicit-any` und `@typescript-eslint/no-non-null-assertion` auf 0, für die ganze Bibliothek unter `packages/twopoint5d/src`, nicht nur für Demos und Tests. Der Produktcode trägt heute nur 8 explizite `any`; ein neues fällt aber keinem Gate mehr auf, auch nicht in der öffentlichen API, deren Typqualität `checkNameableTypes.mjs` sonst eigens absichert. Die Non-Null-Assertions sind in den generierten Accessoren von `vertex-objects` bewusst gesetzt, dort bräuchte es einen gezielten Disable.",
+      "recommendation": "Die beiden Regeln zumindest für `packages/*/src/**` wieder aktivieren, oder falls die Deaktivierung bewusst ist, den Grund als Kommentar neben der Regel festhalten, damit ein `any` in der öffentlichen API nicht mehr unbemerkt durchrutscht.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "DOC-073",
+      "category": "dx",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Konkreten `parseArgs`-Fehler in `nxCacheServer.mjs` ausgeben statt verschlucken",
+      "location": "scripts/ci/nxCacheServer.mjs:9",
+      "locations": [
+        "scripts/ci/nxCacheServer.mjs:13"
+      ],
+      "description": "Wirft `parseArgs` (z. B. bei einer unbekannten Option), fängt der leere `catch` sie ab und setzt nur `values = {}`; das Script zeigt danach ausschließlich die generische `USAGE`-Zeile, nie die eigentliche Fehlermeldung von `parseArgs`. Wer das Script mit einem Tippfehler in einer Option aufruft, sieht nicht, welche Option gemeint war.",
+      "recommendation": "Die gefangene Fehlermeldung mit ausgeben (z. B. `console.error(err.message)` vor der `USAGE`-Zeile), statt sie stillschweigend zu verwerfen.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "CFG-001",
+      "category": "build",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Wirkungslosen `{files: [...]}`-Block in eslint.config.mjs entfernen oder korrigieren",
+      "location": "eslint.config.mjs:14",
+      "description": "Der Eintrag `{files: ['**/*.{js,ts}']}` ganz ohne `rules`/`languageOptions` unmittelbar vor `pluginJs.configs.recommended` und `...tseslint.configs.recommended` sieht aus, als solle er die beiden folgenden Configs auf `.js`/`.ts`-Dateien eingrenzen. In ESLint Flat Config gilt `files` aber nur für das eigene Config-Objekt, nie für nachfolgende Einträge im Array — der Block hat keinerlei Wirkung. `pluginJs.configs.recommended` und `tseslint.configs.recommended` greifen unverändert nach ihren eigenen, unbeeinflussten Regeln.",
+      "recommendation": "Den wirkungslosen Block entfernen, oder falls die Eingrenzung wirklich gewollt ist, `pluginJs.configs.recommended`/`tseslint.configs.recommended` selbst mit einem `files`-Feld versehen (z. B. per Objekt-Spread).",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "CFG-002",
+      "category": "build",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Hartkodierte Compiler-Options von checkNameableTypes.mjs an das gemeinsame tsconfig.json angleichen",
+      "location": "scripts/checkNameableTypes.mjs:26",
+      "description": "`checkNameableTypes.mjs` baut sein eigenes Options-Objekt (`target: ESNext, module/moduleResolution: NodeNext, skipLibCheck, strict: true`) von Hand, während das Schwester-Script `scripts/checkDocSnippets/compileSnippets.mjs:69` dieselben Einstellungen aus dem echten `tsconfig.json` der Repo-Wurzel liest. Zwei unabhängige Quellen für dieselbe Art von Konfiguration in derselben Script-Familie können auseinanderlaufen, ohne dass etwas das bemerkt.",
+      "recommendation": "`checkNameableTypes.mjs` seine Compiler-Options ebenfalls aus `tsconfig.json` lesen lassen (ggf. mit denselben Overrides wie `compileSnippets.mjs`), statt sie zu duplizieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "SEC-001",
+      "category": "security",
+      "domain": "code",
+      "severity": "low",
+      "title": "Bearer-Token-Vergleich des Nx-Cache-Servers gegen Timing-Angriffe absichern",
+      "location": "scripts/ci/nxCacheServer/createCacheServer.mjs:32",
+      "description": "`req.headers.authorization !== expectedAuthorization` vergleicht das Token mit einem gewöhnlichen String-Vergleich, der bei einem Unterschied früh abbricht und damit ein Timing-Seitenkanal ist. Die Angriffsfläche ist durch `server.listen(port, '127.0.0.1', ...)` auf localhost begrenzt, ein Angreifer bräuchte also ohnehin schon Zugriff auf den CI-Runner-Prozess.",
+      "recommendation": "`crypto.timingSafeEqual` auf gleich lange, z. B. mit SHA-256 vorab gehashte Puffer anwenden, statt des direkten String-Vergleichs — günstige Absicherung ohne Funktionsänderung.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace"
+    },
+    {
+      "id": "PERF-033",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "syncArrays() nur bei getauschtem Pool-Array arbeiten lassen",
+      "location": "packages/twopoint5d/src/vertex-objects/GeometryAttributeSlots.ts:153",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:35",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:191"
+      ],
+      "description": "syncArrays() überspringt ein Attribut nur, wenn bufAttr.version seit dem letzten Aufruf gleich geblieben ist. Die Version steigt aber mit jedem needsUpdate = true (three 0.185.1, BufferAttribute.js:157 und InterleavedBuffer.js:103), und genau das setzt die Bibliothek selbst in jedem Frame: für jeden autoTouch-Buffer in markForUpload() und für jeden Buffer mit Schreibzugriff in syncUploads(). Für alle dynamischen Attribute läuft deshalb jeden Frame der volle Pfad: poolOf(), inklusive der expectDefined()-Meldung, die als Template-Literal eager gebaut wird (String-Allokation); danach zwei weitere Map-Lookups und die Neuzuweisung von bufAttr.array. Bei interleaved Buffern wiederholt sich das für jedes Attribut desselben Buffers. Aufrufpfad: VertexObjects.update() → VOBufferGeometry/InstancedVOBufferGeometry.update() → GeometryAttributeSlots.syncArrays(). Eigentlich soll syncArrays() nur auf ein im Pool getauschtes Array reagieren (fromBuffersData() → setTypedArray()); dieses Signal ist mit der Upload-Version vermischt. Der günstige Aufruf, den der Klassenkommentar (Z. 44–46) verspricht, kommt für dynamische Slots nie zustande.",
+      "evidence": "`const version = bufAttr.version; if (this.#serials.get(attrName) === version) continue;`",
+      "recommendation": "Den Array-Tausch direkt erkennen, etwa nach dem Lookup mit `if (bufAttr.array === poolBuf.typedArray) continue;`. Alternativ im AttributeBuffer eine eigene Array-Generation führen, die nur setTypedArray() erhöht, und syncArrays() darauf vergleichen lassen statt auf bufAttr.version. Pro Buffer statt pro Attribut synchronisieren.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-022",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "expectDefined-Meldungen in Schleifen und im Frame-Pfad nicht eager bauen",
+      "location": "packages/twopoint5d/src/vertex-objects/createIndicesArray.ts:17",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/GeometryAttributeSlots.ts:98"
+      ],
+      "description": "createIndicesArray() ruft für jedes einzelne Element expectDefined(indices[j], `index ${j}`) auf. Das Template-Literal wird bei jedem Aufruf gebaut, auch wenn der Wert vorhanden ist, obwohl j \u003c itemCount ihn ohnehin garantiert. Ein Pool mit capacity 100 000 Quads und 6 Indizes kostet damit beim Bau der Geometrie 600 000 String-Allokationen (VOBufferGeometry-/InstancedVOBufferGeometry-Konstruktor → initializeRoute() → createIndicesArray()).",
+      "evidence": "`arr[i * itemCount + j] = expectDefined(indices[j], `index ${j}`) + i * stride;`",
+      "recommendation": "Die Assertion einmal vor der Schleife machen oder die Indizes vorab in ein lokales Uint32Array kopieren. expectDefined eine Variante mit lazy Meldung geben (`expectDefined(v, () => …)`) und sie in Schleifen und im Frame-Pfad verwenden.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-023",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Generierte Accessoren ohne string-keyed Map-Lookup pro Wert auflösen",
+      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:12",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:23",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:43",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:94",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:119"
+      ],
+      "description": "Jeder generierte Getter und Setter, auch jede einzelne Komponente wie x0 oder y0, löst pro Zugriff `this[voBuffer]!.buffers.get(bufferName)!` auf. Das ist ein Aufruf des Getters VertexObjectBuffer#buffers (mit Brand-Check des Private Fields) plus ein string-keyed Map.get, bevor der eigentliche Typed-Array-Zugriff kommt. Es ist der häufigste Vorgang der Bibliothek; der Code-Kommentar sagt selbst »these accessors run per sprite and per frame«. Aufrufpfad: Anwendungscode im requestAnimationFrame, etwa sprite.x = … oder sprite.setInstancePosition(…) auf TexturedSprite/AnimatedSprite, sowie TileSpritesFactory.updateTile() → setInstancePosition(). Micro-Benchmark (Node/V8, 10 000 VOs, drei Setter je VO, monomorph): 11,6 ns/VO mit Map-Lookup gegenüber 3,4 ns/VO, wenn der Buffer über einen numerischen Index aus einem Array kommt; mit getrennten Callsites 18,6 gegenüber 13,8 ns. In absoluten Zahlen sind das etwa 0,05–0,08 ms pro Frame und 10 000 Sprites.",
+      "evidence": "`const buf = this[voBuffer]!.buffers.get(bufferName)!;`",
+      "recommendation": "VertexObjectBuffer führt die AttributeBuffer-Records zusätzlich als Array in fester Reihenfolge ab dem Konstruktor. createVertexObjectPrototype() gibt den Accessoren den numerischen Index statt des Namens mit: `this[voBuffer]!.bufferList[k]!.typedArray![idx]`. Die Records bleiben über setTypedArray() dieselben Objekte, ein Array-Tausch bleibt also sichtbar; resize() baut einen neuen Buffer mit identischem Layout und damit identischen Indizes.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-034",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Megamorphe Inline-Caches der geteilten Accessor-Fabriken messen und bei Bedarf pro Descriptor erzeugen",
+      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:6",
+      "component": "vertex-objects",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:17",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:80",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:99"
+      ],
+      "description": "Alle Accessoren aller Descriptoren stammen aus denselben vier Fabrik-Funktionen. V8 teilt den Feedback-Vektor zwischen Closures desselben Funktionsliterals. Die Inline-Caches für `this[voBuffer]`, `.buffers` und `typedArray[idx]` sehen damit die VO-Maps aller Descriptoren der Anwendung (eine Map je Prototyp) und alle Typed-Array-Element-Kinds; ab fünf VO-Typen werden sie megamorph. Die Bibliothek bringt selbst schon TexturedSprite, AnimatedSprite, TileSprite und die zugehörigen Basis-Descriptoren mit. Micro-Benchmark (Node/V8, 10 000 VOs je Descriptor, getrennte Callsites je Descriptor im Aufrufer): 44,6 ns/VO bei sechs Descriptoren gegenüber 18,6 ns/VO bei einem, also ×2,4. In absoluten Zahlen sind das etwa 0,25 ms mehr pro Frame und 10 000 Sprites.",
+      "recommendation": "Zuerst in einer realen Szene mit mehreren Sprite-Typen im DevTools-Profil prüfen. Bestätigt sich der Effekt, die Accessoren pro Descriptor als eigene Funktionsliterale erzeugen, etwa per Codegenerierung mit `new Function`, wegen CSP (`unsafe-eval`) als Opt-in. Mindestens aber den numerischen Buffer-Index aus der Empfehlung zu den Map-Lookups nutzen, der den Map-Load aus dem polymorphen Pfad nimmt.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-025",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "VO-Wrapper in createVO() ohne Property-Deskriptoren anlegen",
+      "location": "packages/twopoint5d/src/vertex-objects/createVertexObject.ts:18",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:215"
+      ],
+      "description": "createVertexObject() baut jedes VO mit `Object.create(proto, {[voBuffer]: {…}, [voIndex]: {…}})`. Das sind pro Aufruf drei Deskriptor-Objekte, dazu der langsame DefineProperties-Pfad statt einer Inline-Allokation. freeVO() verwirft das VO-Objekt (clearBuffer), der nächste createVO() baut ein neues; wiederverwendet wird nur der Slot im Typed Array. Aufrufpfad im Frame: TileSpritesFactory.createTile() → instancedPool.createVO() beim Scrollen der Karte, sowie jede Spawn-Logik im Anwendungscode. Micro-Benchmark (Node/V8): 330 ns je VO mit Deskriptoren gegenüber 9 ns mit Object.create(proto) plus zwei Zuweisungen. 1 000 Spawns pro Frame kosten damit etwa 0,33 ms statt 0,01 ms.",
+      "evidence": "`Object.create(descriptor.voPrototype, { [voBuffer]: {value: buffer, writable: true}, [voIndex]: {value: objectIndex, writable: true} })`",
+      "recommendation": "Auf `const vo = Object.create(proto); vo[voBuffer] = buffer; vo[voIndex] = idx;` umstellen. Symbol-Properties tauchen in for…in und Object.keys ohnehin nicht auf; vorher aber prüfen, ob Tests VOs per toEqual vergleichen, denn dort zählen aufzählbare Symbole mit. Wer die Nicht-Aufzählbarkeit braucht, bekommt sie über eine pro Descriptor erzeugte Klasse, deren Konstruktor die beiden Felder setzt. Optional eine Freiliste freigegebener VO-Objekte im Pool führen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-026",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Allokationen pro update() im Upload-Pfad abbauen",
+      "location": "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:163",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:200",
+        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:271",
+        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:278",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:207"
+      ],
+      "description": "Jedes update() einer Geometrie läuft über `for (const route of this)` in syncUploads() und in autoTouch(). Jeder dieser Durchläufe legt ein Generator-Objekt an, dazu den Array- und den Map-Iterator aus den beiden yield*. pickUpDirtyRange() gibt für jeden Buffer mit Schreibzugriff ein neues {from, to} zurück; syncUploads() baut für jeden autoTouch-/touch()-Buffer zusätzlich `{from: 0, to: usedCount - 1}`. `#fullUploads.clear()` ersetzt in V8 den Backing-Store des Sets. Einzeln ist das wenig, pro Geometrie und Frame kommen aber rund 6–10 kurzlebige Objekte zusammen, in Szenen mit vielen Layern entsprechend mehr für den Minor GC. Aufrufpfad: VertexObjects.update() → geometry.update() → GeometryRoutes.autoTouch()/syncUploads().",
+      "evidence": "`*[Symbol.iterator](): IterableIterator\u003cGeometryRoute> { yield* this.#routes; yield* this.#attached.values(); }`",
+      "recommendation": "Die Routen intern in einem flachen Array halten; die benannten Routen werden bei attach()/detach() dort mit eingetragen oder ausgetragen. Im Hot Path mit einem Index-Loop iterieren und den Generator nur als öffentliche Iteration stehen lassen. pickUpDirtyRange() schreibt from/to in ein wiederverwendetes Ergebnisobjekt (Out-Parameter). Statt des Sets reicht ein Flag pro Route-Buffer oder ein wiederverwendetes Array, das mit length = 0 geleert wird.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-027",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Leere Upload-Range nicht als addUpdateRange(start, 0) an three geben",
+      "location": "packages/twopoint5d/src/vertex-objects/setUploadRange.ts:36",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:278",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:190"
+      ],
+      "description": "Liegt ein Schreibzugriff komplett oberhalb von usedCount, antwortet pickUpDirtyRange() mit {from: 0, to: -1}. Das passiert etwa, wenn in einem Frame freeVO() mitten im Pool markiert und danach so viele VOs freigegeben werden, dass usedCount unter den markierten Slot fällt; ebenso, wenn alle Sprites freigegeben werden oder touch() bei usedCount 0 läuft. syncUploads() setzt trotzdem needsUpdate, setUploadRange() hinterlegt eine Range mit count 0. Im WebGL-Fallback von three 0.185.1 wird daraus `gl.bufferSubData(type, start * BPE, array, start, 0)` (WebGLAttributeUtils.js:216). Nach WebGL2-Spezifikation bedeutet length 0 »bis zum Ende von srcData«, es wird also das ganze Array über die volle Kapazität hochgeladen, obwohl die Bibliothek »nichts zu tragen« meint. Im WebGPU-Backend entsteht ein leerer writeBuffer-Aufruf.",
+      "evidence": "`bufAttr.clearUpdateRanges(); bufAttr.addUpdateRange(start, count);` mit count === 0",
+      "recommendation": "In syncUploads() bei einer leeren Range (from > to und nichts offen auf dem Attribut) nur die Serial übernehmen und weder needsUpdate setzen noch eine Range hinterlegen. setUploadRange() ruft addUpdateRange() nie mit count 0 auf. Mit einem Test absichern, der nach dem Freigeben aller VOs prüft, dass kein Attribut eine Range mit count 0 trägt.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-028",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "touch() im Frame ohne Zwischenarrays und mit gecachter Auswahl auflösen",
+      "location": "packages/twopoint5d/src/vertex-objects/InstancedVOBufferGeometry.ts:499",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/VOBufferGeometry.ts:129",
+        "packages/twopoint5d/src/vertex-objects/parseTouchArgs.ts:30",
+        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:227",
+        "packages/twopoint5d/src/vertex-objects/selectAttributes.ts:9"
+      ],
+      "description": "Für Attribute mit autoTouch: false empfiehlt types.ts:67 geometry.touch('attr') nach jedem Schreiben, also im Frame. Ein solcher Aufruf legt an: das Rest-Array, in parseTouchArgs() ein Ergebnisobjekt plus attrNames-Array (bei geroutetem Aufruf zusätzlich Spread-Objekte), mit touchAttributes(...attrNames) ein zweites Rest-Array, in #select() ein Array plus push(...spread) je Route und in selectAttributes() ein Set plus ein Array. Anders als die autoTouch-Auswahl (#getAutoTouchBuffers) wird diese Auswahl bei jedem Aufruf neu aufgelöst. Das sind etwa 8–10 Allokationen pro touch().",
+      "evidence": "`selected.push(...selectAttributes(route.pool, route.buffers, attrNames));`",
+      "recommendation": "Intern Arrays statt Rest/Spread durchreichen, in Schleifen einzeln pushen und die aufgelöste Auswahl pro Attributnamen-Schlüssel in einer Map cachen, die #dropAutoTouchSelection() mit verwirft.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-029",
+      "category": "performance",
+      "domain": "code",
+      "severity": "low",
+      "title": "Buffer-Stride auf 4 Byte ausrichten, damit three nicht bei jedem Upload neu padded",
+      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:178",
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/initializeAttributes.ts:69"
+      ],
+      "description": "Die itemSize eines Buffers ist die Summe der Attributgrößen, ohne Ausrichtung. Ein nicht-interleavter Buffer mit einem Datentyp unter 32 Bit und einer Stride, die kein Vielfaches von 4 Byte ist (etwa uint8, uint16 oder float16 mit size 3), wird vom WebGPU-Backend von three 0.185.1 gepolstert (WebGPUAttributeUtils.js:117–125). Bei jedem Update allokiert three dafür ein neues Array in voller Länge und kopiert alle Vertices um (WebGPUAttributeUtils.js:202–212), unabhängig von den updateRanges; mit autoTouch passiert das jeden Frame. Die Descriptoren der Bibliothek selbst nutzen solche Typen nicht, die öffentliche API (`type: 'uint8'` usw.) lässt sie aber zu.",
+      "recommendation": "Im Layout von VertexObjectBuffer die itemSize eines Buffers auf ein Vielfaches von 4 Byte aufrunden (Padding-Elemente am Ende der Vertex-Stride). Alternativ lehnt VertexObjectDescriptor solche Layouts mit einer klaren Meldung ab. Mindestens gehört es in die Doku von `type` in types.ts.",
+      "effort": "M",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d"
+    },
+    {
+      "id": "PERF-030",
+      "category": "performance",
+      "domain": "code",
+      "severity": "info",
+      "title": "Tile-Boxen in `CameraBasedVisibility` mit einer kombinierten Matrix transformieren und Debug-Daten nur bei Bedarf rechnen",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:685",
+      "component": "map2d",
+      "kind": "improvement",
+      "locations": [
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:695",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:705",
+        "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:610"
+      ],
+      "description": "Pro geprüftem Tile wird die Frustum-Box zweimal mit `Box3.applyMatrix4` transformiert (erst `#tileBoxMatrix`, dann `matrixWorld`, je 8 Ecken), pro akzeptiertem Tile zusätzlich `centerWorld` zweimal und `tile.box` einmal — etwa 26 Matrix-Vektor-Produkte je Tile und Frame mit bewegter Kamera. `#tileBoxMatrix` ist eine reine Translation, das Produkt `matrixWorld · tileBoxMatrix` ergibt dieselbe AABB mit halber Arbeit. `tile.box` liest nur `CameraBasedVisibilityHelpers`, trotzdem wird es in jedem Frame für jedes Tile gerechnet; ebenso Distanz und `visibles.sort()`, deren Reihenfolge der Streamer nicht nutzt.",
+      "recommendation": "Einmal pro Neuberechnung `#tileWorldMatrix = matrixWorld × tileBoxMatrix` bilden und damit Frustum-Box und Mittelpunkt transformieren; `tile.box` lazy berechnen oder nur, wenn Helfer angemeldet sind; prüfen, ob die Distanzsortierung Teil des Vertrags bleiben muss.",
+      "effort": "S",
+      "status": "new",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -531,7 +1822,7 @@
       "description": "`RenderPipeline.render()` wendet in three 0.185 bei `outputColorTransform === true` (Default) Tone-Mapping und die Kodierung nach `outputColorSpace` an, unabhängig vom Target. Die Kind-Pipeline schreibt so sRGB-kodierte Werte in ihr lineares Pass-RT. Der Parent sampelt sie als linear und kodiert erneut. Im dokumentierten Mode E wirkt das Kind-Bild dadurch ausgewaschen oder doppelt tone-mapped. Das ist aus dem three-Quelltext abgeleitet und nicht per Pixel-Test verifiziert.",
       "recommendation": "Beim Vorrendern eines Kindes `pipeline.outputColorTransform = false` setzen und danach zurücksetzen. Das Verhalten für `outputRenderTarget` in der TSDoc festhalten und einen Pixel-Test für Mode E ergänzen.",
       "effort": "M",
-      "status": "new",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -550,22 +1841,7 @@
       "description": "`root.add(child)` setzt bei einem Kind-Renderer weder `parent` noch `OnAddToParent`. Ein späteres `child.attach(display)` lässt ihn doppelt treiben, vom Display und vom Root. `child.dispose()` lässt ihn in der Liste des Parents stehen, und der komponierende Parent wirft ab dem nächsten Frame jedes Mal. `StageRenderer.dispose()` emittiert kein `dispose`-Event, obwohl resource-lifecycle.md §4/§6.3 das für abonnierte Objekte verlangt. Für `Stage2D` ist dieselbe Falle nur als Pitfall dokumentiert.",
       "recommendation": "In `add()` bei einem `StageRenderer` den `parent` setzen, auf `dispose` der Stage hören und sie dann per `remove()` austragen. `StageRenderer.dispose()` emittiert vor `off(this)` ein `dispose`-Event.",
       "effort": "M",
-      "status": "unchanged",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-115",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "ProjectionPlane.getForward() als Richtung statt als Punkt berechnen",
-      "location": "packages/twopoint5d/src/stage/ProjectionPlane.ts:69-81",
-      "description": "`getForward()` negiert `getPointByDistance(1)`, also `(constant − 1)·normal`. Bei `constant > 1` zeigt die Richtung gegen die Normale, `getRight()` kippt, und `getPoint(x, y)` spiegelt x. Bei `constant === 1` ist `forward` der Nullvektor, x fällt weg. Die Klasse ist öffentlich und nimmt ausdrücklich eigene `THREE.Plane`s an. Specs mit Offset-Ebenen testen nur den Ursprung.",
-      "evidence": "`getForward(target) { return this.getPointByDistance(1, target).negate(); }`",
-      "recommendation": "`this.plane.normal.clone().negate()` (bzw. in `target`) zurückgeben und Specs für `getRight`/`getPoint` bei `constant = 3` ergänzen.",
-      "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -580,7 +1856,7 @@
       "description": "Jedes `needsUpdate` erzeugt über `TextureFactory.create()` eine neue `Texture` samt GPU-Allokation, setzt `material.needsUpdate` und disposed die alte. Bei einem animierten Canvas passiert das jeden Frame, das Lookbook setzt `needsUpdate` bei jeder Datenänderung.",
       "recommendation": "Die Textur einmal bauen und danach `texture.needsUpdate = true` setzen. Neu bauen nur bei geänderter Canvas-Größe.",
       "effort": "S",
-      "status": "unchanged",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -597,7 +1873,7 @@
       "description": "Eine von außen zugewiesene Textur landet nie in `sprite.material.map`. Sie wird nur beim nächsten Update oder in `dispose()` freigegeben, obwohl die TSDoc sie »the texture the canvas content is drawn from« nennt. `needsUpdate` startet mit false, deshalb bleibt ein schon bemalter, übergebener Canvas unsichtbar, bis der Aufrufer das Flag setzt.",
       "recommendation": "`texture` nur lesend exponieren oder im Setter aufs Material anwenden und `needsUpdate` initial auf true setzen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -617,7 +1893,7 @@
       "description": "Die übrigen Events der Library stehen als `On*`-Konstanten mit Interface in `events.ts`. `Stage2D` (`dispose`), `Canvas2DStage` (`resize`, `render`) und `PanControl2D` (`update`, `hideCursor`, `restoreCursor`) emittieren dagegen nackte Strings. Ein Tippfehler beim Abonnieren wird so kein Compilerfehler, und die Payloads sind nicht typisiert.",
       "recommendation": "Konstanten und Interfaces in `events.ts` ergänzen, für `PanControl2D` zusätzlich typisierte `on*()`-Helfer analog zu `Display`.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -634,7 +1910,7 @@
       "description": "`readonly stages: StageItem[]` schützt nur die Referenz. Ein `push` oder `splice` von außen umgeht Kamera-Subscription, Cache und Dirty-Flag. `renderOrderArray` gibt den internen Cache heraus. Die protected Hooks, etwa `onRenderOrderChanged` ohne TSDoc, haben im Repo keinen Nutzer, und `renderStage` greift nur im Plain-Modus und in Mode C.",
       "recommendation": "`stages` als `ReadonlyArray` typisieren, `renderOrderArray` kopiert herausgeben, die Hooks dokumentieren oder privat machen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -652,44 +1928,8 @@
       "description": "Nach `pipeline = undefined` oder einer Zuweisung von `buildOutputNode` belegt `#internalRT` weiter Speicher in voller Größe mal Pixel Ratio. Dasselbe gilt für `#asPassNodeRT` nach `remove()`. Ein Leak ist das nicht, weil `dispose()` beides freigibt, es kostet aber VRAM.",
       "recommendation": "`#internalRT` beim Verlassen von Mode C freigeben und `#asPassNodeRT` bei `OnRemoveFromParent`.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-121",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "high",
-      "title": "Gehaltene Pan-Tasten bei blur und visibilitychange loslassen",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:319-320",
-      "locations": [
-        "packages/twopoint5d/src/controls/PanControl2D.ts:583-595",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:365-372"
-      ],
-      "description": "Die Speed-Felder setzt allein ein `keyup` auf `document` zurück, einen `blur`- oder `visibilitychange`-Listener gibt es nicht. W halten und Alt-Tab, ein Klick in die DevTools oder Cmd+S auf macOS (der Browser liefert dort kein `keyup` für Tasten, die mit gehaltener Meta-Taste gedrückt wurden) lassen `speedNorth` auf `pixelsPerSecond` stehen. Der View scrollt dann endlos weiter, bis die Taste erneut gedrückt wird.",
-      "recommendation": "`blur` auf `window` und `visibilitychange` auf `document` über `addEventListener` der Basisklasse registrieren und dort `#releaseKeyedSpeeds()` aufrufen. Keydowns mit `metaKey`/`ctrlKey` ignorieren.",
-      "effort": "S",
-      "status": "new",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-122",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Pan-Input auf ein Ziel begrenzen und editierbare Felder auslassen",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:337-340",
-      "locations": [
-        "packages/twopoint5d/src/controls/PanControl2D.ts:424-444",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:583-588"
-      ],
-      "description": "Alle Listener hängen an `document`, und `#onPointerDown` prüft nur `isPrimary` und die Buttons. `coordsTarget` bestimmt nur die Koordinaten, nicht, wo Input angenommen wird. Wer einen HTML-Slider über dem Canvas zieht, pannt die Karte mit. Wer in ein `\u003cinput>` »wasd« tippt, bewegt den View. Zwei Displays mit je einem PanControl2D pannen gleichzeitig.",
-      "recommendation": "Eine Option für das Input-Target einführen (Default: bisheriges Verhalten) und Keydowns aus `input`, `textarea` und `isContentEditable` sowie mit `defaultPrevented` überspringen.",
-      "effort": "M",
-      "status": "new",
-      "component": "controls",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -703,7 +1943,7 @@
       "description": "Jedes `pointermove` ruft `getBoundingClientRect()` auf, standardmäßig auf `document.body`. Ist das DOM dirty, erzwingt das pro Move ein Layout, obwohl das Rechteck laut TSDoc während eines Drags konstant sein muss.",
       "recommendation": "Das Rechteck bei `pointerdown` pro Pointer cachen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "controls",
       "package": "@spearwolf/twopoint5d"
     },
@@ -720,7 +1960,7 @@
       "description": "Der Display-Anteil (start/stop-Race, Chronometer, Dispose während Init, Device-Pixel-Clamp bei dpr > 1) ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`), der Sprites-Anteil (Billboards an einem verschobenen Mesh, `texCoordsFromIndex` mit einer zweiten Zeile, die Frame-Index-Formel samt `animOffset`, Zeit über der Dauer, zweiter Animation und Dauer 0) im Lauf vom 2026-09-26 (`324ab4a1`). Offen bleiben die Pfade der Stage, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames; dazu kein Test für ein verlorenes `keyup`, und `PanControl2D` hat keine `*.spec.ts`.",
       "recommendation": "Für Mode E und das verschachtelte Plain-Kind je einen Browser-Test mit Pixel-Readback ergänzen; für das verlorene `keyup` genügt eine Vitest-Spec.",
       "effort": "M",
-      "status": "new",
+      "status": "carried-over",
       "package": "twopoint5d-testing"
     },
     {
@@ -736,7 +1976,7 @@
       "description": "`paths-ignore: '**.md'` lässt CI für jeden Push ausfallen, der nur Markdown ändert. Genau Markdown ist aber der Input von `twopoint5d-testing:typecheck`, das alle `ts check`-Blöcke kompiliert. Ein kaputter Doc-Snippet landet so ungeprüft auf main und fällt erst beim nächsten Code-Push auf, ohne erkennbaren Bezug zur Ursache.",
       "recommendation": "`paths-ignore` entfernen oder für reine Markdown-Pushes einen leichten Job mit Build und `twopoint5d-testing:typecheck` fahren.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -749,7 +1989,7 @@
       "description": "`referencedName` behandelt TypeReference, TypeQuery, ComputedPropertyName und ExpressionWithTypeArguments, aber keinen `ImportTypeNode`. Genau diese Form schreibt tsc in die `.d.ts`, wenn ein Typ aus einem internen Modul inferiert wird, also im typischen Fall eines nicht benennbaren Typs. Nachgestellt: `export declare const a: import(\"./internal.js\").Hidden;` ergibt »0 not nameable« und Exit 0. Aktuell ist die Lücke latent.",
       "recommendation": "In `referencedName` `ts.isImportTypeNode(node)` über `node.qualifier` auswerten und mit einer Fixture testen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -767,7 +2007,7 @@
       "description": "Der Job mit `id-token: write` führt `pnpm install` samt Workspace-`postinstall` und den Build-Skripten von esbuild, nx, sharp und @parcel/watcher aus und baut dann alles. Jede Dev-Dependency kann dabei über `ACTIONS_ID_TOKEN_REQUEST_*` ein npm-Publish-Token anfordern. Die Lookbook-Installation braucht der Publish gar nicht, und der Checkout läuft ohne `persist-credentials: false`.",
       "recommendation": "Build und Checks in einem Job ohne `id-token`, `dist/` als Artifact weitergeben, der Publish-Job lädt nur das Artifact und ruft `npm publish` auf. Mindestens `--filter @spearwolf/twopoint5d...` und `persist-credentials: false`.",
       "effort": "M",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -784,7 +2024,7 @@
       "description": "Die Doku nennt »WebGL or WebGPU«, `Display` weist einen `WebGLRenderer` aber ab. Sie spricht von `ShaderMaterial`, die Sprite-Materialien erben jedoch von `NodeMaterial`. Laut README hat display »no other dependency than the three.js package«, tatsächlich importiert es `@spearwolf/eventize` an sechs Stellen.",
       "recommendation": "Die drei Stellen korrigieren.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -801,7 +2041,7 @@
       "description": "AGENTS.md und die Architektur-Doku nennen alle vier Catalog-Einträge Peer Dependencies. Deklariert sind nur drei. Die publizierten `.d.ts` importieren `three`, TS-Konsumenten brauchen also `@types/three` in passender Version (~0.185) und erfahren das nirgends.",
       "recommendation": "`@types/three: catalog:` mit `peerDependenciesMeta.optional` deklarieren oder die Doku anpassen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -818,7 +2058,7 @@
       "description": "`importHelpers: true` lässt tsc `import … from \"tslib\"` emittieren, sobald ein Helper nötig wird, etwa für `using` oder Standard-Decorators bei ES2022. Nach der Peer-only-Policy kann tslib nie eine Dependency sein, und kein Gate prüft, dass `dist` nur Peers und relative Pfade importiert. Heute ist `dist` frei von tslib, ein Verstoß käme aber als kaputter Release an.",
       "recommendation": "`importHelpers: false` im Build-Tsconfig setzen oder in `lintPkg` die bare-specifier-Imports in `dist/lib/**/*.js` gegen `peerDependencies` abgleichen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -832,7 +2072,7 @@
       "description": "`--ignore-rules cjs-resolves-to-esm no-resolution` schaltet `no-resolution` auch für node16-ESM und bundler ab. Eine echte Auflösungsregression dort bliebe stumm.",
       "recommendation": "`attw --pack dist --profile esm-only` verwenden.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -850,7 +2090,7 @@
       "description": "TypeScript 7.0.2 ist erschienen. Die Root-tsconfig nutzt `baseUrl` und `downlevelIteration`, die mit TS 6 deprecated sind, und setzt kein `types`. Library-Code sieht damit `@types/node` und `@types/sinon` als Globals, und mit dem neuen Default `types: []` ändert sich das Verhalten.",
       "recommendation": "`baseUrl` und `downlevelIteration` entfernen und `types` explizit setzen (Library: `[]`), bevor der Major-Bump kommt.",
       "effort": "M",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -864,7 +2104,7 @@
       "description": "`val as unknown as ValueType` lässt `ValueType` allein aus `defValue` folgen. `readOption(opts, 'x', 'str')` liefert `string`, egal welchen Typ `opts.x` hat.",
       "recommendation": "`\u003cO, K extends keyof O>(options: O, propName: K, defValue: NonNullable\u003cO[K]>): NonNullable\u003cO[K]>`.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "component": "controls",
       "package": "@spearwolf/twopoint5d"
     },
@@ -879,22 +2119,8 @@
       "description": "Das Lint nutzt nur `tseslint.configs.recommended`, ohne `no-floating-promises` und `no-misused-promises`, und das in einer stark async- und signal-lastigen Library. Die knapp 1k Zeilen Publish-Pipeline unter `scripts/` erfasst kein Typecheck (`checkJs` fehlt), obwohl dort schon JSDoc-Typen stehen.",
       "recommendation": "Die beiden Promise-Regeln für `packages/twopoint5d/src` aktivieren und eine tsconfig mit `checkJs` für `scripts/` in `pnpm typecheck` aufnehmen.",
       "effort": "M",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
-    },
-    {
-      "id": "DOC-061",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "CHANGELOG-Links ergänzen und den Migration Guide beim Release auslagern",
-      "location": "packages/twopoint5d/CHANGELOG.md:8",
-      "description": "`[Unreleased]` und `[0.21.2]` haben keine Link-Referenzdefinitionen. Die Datei ist 211 KB groß, davon rund 1800 Zeilen Migration Guide im Unreleased-Abschnitt, und geht vollständig in den npm-Tarball.",
-      "recommendation": "Compare-Links ergänzen und den Migration Guide beim Release in eine eigene Doku-Datei verschieben.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
     },
     {
       "id": "DOC-062",
@@ -907,7 +2133,7 @@
       "description": "Es gibt keinen einzigen Versionstag. Der Deploy erzeugt weder Tag noch Release, ein npm-Release lässt sich nur über die Provenance auf seinen Commit zurückführen.",
       "recommendation": "Nach erfolgreichem Publish `v\u003cversion>` taggen oder einen GitHub Release anlegen (`contents: write` nur im Publish-Job).",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace"
     },
     {
@@ -934,8 +2160,7 @@
       "description": "Der Display-Anteil (Pause/Restart, `stop()`, `visibilitychange`, `maxFps`, `resizePollIntervalMs`, Init/Start-Reihenfolge, Rejection bei gescheitertem Init) ist mit `Display.spec.ts` und `display-lifecycle.test.js` abgedeckt (Remediation-Lauf vom 2026-09-24, `6a4bcacf`), `styleUtils` hat inzwischen eine Spec. Offen bleibt `PanControl2D`: die Tests nutzen nur Maus mit `pointerId: 1` — kein Touch, kein zweiter Pointer, kein `pointercancel`, keine `mouseButton`/`keyCodes`-Optionen, keine zwei Controls in einer Root. `PanControl2D.ts` steht bei 0 % Vitest-Coverage.",
       "recommendation": "`pan-control-input.test.js` um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen `pointercancel`-Fall erweitern; eine `PanControl2D.spec.ts` für Optionen und zwei Controls in einer Root.",
       "effort": "M",
-      "status": "improved",
-      "previousSeverity": "medium",
+      "status": "carried-over",
       "package": "twopoint5d-testing",
       "component": "controls"
     },
@@ -949,21 +2174,6 @@
       "description": "Keine Spec übt: \u003ccode>Stage2D\u003c/code> \u003ccode>projection\u003c/code>-Wechsel / \u003ccode>camera\u003c/code>-Override-Vorrang / \u003ccode>OnStageAfterCameraChanged\u003c/code>, \u003ccode>OnStageResize\u003c/code>, \u003ccode>OnStageFirstFrame\u003c/code> (retained), \u003ccode>OnStageUpdateFrame\u003c/code>, \u003ccode>updateProjection(needsUpdate)\u003c/code>; \u003ccode>ParallaxProjection.updateCamera\u003c/code>/\u003ccode>OrthographicProjection.updateCamera\u003c/code> (CONS-025); \u003ccode>ProjectionPlane.applyRotation\u003c/code>, \u003ccode>clone\u003c/code>, \u003ccode>equals\u003c/code>, den »up is mandatory«-Throw; \u003ccode>fitIntoRectangle\u003c/code> im \u003ccode>cover\u003c/code>-Modus komplett und die beidseitigen \u003ccode>contain\u003c/code>-Zweige (fitIntoRectangle.ts:220-233); im \u003ccode>StageRenderer\u003c/code> den Transparent-Black-Pfad von \u003ccode>#clearForInternalRT\u003c/code> (454-457), \u003ccode>#applyClear\u003c/code> in Pipeline-Modi, ein verschachteltes Kind mit eigener Pipeline (Mode E), erneutes \u003ccode>attach()\u003c/code> an einen zweiten Host, \u003ccode>asPassNodeRT\u003c/code>-Resize; \u003ccode>Canvas2DStage.fit\u003c/code>-Setter und \u003ccode>setContainerSize()\u003c/code>. Die drei High/Medium-Bugs dieses Laufs in der stage-Schicht (BUG-078, BUG-079, MEM-005) liegen alle in diesen Lücken.",
       "recommendation": "Die aufgezählten Specs ergänzen, beginnend mit Kamera-Wechsel + Pipeline-Rebuild, Mode E und \u003ccode>cover\u003c/code>.",
       "effort": "M",
-      "status": "improved",
-      "previousSeverity": "medium",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-006",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Stage2D.needsUpdate: dokumentieren, wer das Flag zurücksetzt",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:46",
-      "description": "Das Feld trägt inzwischen ein zweizeiliges TSDoc (»with this flag you can tell the updateProjection() method that the projection calculation needs an update«), das aber weiter verschweigt, dass \u003ccode>#updateProjection\u003c/code> es selbst zurücksetzt. Wer das nicht weiß, setzt es zu oft oder wundert sich, warum der eigene Reset nichts tut. Der Vorlauf führte den Punkt als \u003cem>medium\u003c/em>; mit dem vorhandenen TSDoc bleibt eine Lücke, kein Loch.",
-      "recommendation": "Einen Satz ergänzen: wer liest es (jedes \u003ccode>updateProjection()\u003c/code>), wer setzt es zurück (\u003ccode>#updateProjection\u003c/code>), und dass ein \u003ccode>resize()\u003c/code> es implizit erledigt.",
-      "effort": "S",
       "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
@@ -1214,8 +2424,7 @@
       "description": "Der Wurf von \u003ccode>updateCamera()\u003c/code> auf einer Projektion ohne Projektionsebene und der Frühausstieg von \u003ccode>setContainerSize()\u003c/code> bei unveränderter Größe stehen beide im CHANGELOG, aber in keiner Spec.",
       "recommendation": "Je einen Test ergänzen: eine Projektion ohne Plane, und ein \u003ccode>setContainerSize()\u003c/code> mit der Größe, die der Renderer schon trägt.",
       "effort": "S",
-      "status": "improved",
-      "previousSeverity": "low",
+      "status": "carried-over",
       "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
@@ -1269,19 +2478,6 @@
       "description": "Das einzige \u003ccode>install\u003c/code> im README ist das \u003ccode>pnpm install\u003c/code> des Contributors. Es gibt kein \u003ccode>npm i @spearwolf/twopoint5d three @spearwolf/eventize @spearwolf/signalize\u003c/code> (drei Peers, die der Konsument selbst installieren muss), kein Import-Snippet, keinen Hinweis auf \u003ccode>three/webgpu\u003c/code> / TSL, obwohl jede Demo daraus importiert, und die Prosa beschreibt weiter eine WebGL/GLSL-Bibliothek (»custom vertex shader«, »WebGL API«), während die Paket-Keywords \u003ccode>webgpu\u003c/code> sagen. Das npm-README ist neun Zeilen, die hierher zurückverweisen. Scripts und Befehle in README und AGENTS.md sind korrekt (gegen package.json geprüft).",
       "recommendation": "Ein »Usage«-Abschnitt: Install-Zeile mit Peers, ein 15-Zeilen-Beispiel \u003ccode>Display\u003c/code> + \u003ccode>TexturedSprites\u003c/code>, ein Satz zu WebGPURenderer mit WebGL-Fallback, Link auf die Lookbook und \u003ccode>src/stage/README.md\u003c/code>; die zwei WebGL-Sätze auffrischen.",
       "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DEPS-004",
-      "category": "dependencies",
-      "domain": "harness",
-      "severity": "low",
-      "title": "TypeScript 7 ist durch den Peer-Deckel von typescript-eslint gesperrt",
-      "location": "package.json:60",
-      "description": "\u003ccode>typescript\u003c/code> steht auf \u003ccode>^5.9.3\u003c/code>, aktuell ist 7.0.2 — der Wechsel auf den nativen Compiler. \u003ccode>typescript-eslint@8.69.0\u003c/code> führt \u003ccode>typescript: &gt;=4.8.4 &lt;6.1.0\u003c/code> als Peer; TypeScript 7 ist damit hier nicht installierbar, ohne den gesamten \u003ccode>@typescript-eslint/*\u003c/code>-Regelblock fallen zu lassen. Re-Check: unverändert.",
-      "recommendation": "Nicht erzwingen. Fällig wird der Sprung, sobald \u003ccode>typescript-eslint\u003c/code> v9 erscheint; bis dahin ist der Deckel stromaufwärts.",
-      "effort": "M",
       "status": "carried-over",
       "package": "workspace"
     },
@@ -1555,7 +2751,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Die Verweise auf \u003ccode>§3.2\u003c/code>, \u003ccode>§6.2\u003c/code>, \u003ccode>§6.3\u003c/code> und \u003ccode>§6.4\u003c/code> führen ins Leere, weil die README keine nummerierten Abschnitte hat.",
       "recommendation": "Die Verweise durch Überschriften-Links ersetzen oder die Abschnitte nummerieren.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d",
       "origin": {
         "kind": "discovered",
@@ -1577,7 +2773,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. 11 Zeilen sind länger als 88 Zeichen (\u003ccode>awk 'length>88'\u003c/code>). Die übrigen Architektur-Dokumente sind auf 88 Spalten umbrochen.",
       "recommendation": "Die Datei auf 88 Spalten umbrechen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "@spearwolf/twopoint5d",
       "origin": {
         "kind": "discovered",
@@ -1594,7 +2790,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-22, kleiner Befund des Reviewers. Die bewusst abgeschaltete Option \u003ccode>exactOptionalPropertyTypes\u003c/code> steht nach \u003ccode>experimentalDecorators\u003c/code>, obwohl die Datei ihre Optionen sonst alphabetisch führt. Für \u003ccode>tsc\u003c/code> spielt die Reihenfolge keine Rolle.",
       "recommendation": "Die Option samt Kommentar vor \u003ccode>experimentalDecorators\u003c/code> ziehen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "package": "workspace",
       "origin": {
         "kind": "induced",
@@ -1614,7 +2810,7 @@
         "run": "2026-09-24"
       },
       "domain": "harness",
-      "status": "new",
+      "status": "carried-over",
       "package": "twopoint5d-testing",
       "effort": "S"
     },
@@ -1631,7 +2827,7 @@
         "run": "2026-09-24"
       },
       "domain": "harness",
-      "status": "new",
+      "status": "carried-over",
       "package": "twopoint5d-testing",
       "effort": "S"
     },
@@ -1648,7 +2844,7 @@
         "run": "2026-09-24"
       },
       "domain": "harness",
-      "status": "new",
+      "status": "carried-over",
       "package": "twopoint5d-testing",
       "effort": "S"
     },
@@ -1665,7 +2861,7 @@
         "run": "2026-09-24"
       },
       "domain": "code",
-      "status": "new",
+      "status": "carried-over",
       "package": "twopoint5d-testing",
       "effort": "S"
     },
@@ -1679,11 +2875,12 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Die Sprite-Materialien haben inzwischen Pixel-Tests (\u003ccode>sprites-textured-material.test.js\u003c/code>, \u003ccode>sprites-animated-material.test.js\u003c/code>, \u003ccode>sprites-billboard.test.js\u003c/code>). \u003ccode>Canvas2DStage\u003c/code> und \u003ccode>OrthographicProjection\u003c/code> werden in der Browser-Suite dagegen nie instanziiert und nie gerendert. Ein kaputter Render-Pfad dort passiert das volle Gate. Das Finding hängt mit TEST-022 zusammen, dort fehlen die Specs der stage-Schicht.",
       "recommendation": "Je eine Smoke-Datei: Stage mit bekannter Füllung in ein \u003ccode>RenderTarget\u003c/code> rendern und das Pixel über \u003ccode>renderToPixels\u003c/code>/\u003ccode>rgbAt\u003c/code> aus \u003ccode>test/helpers/fixtures.js\u003c/code> assertieren.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "origin": {
         "kind": "discovered",
         "run": "2026-09-25"
-      }
+      },
+      "package": "twopoint5d-testing"
     },
     {
       "id": "DOC-070",
@@ -1698,11 +2895,12 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Nach dem Umbruch langer Zeilen steht in \u003ccode>AGENTS.md\u003c/code> das Wort \u003ccode>whether\u003c/code> und in \u003ccode>apps/lookbook/README.md\u003c/code> \u003ccode>lookbook and\u003c/code> allein auf einer Zeile vor der unveränderten Nachbarzeile. Reine Optik, Lint ist grün.",
       "recommendation": "Beide Absätze durchgehend bei rund 90 Zeichen neu umbrechen.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "origin": {
         "kind": "induced",
         "run": "2026-09-25"
-      }
+      },
+      "package": "workspace"
     },
     {
       "id": "TEST-048",
@@ -1720,7 +2918,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Drei describe-Namen tragen `§6.2`, `§6.3` und `§6.4` (»outputRenderTarget (§6.4 RT only, no pipeline)«, »pipeline without buildOutputNode (§6.4 Mode C)«, »asPassNode + buildOutputNode (§6.2 / §6.3)«). Ein Dokument mit diesen Abschnitten liegt nicht im Repo; wer einen roten Test liest, erfährt nicht, welche Zusage gemeint ist. Dieselben Verweise in `src/stage/README.md` führt DOC-066.",
       "recommendation": "Die Verweise durch den Satz ersetzen, den sie meinen, etwa den Namen des Modus oder die Zusage selbst.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "origin": {
         "kind": "discovered",
         "run": "2026-09-26"
@@ -1737,7 +2935,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Der Eintrag zu `TextureStore#loadAsync()` sagt, ein werfender `error`-Listener ändere nicht, wie das Promise settlet, »while it hears one of the failures above«. Unmittelbar davor stehen die Item-Events, die nicht rejecten; »the failures above« lässt sich zur Not auch auf sie beziehen, gemeint sind nur die vier Fehlschläge, die rejecten.",
       "recommendation": "»one of the four failures that reject« statt »one of the failures above« schreiben.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "origin": {
         "kind": "induced",
         "run": "2026-09-26"
@@ -1758,7 +2956,7 @@
       "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `expectDefined(this.projectionPlane, …)` meldet `expected the projection plane of this projection to be defined`: die Meldung nennt weder Klasse noch Methode, und `projectionPlane` ist ein optionales öffentliches Feld des Aufrufers, keine Invariante, für die `expectDefined()` laut TSDoc gedacht ist. `TileSpritesFactory#createTile()` löst dasselbe Muster mit einem `Error`, der Methode, Feld und Wert nennt.",
       "recommendation": "Einen `Error` werfen, der Klasse, Methode und das zu setzende Feld nennt, wie `TileSpritesFactory#createTile()`; die Meldung im Test festhalten.",
       "effort": "S",
-      "status": "new",
+      "status": "carried-over",
       "origin": {
         "kind": "discovered",
         "run": "2026-09-26"
@@ -1766,43 +2964,138 @@
     }
   ],
   "openQuestions": [
-    "Soll `IMapTileFactory.createTile() → undefined` ausschließlich »kein Tile an dieser Koordinate« bedeuten? Davon hängt ab, ob die Pool-Erschöpfung im Factory- oder im Renderer-Vertrag behoben wird.",
-    "Hängt `PanControl2D` seine Listener bewusst an `document`, etwa für Vollbild-Apps? Dann ist die fehlende Input-Begrenzung eine Doku-Lücke und kein Defekt.",
-    "Wird Mode E (verschachtelte Renderer mit eigener Pipeline unter einem komponierenden Parent) mit sRGB-Output produktiv genutzt? Der doppelte Output-Transform ist aus dem three-Quelltext abgeleitet, aber nicht per Pixel-Test bestätigt.",
-    "`PanControl2D.update()` teilt den Pointer-Pan durch `devicePixelRatio`, die Tastatur-Speeds aber nicht. Ist es gewollt, dass die Karte auf Retina nur halb so schnell wie die Maus folgt?",
-    "Ist Mode D mit einem `outputRenderTarget`, dessen Größe vom Drawing Buffer abweicht, ein unterstützter Fall? `pass()` dimensioniert sein RT nach dem Drawing Buffer."
+    "Soll `autoTouch` für `dynamic`/`stream`-Attribute weiterhin den vollen genutzten Bereich pro Frame hochladen (so dokumentiert in `vertex-objects/types.ts:60–69`), oder dürfen die generierten Setter künftig eine Dirty-Range pflegen? Davon hängt ab, ob PERF-006 und PERF-005 kleine Verbesserungen oder ein Umbau des Upload-Modells sind.",
+    "Ist das WebGL-Backend des `WebGPURenderer` ein unterstütztes Produktionsziel? Nur dort wird die leere Upload-Range (PERF-027) zu einem Upload über die volle Kapazität.",
+    "Ist `Display.maxDeltaTime = 1/30` bewusst auch als Zeitlupe bei dauerhaft niedriger Framerate gedacht, oder nur als Schutz gegen Ausreißer? Davon hängt ab, ob BUG-003 ein Bug oder eine Doku-Lücke ist.",
+    "Ist es gewollt, dass `TextureStore#clearUnused()` und `evictMissing` Resources samt Textur entsorgen, deren Texturen nach einem erfüllten `getAsync()` (refCount 0) noch in Materialien stecken? Das TSDoc beschreibt es, abgesichert ist es nicht.",
+    "Ist die Sortierung von `CameraBasedVisibility.visibles`/`tiles` nach Kameradistanz ein öffentlicher Vertrag, etwa als Ladepriorität für Apps? In der Bibliothek liest sie nur der Debug-Helfer, und PERF-032 würde sie gern einsparen.",
+    "Unter WebGPU hält ein verstecktes Tab die Freigabe des Renderers und damit das `GPUDevice`, bis es wieder sichtbar ist (`Display.ts:124–139`, bewusster Firefox-Workaround). Wie viele Displays entsorgt eine App typischerweise im Hintergrund, zum Beispiel bei SPA-Routenwechseln?"
   ],
   "methodology": {
-    "text": "**Vollständig gelesen** wurde der gesamte Produktcode: alle 134 Nicht-Spec-Dateien unter `packages/twopoint5d/src/` (Module `vertex-objects`, `map2d`, `texture`, `stage`, `sprites`, `display`, `controls`, `utils`, dazu `index.ts` und `events.ts`), alle Nicht-Test-Skripte unter `scripts/` sowie `eslint.config.mjs` und `vite.config.ts`. Gelesen wurde modulweise, wie es `AGENTS.md` verlangt, jeweils mit `resource-lifecycle.md` und dem passenden Abschnitt der Architektur-Doku daneben. Die `high`-Befunde und mehrere `medium`-Befunde wurden gegen den Code und gegen den Quelltext von three 0.185.1 (`Renderer.js`, `RenderPipeline.js`) nachgeprüft. Einzelne Befunde (`voInitialize`, `VOBufferPool#buffer`, `toAttributeArrays`, `checkNameableTypes`) wurden per Skript gegen `dist/lib` bzw. mit einer Fixture im Scratchpad nachgestellt.\n\n**Stichproben** gab es aus den 71 Vitest-Specs (rund 1300 Tests) und den 25 Browser-Testdateien (rund 147 Tests), dazu aus allen Konfigurationen, Workflows, READMEs, dem CHANGELOG-Aufbau und der Library-Doku. **Nicht gelesen** wurden das Lookbook (`apps/lookbook`) und die Browser-Tests als Quelltext. Ihre Befunde stammen aus dem Vorlauf und wurden nur punktuell an der Fundstelle nachgeprüft.\n\n**Ausgeführt** wurden `pnpm lint` (Exit 0), `pnpm typecheck` (Exit 0), `pnpm test:scripts` (76/76 grün), `pnpm audit` und `pnpm audit --prod` (keine bekannten Schwachstellen) sowie `pnpm outdated -r`: three/@types/three 0.186, nx 23.2.1, TypeScript 7.0.2 und prettier-plugin-astro 1.0.1 sind verfügbar. `pnpm run ci` lief nicht, weil es `dist` leert und die Browser-Suite braucht.",
+    "text": "**Vollständig gelesen** wurden alle 160 Quelldateien im Umfang (22 141 Zeilen): der gesamte Produktcode unter `packages/twopoint5d/src/` (ohne Specs), die Skripte unter `scripts/`, `eslint.config.mjs` und `vite.config.ts`. Die Arbeit lief in sieben Code-Slices entlang der Features, `controls` zusammen mit `stage` und `utils` zusammen mit `sprites`. Die Slices mit Hot-Path-Bezug (vertex-objects, sprites, map2d, display, stage, texture) liefen auf Opus mit dem ausdrücklichen Auftrag, jeden Aufrufpfad aus `requestAnimationFrame` auf Allokationen, Upload-Umfang, Lookups und frühe Abbrüche zu prüfen. Der vertex-objects-Slice hat seine Kennzahlen zu Accessor-Lookups, megamorphen Inline-Caches und `createVO()` mit Node/V8-Micro-Benchmarks im Scratchpad gemessen, nicht in einer Browser-Szene. Der `high`-Befund zum asPassNode-RenderTarget und der Alias-Verdacht aus dem Sprites-Slice (verworfen) wurden vom Orchestrator am Code nachgeprüft.\n\n**Stichproben** kamen aus Konfigurationen, Workflows, Manifesten, vier Vitest-Specs, drei Browser-Testdateien samt Fixtures und dem Aufbau des CHANGELOG (3738 Zeilen, nach Struktur, nicht Zeile für Zeile). Im Lookbook wurde nur gezielt nach Aufrufern gesucht (`findWithin`, `findChunksAt`, `camera.far`). **Nicht gelesen** wurden das Lookbook und die Browser-Tests als Quelltext.\n\n**Ausgeführt** wurden `pnpm lint` (Exit 0), `pnpm typecheck` (Exit 0), `pnpm test:coverage` (Exit 0, Ergebnis aus dem Nx-Cache für den aktuellen Stand), `pnpm audit --prod` (keine bekannten Schwachstellen) und `pnpm outdated` (Ergebnis in DEPS-004). `pnpm run ci` lief nicht, weil es `dist` leert und die Browser-Suite braucht.",
     "notes": [
-      "Mit diesem Lauf wechselt der Score von Modell 1 (absolut) auf Modell 2 (Dichte je gelesener kLOC). Der Vorlauf ist deshalb nicht direkt vergleichbar, und eine Delta-Einordnung entfällt.",
-      "Der Vorlauf trug weder Features noch einen gemessenen Umfang, beides ist neu angelegt. Ausgeschlossen sind Tests, Typdeklarationen, Build-Output, das Lookbook als Demo-App und das Browser-Testpaket.",
-      "Die Findings wurden über Kategorie und überlappende Fundstelle zugeordnet, sekundär über den Titel. Gematchte Findings behalten ihre alte ID, neue bekommen Nummern oberhalb des Vorlaufs.",
-      "Alle 123 alten Findings ohne Gegenstück wurden vor der Übernahme einzeln an Fundstelle und Doku nachgeprüft. 112 sind noch belegbar, 11 sind behoben oder durch Doku bzw. Code gegenstandslos, darunter drei, deren Prämisse schon im Vorlauf nicht stimmte (Demos für `PanControl2D` und `TextureStore` existieren).",
-      "Zwei neu gefundene Befunde decken sich mit akzeptierten Punkten, dem Tippfehler `anisotrophy` und der Asymmetrie zwischen `TexturedSprite` und `AnimatedSprite`. Sie stehen deshalb nur im Anhang.",
-      "Mitgeführte Findings aus dem Lookbook und dem Browser-Testpaket zählen im Score, obwohl dieser Lauf dort keinen Umfang gelesen hat.",
-      "Seit dem Vorlauf trägt kein Commit einen `Remediation-Run`-Trailer. Eine Fix-Bilanz entfällt deshalb.",
-      "`build-report.mjs` beendet sich still ohne Ausgabe, wenn es über den Symlink `~/.claude/skills/…` aufgerufen wird: die Einstiegsprüfung vergleicht den unaufgelösten `argv[1]` mit dem realen Pfad aus `import.meta.url`. Dieser Lauf hat es deshalb über den realen Pfad aufgerufen.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-21 (Plan vom 2026-09-21): 4 Commits (`049ba431`, `cf337e90`, `1087d55d`, `88019d0c`). Die 3 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen. 13 Nebenbefunde: 6 in Drain-Paketen behoben, 7 als neue Findings ins Backlog gegangen, dazu 1 induzierter Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-22 (Plan vom 2026-09-22): 2 Commits (`19890c54`, `7ec25649`). Die 11 Findings im Scope sind mit Reviewer-Urteil und Commit-Hash geschlossen, eines davon als gegenstandslos, weil die Datei nicht mehr existierte. 1 Nebenbefund im Library-Code ging als neues Finding ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-23 (Plan vom 2026-09-23): 4 Commits (`3deb43eb`, `37e07568`, `c36f89af`, `3835f95d`). Die 19 Findings im Scope, also alles im Modul vertex-objects samt seinen Tests und dazu BUG-101, sind mit Reviewer-Urteil und Commit-Hash geschlossen. Keines blieb mangels Beleg offen. 6 Nebenbefunde wurden im Lauf behoben, 2 gingen als neue Findings ins Backlog, dazu 1 induzierter kleiner Befund. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24), Domäne »Display & Frame-Loop«: 9 Commits (`6a4bcacf`, `cf1304c7`, `a33a6961`, `e9c29c0b`, `78ee4952`, `d38cc402`, `a96d0ca3`, `e1b9f2ff`, `bd80d232`). 30 Findings sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-004, TEST-042 und READ-001 wurden nur mit ihrem Display-Anteil behoben und stehen mit dem verbleibenden Rest im Backlog. Bei einigen Findings nennt der Reviewer die Fundstelle als Datei und Symbol statt als Zeile. Im Lauf wurden 32 Nebenbefunde gefunden; der Firefox/WebGPU-rAF-Stillstand nach `renderer.dispose()` wurde als vorbestehend bestätigt und behoben. 6 Nebenbefunde gingen als neue Findings ins Backlog, 2 Restgrenzen der Fixes als induzierte Findings. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus einem Einzel-Fix auf `main` ohne Remediation-Plan: 1 Commit (`3d8bb8b1`). BUG-124 (werfender `OnDisplayStart`-Listener: alle Listener hören das Event, danach User-Pause wie `stop()`, `start()` rejected) und ASYNC-007 (bei verborgener Seite wartet die WebGPU-Freigabe bis zur Sichtbarkeit und zwei Frames) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 1 induzierter kleiner Befund ging als neues Finding ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-26 (Feature texture; Scope-Regel: die Feature-Domain texture vollständig, jede Severity einschließlich info und Optimierungspotenzial, samt Specs, Doku und den Stellen in Lookbook und Browser-Tests, die texture benutzen; dazu IMPL-001, CONS-048 und die acknowledged Umbenennungen API-019, API-020, API-023): 12 Commits (`dff733ff` bis `9ec5944e`). Alle 29 texture-Findings, IMPL-001, CONS-048 sowie API-019, API-020 und API-023 sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-016, IMPL-011 und ARCH-005, die über zwei oder mehr Pakete verteilt waren, erst mit allen Teilen. Kein Finding blieb mangels Beleg offen; BUG-020, DOC-013, CONS-005 und CONS-007 bleiben acknowledged. Von 29 Nebenbefunden wurden 23 im Lauf behoben, 4 gingen als neue Findings ins Backlog, zwei davon (BUG-125, BUG-126) mit offener Frage zur Scope-Grenze texture/sprites; 2 deckten sich mit TYPE-019 und DOC-060 und sind nicht doppelt eingetragen. Die kleinen Review-Befunde auf die Diffs des Laufs hat das Nachtragspaket 12 behoben; offen blieb davon nur ein Formulierungshinweis im CHANGELOG (DOC-071). Die offene Frage zu relativen `meta.image`-URLs ist mit der Entscheidung vom 2026-09-26 beantwortet (Auflösung gegen die URL der JSON-Datei). Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus dem Remediation-Lauf der Domains sprites und map2d vom 2026-09-26 (sechs Commits, 324ab4a1..840e2c0e): drei Findings geschlossen, eines auf den Anteil außerhalb von sprites eingeengt, zwei Nebenbefunde aus texture und stage neu aufgenommen. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Nachgeführt aus einem Einzel-Fix auf main vom 2026-09-26 (ein Commit, 810eb4c7, ohne Remediation-Plan): der Default der Texturgrößenprüfung von FrameBasedAnimations liest jetzt FrameBasedAnimations.MaxTextureSize, ein Finding geschlossen, vom Reviewer bestätigt. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Folgelauf zum Audit vom 2026-09-21, gemessen mit denselben Ausschlüssen. Der Umfang wuchs von 152 Dateien und 18 605 Zeilen auf 160 Dateien und 22 141 Zeilen, die Remediation-Läufe seit dem Vorlauf haben Code hinzugefügt.",
+      "Die neuen Findings wurden per `match` über Kategorie und gemeinsame Datei gepaart. Aus den vier mehrdeutigen Gruppen wurden von Hand vier Paare gebildet (asPassNode-RT, gehaltene Pan-Tasten, editierbare Felder, `Stage2D.needsUpdate`). Ein vom Skript als sicher gemeldetes Paar wurde getrennt: Die fehlenden Tests von `checkNameableTypes.mjs` sind ein anderer Befund als der fehlende `ImportTypeNode`. Bei den beiden Pan-Befunden wurde die Severity an den Vorlauf angeglichen, statt eine Verbesserung auszuweisen, die im Code nicht stattfand.",
+      "Alle 80 nicht gepaarten alten Findings und alle 14 Anhangpunkte gingen durch den Re-Check (Haiku-Prüfer, sieben Stapel). Alle alten Findings bestehen noch. Zwei Anhangpunkte (BUG-020, DOC-013) meldeten die Prüfer als »Begründung veraltet«; der Orchestrator hat beide am Code nachgeprüft und als weiterhin tragend eingestuft, weil ihre Begründung genau den heutigen Stand beschreibt.",
+      "Das Delta zum letzten Eintrag beträgt −9 Punkte. Von den 61 neuen Findings liegen 51 in Dateien, die schon der Vorlauf gelesen hatte. Laut `git blame` gehen 49 davon auf Zeilen zurück, die älter sind als der Vorlauf. Sie sind durch den Hot-Path-Fokus dieses Laufs zutage gekommen und keine Verschlechterung des Codes. 9 gehen auf Remediation-Commits seit dem 2026-09-21 zurück und tragen `origin: induced`.",
+      "Neue Findings bekamen ihr Package über die Fundstelle; zwei mitgeführte Findings ohne Package wurden dabei ebenfalls zugeordnet."
     ]
   },
-  "scoreHistory": [
+  "acknowledged": [
     {
-      "date": "2026-09-02",
-      "score": 0,
-      "source": "audit",
-      "scoreModel": 1
+      "title": "defaultTextureClasses lässt sich beim Re-Parse nicht leeren",
+      "category": "correctness",
+      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
+      "reason": "Bewusst so belassen — seit dem Signal-Umbau (API-022) per store.defaultTextureClasses = [] direkt leerbar.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "BUG-020"
     },
+    {
+      "title": "renderOrder akzeptiert nur einen String, kein String-Array",
+      "category": "api",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
+      "reason": "Bewusst nicht umgesetzt — der kommaseparierte String bleibt das dokumentierte Format.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "API-024"
+    },
+    {
+      "title": "isWebGLRenderer-Import lebt weiter, obwohl der Pfad wirft",
+      "category": "api",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
+      "reason": "Zurückgestellt: der Import fällt nach dem nächsten Major, sobald keine WebGL-Konsumenten mehr existieren.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "API-025"
+    },
+    {
+      "title": "TileSet.firstId beginnt bei 1, TextureAtlas-frameId bei 0",
+      "category": "dx",
+      "location": "packages/twopoint5d/src/texture/TileSet.ts, TextureAtlas.ts",
+      "reason": "Bewusst so belassen — beides dokumentiert; geplant sind nur wechselseitige TSDoc-Verweise.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "DOC-013"
+    },
+    {
+      "title": "parse() emittiert OnReady auch bei leerer items-Liste",
+      "category": "consistency",
+      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
+      "reason": "Bewusst so belassen, vom Autor bestätigt — whenResource(id) ist der Weg für konkrete Einträge.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "CONS-005"
+    },
+    {
+      "title": "TextureStore akzeptiert nur einen WebGPURenderer",
+      "category": "consistency",
+      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
+      "reason": "Bewusst so belassen — die Bibliothek baut auf three/webgpu, die restriktive Typisierung ist Absicht.",
+      "acknowledgedDate": "2026-05-14",
+      "id": "CONS-007"
+    },
+    {
+      "title": "33 Breaking Changes stauen sich vor einem Release, der seit zweieinhalb Monaten aussteht",
+      "category": "build",
+      "location": "packages/twopoint5d/CHANGELOG.md:8-1054 gegen packages/twopoint5d/package.json:4 (0.21.2)",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "CFG-017"
+    },
+    {
+      "title": "Asymmetrie zwischen TexturedSprite und AnimatedSprite",
+      "category": "api",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts, sprites/AnimatedSprites/AnimatedSprite.ts",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "API-004"
+    },
+    {
+      "title": "TSDoc-Abdeckung der Public-API liegt bei rund 6 bis 8 Prozent",
+      "category": "dx",
+      "location": "packages/twopoint5d/src/**/public-api.ts",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "DOC-002"
+    },
+    {
+      "title": "Die Lookbook wird nirgends deployt",
+      "category": "dx",
+      "location": ".github/workflows/deploy.yml",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "DOC-004"
+    },
+    {
+      "title": "Kein ARCHITECTURE.md",
+      "category": "dx",
+      "location": "Repo-Root",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "DOC-006"
+    },
+    {
+      "title": "Der Lookbook-Dev-Server lauscht auf allen Interfaces und akzeptiert jeden Host-Header",
+      "category": "security",
+      "location": "apps/lookbook/astro.config.mjs:10-13",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "CFG-015"
+    },
+    {
+      "title": "Magic Numbers in den Lookbook-Beispielen",
+      "category": "dx",
+      "location": "apps/lookbook/src/demos/",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "DOC-010"
+    },
+    {
+      "title": "ChunkQuadTreeNode ist exportiert, hat aber keinen Produktions-Konsumenten",
+      "category": "completeness",
+      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/",
+      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
+      "acknowledgedDate": "2026-09-19",
+      "id": "IMPL-003"
+    }
+  ],
+  "scoreHistory": [
     {
       "date": "2026-09-03",
       "score": 14.5,
@@ -1951,6 +3244,17 @@
         "harness": 72
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-26",
+      "score": 69,
+      "source": "audit",
+      "scoreModel": 2,
+      "domains": {
+        "code": 72,
+        "harness": 66
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -2063,120 +3367,16 @@
       "inducedOpen": 0,
       "discovered": 0,
       "attribution": "reviewed"
-    }
-  ],
-  "acknowledged": [
-    {
-      "title": "defaultTextureClasses lässt sich beim Re-Parse nicht leeren",
-      "category": "correctness",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
-      "reason": "Bewusst so belassen — seit dem Signal-Umbau (API-022) per store.defaultTextureClasses = [] direkt leerbar.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "BUG-020"
     },
     {
-      "title": "renderOrder akzeptiert nur einen String, kein String-Array",
-      "category": "api",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
-      "reason": "Bewusst nicht umgesetzt — der kommaseparierte String bleibt das dokumentierte Format.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "API-024"
-    },
-    {
-      "title": "isWebGLRenderer-Import lebt weiter, obwohl der Pfad wirft",
-      "category": "api",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
-      "reason": "Zurückgestellt: der Import fällt nach dem nächsten Major, sobald keine WebGL-Konsumenten mehr existieren.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "API-025"
-    },
-    {
-      "title": "TileSet.firstId beginnt bei 1, TextureAtlas-frameId bei 0",
-      "category": "dx",
-      "location": "packages/twopoint5d/src/texture/TileSet.ts, TextureAtlas.ts",
-      "reason": "Bewusst so belassen — beides dokumentiert; geplant sind nur wechselseitige TSDoc-Verweise.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "DOC-013"
-    },
-    {
-      "title": "parse() emittiert OnReady auch bei leerer items-Liste",
-      "category": "consistency",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
-      "reason": "Bewusst so belassen, vom Autor bestätigt — whenResource(id) ist der Weg für konkrete Einträge.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "CONS-005"
-    },
-    {
-      "title": "TextureStore akzeptiert nur einen WebGPURenderer",
-      "category": "consistency",
-      "location": "packages/twopoint5d/src/texture/TextureStore.ts",
-      "reason": "Bewusst so belassen — die Bibliothek baut auf three/webgpu, die restriktive Typisierung ist Absicht.",
-      "acknowledgedDate": "2026-05-14",
-      "id": "CONS-007"
-    },
-    {
-      "title": "33 Breaking Changes stauen sich vor einem Release, der seit zweieinhalb Monaten aussteht",
-      "category": "build",
-      "location": "packages/twopoint5d/CHANGELOG.md:8-1054 gegen packages/twopoint5d/package.json:4 (0.21.2)",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "CFG-017"
-    },
-    {
-      "title": "Asymmetrie zwischen TexturedSprite und AnimatedSprite",
-      "category": "api",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts, sprites/AnimatedSprites/AnimatedSprite.ts",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "API-004"
-    },
-    {
-      "title": "TSDoc-Abdeckung der Public-API liegt bei rund 6 bis 8 Prozent",
-      "category": "dx",
-      "location": "packages/twopoint5d/src/**/public-api.ts",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "DOC-002"
-    },
-    {
-      "title": "Die Lookbook wird nirgends deployt",
-      "category": "dx",
-      "location": ".github/workflows/deploy.yml",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "DOC-004"
-    },
-    {
-      "title": "Kein ARCHITECTURE.md",
-      "category": "dx",
-      "location": "Repo-Root",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "DOC-006"
-    },
-    {
-      "title": "Der Lookbook-Dev-Server lauscht auf allen Interfaces und akzeptiert jeden Host-Header",
-      "category": "security",
-      "location": "apps/lookbook/astro.config.mjs:10-13",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "CFG-015"
-    },
-    {
-      "title": "Magic Numbers in den Lookbook-Beispielen",
-      "category": "dx",
-      "location": "apps/lookbook/src/demos/",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "DOC-010"
-    },
-    {
-      "title": "ChunkQuadTreeNode ist exportiert, hat aber keinen Produktions-Konsumenten",
-      "category": "completeness",
-      "location": "packages/twopoint5d/src/map2d/chunk-quad-tree/",
-      "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
-      "acknowledgedDate": "2026-09-19",
-      "id": "IMPL-003"
+      "date": "2026-09-26",
+      "source": "audit",
+      "ref": "2026-09-21",
+      "fixed": 0,
+      "inducedFixed": 0,
+      "inducedOpen": 9,
+      "discovered": 49,
+      "attribution": "heuristic"
     }
   ]
 }</script>
