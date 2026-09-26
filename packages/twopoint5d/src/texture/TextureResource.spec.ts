@@ -7,6 +7,7 @@ import {afterEach, describe, expect, test, vi} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureResource} from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
+import type {TextureAtlas} from './TextureAtlas.js';
 import type {FrameBasedAnimationsDataMap} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -188,6 +189,61 @@ describe('TextureResource', () => {
         {tag: 'a.png', disposed: true},
         {tag: 'b.png', disposed: true},
       ]);
+    });
+  });
+
+  describe('a subscriber that throws keeps no value from the others', () => {
+    test('a subscriber of the texture that throws leaves the texture to every other subscriber and to the retained event', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 8, height: 8, tag: 'a.png'}) as unknown as HTMLImageElement,
+      );
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('rx', 'a.png');
+      resource.load();
+
+      on(resource, 'error', () => {});
+      on(resource, 'texture', () => {
+        throw new Error('a subscriber that throws');
+      });
+      const behind = vi.fn();
+      on(resource, 'texture', behind);
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(behind).toHaveBeenCalledWith(textures[0]);
+
+      const late = vi.fn();
+      on(resource, 'texture', late);
+
+      expect(late).toHaveBeenCalledWith(textures[0]);
+
+      resource.dispose();
+    });
+
+    test('a subscriber of the tile set that throws leaves the atlas of that tile set on the resource', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 8, height: 8, tag: 't.png'}) as unknown as HTMLImageElement,
+      );
+
+      const resource = TextureResource.fromTileSet('ts', 't.png', {tileWidth: 4, tileHeight: 4});
+      resource.load();
+
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+      on(resource, 'tileSet', () => {
+        throw new Error('a subscriber that throws');
+      });
+
+      resource.textureFactory = makeTextureFactory().factory;
+      await flushMicrotasks();
+
+      expect(resource.tileSet).toBeDefined();
+      expect(resource.atlas).toBe(resource.tileSet!.atlas);
+      expect(errors).toMatchObject([{source: 'texture', id: 'ts'}]);
+
+      resource.dispose();
     });
   });
 
@@ -872,6 +928,138 @@ describe('TextureResource', () => {
       expect(errors).toEqual([]);
       expect(resource.imageUrl).toBe('second.png');
       expect(resource.atlas!.frameNames()).toEqual(['idle.1']);
+
+      resource.dispose();
+    });
+
+    const writtenAtlasJson = {
+      frames: {own: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {image: 'own.png', size: {w: 16, h: 16}},
+    };
+
+    test('an atlasJson written while the fetch is in flight aborts that fetch', async () => {
+      const calls = stubAbortableFetch();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+
+      resource.load();
+      resource.atlasJson = writtenAtlasJson as never;
+
+      expect(calls[0]!.signal.aborted).toBe(true);
+
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.atlasJson).toEqual(writtenAtlasJson);
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+    });
+
+    // `fetch` that pays no heed to its signal and answers only when the test says so: what it
+    // answers after an abort reaches the resource, and only the resource can ignore it
+    const stubDeafFetch = () => {
+      let answer!: (response: Response) => void;
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      return (response: Response) => answer(response);
+    };
+
+    test('a fetch that answers after an atlasJson was written leaves the written json in place', async () => {
+      const answer = stubDeafFetch();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+
+      resource.load();
+      resource.atlasJson = writtenAtlasJson as never;
+
+      answer(
+        new Response(
+          JSON.stringify({
+            frames: {fetched: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+            meta: {image: 'fetched.png', size: {w: 16, h: 16}},
+          }),
+        ),
+      );
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.atlasJson).toEqual(writtenAtlasJson);
+      expect(resource.imageUrl).toBe('own.png');
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+    });
+
+    test('a fetch that fails after an atlasJson was written reports nothing', async () => {
+      const answer = stubDeafFetch();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+
+      resource.load();
+      resource.atlasJson = writtenAtlasJson as never;
+
+      answer(new Response('{}', {status: 404}));
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+    });
+
+    test('a subscriber of the atlas that throws while a fetched json is published is no failure of the fetch', async () => {
+      // both jsons name the same image, so the second one finds it loaded and the atlas it
+      // describes is published inside the write of the fetched json
+      const atlasJsonWithFrame = (frame: string) =>
+        JSON.stringify({
+          frames: {[frame]: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+          meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+        });
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        async (url) => new Response(atlasJsonWithFrame(url === 'first.json' ? 'a' : 'b')),
+      );
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async (url) => ({width: 16, height: 16, tag: url}) as unknown as HTMLImageElement,
+      );
+
+      const resource = TextureResource.fromAtlas('sprites', 'first.json');
+      const errors: unknown[] = [];
+      on(resource, 'error', (payload: unknown) => errors.push(payload));
+
+      resource.load();
+      resource.textureFactory = makeTextureFactory().factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.atlas!.frameNames()).toEqual(['a']);
+
+      // throws only for the atlas of the second json, so the retained replay of the first one
+      // on subscribing goes through
+      on(resource, 'atlas', (atlas: TextureAtlas) => {
+        if (atlas.frameNames().includes('b')) throw new Error('a subscriber that throws');
+      });
+
+      resource.atlasUrl = 'second.json';
+      await flushMicrotasks();
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toMatchObject([{source: 'texture', id: 'sprites'}]);
+      expect(resource.atlas!.frameNames()).toEqual(['b']);
 
       resource.dispose();
     });

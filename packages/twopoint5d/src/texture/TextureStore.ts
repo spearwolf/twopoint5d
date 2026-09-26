@@ -799,9 +799,10 @@ export class TextureStore {
    * json that `TexturePackerJson` cannot read. A failure reported before the call counts as
    * well, until a change of what the failed step reads — its url, its options, the texture
    * classes, the renderer — sends that step off again, or an `atlasJson` written to the
-   * resource takes the place of one that could not be fetched. The error names the step and
-   * the url, and carries what the resource reported as its `cause`. An animation entry that
-   * is skipped does not reject.
+   * resource takes the place of one that could not be fetched or is still being fetched. The
+   * error names the step and the url, and carries what the resource reported as its `cause`.
+   * An animation entry that is skipped does not reject, and neither does a subscriber of the
+   * resource that throws: the value it was handed is there.
    */
   get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,

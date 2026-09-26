@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, retain, retainClear} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, off, retain, retainClear} from '@spearwolf/eventize';
 import type {Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
@@ -85,8 +85,13 @@ export const TextureResourceSubtypes = {
  * is cleared again — the response was a 200, so there is no status to name. It
  * carries `{source: 'texture', id, error}` for a failure behind an image that loaded
  * successfully — texture creation, or any value derived from it, such as an atlas or a tile
- * set — with no `url`, since none has failed. A tile set that `TileSet` refuses is reported
- * here whether the image arrives or the `tileSetOptions` change; the write that changed them
+ * set — with no `url`, since none has failed. A subscriber of `imageCoords`, `atlas`, `tileSet`,
+ * `texture` or `frameBasedAnimations` that throws keeps the value from no one: every other
+ * subscriber is called and the retained value is written before the throw goes on. A throw
+ * raised while the resource publishes what it loaded — its image, its atlas json and what is
+ * built from them — is reported with the same `{source: 'texture', id, error}`; the value stays
+ * published, and `TextureStore#get()` does not reject on it. A tile set that `TileSet` refuses
+ * is reported here whether the image arrives or the `tileSetOptions` change; the write that changed them
  * does not throw. An `atlasJson` that `TexturePackerJson` cannot read is reported here as soon
  * as the image it names is there; the write that set it does not throw either. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
@@ -368,9 +373,10 @@ export class TextureResource {
    * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
    * json names otherwise — a relative name resolved against `atlasUrl`, so it names the file
    * next to the json. The `overrideImageUrl` is taken as written. A json written from outside
-   * replaces the fetched one, and a fetch of `atlasUrl` that failed along with it; it has no
-   * url of its own and keeps its `meta.image` as written, and the image loader resolves a
-   * relative one against the document.
+   * replaces the fetched one and a fetch of `atlasUrl` that failed, and it cuts short a fetch
+   * that is still under way: neither the json nor a failure of that fetch arrives after the
+   * write. It has no url of its own and keeps its `meta.image` as written, and the image loader
+   * resolves a relative one against the document.
    *
    * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
    * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
@@ -383,6 +389,11 @@ export class TextureResource {
   set atlasJson(value: TexturePackerJsonData | undefined) {
     if (this.#disposed) return;
     if (!this.#atlasJson) throw wrongShapeError(this, 'atlasJson');
+    // a fetch of `atlasUrl` that is still under way would replace this json once it arrives —
+    // through `#fetchedAtlasJson` and the atlas image effect — and its failure would hold back
+    // what this json brings
+    this.#atlasFetch?.abort();
+    this.#atlasFetch = undefined;
     // a json written from outside replaces the fetched one: a later change of the
     // `overrideImageUrl` must not bring the fetched json back in its place
     this.#fetchedAtlasJson?.set(undefined);
@@ -485,8 +496,15 @@ export class TextureResource {
   #ownTexture?: Texture;
 
   // the failure each step last ended with, until that step runs again: a resource does not
-  // try again by itself, and a get() that comes after the failure has to see it all the same
+  // try again by itself, and a get() that comes after the failure has to see it all the same.
+  // Only a step that ends without its result lands here — a subscriber that throws while a
+  // result is published is no failure of the step: the result is there
   #loadFailures = new Map<LoadStep, TextureResourceLoadFailure>();
+
+  // the atlas fetch under way, if there is one: the run of the fetch effect that started it
+  // sets it and lets go of it when the fetch is over; that run's cleanup and the `atlasJson`
+  // setter cut it short
+  #atlasFetch?: AbortController;
 
   #load = false;
   #disposed = false;
@@ -580,7 +598,9 @@ export class TextureResource {
           if (value === undefined) {
             retainClear(this, event);
           } else {
-            emit(this, event, value);
+            // every subscriber hears the value and the retained event takes it, even behind
+            // one that throws; the throw goes on to the writer afterwards
+            emitStrict(this, event, value);
           }
         });
       };
@@ -608,55 +628,67 @@ export class TextureResource {
           if (!factory || !url) return;
 
           let aborted = false;
-          let texture: Texture | undefined;
 
           // one lease per run, given back by the cleanup of exactly this run: a source that is
           // swapped in between cannot make this run give back what it never took
           const lease: ImageLease | undefined = this[imageSource]?.acquire(url);
 
-          (lease?.image ?? new ImageLoader().loadAsync(url))
-            .then(
-              (image) => {
-                if (aborted) return;
-                texture = factory.create(image, ...(classes ?? []));
-                texture.name = this.id;
-                // The resource owns the texture before it publishes it: a subscriber that throws
-                // inside the batch, or one that disposes this resource, cannot skip the handover —
-                // dispose() releases whatever is owned at that moment. The predecessor stays alive
-                // while it is still the published value and is released only after the batch, once
-                // the successor is on the signal and no reader can reach it
-                const previous = this.#ownTexture;
-                this.#ownTexture = texture;
-                try {
-                  // one batch: the three values reach their effects together, and the higher
-                  // priority of everything derived from the image — the atlas among it — puts
-                  // those runs ahead of the bridge that carries the texture out
-                  batch(() => {
-                    this.#imageUrlOfCoords.set(url);
-                    this.#imageCoords.set(new TextureCoords(0, 0, image.width, image.height));
-                    this.#texture.set(texture);
-                  });
-                } finally {
-                  previous?.dispose();
-                }
-              },
-              (error) => {
-                // the second parameter of .then() sees exactly the rejection of the image load
-                // this promise wraps — the one case an `{source: 'image', url}` describes
-                if (aborted) return;
-                this.#fail('image', {source: 'image', url, error});
-              },
-            )
-            .catch((error) => {
-              // texture creation that throws lands here, and so does a subscriber of an event
-              // that throws inside the batch() above: signalize propagates inline, isolates the
-              // throw and rethrows it to the writer once delivery ends, several at once as an
-              // AggregateError. The writer here is the batch() itself, so it surfaces here, long
-              // after the image fetch has already succeeded — there is no failed url to name, so
-              // this reports the resource instead
+          // No closing .catch(): what either handler below still throws can only come from an
+          // error listener that throws itself, and that is no failure of this step
+          (lease?.image ?? new ImageLoader().loadAsync(url)).then(
+            (image) => {
               if (aborted) return;
-              this.#fail('image', {source: 'texture', id: this.id, error});
-            });
+              // the coordinates first, so a throw there leaves no texture behind that nobody
+              // releases. There is no failed url to name here, so the resource is reported
+              let coords: TextureCoords;
+              let texture: Texture;
+              try {
+                coords = new TextureCoords(0, 0, image.width, image.height);
+                texture = factory.create(image, ...(classes ?? []));
+              } catch (error) {
+                this.#fail('image', {source: 'texture', id: this.id, error});
+                return;
+              }
+              texture.name = this.id;
+              // The resource owns the texture before it publishes it: a subscriber that throws
+              // inside the batch, or one that disposes this resource, cannot skip the handover —
+              // dispose() releases whatever is owned at that moment. The predecessor stays alive
+              // while it is still the published value and is released only after the batch, once
+              // the successor is on the signal and no reader can reach it
+              const previous = this.#ownTexture;
+              this.#ownTexture = texture;
+              let publishError: {error: unknown} | undefined;
+              try {
+                // one batch: the three values reach their effects together, and the higher
+                // priority of everything derived from the image — the atlas among it — puts
+                // those runs ahead of the bridge that carries the texture out
+                batch(() => {
+                  this.#imageUrlOfCoords.set(url);
+                  this.#imageCoords.set(coords);
+                  this.#texture.set(texture);
+                });
+              } catch (error) {
+                // a subscriber that throws inside the batch lands here: signalize propagates
+                // inline, isolates the throw and rethrows it to the writer once delivery ends,
+                // several at once as an AggregateError, and the writer is the batch() itself.
+                // Every value is published by then and every subscriber has heard it, so the step
+                // has its result: the throw is reported without a record that would hold a value
+                // back, and whether this run was cut short in the meantime changes nothing
+                publishError = {error};
+              } finally {
+                previous?.dispose();
+              }
+              if (publishError) {
+                emit(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+              }
+            },
+            (error) => {
+              // the second parameter of .then() sees exactly the rejection of the image load
+              // this promise wraps — the one case an `{source: 'image', url}` describes
+              if (aborted) return;
+              this.#fail('image', {source: 'image', url, error});
+            },
+          );
 
           return () => {
             // a texture that reached the signal outlives this run and is released by the run
@@ -696,8 +728,13 @@ export class TextureResource {
             }
 
             if (tileSet) {
-              tileSetSignal.set(tileSet);
-              tileSetAtlasSignal.set(tileSet.atlas);
+              // one batch: a subscriber of the tile set that throws makes its set() throw, and
+              // the atlas of that tile set would never reach the resource
+              const built = tileSet;
+              batch(() => {
+                tileSetSignal.set(built);
+                tileSetAtlasSignal.set(built.atlas);
+              });
               return;
             }
 
@@ -791,51 +828,73 @@ export class TextureResource {
             const atlasUrl = this.atlasUrl;
             if (!atlasUrl) return;
             const ac = new AbortController();
-            let aborted = false;
+            this.#atlasFetch = ac;
             (async () => {
+              // the try holds the fetch and nothing else: writing the json publishes whatever it
+              // brings — with its image already there, the atlas within this very call — and a
+              // subscriber that throws there is no failure of the fetch
+              let result: {json: AtlasJsonResponse} | {failure: TextureResourceLoadFailure};
               try {
                 const response = await fetch(atlasUrl, {signal: ac.signal});
-                if (aborted) return;
+                if (ac.signal.aborted) return;
                 if (!response.ok) {
                   // without this check, a 4xx/5xx body that happens to satisfy
                   // isAtlasJsonResponse below would be taken for a valid atlas, and the status
                   // this branch reports would be lost
-                  this.#fail('atlasFetch', {
-                    source: 'atlas',
-                    url: atlasUrl,
-                    status: response.status,
-                    error: new Error(`[TextureResource] fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`),
-                  });
-                  return;
+                  result = {
+                    failure: {
+                      source: 'atlas',
+                      url: atlasUrl,
+                      status: response.status,
+                      error: new Error(
+                        `[TextureResource] fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`,
+                      ),
+                    },
+                  };
+                } else {
+                  const atlasJson = await response.json();
+                  if (ac.signal.aborted) return;
+                  if (isAtlasJsonResponse(atlasJson)) {
+                    // a relative image name is a file next to the atlas json, and `atlasUrl` here is the url
+                    // this very json came from — the effect that picks the image may already see the next one
+                    const image = atlasJson.meta.image;
+                    result = {
+                      json:
+                        typeof image === 'string'
+                          ? {...atlasJson, meta: {...atlasJson.meta, image: resolveRelativeUrl(image, atlasUrl)}}
+                          : atlasJson,
+                    };
+                  } else {
+                    result = {
+                      failure: {
+                        source: 'atlas',
+                        url: atlasUrl,
+                        error: new Error(`[TextureResource] the response of "${atlasUrl}" is no texture atlas json`),
+                      },
+                    };
+                  }
                 }
-                const atlasJson = await response.json();
-                if (aborted) return;
-
-                if (!isAtlasJsonResponse(atlasJson)) {
-                  this.#fail('atlasFetch', {
-                    source: 'atlas',
-                    url: atlasUrl,
-                    error: new Error(`[TextureResource] the response of "${atlasUrl}" is no texture atlas json`),
-                  });
-                  return;
-                }
-
-                // a relative image name is a file next to the atlas json, and `atlasUrl` here is the url
-                // this very json came from — the effect that picks the image may already see the next one
-                const image = atlasJson.meta.image;
-                fetchedAtlasJsonSignal.set(
-                  typeof image === 'string'
-                    ? {...atlasJson, meta: {...atlasJson.meta, image: resolveRelativeUrl(image, atlasUrl)}}
-                    : atlasJson,
-                );
               } catch (error) {
-                if (aborted) return;
-                this.#fail('atlasFetch', {source: 'atlas', url: atlasUrl, error});
+                if (ac.signal.aborted) return;
+                result = {failure: {source: 'atlas', url: atlasUrl, error}};
+              } finally {
+                if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
+              }
+              if ('failure' in result) {
+                this.#fail('atlasFetch', result.failure);
+                return;
+              }
+              try {
+                fetchedAtlasJsonSignal.set(result.json);
+              } catch (error) {
+                // signalize hands the throw of a subscriber to the writer once every effect has
+                // run: the json and what is built from it are published, so no record is kept
+                emit(this, OnError, {source: 'texture', id: this.id, error});
               }
             })();
             return () => {
-              aborted = true;
               ac.abort();
+              if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
             };
           },
           [atlasUrlSignal],

@@ -1770,6 +1770,67 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
+    test('a get() after an atlasJson written over a fetch still in flight is not rejected when that fetch fails', async () => {
+      // pays no heed to its signal: the 404 below reaches the resource even after an abort
+      let answer!: (response: Response) => void;
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      let resolveImage!: (image: HTMLImageElement) => void;
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        () =>
+          new Promise<HTMLImageElement>((resolve) => {
+            resolveImage = resolve;
+          }),
+      );
+
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+      // subscribing loads the resource, and that sends the fetch off
+      const atlas = store.get('a', 'atlas');
+      const resource = await store.whenResource('a');
+
+      resource.atlasJson = {
+        frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
+        meta: {image: 'a.png', size: {w: 100, h: 50}},
+      } as never;
+      answer(new Response('{}', {status: 404}));
+      await flushMicrotasks();
+
+      resolveImage({width: 100, height: 50} as unknown as HTMLImageElement);
+      const settled = await settleWithin(atlas);
+
+      expect(messageOf(settled)).toBe(resource.atlas);
+      expect(settled).toBeDefined();
+
+      store.dispose();
+    });
+
+    test('a subscriber that throws holds no get() back', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
+
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      store.on('a', 'texture', () => {
+        throw new Error('a subscriber that throws');
+      });
+      const pending = store.get('a', 'texture');
+      await flushMicrotasks();
+      const late = store.get('a', 'texture');
+
+      const texture = (await store.whenResource('a')).texture;
+
+      expect(await settleWithin(pending)).toBe(texture);
+      expect(await settleWithin(late)).toBe(texture);
+      expect(texture).toBeDefined();
+
+      store.dispose();
+    });
+
     test('a get() asked after the image failed rejects as well', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(new Error('404'));
 
