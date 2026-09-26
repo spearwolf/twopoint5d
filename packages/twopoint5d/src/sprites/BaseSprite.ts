@@ -31,7 +31,7 @@ export interface BaseSprite extends VO {
 }
 
 export class BaseSprite {
-  make(width = 0.5, height = 0.5, xOffset = 0, yOffset = 0): void {
+  make(halfWidth = 0.5, halfHeight = 0.5, xOffset = 0, yOffset = 0): void {
     // A square lying on the XY plane:
     //
     //             ^(y)
@@ -46,10 +46,10 @@ export class BaseSprite {
 
     // prettier-ignore
     this.setPosition([
-      -width + xOffset, -height + yOffset, 0,
-      -width + xOffset, +height + yOffset, 0,
-      +width + xOffset, +height + yOffset, 0,
-      +width + xOffset, -height + yOffset, 0,
+      -halfWidth + xOffset, -halfHeight + yOffset, 0,
+      -halfWidth + xOffset, +halfHeight + yOffset, 0,
+      +halfWidth + xOffset, +halfHeight + yOffset, 0,
+      +halfWidth + xOffset, -halfHeight + yOffset, 0,
     ]);
 
     //   (0,0)----(1,0)

@@ -65,11 +65,16 @@ const trimScratch: FrameTrimMargins = [0, 0, 0, 0];
 
 export class TexturedSprite {
   [voInitialize]() {
-    this.setColorValues(1, 1, 1, 1);
     // the slot createVO() hands out still carries the values of the sprite that stood in it before;
-    // a new sprite starts upright and untrimmed
+    // a new sprite starts from the values of a slot no sprite has stood in — 0 in every attribute,
+    // and white as the color that tints it
+    this.setQuadSize(0, 0);
+    this.setTexCoords(0, 0, 0, 0);
     this.texFlipDiagonal = 0;
     this.setTexTrim(0, 0, 0, 0);
+    this.setInstancePosition(0, 0, 0);
+    this.rotation = 0;
+    this.setColorValues(1, 1, 1, 1);
   }
 
   setSize(width: number, height: number): void {

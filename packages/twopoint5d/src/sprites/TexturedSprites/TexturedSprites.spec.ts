@@ -158,6 +158,30 @@ describe('TexturedSprites', () => {
     sprites.dispose();
   });
 
+  test('createSprite() hands out a sprite with every attribute at the value of an unused slot — 0, and white as its color — whatever its slot held before', () => {
+    const sprites = new TexturedSprites(4);
+    const pool = sprites.spritePool!;
+    sprites.createSprite();
+    const second = sprites.createSprite()!;
+    // 7 in every element of every buffer stands for whatever the two sprites were given
+    for (const {typedArray} of pool.buffer.buffers.values()) typedArray!.fill(7);
+
+    // the last sprite of the pool goes back, and the next createSprite() takes its slot again
+    sprites.freeSprite(second);
+    sprites.createSprite();
+
+    // every attribute the description declares, so that one added later is held to the reset as well
+    const names = [...pool.descriptor.attributeNames];
+    const slot = pool.buffer.toAttributeArrays(names, 1, 2);
+    for (const name of names) {
+      const {size} = pool.descriptor.getAttribute(name)!;
+      const expected = name === 'color' ? [1, 1, 1, 1] : new Array<number>(size).fill(0);
+      expect(Array.from(slot[name]!), `${name} of the new sprite`).toEqual(expected);
+    }
+
+    sprites.dispose();
+  });
+
   test('freeSprite() gives a sprite back to the pool', () => {
     const sprites = new TexturedSprites(4);
 

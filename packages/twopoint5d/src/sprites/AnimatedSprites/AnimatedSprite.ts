@@ -1,3 +1,4 @@
+import {voInitialize} from '../../vertex-objects/constants.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
 
 export interface AnimatedSprite extends VO {
@@ -20,6 +21,16 @@ export interface AnimatedSprite extends VO {
 }
 
 export class AnimatedSprite {
+  [voInitialize]() {
+    // the slot createVO() hands out still carries the values of the sprite that stood in it before;
+    // a new sprite starts from the values of a slot no sprite has stood in
+    this.setQuadSize(0, 0);
+    this.animId = 0;
+    this.animOffset = 0;
+    this.setInstancePosition(0, 0, 0);
+    this.rotation = 0;
+  }
+
   setSize(width: number, height: number): void {
     this.setQuadSize(width, height);
   }

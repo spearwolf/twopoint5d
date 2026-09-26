@@ -38,17 +38,33 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
    * data provider gives the tile id `0`, and {@link noTileCapacity} when the instanced pool of the
    * geometry has no slot left — or when `tileSprites` has no geometry, and so no pool.
    *
-   * @throws when the factory has no tile data provider, no tile set, or the atlas of the tile
-   * set has no frame for the tile id; nothing is taken out of the pool then
+   * @throws an `Error` naming the method and the field to set when the factory has no
+   * `tileDataProvider`, or no `tileSet` for a coordinate whose tile id is not `0`; the `RangeError`
+   * of `TileSet#frameId()` when the provider answers a tile id that is no whole number. Nothing is
+   * taken out of the pool then
    */
   createTile(tileCoords: IMap2DTileCoords): TileSprite | undefined | typeof noTileCapacity {
-    const tileDataProvider = expectDefined(this.tileDataProvider, 'the tile data provider of this factory');
+    const {tileDataProvider} = this;
+    if (tileDataProvider == null) {
+      throw new Error(
+        `TileSpritesFactory#createTile() has no tileDataProvider to read tile ${tileCoords.x},${tileCoords.y} from: ` +
+          'set TileSpritesFactory#tileDataProvider before the factory builds tiles',
+      );
+    }
     const tileDataId = tileDataProvider.getTileIdAt(tileCoords.x, tileCoords.y);
 
     if (tileDataId === 0) return;
 
-    const tileSet = expectDefined(this.tileSet, 'the tile set of this factory');
+    const {tileSet} = this;
+    if (tileSet == null) {
+      throw new Error(
+        `TileSpritesFactory#createTile() has no tileSet to look up tile id ${tileDataId} of tile ${tileCoords.x},${tileCoords.y} in: ` +
+          'set TileSpritesFactory#tileSet before the factory builds tiles',
+      );
+    }
     const frameId = tileSet.frameId(tileDataId);
+    // frameId() answers a frame id inside the range of the tile set, and its atlas holds a frame for
+    // each of them: a missing frame is a broken invariant, not a field the caller left empty
     const texCoords = expectDefined(tileSet.atlas.get(frameId), `the atlas frame of tile ${tileDataId}`).coords;
 
     // everything that can throw has thrown by now: the slot below comes out of the instanced

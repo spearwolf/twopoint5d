@@ -16,7 +16,8 @@ export class AnimatedSpritesGeometry extends InstancedVertexObjectGeometry<Anima
    */
   constructor(
     capacity = 100,
-    makeBaseSpriteArgs: [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number] = [
+    makeBaseSpriteArgs:
+      [halfWidth: number, halfHeight: number] | [halfWidth: number, halfHeight: number, xOffset: number, yOffset: number] = [
       0.5, 0.5,
     ],
   ) {

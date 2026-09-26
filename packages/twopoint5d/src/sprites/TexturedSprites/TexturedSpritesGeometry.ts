@@ -16,7 +16,7 @@ export type TexturedSpritesPool = VertexObjectPool<TexturedSprite>;
 export type TexturedSpritePool = TexturedSpritesPool;
 
 export type TexturedSpritesMakeBaseSpriteArgs =
-  [width: number, height: number] | [width: number, height: number, xOffset: number, yOffset: number];
+  [halfWidth: number, halfHeight: number] | [halfWidth: number, halfHeight: number, xOffset: number, yOffset: number];
 
 /** @deprecated Use {@link TexturedSpritesMakeBaseSpriteArgs}. The plural belongs to the `TexturedSprites` module, not to a single sprite. */
 export type TexturedSpriteMakeBaseSpriteArgs = TexturedSpritesMakeBaseSpriteArgs;

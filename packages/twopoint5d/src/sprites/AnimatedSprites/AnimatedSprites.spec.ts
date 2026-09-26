@@ -33,6 +33,27 @@ describe('AnimatedSprites', () => {
     expect(sprite.z).toBe(3);
   });
 
+  test('a sprite out of the pool of an AnimatedSpritesGeometry starts with every attribute at 0, whatever its slot held before', () => {
+    const geometry = new AnimatedSpritesGeometry(2);
+    const pool = geometry.instancedPool;
+    pool.createVO();
+    const second = pool.createVO()!;
+    // 7 in every element of every buffer stands for whatever the two sprites were given
+    for (const {typedArray} of pool.buffer.buffers.values()) typedArray!.fill(7);
+
+    pool.freeVO(second);
+    pool.createVO();
+
+    const names = [...pool.descriptor.attributeNames];
+    const slot = pool.buffer.toAttributeArrays(names, 1, 2);
+    for (const name of names) {
+      const {size} = pool.descriptor.getAttribute(name)!;
+      expect(Array.from(slot[name]!), `${name} of the new sprite`).toEqual(new Array<number>(size).fill(0));
+    }
+
+    geometry.dispose();
+  });
+
   test('an AnimatedSprites built without a geometry or a material is typed with what THREE.Mesh puts there', () => {
     const sprites = new AnimatedSprites();
 

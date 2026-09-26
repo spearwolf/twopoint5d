@@ -41,12 +41,29 @@ const attrAt = (geometry: TileSpritesGeometry, attrName: string, slot: number, s
 
 describe('TileSpritesFactory', () => {
   describe('createTile()', () => {
-    test('a factory without a tile set leaves the instanced pool as it found it', () => {
+    test('a factory without a tile set throws an Error naming the method, the field and the tile, and leaves the instanced pool as it found it', () => {
       const tileSprites = new TileSprites(new TileSpritesGeometry(4));
       const factory = new TileSpritesFactory(tileSprites, undefined, new RepeatingTilesProvider(1));
       const pool = tileSprites.geometry!.instancedPool;
 
-      expect(() => factory.createTile(new Map2DTileCoords(0, 0))).toThrow('expected the tile set of this factory to be defined');
+      const call = () => factory.createTile(new Map2DTileCoords(0, 0));
+      expect(call).toThrow(Error);
+      expect(call).toThrow(
+        'TileSpritesFactory#createTile() has no tileSet to look up tile id 1 of tile 0,0 in: set TileSpritesFactory#tileSet before the factory builds tiles',
+      );
+      expect(pool.usedCount, 'usedCount after a throw').toBe(0);
+    });
+
+    test('a factory without a tile data provider throws an Error naming the method, the field and the tile, and leaves the instanced pool as it found it', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(4));
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet());
+      const pool = tileSprites.geometry!.instancedPool;
+
+      const call = () => factory.createTile(new Map2DTileCoords(2, 3));
+      expect(call).toThrow(Error);
+      expect(call).toThrow(
+        'TileSpritesFactory#createTile() has no tileDataProvider to read tile 2,3 from: set TileSpritesFactory#tileDataProvider before the factory builds tiles',
+      );
       expect(pool.usedCount, 'usedCount after a throw').toBe(0);
     });
 
