@@ -101,7 +101,12 @@ type AnimEntry = FrameBasedAnimDef & {trims: FrameTrimMargins[]};
 
 type AnimationsMap = Map<AnimName, AnimEntry>;
 
-const getBufferSize = (animationsMap: AnimationsMap, texelsPerFrame = 1, maxTextureSize = 16384) => {
+// the default is read at the call, after the class below has been initialized
+const getBufferSize = (
+  animationsMap: AnimationsMap,
+  texelsPerFrame = 1,
+  maxTextureSize = FrameBasedAnimations.MaxTextureSize,
+) => {
   const anims = Array.from(animationsMap.values());
   const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
   const minBufSize = anims.length + totalFramesCount * texelsPerFrame;
