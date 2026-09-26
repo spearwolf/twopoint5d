@@ -4,15 +4,28 @@ import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import type {TextureSource} from './types.js';
 
+/** @deprecated Belongs to the deprecated {@link TextureImageLoader}, which a `TextureStore` replaces. */
 export interface TextureImage {
   texture: Texture;
   imgEl: TextureSource;
   texCoords: TextureCoords;
 }
 
+/** @deprecated Belongs to the deprecated {@link TextureImageLoader}, which a `TextureStore` replaces. */
 export type TextureImageLoadCallback = (textureData: TextureImage) => void;
+/** @deprecated Belongs to the deprecated {@link TextureImageLoader}, which a `TextureStore` replaces. */
 export type TextureImageLoadErrorCallback = ((err: unknown) => void) | undefined;
 
+/**
+ * Loads an image and builds a texture of it, padded to powers of 2 by a
+ * {@link PowerOf2ImageLoader}.
+ *
+ * @deprecated Use a `TextureStore`: a catalog item with an `imageUrl`, read with
+ *   `getAsync(id, ['texture', 'imageCoords'])`. The store loads the image without padding it, its
+ *   `imageCoords` are the root of the image, and it starts from no texture class where this
+ *   loader starts from `nearest`; the texture belongs to the store. The class stays until a
+ *   breaking release removes it.
+ */
 export class TextureImageLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;

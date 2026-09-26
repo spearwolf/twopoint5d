@@ -43,7 +43,7 @@ export type FrameBasedAnimationsDataMap = Record<string, FrameBasedAnimationsDat
 export interface TextureResourceData {
   /**
    * The image of an image or a tile set resource. A relative url names a file next to the
-   * catalog when `TextureStore#load()` fetches it, or next to the `baseUrl` given to
+   * catalog when `TextureStore#loadAsync()` fetches it, or next to the `baseUrl` given to
    * `TextureStore#parse()`.
    */
   imageUrl?: string;

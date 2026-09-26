@@ -78,7 +78,7 @@ export const TextureResourceSubtypes = {
  * subscriber is called and the retained value is written before the throw goes on. A throw
  * raised while the resource publishes what it loaded — its image, its atlas json and what is
  * built from them — is reported with the same `{source: 'texture', id, error}`; the value stays
- * published, and `TextureStore#get()` does not reject on it. A tile set that `TileSet` refuses
+ * published, and `TextureStore#getAsync()` does not reject on it. A tile set that `TileSet` refuses
  * is reported here whether the image arrives or the `tileSetOptions` change; the write that changed them
  * does not throw. An `atlasJson` that `TexturePackerJson` cannot read is reported here as soon
  * as the image it names is there; the write that set it does not throw either. It carries
@@ -203,7 +203,7 @@ export interface TextureResource extends EventizedObject {}
  * `textureClasses`, `textureFactory` and `renderer`. `atlasJson` is both: an atlas
  * resource with an `atlasUrl` fetches the JSON and writes it here itself.
  *
- * **Output** — read-only, produced by the effects {@link TextureResource.load} registers:
+ * **Output** — read-only, produced by the effects {@link TextureResource.activate} registers:
  * `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations`. Each of them is
  * also an event of the same name, retained, so a subscriber that arrives late still sees
  * the current value. A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations`
@@ -281,7 +281,7 @@ export class TextureResource {
   }
 
   // the inputs of one shape each, created by the constructor for that shape and no other: a
-  // setter of another shape finds none and throws, and load() registers the effects of the
+  // setter of another shape finds none and throws, and activate() registers the effects of the
   // shape they belong to
   readonly #tileSetOptions?: Signal<TileSetOptions | undefined>;
   readonly #atlasSignals?: AtlasSignals;
@@ -317,7 +317,7 @@ export class TextureResource {
 
   /**
    * How many `TextureStore#on()` subscriptions hold this resource, a pending
-   * `TextureStore#get()` among them. `TextureStore#clearUnused()` and
+   * `TextureStore#getAsync()` among them. `TextureStore#clearUnused()` and
    * `TextureStore#parse()` with `{evictMissing: true}` dispose a resource only while this
    * is 0.
    *
@@ -379,7 +379,7 @@ export class TextureResource {
    * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
    * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
    * with `source: 'texture'` once the image it names is there; writing it does not throw.
-   * Written before {@link TextureResource.load}, it takes the place of the fetch of the
+   * Written before {@link TextureResource.activate}, it takes the place of the fetch of the
    * `atlasUrl` it was written after.
    */
   get atlasJson(): TexturePackerJsonData | undefined {
@@ -390,9 +390,9 @@ export class TextureResource {
     if (this.#disposed) return;
     const signals = this.#atlasSignals;
     if (!signals) throw wrongShapeError(this, 'atlasJson');
-    // a fetch of `atlasUrl` that is still under way, and a fetch that load() has yet to start,
-    // would replace this json once it arrives — through `#fetchedAtlasJson` and the atlas image
-    // effect — and its failure would hold back what this json brings
+    // a fetch of `atlasUrl` that is still under way, and a fetch that activate() has yet to
+    // start, would replace this json once it arrives — through `#fetchedAtlasJson` and the atlas
+    // image effect — and its failure would hold back what this json brings
     this.#atlasFetch?.abort();
     this.#atlasFetch = undefined;
     this.#atlasFetchDue = false;
@@ -500,9 +500,9 @@ export class TextureResource {
   #ownTexture?: Texture;
 
   // the failure each step last ended with, until that step runs again: a resource does not
-  // try again by itself, and a get() that comes after the failure has to see it all the same.
-  // Only a step that ends without its result lands here — a subscriber that throws while a
-  // result is published is no failure of the step: the result is there
+  // try again by itself, and a getAsync() that comes after the failure has to see it all the
+  // same. Only a step that ends without its result lands here — a subscriber that throws while
+  // a result is published is no failure of the step: the result is there
   #loadFailures = new Map<LoadStep, TextureResourceLoadFailure>();
 
   // the atlas fetch under way, if there is one: the run of the fetch effect that started it
@@ -510,20 +510,20 @@ export class TextureResource {
   // setter cut it short
   #atlasFetch?: AbortController;
 
-  // whether load() starts the fetch of `atlasUrl`: a url that changes makes it due, and an
+  // whether activate() starts the fetch of `atlasUrl`: a url that changes makes it due, and an
   // `atlasJson` written after it takes its place, as it cuts short a fetch under way. Read by
-  // load() alone — once the effects are registered, a new url starts its fetch by itself
+  // activate() alone — once the effects are registered, a new url starts its fetch by itself
   #atlasFetchDue = false;
 
-  #load = false;
+  #activated = false;
   #disposed = false;
 
   /**
    * A resource of the given `type`, with the inputs of that shape and of no other: an `'atlas'`
    * resource takes `atlasUrl`, `atlasJson` and `overrideImageUrl`, a `'tileset'` resource
-   * `tileSetOptions`, and {@link TextureResource.load} registers the effects of that shape. The
-   * static factories {@link TextureResource.fromImage}, {@link TextureResource.fromTileSet} and
-   * {@link TextureResource.fromAtlas} build one the same way and write its first values.
+   * `tileSetOptions`, and {@link TextureResource.activate} registers the effects of that shape.
+   * The static factories {@link TextureResource.fromImage}, {@link TextureResource.fromTileSet}
+   * and {@link TextureResource.fromAtlas} build one the same way and write its first values.
    */
   constructor(id: string, type: TextureResourceType) {
     eventize(this);
@@ -554,7 +554,7 @@ export class TextureResource {
    * Afterwards every getter of this resource answers `undefined`, while
    * {@link TextureResource.id} and {@link TextureResource.type} still say which resource
    * this was and {@link TextureResource.refCount} how many subscriptions still hold it. A
-   * write to any setter, a {@link TextureResource.load} and a second `dispose()` do
+   * write to any setter, an {@link TextureResource.activate} and a second `dispose()` do
    * nothing — a setter that would throw on the shape of this resource stays silent as well.
    */
   dispose() {
@@ -606,15 +606,14 @@ export class TextureResource {
    * `atlasUrl` is fetched unless an `atlasJson` was written after it.
    *
    * It fetches nothing by itself: the effects do that, once the resource has what they
-   * read. The two `TextureStore` methods of the same name do the fetching — the instance
-   * method into an existing store, the static one into a store it builds for the attempt.
+   * read. `TextureStore#loadAsync()` fetches a catalog and builds its resources.
    *
    * On a disposed resource this does nothing — no effect and no signal is created — and
    * returns `this`.
    */
-  load(): TextureResource {
-    if (this.#disposed || this.#load) return this;
-    this.#load = true;
+  activate(): TextureResource {
+    if (this.#disposed || this.#activated) return this;
+    this.#activated = true;
 
     // A value that is taken back is not announced: a subscriber would get an `undefined`
     // where the event promises a value. The retained event is cleared instead, so a
@@ -665,9 +664,18 @@ export class TextureResource {
     return this;
   }
 
+  /**
+   * @deprecated Use {@link TextureResource.activate}: it registers the effects of this resource
+   *   and loads nothing by itself. The old name stays as an alias until a breaking release
+   *   removes it.
+   */
+  load(): TextureResource {
+    return this.activate();
+  }
+
   #registerImageEffect(): void {
     // auto-tracking effect (no static deps) so it autoruns at registration
-    // — load() is typically called AFTER `textureFactory` and `imageUrl` are
+    // — activate() is typically called AFTER `textureFactory` and `imageUrl` are
     // already set on the resource (by the store's parse-time injection), and
     // a static-dep effect would otherwise never fire because no dep changes
     // post-registration.
@@ -1034,10 +1042,11 @@ export class TextureResource {
       if ('frameNameQuery' in data) animations.add(name, data, atlas, data.frameNameQuery);
     });
 
-    // load() takes up what the resource holds at this call as if it were written right after it.
-    // These effects have static dependencies and run on a change alone: a json written before
+    // activate() takes up what the resource holds at this call as if it were written right after
+    // it. These effects have static dependencies and run on a change alone: a json written before
     // the call builds its atlas once touched, and the fetch of `atlasUrl` starts only while it is
-    // due — an `atlasJson` written after that url takes its place, as it cuts short a fetch under way
+    // due — an `atlasJson` written after that url takes its place, as it cuts short a fetch under
+    // way
     if (atlasJsonSignal.value !== undefined) touch(atlasJsonSignal);
     if (this.#atlasFetchDue) touch(atlasUrlSignal);
   }

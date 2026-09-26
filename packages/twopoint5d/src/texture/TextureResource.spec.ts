@@ -80,7 +80,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'first.png');
-      resource.load();
+      resource.activate();
 
       const deliveries: Array<{tag: string; disposed: boolean}> = [];
       on(resource, 'texture', (texture: StubTexture | undefined) => {
@@ -129,7 +129,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'a.png');
-      resource.load();
+      resource.activate();
 
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
@@ -154,7 +154,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'a.png');
-      resource.load();
+      resource.activate();
 
       on(resource, 'error', () => {});
       on(resource, 'texture', (texture: StubTexture) => {
@@ -179,7 +179,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'a.png');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -205,7 +205,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'a.png');
-      resource.load();
+      resource.activate();
 
       on(resource, 'error', () => {});
       on(resource, 'texture', () => {
@@ -233,7 +233,7 @@ describe('TextureResource', () => {
       );
 
       const resource = TextureResource.fromTileSet('ts', 't.png', {tileWidth: 4, tileHeight: 4});
-      resource.load();
+      resource.activate();
 
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
@@ -260,7 +260,7 @@ describe('TextureResource', () => {
       );
 
       const resource = TextureResource.fromImage(id, `${tag}.png`);
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
 
       await flushMicrotasks();
@@ -286,7 +286,7 @@ describe('TextureResource', () => {
       const factoryDispose = sandbox.spy(disposableFactory, 'dispose');
 
       const resource = TextureResource.fromImage('handed-in', 'handed-in.png');
-      resource.load();
+      resource.activate();
       resource.textureFactory = disposableFactory as never;
 
       resource.dispose();
@@ -338,7 +338,7 @@ describe('TextureResource', () => {
       const baselineEffects = getEffectsCount();
 
       const resource = TextureResource.fromImage('counted', 'counted.png');
-      resource.load();
+      resource.activate();
 
       expect(getSignalsCount()).toBeGreaterThan(baselineSignals);
       expect(getEffectsCount()).toBeGreaterThan(baselineEffects);
@@ -364,7 +364,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
         walk: {duration: 1, frameNameQuery: 'walk.*'},
       });
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
@@ -402,7 +402,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
         walk: {duration: 1, tileIds: [1, 2]},
       });
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; animation: string}> = [];
       on(resource, 'error', (payload: {source: string; animation: string}) => {
@@ -435,7 +435,7 @@ describe('TextureResource', () => {
         walk: null,
         run: {duration: 1, tileIds: [1, 2]},
       } as unknown as FrameBasedAnimationsDataMap);
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id: string; animation?: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id: string; animation?: string; error: Error}) => {
@@ -472,7 +472,7 @@ describe('TextureResource', () => {
         walk: null,
         run: {duration: 1, frameNameQuery: 'idle.*'},
       } as unknown as FrameBasedAnimationsDataMap);
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id?: string; animation?: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id?: string; animation?: string; error: Error}) => {
@@ -508,7 +508,7 @@ describe('TextureResource', () => {
         run: {firstTileId: 1, tileCount: 2},
         idle: {duration: 1, tileIds: [3, 4]},
       } as unknown as FrameBasedAnimationsDataMap);
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
@@ -545,7 +545,7 @@ describe('TextureResource', () => {
         walk: {frameRate: 0, tileIds: [1, 2]},
         idle: {frameRate: 2, tileIds: [3, 4]},
       });
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; animation: string}> = [];
       on(resource, 'error', (payload: {source: string; animation: string}) => {
@@ -585,7 +585,7 @@ describe('TextureResource', () => {
         walk: {frameNameQuery: 'walk_.*'},
         idle: {duration: 1, frameNameQuery: 'idle_.*'},
       } as unknown as FrameBasedAnimationsDataMap);
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
@@ -627,7 +627,7 @@ describe('TextureResource', () => {
         undefined,
         tileAnimationsData,
       );
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -664,7 +664,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
         idle: {duration: 1, frameNameQuery: 'idle.*'},
       });
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -722,7 +722,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
-      resource.load();
+      resource.activate();
 
       const seen: Array<{tileSet: unknown; atlas: unknown}> = [];
       on(resource, 'imageCoords', () => {
@@ -754,7 +754,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
-      resource.load();
+      resource.activate();
 
       const seen: unknown[] = [];
       on(resource, 'imageCoords', () => {
@@ -785,7 +785,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
 
@@ -808,7 +808,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
 
@@ -835,7 +835,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
 
@@ -864,7 +864,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -897,7 +897,7 @@ describe('TextureResource', () => {
       const loadAsyncSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync');
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
-      resource.load();
+      resource.activate();
       resource.textureFactory = makeTextureFactory().factory;
 
       expect(calls).toHaveLength(1);
@@ -925,7 +925,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = makeTextureFactory().factory;
 
       resource.atlasUrl = 'second.json';
@@ -965,7 +965,7 @@ describe('TextureResource', () => {
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
 
-      resource.load();
+      resource.activate();
       resource.atlasJson = writtenAtlasJson as never;
 
       expect(calls[0]!.signal.aborted).toBe(true);
@@ -999,7 +999,7 @@ describe('TextureResource', () => {
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
 
-      resource.load();
+      resource.activate();
       resource.atlasJson = writtenAtlasJson as never;
 
       answer(
@@ -1028,7 +1028,7 @@ describe('TextureResource', () => {
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
 
-      resource.load();
+      resource.activate();
       resource.atlasJson = writtenAtlasJson as never;
 
       answer(new Response('{}', {status: 404}));
@@ -1060,7 +1060,7 @@ describe('TextureResource', () => {
       const errors: unknown[] = [];
       on(resource, 'error', (payload: unknown) => errors.push(payload));
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = makeTextureFactory().factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1099,7 +1099,7 @@ describe('TextureResource', () => {
         const {factory} = makeTextureFactory();
 
         const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
-        resource.load();
+        resource.activate();
         resource.textureFactory = factory;
         await flushMicrotasks();
         await flushMicrotasks();
@@ -1134,7 +1134,7 @@ describe('TextureResource', () => {
           errors.push(payload);
         });
 
-        resource.load();
+        resource.activate();
         resource.textureFactory = factory;
         await flushMicrotasks();
         await flushMicrotasks();
@@ -1164,7 +1164,7 @@ describe('TextureResource', () => {
         const {factory} = makeTextureFactory();
 
         const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
-        resource.load();
+        resource.activate();
         resource.textureFactory = factory;
         await flushMicrotasks();
         await flushMicrotasks();
@@ -1208,7 +1208,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
         idle: {duration: 1, frameNameQuery: 'idle.*'},
       });
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1310,7 +1310,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1343,7 +1343,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1370,7 +1370,7 @@ describe('TextureResource', () => {
         errors.push(payload);
       });
 
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1401,7 +1401,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', validOptions, undefined, animationsData);
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1517,7 +1517,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', refusedOptions);
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1599,7 +1599,7 @@ describe('TextureResource', () => {
       }).not.toThrow();
 
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
 
@@ -1623,7 +1623,7 @@ describe('TextureResource', () => {
       resource.imageUrl = 'tiles.png';
       resource.tileSetOptions = {tileWidth: 16, tileHeight: 16};
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       expect(resource.tileSet?.tileCount).toBe(16);
@@ -1659,19 +1659,39 @@ describe('TextureResource', () => {
     });
   });
 
-  describe('load()', () => {
+  describe('activate()', () => {
     test('registers no dispose listener of its own', () => {
       const resource = TextureResource.fromTileSet('t', 'tiles.png', {tileWidth: 16, tileHeight: 16});
 
       const before = getSubscriptionCount(resource);
-      resource.load();
+      resource.activate();
 
       expect(getSubscriptionCount(resource)).toBe(before);
 
       resource.dispose();
     });
 
-    test('load() on a disposed resource registers nothing', () => {
+    test('load() is a deprecated alias of activate() and registers the effects once', () => {
+      const baselineEffects = getEffectsCount();
+
+      const once = TextureResource.fromTileSet('once', 'tiles.png', {tileWidth: 16, tileHeight: 16});
+      expect(once.activate()).toBe(once);
+      const effectsOfOne = getEffectsCount() - baselineEffects;
+      expect(effectsOfOne).toBeGreaterThan(0);
+      once.dispose();
+
+      const resource = TextureResource.fromTileSet('t', 'tiles.png', {tileWidth: 16, tileHeight: 16});
+      expect(resource.load()).toBe(resource);
+      expect(resource.activate()).toBe(resource);
+      expect(resource.load()).toBe(resource);
+
+      expect(getEffectsCount() - baselineEffects).toBe(effectsOfOne);
+
+      resource.dispose();
+      expect(getEffectsCount()).toBe(baselineEffects);
+    });
+
+    test('activate() on a disposed resource registers nothing', () => {
       const baselineSignals = getSignalsCount();
       const baselineEffects = getEffectsCount();
 
@@ -1681,20 +1701,20 @@ describe('TextureResource', () => {
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
 
-      resource.load();
+      resource.activate();
 
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
 
       // nothing this resource could still tear down: the second call returns at the flag,
-      // so whatever load() registered here would stay for the life of the process
+      // so whatever activate() registered here would stay for the life of the process
       resource.dispose();
 
       expect(getSignalsCount()).toBe(baselineSignals);
       expect(getEffectsCount()).toBe(baselineEffects);
     });
 
-    test('a tile set resource whose options were cleared before load() builds its tile set once they are set again', async () => {
+    test('a tile set resource whose options were cleared before activate() builds its tile set once they are set again', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
       );
@@ -1702,7 +1722,7 @@ describe('TextureResource', () => {
 
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
       resource.tileSetOptions = undefined;
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1718,7 +1738,7 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
-    test('an atlas resource whose atlasUrl was cleared before load() fetches once it is set again', async () => {
+    test('an atlas resource whose atlasUrl was cleared before activate() fetches once it is set again', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
@@ -1727,7 +1747,7 @@ describe('TextureResource', () => {
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       resource.atlasUrl = undefined;
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
 
@@ -1747,7 +1767,7 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
-    test('an atlas resource without an atlasUrl at load() builds its atlas from an atlasJson written later', async () => {
+    test('an atlas resource without an atlasUrl at activate() builds its atlas from an atlasJson written later', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
       );
@@ -1755,7 +1775,7 @@ describe('TextureResource', () => {
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       resource.atlasUrl = undefined;
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
 
       resource.atlasJson = atlasJson;
@@ -1768,7 +1788,7 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
-    test('image-load effect runs even when factory + imageUrl are already set before load()', async () => {
+    test('image-load effect runs even when factory + imageUrl are already set before activate()', async () => {
       let resolveLoad!: (img: unknown) => void;
       const loadP = new Promise<unknown>((r) => {
         resolveLoad = r;
@@ -1780,9 +1800,9 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'first.png');
-      // mimic the store flow: both factory and url are set BEFORE load() registers effects
+      // mimic the store flow: both factory and url are set BEFORE activate() registers effects
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
 
       resolveLoad({width: 10, height: 10, tag: 'live'});
       await flushMicrotasks();
@@ -1795,7 +1815,7 @@ describe('TextureResource', () => {
     });
   });
 
-  describe('an atlasJson written before load()', () => {
+  describe('an atlasJson written before activate()', () => {
     test('builds its atlas without an atlasUrl', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
@@ -1807,7 +1827,7 @@ describe('TextureResource', () => {
       resource.atlasUrl = undefined;
       resource.atlasJson = atlasJson;
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       expect(fetchMock).not.toHaveBeenCalled();
@@ -1832,7 +1852,7 @@ describe('TextureResource', () => {
       const ownJson = {...atlasJson, meta: {...atlasJson.meta, image: 'own.png'}};
       resource.atlasJson = ownJson;
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1858,7 +1878,7 @@ describe('TextureResource', () => {
       resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: 'own.png'}};
       resource.atlasUrl = 'atlas.json';
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
       await flushMicrotasks();
       await flushMicrotasks();
@@ -1891,8 +1911,8 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('rx', 'first.png');
-      resource.load();
-      // setting the factory after load() triggers the image-loading effect
+      resource.activate();
+      // setting the factory after activate() triggers the image-loading effect
       resource.textureFactory = factory;
       // change imageUrl while first.png is still pending → forces a second load + abort
       resource.imageUrl = 'second.png';
@@ -1924,7 +1944,7 @@ describe('TextureResource', () => {
       const {factory, textures} = makeTextureFactory();
 
       const resource = TextureResource.fromImage('ry', 'pending.png');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
 
       resource.dispose();
@@ -1963,7 +1983,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromImage('hero', 'first.png');
       const errors = collectErrors(resource);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       expect(resource.texture).toBeDefined();
@@ -1986,7 +2006,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromImage('hero', 'first.png');
       const errors = collectErrors(resource);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       resource.imageUrl = undefined;
@@ -2015,7 +2035,7 @@ describe('TextureResource', () => {
       const subscriber = vi.fn();
       on(resource, 'texture', subscriber);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       resource.imageUrl = undefined;
@@ -2036,7 +2056,7 @@ describe('TextureResource', () => {
       });
       const errors = collectErrors(resource);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       expect(resource.tileSet).toBeDefined();
@@ -2067,7 +2087,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromImage('hero', 'first.png');
       const errors = collectErrors(resource);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
 
       resource.imageUrl = undefined;
       resolveLoad({width: 16, height: 16, tag: 'first'});
@@ -2087,7 +2107,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromImage('hero', 'first.png');
       const errors = collectErrors(resource);
       resource.textureFactory = factory;
-      resource.load();
+      resource.activate();
       await flushMicrotasks();
 
       const texture = resource.texture;
@@ -2109,7 +2129,7 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       const errors = collectErrors(resource);
       resource.atlasUrl = undefined;
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       resource.atlasJson = atlasJson;
       await flushMicrotasks();
@@ -2171,7 +2191,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -2189,7 +2209,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json', 'override.png');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -2207,7 +2227,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       resource.atlasJson = atlasJsonNaming('outside.png');
       await flushMicrotasks();
@@ -2226,7 +2246,7 @@ describe('TextureResource', () => {
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('a', 'atlases/a.json');
-      resource.load();
+      resource.activate();
       resource.textureFactory = factory;
       await flushMicrotasks();
       await flushMicrotasks();
@@ -2254,7 +2274,7 @@ describe('TextureResource', () => {
         // the catalog json carries what it carries
         animationsData as FrameBasedAnimationsDataMap,
       );
-      resource.load();
+      resource.activate();
 
       const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {

@@ -20,7 +20,7 @@ describe('TextureFactory', () => {
     test('a class below the maximum is written to texture.anisotropy', () => {
       const factory = new TextureFactory(16, []);
 
-      const texture = factory.update(new Texture(), 'anisotrophy-4');
+      const texture = factory.update(new Texture(), 'anisotropy-4');
 
       expect(texture.anisotropy).toBe(4);
       expect(texture).not.toHaveProperty('anisotrophy');
@@ -29,32 +29,32 @@ describe('TextureFactory', () => {
     test('a class above the maximum is capped at the maximum', () => {
       const factory = new TextureFactory(2, []);
 
-      expect(factory.update(new Texture(), 'anisotrophy-4').anisotropy).toBe(2);
+      expect(factory.update(new Texture(), 'anisotropy-4').anisotropy).toBe(2);
     });
 
     test('the open class takes whatever the maximum is', () => {
       const factory = new TextureFactory(8, []);
 
-      expect(factory.update(new Texture(), 'anisotrophy').anisotropy).toBe(8);
+      expect(factory.update(new Texture(), 'anisotropy').anisotropy).toBe(8);
     });
 
     test('no anisotropic filtering is the value 1, which is what three.js calls off', () => {
       const factory = new TextureFactory(16, []);
 
-      expect(factory.update(new Texture(), 'no-anisotrophy').anisotropy).toBe(1);
+      expect(factory.update(new Texture(), 'no-anisotropy').anisotropy).toBe(1);
     });
 
     test('a renderer that cannot name a maximum hands out none', () => {
       const factory = new TextureFactory(rendererWithoutMaxAnisotropy(), []);
 
-      expect(factory.getOptions(['anisotrophy-4']).anisotrophy).toBe(0);
-      expect(factory.update(new Texture(), 'anisotrophy-4').anisotropy).toBe(1);
+      expect(factory.getOptions(['anisotropy-4']).anisotropy).toBe(1);
+      expect(factory.update(new Texture(), 'anisotropy-4').anisotropy).toBe(1);
     });
 
     test('a renderer that names a maximum caps against it', () => {
       const factory = new TextureFactory(rendererWithMaxAnisotropy(2), []);
 
-      expect(factory.update(new Texture(), 'anisotrophy-4').anisotropy).toBe(2);
+      expect(factory.update(new Texture(), 'anisotropy-4').anisotropy).toBe(2);
     });
   });
 
@@ -86,12 +86,57 @@ describe('TextureFactory', () => {
       expect(getOptions(['linear-srgb', 'srgb']).colorSpace).toBe(SRGBColorSpace);
     });
 
-    test("['anisotrophy-4','no-anisotrophy'] ends on no-anisotrophy", () => {
-      expect(getOptions(['anisotrophy-4', 'no-anisotrophy']).anisotrophy).toBe(0);
+    test("['anisotropy-4','no-anisotropy'] ends on no-anisotropy", () => {
+      expect(getOptions(['anisotropy-4', 'no-anisotropy']).anisotropy).toBe(1);
     });
 
-    test("['no-anisotrophy','anisotrophy-4'] ends on anisotrophy-4", () => {
-      expect(getOptions(['no-anisotrophy', 'anisotrophy-4']).anisotrophy).toBe(4);
+    test("['no-anisotropy','anisotropy-4'] ends on anisotropy-4", () => {
+      expect(getOptions(['no-anisotropy', 'anisotropy-4']).anisotropy).toBe(4);
+    });
+  });
+
+  describe('the deprecated anisotrophy spelling', () => {
+    const aliases = [
+      ['anisotrophy', 'anisotropy'],
+      ['anisotrophy-2', 'anisotropy-2'],
+      ['anisotrophy-4', 'anisotropy-4'],
+      ['no-anisotrophy', 'no-anisotropy'],
+    ] as const satisfies ReadonlyArray<readonly [TextureOptionClasses, TextureOptionClasses]>;
+
+    test.each(aliases)('%s gives the same options and the same texture.anisotropy as %s', (alias, name) => {
+      const factory = new TextureFactory(8, []);
+
+      expect(factory.getOptions([alias])).toEqual(factory.getOptions([name]));
+      expect(factory.update(new Texture(), alias).anisotropy).toBe(factory.update(new Texture(), name).anisotropy);
+    });
+
+    test('getOptions() answers anisotropy counted from 1 and anisotrophy counted from 0', () => {
+      const none = new TextureFactory(16, []).getOptions(['no-anisotropy']);
+      expect([none.anisotropy, none.anisotrophy]).toEqual([1, 0]);
+
+      const noMaximum = new TextureFactory(0, []).getOptions(['anisotropy-4']);
+      expect([noMaximum.anisotropy, noMaximum.anisotrophy]).toEqual([1, 0]);
+
+      const four = new TextureFactory(8, []).getOptions(['anisotropy-4']);
+      expect([four.anisotropy, four.anisotrophy]).toEqual([4, 4]);
+    });
+
+    test('defaultOptions with anisotrophy alone count it, and with both keys anisotropy counts', () => {
+      const alone = new TextureFactory(16, [], {anisotrophy: 4});
+      expect(alone.getOptions([]).anisotropy).toBe(4);
+      expect(alone.update(new Texture()).anisotropy).toBe(4);
+
+      const both = new TextureFactory(16, [], {anisotropy: 2, anisotrophy: 4});
+      expect(both.getOptions([]).anisotropy).toBe(2);
+      expect(both.update(new Texture()).anisotropy).toBe(2);
+    });
+
+    test('update() leaves no own anisotrophy key on the texture', () => {
+      const factory = new TextureFactory(16, [], {anisotrophy: 4});
+
+      expect(Object.hasOwn(factory.update(new Texture()), 'anisotrophy')).toBe(false);
+      expect(Object.hasOwn(factory.update(new Texture(), 'anisotrophy-2'), 'anisotrophy')).toBe(false);
+      expect(Object.hasOwn(factory.update(new Texture(), 'anisotropy-2'), 'anisotrophy')).toBe(false);
     });
   });
 
@@ -152,6 +197,10 @@ describe('TextureFactory', () => {
 
   describe('isTextureOptionClass() tells class names from other values, and getOptions() skips the others', () => {
     const everyClassName = [
+      'anisotropy',
+      'anisotropy-2',
+      'anisotropy-4',
+      'no-anisotropy',
       'anisotrophy',
       'anisotrophy-2',
       'anisotrophy-4',

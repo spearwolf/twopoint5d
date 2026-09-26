@@ -6,18 +6,22 @@ import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';
 import {TexturePackerJson, type TexturePackerJsonData, type TexturePackerMetaData} from './TexturePackerJson.js';
 
+/** @deprecated Belongs to the deprecated {@link TextureAtlasLoader}, which a `TextureStore` replaces. */
 export interface TextureAtlasData extends TextureImage {
   atlas: TextureAtlas;
   /** The meta block of the atlas json, with `image` naming the image url the texture was loaded from. */
   meta: TexturePackerMetaData;
 }
 
+/** @deprecated Belongs to the deprecated {@link TextureAtlasLoader}, which a `TextureStore` replaces. */
 export interface TextureAtlasLoadOptions {
   /** The image url to load, instead of the one the atlas json names — taken as written, not resolved against the atlas url. */
   overrideImageUrl?: string;
 }
 
+/** @deprecated Belongs to the deprecated {@link TextureAtlasLoader}, which a `TextureStore` replaces. */
 export type TextureAtlasLoadCallback = (textureData: TextureAtlasData) => void;
+/** @deprecated Belongs to the deprecated {@link TextureAtlasLoader}, which a `TextureStore` replaces. */
 export type TextureAtlasLoadErrorCallback = ((err: unknown) => void) | undefined;
 
 const makeFileLoader = () => {
@@ -26,6 +30,15 @@ const makeFileLoader = () => {
   return loader;
 };
 
+/**
+ * Loads a TexturePacker atlas json and the image it names, and builds the atlas and a texture.
+ *
+ * @deprecated Use a `TextureStore`: a catalog item with an `atlasUrl` — and an
+ *   `overrideImageUrl` in place of `options.overrideImageUrl` —, read with
+ *   `getAsync(id, ['atlas', 'texture'])`. The store loads the image without padding it to powers
+ *   of 2 and starts from no texture class where this loader starts from `nearest`; the texture
+ *   belongs to the store. The class stays until a breaking release removes it.
+ */
 export class TextureAtlasLoader {
   fileLoader: FileLoader;
   textureImageLoader: TextureImageLoader;

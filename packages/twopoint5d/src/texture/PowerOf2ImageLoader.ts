@@ -3,14 +3,25 @@ import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {isPowerOf2} from '../utils/isPowerOf2.js';
 import {TextureCoords} from './TextureCoords.js';
 
+/** @deprecated Belongs to the deprecated {@link PowerOf2ImageLoader}, which a `TextureStore` replaces. */
 export interface ImageWithTexCoords {
   imgEl: HTMLImageElement | HTMLCanvasElement;
   texCoords: TextureCoords;
 }
 
+/** @deprecated Belongs to the deprecated {@link PowerOf2ImageLoader}, which a `TextureStore` replaces. */
 export type PowerOf2ImageLoadCallback = (image: ImageWithTexCoords) => void;
+/** @deprecated Belongs to the deprecated {@link PowerOf2ImageLoader}, which a `TextureStore` replaces. */
 export type PowerOf2ImageLoadErrorCallback = ((err: unknown) => void) | undefined;
 
+/**
+ * Loads an image and pads it onto a canvas whose sides are powers of 2, when its own sides
+ * are not.
+ *
+ * @deprecated Load the image through a `TextureStore` instead: a catalog item with an
+ *   `imageUrl`. The padding to powers of 2 has no counterpart there — the store loads the image
+ *   as it is. The class stays until a breaking release removes it.
+ */
 export class PowerOf2ImageLoader {
   #imageLoader?: ImageLoader;
 

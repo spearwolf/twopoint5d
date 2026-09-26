@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `TextureCoords#getTexCoords(target?)`: `s`, `t`, `u` and `v` in one walk up the parents, where each getter walks on its own. Without a `target` it answers a new tuple; with a typed array or a plain array it writes the four values to the indices 0 to 3 and answers the `target`, without allocating. A `target` shorter than four values throws a `RangeError` and stays unchanged
 - add the option `flipDiagonal` of `colorFromTextureByTexCoords()`: a node above 0.5 swaps the two components of the lookup, the lookup `TextureCoords` describes for a frame with `FLIP_DIAGONAL`; without the option the lookup swaps nothing
 - add the instance attribute `texFlipDiagonal` of `TexturedSprite` and `TileSprite`: `1` for a frame with `FLIP_DIAGONAL`, `0` otherwise, written by `TexturedSprite#setFrame()` and `TileSpritesFactory#createTile()` together with the tex coords, and taking the usage the `attributeUsage` of a `TexturedSpritesGeometry` names for `texCoords`. `TexturedSpritesMaterial#texFlipDiagonalNode` puts another node in its place; `TexturedSpritesMaterial.TexFlipDiagonalAttributeName`, `TileSpritesMaterial.TexFlipDiagonalAttributeName` and the type `TAttributeNodeTexFlipDiagonal` name it
+- add `TextureResource#activate()`: it registers the effects of the resource and fetches nothing by itself
+- add `TextureStore#loadAsync()`, the static `TextureStore.loadAsync()` and `TextureStoreLoadOptions` with its `signal`. The instance method resolves with the store once the catalog has parsed. It rejects on a fetch that fails, a response that answers with a status, a body that is no JSON and a `parse()` that throws — each of them goes out as an `error` event as well —, with an `AbortError` once `signal` aborts, and with the error of a disposed store once `dispose()` cuts it short; an item that builds no resource and a texture class name no `TextureFactory` knows stay `error` events, and the promise resolves. On a disposed store it rejects right away and fetches nothing. The static method builds a store for the attempt, counts every error the attempt reports as a failure — nobody can listen to that store before the method returns it —, and disposes the store before it rejects
+- add `TextureStore#getAsync()`: it answers as `get()` does, and its messages name `getAsync()`
+- add `TextureOptions#anisotropy`, counted as three.js counts it — 1 is none, and a value below 1 counts as 1 —, and the texture classes `anisotropy`, `anisotropy-2`, `anisotropy-4` and `no-anisotropy`. `TextureFactory#getOptions()` answers the anisotropy under both keys, `anisotropy` counted from 1 and `anisotrophy` from 0
 
 ### Changed
 
@@ -236,6 +240,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - deprecate `TexturedSpritePool`, `TexturedSpriteMakeBaseSpriteArgs` and `TexturedSpriteGeometryParameters` in favour of `TexturedSpritesPool`, `TexturedSpritesMakeBaseSpriteArgs` and `TexturedSpritesGeometryParameters`: the plural belongs to the `TexturedSprites` module, as it does in `TexturedSpritesBasePool` and `TexturedSpritesMaterialParameters`, not to a single sprite. The old names stay as aliases of the new types for one release
 - deprecate the `keyCodes` option and the `PanControl2D#keyCodes` field in favour of `keys`: `KeyboardEvent.keyCode` depends on the keyboard layout. `keyCodes` still decides as long as it holds anything other than `[87, 83, 65, 68]` and `keys` holds its default — a `keyCodes` passed in or rebound in place keeps working, and `keys` wins where both are set
 - deprecate `Stylesheets.getGlobalSheet()` in favour of `getSheet()`: there is one sheet per document or shadow root, not one global sheet. The old name stays as an alias of `getSheet()` for one release
+- deprecate `PowerOf2ImageLoader`, `TextureImageLoader`, `TextureAtlasLoader` and `TileSetLoader`, with `ImageWithTexCoords`, `TextureImage`, `TextureAtlasData`, `TextureAtlasLoadOptions`, `TileSetData` and their callback types, in favour of `TextureStore`. The same image comes out of the two differently: a loader pads an image whose sides are no powers of 2 onto a canvas whose sides are, hands out its coordinates as a child of that canvas, starts from the texture class `nearest` and leaves the texture to its caller; the store loads the image as it is, its `imageCoords` are the root of the image, it starts from no texture class, and it keeps the texture. The padding to powers of 2 has no counterpart in the store. The loaders stay until a breaking release removes them. See the Migration Guide
+- deprecate `TextureResource#load()` in favour of `activate()`. The old name stays until a breaking release removes it
+- deprecate the instance method `TextureStore#load()` and the static `TextureStore.load()` in favour of `loadAsync()`. The instance `load()` goes on resolving with the store however the attempt ends. The old names stay until a breaking release removes them
+- deprecate `TextureStore#get()` in favour of `getAsync()`; its messages go on naming `get()`. The old name stays until a breaking release removes it
+- deprecate `TextureOptions#anisotrophy` and the texture classes `anisotrophy`, `anisotrophy-2`, `anisotrophy-4` and `no-anisotrophy` in favour of `anisotropy` and its classes, which write the same values. `anisotrophy` counts from 0, where 0 is none; in the `defaultOptions` of a `TextureFactory` it counts while `anisotropy` is missing. The old names stay until a breaking release removes them
 
 ### Removed
 
@@ -398,6 +407,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TexturePackerJson.parse()` with a frame name that appears twice in the json or that the `target` atlas already holds: it throws before it adds a frame, so the `target` stays as it was
 - fix `TexturedSprites`, `AnimatedSprites` and `TileSprites` for a frame with `FLIP_DIAGONAL`: they draw it as `TextureCoords` describes it, so a rotated TexturePacker frame stands upright
 - fix `AnimatedSpritesMaterial` with an `animsMap` baked with `includeTextureSize`: it reads every frame at the texel `bakeDataTexture()` writes it to, the second frame of an animation and those after it included
+- fix `TextureStore#dispose()` while a catalog is being fetched: it aborts the fetch, and a `loadAsync()` still waiting for it rejects
 
 ### Migration Guide
 
@@ -934,7 +944,9 @@ store.load(url).parse(moreData);
 **After**
 
 ```ts
-store.load(url);
+store.loadAsync(url).catch(() => {
+  // the failure goes out as an error event of the store as well
+});
 store.parse(moreData);
 ```
 
@@ -1113,7 +1125,7 @@ store.dispose();
 const store = new TextureStore(renderer);
 store.parse(data);
 
-store.get('hero', 'texture')
+store.getAsync('hero', 'texture')
   .then((texture) => {
     material.map = texture;
   })
@@ -1175,7 +1187,7 @@ const tileSet = resource.tileSet; // a tile set out of a resource that is alread
 
 ```ts
 const resource = await store.whenResource('hero');
-resource.load();
+resource.activate();
 const tileSet = resource.tileSet;
 
 store.dispose(); // the value you took stays; the resource says nothing more
@@ -2615,7 +2627,7 @@ material.map = texture;
 
 ```ts
 try {
-  material.map = await store.get('hero', 'texture');
+  material.map = await store.getAsync('hero', 'texture');
 } catch (error) {
   console.warn((error as Error).message, (error as Error).cause); // names the step and the url
 }
@@ -2718,6 +2730,65 @@ material.colorNode = colorFromTextureByTexCoords(colorMap, {flipDiagonal: attrib
 
 sprite.setTexCoords(coords.getTexCoords());
 sprite.texFlipDiagonal = coords.flipD ? 1 : 0;
+```
+
+#### The texture module names what its methods do
+
+`TextureResource#load()` is `activate()`, both `TextureStore.load()` methods are `loadAsync()`,
+`TextureStore#get()` is `getAsync()`, and the anisotropy option and classes are spelled as in
+three.js. The old names stay as deprecated aliases. `loadAsync()` rejects where `load()`
+resolved: await it inside a `try`, or give it a `catch`.
+
+**Before**
+
+```ts
+store.load(url);
+const texture = await store.get('hero', 'texture');
+resource.load();
+const factory = new TextureFactory(renderer, ['anisotrophy-4']);
+```
+
+**After**
+
+```ts
+await store.loadAsync(url); // rejects when the catalog cannot be fetched or parsed
+const texture = await store.getAsync('hero', 'texture');
+resource.activate();
+const factory = new TextureFactory(renderer, ['anisotropy-4']);
+```
+
+`TextureOptions#anisotropy` counts as three.js does, from 1, where the deprecated `anisotrophy`
+counts from 0. A `defaultOptions` of your own that sets `anisotrophy` goes on working, and renamed
+to `anisotropy` it gives the texture the same value: a 0 counts as 1 there, which is none. Code
+that reads `getOptions().anisotrophy` reads `anisotropy` and gets the value three.js is given.
+
+#### The callback loaders give way to `TextureStore`
+
+A resource of the store takes the place of a loader call. The store starts from no texture
+class, so `nearest` is named on the item where the loader applied it by default. It loads the
+image without padding it to powers of 2, and the texture belongs to the store: it is released
+with its resource, not by the caller.
+
+**Before**
+
+```ts
+const {tileSet, texture} = await new TileSetLoader().loadAsync(url, {tileWidth: 16, tileHeight: 16}, ['nearest']);
+// …
+texture.dispose();
+```
+
+**After**
+
+```ts
+const store = new TextureStore(renderer);
+store.parse({
+  items: {
+    tiles: {imageUrl: url, tileSet: {tileWidth: 16, tileHeight: 16}, texture: ['nearest']},
+  },
+});
+const [tileSet, texture] = await store.getAsync('tiles', ['tileSet', 'texture']);
+// …
+store.dispose(); // releases the texture
 ```
 
 ## [0.21.2] - 2026-06-19

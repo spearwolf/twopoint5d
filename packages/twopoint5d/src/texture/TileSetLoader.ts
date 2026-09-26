@@ -5,6 +5,7 @@ import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
 import type {TextureSource} from './types.js';
 
+/** @deprecated Belongs to the deprecated {@link TileSetLoader}, which a `TextureStore` replaces. */
 export interface TileSetData {
   tileSet: TileSet;
   texture: Texture;
@@ -12,9 +13,20 @@ export interface TileSetData {
   texCoords: TextureCoords;
 }
 
+/** @deprecated Belongs to the deprecated {@link TileSetLoader}, which a `TextureStore` replaces. */
 export type TileSetLoadCallback = (tileSetData: TileSetData) => void;
+/** @deprecated Belongs to the deprecated {@link TileSetLoader}, which a `TextureStore` replaces. */
 export type TileSetLoadErrorCallback = ((err: unknown) => void) | undefined;
 
+/**
+ * Loads an image and lays a tile set over it, with a texture of the image.
+ *
+ * @deprecated Use a `TextureStore`: a catalog item with an `imageUrl` and a `tileSet`, read
+ *   with `getAsync(id, ['tileSet', 'texture'])`. The store loads the image without padding it to
+ *   powers of 2, lays the tiles out from the root of the image, and starts from no texture class
+ *   where this loader starts from `nearest`; the texture belongs to the store. The class stays
+ *   until a breaking release removes it.
+ */
 export class TileSetLoader {
   imageLoader: PowerOf2ImageLoader;
   textureFactory: TextureFactory;

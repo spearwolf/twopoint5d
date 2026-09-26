@@ -23,7 +23,7 @@ export interface TextureImageSource {
 
 /**
  * The payload of an `error` event of a `TextureResource` that keeps a value from arriving,
- * as the resource records it. `TextureStore#get()` reads it through {@link loadFailureFor}.
+ * as the resource records it. `TextureStore#getAsync()` reads it through {@link loadFailureFor}.
  */
 export interface TextureResourceLoadFailure {
   source: 'image' | 'atlas' | 'texture';
@@ -41,6 +41,6 @@ export const imageSource: unique symbol = Symbol('TextureResource.imageSource');
 
 /**
  * The method of a `TextureResource` that answers with the failure that keeps one of the
- * given subtypes from arriving, if there is one. `TextureStore#get()` asks it.
+ * given subtypes from arriving, if there is one. `TextureStore#getAsync()` asks it.
  */
 export const loadFailureFor: unique symbol = Symbol('TextureResource.loadFailureFor');

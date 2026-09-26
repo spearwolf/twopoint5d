@@ -4,7 +4,7 @@ import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURende
 import {afterEach, describe, expect, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
-import {TextureStore, TextureStoreEvents} from './TextureStore.js';
+import {TextureStore, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
 import type {TextureStoreData} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -145,11 +145,11 @@ describe('TextureStore', () => {
       expect(rendererDispose).not.toHaveBeenCalled();
     });
 
-    test('rejects a get() promise that is still pending', async () => {
+    test('rejects a getAsync() promise that is still pending', async () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      const pending = store.get('a', 'texture');
+      const pending = store.getAsync('a', 'texture');
       store.dispose();
 
       await expect(pending).rejects.toThrow(/this store has been disposed/);
@@ -217,16 +217,26 @@ describe('TextureStore', () => {
       expect(store.clearUnused()).toBe(0);
     });
 
-    test('load() on a disposed store does not fetch', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+    test('dispose() cuts short the catalog fetch of a loadAsync() under way', async () => {
+      // a fetch that answers only when its signal aborts, as a real one does
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          }),
+      );
       try {
         const store = new TextureStore();
+        const loading = settleWithin(store.loadAsync('http://example.test/data.json'));
+
         store.dispose();
 
-        store.load('http://example.test/data.json');
-        await flushMicrotasks();
-
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(fetchMock.mock.calls[0]![1]?.signal?.aborted).toBe(true);
+        const settled = await loading;
+        expect(settled).toBeInstanceOf(Error);
+        expect((settled as Error).message).toBe(
+          '[TextureStore] loadAsync(http://example.test/data.json) was cancelled: this store has been disposed',
+        );
       } finally {
         fetchMock.mockRestore();
       }
@@ -254,7 +264,7 @@ describe('TextureStore', () => {
     });
 
     // (c) every public member behaves after dispose() as its TSDoc says
-    test('behaves as documented after dispose()', () => {
+    test('behaves as documented after dispose()', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
       try {
         const store = new TextureStore(makeRendererStub());
@@ -274,7 +284,10 @@ describe('TextureStore', () => {
 
         expect(() => store.dispose()).not.toThrow();
         expect(() => store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
-        expect(() => store.load('http://example.test/data.json')).not.toThrow();
+        await expect(store.loadAsync('http://example.test/data.json')).rejects.toThrow(
+          '[TextureStore] loadAsync(http://example.test/data.json) was cancelled: this store has been disposed',
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
         expect(store.clearUnused()).toBe(0);
 
         // a configuration array is no resource, and its last value stays right
@@ -292,7 +305,7 @@ describe('TextureStore', () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      // subscribing is what makes the resource load(), and load() is where the effects come
+      // subscribing is what makes the resource activate(), and activate() is where the effects come
       // from; without a renderer there is no texture factory, so the effect reaches no loader
       store.on('a', 'texture', () => {});
 
@@ -405,7 +418,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('on()/get() accept both string-literal and constant forms', () => {
+  describe('on()/getAsync() accept both string-literal and constant forms', () => {
     test('string-literal form: type narrows correctly for single subtype and tuple', () => {
       const store = new TextureStore();
 
@@ -438,17 +451,17 @@ describe('TextureStore', () => {
       u2();
     });
 
-    test('get() resolves with the correctly-typed tuple for the string-literal form', async () => {
+    test('getAsync() resolves with the correctly-typed tuple for the string-literal form', async () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
       // Just verify we can wire the call — the resolve depends on image loading
       // which is covered elsewhere. This call serves as a TS compile-check via the
       // destructure usage below.
-      const p = store.get('a', ['texture', 'imageCoords']);
+      const p = store.getAsync('a', ['texture', 'imageCoords']);
       const ac = new AbortController();
       ac.abort();
-      const pAborted = store.get('a', ['texture', 'imageCoords'], {signal: ac.signal});
-      await expect(pAborted).rejects.toThrow('get() aborted before subscription');
+      const pAborted = store.getAsync('a', ['texture', 'imageCoords'], {signal: ac.signal});
+      await expect(pAborted).rejects.toThrow('getAsync() aborted before subscription');
       // no image loader runs here, so `p` is still pending when the store goes away
       store.dispose();
       await expect(p).rejects.toThrow(/this store has been disposed/);
@@ -480,15 +493,13 @@ describe('TextureStore', () => {
   });
 
   describe('error events instead of console.error', () => {
-    test("TextureStore.load() emits 'error' on fetch failure", async () => {
+    test("TextureStore#loadAsync() emits 'error' on fetch failure", async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
       try {
         const store = new TextureStore();
         const errorHandler = vi.fn();
         on(store, 'error', errorHandler);
-        store.load('http://example.test/bad.json');
-        await flushMicrotasks();
-        await flushMicrotasks();
+        await expect(store.loadAsync('http://example.test/bad.json')).rejects.toThrow();
         expect(errorHandler).toHaveBeenCalledTimes(1);
         const event = errorHandler.mock.calls[0]![0];
         expect(event.source).toBe('fetch');
@@ -497,15 +508,13 @@ describe('TextureStore', () => {
       }
     });
 
-    test("TextureStore.load() emits 'error' on parse failure", async () => {
+    test("TextureStore#loadAsync() emits 'error' on parse failure", async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not-json'));
       try {
         const store = new TextureStore();
         const errorHandler = vi.fn();
         on(store, 'error', errorHandler);
-        store.load('http://example.test/bad.json');
-        await flushMicrotasks();
-        await flushMicrotasks();
+        await expect(store.loadAsync('http://example.test/bad.json')).rejects.toThrow();
         expect(errorHandler).toHaveBeenCalledTimes(1);
         expect(errorHandler.mock.calls[0]![0].source).toBe('parse');
       } finally {
@@ -513,7 +522,7 @@ describe('TextureStore', () => {
       }
     });
 
-    test("TextureStore.load() emits 'error' on a response that answers with a status", async () => {
+    test("TextureStore#loadAsync() emits 'error' on a response that answers with a status", async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}', {status: 404}));
       try {
         const store = new TextureStore();
@@ -521,9 +530,7 @@ describe('TextureStore', () => {
         const readyHandler = vi.fn();
         on(store, 'error', errorHandler);
         on(store, 'ready', readyHandler);
-        store.load('http://example.test/missing.json');
-        await flushMicrotasks();
-        await flushMicrotasks();
+        await expect(store.loadAsync('http://example.test/missing.json')).rejects.toThrow();
         expect(errorHandler).toHaveBeenCalledTimes(1);
         const event = errorHandler.mock.calls[0]![0];
         expect(event.source).toBe('fetch');
@@ -535,7 +542,198 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('load() answers as a promise', () => {
+  describe('loadAsync()', () => {
+    const catalogUrl = 'http://example.test/data.json';
+
+    // a fetch that answers only once the test says so, whatever its signal does in between
+    const deferredFetch = () => {
+      let answer!: (response: Response) => void;
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      return {fetchMock, answer: (response: Response) => answer(response)};
+    };
+
+    test('resolves with the store once the catalog has parsed', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+      const store = new TextureStore();
+
+      expect(await store.loadAsync(catalogUrl)).toBe(store);
+      expect(await store.whenResource('a')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test.each([
+      ['a fetch that fails', 'fetch', () => Promise.reject(new Error('boom'))],
+      ['a response with a status', 'fetch', () => Promise.resolve(new Response('{"items":{}}', {status: 404}))],
+      ['a body that is no JSON', 'parse', () => Promise.resolve(new Response('not-json'))],
+      ['a parse() that throws', 'parse', () => Promise.resolve(new Response('{"items":5}'))],
+    ] as const)('rejects on %s, naming the %s step, and the error event goes out as well', async (_what, step, answer) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(answer);
+      const store = new TextureStore();
+      const errors: Array<{source: string; url: string; error: unknown}> = [];
+      on(store, TextureStoreEvents.Error, (payload: {source: string; url: string; error: unknown}) => errors.push(payload));
+
+      const settled = await settleWithin(store.loadAsync(catalogUrl));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe(`[TextureStore] load failed at the ${step} step: "${catalogUrl}"`);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe(step);
+      expect((settled as Error).cause).toBe(errors[0]!.error);
+
+      store.dispose();
+    });
+
+    test('an item that builds no resource is reported as an error event, and the promise resolves', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"},"b":{}}}'));
+      const store = new TextureStore();
+      const errors: Array<{source: string; id?: string}> = [];
+      on(store, TextureStoreEvents.Error, (payload: {source: string; id?: string}) => errors.push(payload));
+
+      expect(await store.loadAsync(catalogUrl)).toBe(store);
+      expect(errors).toEqual([expect.objectContaining({source: 'parse', id: 'b'})]);
+      expect(await store.whenResource('a')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test('a signal that is already aborted rejects with an AbortError and fetches nothing', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      const store = new TextureStore();
+      const ac = new AbortController();
+      ac.abort();
+      const addEventListener = vi.spyOn(ac.signal, 'addEventListener');
+
+      const settled = await settleWithin(store.loadAsync(catalogUrl, {signal: ac.signal}));
+
+      expect(settled).toBeInstanceOf(DOMException);
+      expect((settled as DOMException).name).toBe('AbortError');
+      expect((settled as DOMException).message).toBe(`loadAsync(${catalogUrl}) aborted`);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(addEventListener).not.toHaveBeenCalled();
+
+      store.dispose();
+    });
+
+    test('a signal that aborts during the fetch aborts it, rejects with an AbortError, parses nothing and reports nothing', async () => {
+      const {fetchMock, answer} = deferredFetch();
+      const store = new TextureStore();
+      const parse = vi.spyOn(store, 'parse');
+      const errorHandler = vi.fn();
+      on(store, TextureStoreEvents.Error, errorHandler);
+      const ac = new AbortController();
+
+      const loading = settleWithin(store.loadAsync(catalogUrl, {signal: ac.signal}));
+      ac.abort();
+      // a fetch that answers after all is dropped
+      answer(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+
+      const settled = await loading;
+
+      expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+      expect(settled).toBeInstanceOf(DOMException);
+      expect((settled as DOMException).name).toBe('AbortError');
+      expect(parse).not.toHaveBeenCalled();
+      expect(errorHandler).not.toHaveBeenCalled();
+
+      store.dispose();
+    });
+
+    test('dispose() between the fetch and the parse rejects, and nothing is parsed', async () => {
+      let answerJson!: (data: unknown) => void;
+      const response = new Response('{}');
+      vi.spyOn(response, 'json').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answerJson = resolve;
+          }),
+      );
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
+      const store = new TextureStore();
+      const parse = vi.spyOn(store, 'parse');
+
+      const loading = settleWithin(store.loadAsync(catalogUrl));
+      await flushMicrotasks();
+      store.dispose();
+      answerJson({items: {a: {imageUrl: 'a.png'}}});
+
+      const settled = await loading;
+
+      expect((settled as Error).message).toBe(
+        `[TextureStore] loadAsync(${catalogUrl}) was cancelled: this store has been disposed`,
+      );
+      expect(parse).not.toHaveBeenCalled();
+    });
+
+    test('on a disposed store it rejects without fetching', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      const store = new TextureStore();
+      store.dispose();
+
+      await expect(store.loadAsync(catalogUrl)).rejects.toThrow(
+        `[TextureStore] loadAsync(${catalogUrl}) was cancelled: this store has been disposed`,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // every abort listener a load put on the caller's signal is taken off again by the time the
+    // promise settles: a long-lived AbortController would otherwise collect one per load
+    const abortListenersLeft = (signal: AbortSignal) => {
+      const add = vi.spyOn(signal, 'addEventListener');
+      const remove = vi.spyOn(signal, 'removeEventListener');
+      return () => {
+        const added = add.mock.calls.filter(([type]) => type === 'abort').map(([, listener]) => listener);
+        const removed = remove.mock.calls.filter(([type]) => type === 'abort').map(([, listener]) => listener);
+        return {added: added.length, left: added.filter((listener) => !removed.includes(listener)).length};
+      };
+    };
+
+    test('a load that resolved leaves no abort listener on the caller signal', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+      const store = new TextureStore();
+      const ac = new AbortController();
+      const listeners = abortListenersLeft(ac.signal);
+
+      await store.loadAsync(catalogUrl, {signal: ac.signal});
+
+      expect(listeners()).toEqual({added: 1, left: 0});
+
+      store.dispose();
+    });
+
+    test('a load that rejected leaves no abort listener on the caller signal', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
+      const store = new TextureStore();
+      const ac = new AbortController();
+      const listeners = abortListenersLeft(ac.signal);
+
+      await expect(store.loadAsync(catalogUrl, {signal: ac.signal})).rejects.toThrow('load failed at the fetch step');
+
+      expect(listeners()).toEqual({added: 1, left: 0});
+
+      store.dispose();
+    });
+
+    test('a load cut short by dispose() leaves no abort listener on the caller signal', async () => {
+      deferredFetch();
+      const store = new TextureStore();
+      const ac = new AbortController();
+      const listeners = abortListenersLeft(ac.signal);
+
+      const loading = settleWithin(store.loadAsync(catalogUrl, {signal: ac.signal}));
+      store.dispose();
+
+      expect(await loading).toBeInstanceOf(Error);
+      expect(listeners()).toEqual({added: 1, left: 0});
+    });
+  });
+
+  describe('the deprecated instance load() resolves with the store however the attempt ends', () => {
     test('resolves with the store once the attempt is over', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
       try {
@@ -566,6 +764,30 @@ describe('TextureStore', () => {
       }
     });
 
+    test('an attempt that was aborted resolves with the store', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      const store = new TextureStore();
+      const ac = new AbortController();
+      ac.abort();
+      const options: TextureStoreLoadOptions = {signal: ac.signal};
+
+      expect(await settleWithin(store.load('http://example.test/data.json', options))).toBe(store);
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      store.dispose();
+    });
+
+    test('an attempt cut short by dispose() resolves with the store', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
+      const store = new TextureStore();
+
+      const loading = settleWithin(store.load('http://example.test/data.json'));
+      store.dispose();
+
+      expect(await loading).toBe(store);
+      expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    });
+
     test('on a disposed store it resolves right away and fetches nothing', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
       try {
@@ -577,6 +799,66 @@ describe('TextureStore', () => {
       } finally {
         fetchMock.mockRestore();
       }
+    });
+
+    test('on a disposed store it does not fetch', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
+      try {
+        const store = new TextureStore();
+        store.dispose();
+
+        store.load('http://example.test/data.json');
+        await flushMicrotasks();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+  });
+
+  describe('the deprecated get()', () => {
+    test('resolves as getAsync() does', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 2, height: 2}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+      store.onResource('a', (resource) => {
+        resource.textureFactory = {create: () => ({name: 'a', dispose() {}})} as never;
+      });
+
+      const [viaGet, viaGetAsync] = await Promise.all([store.get('a', 'texture'), store.getAsync('a', 'texture')]);
+
+      expect(viaGet).toBeDefined();
+      expect(viaGet).toBe(viaGetAsync);
+
+      store.dispose();
+    });
+
+    test('rejects with messages that name get()', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(new Error('404'));
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      await expect(store.get('a', 'texture')).rejects.toThrow('[TextureStore] get(a, texture) failed at the image step: "a.png"');
+
+      const ac = new AbortController();
+      ac.abort();
+      await expect(store.get('a', 'texture', {signal: ac.signal})).rejects.toThrow('get() aborted before subscription');
+
+      // a store that has not parsed yet keeps the get() waiting until the signal aborts
+      const waiting = new TextureStore();
+      const pending = new AbortController();
+      const aborted = waiting.get('b', 'texture', {signal: pending.signal});
+      pending.abort();
+      await expect(aborted).rejects.toThrow('get(b, texture) aborted');
+      waiting.dispose();
+
+      store.dispose();
+      await expect(store.get('a', 'texture')).rejects.toThrow(
+        '[TextureStore] get(a, texture) was cancelled: this store has been disposed',
+      );
     });
   });
 
@@ -605,7 +887,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('whenResource() / abortable get()', () => {
+  describe('whenResource() / abortable getAsync()', () => {
     test('whenResource() resolves when the resource is present at call time', async () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
@@ -629,17 +911,17 @@ describe('TextureStore', () => {
       expect(resource.id).toBe('a');
     });
 
-    test('get() with AbortSignal rejects when aborted', async () => {
+    test('getAsync() with AbortSignal rejects when aborted', async () => {
       const store = new TextureStore();
       const ac = new AbortController();
-      const p = store.get('never', 'texture', {signal: ac.signal});
+      const p = store.getAsync('never', 'texture', {signal: ac.signal});
       ac.abort();
       await expect(p).rejects.toThrow(/aborted/i);
     });
 
-    test('get() rejects once the first parse() has gone by without the id', async () => {
+    test('getAsync() rejects once the first parse() has gone by without the id', async () => {
       const store = new TextureStore();
-      const pending = store.get('missing', 'texture');
+      const pending = store.getAsync('missing', 'texture');
 
       store.parse({defaultTextureClasses: [], items: {other: {imageUrl: 'o.png'}}});
 
@@ -648,14 +930,14 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('get() on an already disposed store is rejected', async () => {
+    test('getAsync() on an already disposed store is rejected', async () => {
       const store = new TextureStore();
       store.dispose();
 
-      await expect(store.get('a', 'texture')).rejects.toThrow(/this store has been disposed/);
+      await expect(store.getAsync('a', 'texture')).rejects.toThrow(/this store has been disposed/);
     });
 
-    test('get() resolves when the value is already there at call time', async () => {
+    test('getAsync() resolves when the value is already there at call time', async () => {
       const loadSpy = vi
         .spyOn(ImageLoader.prototype, 'loadAsync')
         .mockImplementation(async () => ({width: 4, height: 4, tag: 'ready'}) as unknown as HTMLImageElement);
@@ -671,14 +953,14 @@ describe('TextureStore', () => {
         store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
         // warm the resource up — this is what puts a value on the retained texture event,
-        // so that the get() below is answered from within its own subscription call
+        // so that the getAsync() below is answered from within its own subscription call
         const warm = store.on('a', 'texture', () => {});
         store.onResource('a', (resource) => {
           resource.textureFactory = factory as never;
         });
         await flushMicrotasks();
 
-        const texture = await store.get('a', 'texture');
+        const texture = await store.getAsync('a', 'texture');
         expect((texture as unknown as {tag: string}).tag).toBe('ready');
 
         warm();
@@ -749,7 +1031,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('on()/get() listener bookkeeping', () => {
+  describe('on()/getAsync() listener bookkeeping', () => {
     test('unsubscribe() removes the OnDispose listener', () => {
       const store = new TextureStore();
       const base = getSubscriptionCount(store);
@@ -764,12 +1046,12 @@ describe('TextureStore', () => {
       expect(getSubscriptionCount(store)).toBe(base);
     });
 
-    test('a get() that was aborted leaves no listener behind', async () => {
+    test('a getAsync() that was aborted leaves no listener behind', async () => {
       const store = new TextureStore();
       const base = getSubscriptionCount(store);
 
       const ac = new AbortController();
-      const aborted = store.get('a', 'texture', {signal: ac.signal});
+      const aborted = store.getAsync('a', 'texture', {signal: ac.signal});
       ac.abort();
 
       await expect(aborted).rejects.toThrow(/aborted/i);
@@ -778,11 +1060,11 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() that gave up on a missing id leaves no listener behind', async () => {
+    test('a getAsync() that gave up on a missing id leaves no listener behind', async () => {
       const store = new TextureStore();
       const base = getSubscriptionCount(store);
 
-      const missing = store.get('missing', 'texture');
+      const missing = store.getAsync('missing', 'texture');
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
       await expect(missing).rejects.toThrow(/No resource with id "missing"/);
@@ -791,7 +1073,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() that resolved leaves no listener behind', async () => {
+    test('a getAsync() that resolved leaves no listener behind', async () => {
       const loadSpy = vi
         .spyOn(ImageLoader.prototype, 'loadAsync')
         .mockImplementation(async () => ({width: 2, height: 2}) as unknown as HTMLImageElement);
@@ -804,7 +1086,7 @@ describe('TextureStore', () => {
           resource.textureFactory = {create: () => ({name: '', dispose() {}})} as never;
         });
 
-        const value = await store.get('a', 'texture');
+        const value = await store.getAsync('a', 'texture');
 
         expect(value).toBeDefined();
         expect(getSubscriptionCount(store)).toBe(base);
@@ -815,7 +1097,7 @@ describe('TextureStore', () => {
       }
     });
 
-    test('a get() answered synchronously installs no abort listener on the caller signal', async () => {
+    test('a getAsync() answered synchronously installs no abort listener on the caller signal', async () => {
       const loadSpy = vi
         .spyOn(ImageLoader.prototype, 'loadAsync')
         .mockImplementation(async () => ({width: 2, height: 2}) as unknown as HTMLImageElement);
@@ -824,7 +1106,7 @@ describe('TextureStore', () => {
         const store = new TextureStore();
         store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-        // warm the resource up, so that the get() below is answered from within its own
+        // warm the resource up, so that the getAsync() below is answered from within its own
         // subscription call and never reaches a state in which an abort could still matter
         const warm = store.on('a', 'texture', () => {});
         store.onResource('a', (resource) => {
@@ -835,7 +1117,7 @@ describe('TextureStore', () => {
         const ac = new AbortController();
         const addEventListener = vi.spyOn(ac.signal, 'addEventListener');
 
-        const value = await store.get('a', 'texture', {signal: ac.signal});
+        const value = await store.getAsync('a', 'texture', {signal: ac.signal});
 
         expect(value).toBeDefined();
         expect(addEventListener.mock.calls.filter(([type]) => type === 'abort')).toEqual([]);
@@ -847,10 +1129,10 @@ describe('TextureStore', () => {
       }
     });
 
-    // The fourth exit — the store being disposed under a pending get() — is deliberately
+    // The fourth exit — the store being disposed under a pending getAsync() — is deliberately
     // not measured here. dispose() ends with off(this), which drops every listener of the
     // store whether or not the promise cleaned up after itself, so a count taken around it
-    // says nothing about this teardown. The exit itself is covered by "rejects a get()
+    // says nothing about this teardown. The exit itself is covered by "rejects a getAsync()
     // promise that is still pending" in the dispose() block.
   });
 
@@ -1028,7 +1310,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a tile set item without an imageUrl takes the texture of its resource back, and a get() waits for the next image', async () => {
+    test('a tile set item without an imageUrl takes the texture of its resource back, and a getAsync() waits for the next image', async () => {
       const loadSpy = vi
         .spyOn(ImageLoader.prototype, 'loadAsync')
         .mockImplementation(async (url: string) => ({width: 64, height: 64, url}) as unknown as HTMLImageElement);
@@ -1055,14 +1337,14 @@ describe('TextureStore', () => {
       const resource = await store.whenResource('t');
       resource.textureFactory = factory as never;
 
-      await store.get('t', 'texture');
+      await store.getAsync('t', 'texture');
 
       store.parse({defaultTextureClasses: [], items: {t: {tileSet: {tileWidth: 16, tileHeight: 16}}}});
 
       expect(resource.texture).toBeUndefined();
       expect(textures[0]!.disposed).toBe(true);
 
-      const next = store.get('t', 'texture');
+      const next = store.getAsync('t', 'texture');
       expect(await settleWithin(next)).toBe('pending');
 
       store.parse({defaultTextureClasses: [], items: {t: {imageUrl: 'tiles2.png', tileSet: {tileWidth: 16, tileHeight: 16}}}});
@@ -1561,7 +1843,7 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('static load()', () => {
+  describe('static loadAsync()', () => {
     test('awaits whenReady() before resolving — resource is present after await', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
@@ -1573,7 +1855,7 @@ describe('TextureStore', () => {
       );
 
       try {
-        const store = await TextureStore.load('http://example.test/data.json');
+        const store = await TextureStore.loadAsync('http://example.test/data.json');
         expect(store).toBeInstanceOf(TextureStore);
 
         let resourceSeen: TextureResource | undefined;
@@ -1591,7 +1873,7 @@ describe('TextureStore', () => {
     test('rejects when the fetch fails', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
       try {
-        const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+        const settled = await settleWithin(TextureStore.loadAsync('http://example.test/data.json'));
         expect(settled).toBeInstanceOf(Error);
       } finally {
         fetchMock.mockRestore();
@@ -1601,11 +1883,44 @@ describe('TextureStore', () => {
     test('rejects when the response is not json', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not-json'));
       try {
-        const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+        const settled = await settleWithin(TextureStore.loadAsync('http://example.test/data.json'));
         expect(settled).toBeInstanceOf(Error);
       } finally {
         fetchMock.mockRestore();
       }
+    });
+
+    test('rejects with an AbortError once its signal aborts, and disposes the store it built', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch');
+      const dispose = vi.spyOn(TextureStore.prototype, 'dispose');
+      const ac = new AbortController();
+      ac.abort();
+
+      const settled = await settleWithin(TextureStore.loadAsync('http://example.test/data.json', {signal: ac.signal}));
+
+      expect(settled).toBeInstanceOf(DOMException);
+      expect((settled as DOMException).name).toBe('AbortError');
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test('the deprecated static load() resolves as loadAsync() does', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"tex":{"imageUrl":"img.png"}}}'));
+
+      const store = await TextureStore.load('http://example.test/data.json');
+
+      expect(store).toBeInstanceOf(TextureStore);
+      expect((await store.whenResource('tex')).imageUrl).toBe('http://example.test/img.png');
+
+      store.dispose();
+    });
+
+    test('the deprecated static load() rejects as loadAsync() does', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
+
+      await expect(TextureStore.load('http://example.test/data.json')).rejects.toThrow(
+        '[TextureStore] load failed at the fetch step: "http://example.test/data.json"',
+      );
     });
   });
 
@@ -1740,23 +2055,23 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('get() gives up on a resource that cannot deliver', () => {
+  describe('getAsync() gives up on a resource that cannot deliver', () => {
     const stubImage = () => ({width: 4, height: 4}) as unknown as HTMLImageElement;
 
     // what settleWithin() answered with, as a message: a rejection gives its text, and a
     // promise still waiting gives 'pending', which a failed expectation then shows as such
     const messageOf = (settled: unknown) => (settled instanceof Error ? settled.message : settled);
 
-    const imageFailed = '[TextureStore] get(a, texture) failed at the image step: "a.png"';
+    const imageFailed = '[TextureStore] getAsync(a, texture) failed at the image step: "a.png"';
 
-    test('get() rejects when the image does not load', async () => {
+    test('getAsync() rejects when the image does not load', async () => {
       const loaderError = new Error('404');
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(loaderError);
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      const settled = await settleWithin(store.get('a', 'texture'));
+      const settled = await settleWithin(store.getAsync('a', 'texture'));
 
       expect(messageOf(settled)).toBe(imageFailed);
       expect((settled as Error).cause).toBe(loaderError);
@@ -1764,20 +2079,20 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('get() rejects when the atlas json cannot be fetched', async () => {
+    test('getAsync() rejects when the atlas json cannot be fetched', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', {status: 404}));
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
 
-      const settled = await settleWithin(store.get('a', 'texture'));
+      const settled = await settleWithin(store.getAsync('a', 'texture'));
 
-      expect(messageOf(settled)).toBe('[TextureStore] get(a, texture) failed at the atlas step: "atlas.json"');
+      expect(messageOf(settled)).toBe('[TextureStore] getAsync(a, texture) failed at the atlas step: "atlas.json"');
 
       store.dispose();
     });
 
-    test('a get() after an atlasJson written over a failed fetch waits for the atlas', async () => {
+    test('a getAsync() after an atlasJson written over a failed fetch waits for the atlas', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', {status: 404}));
       let resolveImage!: (image: HTMLImageElement) => void;
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
@@ -1791,16 +2106,16 @@ describe('TextureStore', () => {
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
       const resource = await store.whenResource('a');
 
-      const failed = await settleWithin(store.get('a', 'texture'));
-      expect(messageOf(failed)).toBe('[TextureStore] get(a, texture) failed at the atlas step: "atlas.json"');
+      const failed = await settleWithin(store.getAsync('a', 'texture'));
+      expect(messageOf(failed)).toBe('[TextureStore] getAsync(a, texture) failed at the atlas step: "atlas.json"');
 
       // the json written from outside takes the place of the one that could not be fetched,
-      // and the image it names is still on its way when the get() below asks
+      // and the image it names is still on its way when the getAsync() below asks
       resource.atlasJson = {
         frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
         meta: {image: 'a.png', size: {w: 100, h: 50}},
       } as never;
-      const atlas = store.get('a', 'atlas');
+      const atlas = store.getAsync('a', 'atlas');
 
       resolveImage({width: 100, height: 50} as unknown as HTMLImageElement);
       const settled = await settleWithin(atlas);
@@ -1811,7 +2126,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() after an atlasJson written over a fetch still in flight is not rejected when that fetch fails', async () => {
+    test('a getAsync() after an atlasJson written over a fetch still in flight is not rejected when that fetch fails', async () => {
       // pays no heed to its signal: the 404 below reaches the resource even after an abort
       let answer!: (response: Response) => void;
       vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -1831,7 +2146,7 @@ describe('TextureStore', () => {
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
       // subscribing loads the resource, and that sends the fetch off
-      const atlas = store.get('a', 'atlas');
+      const atlas = store.getAsync('a', 'atlas');
       const resource = await store.whenResource('a');
 
       resource.atlasJson = {
@@ -1850,7 +2165,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a subscriber that throws holds no get() back', async () => {
+    test('a subscriber that throws holds no getAsync() back', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
       const store = new TextureStore(makeRendererStub());
@@ -1859,9 +2174,9 @@ describe('TextureStore', () => {
       store.on('a', 'texture', () => {
         throw new Error('a subscriber that throws');
       });
-      const pending = store.get('a', 'texture');
+      const pending = store.getAsync('a', 'texture');
       await flushMicrotasks();
-      const late = store.get('a', 'texture');
+      const late = store.getAsync('a', 'texture');
 
       const texture = (await store.whenResource('a')).texture;
 
@@ -1872,14 +2187,14 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() asked after the image failed rejects as well', async () => {
+    test('a getAsync() asked after the image failed rejects as well', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(new Error('404'));
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      const first = await settleWithin(store.get('a', 'texture'));
-      const second = await settleWithin(store.get('a', 'texture'));
+      const first = await settleWithin(store.getAsync('a', 'texture'));
+      const second = await settleWithin(store.getAsync('a', 'texture'));
 
       expect(messageOf(first)).toBe(imageFailed);
       expect(messageOf(second)).toBe(imageFailed);
@@ -1887,13 +2202,13 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() for the texture of a tile set whose options TileSet refuses resolves', async () => {
+    test('a getAsync() for the texture of a tile set whose options TileSet refuses resolves', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {t: {imageUrl: 't.png', tileSet: {tileWidth: 0, tileHeight: 8}}}});
 
-      const settled = await settleWithin(store.get('t', 'texture'));
+      const settled = await settleWithin(store.getAsync('t', 'texture'));
 
       expect(settled).toBe((await store.whenResource('t')).texture);
       expect(settled).toBeDefined();
@@ -1901,20 +2216,20 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() for the tileSet of such a resource rejects at the texture step', async () => {
+    test('a getAsync() for the tileSet of such a resource rejects at the texture step', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {t: {imageUrl: 't.png', tileSet: {tileWidth: 0, tileHeight: 8}}}});
 
-      const settled = await settleWithin(store.get('t', 'tileSet'));
+      const settled = await settleWithin(store.getAsync('t', 'tileSet'));
 
-      expect(messageOf(settled)).toBe('[TextureStore] get(t, tileSet) failed at the texture step');
+      expect(messageOf(settled)).toBe('[TextureStore] getAsync(t, tileSet) failed at the texture step');
 
       store.dispose();
     });
 
-    test('a skipped animation entry does not reject get()', async () => {
+    test('a skipped animation entry does not reject getAsync()', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
 
       const store = new TextureStore(makeRendererStub());
@@ -1927,7 +2242,7 @@ describe('TextureStore', () => {
             frameBasedAnimations: {
               walk: {duration: 1, firstTileId: 1, tileCount: 2},
               // neither a duration nor a frameRate: the entry is skipped and reported while
-              // the animations the get() below waits for are still being built
+              // the animations the getAsync() below waits for are still being built
               run: {firstTileId: 1, tileCount: 2} as never,
             },
           },
@@ -1937,7 +2252,7 @@ describe('TextureStore', () => {
       const errors: unknown[] = [];
       on(resource, TextureResourceEvents.Error, (payload: unknown) => errors.push(payload));
 
-      const settled = await settleWithin(store.get('t', 'frameBasedAnimations'));
+      const settled = await settleWithin(store.getAsync('t', 'frameBasedAnimations'));
 
       expect(errors).toMatchObject([{source: 'frameBasedAnimations', animation: 'run'}]);
       expect(settled).toBe(resource.frameBasedAnimations);
@@ -1946,7 +2261,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() after a new image url waits for that image', async () => {
+    test('a getAsync() after a new image url waits for that image', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync')
         .mockImplementationOnce(async () => {
           throw new Error('404');
@@ -1956,12 +2271,12 @@ describe('TextureStore', () => {
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      const failed = await settleWithin(store.get('a', 'texture'));
+      const failed = await settleWithin(store.getAsync('a', 'texture'));
       expect(messageOf(failed)).toBe(imageFailed);
 
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'b.png'}}});
 
-      const settled = await settleWithin(store.get('a', 'texture'));
+      const settled = await settleWithin(store.getAsync('a', 'texture'));
 
       expect(settled).toBe((await store.whenResource('a')).texture);
       expect(settled).toBeDefined();
@@ -1969,7 +2284,7 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
-    test('a get() rejected by a failure leaves no listener behind', async () => {
+    test('a getAsync() rejected by a failure leaves no listener behind', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(new Error('404'));
 
       const store = new TextureStore(makeRendererStub());
@@ -1979,7 +2294,7 @@ describe('TextureStore', () => {
       const storeBase = getSubscriptionCount(store);
       const resourceBase = getSubscriptionCount(resource);
 
-      const settled = await settleWithin(store.get('a', 'texture'));
+      const settled = await settleWithin(store.getAsync('a', 'texture'));
 
       expect(messageOf(settled)).toBe(imageFailed);
       expect(getSubscriptionCount(store)).toBe(storeBase);
@@ -2144,19 +2459,19 @@ describe('TextureStore', () => {
       expect(errors).toHaveLength(2);
     });
 
-    test('TextureStore.load() rejects a catalog that names an unknown texture class, naming the parse step', async () => {
+    test('TextureStore.loadAsync() rejects a catalog that names an unknown texture class, naming the parse step', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({items: {a: {imageUrl: 'a.png', texture: ['nearset']}}})),
       );
 
-      const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+      const settled = await settleWithin(TextureStore.loadAsync('http://example.test/data.json'));
 
       expect(settled).toBeInstanceOf(Error);
       expect((settled as Error).message).toBe('[TextureStore] load failed at the parse step: "a"');
     });
   });
 
-  describe('load() resolves the relative urls of a catalog against the catalog', () => {
+  describe('loadAsync() resolves the relative urls of a catalog against the catalog', () => {
     afterEach(() => {
       vi.unstubAllGlobals();
     });
@@ -2168,7 +2483,7 @@ describe('TextureStore', () => {
       answerWithCatalog({a: {imageUrl: 'a.png'}, b: {atlasUrl: 'atlas/b.json', overrideImageUrl: '../img/b.png'}});
       const store = new TextureStore();
 
-      await store.load('http://example.test/assets/catalog.json');
+      await store.loadAsync('http://example.test/assets/catalog.json');
 
       const a = await store.whenResource('a');
       const b = await store.whenResource('b');
@@ -2181,7 +2496,7 @@ describe('TextureStore', () => {
       answerWithCatalog({a: {imageUrl: 'HTTP://Other.test/A%20b.png'}});
       const store = new TextureStore();
 
-      await store.load('http://example.test/assets/catalog.json');
+      await store.loadAsync('http://example.test/assets/catalog.json');
 
       expect((await store.whenResource('a')).imageUrl).toBe('HTTP://Other.test/A%20b.png');
     });
@@ -2191,7 +2506,7 @@ describe('TextureStore', () => {
       answerWithCatalog({a: {imageUrl: 'a.png'}});
       const store = new TextureStore();
 
-      await store.load('assets/catalog.json');
+      await store.loadAsync('assets/catalog.json');
 
       expect((await store.whenResource('a')).imageUrl).toBe('http://example.test/demo/assets/a.png');
     });
@@ -2200,7 +2515,7 @@ describe('TextureStore', () => {
       answerWithCatalog({a: {imageUrl: 'a.png'}});
       const store = new TextureStore();
 
-      await store.load('blob:http://example.test/0b1c2d3e');
+      await store.loadAsync('blob:http://example.test/0b1c2d3e');
 
       expect((await store.whenResource('a')).imageUrl).toBe('a.png');
     });

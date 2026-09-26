@@ -28,7 +28,7 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
   it('the open class takes the maximum the hardware names', () => {
     const factory = new TextureFactory(renderer, []);
 
-    const texture = factory.update(new Texture(), 'anisotrophy');
+    const texture = factory.update(new Texture(), 'anisotropy');
 
     expect(texture.anisotropy, 'the anisotropy three.js will build the sampler with').to.equal(
       Math.max(1, renderer.getMaxAnisotropy()),
@@ -38,7 +38,7 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
   it('a fixed class is capped against that maximum', () => {
     const factory = new TextureFactory(renderer, []);
 
-    const texture = factory.update(new Texture(), 'anisotrophy-4');
+    const texture = factory.update(new Texture(), 'anisotropy-4');
 
     expect(texture.anisotropy, 'the anisotropy three.js will build the sampler with').to.equal(
       Math.min(4, Math.max(1, renderer.getMaxAnisotropy())),

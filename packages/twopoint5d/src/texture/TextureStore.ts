@@ -72,8 +72,8 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  *   among it —, an item that builds no resource because it names no source or carries a
  *   field of the wrong type, and texture class names no `TextureFactory` knows, which are
  *   left out. The `atlas`, `image` and `texture` failures of a resource are emitted by
- *   `TextureResource` and are subscribed there; {@link TextureStore.get} is rejected on those
- *   that keep a value it asks for from arriving, as its TSDoc sets out.
+ *   `TextureResource` and are subscribed there; {@link TextureStore.getAsync} is rejected on
+ *   those that keep a value it asks for from arriving, as its TSDoc sets out.
  */
 export const TextureStoreEvents = {
   Ready: 'ready',
@@ -115,7 +115,7 @@ const disposedError = (what: string): Error => new Error(`[TextureStore] ${what}
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
   new Error(`[TextureStore] load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
 
-// one message for a get() whose resource reported a failure that keeps a value it asks for
+// one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
 const resourceFailedError = (what: string, {source, url, error}: TextureResourceLoadFailure): Error =>
   new Error(`[TextureStore] ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
@@ -126,8 +126,8 @@ export interface TextureStoreParseOptions {
    * `refCount` is 0.
    *
    * `refCount` counts the live {@link TextureStore.on} subscriptions of a resource. A
-   * value fetched through {@link TextureStore.get} does not raise it: that promise gives
-   * its subscription up as it settles, so a texture sitting in a material counts for
+   * value fetched through {@link TextureStore.getAsync} does not raise it: that promise
+   * gives its subscription up as it settles, so a texture sitting in a material counts for
    * nothing here. A caller who wants to keep such a value keeps a subscription as well.
    *
    * Defaults to `false`, which keeps every resource until
@@ -141,68 +141,94 @@ export interface TextureStoreParseOptions {
    * it. A relative `baseUrl` is itself resolved against the document, in a worker against
    * its location. An absolute url of an item stays exactly as written.
    *
-   * {@link TextureStore.load} sets it to the url it fetches. Without it `parse()` writes the
-   * urls as the data carries them, and the browser resolves them against the document; a
-   * base that cannot carry a relative url — a `blob:` or a `data:` url — leaves them as
-   * written as well.
+   * {@link TextureStore.loadAsync} sets it to the url it fetches. Without it `parse()`
+   * writes the urls as the data carries them, and the browser resolves them against the
+   * document; a base that cannot carry a relative url — a `blob:` or a `data:` url — leaves
+   * them as written as well.
    */
   baseUrl?: string | URL;
+}
+
+export interface TextureStoreLoadOptions extends TextureStoreParseOptions {
+  /**
+   * Cuts the load short: the fetch is aborted, nothing is parsed, and the promise rejects
+   * with an `AbortError`. A signal that aborts once the data is parsed changes nothing.
+   */
+  signal?: AbortSignal;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureStore extends EventizedObject {}
 
+/**
+ * The way to load textures, texture atlases and tile sets.
+ *
+ * A catalog — {@link TextureStoreData} — names the resources: {@link TextureStore.loadAsync}
+ * fetches one, {@link TextureStore.parse} takes one that is already at hand, and
+ * {@link TextureStore.getAsync} and {@link TextureStore.on} hand out the values the resources
+ * build. Every image is fetched once, however many resources name it. Every resource builds
+ * its own texture and keeps it; a caller only borrows it.
+ *
+ * The four callback loaders — `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`
+ * and `PowerOf2ImageLoader` — are the older way and deprecated, and the same image comes out
+ * of them differently. A loader pads an image whose sides are no powers of 2 onto a canvas
+ * whose sides are, hands out its coordinates as a child of that canvas and starts from the
+ * texture class `nearest`; the store loads the image as it is, its `imageCoords` are the root
+ * of the image, and it starts from no texture class. The texture of a loader belongs to its
+ * caller.
+ */
 export class TextureStore {
   /**
-   * Build a store, fetch texture store data from `url` and resolve once it has parsed.
+   * Build a store, fetch the catalog at `url` into it and resolve with the store once the
+   * catalog has parsed.
    *
-   * A `fetch` that fails, a response that answers with a status, a body that is no JSON and
-   * a `parse()` that throws all reject the returned promise — and so does a catalog item
-   * that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl` or that carries a field
-   * of the wrong type, because that item builds no resource and this is where it is said
-   * out loud, and a texture class name no `TextureFactory` knows, which is left out. The
-   * store built for the attempt is disposed by then.
+   * Every failure the attempt reports counts: a `fetch` that fails, a response that answers
+   * with a status, a body that is no JSON, a `parse()` that throws — and a catalog item that
+   * builds no resource or a texture class name no `TextureFactory` knows, which the instance
+   * method {@link TextureStore.loadAsync} leaves to the `error` event. Nobody can listen to
+   * that event on a store before this method hands it out, so this is where they are said
+   * out loud. The promise rejects with the first of them, and with an `AbortError` once
+   * `options.signal` aborts; the store built for the attempt is disposed by then.
    *
-   * The relative urls of the items are resolved against `url`, as the instance method
-   * {@link TextureStore.load} does.
-   *
-   * The instance method {@link TextureStore.load} of the same name fetches into an existing
-   * store and never rejects; `TextureResource#load()` registers the effects of a single
-   * resource and fetches nothing by itself.
+   * The relative urls of the items are resolved against `url`, and a `baseUrl` in `options`
+   * takes its place, as in the instance method.
    */
-  static async load(url: string | URL): Promise<TextureStore> {
+  static async loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<TextureStore> {
     const store = new TextureStore();
 
-    let unsubscribeFromError: (() => void) | undefined;
-    const whenFailed = new Promise<never>((_resolve, reject) => {
-      unsubscribeFromError = once(
-        store,
-        OnError,
-        ({source, url: failedUrl, id, error}: {source: string; url?: string | URL; id?: string; error: unknown}) => {
-          reject(loadFailedError(source, failedUrl ?? id, error));
-        },
-      );
-    });
-
-    // the promise of the instance method is left lying here on purpose: it says the attempt
-    // is over, and the race below is what says how it went
-    void store.load(url);
+    // the first failure the attempt reports, whether or not it keeps the catalog from parsing
+    let failure: Error | undefined;
+    const unsubscribeFromError = on(
+      store,
+      OnError,
+      ({source, url: failedUrl, id, error}: {source: string; url?: string | URL; id?: string; error: unknown}) => {
+        failure ??= loadFailedError(source, failedUrl ?? id, error);
+      },
+    );
 
     try {
-      // the loser of this race is not left as an unhandled rejection: Promise.race attaches a
-      // handler to every entry, so the discarded whenReady() promise counts as handled
-      await Promise.race([store.whenReady(), whenFailed]);
+      await store.loadAsync(url, options);
+      if (failure) throw failure;
     } catch (error) {
-      // disposing from inside the error listener would tear the store down in the middle of
-      // the delivery, and the rejection whenReady() throws for a disposed store could cover
-      // the real cause up; here the race is long decided
+      // the instance promise is settled by now, so this dispose() rejects nothing that is
+      // still waiting
       store.dispose();
       throw error;
     } finally {
-      unsubscribeFromError?.();
+      unsubscribeFromError();
     }
 
     return store;
+  }
+
+  /**
+   * Build a store around the catalog at `url`, as {@link TextureStore.loadAsync} does.
+   *
+   * @deprecated Use {@link TextureStore.loadAsync}. It stays as an alias until a breaking
+   *   release removes it.
+   */
+  static load(url: string | URL): Promise<TextureStore> {
+    return TextureStore.loadAsync(url);
   }
 
   /**
@@ -295,6 +321,10 @@ export class TextureStore {
 
   #disposed = false;
 
+  // aborted by dispose(): every loadAsync() under way listens to it, cuts its fetch short and
+  // rejects
+  #disposal = new AbortController();
+
   constructor(renderer?: WebGPURenderer) {
     retain(this, [OnReady, OnRendererChanged]);
 
@@ -382,12 +412,20 @@ export class TextureStore {
   }
 
   /**
-   * Fetch texture store data from `url` and hand it to {@link TextureStore.parse}.
+   * Fetch the catalog at `url`, hand it to {@link TextureStore.parse} and resolve with this
+   * store once it has parsed.
    *
-   * The promise resolves with this store once the attempt is over, and it never rejects:
-   * every failure along the way — the fetch, the status of the response, the JSON, the
-   * parse — goes out as an `error` event instead. Resolving says the attempt is done, not
-   * that it worked; for that, wait on {@link TextureStore.whenReady}.
+   * The promise rejects when the catalog never gets as far as the parse: a `fetch` that
+   * fails, a response that answers with a status, a body that is no JSON, a `parse()` that
+   * throws. Each of these goes out as an `error` event as well, and the rejection names the
+   * step and the url and carries the reported error as its `cause`. A catalog item that
+   * builds no resource and a texture class name no `TextureFactory` knows are `error` events
+   * only: the rest of the catalog is parsed, and the promise resolves.
+   *
+   * `options.signal` cuts the load short, and so does {@link TextureStore.dispose}: the fetch
+   * is aborted, nothing is parsed, and no `error` event goes out. The promise rejects with an
+   * `AbortError` for the signal and with the error of a disposed store for `dispose()`. On a
+   * store that is already disposed it rejects right away and fetches nothing.
    *
    * With `{evictMissing: true}` the parse step also disposes and removes every resource
    * the new data no longer names and whose `refCount` is 0 — see
@@ -396,50 +434,112 @@ export class TextureStore {
    * The relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the items are resolved
    * against `url`, so a catalog names the files next to it; a `baseUrl` in `options` takes
    * its place. See {@link TextureStoreParseOptions.baseUrl}.
+   */
+  loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<this> {
+    const what = `loadAsync(${String(url)})`;
+    if (this.#disposed) return Promise.reject(disposedError(what));
+
+    // the signal belongs to this call and not to the parse
+    const {signal, ...parseOptions} = options ?? {};
+    if (signal?.aborted) return Promise.reject(new DOMException(`${what} aborted`, 'AbortError'));
+
+    const disposal = this.#disposal.signal;
+
+    return new Promise<this>((resolve, reject) => {
+      // the fetch listens to one signal, and two sides pull it: the caller and dispose()
+      const fetchAbort = new AbortController();
+      let settled = false;
+
+      // once the attempt is over, nothing of it stays on the caller's signal or on the store
+      const settle = () => {
+        settled = true;
+        signal?.removeEventListener('abort', onAbort);
+        disposal.removeEventListener('abort', onDispose);
+      };
+
+      const cutShort = (error: Error) => {
+        if (settled) return;
+        settle();
+        fetchAbort.abort();
+        reject(error);
+      };
+      const onAbort = () => cutShort(new DOMException(`${what} aborted`, 'AbortError'));
+      const onDispose = () => cutShort(disposedError(what));
+
+      signal?.addEventListener('abort', onAbort, {once: true});
+      disposal.addEventListener('abort', onDispose, {once: true});
+
+      // a step that fails is reported twice: to whoever listens to the store, and to this caller
+      const failed = (source: 'fetch' | 'parse', error: unknown, status?: number): Error => {
+        emit(this, OnError, status === undefined ? {source, url, error} : {source, url, status, error});
+        return loadFailedError(source, url, error);
+      };
+
+      // An attempt that was cut short ends at the next check: what arrives after it is dropped
+      // and reports nothing. The check follows every await, because a body that is already
+      // there — a mocked `Response#json()` among them — resolves without asking the signal.
+      const attempt = async (): Promise<void> => {
+        let response: Response;
+        try {
+          response = await fetch(url, {signal: fetchAbort.signal});
+        } catch (error) {
+          if (settled) return;
+          throw failed('fetch', error);
+        }
+        if (settled) return;
+        if (!response.ok) {
+          // a status is a failure of the request, not of the parsing — an error response with
+          // a JSON body would otherwise pass for a catalog
+          throw failed(
+            'fetch',
+            new Error(`[TextureStore] fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
+            response.status,
+          );
+        }
+        let data: TextureStoreData;
+        try {
+          data = await response.json();
+        } catch (error) {
+          if (settled) return;
+          throw failed('parse', error);
+        }
+        if (settled) return;
+        try {
+          this.parse(data, {...parseOptions, baseUrl: parseOptions.baseUrl ?? url});
+        } catch (error) {
+          throw failed('parse', error);
+        }
+      };
+
+      attempt().then(
+        () => {
+          if (settled) return;
+          settle();
+          resolve(this);
+        },
+        (error: unknown) => {
+          if (settled) return;
+          settle();
+          reject(error);
+        },
+      );
+    });
+  }
+
+  /**
+   * Fetch the catalog at `url` into this store, as {@link TextureStore.loadAsync} does, and
+   * resolve with this store however the attempt ends. On a disposed store it resolves right
+   * away and fetches nothing.
    *
-   * Two more methods carry this name: the static {@link TextureStore.load} builds a store
-   * around one such fetch and rejects when it fails, and `TextureResource#load()` registers
-   * the effects of a single resource and fetches nothing by itself.
-   *
-   * On a disposed store nothing is fetched, and the promise resolves with `this` right
-   * away.
+   * @deprecated Use {@link TextureStore.loadAsync}, which rejects when the load fails; this
+   *   name resolves with the store all the same and leaves the failure to the error event. It
+   *   stays as an alias until a breaking release removes it.
    */
   load(url: string | URL, options?: TextureStoreParseOptions): Promise<TextureStore> {
-    if (this.#disposed) return Promise.resolve(this);
-
-    return (async (): Promise<TextureStore> => {
-      let response: Response;
-      try {
-        response = await fetch(url);
-      } catch (error) {
-        emit(this, OnError, {source: 'fetch', url, error});
-        return this;
-      }
-      if (!response.ok) {
-        // a status is a failure of the request, not of the parsing — an error response with
-        // a JSON body would otherwise pass for a catalog
-        emit(this, OnError, {
-          source: 'fetch',
-          url,
-          status: response.status,
-          error: new Error(`[TextureStore] fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
-        });
-        return this;
-      }
-      let data: TextureStoreData;
-      try {
-        data = await response.json();
-      } catch (error) {
-        emit(this, OnError, {source: 'parse', url, error});
-        return this;
-      }
-      try {
-        this.parse(data, {...options, baseUrl: options?.baseUrl ?? url});
-      } catch (error) {
-        emit(this, OnError, {source: 'parse', url, error});
-      }
-      return this;
-    })();
+    return this.loadAsync(url, options).then(
+      () => this,
+      () => this,
+    );
   }
 
   /**
@@ -663,8 +763,8 @@ export class TextureStore {
    *
    * Only values that are there are delivered: a subtype that is cleared and announces it
    * does not reach the callback, and for several subtypes the callback waits until every
-   * one of them has a value again. {@link TextureStore.get} inherits this, so it cannot
-   * resolve with an `undefined` where its type promises a value.
+   * one of them has a value again. {@link TextureStore.getAsync} inherits this, so it
+   * cannot resolve with an `undefined` where its type promises a value.
    *
    * For several subtypes the callback is called once per tuple, not once per event: values
    * that belong together change in one go, and the events announcing them arrive one after
@@ -726,7 +826,7 @@ export class TextureStore {
           clearSubTypeSubscriptions();
 
           resource[imageSource] ??= this.#imageSource;
-          resource.load();
+          resource.activate();
           if (this.#textureFactory.value && !resource.textureFactory) {
             resource.textureFactory = this.#textureFactory.value;
           }
@@ -765,7 +865,7 @@ export class TextureStore {
               on(resource, type as TextureResourceSubType, (val) => {
                 // the same filter the tuple path applies: a signal that is cleared and notifies
                 // would otherwise hand the callback an undefined where its type promises a
-                // value — and get() would resolve with it
+                // value — and getAsync() would resolve with it
                 if (val == null) return;
                 callback(val as MapSubTypes<T>);
               }),
@@ -804,19 +904,47 @@ export class TextureStore {
    * An animation entry that is skipped does not reject, and neither does a subscriber of the
    * resource that throws: the value it was handed is there.
    */
+  getAsync<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    id: string,
+    type: T,
+    options?: {signal?: AbortSignal},
+  ): Promise<MapSubTypes<T>> {
+    return this.#getOnce('getAsync', id, type, options);
+  }
+
+  /**
+   * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
+   * resource `id` has them, as {@link TextureStore.getAsync} does; its messages name `get()`.
+   *
+   * @deprecated Use {@link TextureStore.getAsync}: it answers once, as a promise, where a
+   *   `get()` of a `Map` answers right away. It stays as an alias until a breaking release
+   *   removes it.
+   */
   get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
     options?: {signal?: AbortSignal},
   ): Promise<MapSubTypes<T>> {
+    return this.#getOnce('get', id, type, options);
+  }
+
+  // the body of getAsync() and of its alias; every message names the method the caller wrote,
+  // so that it leads back to the line it came from
+  #getOnce<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    method: 'get' | 'getAsync',
+    id: string,
+    type: T,
+    options?: {signal?: AbortSignal},
+  ): Promise<MapSubTypes<T>> {
     const signal = options?.signal;
+    const what = `${method}(${id}, ${String(type)})`;
     return new Promise((resolve, reject) => {
       if (this.#disposed) {
-        reject(disposedError(`get(${id}, ${String(type)})`));
+        reject(disposedError(what));
         return;
       }
       if (signal?.aborted) {
-        reject(new DOMException('get() aborted before subscription', 'AbortError'));
+        reject(new DOMException(`${method}() aborted before subscription`, 'AbortError'));
         return;
       }
 
@@ -844,7 +972,7 @@ export class TextureStore {
 
       const onAbort = () => {
         settle();
-        reject(new DOMException(`get(${id}, ${String(type)}) aborted`, 'AbortError'));
+        reject(new DOMException(`${what} aborted`, 'AbortError'));
       };
 
       track(
@@ -868,7 +996,7 @@ export class TextureStore {
             const failure = resource[loadFailureFor](subTypes);
             if (failure == null) return;
             settle();
-            reject(resourceFailedError(`get(${id}, ${String(type)})`, failure));
+            reject(resourceFailedError(what, failure));
           };
           track(on(resource, TextureResourceEvents.Error, rejectIfHeldBack));
           rejectIfHeldBack();
@@ -878,11 +1006,11 @@ export class TextureStore {
       track(
         once(this, OnDispose, () => {
           settle();
-          reject(disposedError(`get(${id}, ${String(type)})`));
+          reject(disposedError(what));
         }),
       );
 
-      // on() keeps waiting for a later parse(); get() answers like whenResource() and gives
+      // on() keeps waiting for a later parse(); getAsync() answers like whenResource() and gives
       // up once the first ready has gone by without the id showing up
       track(
         once(this, OnReady, () => {
@@ -893,7 +1021,7 @@ export class TextureStore {
       );
 
       // the promise may already have settled synchronously; a listener installed now would sit
-      // on the caller's signal until that signal aborts — one per such get() on a long-lived
+      // on the caller's signal until that signal aborts — one per such getAsync() on a long-lived
       // AbortController
       if (!settled) {
         signal?.addEventListener('abort', onAbort, {once: true});
@@ -920,16 +1048,20 @@ export class TextureStore {
   /**
    * Release this store and every resource it holds.
    *
-   * Every promise handed out by {@link TextureStore.get},
+   * Every promise handed out by {@link TextureStore.getAsync},
    * {@link TextureStore.whenReady} and {@link TextureStore.whenResource} that is still
-   * pending is rejected. The renderer belongs to whoever handed it in and is not
-   * disposed. A second call does nothing.
+   * pending is rejected. So is every {@link TextureStore.loadAsync} still under way, and its
+   * fetch is aborted: once this call returns, no catalog fetch of this store runs any more.
+   * The renderer belongs to whoever handed it in and is not disposed. A second call does
+   * nothing.
    *
    * The dispose event is the last event this store emits. Afterwards
    * {@link TextureStore.renderer} and {@link TextureStore.textureFactory} answer
-   * `undefined`, and {@link TextureStore.parse}, {@link TextureStore.load},
-   * {@link TextureStore.on}, {@link TextureStore.onResource} and a write to `renderer`
-   * do nothing. {@link TextureStore.defaultTextureClasses} keeps its last value.
+   * `undefined`, {@link TextureStore.loadAsync} rejects right away and fetches nothing — the
+   * deprecated {@link TextureStore.load} resolves right away instead —, and
+   * {@link TextureStore.parse}, {@link TextureStore.on}, {@link TextureStore.onResource} and a
+   * write to `renderer` do nothing. {@link TextureStore.defaultTextureClasses} keeps its last
+   * value.
    */
   dispose() {
     if (this.#disposed) return;
@@ -941,6 +1073,10 @@ export class TextureStore {
     // follow the dispose event with a rendererChanged
     emit(this, OnDispose);
     off(this);
+
+    // before the resources go: no catalog fetch of this store outlives this call, and no
+    // loadAsync() is left waiting for one
+    this.#disposal.abort();
 
     for (const resource of this.#resources.values()) {
       resource.dispose();

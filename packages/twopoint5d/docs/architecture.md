@@ -79,10 +79,18 @@ applied immediately — dropping a dirty flag silently renders stale data.
 
 `TextureAtlas` and `TileSet` describe where a frame lives inside an image;
 `TextureCoords` is the value type they hand out. `TextureFactory` builds three.js
-textures with a given set of options, `TextureStore` caches and reference-counts the
-loaded resources, and the `*Loader` files parse the external formats (TexturePacker
-JSON Hash and JSON Array, rotated frames included, tile sets, power-of-two images). `FrameBasedAnimations` turns a sequence of atlas
-frames into the timing data the animated sprite shaders read.
+textures with a given set of options.
+
+`TextureStore` with its `TextureResource`s is the way to load textures, atlases and tile
+sets: a catalog names the resources, every image is fetched once however many resources
+name it, every resource counts the subscriptions that hold it, and `getAsync()` and `on()`
+hand out what it builds.
+`TexturePackerJson` reads the TexturePacker formats, JSON Hash and JSON Array, rotated
+frames included. The four `*Loader` classes are the older way and deprecated; they pad an
+image to power-of-two sides, hand out its coordinates as a child of the padded canvas and
+start from the texture class `nearest`, where the store loads the image as it is, with its
+coordinates at the root, and starts from no texture class. `FrameBasedAnimations` turns a
+sequence of atlas frames into the timing data the animated sprite shaders read.
 
 ### `display/`
 

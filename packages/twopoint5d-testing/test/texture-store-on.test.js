@@ -109,7 +109,7 @@ describe('TextureStore.on() — black-box workflow', function () {
       });
       expect(unsubscribe).to.be.a('function');
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const coords = await waitUntil(() => received);
       expect(coords).to.be.instanceOf(TextureCoords);
@@ -126,7 +126,7 @@ describe('TextureStore.on() — black-box workflow', function () {
       const unsubscribe = store.on('plain', 'texture', (texture) => {
         received = texture;
       });
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const texture = await waitUntil(() => received);
       expect(texture).to.be.instanceOf(Texture);
@@ -144,7 +144,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         tuple = values;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       await waitUntil(() => tuple);
       expect(tuple).to.be.an('array').with.length(2);
@@ -157,7 +157,7 @@ describe('TextureStore.on() — black-box workflow', function () {
     });
 
     it('late subscriber (after load+ready) is still notified thanks to retained events', async () => {
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       // wait until the underlying resource has finished loading via a primary subscription
       let primaryTexture;
@@ -184,7 +184,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         calls++;
         firstTexture ??= texture;
       });
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       await waitUntil(() => calls > 0);
       const callsAfterFirst = calls;
@@ -217,7 +217,7 @@ describe('TextureStore.on() — black-box workflow', function () {
       const u1 = store.on('plain', 'texture', (t) => received.push(['a', t]));
       const u2 = store.on('plain', 'texture', (t) => received.push(['b', t]));
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
       await waitUntil(() => received.length >= 2);
 
       const byTag = new Map(received);
@@ -237,7 +237,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         tileSet = ts;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const ts = await waitUntil(() => tileSet);
       expect(ts).to.be.instanceOf(TileSet);
@@ -254,7 +254,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         atlas = a;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const a = await waitUntil(() => atlas);
       expect(a).to.be.instanceOf(TextureAtlas);
@@ -268,7 +268,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         fba = anims;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const anims = await waitUntil(() => fba);
       expect(anims).to.be.instanceOf(FrameBasedAnimations);
@@ -286,7 +286,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         payload = values;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       await waitUntil(() => payload);
       const [texture, tileSet, fba] = payload;
@@ -306,7 +306,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         atlas = a;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const a = await waitUntil(() => atlas);
       expect(a).to.be.instanceOf(TextureAtlas);
@@ -322,7 +322,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         texture = t;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const tex = await waitUntil(() => texture);
       expect(tex).to.be.instanceOf(Texture);
@@ -336,7 +336,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         fba = anims;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       const anims = await waitUntil(() => fba);
       expect(anims).to.be.instanceOf(FrameBasedAnimations);
@@ -360,7 +360,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         payload = values;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       await waitUntil(() => payload);
       const [texture, atlas] = payload;
@@ -376,7 +376,7 @@ describe('TextureStore.on() — black-box workflow', function () {
     it('on() bumps refCount; unsubscribe() decrements it; clearUnused() removes idle resources', async () => {
       // subscribe to 'plain' only — leave the other items idle
       const unsub = store.on('plain', 'texture', () => {});
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
 
       // wait until all four resources are present
       const resourceById = {};
@@ -413,7 +413,7 @@ describe('TextureStore.on() — black-box workflow', function () {
         viaConst = t;
       });
 
-      store.load(catalogUrl);
+      await store.loadAsync(catalogUrl);
       await waitUntil(() => viaLiteral && viaConst);
       expect(viaConst).to.equal(viaLiteral);
 
