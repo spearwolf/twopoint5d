@@ -10,6 +10,13 @@ import {
   type TextureImageSource,
   type TextureResourceLoadFailure,
 } from './internals.js';
+import {
+  assertTextureStoreData,
+  listCatalogValues,
+  partitionTextureClasses,
+  textureResourceDataProblems,
+} from './checkTextureStoreData.js';
+import {resolveRelativeUrl} from './resolveRelativeUrl.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -61,8 +68,10 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  * - `Dispose`: fires once when `dispose()` is called.
  * - `Error`: fires with `{source: 'fetch'|'parse', url?, id?, status?, error}`.
  *   `fetch` covers a request that failed and a response that answered with a status;
- *   `parse` a body that is no JSON, a `parse()` that threw, and an item that names no
- *   source. The `atlas`, `image` and `texture` failures of a resource are emitted by
+ *   `parse` a body that is no JSON, a `parse()` that threw — data without an items object
+ *   among it —, an item that builds no resource because it names no source or carries a
+ *   field of the wrong type, and texture class names no `TextureFactory` knows, which are
+ *   left out. The `atlas`, `image` and `texture` failures of a resource are emitted by
  *   `TextureResource` and are subscribed there; {@link TextureStore.get} is rejected on those
  *   that keep a value it asks for from arriving, as its TSDoc sets out.
  */
@@ -125,6 +134,19 @@ export interface TextureStoreParseOptions {
    * {@link TextureStore.clearUnused} is called.
    */
   evictMissing?: boolean;
+
+  /**
+   * The url the relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the items are
+   * resolved against: the url of the catalog, so that a catalog names the files next to
+   * it. A relative `baseUrl` is itself resolved against the document, in a worker against
+   * its location. An absolute url of an item stays exactly as written.
+   *
+   * {@link TextureStore.load} sets it to the url it fetches. Without it `parse()` writes the
+   * urls as the data carries them, and the browser resolves them against the document; a
+   * base that cannot carry a relative url — a `blob:` or a `data:` url — leaves them as
+   * written as well.
+   */
+  baseUrl?: string | URL;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -136,9 +158,13 @@ export class TextureStore {
    *
    * A `fetch` that fails, a response that answers with a status, a body that is no JSON and
    * a `parse()` that throws all reject the returned promise — and so does a catalog item
-   * that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, because that item
-   * builds no resource and this is where it is said out loud. The store built for the
-   * attempt is disposed by then.
+   * that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl` or that carries a field
+   * of the wrong type, because that item builds no resource and this is where it is said
+   * out loud, and a texture class name no `TextureFactory` knows, which is left out. The
+   * store built for the attempt is disposed by then.
+   *
+   * The relative urls of the items are resolved against `url`, as the instance method
+   * {@link TextureStore.load} does.
    *
    * The instance method {@link TextureStore.load} of the same name fetches into an existing
    * store and never rejects; `TextureResource#load()` registers the effects of a single
@@ -184,8 +210,9 @@ export class TextureStore {
    * item names for itself.
    *
    * {@link TextureStore.parse} reads it: an assignment reaches a resource with the next
-   * `parse()` that names that resource, and a `parse()` whose data carries a non-empty
-   * `defaultTextureClasses` replaces this value before it reads it. A resource that no
+   * `parse()` that names that resource, and a `parse()` whose data carries a
+   * `defaultTextureClasses` with a known texture class name left in it replaces this value
+   * before it reads it. A resource that no
    * later `parse()` names keeps the classes it was given.
    *
    * Keeps its last value once {@link TextureStore.dispose} has run: a configuration array
@@ -366,6 +393,10 @@ export class TextureStore {
    * the new data no longer names and whose `refCount` is 0 — see
    * {@link TextureStoreParseOptions.evictMissing} for what that count covers.
    *
+   * The relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the items are resolved
+   * against `url`, so a catalog names the files next to it; a `baseUrl` in `options` takes
+   * its place. See {@link TextureStoreParseOptions.baseUrl}.
+   *
    * Two more methods carry this name: the static {@link TextureStore.load} builds a store
    * around one such fetch and rejects when it fails, and `TextureResource#load()` registers
    * the effects of a single resource and fetches nothing by itself.
@@ -403,7 +434,7 @@ export class TextureStore {
         return this;
       }
       try {
-        this.parse(data, options);
+        this.parse(data, {...options, baseUrl: options?.baseUrl ?? url});
       } catch (error) {
         emit(this, OnError, {source: 'parse', url, error});
       }
@@ -417,12 +448,32 @@ export class TextureStore {
    * This method can be called multiple times. Resources that were previously loaded
    * and now receive new specifications will be updated accordingly.
    *
-   * Every item is checked before the first one is written. An item whose type does not
-   * match the resource that already carries its id throws — one error naming all of them,
-   * and nothing has been written or emitted by then. An item that names neither a
-   * `tileSet`, an `atlasUrl` nor an `imageUrl` builds no resource and goes out as an
-   * `error` event with `source: 'parse'` and its id; a resource that already carries that
-   * id stays as it is.
+   * The data is checked before the first item is written, on two levels. What makes the
+   * whole unreadable throws a `TypeError`: data that is no object, an `items` that is no
+   * object, a `defaultTextureClasses` that is there and no array. So does an item whose type
+   * does not match the resource that already carries its id — one error naming all of them.
+   * Nothing has been written or emitted by then.
+   *
+   * A single item that cannot be read builds no resource and goes out as an `error` event
+   * with `source: 'parse'` and its id: one that is no object, one with a field of the wrong
+   * type — a url that is no string, a `tileSet` or `frameBasedAnimations` that is no object,
+   * a `texture` that is no array; absent is `undefined`, a `null` is a field of the wrong
+   * type —, and one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`. A
+   * resource that already carries that id stays as it is.
+   *
+   * A texture class name no `TextureFactory` knows, in `texture` or in
+   * `defaultTextureClasses`, is left out and reported as an `error` event with
+   * `source: 'parse'` — with the id of its item, if it has one; the item is built with the
+   * names that are left. Only a `defaultTextureClasses` with a known name left in it
+   * replaces {@link TextureStore.defaultTextureClasses}.
+   *
+   * With `options.baseUrl` the relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of
+   * the items are resolved against it — see {@link TextureStoreParseOptions.baseUrl}.
+   *
+   * The data is configuration, trusted as far as these checks do not reach: a
+   * `frameNameQuery` is compiled into a `RegExp` and run against every frame name of its
+   * atlas, and a pattern that backtracks catastrophically stalls the page. Check a catalog
+   * from a source you do not control before handing it in.
    *
    * With `{evictMissing: true}` every resource this data no longer names and whose
    * `refCount` is 0 is disposed and removed — the same criterion
@@ -435,16 +486,27 @@ export class TextureStore {
   parse(data: TextureStoreData, options?: TextureStoreParseOptions) {
     if (this.#disposed) return;
 
+    // the shape the loops below read is checked first: data without an items object is
+    // refused whole, before anything is written or emitted
+    assertTextureStoreData(data);
+
     // every item is held against what is already there before the first one is written: a
     // parse either runs whole or not at all, instead of leaving half its resources updated
     // and the ready event behind
     const conflicts: string[] = [];
-    const withoutSource: string[] = [];
+    // every item that builds nothing this run, with what says why; a resource that already
+    // carries its id stays as it is
+    const skipped = new Map<string, Error>();
 
     for (const [id, item] of Object.entries(data.items)) {
+      const problems = textureResourceDataProblems(item);
+      if (problems.length) {
+        skipped.set(id, new Error(`[TextureStore] item "${id}" builds no resource: ${problems.join('; ')}`));
+        continue;
+      }
       const wanted = item.tileSet ? 'tileset' : item.atlasUrl ? 'atlas' : item.imageUrl ? 'image' : undefined;
       if (wanted == null) {
-        withoutSource.push(id);
+        skipped.set(id, new Error(`[TextureStore] item "${id}" names no tileSet, atlasUrl or imageUrl and builds no resource`));
         continue;
       }
       const existing = this.#resources.get(id);
@@ -457,17 +519,44 @@ export class TextureStore {
       throw new Error(`[TextureStore] parse() found ${conflicts.length} item(s) of a conflicting type: ${conflicts.join('; ')}`);
     }
 
-    if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
-      this.defaultTextureClasses = data.defaultTextureClasses.slice();
+    // only a list with a known name left in it replaces the defaults: one that held nothing
+    // but typos would otherwise take every default away
+    const defaults = data.defaultTextureClasses === undefined ? undefined : partitionTextureClasses(data.defaultTextureClasses);
+    if (defaults?.known.length) {
+      this.defaultTextureClasses = defaults.known;
     }
-
-    for (const id of withoutSource) {
+    if (defaults?.unknown.length) {
       emit(this, OnError, {
         source: 'parse',
-        id,
-        error: new Error(`[TextureStore] item "${id}" names no tileSet, atlasUrl or imageUrl and builds no resource`),
+        error: new Error(
+          `[TextureStore] defaultTextureClasses names ${listCatalogValues(defaults.unknown)}, which no TextureFactory knows — left out`,
+        ),
       });
     }
+
+    const itemClasses = new Map<string, TextureOptionClasses[]>();
+    for (const [id, item] of Object.entries(data.items)) {
+      const why = skipped.get(id);
+      if (why) {
+        emit(this, OnError, {source: 'parse', id, error: why});
+        continue;
+      }
+      if (item.texture === undefined) continue;
+      const {known, unknown} = partitionTextureClasses(item.texture);
+      itemClasses.set(id, known);
+      if (unknown.length) {
+        emit(this, OnError, {
+          source: 'parse',
+          id,
+          error: new Error(
+            `[TextureStore] item "${id}" names ${listCatalogValues(unknown)} in texture, which no TextureFactory knows — left out`,
+          ),
+        });
+      }
+    }
+
+    const baseUrl = options?.baseUrl;
+    const resolve = (url: string | undefined) => (url === undefined ? undefined : resolveRelativeUrl(url, baseUrl));
 
     const updatedResources: TextureResource[] = [];
 
@@ -475,35 +564,49 @@ export class TextureStore {
       for (const [id, item] of Object.entries(data.items)) {
         let resource: TextureResource | undefined = this.#resources.get(id);
 
-        const textureClasses = joinTextureClasses(this.defaultTextureClasses, item.texture);
+        // the fields of a skipped item are never read: `tileSet: 5` would pass for a tile set.
+        // A resource that already carries its id is announced all the same and stays out of
+        // `evictMissing`
+        if (skipped.has(id)) {
+          if (resource) updatedResources.push(resource);
+          continue;
+        }
+
+        const textureClasses = joinTextureClasses(this.defaultTextureClasses, itemClasses.get(id));
 
         if (item.tileSet) {
           if (resource) {
             // The narrowing of `resource` does not reach into the callback, so it is bound here.
             const knownResource = resource;
             batch(() => {
-              knownResource.imageUrl = item.imageUrl;
+              knownResource.imageUrl = resolve(item.imageUrl);
               knownResource.tileSetOptions = item.tileSet;
               knownResource.textureClasses = textureClasses;
               knownResource.frameBasedAnimationsData = item.frameBasedAnimations;
             });
           } else {
-            resource = TextureResource.fromTileSet(id, item.imageUrl, item.tileSet, textureClasses, item.frameBasedAnimations);
+            resource = TextureResource.fromTileSet(
+              id,
+              resolve(item.imageUrl),
+              item.tileSet,
+              textureClasses,
+              item.frameBasedAnimations,
+            );
           }
         } else if (item.atlasUrl) {
           if (resource) {
             const knownResource = resource;
             batch(() => {
-              knownResource.atlasUrl = item.atlasUrl;
-              knownResource.overrideImageUrl = item.overrideImageUrl;
+              knownResource.atlasUrl = resolve(item.atlasUrl);
+              knownResource.overrideImageUrl = resolve(item.overrideImageUrl);
               knownResource.textureClasses = textureClasses;
               knownResource.frameBasedAnimationsData = item.frameBasedAnimations;
             });
           } else {
             resource = TextureResource.fromAtlas(
               id,
-              item.atlasUrl,
-              item.overrideImageUrl,
+              resolveRelativeUrl(item.atlasUrl, baseUrl),
+              resolve(item.overrideImageUrl),
               textureClasses,
               item.frameBasedAnimations,
             );
@@ -512,11 +615,11 @@ export class TextureStore {
           if (resource) {
             const knownResource = resource;
             batch(() => {
-              knownResource.imageUrl = item.imageUrl;
+              knownResource.imageUrl = resolve(item.imageUrl);
               knownResource.textureClasses = textureClasses;
             });
           } else {
-            resource = TextureResource.fromImage(id, item.imageUrl, textureClasses);
+            resource = TextureResource.fromImage(id, resolveRelativeUrl(item.imageUrl, baseUrl), textureClasses);
           }
         }
 
@@ -542,8 +645,8 @@ export class TextureStore {
 
     if (options?.evictMissing) {
       // the set comes from the resources this run touched, not from the data keys: an item
-      // that matches none of the three shapes builds no resource, yet leaves an existing one
-      // in place — and that one is in `updatedResources`
+      // that names no source or carries a field of the wrong type builds no resource, yet
+      // leaves an existing one in place — and that one is in `updatedResources`
       const keep = new Set(updatedResources.map((resource) => resource.id));
       for (const [id, resource] of this.#resources) {
         if (keep.has(id) || resource.refCount > 0) continue;

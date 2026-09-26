@@ -673,4 +673,75 @@ describe('FrameBasedAnimations', () => {
       }).toThrow(/got a frameRate of -5 for the animation `invalid`/);
     });
   });
+
+  describe('add() refuses tile ids, a first tile id, a tile count and a frame name query that cannot pick frames', () => {
+    // 4 x 4 tiles of 16 x 16
+    const makeTileSet = () => new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16});
+
+    // the catalog json carries what it carries, so the values below are cast past the types
+    test.each([
+      ['"5"', '5' as unknown as number],
+      ['2.5', 2.5],
+      ['NaN', NaN],
+      ['16385', FrameBasedAnimations.MaxTextureSize + 1],
+      // the tileCount message, not the one about an animation without frames
+      ['0', 0],
+    ])('a tileCount of %s is refused', (described, tileCount) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('walk', 1, makeTileSet(), 1, tileCount)).toThrow(
+        `FrameBasedAnimations: add() got a tileCount of ${described} for the animation \`walk\` — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
+      );
+    });
+
+    test.each([
+      ['"1"', '1' as unknown as number],
+      ['1.5', 1.5],
+    ])('a firstTileId of %s is refused', (described, firstTileId) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('walk', 1, makeTileSet(), firstTileId, 2)).toThrow(
+        `FrameBasedAnimations: add() got a firstTileId of ${described} for the animation \`walk\` — a firstTileId is a whole number`,
+      );
+    });
+
+    test.each([
+      ['"2"', '2' as unknown as number],
+      ['1.5', 1.5],
+    ])('a tile id of %s is refused, naming its index', (described, tileId) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('walk', 1, makeTileSet(), [1, tileId, 3])).toThrow(
+        `FrameBasedAnimations: add() got a tileId of ${described} at index 1 for the animation \`walk\` — a tileId is a whole number`,
+      );
+    });
+
+    test('a negative firstTileId and a negative tile id are accepted, the tile set wraps them', () => {
+      const animations = new FrameBasedAnimations();
+      const tileSet = makeTileSet();
+
+      expect(animations.add('range', 1, tileSet, -3, 2)).toBe(0);
+      expect(animations.add('ids', 1, tileSet, [-1, -2])).toBe(1);
+    });
+
+    test('a tile set of more tiles than MaxTextureSize is accepted without a tileCount', () => {
+      const animations = new FrameBasedAnimations();
+      // 200 x 100 tiles of 1 x 1
+      const tileSet = new TileSet(new TextureCoords(0, 0, 200, 100), {tileWidth: 1, tileHeight: 1});
+      expect(tileSet.tileCount).toBeGreaterThan(FrameBasedAnimations.MaxTextureSize);
+
+      expect(() => animations.add('all', 1, tileSet)).not.toThrow();
+    });
+
+    test('a frameNameQuery of 5 is refused instead of taking every frame of the atlas', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+      atlas.add('walk.1', new TextureCoords(0, 0, 8, 8));
+      atlas.add('idle.1', new TextureCoords(8, 0, 8, 8));
+
+      expect(() => animations.add('walk', 1, atlas, 5 as unknown as string)).toThrow(
+        'FrameBasedAnimations: add() got a frameNameQuery of 5 for the animation `walk` — a frameNameQuery is a string or a RegExp',
+      );
+    });
+  });
 });

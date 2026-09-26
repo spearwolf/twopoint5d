@@ -46,6 +46,7 @@ export interface TileSetOptions {
   /** How many tiles the set holds — a whole number of 1 or more. Defaults to as many tiles as fit into the image. */
   tileCount?: number;
 
+  /** The `tileId` of the first tile — a whole number. Defaults to 1. */
   firstId?: number;
 }
 
@@ -75,7 +76,8 @@ export class TileSet {
   /**
    * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
    * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
-   * of 1 or more, or if the width or height of the `baseCoords` is not finite.
+   * of 1 or more, if `firstId` is not a whole number, or if the width or height of the `baseCoords`
+   * is not finite.
    */
   constructor(...args: [TextureAtlas, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
@@ -184,6 +186,8 @@ export class TileSet {
       'a whole number of 1 or more',
       tileCountLimit,
     );
+    // the ids of the tiles are counted from here: a string would be concatenated, not added
+    assertOption(Number.isInteger(this.firstId), 'firstId', 'a whole number', this.firstId);
 
     const tileOuterWidth = this.tileWidth + padding * 2;
     const tileOuterHeight = this.tileHeight + padding * 2;

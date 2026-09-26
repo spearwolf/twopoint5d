@@ -10,7 +10,6 @@
     },
     "splotchs": {
       "atlasUrl": "/lookbook/assets/splotchs-256x.json",
-      "overrideImageUrl": "/lookbook/assets/splotchs-256x.png",
       "texture": ["srgb"]
     }
   }

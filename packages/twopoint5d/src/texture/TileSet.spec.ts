@@ -178,4 +178,25 @@ describe('TileSet', () => {
       expect(tiles.frameId(tileId)).toBe(expectedFrameId);
     });
   });
+
+  describe('TileSet refuses a firstId that is no whole number and accepts a negative one', () => {
+    const base = new TextureCoords(0, 0, 64, 64);
+
+    test.each([
+      // the catalog json carries what it carries: a string would be concatenated, not added
+      ['a string', '1' as unknown as number, '[TileSet] firstId must be a whole number, got "1"'],
+      ['a fraction', 1.5, '[TileSet] firstId must be a whole number, got 1.5'],
+      ['NaN', NaN, '[TileSet] firstId must be a whole number, got NaN'],
+    ])('%s is refused', (_name, firstId, message) => {
+      expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(RangeError);
+      expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(message);
+    });
+
+    test('a negative firstId is accepted', () => {
+      const tiles = new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId: -3});
+
+      expect(tiles.firstId).toBe(-3);
+      expect(tiles.frameId(-3)).toBe(tiles.firstFrameId);
+    });
+  });
 });

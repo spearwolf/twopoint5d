@@ -1,7 +1,7 @@
 import {emit, getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURenderer} from 'three/webgpu';
-import {describe, expect, test, vi} from 'vitest';
+import {afterEach, describe, expect, test, vi} from 'vitest';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
 import {TextureStore, TextureStoreEvents} from './TextureStore.js';
@@ -1884,6 +1884,233 @@ describe('TextureStore', () => {
       expect(getSubscriptionCount(resource)).toBe(resourceBase);
 
       store.dispose();
+    });
+  });
+
+  describe('parse() checks catalog data before it writes anything', () => {
+    type ParseError = {source: string; id?: string; error: Error};
+
+    const collectErrors = (store: TextureStore) => {
+      const errors: ParseError[] = [];
+      on(store, 'error', (payload: ParseError) => {
+        errors.push(payload);
+      });
+      return errors;
+    };
+
+    test.each([
+      ['without items', {defaultTextureClasses: []}, 'undefined'],
+      ['whose items is null', {items: null}, 'null'],
+      ['whose items is an array', {items: []}, 'an array'],
+    ])('data %s throws a TypeError naming what items is', (_name, data, described) => {
+      const store = new TextureStore();
+
+      expect(() => store.parse(data as never)).toThrow(TypeError);
+      expect(() => store.parse(data as never)).toThrow(
+        `[TextureStore] parse() got texture store data whose items is ${described} — items is an object of resource items by id`,
+      );
+    });
+
+    test('data that is no object throws a TypeError naming what it is', () => {
+      const store = new TextureStore();
+
+      expect(() => store.parse(null as never)).toThrow(TypeError);
+      expect(() => store.parse(null as never)).toThrow(
+        '[TextureStore] parse() got null instead of texture store data, an object with an items object',
+      );
+    });
+
+    test('a defaultTextureClasses that is no array throws, and neither a resource nor the defaults nor an event has changed', async () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: ['nearest'], items: {a: {imageUrl: 'a.png'}}});
+      const a = await store.whenResource('a');
+
+      const errors = collectErrors(store);
+      let readyCount = 0;
+      on(store, 'ready', () => {
+        readyCount++;
+      });
+      // the ready event is retained, so subscribing replays the parse that has already run
+      readyCount = 0;
+
+      const data = {defaultTextureClasses: 'linear', items: {a: {imageUrl: 'a2.png'}, b: {imageUrl: 'b.png'}}};
+      expect(() => store.parse(data as never)).toThrow(TypeError);
+      expect(() => store.parse(data as never)).toThrow(
+        '[TextureStore] parse() got texture store data whose defaultTextureClasses is "linear" — defaultTextureClasses is an array of texture class names',
+      );
+
+      expect(a.imageUrl).toBe('a.png');
+      expect(store.defaultTextureClasses).toEqual(['nearest']);
+      expect(await settleWithin(store.whenResource('b'))).toBeInstanceOf(Error);
+      expect(errors).toHaveLength(0);
+      expect(readyCount).toBe(0);
+    });
+
+    test('an item that is no object builds no resource and goes out as a parse error, the other items are built', async () => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({items: {a: null, b: {imageUrl: 'b.png'}}} as never);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'parse', id: 'a'});
+      expect(errors[0]!.error.message).toBe('[TextureStore] item "a" builds no resource: it is null, not an object');
+      expect(await settleWithin(store.whenResource('a'))).toBeInstanceOf(Error);
+      expect((await store.whenResource('b')).imageUrl).toBe('b.png');
+    });
+
+    test.each([
+      ['an imageUrl of 5', {imageUrl: 5}, 'imageUrl is 5, not a string'],
+      ['a tileSet of true', {tileSet: true}, 'tileSet is true, not an object'],
+      ['a texture that is no array', {imageUrl: 'a.png', texture: 'srgb'}, 'texture is "srgb", not an array'],
+      [
+        'two fields of the wrong type',
+        {imageUrl: 5, texture: 'srgb'},
+        'imageUrl is 5, not a string; texture is "srgb", not an array',
+      ],
+    ])('an item with %s builds no resource and names what is wrong', async (_name, item, problems) => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({items: {a: item}} as never);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'parse', id: 'a'});
+      expect(errors[0]!.error.message).toBe(`[TextureStore] item "a" builds no resource: ${problems}`);
+      expect(await settleWithin(store.whenResource('a'))).toBeInstanceOf(Error);
+    });
+
+    test('a malformed item leaves the resource that already carries its id as it was', async () => {
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+      const a = await store.whenResource('a');
+      const errors = collectErrors(store);
+
+      store.parse({items: {a: {imageUrl: 5}}} as never, {evictMissing: true});
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'parse', id: 'a'});
+      expect(a.imageUrl).toBe('a.png');
+      expect(await store.whenResource('a')).toBe(a);
+    });
+
+    test('a type conflict still throws before any parse error of a malformed item goes out', async () => {
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+      await store.whenResource('a');
+      const errors = collectErrors(store);
+
+      expect(() => store.parse({items: {a: {tileSet: {tileWidth: 8, tileHeight: 8}}, b: {imageUrl: 5}}} as never)).toThrow(
+        '[TextureStore] parse() found 1 item(s) of a conflicting type: "a" is a "image" resource and cannot become "tileset"',
+      );
+
+      expect(errors).toHaveLength(0);
+    });
+
+    test('a texture class no TextureFactory knows is left out and reported with the item id', async () => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({items: {a: {imageUrl: 'a.png', texture: ['nearset', 'srgb']}}} as never);
+
+      expect((await store.whenResource('a')).textureClasses).toEqual(['srgb']);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'parse', id: 'a'});
+      expect(errors[0]!.error.message).toBe(
+        '[TextureStore] item "a" names "nearset" in texture, which no TextureFactory knows — left out',
+      );
+    });
+
+    test('a default texture class no TextureFactory knows is left out and reported', () => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({defaultTextureClasses: ['nearset', 'linear'], items: {}} as never);
+
+      expect(store.defaultTextureClasses).toEqual(['linear']);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]!.source).toBe('parse');
+      expect(errors[0]).not.toHaveProperty('id');
+      expect(errors[0]!.error.message).toBe(
+        '[TextureStore] defaultTextureClasses names "nearset", which no TextureFactory knows — left out',
+      );
+
+      // a list that holds nothing but unknown names leaves the defaults standing
+      store.parse({defaultTextureClasses: ['nearset'], items: {}} as never);
+
+      expect(store.defaultTextureClasses).toEqual(['linear']);
+      expect(errors).toHaveLength(2);
+    });
+
+    test('TextureStore.load() rejects a catalog that names an unknown texture class, naming the parse step', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({items: {a: {imageUrl: 'a.png', texture: ['nearset']}}})),
+      );
+
+      const settled = await settleWithin(TextureStore.load('http://example.test/data.json'));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe('[TextureStore] load failed at the parse step: "a"');
+    });
+  });
+
+  describe('load() resolves the relative urls of a catalog against the catalog', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const answerWithCatalog = (items: TextureStoreData['items']) =>
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({items})));
+
+    test('a relative imageUrl, atlasUrl and overrideImageUrl name the files next to the catalog', async () => {
+      answerWithCatalog({a: {imageUrl: 'a.png'}, b: {atlasUrl: 'atlas/b.json', overrideImageUrl: '../img/b.png'}});
+      const store = new TextureStore();
+
+      await store.load('http://example.test/assets/catalog.json');
+
+      const a = await store.whenResource('a');
+      const b = await store.whenResource('b');
+      expect(a.imageUrl).toBe('http://example.test/assets/a.png');
+      expect(b.atlasUrl).toBe('http://example.test/assets/atlas/b.json');
+      expect(b.overrideImageUrl).toBe('http://example.test/img/b.png');
+    });
+
+    test('an absolute item url stays exactly as written', async () => {
+      answerWithCatalog({a: {imageUrl: 'HTTP://Other.test/A%20b.png'}});
+      const store = new TextureStore();
+
+      await store.load('http://example.test/assets/catalog.json');
+
+      expect((await store.whenResource('a')).imageUrl).toBe('HTTP://Other.test/A%20b.png');
+    });
+
+    test('a relative catalog url is resolved against the document first', async () => {
+      vi.stubGlobal('document', {baseURI: 'http://example.test/demo/page.html'});
+      answerWithCatalog({a: {imageUrl: 'a.png'}});
+      const store = new TextureStore();
+
+      await store.load('assets/catalog.json');
+
+      expect((await store.whenResource('a')).imageUrl).toBe('http://example.test/demo/assets/a.png');
+    });
+
+    test('a catalog behind a blob: url leaves relative item urls as written', async () => {
+      answerWithCatalog({a: {imageUrl: 'a.png'}});
+      const store = new TextureStore();
+
+      await store.load('blob:http://example.test/0b1c2d3e');
+
+      expect((await store.whenResource('a')).imageUrl).toBe('a.png');
+    });
+
+    test('parse() resolves against a baseUrl it is given, and writes the urls as they are without one', async () => {
+      const withBase = new TextureStore();
+      withBase.parse({items: {a: {imageUrl: 'a.png'}}}, {baseUrl: 'http://example.test/assets/catalog.json'});
+      expect((await withBase.whenResource('a')).imageUrl).toBe('http://example.test/assets/a.png');
+
+      const withoutBase = new TextureStore();
+      withoutBase.parse({items: {a: {imageUrl: 'a.png'}}});
+      expect((await withoutBase.whenResource('a')).imageUrl).toBe('a.png');
     });
   });
 });

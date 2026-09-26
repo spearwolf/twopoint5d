@@ -4,6 +4,7 @@ import {createSandbox} from 'sinon';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
+import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureResource} from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
 import type {FrameBasedAnimationsDataMap} from './types.js';
@@ -1602,6 +1603,159 @@ describe('TextureResource', () => {
       const cls: ('nearest' | 'flipy')[] = ['nearest', 'flipy'];
       TextureResource.fromAtlas('a', 'atlas.json', undefined, cls);
       expect(cls).toEqual(['nearest', 'flipy']);
+    });
+  });
+
+  describe('the image an atlas json names lies next to that json', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const atlasJsonNaming = (image: string) => ({
+      frames: {'walk.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {image, size: {w: 16, h: 16}},
+    });
+
+    // the image loader stub answers every url and records which one it was asked for
+    const spyOnImageLoads = () =>
+      vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
+
+    test('an atlas resolves a relative meta.image against its atlasUrl', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJsonNaming('a.png'))));
+      const imageLoads = spyOnImageLoads();
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json');
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBe('http://example.test/atlases/a.png');
+      expect(resource.atlasJson?.meta.image).toBe('http://example.test/atlases/a.png');
+      expect(imageLoads.mock.calls.map(([url]) => url)).toEqual(['http://example.test/atlases/a.png']);
+
+      resource.dispose();
+    });
+
+    test('an overrideImageUrl is taken as written, not resolved against the atlasUrl', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJsonNaming('a.png'))));
+      const imageLoads = spyOnImageLoads();
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json', 'override.png');
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBe('override.png');
+      expect(imageLoads.mock.calls.map(([url]) => url)).toEqual(['override.png']);
+
+      resource.dispose();
+    });
+
+    test('an atlasJson written from outside keeps its meta.image as written', async () => {
+      // a fetch that never answers: the json on the resource is the one written below
+      vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise<Response>(() => {}));
+      const imageLoads = spyOnImageLoads();
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('a', 'http://example.test/atlases/a.json');
+      resource.load();
+      resource.textureFactory = factory;
+      resource.atlasJson = atlasJsonNaming('outside.png');
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBe('outside.png');
+      expect(resource.atlasJson?.meta.image).toBe('outside.png');
+      expect(imageLoads.mock.calls.map(([url]) => url)).toEqual(['outside.png']);
+
+      resource.dispose();
+    });
+
+    test('a relative atlasUrl is resolved against the document before it serves as the base', async () => {
+      vi.stubGlobal('document', {baseURI: 'http://example.test/demo/page.html'});
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJsonNaming('a.png'))));
+      spyOnImageLoads();
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('a', 'atlases/a.json');
+      resource.load();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      // the atlasUrl itself stays as written: fetch() resolves it against the document too
+      expect(resource.atlasUrl).toBe('atlases/a.json');
+      expect(resource.imageUrl).toBe('http://example.test/demo/atlases/a.png');
+
+      resource.dispose();
+    });
+  });
+
+  describe('a tile set animation entry whose tiles cannot be picked is skipped', () => {
+    const loadTileSetWith = async (animationsData: unknown) => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet(
+        'tiles',
+        'tiles.png',
+        {tileWidth: 16, tileHeight: 16},
+        undefined,
+        // the catalog json carries what it carries
+        animationsData as FrameBasedAnimationsDataMap,
+      );
+      resource.load();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      return {resource, errors};
+    };
+
+    test('an entry whose tileIds is no array is skipped and reported, the other entries are registered', async () => {
+      const {resource, errors} = await loadTileSetWith({
+        walk: {duration: 1, tileIds: 3},
+        run: {duration: 1, tileIds: [1, 2]},
+      });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
+      expect(errors[0]!.error.message).toBe(
+        '[TextureResource] animation "walk" of resource "tiles" carries tileIds of 3 — tileIds is an array of tile ids',
+      );
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+      expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
+
+      resource.dispose();
+    });
+
+    test('an entry with a tileCount of "5" is skipped and reported with the message of add()', async () => {
+      const {resource, errors} = await loadTileSetWith({
+        walk: {duration: 1, firstTileId: 1, tileCount: '5'},
+        run: {duration: 1, firstTileId: 1, tileCount: 2},
+      });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
+      expect(errors[0]!.error.message).toBe(
+        `FrameBasedAnimations: add() got a tileCount of "5" for the animation \`walk\` — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
+      );
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+      expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
+
+      resource.dispose();
     });
   });
 });

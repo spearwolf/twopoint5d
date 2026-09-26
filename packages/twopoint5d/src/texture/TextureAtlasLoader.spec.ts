@@ -1,4 +1,4 @@
-import type {FileLoader, Texture} from 'three/webgpu';
+import {FileLoader, type Texture} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 import {TextureAtlasLoader} from './TextureAtlasLoader.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -11,6 +11,8 @@ import type {TextureSource} from './types.js';
 // stub that answers with a body is a file loader enough
 const fileLoaderAnswering = (body: unknown): FileLoader =>
   ({
+    // the path a three.js loader carries unless one is set
+    path: '',
     load(_url: string, onLoad: (data: unknown) => void) {
       onLoad(body);
     },
@@ -249,5 +251,56 @@ describe('TextureAtlasLoader', () => {
     const coords = atlas.frame('walk.1')!.coords;
     expect(coords.parent).toBe(texCoords);
     expect(coords).toMatchObject({s: 0.5, t: 0, u: 0.5, v: 0.5});
+  });
+
+  describe('the image an atlas json names lies next to that json', () => {
+    const atlasJsonNamingARelativeImage = {
+      frames: {'walk.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {image: 'sprites.png', size: {w: 16, h: 16}},
+    };
+
+    test('a relative meta.image is resolved against the url of the atlas json', async () => {
+      const imageLoad = imageLoaderAnswering();
+      const loader = new TextureAtlasLoader({
+        fileLoader: fileLoaderAnswering(atlasJsonNamingARelativeImage),
+        textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+      });
+
+      const {meta} = await loader.loadAsync('http://example.test/atlases/sprites.json');
+
+      expect(imageLoad.mock.calls[0]![0]).toBe('http://example.test/atlases/sprites.png');
+      expect(meta.image).toBe('http://example.test/atlases/sprites.png');
+    });
+
+    test('an overrideImageUrl is taken as written', async () => {
+      const imageLoad = imageLoaderAnswering();
+      const loader = new TextureAtlasLoader({
+        fileLoader: fileLoaderAnswering(atlasJsonNamingARelativeImage),
+        textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+      });
+
+      const {meta} = await loader.loadAsync('http://example.test/atlases/sprites.json', null, {overrideImageUrl: 'other.png'});
+
+      expect(imageLoad.mock.calls[0]![0]).toBe('other.png');
+      expect(meta.image).toBe('other.png');
+    });
+
+    test('a relative meta.image is resolved against the url the json came from, path of the file loader included', async () => {
+      // a real file loader for its `path`; only the request is answered by hand
+      const fileLoader = new FileLoader().setPath('http://example.test/assets/');
+      fileLoader.load = ((_url: string, onLoad: (data: unknown) => void) => {
+        onLoad(atlasJsonNamingARelativeImage);
+      }) as unknown as FileLoader['load'];
+      const imageLoad = imageLoaderAnswering();
+      const loader = new TextureAtlasLoader({
+        fileLoader,
+        textureImageLoader: {load: imageLoad} as unknown as TextureImageLoader,
+      });
+
+      const {meta} = await loader.loadAsync('sprites.json');
+
+      expect(imageLoad.mock.calls[0]![0]).toBe('http://example.test/assets/sprites.png');
+      expect(meta.image).toBe('http://example.test/assets/sprites.png');
+    });
   });
 });

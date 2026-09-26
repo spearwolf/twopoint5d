@@ -163,6 +163,14 @@ export class FrameBasedAnimations {
    * refused with an error naming the case, as are a `frameRate` that is not a number above zero
    * and timing that carries neither a `duration` nor a `frameRate`.
    *
+   * What picks the frames is refused as well when it cannot pick any: a tile id that is no whole
+   * number, naming its index; a `firstTileId` that is no whole number; a `tileCount` that is no
+   * whole number from 1 to {@link FrameBasedAnimations.MaxTextureSize}, as read at the call —
+   * more frames fit into no data texture; and a `frameNameQuery` that is neither a string nor a
+   * `RegExp`. Tile ids and a `firstTileId` may be negative, the tile set wraps them. `firstTileId`
+   * and `tileCount` are checked only when they are passed: their defaults come from the tile set,
+   * which may hold more tiles than `MaxTextureSize`.
+   *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
    * stepping over every name already taken — so it is reachable through `animId()` like
@@ -199,10 +207,17 @@ export class FrameBasedAnimations {
       frames = args[2];
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
-      // both forms of a query reach the atlas: `frameNames()` takes a pattern as a string or
-      // as a RegExp, and letting one of them fall away would quietly widen the animation to
-      // every frame of the atlas
-      const frameNameQuery = typeof args[3] === 'string' || args[3] instanceof RegExp ? args[3] : undefined;
+      const query: unknown = args[3];
+      // a query of any other kind is refused rather than dropped: without a query the atlas hands
+      // out every frame it has
+      if (query !== undefined && typeof query !== 'string' && !(query instanceof RegExp)) {
+        throw new Error(
+          `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation \`${animNameInError(name)}\` — a frameNameQuery is a string or a RegExp`,
+        );
+      }
+      // from here the query is a pattern as a string, a RegExp or no query at all — both forms
+      // of a pattern reach the atlas, whose `frameNames()` takes either
+      const frameNameQuery = query;
       // Only string names go into an animation: a frame registered under a symbol has no
       // place in an ordered sequence, and the default comparator of Array#sort() converts
       // every value to a string, which throws on a symbol.
@@ -220,8 +235,31 @@ export class FrameBasedAnimations {
       const tileSet = args[2];
       if (Array.isArray(args[3])) {
         const tileIds = args[3];
+        // a tile id that is no whole number finds no frame, and a string is concatenated, not added
+        tileIds.forEach((tileId: unknown, index) => {
+          if (!Number.isInteger(tileId)) {
+            throw new Error(
+              `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation \`${animNameInError(name)}\` — a tileId is a whole number`,
+            );
+          }
+        });
         frames = tileIds.map((tileId) => tileSet.frame(tileId).coords);
       } else {
+        // only what was passed is checked: the defaults come from the tile set, which may hold
+        // more tiles than a data texture can, and an add() that is never baked is legitimate
+        if (args[3] !== undefined && !Number.isInteger(args[3])) {
+          throw new Error(
+            `FrameBasedAnimations: add() got a firstTileId of ${describeValue(args[3])} for the animation \`${animNameInError(name)}\` — a firstTileId is a whole number`,
+          );
+        }
+        // the upper bound keeps the loop below finite: more frames than this fit into no data
+        // texture, and the exact capacity is left to bakeDataTexture()
+        const maxTileCount = FrameBasedAnimations.MaxTextureSize;
+        if (args[4] !== undefined && (!Number.isInteger(args[4]) || args[4] < 1 || args[4] > maxTileCount)) {
+          throw new Error(
+            `FrameBasedAnimations: add() got a tileCount of ${describeValue(args[4])} for the animation \`${animNameInError(name)}\` — a tileCount is a whole number from 1 to ${maxTileCount}`,
+          );
+        }
         const firstTileId = (args[3] as number | undefined) ?? tileSet.firstId;
         const tileCount: number = args[4] ?? tileSet.tileCount;
         frames = [];
@@ -301,6 +339,13 @@ export class FrameBasedAnimations {
     return this.#animations.has(name);
   }
 
+  /**
+   * Bake every registered animation into a `DataTexture`, the `animsMap` a material reads the
+   * frames from.
+   *
+   * Every call builds a new `DataTexture` and keeps no reference to it: the caller owns it and
+   * disposes it. A material it is handed to as `animsMap` borrows it and does not dispose it.
+   */
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {
     const includeTextureSize = Boolean(options?.includeTextureSize);
 

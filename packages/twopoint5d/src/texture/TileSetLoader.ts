@@ -27,6 +27,15 @@ export class TileSetLoader {
     this.imageLoader = imageLoader;
   }
 
+  /**
+   * Load the image at `url` and call `onLoadCallback` with a tile set laid out over it, a
+   * texture of it with the texture classes applied, the image and its coordinates. A load
+   * that fails, and tile set options that `TileSet` refuses, reach the caller through
+   * `onErrorCallback`.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   load(
     url: string,
     tileSetOptions: TileSetOptions,
@@ -68,6 +77,14 @@ export class TileSetLoader {
     );
   }
 
+  /**
+   * {@link TileSetLoader.load} as a promise: it resolves with the tile set, the texture, the
+   * image and its coordinates, and rejects when the load fails or `TileSet` refuses the
+   * options.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   loadAsync(
     url: string,
     tileSetOptions: TileSetOptions,

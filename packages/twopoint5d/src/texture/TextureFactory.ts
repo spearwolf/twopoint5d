@@ -86,6 +86,13 @@ const TextureClasses = {
  */
 export type TextureOptionClasses = keyof typeof TextureClasses;
 
+/**
+ * Whether `name` is one of the {@link TextureOptionClasses} — a name a
+ * {@link TextureFactory} applies. For names out of json, such as a texture store catalog.
+ */
+export const isTextureOptionClass = (name: unknown): name is TextureOptionClasses =>
+  typeof name === 'string' && Object.hasOwn(TextureClasses, name);
+
 // The number says how broad a class is, not how important: a class that writes two
 // options is applied before one that writes a single one, so the narrower class has
 // the last word. Classes of the same breadth carry the same number — then the order
@@ -152,11 +159,20 @@ export class TextureFactory {
     this.textureLoader = new TextureLoader();
   }
 
+  /**
+   * The texture options the given classes add up to, on top of the defaults of this factory.
+   *
+   * A name that is no texture option class is skipped; `TextureStore#parse()` reports such a
+   * name when a catalog carries it.
+   */
   getOptions(classNames: Array<TextureOptionClasses>): Partial<TextureOptions> {
     const options = Object.assign(
       {},
       this.#defaultOptions,
       ...classNames
+        // a name this factory does not know carries neither options nor a priority, and its
+        // `undefined` priority would make the order of every other class undetermined
+        .filter(isTextureOptionClass)
         .map((className) => [TextureClassPriority[className], TextureClasses[className]] as [number, Partial<TextureOptions>])
         .sort(([a], [b]) => b - a)
         .map(([, opts]) => opts),
@@ -165,11 +181,22 @@ export class TextureFactory {
     return options;
   }
 
+  /**
+   * A new texture of `source` with the texture classes applied. A name that is no texture
+   * option class is skipped, as {@link TextureFactory.getOptions} does.
+   *
+   * Every call builds a new texture and keeps no reference to it: the caller owns it and
+   * disposes it.
+   */
   create(source: TextureSource, ...classNames: Array<TextureOptionClasses>): Texture {
     const texture = new Texture(source);
     return this.update(texture, ...classNames);
   }
 
+  /**
+   * Apply the texture classes to `texture` and return it. A name that is no texture option
+   * class is skipped, as {@link TextureFactory.getOptions} does.
+   */
   update(texture: Texture, ...classNames: Array<TextureOptionClasses>): Texture {
     const {anisotrophy, ...textureOptions} = this.getOptions(classNames);
     Object.assign(texture, textureOptions);
@@ -186,6 +213,9 @@ export class TextureFactory {
    *
    * A load that fails reaches the caller only through `options.onError` — pass one, or use
    * {@link TextureFactory.loadAsync}, where the failure cannot be missed.
+   *
+   * Every call builds a new texture and keeps no reference to it: the caller owns it and
+   * disposes it.
    */
   load(url: string, ...classNames: Array<TextureOptionClasses>): Texture;
   load(url: string, options: TextureLoadOptions, ...classNames: Array<TextureOptionClasses>): Texture;
@@ -213,6 +243,9 @@ export class TextureFactory {
    * The texture at `url`, with the texture classes applied once it is there.
    * A load that fails rejects — the error cannot be missed, which is the difference to
    * `load()`, where it has to be asked for through `onError`.
+   *
+   * Every call builds a new texture and keeps no reference to it: the caller owns it and
+   * disposes it.
    */
   loadAsync(url: string, textureClasses?: Array<TextureOptionClasses>): Promise<Texture> {
     return this.textureLoader.loadAsync(url).then((texture) => this.update(texture, ...(textureClasses ?? [])));

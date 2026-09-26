@@ -25,6 +25,14 @@ export class TextureImageLoader {
     this.imageLoader = imageLoader;
   }
 
+  /**
+   * Load the image at `url` and call `onLoadCallback` with a texture of it, the texture
+   * classes applied, the image and its coordinates. A load that fails reaches the caller
+   * through `onErrorCallback`.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   load(
     url: string,
     textureClasses: Array<TextureOptionClasses> | null | undefined,
@@ -59,6 +67,13 @@ export class TextureImageLoader {
     );
   }
 
+  /**
+   * {@link TextureImageLoader.load} as a promise: it resolves with the texture, the image and
+   * its coordinates, and rejects when the load fails.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   loadAsync(url: string, textureClasses?: Array<TextureOptionClasses> | null): Promise<TextureImage> {
     return new Promise((resolve, reject) => {
       this.load(url, textureClasses, resolve, reject);

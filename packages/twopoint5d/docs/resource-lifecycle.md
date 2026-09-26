@@ -13,6 +13,18 @@ A resource handed in — through the constructor, a setter or an attach method �
 to the caller: not disposed, not cleared, not modified. Handing a resource out does not
 transfer it either; returning a pool from a getter keeps you the owner.
 
+**What a method builds for its caller and keeps no reference to belongs to the caller.**
+The loaders of the texture module — [`TextureImageLoader`](../src/texture/TextureImageLoader.ts),
+[`TileSetLoader`](../src/texture/TileSetLoader.ts),
+[`TextureAtlasLoader`](../src/texture/TextureAtlasLoader.ts) —,
+[`TextureFactory`](../src/texture/TextureFactory.ts)`#create()`, `#load()` and
+`#loadAsync()`, and
+[`FrameBasedAnimations`](../src/texture/FrameBasedAnimations.ts)`#bakeDataTexture()`
+build a new texture on every call and have no `dispose()` of their own: whoever called
+them disposes what came back. [`TextureResource`](../src/texture/TextureResource.ts) is
+the other case — it keeps the texture it built and disposes it itself, and a subscriber
+of `TextureStore` only borrows it.
+
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
 the constructor parameter, at the field, at the method that accepts the resource. Two
 exist today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its

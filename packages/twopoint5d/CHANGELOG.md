@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `{copy: true}` option to `VOBufferPool#toBuffersData()`: it hands out arrays the pool does not hold, `typedArray.slice()` of its own. That is the way to transfer buffers through `postMessage`, or to build a second pool that stays independent of this one — without it, every array is the pool's own, shared by reference with whatever takes the result in
 - add `Stylesheets.getSheet()`: the stylesheet of the document or shadow root that `root` stands for — the sheet `getGlobalSheet()` answers, under the name of what it is
 - add an optional `out` set to `Map2DSpatialHashGrid#findWithin()` and `#getTiles()`: it is emptied, filled and handed back, empty rather than `undefined` when nothing lies within. Without it both answer as before, with a new set or `undefined`
+- add the `baseUrl` option of `TextureStoreParseOptions`: the url the relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the catalog items are resolved against. `TextureStore#load()` sets it to the url it fetches; a caller who fetches the json itself and hands it to `parse()` passes it there
+- add `isTextureOptionClass()`: whether a name is one of the `TextureOptionClasses` a `TextureFactory` applies — the question for names out of json
 
 ### Changed
 
@@ -210,7 +212,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DataIdsChunk2D` takes exactly `width × height` ids: a `uint32Arr` of another length throws a `RangeError` from the constructor, a base64 string of another length at the first read
 - `RepeatingTilesProvider#getTileIdsWithin()` writes the first `width × height` cells of a `target` and leaves the cells behind them as they are; a `target` shorter than that throws a `RangeError`
 - `TextureResource#refCount` is read-only: it counts the `TextureStore#on()` subscriptions that hold the resource, a pending `TextureStore#get()` among them, and only the store changes it
-- `TextureStore#defaultTextureClasses` is a field that `parse()` reads: an assignment reaches a resource with the next `parse()` that names it, and a `parse()` whose data carries non-empty `defaultTextureClasses` replaces it first
+- `TextureStore#defaultTextureClasses` is a field that `parse()` reads: an assignment reaches a resource with the next `parse()` that names it, and a `parse()` whose data carries a `defaultTextureClasses` with a known name left in it replaces it first
+- `TextureStore#load()` and the static `TextureStore.load()` resolve a relative `imageUrl`, `atlasUrl` or `overrideImageUrl` of a catalog item against the url of the catalog, so a catalog names the files next to it. An absolute url stays exactly as written, and a catalog behind a `blob:` or a `data:` url leaves relative urls as written, for the browser to resolve against the document
+- an atlas resource of `TextureStore` and `TextureAtlasLoader` resolve a relative `meta.image` of the atlas json against the url of that json, so it names the image next to the json; an `overrideImageUrl` is taken as written. An `atlasJson` written to a resource from outside keeps its `meta.image` as written
+- `TextureStore#parse()` checks the catalog before it writes anything. Data that is no object, an `items` that is no object and a `defaultTextureClasses` that is there and no array throw a `TypeError` naming what was found. An item that is no object or carries a field of the wrong type — a url that is no string, a `tileSet` or `frameBasedAnimations` that is no object, a `texture` that is no array, `null` among them — builds no resource and goes out as an `error` event with `source: 'parse'` and its id; a resource that already carries the id stays as it is. A texture class name no `TextureFactory` knows, in an item or in `defaultTextureClasses`, is left out and reported the same way, and a `defaultTextureClasses` of nothing but unknown names leaves the defaults standing. The static `TextureStore.load()` rejects on each of these reports
+- `TextureStoreData#defaultTextureClasses` is optional: a catalog may leave it out
+- `TextureFactory#getOptions()`, and with it `create()` and `update()`, skip a name that is no texture option class; the order of the other classes stays what it would be without it
 
 ### Deprecated
 
@@ -368,6 +375,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureStore#get()` for a resource that cannot deliver: it rejects with an error naming the step and the url when the resource reports that its image does not load, that its atlas json cannot be fetched or read or names no image, or that its texture cannot be built — and for `tileSet`, `atlas` and `frameBasedAnimations` when `TileSet` refuses the tile set options or `TexturePackerJson` the atlas json. A failure reported before the call counts until the step that failed runs again, or until an `atlasJson` written to the resource takes the place of one that could not be fetched. The error carries what the resource reported as its `cause`; a skipped animation entry rejects nothing
 - fix `TextureStore#parse()` with a type conflict: the `defaultTextureClasses` of its data are not written either
 - fix `TextureStore#on()` for a subscription made before the `parse()` that brings its resource: a later `parse()` that brings the same resource does not call it again with the values it already had
+- fix `FrameBasedAnimations#add()` with tiles that cannot be picked: a tile id or a `firstTileId` that is no whole number, a `tileCount` that is no whole number from 1 to `FrameBasedAnimations.MaxTextureSize` and a `frameNameQuery` that is neither a string nor a `RegExp` throw an error naming the value and the animation. A `TextureResource` skips such an animation entry and reports it, and so it does with one whose `tileIds` are no array
+- fix `TileSet` with a `firstId` that is no whole number: it is refused with a `RangeError`
 
 ### Migration Guide
 
@@ -2567,6 +2576,58 @@ try {
 } catch (error) {
   console.warn((error as Error).message, (error as Error).cause); // names the step and the url
 }
+```
+
+#### Relative urls of a catalog resolve against the catalog
+
+A relative `imageUrl`, `atlasUrl` or `overrideImageUrl` of a catalog that `TextureStore#load()`
+fetches names a file next to the catalog, and a relative `meta.image` of an atlas json names a
+file next to that json. A catalog whose item urls were written relative to the document while the
+catalog lies elsewhere writes them relative to the catalog, or absolute. An `overrideImageUrl`
+that only pointed at the image next to the atlas json can go. A `TextureAtlasLoader` resolves
+`meta.image` against the `path` of its `fileLoader` followed by the url it is given, so a directory
+both files lie in goes on the `fileLoader`; its image loader stays without a `path`, which three.js
+would put in front of the resolved url.
+
+**Before**
+
+```json
+{
+  "items": {
+    "splotchs": {
+      "atlasUrl": "/lookbook/assets/splotchs-256x.json",
+      "overrideImageUrl": "/lookbook/assets/splotchs-256x.png"
+    }
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "items": {
+    "splotchs": {
+      "atlasUrl": "/lookbook/assets/splotchs-256x.json"
+    }
+  }
+}
+```
+
+#### `TextureStoreData#defaultTextureClasses` is optional
+
+Code that reads the field of a `TextureStoreData` handles its absence.
+
+**Before**
+
+```ts
+const classes = data.defaultTextureClasses.slice();
+```
+
+**After**
+
+```ts
+const classes = data.defaultTextureClasses?.slice() ?? [];
 ```
 
 ## [0.21.2] - 2026-06-19

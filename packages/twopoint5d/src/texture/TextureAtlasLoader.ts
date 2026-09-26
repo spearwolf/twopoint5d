@@ -1,5 +1,6 @@
 import {FileLoader} from 'three/webgpu';
 import {isAtlasJsonResponse} from './isAtlasJsonResponse.js';
+import {resolveRelativeUrl} from './resolveRelativeUrl.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {TextureImageLoader, type TextureImage} from './TextureImageLoader.js';
@@ -12,7 +13,7 @@ export interface TextureAtlasData extends TextureImage {
 }
 
 export interface TextureAtlasLoadOptions {
-  /** The image url to load, instead of the one the atlas json names. */
+  /** The image url to load, instead of the one the atlas json names — taken as written, not resolved against the atlas url. */
   overrideImageUrl?: string;
 }
 
@@ -34,6 +35,20 @@ export class TextureAtlasLoader {
     this.textureImageLoader = defaults?.textureImageLoader ?? new TextureImageLoader();
   }
 
+  /**
+   * Load the atlas json at `url` and the image it names, and call `onLoadCallback` with the
+   * atlas, the `meta` of the json, the texture and the image. A relative `meta.image` is
+   * resolved against the url the json came from — the `path` of the `fileLoader` followed by
+   * `url` —, so it names the file next to the json; an `overrideImageUrl` is taken as written.
+   * A load that fails reaches the caller through `onErrorCallback`.
+   *
+   * A directory both files lie in belongs on the `fileLoader`, as its `path`. The image loader
+   * behind `textureImageLoader` stays without one: three.js puts a loader's `path` in front of
+   * every url it loads, the resolved one included, which is already absolute.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   load(
     url: string,
     textureClasses: Array<TextureOptionClasses> | null | undefined,
@@ -52,7 +67,12 @@ export class TextureAtlasLoader {
           return;
         }
 
-        const imageUrl = options?.overrideImageUrl ?? jsonData.meta.image;
+        // the json came from here: three.js puts the `path` of a loader in front of the url it
+        // is asked for, and that `path` is an empty string unless one was set
+        const jsonUrl = this.fileLoader.path + url;
+        const imageUrl =
+          options?.overrideImageUrl ??
+          (typeof jsonData.meta.image === 'string' ? resolveRelativeUrl(jsonData.meta.image, jsonUrl) : undefined);
         if (typeof imageUrl !== 'string') {
           onErrorCallback?.(
             new Error(`TextureAtlasLoader: the response of "${url}" names no image and no overrideImageUrl was given`),
@@ -94,6 +114,17 @@ export class TextureAtlasLoader {
     );
   }
 
+  /**
+   * {@link TextureAtlasLoader.load} as a promise: it resolves with the atlas, the `meta` of
+   * the json, the texture and the image, and rejects when the load fails. A relative
+   * `meta.image` is resolved against the url the json came from, the `path` of the
+   * `fileLoader` followed by `url`; an `overrideImageUrl` is taken as written. A directory
+   * both files lie in belongs on the `fileLoader`, and the image loader stays without a
+   * `path`, as {@link TextureAtlasLoader.load} sets out.
+   *
+   * The texture handed out is built for this call and kept by no one else: the caller owns
+   * it and disposes it.
+   */
   loadAsync(
     url: string,
     textureClasses?: Array<TextureOptionClasses> | null,

@@ -17,7 +17,6 @@ const TILES_URL = `${ASSET_BASE}/nobinger-anim-sheet.png`;
 const BALL_ATLAS_URL = `${ASSET_BASE}/ball-patterns.json`;
 const BALL_ATLAS_IMG = `${ASSET_BASE}/ball-patterns.png`;
 const FIRE_ATLAS_URL = `${ASSET_BASE}/fire-particles.json`;
-const FIRE_ATLAS_IMG = `${ASSET_BASE}/fire-particles.png`;
 
 // Black-box stub renderer — TextureFactory only consults `getMaxAnisotropy()`.
 // No GPU upload is required because `on()` resolves before any rendering.
@@ -70,7 +69,6 @@ const CATALOG = {
     },
     fire: {
       atlasUrl: FIRE_ATLAS_URL,
-      overrideImageUrl: FIRE_ATLAS_IMG,
       frameBasedAnimations: {
         flames: {duration: 0.5, frameNameQuery: '^fire\\d+$'},
       },
@@ -344,6 +342,11 @@ describe('TextureStore.on() — black-box workflow', function () {
       expect(anims).to.be.instanceOf(FrameBasedAnimations);
       const id = anims.animId('flames');
       expect(id).to.be.a('number').and.greaterThanOrEqual(0);
+      // the catalog comes from a blob: url, so the atlasUrl stays as written; the image the
+      // atlas json names is resolved against that url and the document
+      expect((await store.whenResource('fire')).imageUrl).to.equal(
+        new URL(`${ASSET_BASE}/fire-particles.png`, document.baseURI).href,
+      );
 
       unsub();
     });

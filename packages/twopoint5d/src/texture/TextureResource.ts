@@ -3,6 +3,7 @@ import type {Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
 import {
   changeRefCount,
@@ -13,6 +14,7 @@ import {
   type TextureResourceLoadFailure,
 } from './internals.js';
 import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
+import {resolveRelativeUrl} from './resolveRelativeUrl.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -89,8 +91,10 @@ export const TextureResourceSubtypes = {
  * as the image it names is there; the write that set it does not throw either. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data is no object or does not fit this kind of resource, one whose data does not
- * let the animation be built — no `duration` and no `frameRate`, or a `frameRate` of 0 — and one
- * whose frames come out empty, a `frameNameQuery` that matches nothing or an empty tile range.
+ * let the animation be built — no `duration` and no `frameRate`, a `frameRate` of 0, `tileIds` that
+ * are no array, a tile id, a `firstTileId` or a `tileCount` that `FrameBasedAnimations#add()` refuses,
+ * a `frameNameQuery` that is neither a string nor a `RegExp` — and one whose frames come out empty,
+ * a `frameNameQuery` that matches nothing or an empty list of `tileIds`.
  * Every other entry of the same map is registered all the same.
  * `dispose` fires once at the start of `dispose()`.
  */
@@ -278,7 +282,8 @@ export class TextureResource {
 
   #atlasUrl?: Signal<string | undefined>;
   #atlasJson?: Signal<TexturePackerJsonData | undefined>;
-  // the json as `atlasUrl` delivered it, without the image url resolved into it
+  // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
+  // but without the `overrideImageUrl` put in its place
   #fetchedAtlasJson?: Signal<AtlasJsonResponse | undefined>;
   #overrideImageUrl?: Signal<string | undefined>;
   #atlas?: Signal<TextureAtlas | undefined>;
@@ -361,8 +366,11 @@ export class TextureResource {
   /**
    * The atlas json of an atlas resource. For a json fetched from `atlasUrl`, `meta.image` names
    * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
-   * json names otherwise. A json written from outside replaces the fetched one, and a fetch
-   * of `atlasUrl` that failed along with it.
+   * json names otherwise — a relative name resolved against `atlasUrl`, so it names the file
+   * next to the json. The `overrideImageUrl` is taken as written. A json written from outside
+   * replaces the fetched one, and a fetch of `atlasUrl` that failed along with it; it has no
+   * url of its own and keeps its `meta.image` as written, and the image loader resolves a
+   * relative one against the document.
    *
    * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
    * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
@@ -732,6 +740,22 @@ export class TextureResource {
                 emit(this, OnError, wrongAnimationDataError(this, name, shape));
                 continue;
               }
+              // add() would read a number here as a `firstTileId` and quietly build an animation
+              // over the whole tile set
+              if (shape === 'tileIds') {
+                const {tileIds} = data as {tileIds: unknown};
+                if (!Array.isArray(tileIds)) {
+                  emit(this, OnError, {
+                    source: 'frameBasedAnimations',
+                    id: this.id,
+                    animation: name,
+                    error: new Error(
+                      `[TextureResource] animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} — tileIds is an array of tile ids`,
+                    ),
+                  });
+                  continue;
+                }
+              }
               try {
                 const timing = getTimingOptions(data);
                 if ('tileIds' in data) {
@@ -796,7 +820,14 @@ export class TextureResource {
                   return;
                 }
 
-                fetchedAtlasJsonSignal.set(atlasJson);
+                // a relative image name is a file next to the atlas json, and `atlasUrl` here is the url
+                // this very json came from — the effect that picks the image may already see the next one
+                const image = atlasJson.meta.image;
+                fetchedAtlasJsonSignal.set(
+                  typeof image === 'string'
+                    ? {...atlasJson, meta: {...atlasJson.meta, image: resolveRelativeUrl(image, atlasUrl)}}
+                    : atlasJson,
+                );
               } catch (error) {
                 if (aborted) return;
                 this.#fail('atlasFetch', {source: 'atlas', url: atlasUrl, error});
@@ -831,10 +862,11 @@ export class TextureResource {
             }
             // the resolved url goes into the published json, mirroring `TextureAtlasLoader`: `atlasJson`
             // is typed as `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url
-            // has to land in the json itself rather than in a cast that would let the getter lie. The json
-            // as it came stays in `#fetchedAtlasJson`, so an override that is cleared again gives the image
-            // back to the one the json names. Written straight onto the signal, because the public setter
-            // treats a write as a json from outside and drops the fetched one
+            // has to land in the json itself rather than in a cast that would let the getter lie. The
+            // fetched json, without the override, stays in `#fetchedAtlasJson`, so an override that is
+            // cleared again gives the image back to the one the json names. Written straight onto the
+            // signal, because the public setter treats a write as a json from outside and drops the
+            // fetched one
             atlasJsonSignal.set({...fetched, meta: {...fetched.meta, image: imageUrl}});
           },
           [fetchedAtlasJsonSignal, overrideImageUrlSignal],

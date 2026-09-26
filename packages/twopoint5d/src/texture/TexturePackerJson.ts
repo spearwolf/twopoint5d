@@ -16,7 +16,6 @@ export interface TexturePackerMetaData {
     w: number;
     h: number;
   };
-  // TODO add textureOptions: TextureClasses[]
 }
 
 export interface TexturePackerJsonData {

@@ -8,7 +8,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
-import {TextureFactory} from './TextureFactory.js';
+import {isTextureOptionClass, TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 
 // the factory asks a renderer for exactly one thing, so a stub that answers it is a renderer enough
 const rendererWithMaxAnisotropy = (max: number): WebGPURenderer => ({getMaxAnisotropy: () => max}) as unknown as WebGPURenderer;
@@ -148,5 +148,57 @@ describe('TextureFactory', () => {
       expect(options.magFilter).toBe(LinearFilter);
       expect(options.minFilter).toBe(NearestFilter);
     });
+  });
+
+  describe('isTextureOptionClass() tells class names from other values, and getOptions() skips the others', () => {
+    const everyClassName = [
+      'anisotrophy',
+      'anisotrophy-2',
+      'anisotrophy-4',
+      'no-anisotrophy',
+      'nearest',
+      'mag-nearest',
+      'min-nearest',
+      'linear',
+      'mag-linear',
+      'min-linear',
+      'flipy',
+      'no-flipy',
+      'srgb',
+      'linear-srgb',
+    ] satisfies TextureOptionClasses[];
+
+    test.each(everyClassName)('isTextureOptionClass(%j) answers true', (name) => {
+      expect(isTextureOptionClass(name)).toBe(true);
+    });
+
+    // `toString` is reachable through `in` on every object, and a check built on `in` would take it
+    test.each(['nearset', 'toString', 5, undefined])('isTextureOptionClass(%j) answers false', (name) => {
+      expect(isTextureOptionClass(name)).toBe(false);
+    });
+
+    // the second order is the one that tells: a sort whose comparator answers NaN for the
+    // unknown name leaves `linear` behind `mag-nearest`, and `linear` then has the last word
+    test.each([
+      [
+        ['linear', 'nearset', 'mag-nearest'],
+        ['linear', 'mag-nearest'],
+      ],
+      [
+        ['mag-nearest', 'nearset', 'linear'],
+        ['mag-nearest', 'linear'],
+      ],
+    ] as Array<[TextureOptionClasses[], TextureOptionClasses[]]>)(
+      'getOptions() skips a name that is no texture option class and orders the rest as if it were not there: %j',
+      (withUnknown, without) => {
+        const factory = new TextureFactory(16, []);
+
+        const options = factory.getOptions(withUnknown);
+
+        expect(options).toEqual(factory.getOptions(without));
+        expect(options.magFilter).toBe(NearestFilter);
+        expect(options.minFilter).toBe(LinearFilter);
+      },
+    );
   });
 });
