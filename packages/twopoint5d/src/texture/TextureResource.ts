@@ -4,6 +4,14 @@ import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
+import {
+  changeRefCount,
+  imageSource,
+  type ImageLease,
+  loadFailureFor,
+  type TextureImageSource,
+  type TextureResourceLoadFailure,
+} from './internals.js';
 import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -133,6 +141,21 @@ const OnError = TextureResourceEvents.Error;
 // priority is what keeps the promise once those three lines are ever reordered.
 const DERIVED_FROM_IMAGE_PRIORITY = 100;
 
+type LoadStep = 'image' | 'atlasFetch' | 'atlasImage' | 'tileSet' | 'atlasParse';
+
+const ALL_SUBTYPES: readonly TextureResourceSubType[] = Object.values(TextureResourceSubtypes);
+
+// what a step that ended in a failure keeps from arriving: an image, an atlas json or a
+// texture that is not there takes everything with it, while a tile set or an atlas json
+// that is refused leaves the texture and the coordinates of the image standing
+const SUBTYPES_HELD_BACK_BY_STEP: Record<LoadStep, readonly TextureResourceSubType[]> = {
+  image: ALL_SUBTYPES,
+  atlasFetch: ALL_SUBTYPES,
+  atlasImage: ALL_SUBTYPES,
+  tileSet: ['tileSet', 'atlas', 'frameBasedAnimations'],
+  atlasParse: ['atlas', 'frameBasedAnimations'],
+};
+
 // An animation entry that carries the data of another kind of resource is skipped, and
 // this is what says so: a tile range on an atlas, a frame name query on a tile set, or an
 // entry that names no frames at all.
@@ -161,11 +184,6 @@ const derivedImageUrlError = (resource: TextureResource): TypeError =>
   new TypeError(
     `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead`,
   );
-
-interface TextureImageSource {
-  acquire(url: string): Promise<HTMLImageElement>;
-  release(url: string): void;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface TextureResource extends EventizedObject {}
@@ -289,9 +307,27 @@ export class TextureResource {
   readonly id: string;
   readonly type: TextureResourceType;
 
-  refCount: number = 0;
+  #refCount = 0;
 
-  // Every getter of this class answers `undefined` once dispose() has run. A setter needs
+  /**
+   * How many `TextureStore#on()` subscriptions hold this resource, a pending
+   * `TextureStore#get()` among them. `TextureStore#clearUnused()` and
+   * `TextureStore#parse()` with `{evictMissing: true}` dispose a resource only while this
+   * is 0.
+   *
+   * Read-only: the store that holds the resource keeps the count.
+   */
+  get refCount(): number {
+    return this.#refCount;
+  }
+
+  /** @internal */
+  [changeRefCount](delta: 1 | -1): void {
+    this.#refCount += delta;
+  }
+
+  // Every getter of this class answers `undefined` once dispose() has run, `refCount` aside:
+  // that one goes on counting the subscriptions that still hold the resource. A setter needs
   // no guard against a write that arrives too late: once dispose() has returned,
   // SignalGroup.delete(this) has taken the change bridges and the effects down, so nothing
   // reads what such a write would still put into a signal. The setters that are tied to one
@@ -325,7 +361,8 @@ export class TextureResource {
   /**
    * The atlas json of an atlas resource. For a json fetched from `atlasUrl`, `meta.image` names
    * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
-   * json names otherwise. A json written from outside replaces the fetched one.
+   * json names otherwise. A json written from outside replaces the fetched one, and a fetch
+   * of `atlasUrl` that failed along with it.
    *
    * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
    * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
@@ -341,6 +378,9 @@ export class TextureResource {
     // a json written from outside replaces the fetched one: a later change of the
     // `overrideImageUrl` must not bring the fetched json back in its place
     this.#fetchedAtlasJson?.set(undefined);
+    // and a fetch that failed holds nothing back any more; its effect hangs off `atlasUrl`
+    // alone and would not run again to clear the record
+    this.#loadFailures.delete('atlasFetch');
     this.#atlasJson.set(value);
   }
 
@@ -414,15 +454,14 @@ export class TextureResource {
 
   /**
    * How this resource fetches its image. The store it belongs to injects its shared,
-   * de-duplicating loader here; a resource on its own falls back to a plain `ImageLoader`.
+   * de-duplicating cache here; a resource on its own falls back to a plain `ImageLoader`.
    *
-   * `acquire()` and `release()` are paired: every run of the image effect acquires once and
-   * releases in its cleanup, which is what lets the store drop a cached image once no
-   * resource wants it any more.
+   * Every run of the image effect takes one lease and gives it back in its cleanup, which
+   * is what lets the store drop a cached image once no resource wants it any more.
    *
    * @internal
    */
-  imageLoader?: TextureImageSource;
+  [imageSource]?: TextureImageSource;
 
   get renderer(): WebGPURenderer | undefined {
     return this.#disposed ? undefined : this.#renderer.value;
@@ -436,6 +475,10 @@ export class TextureResource {
   // resource owns: every texture that reaches the signal was built here, and is released
   // here once its successor has taken its place
   #ownTexture?: Texture;
+
+  // the failure each step last ended with, until that step runs again: a resource does not
+  // try again by itself, and a get() that comes after the failure has to see it all the same
+  #loadFailures = new Map<LoadStep, TextureResourceLoadFailure>();
 
   #load = false;
   #disposed = false;
@@ -457,9 +500,9 @@ export class TextureResource {
    *
    * Afterwards every getter of this resource answers `undefined`, while
    * {@link TextureResource.id} and {@link TextureResource.type} still say which resource
-   * this was. A write to any setter, a {@link TextureResource.load} and a second
-   * `dispose()` do nothing — a setter that would throw on the shape of this resource
-   * stays silent as well.
+   * this was and {@link TextureResource.refCount} how many subscriptions still hold it. A
+   * write to any setter, a {@link TextureResource.load} and a second `dispose()` do
+   * nothing — a setter that would throw on the shape of this resource stays silent as well.
    */
   dispose() {
     if (this.#disposed) return;
@@ -478,8 +521,25 @@ export class TextureResource {
     this.#ownTexture?.dispose();
     this.#ownTexture = undefined;
 
+    this.#loadFailures.clear();
+
     SignalGroup.delete(this);
     off(this);
+  }
+
+  // the record goes in before the event goes out: a listener of the error event reads it
+  #fail(step: LoadStep, failure: TextureResourceLoadFailure): void {
+    this.#loadFailures.set(step, failure);
+    emit(this, OnError, failure);
+  }
+
+  /** @internal */
+  [loadFailureFor](subTypes: readonly TextureResourceSubType[]): TextureResourceLoadFailure | undefined {
+    if (this.#disposed) return undefined;
+    for (const [step, failure] of this.#loadFailures) {
+      if (SUBTYPES_HELD_BACK_BY_STEP[step].some((subType) => subTypes.includes(subType))) return failure;
+    }
+    return undefined;
   }
 
   /**
@@ -532,6 +592,8 @@ export class TextureResource {
       // post-registration.
       createEffect(
         () => {
+          // a new run is a new attempt, and a run without a factory or a url is a "not yet"
+          this.#loadFailures.delete('image');
           const factory = this.#textureFactory.get();
           const url = this.#imageUrl.get();
           const classes = this.#textureClasses.get();
@@ -540,11 +602,11 @@ export class TextureResource {
           let aborted = false;
           let texture: Texture | undefined;
 
-          // read once and used for both halves of the pair, so a field that is reassigned
-          // between the two cannot make this run release what it never acquired
-          const source = this.imageLoader;
+          // one lease per run, given back by the cleanup of exactly this run: a source that is
+          // swapped in between cannot make this run give back what it never took
+          const lease: ImageLease | undefined = this[imageSource]?.acquire(url);
 
-          (source ? source.acquire(url) : new ImageLoader().loadAsync(url))
+          (lease?.image ?? new ImageLoader().loadAsync(url))
             .then(
               (image) => {
                 if (aborted) return;
@@ -574,7 +636,7 @@ export class TextureResource {
                 // the second parameter of .then() sees exactly the rejection of the image load
                 // this promise wraps — the one case an `{source: 'image', url}` describes
                 if (aborted) return;
-                emit(this, OnError, {source: 'image', url, error});
+                this.#fail('image', {source: 'image', url, error});
               },
             )
             .catch((error) => {
@@ -585,7 +647,7 @@ export class TextureResource {
               // after the image fetch has already succeeded — there is no failed url to name, so
               // this reports the resource instead
               if (aborted) return;
-              emit(this, OnError, {source: 'texture', id: this.id, error});
+              this.#fail('image', {source: 'texture', id: this.id, error});
             });
 
           return () => {
@@ -593,7 +655,7 @@ export class TextureResource {
             // that replaces it, or by dispose() — freeing it here would leave the signal
             // pointing at a texture that is already gone
             aborted = true;
-            source?.release(url);
+            lease?.release();
           };
         },
         {attach: this},
@@ -610,6 +672,7 @@ export class TextureResource {
       if (tileSetOptionsSignal && tileSetSignal && tileSetAtlasSignal) {
         createEffect(
           () => {
+            this.#loadFailures.delete('tileSet');
             const imageCoords = this.imageCoords;
             if (!imageCoords) return;
             const options = this.tileSetOptions;
@@ -643,7 +706,7 @@ export class TextureResource {
             this.#frameBasedAnimations.set(undefined);
 
             if (refusal) {
-              emit(this, OnError, {source: 'texture', id: this.id, error: refusal.error});
+              this.#fail('tileSet', {source: 'texture', id: this.id, error: refusal.error});
             }
           },
           [this.#imageCoords, tileSetOptionsSignal],
@@ -700,6 +763,7 @@ export class TextureResource {
       if (atlasUrlSignal && atlasJsonSignal && fetchedAtlasJsonSignal && overrideImageUrlSignal && atlasSignal) {
         createEffect(
           () => {
+            this.#loadFailures.delete('atlasFetch');
             const atlasUrl = this.atlasUrl;
             if (!atlasUrl) return;
             const ac = new AbortController();
@@ -712,7 +776,7 @@ export class TextureResource {
                   // without this check, a 4xx/5xx body that happens to satisfy
                   // isAtlasJsonResponse below would be taken for a valid atlas, and the status
                   // this branch reports would be lost
-                  emit(this, OnError, {
+                  this.#fail('atlasFetch', {
                     source: 'atlas',
                     url: atlasUrl,
                     status: response.status,
@@ -724,7 +788,7 @@ export class TextureResource {
                 if (aborted) return;
 
                 if (!isAtlasJsonResponse(atlasJson)) {
-                  emit(this, OnError, {
+                  this.#fail('atlasFetch', {
                     source: 'atlas',
                     url: atlasUrl,
                     error: new Error(`[TextureResource] the response of "${atlasUrl}" is no texture atlas json`),
@@ -735,7 +799,7 @@ export class TextureResource {
                 fetchedAtlasJsonSignal.set(atlasJson);
               } catch (error) {
                 if (aborted) return;
-                emit(this, OnError, {source: 'atlas', url: atlasUrl, error});
+                this.#fail('atlasFetch', {source: 'atlas', url: atlasUrl, error});
               }
             })();
             return () => {
@@ -749,13 +813,14 @@ export class TextureResource {
 
         createEffect(
           () => {
+            this.#loadFailures.delete('atlasImage');
             const fetched = fetchedAtlasJsonSignal.value;
             if (!fetched) return;
             const imageUrl = this.overrideImageUrl ?? fetched.meta.image;
             if (typeof imageUrl !== 'string') {
               // the json that is published stays as it was: a subscriber would get an `undefined`
               // where the event type promises a value
-              emit(this, OnError, {
+              this.#fail('atlasImage', {
                 source: 'atlas',
                 url: this.atlasUrl,
                 error: new Error(
@@ -790,6 +855,7 @@ export class TextureResource {
 
         createEffect(
           () => {
+            this.#loadFailures.delete('atlasParse');
             const atlasJson = this.atlasJson;
             // Nothing on the resource may have been built from a json other than the current
             // one. The animations go back here as well, for the same reason as in the tile set
@@ -820,7 +886,7 @@ export class TextureResource {
               // `atlasJson` setter, a `TextureStore#parse()` — or the image effect, whose load
               // would then end as a texture failure
               takeBack();
-              emit(this, OnError, {source: 'texture', id: this.id, error});
+              this.#fail('atlasParse', {source: 'texture', id: this.id, error});
               return;
             }
             atlasSignal.set(atlas);

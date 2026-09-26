@@ -2,10 +2,18 @@ import {emit, type EventizedObject, off, on, once, retain} from '@spearwolf/even
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {
+  changeRefCount,
+  type ImageLease,
+  imageSource,
+  loadFailureFor,
+  type TextureImageSource,
+  type TextureResourceLoadFailure,
+} from './internals.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
-import {TextureResource, type TextureResourceSubType} from './TextureResource.js';
+import {TextureResource, TextureResourceEvents, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
 
@@ -55,7 +63,8 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  *   `fetch` covers a request that failed and a response that answered with a status;
  *   `parse` a body that is no JSON, a `parse()` that threw, and an item that names no
  *   source. The `atlas`, `image` and `texture` failures of a resource are emitted by
- *   `TextureResource` and are subscribed there.
+ *   `TextureResource` and are subscribed there; {@link TextureStore.get} is rejected on those
+ *   that keep a value it asks for from arriving, as its TSDoc sets out.
  */
 export const TextureStoreEvents = {
   Ready: 'ready',
@@ -97,13 +106,10 @@ const disposedError = (what: string): Error => new Error(`[TextureStore] ${what}
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
   new Error(`[TextureStore] load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
 
-const cmpDefaultClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-};
+// one message for a get() whose resource reported a failure that keeps a value it asks for
+// from arriving, naming the step that failed and the url it failed on, if there is one
+const resourceFailedError = (what: string, {source, url, error}: TextureResourceLoadFailure): Error =>
+  new Error(`[TextureStore] ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
 
 export interface TextureStoreParseOptions {
   /**
@@ -173,22 +179,19 @@ export class TextureStore {
     return store;
   }
 
-  #defaultTextureClasses = createSignal<TextureOptionClasses[]>([], {compare: cmpDefaultClasses, attach: this});
-
   /**
    * The texture classes every resource of this store starts from, merged with whatever an
    * item names for itself.
    *
+   * {@link TextureStore.parse} reads it: an assignment reaches a resource with the next
+   * `parse()` that names that resource, and a `parse()` whose data carries a non-empty
+   * `defaultTextureClasses` replaces this value before it reads it. A resource that no
+   * later `parse()` names keeps the classes it was given.
+   *
    * Keeps its last value once {@link TextureStore.dispose} has run: a configuration array
    * is no resource, and the answer stays right.
    */
-  get defaultTextureClasses(): TextureOptionClasses[] {
-    return this.#defaultTextureClasses.value;
-  }
-
-  set defaultTextureClasses(value: TextureOptionClasses[]) {
-    this.#defaultTextureClasses.set(value);
-  }
+  defaultTextureClasses: TextureOptionClasses[] = [];
 
   #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
   #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
@@ -225,8 +228,16 @@ export class TextureStore {
   // One fetch per url for as long as at least one resource wants it. What is shared is the
   // image and not the texture: each resource applies its own texture classes to it and
   // disposes the texture it built, and a shared Texture would belong to nobody.
-  #imageSource = {
-    acquire: (url: string): Promise<HTMLImageElement> => {
+  //
+  // An image is given up one microtask after its last lease comes back, not at once:
+  // signalize calls the cleanup of an effect right before its next run, and that run asks
+  // for the same url straight away. A change of texture classes or of the renderer would
+  // otherwise find an empty cache and fetch again, an image that is still loading among
+  // them. And a lease knows its entry instead of looking it up by url: a failed entry has
+  // already been replaced by the time the resource that held it lets go, and a release by
+  // url would hit the successor.
+  #imageSource: TextureImageSource = {
+    acquire: (url: string): ImageLease => {
       let entry = this.#images.get(url);
       if (!entry) {
         const created = {image: new ImageLoader().loadAsync(url), refCount: 0};
@@ -238,14 +249,20 @@ export class TextureStore {
         this.#images.set(url, created);
         entry = created;
       }
-      entry.refCount++;
-      return entry.image;
-    },
-    release: (url: string): void => {
-      const entry = this.#images.get(url);
-      if (!entry) return;
-      entry.refCount--;
-      if (entry.refCount <= 0) this.#images.delete(url);
+      const leased = entry;
+      leased.refCount++;
+      let released = false;
+      return {
+        image: leased.image,
+        release: () => {
+          if (released) return;
+          released = true;
+          queueMicrotask(() => {
+            leased.refCount--;
+            if (leased.refCount <= 0 && this.#images.get(url) === leased) this.#images.delete(url);
+          });
+        },
+      };
     },
   };
 
@@ -418,10 +435,6 @@ export class TextureStore {
   parse(data: TextureStoreData, options?: TextureStoreParseOptions) {
     if (this.#disposed) return;
 
-    if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
-      this.defaultTextureClasses = data.defaultTextureClasses.slice();
-    }
-
     // every item is held against what is already there before the first one is written: a
     // parse either runs whole or not at all, instead of leaving half its resources updated
     // and the ready event behind
@@ -442,6 +455,10 @@ export class TextureStore {
 
     if (conflicts.length) {
       throw new Error(`[TextureStore] parse() found ${conflicts.length} item(s) of a conflicting type: ${conflicts.join('; ')}`);
+    }
+
+    if (Array.isArray(data.defaultTextureClasses) && data.defaultTextureClasses.length) {
+      this.defaultTextureClasses = data.defaultTextureClasses.slice();
     }
 
     for (const id of withoutSource) {
@@ -505,10 +522,10 @@ export class TextureStore {
 
         if (resource) {
           if (!this.#resources.has(id)) {
-            // the loader goes in before the factory: the image effect returns at once
-            // without a factory and runs when it arrives, so a loader set afterwards would
-            // miss the first fetch
-            resource.imageLoader ??= this.#imageSource;
+            // the image source goes in before the factory: the image effect returns at once
+            // without a factory and runs when it arrives, so an image source set afterwards
+            // would miss the first fetch
+            resource[imageSource] ??= this.#imageSource;
             resource.textureFactory = this.#textureFactory.value;
           }
           this.#resources.set(id, resource);
@@ -567,6 +584,8 @@ export class TextureStore {
     // the tuple this subscription was last called with, so the several events of one batch
     // deliver it once
     let lastValues: unknown[] | undefined;
+    // the resource the subtype subscriptions below listen to
+    let subscribedResource: TextureResource | undefined;
     let unsubscribeFromResource: undefined | (() => void);
     // assigned below, once the handlers they release exist; `unsubscribe` closes over them
     // and reads them only when it runs, which is never before that point
@@ -579,6 +598,7 @@ export class TextureStore {
       unsubscribeFromSubType.forEach((cb) => cb());
       unsubscribeFromSubType.length = 0;
       lastValues = undefined;
+      subscribedResource = undefined;
     };
 
     const unsubscribe: () => void = () => {
@@ -594,17 +614,23 @@ export class TextureStore {
     const onReadyHandler = () => {
       if (isActiveSubscription) {
         unsubscribeFromResource = this.onResource(id, (resource) => {
+          // a subscription whose resource was still missing at the first ready listens for it
+          // on the store for good, and every parse() that names the resource announces it
+          // again; subscribing to the same instance anew would deliver its retained values a
+          // second time
+          if (resource === subscribedResource) return;
+
           clearSubTypeSubscriptions();
 
-          resource.imageLoader ??= this.#imageSource;
+          resource[imageSource] ??= this.#imageSource;
           resource.load();
           if (this.#textureFactory.value && !resource.textureFactory) {
             resource.textureFactory = this.#textureFactory.value;
           }
 
-          resource.refCount++;
+          resource[changeRefCount](1);
           unsubscribeFromSubType.push(() => {
-            resource.refCount--;
+            resource[changeRefCount](-1);
           });
 
           if (isMultipleTypes) {
@@ -642,6 +668,8 @@ export class TextureStore {
               }),
             );
           }
+
+          subscribedResource = resource;
         });
       }
     };
@@ -660,6 +688,17 @@ export class TextureStore {
    * call on a store that is already disposed is rejected right away. An id that is
    * still missing once the first `parse()` has gone by is rejected with the same error
    * {@link TextureStore.whenResource} throws, instead of waiting for a later `parse()`.
+   *
+   * It is rejected as well when the resource reports a failure that keeps a value it asks
+   * for from arriving: an image that does not load, an atlas json that cannot be fetched or
+   * read or that names no image, a texture that cannot be built — and, for `tileSet`,
+   * `atlas` and `frameBasedAnimations`, tile set options that `TileSet` refuses or an atlas
+   * json that `TexturePackerJson` cannot read. A failure reported before the call counts as
+   * well, until a change of what the failed step reads — its url, its options, the texture
+   * classes, the renderer — sends that step off again, or an `atlasJson` written to the
+   * resource takes the place of one that could not be fetched. The error names the step and
+   * the url, and carries what the resource reported as its `cause`. An animation entry that
+   * is skipped does not reject.
    */
   get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
@@ -708,6 +747,27 @@ export class TextureStore {
         this.on(id, type, (value) => {
           settle();
           resolve(value);
+        }),
+      );
+
+      // a failure the resource reported before this call counts like one that arrives while
+      // waiting: the step that failed does not run again by itself. A value on() delivers
+      // synchronously wins, because on() subscribes first
+      const subTypes = (Array.isArray(type) ? type : [type]) as readonly TextureResourceSubType[];
+      let watchedResource: TextureResource | undefined;
+      track(
+        this.onResource(id, (resource) => {
+          if (resource === watchedResource) return;
+          watchedResource = resource;
+          const rejectIfHeldBack = () => {
+            if (settled) return;
+            const failure = resource[loadFailureFor](subTypes);
+            if (failure == null) return;
+            settle();
+            reject(resourceFailedError(`get(${id}, ${String(type)})`, failure));
+          };
+          track(on(resource, TextureResourceEvents.Error, rejectIfHeldBack));
+          rejectIfHeldBack();
         }),
       );
 

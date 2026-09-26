@@ -209,6 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - perf `ChunkQuadTreeNode#subdivide()` picks the axes of a node of n chunks in O(n log n) from its edges, sorted once per axis
 - `DataIdsChunk2D` takes exactly `width × height` ids: a `uint32Arr` of another length throws a `RangeError` from the constructor, a base64 string of another length at the first read
 - `RepeatingTilesProvider#getTileIdsWithin()` writes the first `width × height` cells of a `target` and leaves the cells behind them as they are; a `target` shorter than that throws a `RangeError`
+- `TextureResource#refCount` is read-only: it counts the `TextureStore#on()` subscriptions that hold the resource, a pending `TextureStore#get()` among them, and only the store changes it
+- `TextureStore#defaultTextureClasses` is a field that `parse()` reads: an assignment reaches a resource with the next `parse()` that names it, and a `parse()` whose data carries non-empty `defaultTextureClasses` replaces it first
 
 ### Deprecated
 
@@ -362,6 +364,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Map2DSpatialHashGrid`: a renderable of width or height 0 on a cell border lies in the cell of its upper left corner, where `findWithin()` finds it; `remove()` takes a renderable out of every cell `add()` put it into, also after its `aabb` changed; `add()` of a renderable the grid holds moves it to the cells of its current `aabb`; `findWithin()` with an `aabb` of width or height 0 looks into the cell its corner lies in
 - fix `CameraBasedVisibility`: the probe rays and the frustum test take the near and far plane from `camera.coordinateSystem` and `camera.reversedDepth`. This matters for a camera a WebGPU renderer has rendered with and for a renderer with `reversedDepthBuffer`; a perspective camera with reversed depth finds the map plane
 - fix `ChunkQuadTreeNode#subdivide()` and `#appendChunk()`: a chunk of width or height 0 whose edge lies on an axis goes to the west or north side of it, and `subdivide()` comes to an end for such chunks
+- fix the shared image cache of `TextureStore`: a resource whose texture classes or renderer change builds its new texture from the image it already has, and an image still loading stays in the cache. The cache gives an image up one microtask after the last resource lets go of it, and every resource gives back the entry it took, so a load that failed and was retried by another resource leaves the retry cached
+- fix `TextureStore#get()` for a resource that cannot deliver: it rejects with an error naming the step and the url when the resource reports that its image does not load, that its atlas json cannot be fetched or read or names no image, or that its texture cannot be built — and for `tileSet`, `atlas` and `frameBasedAnimations` when `TileSet` refuses the tile set options or `TexturePackerJson` the atlas json. A failure reported before the call counts until the step that failed runs again, or until an `atlasJson` written to the resource takes the place of one that could not be fetched. The error carries what the resource reported as its `cause`; a skipped animation entry rejects nothing
+- fix `TextureStore#parse()` with a type conflict: the `defaultTextureClasses` of its data are not written either
+- fix `TextureStore#on()` for a subscription made before the `parse()` that brings its resource: a later `parse()` that brings the same resource does not call it again with the values it already had
 
 ### Migration Guide
 
@@ -2514,6 +2520,53 @@ visibility.map2dTileCoords.tileWidth = 256;
 
 ```ts
 map2d.tileWidth = 256; // or tileHeight, xOffset, yOffset — on Map2D or on Map2DTileStreamer
+```
+
+#### `TextureResource#refCount` is read-only
+
+The store counts the subscriptions that hold a resource, and `clearUnused()` and
+`parse(data, {evictMissing: true})` dispose a resource only while that count is 0. A caller who
+wrote the count to keep a resource alive holds a subscription instead, and lets go by calling
+the function `on()` returned.
+
+**Before**
+
+```ts
+const resource = await store.whenResource('hero');
+resource.refCount++; // keep 'hero' out of clearUnused()
+// …
+resource.refCount--;
+```
+
+**After**
+
+```ts
+const release = store.on('hero', 'texture', () => {}); // keeps 'hero' out of clearUnused()
+// …
+release();
+```
+
+#### `TextureStore#get()` rejects when its resource cannot deliver
+
+A `get()` for a resource whose image does not load, whose atlas json cannot be fetched or read,
+or whose texture cannot be built is rejected. A call awaited without a `catch` now throws where
+a broken url is involved; `error.cause` carries what the resource reported.
+
+**Before**
+
+```ts
+const texture = await store.get('hero', 'texture'); // waits for good on a broken url
+material.map = texture;
+```
+
+**After**
+
+```ts
+try {
+  material.map = await store.get('hero', 'texture');
+} catch (error) {
+  console.warn((error as Error).message, (error as Error).cause); // names the step and the url
+}
 ```
 
 ## [0.21.2] - 2026-06-19
