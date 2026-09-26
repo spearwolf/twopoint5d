@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="audit-template-version" content="2.1.0">
+<meta name="audit-template-version" content="2.2.0">
 <title>Audit</title>
 <script id="audit-data" type="application/json">{
   "schemaVersion": 2,
   "meta": {
     "generator": "js-ts-audit-remediation",
     "lang": "de",
-    "templateVersion": "2.1.0",
-    "generatedAt": "2026-09-26T12:22:08.008Z"
+    "templateVersion": "2.2.0",
+    "generatedAt": "2026-09-26T14:11:00.594Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -199,23 +199,23 @@
       "code": {
         "executiveSummary": "Vier Defekte treffen realistische Nutzung. Bei vollem Tile-Pool bleiben **dauerhafte Löcher in der Karte**, ohne Meldung. Ein verschachtelter `StageRenderer` ohne eigene Pipeline **schmiert über die Frames**, weil sein Pass-RT nie gelöscht wird. `Display.dispose()` während `renderer.init()` **lässt ein GPU-Device und eine endlose rAF-Schleife zurück**, und eine nach Alt-Tab gehaltene Pan-Taste **scrollt endlos weiter**. Darunter liegt eine Schicht mittelschwerer Korrektheitsfehler an den Grenzen zu Fremdcode und Fremddaten: relative Atlas-URLs, ein doppelter Farbraum-Transform in Mode E, Billboards an transformierten Meshes, `voInitialize` überschreibt importierte Daten, ein Tint-Attribut, das kein Shader liest. Die Ownership- und Dispose-Disziplin nach `resource-lifecycle.md` ist dagegen fast lückenlos.",
         "score": 85,
-        "penalty": 26.5,
+        "penalty": 25.5,
         "bySeverity": {
           "critical": 0,
           "high": 2,
           "medium": 5,
-          "low": 13,
-          "info": 11
+          "low": 11,
+          "info": 13
         },
         "byCategory": {
-          "correctness": 8,
+          "correctness": 6,
           "architecture": 1,
           "api": 8,
           "completeness": 1,
           "readability": 2,
           "performance": 2,
-          "consistency": 2,
-          "dx": 5,
+          "consistency": 3,
+          "dx": 6,
           "testing": 2
         }
       },
@@ -228,10 +228,10 @@
           "high": 0,
           "medium": 6,
           "low": 23,
-          "info": 15
+          "info": 14
         },
         "byCategory": {
-          "testing": 11,
+          "testing": 10,
           "dx": 22,
           "dependencies": 3,
           "completeness": 1,
@@ -247,7 +247,7 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 17542,
-        "findings": 44,
+        "findings": 43,
         "score": 88
       },
       {
@@ -272,7 +272,7 @@
         "score": 95.5
       }
     ],
-    "resolvedCount": 156,
+    "resolvedCount": 159,
     "scoreModel": 2,
     "score": 78,
     "scoring": {
@@ -292,34 +292,33 @@
       "critical": 0,
       "high": 2,
       "medium": 11,
-      "low": 36,
-      "info": 26
+      "low": 34,
+      "info": 27
     },
     "byCategory": {
-      "correctness": 8,
+      "correctness": 6,
       "architecture": 1,
       "api": 8,
-      "testing": 13,
-      "dx": 27,
+      "testing": 12,
+      "dx": 28,
       "dependencies": 3,
       "completeness": 2,
       "readability": 5,
       "performance": 2,
-      "consistency": 3,
+      "consistency": 4,
       "types": 2,
       "build": 1
     },
     "byComponent": {
-      "stage": 26,
+      "stage": 27,
       "controls": 4,
-      "map2d": 1,
-      "sprites": 2
+      "texture": 1
     },
     "counts": {
-      "findings": 75,
+      "findings": 74,
       "improvements": 11,
       "byStatus": {
-        "new": 27,
+        "new": 26,
         "unchanged": 1,
         "carried-over": 44,
         "improved": 3
@@ -714,15 +713,13 @@
       "category": "testing",
       "domain": "harness",
       "severity": "medium",
-      "title": "Die riskantesten GPU-Pfade von Stage, Sprites und PanControl2D mit Browser-Tests absichern",
+      "title": "Die riskantesten GPU-Pfade der Stage und das verlorene keyup von PanControl2D mit Tests absichern",
       "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js",
       "locations": [
-        "packages/twopoint5d-testing/test/pan-control-keys.test.js",
-        "packages/twopoint5d/src/sprites/node-utils.ts:75-83",
-        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:74-81"
+        "packages/twopoint5d-testing/test/pan-control-keys.test.js"
       ],
-      "description": "Der Display-Anteil (start/stop-Race, Chronometer, Dispose während Init, Device-Pixel-Clamp bei dpr > 1) ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`). Offen bleiben die Pfade, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames, keine Tests für Billboards an einem verschobenen Mesh, `texCoordsFromIndex` und die Frame-Index-Formel, kein verlorenes `keyup`; `PanControl2D` hat keine `*.spec.ts`.",
-      "recommendation": "Je Pfad einen Browser-Test mit Pixel-Readback bzw. echtem Renderer ergänzen; für das verlorene `keyup` genügt eine Vitest-Spec.",
+      "description": "Der Display-Anteil (start/stop-Race, Chronometer, Dispose während Init, Device-Pixel-Clamp bei dpr > 1) ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`), der Sprites-Anteil (Billboards an einem verschobenen Mesh, `texCoordsFromIndex` mit einer zweiten Zeile, die Frame-Index-Formel samt `animOffset`, Zeit über der Dauer, zweiter Animation und Dauer 0) im Lauf vom 2026-09-26 (`324ab4a1`). Offen bleiben die Pfade der Stage, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames; dazu kein Test für ein verlorenes `keyup`, und `PanControl2D` hat keine `*.spec.ts`.",
+      "recommendation": "Für Mode E und das verschachtelte Plain-Kind je einen Browser-Test mit Pixel-Readback ergänzen; für das verlorene `keyup` genügt eine Vitest-Spec.",
       "effort": "M",
       "status": "new",
       "package": "twopoint5d-testing"
@@ -1731,80 +1728,6 @@
       }
     },
     {
-      "id": "TEST-049",
-      "category": "testing",
-      "domain": "harness",
-      "component": "map2d",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "Die Grenzprüfungen der map2d-Specs prüfen nur die Fehlerklasse, nicht die Meldung",
-      "location": "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:175",
-      "locations": [
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:179",
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:185",
-        "packages/twopoint5d/src/map2d/RectangularVisibilityArea.spec.ts:191",
-        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:36",
-        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:39",
-        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:43",
-        "packages/twopoint5d/src/map2d/Map2DTileCoordsUtil.spec.ts:48",
-        "packages/twopoint5d/src/map2d/Map2DSpatialHashGrid.spec.ts:32",
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.spec.ts:102",
-        "packages/twopoint5d/src/map2d/Map2DTileStreamer.spec.ts:105"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `toThrow(RangeError)` prüft nur die Klasse. Die Meldung, die Klasse, Eigenschaft und Wert nennt, kann sich ändern oder aus einer anderen Prüfung kommen, ohne dass ein Test rot wird.",
-      "recommendation": "Auf die Meldung prüfen (`toThrow(/…/)` oder den vollen Text), wie es die texture-Specs tun.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-26"
-      }
-    },
-    {
-      "id": "BUG-125",
-      "category": "correctness",
-      "domain": "code",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "low",
-      "title": "AnimatedSpritesMaterial teilt durch die duration, die FrameBasedAnimations als 0 zulässt",
-      "location": "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:90",
-      "locations": [
-        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:34-35",
-        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:296-298"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Der Shader rechnet den Frame-Index als `(time + animOffset) / duration` mit der `duration` aus dem `animsMap`. `FrameBasedAnimations#add()` lässt eine `duration` von 0 als Standbild zu; bei `time + animOffset = 0` ergibt das 0/0 = NaN und einen undefinierten Frame-Index. Aus dem Code abgeleitet, nicht im Browser gesehen. Zu entscheiden ist, auf welcher Seite der Scope-Grenze texture/sprites der Fix liegt: die Stelle liegt in `sprites/`, das gebrochene Versprechen gibt `FrameBasedAnimations#add()` in texture.",
-      "recommendation": "Im Shader eine `duration` von 0 als Standbild behandeln (Frame 0), oder `bakeDataTexture()` schreibt für ein Standbild einen Wert, den der Shader ohne Division liest; dazu ein Test mit `duration: 0`.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-26"
-      }
-    },
-    {
-      "id": "BUG-126",
-      "category": "correctness",
-      "domain": "code",
-      "component": "sprites",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "low",
-      "title": "Getrimmte TexturePacker-Frames werden nach dem getrimmten Bereich gezeichnet",
-      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSprite.ts:60",
-      "locations": [
-        "packages/twopoint5d/src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts:88-99",
-        "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:370"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Ein getrimmter Frame (`trimmed: true`, TexturePackers Voreinstellung) wird nach seinen `coords` gezeichnet, also nach dem beschnittenen Bereich. Wo er im ungetrimmten Sprite liegt (`spriteSourceSize`) und wie groß dieses ist (`sourceSize`), liest kein Konsument: `TexturedSprite#setFrame()` nicht, `AnimatedSpritesMaterial` nicht, und das Layout, das `bakeDataTexture()` ins `animsMap` schreibt, hat keinen Platz dafür. Die Frames einer getrimmten Animation springen, ein Sprite nach `coords.width`/`height` ist zu klein. Seit dem Lauf trägt jeder Frame aus `TexturePackerJson.parse()` die drei Werte als `TextureAtlasFrame#data`. Zu entscheiden ist, ob und in welchem Rahmen der Umbau kommt: er hat die Größe eines eigenen Pakets (Layout des `animsMap` in texture, Shader und Deskriptoren in sprites) und liegt zur Hälfte außerhalb der Domain texture.",
-      "recommendation": "Das `animsMap`-Layout um Versatz und Quellgröße je Frame erweitern, `AnimatedSpritesMaterial` und `TexturedSprite#setFrame()` legen den Quad danach; ein Browser-Test mit Pixelprobe hält es fest. Alternativ in der Doku festhalten, dass Atlanten ohne Trimming exportiert werden müssen.",
-      "effort": "L",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-26"
-      }
-    },
-    {
       "id": "DOC-071",
       "category": "dx",
       "domain": "harness",
@@ -1820,6 +1743,45 @@
         "kind": "induced",
         "run": "2026-09-26"
       }
+    },
+    {
+      "id": "CONS-058",
+      "category": "consistency",
+      "domain": "code",
+      "component": "texture",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "getBufferSize() trägt die maximale Texturgröße als eigenes Literal",
+      "location": "packages/twopoint5d/src/texture/FrameBasedAnimations.ts:104",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `getBufferSize()` setzt `16384` als eigenen Default neben `FrameBasedAnimations.MaxTextureSize`. Heute wirkungslos, weil der einzige Aufrufer den statischen Wert übergibt; ändert jemand die Konstante, driften beide auseinander.",
+      "recommendation": "Den Default aus `FrameBasedAnimations.MaxTextureSize` lesen.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
+    },
+    {
+      "id": "DOC-072",
+      "category": "dx",
+      "domain": "code",
+      "component": "stage",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "Ein fehlendes projectionPlane meldet sich ohne Klasse und Methode",
+      "location": "packages/twopoint5d/src/stage/OrthographicProjection.ts:133",
+      "locations": [
+        "packages/twopoint5d/src/stage/ParallaxProjection.ts:136"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `expectDefined(this.projectionPlane, …)` meldet `expected the projection plane of this projection to be defined`: die Meldung nennt weder Klasse noch Methode, und `projectionPlane` ist ein optionales öffentliches Feld des Aufrufers, keine Invariante, für die `expectDefined()` laut TSDoc gedacht ist. `TileSpritesFactory#createTile()` löst dasselbe Muster mit einem `Error`, der Methode, Feld und Wert nennt.",
+      "recommendation": "Einen `Error` werfen, der Klasse, Methode und das zu setzende Feld nennt, wie `TileSpritesFactory#createTile()`; die Meldung im Test festhalten.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-26"
+      }
     }
   ],
   "openQuestions": [
@@ -1827,8 +1789,7 @@
     "Hängt `PanControl2D` seine Listener bewusst an `document`, etwa für Vollbild-Apps? Dann ist die fehlende Input-Begrenzung eine Doku-Lücke und kein Defekt.",
     "Wird Mode E (verschachtelte Renderer mit eigener Pipeline unter einem komponierenden Parent) mit sRGB-Output produktiv genutzt? Der doppelte Output-Transform ist aus dem three-Quelltext abgeleitet, aber nicht per Pixel-Test bestätigt.",
     "`PanControl2D.update()` teilt den Pointer-Pan durch `devicePixelRatio`, die Tastatur-Speeds aber nicht. Ist es gewollt, dass die Karte auf Retina nur halb so schnell wie die Maus folgt?",
-    "Ist Mode D mit einem `outputRenderTarget`, dessen Größe vom Drawing Buffer abweicht, ein unterstützter Fall? `pass()` dimensioniert sein RT nach dem Drawing Buffer.",
-    "Gehören BUG-125 (`duration` 0 im `AnimatedSpritesMaterial`) und BUG-126 (getrimmte TexturePacker-Frames in den Sprite-Konsumenten) in einen Lauf der Domain texture oder der Domain sprites? Beide brechen ein Versprechen aus texture, der Fix liegt aber ganz oder zur Hälfte in `sprites/`; BUG-126 ist ein Umbau in der Größe eines eigenen Pakets (Layout des `animsMap`, Shader, Deskriptoren)."
+    "Ist Mode D mit einem `outputRenderTarget`, dessen Größe vom Drawing Buffer abweicht, ein unterstützter Fall? `pass()` dimensioniert sein RT nach dem Drawing Buffer."
   ],
   "methodology": {
     "text": "**Vollständig gelesen** wurde der gesamte Produktcode: alle 134 Nicht-Spec-Dateien unter `packages/twopoint5d/src/` (Module `vertex-objects`, `map2d`, `texture`, `stage`, `sprites`, `display`, `controls`, `utils`, dazu `index.ts` und `events.ts`), alle Nicht-Test-Skripte unter `scripts/` sowie `eslint.config.mjs` und `vite.config.ts`. Gelesen wurde modulweise, wie es `AGENTS.md` verlangt, jeweils mit `resource-lifecycle.md` und dem passenden Abschnitt der Architektur-Doku daneben. Die `high`-Befunde und mehrere `medium`-Befunde wurden gegen den Code und gegen den Quelltext von three 0.185.1 (`Renderer.js`, `RenderPipeline.js`) nachgeprüft. Einzelne Befunde (`voInitialize`, `VOBufferPool#buffer`, `toAttributeArrays`, `checkNameableTypes`) wurden per Skript gegen `dist/lib` bzw. mit einer Fixture im Scratchpad nachgestellt.\n\n**Stichproben** gab es aus den 71 Vitest-Specs (rund 1300 Tests) und den 25 Browser-Testdateien (rund 147 Tests), dazu aus allen Konfigurationen, Workflows, READMEs, dem CHANGELOG-Aufbau und der Library-Doku. **Nicht gelesen** wurden das Lookbook (`apps/lookbook`) und die Browser-Tests als Quelltext. Ihre Befunde stammen aus dem Vorlauf und wurden nur punktuell an der Fundstelle nachgeprüft.\n\n**Ausgeführt** wurden `pnpm lint` (Exit 0), `pnpm typecheck` (Exit 0), `pnpm test:scripts` (76/76 grün), `pnpm audit` und `pnpm audit --prod` (keine bekannten Schwachstellen) sowie `pnpm outdated -r`: three/@types/three 0.186, nx 23.2.1, TypeScript 7.0.2 und prettier-plugin-astro 1.0.1 sind verfügbar. `pnpm run ci` lief nicht, weil es `dist` leert und die Browser-Suite braucht.",
@@ -1849,7 +1810,8 @@
       "Nachgeführt aus dem Remediation-Lauf vom 2026-09-24 (Plan vom 2026-09-24, zweiter Lauf des Tages), Domäne »Display & Frame-Loop«: 6 Commits (`412f4a66`, `e796aac3`, `3995236e`, `81ca08de`, `3fbfdb55`, `c983e745`). Die beiden offenen Findings der Domäne (die rAF-Schleife von three während der Pause, der verdrängte Start-Fehler beim Rollback) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 5 vorbestehende Nebenbefunde der Domäne (strikte Pause-Zustellung, Tick ohne Zeitstempel, Abbruch von dispose() bei werfenden Listenern, TSDoc von start() nach dispose(), Pause vor dem ersten Start) wurden im Lauf behoben, ebenso 4 Doku-Folgen aus den eigenen Änderungen. Kein Finding blieb mangels Beleg offen, keines ging ins Backlog. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-25 (Feature-Domain Sprites; Scope-Regel: Sprites und Vertex Objects vollständig): 4 Commits (`deeddeea`, `aceff5f0`, `0d982277`, `9eae955d`). Alle 9 Findings der Sprites-Domain (einschließlich TEST-009 aus der Browser-Suite) sind mit Reviewer-Urteil und Commit-Hash geschlossen. 2 Nebenbefunde in der Domain (Typ von `vertexPositionNode`, `readonly` der Pool-Felder von `TexturedSpritesGeometry`) und alle kleinen Review-Folgen wurden im Lauf behoben. Von 4 Nebenbefunden außerhalb der beiden Domains gingen 3 neu ins Backlog; der vierte, ein rückblickender Absatz in `docs/proposals/sprite-features.md`, wurde direkt nach dem Lauf behoben. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-25 (Feature map2d; Scope-Regel: map2d vollständig einschließlich info und Optimierungspotenzial, Nebenbefunde in map2d, vertex-objects und sprites im Lauf): 7 Commits (`c152bab6`, `8720c67a`, `18b31272`, `584a675d`, `a45cac19`, `e830eec5`, `480b8fc3`). Alle 34 map2d-Findings, davon 2 aus dem Optimierungspotenzial, sind mit Reviewer-Urteil und Commit-Hash geschlossen; die map2d-Stelle von IMPL-001 ist aufgeräumt, das Finding bleibt für seine übrigen Stellen offen. 3 Nebenbefunde in map2d (Frustum-Probe ohne Koordinatensystem und Tiefenrichtung der Kamera, Endlosrekursion in `ChunkQuadTreeNode.subdivide()` bei Chunks ohne Ausdehnung, TSDoc an `CameraBasedVisibilityHelpers#show`) und alle Review-Folgen in map2d wurden im Lauf behoben; eine Folge zur Zeilenoptik zweier Doku-Absätze außerhalb von map2d ging als DOC-070 ins Backlog. Kein Finding blieb mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-26 (Feature texture; Scope-Regel: die Feature-Domain texture vollständig, jede Severity einschließlich info und Optimierungspotenzial, samt Specs, Doku und den Stellen in Lookbook und Browser-Tests, die texture benutzen; dazu IMPL-001, CONS-048 und die acknowledged Umbenennungen API-019, API-020, API-023): 12 Commits (`dff733ff` bis `9ec5944e`). Alle 29 texture-Findings, IMPL-001, CONS-048 sowie API-019, API-020 und API-023 sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-016, IMPL-011 und ARCH-005, die über zwei oder mehr Pakete verteilt waren, erst mit allen Teilen. Kein Finding blieb mangels Beleg offen; BUG-020, DOC-013, CONS-005 und CONS-007 bleiben acknowledged. Von 29 Nebenbefunden wurden 23 im Lauf behoben, 4 gingen als neue Findings ins Backlog, zwei davon (BUG-125, BUG-126) mit offener Frage zur Scope-Grenze texture/sprites; 2 deckten sich mit TYPE-019 und DOC-060 und sind nicht doppelt eingetragen. Die kleinen Review-Befunde auf die Diffs des Laufs hat das Nachtragspaket 12 behoben; offen blieb davon nur ein Formulierungshinweis im CHANGELOG (DOC-071). Die offene Frage zu relativen `meta.image`-URLs ist mit der Entscheidung vom 2026-09-26 beantwortet (Auflösung gegen die URL der JSON-Datei). Der Code wurde seit dem Audit nicht neu geprüft."
+      "Remediation-Lauf vom 2026-09-26 (Feature texture; Scope-Regel: die Feature-Domain texture vollständig, jede Severity einschließlich info und Optimierungspotenzial, samt Specs, Doku und den Stellen in Lookbook und Browser-Tests, die texture benutzen; dazu IMPL-001, CONS-048 und die acknowledged Umbenennungen API-019, API-020, API-023): 12 Commits (`dff733ff` bis `9ec5944e`). Alle 29 texture-Findings, IMPL-001, CONS-048 sowie API-019, API-020 und API-023 sind mit Reviewer-Urteil und Commit-Hash geschlossen; TEST-016, IMPL-011 und ARCH-005, die über zwei oder mehr Pakete verteilt waren, erst mit allen Teilen. Kein Finding blieb mangels Beleg offen; BUG-020, DOC-013, CONS-005 und CONS-007 bleiben acknowledged. Von 29 Nebenbefunden wurden 23 im Lauf behoben, 4 gingen als neue Findings ins Backlog, zwei davon (BUG-125, BUG-126) mit offener Frage zur Scope-Grenze texture/sprites; 2 deckten sich mit TYPE-019 und DOC-060 und sind nicht doppelt eingetragen. Die kleinen Review-Befunde auf die Diffs des Laufs hat das Nachtragspaket 12 behoben; offen blieb davon nur ein Formulierungshinweis im CHANGELOG (DOC-071). Die offene Frage zu relativen `meta.image`-URLs ist mit der Entscheidung vom 2026-09-26 beantwortet (Auflösung gegen die URL der JSON-Datei). Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt aus dem Remediation-Lauf der Domains sprites und map2d vom 2026-09-26 (sechs Commits, 324ab4a1..840e2c0e): drei Findings geschlossen, eines auf den Anteil außerhalb von sprites eingeengt, zwei Nebenbefunde aus texture und stage neu aufgenommen. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "scoreHistory": [
@@ -2099,6 +2061,16 @@
       "inducedOpen": 1,
       "discovered": 29,
       "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-26",
+      "source": "remediation",
+      "ref": "2026-09-26",
+      "fixed": 3,
+      "inducedFixed": 7,
+      "inducedOpen": 0,
+      "discovered": 9,
+      "attribution": "reviewed"
     }
   ],
   "acknowledged": [
@@ -2344,14 +2316,12 @@ button.node:hover { border-color: var(--accent); }
 .svg-diagram .accent { stroke: var(--accent); }
 .svg-diagram text.accent { fill: var(--accent); stroke: none; }
 
-/* Domain-Blöcke: je Domain eine Karte über die volle Breite, innen Zusammenfassung · Schweregrade · Kategorien */
+/* Domain-Blöcke: ab 900 px Code & Laufzeit links, Projekt-Harness rechts; innen untereinander
+   Zusammenfassung · Schweregrade · Kategorien */
 .domains { display: grid; gap: 20px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .domains { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.domains > * { min-width: 0; }
 .domain-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
-.domain-cols { display: grid; gap: 4px clamp(24px, 3vw, 48px); grid-template-columns: 1fr; }
-.domain-cols > * { min-width: 0; }
-@media (min-width: 720px) { .domain-cols { grid-template-columns: 1fr 1fr; } .domain-cols > .col-summary { grid-column: 1 / -1; } }
-@media (min-width: 1100px) { .domain-cols { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); } .domain-cols > .col-summary { grid-column: auto; } }
-@media (min-width: 1100px) { .domain-cols .col-summary .prose { max-width: none; } .domain-cols h4 { margin-top: 4px; } }
 .domain-score { font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .domain h4 { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); margin: 20px 0 8px; }
 .bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 6px 10px; align-items: center; font-size: 0.875rem; }
@@ -2382,12 +2352,14 @@ button.node:hover { border-color: var(--accent); }
 
 /* Filter */
 .filters { display: grid; gap: 10px; margin-bottom: 14px; }
-.fgroup { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.fgroup > .flabel { font-size: 0.8125rem; color: var(--faint); min-width: 72px; }
+.fgroup { display: flex; gap: 6px; align-items: flex-start; }
+.fgroup > .flabel { font-size: 0.8125rem; color: var(--faint); min-width: 72px; min-height: 40px; display: flex; align-items: center; flex: none; }
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: 0; }
 .fbtn { border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 6px 12px; min-height: 40px; font: inherit; font-size: 0.875rem; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
 .fbtn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 .fbtn .n { color: var(--faint); font-variant-numeric: tabular-nums; }
 .fbtn[disabled] { opacity: 0.45; cursor: default; }
+.fbtn[hidden] { display: none; }
 select, input[type="search"] { font: inherit; font-size: 0.9rem; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-height: 40px; padding: 6px 10px; max-width: 100%; }
 input[type="search"] { flex: 1 1 220px; }
 .fstatus { font-size: 0.875rem; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -2491,7 +2463,7 @@ var STRINGS = {
     lastRun: { remediation: 'nachgeführt durch Remediation-Lauf vom', 'github-sync': 'abgeglichen mit GitHub am' },
     reviewed: function (r, t, p) { return 'Geprüft: ' + r + ' von ' + t + ' kLOC (' + p + ' %)'; },
     domain: 'Bereich', severity: 'Schwere', category: 'Kategorie', status_: 'Status', search: 'Suche in Titel, ID, Fundstelle',
-    allCategories: 'Alle Kategorien', reset: 'Filter zurücksetzen', shown: function (a, b) { return a + ' von ' + b + ' angezeigt'; },
+    searchLabel: 'Suche', reset: 'Filter zurücksetzen', shown: function (a, b) { return a + ' von ' + b + ' angezeigt'; },
     nothingMatches: 'Kein Finding passt zu diesen Filtern.',
     colSev: 'Prio', colId: 'ID', colFeat: 'Feature', colTitle: 'Description', colDom: 'Section', colCat: 'Type', colEffort: 'Size', colStatus: 'Status',
     effort: 'Aufwand', location: 'Fundstelle', locations: 'Fundstellen', description: 'Problem', evidence: 'Beleg', recommendation: 'Empfehlung',
@@ -2500,11 +2472,12 @@ var STRINGS = {
     scoreChart: 'Health-Score', scoreCaption: function (d) { return 'Verlauf der Health-Scores seit ' + d + '.'; },
     lgAudit: 'Audit', lgRemediation: 'nachgerechnet (Remediation, GitHub-Sync)', lgCoverage: 'Prüfabdeckung',
     fixChart: 'Fix-Bilanz', lgFixed: 'behoben', lgInducedOpen: 'durch Fix entstanden, offen', lgInducedFixed: 'durch Fix entstanden, im Lauf behoben',
-    lgRate: 'Induktionsrate', lgHeuristic: 'gestrichelt: heuristisch zugeordnet', discoveredShort: 'vorgef.',
-    fixTrend: function (a, dir) { return 'Induktionsrate ' + a + (dir ? ' (' + dir + ')' : '') + '.'; },
+    lgDiscovered: 'Altlast, bei der Arbeit vorgefunden (schmaler Balken)', lgRate: 'neue Findings je Fix', lgHeuristic: 'gestrichelt: heuristisch zugeordnet',
+    fixTrend: function (a, dir) { return 'Neue Findings je Fix: ' + a + (dir ? ' (' + dir + ')' : '') + '.'; },
+    fixTip: function (e, r) { return fmtDate(e.date) + (e.runs > 1 ? ' (' + e.runs + ' Läufe)' : '') + ': ' + e.fixed + ' behoben, ' + (e.inducedFixed + e.inducedOpen) + ' durch Fixes entstanden, ' + e.discovered + ' Altlasten vorgefunden' + (r ? ' · ' + r + ' neue je Fix' : ''); },
     falling: 'fallend', rising: 'steigend', steady: 'gleichbleibend',
-    fixSingle: function (e) { return 'Bisher ein Eintrag (' + e.date + '): ' + e.fixed + ' behoben, ' + (e.inducedFixed + e.inducedOpen) + ' durch Fixes entstanden. Das Diagramm erscheint ab dem zweiten Lauf.'; },
-    fixCaption: 'Pro Lauf: geschlossene Findings nach oben, durch die Fixes entstandene nach unten. Vorgefundene Altlasten zählen nicht in die Rate.',
+    fixSingle: function (e, r) { return 'Bisher ein Tag (' + fmtDate(e.date) + (e.runs > 1 ? ', ' + e.runs + ' Läufe' : '') + '): ' + e.fixed + ' behoben, ' + (e.inducedFixed + e.inducedOpen) + ' durch Fixes entstanden' + (r ? ', also ' + r + ' neue Findings je Fix' : '') + ', dazu ' + e.discovered + ' vorgefundene Altlasten. Das Diagramm erscheint ab dem zweiten Tag.'; },
+    fixCaption: 'Ein Balken je Tag. Nach oben: behobene Findings. Nach unten: was die Fixes selbst kaputt gemacht haben; daneben schmal die Altlasten, die bei der Arbeit aufgefallen sind, aber schon vorher im Code lagen. Die Zahl unter dem Datum sagt, wie viele neue Findings je behobenem entstanden sind: 0,25 heißt, auf vier Fixes kommt ein neuer Fehler. Altlasten zählen dort nicht mit, sie sind kein Schaden der Fixes. Mehrere Läufe eines Tages sind zusammengezählt, »×2« nennt ihre Zahl.',
     formulaTitle: 'Score-Berechnung', scopeTitle: 'Prüfumfang', notesTitle: 'Anmerkungen zu diesem Lauf',
     theme: function (t) { return (t === 'dark' || t === 'light' ? 'Start-Theme: ' + (t === 'dark' ? 'dunkel' : 'hell') + '.' : 'Das Farbschema folgt der Einstellung von System und Browser.') + ' Der Schalter oben rechts überschreibt es für diesen Browser.'; },
     sourceFiles: 'Quelldateien', sourceLoc: 'Quelltext', reviewedLoc: 'davon gelesen', exclusions: 'nicht gezählt',
@@ -2519,7 +2492,7 @@ var STRINGS = {
     formula2Note: 'Der Code-Score bewertet die Dichte der Befunde, nicht ihre Summe: Wer tiefer prüft, findet mehr, liest aber auch mehr. Der Harness-Score bleibt absolut, weil das Gerüst nicht mit der Lesetiefe wächst. Beide Teilscores nutzen dieselbe Skala 0–100 und teilen sich keine 100 Punkte.',
     formula1: function (s) { return 'Start 100, Abzug critical ' + s.weights.critical + ' · high ' + s.weights.high + ' · medium ' + s.weights.medium + ' · low ' + s.weights.low + ' · info 0, Untergrenze 0.\nDieselbe Formel je Domain und über alle Findings.'; },
     formula1Note: 'Score-Modell 1: Diesem Stand fehlt der gemessene Prüfumfang, deshalb gilt noch die absolute Formel. Der nächste Audit-Lauf misst ihn und wechselt auf Modell 2.',
-    ackIntro: 'Diese Punkte ruhen auf ausdrücklichen Wunsch. Sie zählen nicht im Score und lassen sich jederzeit wieder ins Backlog holen.',
+    ackIntro: 'Diese Punkte ruhen auf ausdrücklichen Wunsch. Sie zählen nicht im Score und lassen sich jederzeit wieder ins Backlog holen. Jeder Audit-Lauf prüft sie neu; was nicht mehr zutrifft, fällt heraus.',
     path: 'Pfad', findingsCol: 'Findings',
     since: 'seit', generated: 'Erzeugt', template: 'Template', themeToggle: 'Farbschema umschalten',
     diagramFilter: 'Klick auf einen Knoten filtert das Backlog.'
@@ -2546,7 +2519,7 @@ var STRINGS = {
     lastRun: { remediation: 'updated by remediation run on', 'github-sync': 'synced with GitHub on' },
     reviewed: function (r, t, p) { return 'Reviewed: ' + r + ' of ' + t + ' kLOC (' + p + ' %)'; },
     domain: 'Domain', severity: 'Severity', category: 'Category', status_: 'Status', search: 'Search title, ID, location',
-    allCategories: 'All categories', reset: 'Reset filters', shown: function (a, b) { return a + ' of ' + b + ' shown'; },
+    searchLabel: 'Search', reset: 'Reset filters', shown: function (a, b) { return a + ' of ' + b + ' shown'; },
     nothingMatches: 'No finding matches these filters.',
     colSev: 'Prio', colId: 'ID', colFeat: 'Feature', colTitle: 'Description', colDom: 'Section', colCat: 'Type', colEffort: 'Size', colStatus: 'Status',
     effort: 'Effort', location: 'Location', locations: 'Locations', description: 'Problem', evidence: 'Evidence', recommendation: 'Recommendation',
@@ -2555,11 +2528,12 @@ var STRINGS = {
     scoreChart: 'Health score', scoreCaption: function (d) { return 'Health score history since ' + d + '.'; },
     lgAudit: 'Audit', lgRemediation: 'recalculated (remediation, GitHub sync)', lgCoverage: 'Review coverage',
     fixChart: 'Fix balance', lgFixed: 'resolved', lgInducedOpen: 'introduced by fixes, open', lgInducedFixed: 'introduced by fixes, fixed in run',
-    lgRate: 'Induction rate', lgHeuristic: 'dashed: heuristic attribution', discoveredShort: 'found',
-    fixTrend: function (a, dir) { return 'Induction rate ' + a + (dir ? ' (' + dir + ')' : '') + '.'; },
+    lgDiscovered: 'pre-existing, found during the work (narrow bar)', lgRate: 'new findings per fix', lgHeuristic: 'dashed: heuristic attribution',
+    fixTrend: function (a, dir) { return 'New findings per fix: ' + a + (dir ? ' (' + dir + ')' : '') + '.'; },
+    fixTip: function (e, r) { return fmtDate(e.date) + (e.runs > 1 ? ' (' + e.runs + ' runs)' : '') + ': ' + e.fixed + ' resolved, ' + (e.inducedFixed + e.inducedOpen) + ' introduced by fixes, ' + e.discovered + ' pre-existing found' + (r ? ' · ' + r + ' new per fix' : ''); },
     falling: 'falling', rising: 'rising', steady: 'steady',
-    fixSingle: function (e) { return 'One entry so far (' + e.date + '): ' + e.fixed + ' resolved, ' + (e.inducedFixed + e.inducedOpen) + ' introduced by fixes. The chart appears from the second run on.'; },
-    fixCaption: 'Per run: resolved findings up, findings introduced by the fixes down. Pre-existing issues found along the way do not count toward the rate.',
+    fixSingle: function (e, r) { return 'One day so far (' + fmtDate(e.date) + (e.runs > 1 ? ', ' + e.runs + ' runs' : '') + '): ' + e.fixed + ' resolved, ' + (e.inducedFixed + e.inducedOpen) + ' introduced by fixes' + (r ? ', i.e. ' + r + ' new findings per fix' : '') + ', plus ' + e.discovered + ' pre-existing issues found. The chart appears from the second day on.'; },
+    fixCaption: 'One bar per day. Up: resolved findings. Down: what the fixes themselves broke; next to it, narrow, pre-existing issues found during the work that were in the code before. The number below the date says how many new findings each resolved one produced: 0.25 means one new defect per four fixes. Pre-existing issues do not count there, they are not damage done by the fixes. Several runs on one day are summed up, »×2« gives their number.',
     formulaTitle: 'Score calculation', scopeTitle: 'Review scope', notesTitle: 'Notes on this run',
     theme: function (t) { return (t === 'dark' || t === 'light' ? 'Default theme: ' + t + '.' : 'The color scheme follows the system and browser setting.') + ' The toggle at the top right overrides it for this browser.'; },
     sourceFiles: 'Source files', sourceLoc: 'Source', reviewedLoc: 'Read', exclusions: 'Not counted',
@@ -2574,7 +2548,7 @@ var STRINGS = {
     formula2Note: 'The code score rates the density of findings, not their sum: a deeper review finds more but also reads more. The harness score stays absolute because the scaffolding does not grow with review depth. Both sub-scores use the same 0–100 scale and do not split 100 points.',
     formula1: function (s) { return 'Start at 100, subtract critical ' + s.weights.critical + ' · high ' + s.weights.high + ' · medium ' + s.weights.medium + ' · low ' + s.weights.low + ' · info 0, floor 0.\nSame formula per domain and across all findings.'; },
     formula1Note: 'Score model 1: this state lacks a measured review scope, so the absolute formula still applies. The next audit run measures it and switches to model 2.',
-    ackIntro: 'These items rest at the explicit request of the user. They do not count toward the score and can be moved back into the backlog at any time.',
+    ackIntro: 'These items rest at the explicit request of the user. They do not count toward the score and can be moved back into the backlog at any time. Every audit run checks them again; what no longer applies is dropped.',
     path: 'Path', findingsCol: 'Findings',
     since: 'since', generated: 'Generated', template: 'Template', themeToggle: 'Toggle color scheme',
     diagramFilter: 'Click a node to filter the backlog.'
@@ -2678,17 +2652,16 @@ function md(text, cls) {
 }
 
 // --- Filterzustand, gespiegelt im URL-Hash
-var state = { dom: [], sev: [], st: [], comp: [], cat: '', q: '', f: '' };
+var state = { dom: [], sev: [], st: [], comp: [], cat: [], q: '', f: '' };
 function readHash() {
   var p = new URLSearchParams(location.hash.slice(1));
   function list(k) { return (p.get(k) || '').split(',').filter(Boolean); }
-  state.dom = list('dom'); state.sev = list('sev'); state.st = list('st'); state.comp = list('comp');
-  state.cat = p.get('cat') || ''; state.q = p.get('q') || ''; state.f = p.get('f') || '';
+  state.dom = list('dom'); state.sev = list('sev'); state.st = list('st'); state.comp = list('comp'); state.cat = list('cat');
+  state.q = p.get('q') || ''; state.f = p.get('f') || '';
 }
 function writeHash() {
   var p = [];
-  ['dom', 'sev', 'st', 'comp'].forEach(function (k) { if (state[k].length) p.push(k + '=' + state[k].map(encodeURIComponent).join(',')); });
-  if (state.cat) p.push('cat=' + encodeURIComponent(state.cat));
+  ['dom', 'sev', 'st', 'comp', 'cat'].forEach(function (k) { if (state[k].length) p.push(k + '=' + state[k].map(encodeURIComponent).join(',')); });
   if (state.q) p.push('q=' + encodeURIComponent(state.q));
   if (state.f) p.push('f=' + encodeURIComponent(state.f));
   var hash = p.length ? '#' + p.join('&') : '';
@@ -2922,12 +2895,10 @@ function domainBlock(d) {
     block.appendChild(ds.executiveSummary ? md(ds.executiveSummary, 'muted wide') : h('p', { 'class': 'muted' }, T.noFindings(domLabel(d))));
     return block;
   }
-  var cols = h('div', { 'class': 'domain-cols' });
-  block.appendChild(cols);
-  cols.appendChild(h('div', { 'class': 'col-summary' }, md(ds.executiveSummary)));
+  block.appendChild(md(ds.executiveSummary, 'wide'));
   var bs = ds.bySeverity || {};
   var max = Math.max.apply(null, SEVS.map(function (x) { return bs[x] || 0; }).concat([1]));
-  cols.appendChild(h('div', null, h('h4', null, T.severities), h('div', { 'class': 'bars' }, SEVS.map(function (x) {
+  block.appendChild(h('div', null, h('h4', null, T.severities), h('div', { 'class': 'bars' }, SEVS.map(function (x) {
     var n = bs[x] || 0;
     return [h('span', null, T.sev[x]),
       h('div', { 'class': 'bar' }, h('span', { style: 'width:' + (100 * n / max) + '%;background:var(--sev-' + x + ')' })),
@@ -2936,10 +2907,10 @@ function domainBlock(d) {
   var bc = ds.byCategory || {};
   var cats = Object.keys(CAT_DOMAIN).filter(function (c) { return CAT_DOMAIN[c] === d || bc[c]; })
     .sort(function (a, b) { return (bc[b] || 0) - (bc[a] || 0) || T.cat[a].localeCompare(T.cat[b]); });
-  cols.appendChild(h('div', null, h('h4', null, T.categories), h('ul', { 'class': 'cats' }, cats.map(function (c) {
+  block.appendChild(h('div', null, h('h4', null, T.categories), h('ul', { 'class': 'cats' }, cats.map(function (c) {
     var n = bc[c] || 0;
     return h('li', { 'class': n ? '' : 'zero' },
-      n ? h('button', { 'class': 'linkish', type: 'button', onclick: function () { setFilter({ dom: [d], cat: c }); } }, T.cat[c]) : h('span', null, T.cat[c]),
+      n ? h('button', { 'class': 'linkish', type: 'button', onclick: function () { setFilter({ dom: [d], cat: [c] }); } }, T.cat[c]) : h('span', null, T.cat[c]),
       h('span', { 'class': 'n' }, n || '–'));
   }))));
   return block;
@@ -3033,21 +3004,39 @@ function scoreChart(hist) {
     h('figcaption', null, T.scoreCaption(fmtDate(hist[0].date))));
 }
 
-function pct(v) { return Math.round(v * 100) + ' %'; }
+var RATIO = new Intl.NumberFormat(LANG === 'de' ? 'de-DE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtRatio(v) { return v == null ? '–' : RATIO.format(v); }
+// Ein Balken je Tag: mehrere Läufe eines Datums werden summiert. Heuristisch
+// zugeordnet ist der Tag, sobald einer seiner Läufe es ist.
+function fixByDay(list) {
+  var days = {};
+  list.forEach(function (e) {
+    var d = days[e.date];
+    if (!d) d = days[e.date] = { date: e.date, runs: 0, fixed: 0, inducedFixed: 0, inducedOpen: 0, discovered: 0, attribution: 'reviewed' };
+    d.runs++;
+    d.fixed += e.fixed || 0; d.inducedFixed += e.inducedFixed || 0; d.inducedOpen += e.inducedOpen || 0; d.discovered += e.discovered || 0;
+    if (e.attribution === 'heuristic') d.attribution = 'heuristic';
+  });
+  return Object.keys(days).sort().map(function (k) { return days[k]; });
+}
 function rateOf(e) { return e.fixed ? (e.inducedFixed + e.inducedOpen) / e.fixed : null; }
 
+// Hauptbalken: behoben nach oben, durch Fixes entstanden nach unten. Die Altlasten
+// stehen als schmaler Nebenbalken daneben: im Stapel sähen sie aus wie Schaden der
+// Fixes, und genau den misst die Kennzahl »neue Findings je Fix«.
 function fixChart(list) {
-  var W = chartWidth(), H = 250, L = 34, R = 44, TP = 16, B = 44;
+  var W = chartWidth(), H = 262, L = 34, R = 40, TP = 16, B = 56;
   var iw = W - L - R, ih = H - TP - B, n = list.length;
   var up = niceMax(Math.max.apply(null, list.map(function (e) { return e.fixed; }).concat([1])));
-  var down = niceMax(Math.max.apply(null, list.map(function (e) { return e.inducedFixed + e.inducedOpen; }).concat([1])));
+  var down = niceMax(Math.max.apply(null, list.map(function (e) { return Math.max(e.inducedFixed + e.inducedOpen, e.discovered); }).concat([1])));
   var zero = TP + ih * up / (up + down);
   function yv(v) { return zero - (ih * v / (up + down)); }
-  var slot = iw / n, bw = Math.min(30, slot * 0.5);
+  var slot = iw / n, bw = Math.min(26, slot * 0.4), sw = Math.round(bw * 0.5), gap = 3;
   function cx(i) { return L + slot * (i + 0.5); }
   var rates = list.map(rateOf);
   var rmax = Math.max(1, Math.max.apply(null, rates.filter(function (r) { return r != null; }).concat([0])));
   function yr(r) { return TP + ih * (1 - r / rmax); }
+  var every = Math.max(1, Math.ceil(n / Math.floor(iw / 48)));
   var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': T.fixChart });
   var pid = 'hatch-' + Math.random().toString(36).slice(2, 8);
   svg.appendChild(s('defs', null, s('pattern', { id: pid, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' },
@@ -3056,39 +3045,51 @@ function fixChart(list) {
   svg.appendChild(s('text', { x: L - 8, y: yv(up) + 4, 'text-anchor': 'end', 'class': 'axis-label' }, up));
   svg.appendChild(s('text', { x: L - 8, y: zero + 4, 'text-anchor': 'end', 'class': 'axis-label' }, 0));
   svg.appendChild(s('text', { x: L - 8, y: yv(-down) + 4, 'text-anchor': 'end', 'class': 'axis-label' }, down));
-  svg.appendChild(s('text', { x: W - R + 8, y: yr(rmax) + 4, 'class': 'axis-label' }, pct(rmax)));
-  svg.appendChild(s('text', { x: W - R + 8, y: yr(0) + 4, 'class': 'axis-label' }, '0 %'));
+  svg.appendChild(s('text', { x: W - R + 6, y: yr(rmax) + 4, 'class': 'axis-label' }, NUM.format(rmax)));
+  svg.appendChild(s('text', { x: W - R + 6, y: yr(0) + 4, 'class': 'axis-label' }, 0));
   list.forEach(function (e, i) {
+    var g = s('g', null, s('title', null, T.fixTip(e, rates[i] == null ? null : fmtRatio(rates[i]))));
+    svg.appendChild(g);
     var dash = e.attribution === 'heuristic' ? 'stroke:var(--text);stroke-width:1;stroke-dasharray:3 2;' : '';
     var op = e.attribution === 'heuristic' ? 'opacity:.6;' : '';
-    var x0 = cx(i) - bw / 2;
-    if (e.fixed) svg.appendChild(s('rect', { x: x0, y: yv(e.fixed), width: bw, height: zero - yv(e.fixed), style: 'fill:var(--accent);' + op + dash }));
-    svg.appendChild(s('text', { x: cx(i), y: yv(e.fixed) - 5, 'text-anchor': 'middle' }, e.fixed));
+    var x0 = cx(i) - (bw + gap + sw) / 2, xs = x0 + bw + gap, mid = x0 + bw / 2;
+    if (e.fixed) g.appendChild(s('rect', { x: x0, y: yv(e.fixed), width: bw, height: zero - yv(e.fixed), style: 'fill:var(--accent);' + op + dash }));
+    g.appendChild(s('text', { x: mid, y: yv(e.fixed) - 5, 'text-anchor': 'middle' }, e.fixed));
     var y1 = zero;
-    if (e.inducedOpen) { svg.appendChild(s('rect', { x: x0, y: y1, width: bw, height: yv(-e.inducedOpen) - zero, style: 'fill:var(--chart-strong);' + op + dash })); y1 = yv(-e.inducedOpen); }
-    if (e.inducedFixed) { svg.appendChild(s('rect', { x: x0, y: y1, width: bw, height: yv(-e.inducedFixed) - zero, style: 'fill:url(#' + pid + ');stroke:var(--chart-light);' + op + dash })); y1 += yv(-e.inducedFixed) - zero; }
+    if (e.inducedOpen) { g.appendChild(s('rect', { x: x0, y: y1, width: bw, height: yv(-e.inducedOpen) - zero, style: 'fill:var(--chart-strong);' + op + dash })); y1 = yv(-e.inducedOpen); }
+    if (e.inducedFixed) { g.appendChild(s('rect', { x: x0, y: y1, width: bw, height: yv(-e.inducedFixed) - zero, style: 'fill:url(#' + pid + ');stroke:var(--chart-light);' + op + dash })); y1 += yv(-e.inducedFixed) - zero; }
     var ind = e.inducedFixed + e.inducedOpen;
-    if (ind) svg.appendChild(s('text', { x: cx(i), y: y1 + 13, 'text-anchor': 'middle' }, ind));
-    svg.appendChild(s('text', { x: cx(i), y: H - 22, 'text-anchor': 'middle', 'class': 'axis-label' }, shortDate(e.date)));
-    if (e.discovered) svg.appendChild(s('text', { x: cx(i), y: H - 8, 'text-anchor': 'middle', 'class': 'axis-label' }, '+' + e.discovered + ' ' + T.discoveredShort));
+    if (ind) g.appendChild(s('text', { x: mid, y: y1 + 13, 'text-anchor': 'middle' }, ind));
+    if (e.discovered) {
+      g.appendChild(s('rect', { x: xs, y: zero, width: sw, height: yv(-e.discovered) - zero, style: 'fill:var(--chart-area);stroke:var(--border-strong);stroke-width:1;' + op + dash }));
+      g.appendChild(s('text', { x: xs + sw / 2, y: yv(-e.discovered) + 13, 'text-anchor': 'middle', 'class': 'axis-label' }, e.discovered));
+    }
+    var last = i === n - 1;
+    if (i % every === 0 || last) {
+      g.appendChild(s('text', { x: cx(i), y: H - 26, 'text-anchor': 'middle', 'class': 'axis-label' }, shortDate(e.date) + (e.runs > 1 ? ' ×' + e.runs : '')));
+      g.appendChild(s('text', { x: cx(i), y: H - 10, 'text-anchor': 'middle', style: 'fill:var(--text);font-weight:600' }, fmtRatio(rates[i])));
+    }
   });
   var pts = [];
   rates.forEach(function (r, i) { if (r != null) pts.push([cx(i), yr(r)]); });
   if (pts.length > 1) svg.appendChild(s('polyline', { points: pts.map(function (p) { return p.join(','); }).join(' '), style: 'fill:none;stroke:var(--text);stroke-width:1.5' }));
   pts.forEach(function (p) { svg.appendChild(s('rect', { x: p[0] - 3, y: p[1] - 3, width: 6, height: 6, style: 'fill:var(--text)' })); });
 
-  var last = rates.filter(function (r) { return r != null; }).slice(-3);
+  var lastRates = rates.filter(function (r) { return r != null; }).slice(-3);
   var trend = null;
-  if (last.length >= 2) {
-    var dir = last[last.length - 1] < last[0] - 0.02 ? T.falling : last[last.length - 1] > last[0] + 0.02 ? T.rising : T.steady;
-    trend = T.fixTrend(last.map(pct).join(' → '), dir);
+  if (lastRates.length >= 2) {
+    var a = lastRates[0], z = lastRates[lastRates.length - 1];
+    var dir = z < a - 0.02 ? T.falling : z > a + 0.02 ? T.rising : T.steady;
+    trend = T.fixTrend(lastRates.map(fmtRatio).join(' → '), dir);
   }
   var heur = list.some(function (e) { return e.attribution === 'heuristic'; });
+  var disc = list.some(function (e) { return e.discovered; });
   return h('figure', { 'class': 'card chart' }, h('h3', { style: 'margin-bottom:8px' }, T.fixChart), svg,
     h('div', { 'class': 'legend' },
       h('span', null, h('i', { style: 'background:var(--accent)' }), T.lgFixed),
       h('span', null, h('i', { style: 'background:var(--chart-strong)' }), T.lgInducedOpen),
       h('span', null, h('i', { style: 'background:repeating-linear-gradient(45deg,var(--chart-light) 0 2px,var(--surface) 2px 4px);border:1px solid var(--chart-light)' }), T.lgInducedFixed),
+      disc ? h('span', null, h('i', { style: 'background:var(--chart-area);border:1px solid var(--border-strong);width:6px' }), T.lgDiscovered) : null,
       h('span', null, h('i', { style: 'background:var(--text);width:6px;height:6px' }), T.lgRate),
       heur ? h('span', null, T.lgHeuristic) : null),
     h('figcaption', null, trend ? trend + ' ' : '', T.fixCaption));
@@ -3096,11 +3097,11 @@ function fixChart(list) {
 
 function historySection() {
   var hist = D.scoreHistory || [];
-  var fix = D.fixHistory || [];
+  var fix = fixByDay(D.fixHistory || []);
   var charts = [];
   if (hist.length >= 3) charts.push(scoreChart(hist));
   if (fix.length >= 2) charts.push(fixChart(fix));
-  else if (fix.length === 1) charts.push(h('div', { 'class': 'card chart' }, h('h3', { style: 'margin-bottom:8px' }, T.fixChart), h('p', { 'class': 'muted', style: 'margin:0' }, T.fixSingle(fix[0]))));
+  else if (fix.length === 1) charts.push(h('div', { 'class': 'card chart' }, h('h3', { style: 'margin-bottom:8px' }, T.fixChart), h('p', { 'class': 'muted', style: 'margin:0' }, T.fixSingle(fix[0], rateOf(fix[0]) == null ? null : fmtRatio(rateOf(fix[0]))))));
   if (!charts.length) return null;
   return section('history', T.history, h('div', { 'class': 'charts' + (charts.length > 1 ? ' two' : '') }, charts));
 }
@@ -3221,7 +3222,8 @@ function findingTable(list, cfg, extra) {
 }
 
 function chipGroup(label, key, values, labelOf, counts) {
-  var g = h('div', { 'class': 'fgroup', role: 'group', 'aria-label': label }, h('span', { 'class': 'flabel' }, label));
+  var chips = h('div', { 'class': 'fchips' });
+  var g = h('div', { 'class': 'fgroup', role: 'group', 'aria-label': label }, h('span', { 'class': 'flabel' }, label), chips);
   values.forEach(function (v) {
     var n = counts[v] || 0;
     var b = h('button', { 'class': 'fbtn', type: 'button', 'aria-pressed': 'false', 'data-key': key, 'data-value': v, disabled: !n },
@@ -3232,7 +3234,7 @@ function chipGroup(label, key, values, labelOf, counts) {
       if (key === 'dom') syncCategoryOptions();
       applyFilters(); writeHash();
     });
-    g.appendChild(b);
+    chips.appendChild(b);
   });
   return g;
 }
@@ -3240,15 +3242,12 @@ function chipGroup(label, key, values, labelOf, counts) {
 var ui = {};
 function countBy(list, fn) { var o = {}; list.forEach(function (f) { var k = fn(f); if (k != null) o[k] = (o[k] || 0) + 1; }); return o; }
 
+// Kategorie-Chips folgen dem Bereichsfilter: was in keinem gewählten Bereich
+// vorkommt, verschwindet und fällt aus der Auswahl.
 function syncCategoryOptions() {
-  var sel = ui.cat;
-  var allowed = Object.keys(countBy(DEFECTS.filter(function (f) { return !state.dom.length || state.dom.indexOf(f.domain) >= 0; }), function (f) { return f.category; }));
-  allowed.sort(function (a, b) { return T.cat[a].localeCompare(T.cat[b]); });
-  while (sel.firstChild) sel.removeChild(sel.firstChild);
-  sel.appendChild(h('option', { value: '' }, T.allCategories));
-  allowed.forEach(function (c) { sel.appendChild(h('option', { value: c }, T.cat[c])); });
-  if (state.cat && allowed.indexOf(state.cat) < 0) state.cat = '';
-  sel.value = state.cat;
+  var allowed = countBy(DEFECTS.filter(function (f) { return !state.dom.length || state.dom.indexOf(f.domain) >= 0; }), function (f) { return f.category; });
+  Array.prototype.forEach.call(ui.cats.querySelectorAll('.fbtn'), function (b) { b.hidden = !allowed[b.getAttribute('data-value')]; });
+  state.cat = state.cat.filter(function (c) { return allowed[c]; });
 }
 
 function backlog() {
@@ -3261,12 +3260,14 @@ function backlog() {
     filters.appendChild(chipGroup(T.feature, 'comp', compVals, function (v) { return v === NONE ? T.projectWide : COMP[v].label; }, countBy(DEFECTS, function (f) { return f.component || NONE; })));
   }
   if (FOLLOWUP) filters.appendChild(chipGroup(T.status_, 'st', STATUSES, function (v) { return T.status[v]; }, countBy(DEFECTS, function (f) { return f.status; })));
-  ui.cat = h('select', { 'aria-label': T.category });
-  ui.cat.addEventListener('change', function () { state.cat = ui.cat.value; applyFilters(); writeHash(); });
+  var catCounts = countBy(DEFECTS, function (f) { return f.category; });
+  var catVals = Object.keys(catCounts).sort(function (a, b) { return T.cat[a].localeCompare(T.cat[b]); });
+  ui.cats = chipGroup(T.category, 'cat', catVals, function (v) { return T.cat[v]; }, catCounts);
+  filters.appendChild(ui.cats);
   ui.q = h('input', { type: 'search', placeholder: T.search, 'aria-label': T.search });
   var timer;
   ui.q.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { state.q = ui.q.value.trim(); applyFilters(); writeHash(); }, 150); });
-  filters.appendChild(h('div', { 'class': 'fgroup' }, h('span', { 'class': 'flabel' }, T.category), ui.cat, ui.q));
+  filters.appendChild(h('div', { 'class': 'fgroup' }, h('span', { 'class': 'flabel' }, T.searchLabel), ui.q));
   ui.count = h('span');
   ui.reset = h('button', { 'class': 'linkish', type: 'button', hidden: true }, T.reset);
   ui.reset.addEventListener('click', function () { setFilter({}); });
@@ -3284,7 +3285,7 @@ function matches(f) {
   if (state.sev.length && state.sev.indexOf(f.severity) < 0) return false;
   if (state.st.length && state.st.indexOf(f.status) < 0) return false;
   if (state.comp.length && state.comp.indexOf(f.component || NONE) < 0) return false;
-  if (state.cat && f.category !== state.cat) return false;
+  if (state.cat.length && state.cat.indexOf(f.category) < 0) return false;
   if (state.q) {
     var hay = (f.id + ' ' + f.title + ' ' + f.location + ' ' + (f.locations || []).join(' ')).toLowerCase();
     if (state.q.toLowerCase().split(/\s+/).some(function (w) { return hay.indexOf(w) < 0; })) return false;
@@ -3297,7 +3298,7 @@ function applyFilters() {
   DEFECTS.forEach(function (f) { var ok = matches(f); ROWS[f.id].hidden = !ok; if (ok) shown++; });
   ui.count.textContent = T.shown(shown, DEFECTS.length);
   ui.empty.hidden = shown > 0;
-  var active = state.dom.length || state.sev.length || state.st.length || state.comp.length || state.cat || state.q;
+  var active = state.dom.length || state.sev.length || state.st.length || state.comp.length || state.cat.length || state.q;
   ui.reset.hidden = !active;
   Array.prototype.forEach.call(document.querySelectorAll('.fbtn'), function (b) {
     b.setAttribute('aria-pressed', state[b.getAttribute('data-key')].indexOf(b.getAttribute('data-value')) >= 0 ? 'true' : 'false');
@@ -3307,7 +3308,7 @@ function applyFilters() {
 
 function setFilter(next) {
   state.dom = next.dom || []; state.sev = next.sev || []; state.st = next.st || []; state.comp = next.comp || [];
-  state.cat = next.cat || ''; state.q = next.q || '';
+  state.cat = next.cat || []; state.q = next.q || '';
   syncCategoryOptions(); applyFilters(); writeHash();
   var b = document.getElementById('backlog');
   if (b && Object.keys(next).length) b.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3379,7 +3380,7 @@ function acknowledgedSection() {
 // --- Aufbau
 document.title = S.project + ' · Audit ' + fmtDate(S.date);
 var app = document.getElementById('app');
-[header(), portrait(), summarySection(), historySection(), backlog(), openQuestions(), improvements(), methodology(), acknowledgedSection(),
+[header(), portrait(), summarySection(), historySection(), backlog(), improvements(), openQuestions(), methodology(), acknowledgedSection(),
   h('footer', { 'class': 'no-print' }, T.generated + ' ' + (D.meta.generatedAt ? D.meta.generatedAt.slice(0, 16).replace('T', ' ') : '') + ' · ' + T.template + ' ' + (D.meta.templateVersion || ''))
 ].forEach(function (x) { add(app, x); });
 
