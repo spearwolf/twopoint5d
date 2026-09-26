@@ -56,6 +56,12 @@ const assertOption = (valid: boolean, name: string, rule: string, value: unknown
   }
 };
 
+const assertFits = (fits: boolean, message: () => string): void => {
+  if (!fits) {
+    throw new RangeError(`[TileSet] ${message()}`);
+  }
+};
+
 /**
  * The [[TileSet]] maps _tileIds_ to _frameIds_.
  * Unlike the `frameId` of [[TextureAtlas]], the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
@@ -76,37 +82,37 @@ export class TileSet {
   /**
    * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
    * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
-   * of 1 or more, if `firstId` is not a whole number, or if the width or height of the `baseCoords`
-   * is not finite.
+   * of 1 or more, if `firstId` is not a whole number, if the width or height of the `baseCoords`
+   * is not finite, or if the first tile does not fit into the `baseCoords` with its `margin` and `padding`.
    */
   constructor(...args: [TextureAtlas, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
-      const [atlas, baseCoords, options] = args as [TextureAtlas, TextureCoords, TileSetOptions];
+      const [atlas, baseCoords, options] = args as [TextureAtlas, TextureCoords, TileSetOptions?];
       this.atlas = atlas;
       this.baseCoords = baseCoords;
-      this.options = options;
+      this.options = options ?? {};
     } else {
       this.atlas = new TextureAtlas();
-      const [baseCoords, options] = args as [TextureCoords, TileSetOptions];
+      const [baseCoords, options] = args as [TextureCoords, TileSetOptions?];
       this.baseCoords = baseCoords;
-      this.options = options;
+      this.options = options ?? {};
     }
     this.#createTextureCoords();
   }
 
   get tileWidth(): number {
-    return this.options?.tileWidth ?? this.baseCoords.width;
+    return this.options.tileWidth ?? this.baseCoords.width;
   }
 
   get tileHeight(): number {
-    return this.options?.tileHeight ?? this.baseCoords.height;
+    return this.options.tileHeight ?? this.baseCoords.height;
   }
 
   /**
    * The `tileId` of the _first_ tile
    */
   get firstId(): number {
-    return this.options?.firstId ?? 1;
+    return this.options.firstId ?? 1;
   }
 
   /**
@@ -124,22 +130,26 @@ export class TileSet {
   }
 
   get tileCountLimit(): number {
-    return this.options?.tileCount ?? Infinity;
+    return this.options.tileCount ?? Infinity;
   }
 
   get margin(): number {
-    return this.options?.margin ?? 0;
+    return this.options.margin ?? 0;
   }
 
   get padding(): number {
-    return this.options?.padding ?? 0;
+    return this.options.padding ?? 0;
   }
 
   get spacing(): number {
-    return this.options?.spacing ?? 0;
+    return this.options.spacing ?? 0;
   }
 
+  /**
+   * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
+   */
   frameId(tileId: number): number {
+    assertOption(Number.isInteger(tileId), 'tileId', 'a whole number', tileId);
     return ((((tileId - this.firstId) % this.tileCount) + this.tileCount) % this.tileCount) + this.firstFrameId;
   }
 
@@ -151,7 +161,11 @@ export class TileSet {
     return this.firstFrameId + rand(this.tileCount);
   }
 
+  /**
+   * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
+   */
   frame(tileId: number): TextureAtlasFrame {
+    // frameId() answers a whole number inside the range of the tiles, and the atlas holds a frame for each of them
     return this.atlas.get(this.frameId(tileId))!;
   }
 
@@ -191,6 +205,19 @@ export class TileSet {
 
     const tileOuterWidth = this.tileWidth + padding * 2;
     const tileOuterHeight = this.tileHeight + padding * 2;
+
+    // the first tile is laid without a look at the bounds, so it is checked here: every tile laid
+    // after it is checked in the loop, and with the first one inside, tileCount is 1 or more
+    assertFits(
+      margin * 2 + tileOuterWidth <= baseWidth,
+      () =>
+        `the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take ${margin * 2 + tileOuterWidth}, the baseCoords are ${baseWidth} wide`,
+    );
+    assertFits(
+      margin * 2 + tileOuterHeight <= baseHeight,
+      () =>
+        `the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take ${margin * 2 + tileOuterHeight}, the baseCoords are ${baseHeight} high`,
+    );
 
     let x = margin;
     let y = margin;

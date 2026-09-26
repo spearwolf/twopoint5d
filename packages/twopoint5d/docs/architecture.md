@@ -81,7 +81,7 @@ applied immediately — dropping a dirty flag silently renders stale data.
 `TextureCoords` is the value type they hand out. `TextureFactory` builds three.js
 textures with a given set of options, `TextureStore` caches and reference-counts the
 loaded resources, and the `*Loader` files parse the external formats (TexturePacker
-JSON, tile sets, power-of-two images). `FrameBasedAnimations` turns a sequence of atlas
+JSON Hash and JSON Array, rotated frames included, tile sets, power-of-two images). `FrameBasedAnimations` turns a sequence of atlas
 frames into the timing data the animated sprite shaders read.
 
 ### `display/`

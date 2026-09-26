@@ -8,6 +8,9 @@ import type {TileSprite} from './descriptors.js';
 import type {TileSprites} from './TileSprites.js';
 import {TileSpritesGeometry} from './TileSpritesGeometry.js';
 
+// setTexCoords() copies the four values into the buffer of the sprite, so one tuple serves every call
+const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0, 0];
+
 export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   readonly tileSprites: TileSprites;
 
@@ -59,7 +62,7 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
 
     sprite.setQuadSize(tileCoords.view.width, tileCoords.view.height);
     sprite.setInstancePosition(tileCoords.view.left, 0, tileCoords.view.top);
-    sprite.setTexCoords(texCoords.s, texCoords.t, texCoords.u, texCoords.v);
+    sprite.setTexCoords(texCoords.getTexCoords(texCoordsScratch));
 
     return sprite;
   }

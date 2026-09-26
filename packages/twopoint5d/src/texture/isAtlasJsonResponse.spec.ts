@@ -13,8 +13,19 @@ describe('isAtlasJsonResponse', () => {
     expect(isAtlasJsonResponse({frames, meta: {size}})).toBe(true);
   });
 
+  test('a JSON Array whose entries carry a filename passes', () => {
+    expect(isAtlasJsonResponse({frames: [{filename: 'a.png', frame: {x: 0, y: 0, w: 8, h: 8}}], meta: {size}})).toBe(true);
+  });
+
+  test('a frame with rotated true passes', () => {
+    expect(isAtlasJsonResponse({frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, rotated: true}}, meta: {size}})).toBe(true);
+  });
+
   test.each([
     ['null', null],
+    ['a JSON Array entry without a filename', {frames: [{frame: {x: 0, y: 0, w: 8, h: 8}}], meta: {size}}],
+    ['a JSON Array entry whose filename is a number', {frames: [{filename: 5, frame: {x: 0, y: 0, w: 8, h: 8}}], meta: {size}}],
+    ['a frame whose rotated is a string', {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}, rotated: 'true'}}, meta: {size}}],
     ['a string', 'atlas'],
     ['a json without frames', {meta: {size}}],
     ['frames that are null', {frames: null, meta: {size}}],

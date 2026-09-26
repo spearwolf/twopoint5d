@@ -4,11 +4,15 @@ import {Color, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
+import {TextureCoords} from '../../texture/TextureCoords.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {TexturedSprite} from './TexturedSprite.js';
 import {TexturedSprites} from './TexturedSprites.js';
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
+
+// s, t, u, v of the coords come out as 0.25, 0.5, 0.75, 1
+const frame: TextureAtlasFrame = {coords: new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2)};
 
 // the values of one attribute of the object at `index`, read straight from the typed array of its buffer
 const readAttribute = (pool: VertexObjectPool<TexturedSprite>, name: string, index: number): number[] => {
@@ -70,7 +74,7 @@ describe('TexturedSprites', () => {
     sprite.setPosition(1, 2, 3);
     expect(sprite.z).toBe(3);
 
-    sprite.setFrame({coords: {s: 0.25, t: 0.5, u: 0.75, v: 1}} as unknown as TextureAtlasFrame);
+    sprite.setFrame(frame);
     expect(sprite.s).toBe(0.25);
     expect(sprite.t).toBe(0.5);
     expect(sprite.u).toBe(0.75);
@@ -145,7 +149,7 @@ describe('TexturedSprites', () => {
     const first = sprites.createSprite()!;
     first.setSize(4, 5);
     first.setPosition(1, 2, 3);
-    first.setFrame({coords: {s: 0.25, t: 0.5, u: 0.75, v: 1}} as unknown as TextureAtlasFrame);
+    first.setFrame(frame);
     first.setColor(new Color(0.5, 0.25, 0.125), 0.75);
     sprites.createSprite();
 

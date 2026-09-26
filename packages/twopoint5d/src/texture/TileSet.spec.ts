@@ -71,7 +71,7 @@ describe('TileSet', () => {
   });
 
   test('a fractional padding lays out as many tiles as fit', () => {
-    const tiles = new TileSet(new TextureCoords(0, 0, 100, 10), {tileWidth: 10, tileHeight: 10, padding: 1.5});
+    const tiles = new TileSet(new TextureCoords(0, 0, 100, 13), {tileWidth: 10, tileHeight: 10, padding: 1.5});
 
     expect(tiles.tileCount).toBe(7);
     expect(tiles.frame(tiles.lastId).coords.x).toBe(79.5);
@@ -122,21 +122,63 @@ describe('TileSet', () => {
       expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(/tileWidth must be a finite number above 0, got 0/);
     });
 
-    test('a tile wider than the image still ends the layout', () => {
-      const tiles = new TileSet(base, {tileWidth: 100, tileHeight: 16});
-
-      expect(tiles.tileCount).toBe(4);
-      expect(tiles.frame(1).coords).toMatchObject({x: 0, y: 0, width: 100, height: 16});
-      expect(tiles.frame(4).coords.y).toBe(48);
+    test('a tile wider than the image is refused', () => {
+      expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(RangeError);
+      expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(
+        '[TileSet] the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 100, the baseCoords are 64 wide',
+      );
     });
 
-    // the shape of the tile set of the textured-sprites demo of the lookbook: the tile does
-    // not fit inside the margin, yet the first tile is always laid
-    test('a single tile that does not fit inside the margin is laid all the same', () => {
-      const tiles = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256, margin: 1});
+    test('a first tile that does not fit inside the margin is refused', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256, margin: 1});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(
+        '[TileSet] the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 258, the baseCoords are 256 wide',
+      );
+    });
+
+    test('a first tile taller than the baseCoords is refused', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 64, 32), {tileWidth: 32, tileHeight: 64});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(
+        '[TileSet] the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take 64, the baseCoords are 32 high',
+      );
+    });
+
+    test('a first tile that fills the baseCoords exactly is laid', () => {
+      const tiles = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256});
 
       expect(tiles.tileCount).toBe(1);
-      expect(tiles.frame(1).coords).toMatchObject({x: 1, y: 1});
+      expect(tiles.frame(1).coords).toMatchObject({x: 0, y: 0});
+    });
+  });
+
+  test('a tile set built without options holds an empty options object', () => {
+    expect(new TileSet(new TextureCoords(0, 0, 64, 64)).options).toEqual({});
+    expect(new TileSet(new TextureAtlas(), new TextureCoords(0, 0, 64, 64)).options).toEqual({});
+  });
+
+  describe('frameId() and frame() with a tileId that is no whole number', () => {
+    const tiles = new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16});
+
+    test.each([
+      [1.5, '1.5'],
+      [NaN, 'NaN'],
+      [Infinity, 'Infinity'],
+    ])('a tileId of %s is refused', (tileId, shown) => {
+      const message = `[TileSet] tileId must be a whole number, got ${shown}`;
+
+      expect(() => tiles.frameId(tileId)).toThrow(RangeError);
+      expect(() => tiles.frameId(tileId)).toThrow(message);
+      expect(() => tiles.frame(tileId)).toThrow(RangeError);
+      expect(() => tiles.frame(tileId)).toThrow(message);
+    });
+
+    test('a negative whole tileId does not throw', () => {
+      expect(() => tiles.frameId(-3)).not.toThrow();
+      expect(() => tiles.frame(-3)).not.toThrow();
     });
   });
 

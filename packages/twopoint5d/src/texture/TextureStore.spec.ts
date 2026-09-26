@@ -1232,7 +1232,7 @@ describe('TextureStore', () => {
       const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
       store.on('a', ['atlas', 'texture'], ([atlas, texture]) => {
         tuples.push({
-          atlasWidth: atlas.frame('f0')?.coords.root?.width,
+          atlasWidth: atlas.frame('f0')?.coords.root.width,
           textureWidth: (texture as unknown as {width: number}).width,
         });
       });
@@ -1288,7 +1288,7 @@ describe('TextureStore', () => {
       const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
       store.on('a', ['atlas', 'texture'], ([atlas, texture]) => {
         tuples.push({
-          atlasWidth: atlas.frame('f0')?.coords.root?.width,
+          atlasWidth: atlas.frame('f0')?.coords.root.width,
           textureWidth: (texture as unknown as {width: number}).width,
         });
       });

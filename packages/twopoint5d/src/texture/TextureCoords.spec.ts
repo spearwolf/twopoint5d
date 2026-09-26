@@ -1,4 +1,4 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
 import {TextureCoords} from './TextureCoords.js';
 
 describe('TextureCoords', () => {
@@ -222,6 +222,55 @@ describe('TextureCoords', () => {
         s1: tex.t1,
         t1: tex.s1,
       });
+    });
+  });
+  describe('root', () => {
+    test('root is a TextureCoords, never undefined', () => {
+      const tex = new TextureCoords(new TextureCoords(0, 0, 8, 8), 1, 1, 2, 2);
+
+      expectTypeOf(tex.root).toEqualTypeOf<TextureCoords>();
+    });
+  });
+
+  describe('getTexCoords()', () => {
+    const makeTex = (flip: number) => {
+      const root = new TextureCoords(0, 0, 320, 160);
+      const parent = new TextureCoords(root, 4, 6, 200, 120);
+      const tex = new TextureCoords(parent, 20, 10, 100, 50);
+      tex.flip = flip;
+      return tex;
+    };
+
+    test.each([0, 1, 2, 3, 4, 5, 6, 7])('getTexCoords() answers s, t, u and v as the getters do (flip %i)', (flip) => {
+      const tex = makeTex(flip);
+
+      expect(tex.getTexCoords()).toEqual([tex.s, tex.t, tex.u, tex.v]);
+    });
+
+    test('getTexCoords() writes into the target it is given and answers it', () => {
+      const tex = makeTex(0);
+      const expected = [tex.s, tex.t, tex.u, tex.v];
+
+      const floats = new Float32Array(6);
+      expect(tex.getTexCoords(floats)).toBe(floats);
+      expect(Array.from(floats.subarray(0, 4))).toEqual(expected.map(Math.fround));
+      expect(floats[4]).toBe(0);
+      expect(floats[5]).toBe(0);
+
+      const numbers = [9, 9, 9, 9, 9];
+      expect(tex.getTexCoords(numbers)).toBe(numbers);
+      expect(numbers).toEqual([...expected, 9]);
+    });
+
+    test('getTexCoords() refuses a target shorter than four values and leaves it as it was', () => {
+      const tex = makeTex(0);
+      const target = [7, 7, 7];
+
+      expect(() => tex.getTexCoords(target)).toThrow(RangeError);
+      expect(() => tex.getTexCoords(target)).toThrow(
+        'TextureCoords: getTexCoords() got a target of 3 values, s, t, u and v are 4',
+      );
+      expect(target).toEqual([7, 7, 7]);
     });
   });
 });

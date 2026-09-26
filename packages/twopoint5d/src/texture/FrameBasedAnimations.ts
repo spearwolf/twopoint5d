@@ -126,9 +126,9 @@ const renderFloatsBuffer = (
   floatsBuffer.set(
     includeTextureSize
       ? names.flatMap((name) =>
-          animations.get(name)!.frames.flatMap(({s, t, u, v, width, height}) => [s, t, u, v, width, height, 0, 0]),
+          animations.get(name)!.frames.flatMap((coords) => [...coords.getTexCoords(), coords.width, coords.height, 0, 0]),
         )
-      : names.flatMap((name) => animations.get(name)!.frames.flatMap(({s, t, u, v}) => [s, t, u, v])),
+      : names.flatMap((name) => animations.get(name)!.frames.flatMap((coords) => coords.getTexCoords())),
     names.length * 4,
   );
 

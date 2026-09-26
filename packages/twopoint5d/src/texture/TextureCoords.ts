@@ -1,27 +1,61 @@
-const minCoord = (current: TextureCoords, scalarKey: 'x' | 'y', sizeKey: 'width' | 'height') => {
-  let texCoords: TextureCoords = current;
-  let scalar = 0;
+// One walk from a TextureCoords up to its root answers all four values of `s`, `t`, `u` and `v`, so
+// the getters and `getTexCoords()` agree to the last bit. The result lives in this module-wide
+// scratch array (s, t, s1, t1): the walk never calls out and never re-enters, so nothing can
+// overwrite it before the caller has read it.
+const scratch: [s: number, t: number, s1: number, t1: number] = [0, 0, 0, 0];
 
-  while (texCoords.parent != null) {
-    scalar += texCoords[scalarKey];
-    texCoords = texCoords.parent;
+const computeBounds = (current: TextureCoords): typeof scratch => {
+  const {width, height, flip} = current;
+
+  let sumX = 0;
+  let sumY = 0;
+  let node = current;
+
+  while (node.parent != null) {
+    sumX += node.x;
+    sumY += node.y;
+    node = node.parent;
   }
 
-  return scalar / texCoords[sizeKey];
+  const rootW = node.width;
+  const rootH = node.height;
+
+  const minX = sumX / rootW;
+  const maxX = (width + sumX) / rootW;
+  const minY = sumY / rootH;
+  const maxY = (height + sumY) / rootH;
+
+  // FLIP_DIAGONAL swaps the axes: s runs along y, t along x
+  const flipD = (flip & TextureCoords.FLIP_DIAGONAL) > 0;
+  const sMin = flipD ? minY : minX;
+  const sMax = flipD ? maxY : maxX;
+  const tMin = flipD ? minX : minY;
+  const tMax = flipD ? maxX : maxY;
+
+  const flipH = (flip & TextureCoords.FLIP_HORIZONTAL) > 0;
+  const flipV = (flip & TextureCoords.FLIP_VERTICAL) > 0;
+
+  scratch[0] = flipH ? sMax : sMin;
+  scratch[1] = flipV ? tMax : tMin;
+  scratch[2] = flipH ? sMin : sMax;
+  scratch[3] = flipV ? tMin : tMax;
+
+  return scratch;
 };
 
-const maxCoord = (current: TextureCoords, scalarKey: 'x' | 'y', sizeKey: 'width' | 'height') => {
-  let texCoords: TextureCoords = current;
-  let coord = current[sizeKey];
-
-  while (texCoords.parent != null) {
-    coord += texCoords[scalarKey];
-    texCoords = texCoords.parent;
-  }
-
-  return coord / texCoords[sizeKey];
-};
-
+/**
+ * A rectangle inside a texture, given in pixels relative to its `parent` (or, without a parent, to the texture itself).
+ * `s`, `t`, `u` and `v` derive the rectangle as absolute texture coordinates from the whole chain of parents up to the root.
+ *
+ * The three flip bits together describe all eight orientations of a rectangle: `FLIP_HORIZONTAL` and
+ * `FLIP_VERTICAL` mirror the drawn axis, `FLIP_DIAGONAL` swaps the axes.
+ * Under `FLIP_DIAGONAL` `s` and `u` run along the y axis of the texture and `t` and `v` along its x axis.
+ * The lookup at a quad position `(a, b)` (0 to 1, `b` counted downwards) reads the texture at
+ * `(s + a·u, t + b·v)` and swaps the two components; without `FLIP_DIAGONAL` it takes them as they are.
+ * `width` and `height` stay the measures of the area inside the texture; under `FLIP_DIAGONAL` it is drawn
+ * `height` wide and `width` high.
+ * A rotated TexturePacker frame arrives as `FLIP_DIAGONAL | FLIP_VERTICAL`.
+ */
 export class TextureCoords {
   static readonly FLIP_HORIZONTAL = 1;
   static readonly FLIP_VERTICAL = 2;
@@ -68,7 +102,7 @@ export class TextureCoords {
     return texCoords;
   }
 
-  get root(): TextureCoords | undefined {
+  get root(): TextureCoords {
     let root: TextureCoords = this;
     while (root.parent) {
       root = root.parent;
@@ -119,38 +153,50 @@ export class TextureCoords {
   }
 
   get s(): number {
-    const {flipD} = this;
-    return this.flipH
-      ? maxCoord(this, flipD ? 'y' : 'x', flipD ? 'height' : 'width')
-      : minCoord(this, flipD ? 'y' : 'x', flipD ? 'height' : 'width');
+    return computeBounds(this)[0];
   }
 
   get t(): number {
-    const {flipD} = this;
-    return this.flipV
-      ? maxCoord(this, flipD ? 'x' : 'y', flipD ? 'width' : 'height')
-      : minCoord(this, flipD ? 'x' : 'y', flipD ? 'width' : 'height');
+    return computeBounds(this)[1];
   }
 
   get s1(): number {
-    const {flipD} = this;
-    return this.flipH
-      ? minCoord(this, flipD ? 'y' : 'x', flipD ? 'height' : 'width')
-      : maxCoord(this, flipD ? 'y' : 'x', flipD ? 'height' : 'width');
+    return computeBounds(this)[2];
   }
 
   get t1(): number {
-    const {flipD} = this;
-    return this.flipV
-      ? minCoord(this, flipD ? 'x' : 'y', flipD ? 'width' : 'height')
-      : maxCoord(this, flipD ? 'x' : 'y', flipD ? 'width' : 'height');
+    return computeBounds(this)[3];
   }
 
   get u(): number {
-    return this.s1 - this.s;
+    const bounds = computeBounds(this);
+    return bounds[2] - bounds[0];
   }
 
   get v(): number {
-    return this.t1 - this.t;
+    const bounds = computeBounds(this);
+    return bounds[3] - bounds[1];
+  }
+
+  /**
+   * The four values `s`, `t`, `u` and `v`, computed in one walk up the chain of parents where each getter walks it on its own.
+   * Without a `target` the values come as a new tuple; with one they are written to its indices 0 to 3 and
+   * `target` is answered, without allocating.
+   *
+   * @throws {RangeError} if `target` holds fewer than four values; it stays as it was.
+   */
+  getTexCoords(): [s: number, t: number, u: number, v: number];
+  getTexCoords<T extends {length: number; [index: number]: number}>(target: T): T;
+  getTexCoords(target?: {length: number; [index: number]: number}): unknown {
+    if (target != null && target.length < 4) {
+      throw new RangeError(`TextureCoords: getTexCoords() got a target of ${target.length} values, s, t, u and v are 4`);
+    }
+    const bounds = computeBounds(this);
+    const out = target ?? [0, 0, 0, 0];
+    out[0] = bounds[0];
+    out[1] = bounds[1];
+    out[2] = bounds[2] - bounds[0];
+    out[3] = bounds[3] - bounds[1];
+    return out;
   }
 }

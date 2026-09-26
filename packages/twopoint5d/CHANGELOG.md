@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add an optional `out` set to `Map2DSpatialHashGrid#findWithin()` and `#getTiles()`: it is emptied, filled and handed back, empty rather than `undefined` when nothing lies within. Without it both answer as before, with a new set or `undefined`
 - add the `baseUrl` option of `TextureStoreParseOptions`: the url the relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the catalog items are resolved against. `TextureStore#load()` sets it to the url it fetches; a caller who fetches the json itself and hands it to `parse()` passes it there
 - add `isTextureOptionClass()`: whether a name is one of the `TextureOptionClasses` a `TextureFactory` applies — the question for names out of json
+- `TexturePackerJson.parse()`, and with it `TextureAtlasLoader` and the atlas resources of `TextureStore`, reads the "JSON Array" format of TexturePacker as well as the "JSON Hash" format: a frame is named by its `filename`. The frame type of the array is the exported `TexturePackerArrayFrameData`, and `isAtlasJsonResponse()` lets both formats through and refuses a `rotated` that is no boolean
+- a rotated frame (`rotated: true`) of a TexturePacker json becomes `TextureCoords` over the area it takes in the sheet, `frame.h` wide and `frame.w` high, with `FLIP_DIAGONAL | FLIP_VERTICAL`, which turns it back when it is drawn. `TexturePackerFrameData` carries the optional `rotated`. The class documentation of `TextureCoords` says how the three flip bits lay a rectangle down and how a lookup reads it
+- add `TextureCoords#getTexCoords(target?)`: `s`, `t`, `u` and `v` in one walk up the parents, where each getter walks on its own. Without a `target` it answers a new tuple; with a typed array or a plain array it writes the four values to the indices 0 to 3 and answers the `target`, without allocating. A `target` shorter than four values throws a `RangeError` and stays unchanged
 
 ### Changed
 
@@ -218,6 +221,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureStore#parse()` checks the catalog before it writes anything. Data that is no object, an `items` that is no object and a `defaultTextureClasses` that is there and no array throw a `TypeError` naming what was found. An item that is no object or carries a field of the wrong type — a url that is no string, a `tileSet` or `frameBasedAnimations` that is no object, a `texture` that is no array, `null` among them — builds no resource and goes out as an `error` event with `source: 'parse'` and its id; a resource that already carries the id stays as it is. A texture class name no `TextureFactory` knows, in an item or in `defaultTextureClasses`, is left out and reported the same way, and a `defaultTextureClasses` of nothing but unknown names leaves the defaults standing. The static `TextureStore.load()` rejects on each of these reports
 - `TextureStoreData#defaultTextureClasses` is optional: a catalog may leave it out
 - `TextureFactory#getOptions()`, and with it `create()` and `update()`, skip a name that is no texture option class; the order of the other classes stays what it would be without it
+- `TexturePackerJsonData#frames` is a union of the "JSON Hash" record and the "JSON Array" of `TexturePackerArrayFrameData`: whoever reads `frames` tells the two apart. See the Migration Guide
+- `TextureCoords#root` is typed `TextureCoords`, never `undefined`
+- `TileSet#options` is `{}` when the constructor gets no options
 
 ### Deprecated
 
@@ -379,6 +385,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureStore#on()` for a subscription made before the `parse()` that brings its resource: a later `parse()` that brings the same resource does not call it again with the values it already had
 - fix `FrameBasedAnimations#add()` with tiles that cannot be picked: a tile id or a `firstTileId` that is no whole number, a `tileCount` that is no whole number from 1 to `FrameBasedAnimations.MaxTextureSize` and a `frameNameQuery` that is neither a string nor a `RegExp` throw an error naming the value and the animation. A `TextureResource` skips such an animation entry and reports it, and so it does with one whose `tileIds` are no array
 - fix `TileSet` with a `firstId` that is no whole number: it is refused with a `RangeError`
+- fix `TileSet` with a first tile that does not fit into the `baseCoords` with its `margin` and `padding`: the constructor throws a `RangeError`, because the tile would carry texture coordinates above 1. See the Migration Guide
+- fix `TileSet#frameId()` and `TileSet#frame()` with a `tileId` that is no whole number: they throw a `RangeError`, so `frame()` always answers a `TextureAtlasFrame`
+- fix `TexturePackerJson.parse()` with a frame name that appears twice in the json or that the `target` atlas already holds: it throws before it adds a frame, so the `target` stays as it was
 
 ### Migration Guide
 
@@ -2631,6 +2640,32 @@ const classes = data.defaultTextureClasses.slice();
 ```ts
 const classes = data.defaultTextureClasses?.slice() ?? [];
 ```
+
+#### `TexturePackerJsonData#frames` is a hash or an array
+
+**Before**
+
+```ts
+for (const [name, {frame}] of Object.entries(data.frames)) {
+  // ...
+}
+```
+
+**After**
+
+```ts
+const entries = Array.isArray(data.frames)
+  ? data.frames.map((frameData) => [frameData.filename, frameData] as const)
+  : Object.entries(data.frames);
+
+for (const [name, {frame}] of entries) {
+  // ...
+}
+```
+
+#### `TileSet` refuses a first tile that does not fit
+
+A `TileSet` whose first tile does not fit into the `baseCoords` together with `margin` and `padding` — a `tileWidth` of 256 and a `margin` of 1 on an image 256 pixels wide — throws a `RangeError` from its constructor. Shrink the tile or the `margin`, or leave the `margin` out.
 
 ## [0.21.2] - 2026-06-19
 

@@ -34,6 +34,9 @@ export interface TexturedSprite extends VO {
   setColorValues(color: [r: number, g: number, b: number, a: number]): void;
 }
 
+// setTexCoords() copies the four values into the buffer of the sprite, so one tuple serves every call
+const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0, 0];
+
 export class TexturedSprite {
   [voInitialize]() {
     this.setColorValues(1, 1, 1, 1);
@@ -48,8 +51,7 @@ export class TexturedSprite {
   }
 
   setFrame(frame: TextureAtlasFrame): void {
-    const {coords} = frame;
-    this.setTexCoords(coords.s, coords.t, coords.u, coords.v);
+    this.setTexCoords(frame.coords.getTexCoords(texCoordsScratch));
   }
 
   /**
