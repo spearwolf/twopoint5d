@@ -134,7 +134,7 @@ describe('TexturedSprites', () => {
     sprites.dispose();
   });
 
-  test('createSprite() hands out a sprite that starts upright and untrimmed, whatever its slot held before', () => {
+  test('createSprite() hands out a sprite that starts with its texFlipDiagonal and trim margins at 0, whatever its slot held before', () => {
     const sprites = new TexturedSprites(4);
     const upright = sprites.createSprite()!;
     upright.setFrame(frame);
