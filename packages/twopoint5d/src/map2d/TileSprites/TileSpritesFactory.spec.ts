@@ -67,6 +67,32 @@ describe('TileSpritesFactory', () => {
       expect(pool.usedCount, 'usedCount after a throw').toBe(0);
     });
 
+    test('a factory without a tile set answers undefined for a coordinate whose tile id is 0 and takes no slot', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(4));
+      const factory = new TileSpritesFactory(tileSprites, undefined, new RepeatingTilesProvider(0));
+      const pool = tileSprites.geometry!.instancedPool;
+
+      expect(factory.createTile(new Map2DTileCoords(0, 0))).toBeUndefined();
+      expect(pool.usedCount, 'usedCount after a coordinate without a tile').toBe(0);
+    });
+
+    test.each([
+      [1.5, '1.5'],
+      [NaN, 'NaN'],
+    ])(
+      'a tile id of %s from the tile data provider throws the RangeError of TileSet#frameId() and leaves the instanced pool as it found it',
+      (tileId, shown) => {
+        const tileSprites = new TileSprites(new TileSpritesGeometry(4));
+        const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider(tileId));
+        const pool = tileSprites.geometry!.instancedPool;
+
+        const call = () => factory.createTile(new Map2DTileCoords(0, 0));
+        expect(call).toThrow(RangeError);
+        expect(call).toThrow(`[TileSet] tileId must be a whole number, got ${shown}`);
+        expect(pool.usedCount, 'usedCount after a throw').toBe(0);
+      },
+    );
+
     test('a tile the factory can build takes a slot out of the instanced pool', () => {
       const tileSprites = new TileSprites(new TileSpritesGeometry(4));
       const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
