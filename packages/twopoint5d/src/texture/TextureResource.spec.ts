@@ -321,6 +321,12 @@ describe('TextureResource', () => {
       expect(textureDispose.calledOnce).toBe(true);
     });
 
+    test('is safe to call twice on a resource that never loaded', () => {
+      const resource = TextureResource.fromImage('x', 'x.png');
+      expect(() => resource.dispose()).not.toThrow();
+      expect(() => resource.dispose()).not.toThrow();
+    });
+
     // (e) no signal or effect outlives the instance
     test('does not leak signals or effects', () => {
       const baselineSignals = getSignalsCount();
@@ -484,7 +490,7 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
-    test('an animation entry without a duration and without a frameRate is skipped and reported', async () => {
+    test('an animation entry without a duration and without a frameRate is skipped and reported with the error FrameBasedAnimations#add() throws for it', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
       );
@@ -494,6 +500,7 @@ describe('TextureResource', () => {
         // the animation data of a store comes out of json, where neither of the two timing
         // fields has to be there
         walk: {tileIds: [1, 2]},
+        run: {firstTileId: 1, tileCount: 2},
         idle: {duration: 1, tileIds: [3, 4]},
       } as unknown as FrameBasedAnimationsDataMap);
       resource.load();
@@ -506,10 +513,16 @@ describe('TextureResource', () => {
       resource.textureFactory = factory;
       await flushMicrotasks();
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0]!.source).toBe('frameBasedAnimations');
-      expect(errors[0]!.id).toBe('tiles');
-      expect(errors[0]!.animation).toBe('walk');
+      expect(errors).toHaveLength(2);
+      expect(errors.map((e) => e.source)).toEqual(['frameBasedAnimations', 'frameBasedAnimations']);
+      expect(errors.map((e) => e.id)).toEqual(['tiles', 'tiles']);
+      expect(errors.map((e) => e.animation)).toEqual(['walk', 'run']);
+      expect(errors[0]!.error.message).toBe(
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `walk`',
+      );
+      expect(errors[1]!.error.message).toBe(
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `run`',
+      );
 
       // the entry beside it is registered all the same
       expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
@@ -546,7 +559,7 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
-    test('an atlas animation entry whose timing does not carry is skipped and reported', async () => {
+    test('an atlas animation entry whose timing does not carry is skipped and reported with the error FrameBasedAnimations#add() throws for it', async () => {
       const atlasJson = {
         frames: {
           walk_1: {frame: {x: 0, y: 0, w: 8, h: 8}},
@@ -582,6 +595,9 @@ describe('TextureResource', () => {
       expect(errors[0]!.source).toBe('frameBasedAnimations');
       expect(errors[0]!.id).toBe('sprites');
       expect(errors[0]!.animation).toBe('walk');
+      expect(errors[0]!.error.message).toBe(
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `walk`',
+      );
 
       // the entry beside it is registered all the same
       expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);

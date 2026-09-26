@@ -123,12 +123,6 @@ describe('TextureStore', () => {
       expect(resourceDisposes).toEqual({a: 1, b: 1});
     });
 
-    test('TextureResource.dispose() is idempotent and does not throw', () => {
-      const resource = TextureResource.fromImage('x', 'x.png');
-      expect(() => resource.dispose()).not.toThrow();
-      expect(() => resource.dispose()).not.toThrow();
-    });
-
     // (d) the second call throws nothing and releases nothing a second time
     test('a second dispose() does not emit the dispose event again', () => {
       const store = new TextureStore();

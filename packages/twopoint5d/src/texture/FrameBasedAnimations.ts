@@ -199,7 +199,9 @@ export class FrameBasedAnimations {
     let [name] = args;
 
     if (name && this.#animations.has(name)) {
-      throw new Error(`name='${name.toString()}' must be unique!`);
+      throw new Error(
+        `FrameBasedAnimations: add() got the name \`${animNameInError(name)}\`, which another animation already carries — an animation name must be unique`,
+      );
     }
 
     let frames: TextureCoords[];
@@ -269,7 +271,9 @@ export class FrameBasedAnimations {
         }
       }
     } else {
-      throw new Error('add(): the third argument must be a TextureAtlas, a TileSet or an array of frames');
+      throw new Error(
+        `FrameBasedAnimations: add() got a third argument of ${describeValue(args[2])} for the animation \`${animNameInError(name)}\` — the third argument is a TextureAtlas, a TileSet or an array of frames`,
+      );
     }
 
     const id = this.#names.length;

@@ -152,7 +152,7 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animId('run')).toBe(2);
     });
 
-    test('throw error on duplicate name', () => {
+    test('a name that another animation already carries is refused with the name', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
@@ -160,7 +160,20 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => {
         animations.add('walk', 1.0, frames);
-      }).toThrow("name='walk' must be unique!");
+      }).toThrow(
+        'FrameBasedAnimations: add() got the name `walk`, which another animation already carries — an animation name must be unique',
+      );
+    });
+
+    test('a third argument that is no TextureAtlas, no TileSet and no array is refused with the value and the animation', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => {
+        animations.add('odd', 1, 5 as never);
+      }).toThrow(
+        'FrameBasedAnimations: add() got a third argument of 5 for the animation `odd` — the third argument is a TextureAtlas, a TileSet or an array of frames',
+      );
+      expect(animations.hasAnimation('odd')).toBe(false);
     });
   });
 

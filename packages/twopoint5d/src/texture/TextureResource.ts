@@ -4,7 +4,7 @@ import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
-import {FrameBasedAnimations, type AnimationTimingOptions} from './FrameBasedAnimations.js';
+import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {
   changeRefCount,
   imageSource,
@@ -20,22 +20,7 @@ import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
-import type {FrameBasedAnimationsData, FrameBasedAnimationsDataMap} from './types.js';
-
-/**
- * Extracts timing options from frame-based animation data.
- * Returns AnimationTimingOptions object with either duration or frameRate.
- * @throws Error if neither duration nor frameRate is provided
- */
-const getTimingOptions = (data: FrameBasedAnimationsData): AnimationTimingOptions => {
-  if ('frameRate' in data && data.frameRate !== undefined) {
-    return {frameRate: data.frameRate};
-  }
-  if ('duration' in data && data.duration !== undefined) {
-    return {duration: data.duration};
-  }
-  throw new Error('Either duration or frameRate must be provided in animation data');
-};
+import type {FrameBasedAnimationsDataMap} from './types.js';
 
 type FrameBasedAnimationsDataShape = 'frameNameQuery' | 'tileIds' | 'firstTileId';
 
@@ -794,11 +779,12 @@ export class TextureResource {
                 }
               }
               try {
-                const timing = getTimingOptions(data);
+                // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
+                // place that refuses an entry carrying neither, with the name of the animation
                 if ('tileIds' in data) {
-                  animations.add(name, timing, tileSet, data.tileIds);
+                  animations.add(name, data, tileSet, data.tileIds);
                 } else if ('firstTileId' in data) {
-                  animations.add(name, timing, tileSet, data.firstTileId, data.tileCount);
+                  animations.add(name, data, tileSet, data.firstTileId, data.tileCount);
                 }
               } catch (error) {
                 // One bad entry skips itself. Without this the throw leaves the effect through the
@@ -1004,9 +990,10 @@ export class TextureResource {
                 continue;
               }
               try {
-                const timing = getTimingOptions(data);
+                // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
+                // place that refuses an entry carrying neither, with the name of the animation
                 if ('frameNameQuery' in data) {
-                  animations.add(name, timing, atlas, data.frameNameQuery);
+                  animations.add(name, data, atlas, data.frameNameQuery);
                 }
               } catch (error) {
                 // One bad entry skips itself. Without this the throw leaves the effect through the
