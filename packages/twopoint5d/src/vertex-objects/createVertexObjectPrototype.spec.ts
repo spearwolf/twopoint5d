@@ -283,6 +283,135 @@ describe('the generated attribute accessors', () => {
     ]);
   });
 
+  test('a setter of five to sixteen values declares sixteen parameters', () => {
+    const pool = new VertexObjectPool<{setFoo: VOAttrSetter}>(
+      {vertexCount: 4, attributes: {foo: {components: ['x', 'y', 'z']}, bar: {size: 3}}},
+      1,
+    );
+    const vo = pool.createVO()!;
+    expect(vo.setFoo.length).toBe(16);
+  });
+
+  test('a setter of five to sixteen values leaves the values it was not given', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>({vertexCount: 4, attributes: {foo: {components: ['x', 'y', 'z']}, bar: {size: 3}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    vo.setFoo(9);
+    expect(Array.from(vo.getFoo())).toEqual([9, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  test('a setter of five to sixteen values ignores values beyond the attribute', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>({vertexCount: 4, attributes: {foo: {components: ['x', 'y', 'z']}, bar: {size: 3}}}, 2);
+    const a = pool.createVO()!;
+    const b = pool.createVO()!;
+    b.setFoo(7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7);
+    a.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+    expect(Array.from(a.getFoo())).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(Array.from(b.getFoo())).toEqual([7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]);
+  });
+
+  test('a setter of five to sixteen values writes separate values across every vertex of an interleaved buffer', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>(
+      {
+        vertexCount: 4,
+        attributes: {
+          foo: {components: ['x', 'y', 'z']},
+          bar: {size: 3},
+        },
+      },
+      1,
+    );
+    const vo = pool.createVO()!;
+    vo.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    // prettier-ignore
+    expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
+      0, 0, 0, 1, 2, 3,
+      0, 0, 0, 4, 5, 6,
+      0, 0, 0, 7, 8, 9,
+      0, 0, 0, 10, 11, 12,
+    ]);
+  });
+
+  test('a setter of more than sixteen values reads separate values and an array-like alike', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 6, attributes: {pos: {size: 3}}}, 2);
+    const a = pool.createVO()!;
+    const b = pool.createVO()!;
+    const values = Array.from({length: 18}, (_, k) => k + 1);
+    a.setPos(...values);
+    b.setPos(Float32Array.from({length: 18}, (_, k) => k + 1));
+    expect(Array.from(a.getPos())).toEqual(values);
+    expect(Array.from(b.getPos())).toEqual(values);
+
+    a.setPos(9);
+    expect(Array.from(a.getPos())).toEqual([9, ...values.slice(1)]);
+  });
+
+  test('a setter of more than sixteen values ignores values beyond the attribute', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 6, attributes: {pos: {size: 3}}}, 2);
+    const a = pool.createVO()!;
+    const b = pool.createVO()!;
+    const sevens = Array.from({length: 18}, () => 7);
+    b.setPos(...sevens);
+    // a nineteenth value lies where the first value of the next object starts
+    a.setPos(...Array.from({length: 19}, (_, k) => k + 1));
+    expect(Array.from(a.getPos())).toEqual(Array.from({length: 18}, (_, k) => k + 1));
+    expect(Array.from(b.getPos())).toEqual(sevens);
+  });
+
+  test('a setter of more than sixteen values writes separate values across every vertex of an interleaved buffer', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>(
+      {
+        vertexCount: 6,
+        attributes: {
+          foo: {components: ['x', 'y', 'z']},
+          bar: {size: 3},
+        },
+      },
+      1,
+    );
+    const vo = pool.createVO()!;
+    vo.setFoo(...Array.from({length: 18}, (_, k) => k + 1));
+    // prettier-ignore
+    expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
+      0, 0, 0, 1, 2, 3,
+      0, 0, 0, 4, 5, 6,
+      0, 0, 0, 7, 8, 9,
+      0, 0, 0, 10, 11, 12,
+      0, 0, 0, 13, 14, 15,
+      0, 0, 0, 16, 17, 18,
+    ]);
+  });
+
+  test('a setter of more than sixteen values handed a single undefined writes nothing', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 6, attributes: {pos: {size: 3}}}, 1);
+    const vo = pool.createVO()!;
+    const values = Array.from({length: 18}, (_, k) => k + 1);
+    vo.setPos(...values);
+    expect(() => vo.setPos(undefined as unknown as number)).not.toThrow();
+    expect(Array.from(vo.getPos())).toEqual(values);
+  });
+
   test('a setter leaves an element it is handed undefined for as it was', () => {
     const pool = new VertexObjectPool<{
       setPos: VOAttrSetter;

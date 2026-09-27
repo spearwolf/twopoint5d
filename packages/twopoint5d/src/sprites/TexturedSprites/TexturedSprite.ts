@@ -63,6 +63,13 @@ const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0,
 // setTexTrim() copies the four margins into the buffer of the sprite as well
 const trimScratch: FrameTrimMargins = [0, 0, 0, 0];
 
+// V8 boxes a fractional value that a method hands on as an argument of its own to a setter it
+// does not inline in a full frame loop — a heap number of 16 B per value; in a tuple the value
+// stays unboxed, and the setters copy it into the buffer of the sprite, so one tuple serves every call
+const quadSizeScratch: [width: number, height: number] = [0, 0];
+const positionScratch: [x: number, y: number, z: number] = [0, 0, 0];
+const colorScratch: [r: number, g: number, b: number, a: number] = [0, 0, 0, 0];
+
 export class TexturedSprite {
   [voInitialize]() {
     // the slot createVO() hands out still carries the values of the sprite that stood in it before;
@@ -78,11 +85,16 @@ export class TexturedSprite {
   }
 
   setSize(width: number, height: number): void {
-    this.setQuadSize(width, height);
+    quadSizeScratch[0] = width;
+    quadSizeScratch[1] = height;
+    this.setQuadSize(quadSizeScratch);
   }
 
   setPosition(x: number, y: number, z = 0): void {
-    this.setInstancePosition(x, y, z);
+    positionScratch[0] = x;
+    positionScratch[1] = y;
+    positionScratch[2] = z;
+    this.setInstancePosition(positionScratch);
   }
 
   /**
@@ -106,7 +118,11 @@ export class TexturedSprite {
    * default alpha test a sprite with an alpha of 0 is not drawn at all.
    */
   setColor(color: Color, a = 1): void {
-    this.setColorValues(color.r, color.g, color.b, a);
+    colorScratch[0] = color.r;
+    colorScratch[1] = color.g;
+    colorScratch[2] = color.b;
+    colorScratch[3] = a;
+    this.setColorValues(colorScratch);
   }
 
   getColor(target: Color = new Color()): Color {

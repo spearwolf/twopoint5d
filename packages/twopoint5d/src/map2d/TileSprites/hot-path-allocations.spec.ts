@@ -85,4 +85,27 @@ describe('tile sprites on the hot path', () => {
 
     expect(bytesPerTile, `${bytesPerTile.toFixed(2)} bytes per tile`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
   });
+
+  test('createTile() costs the same for fractional view coordinates as for integral ones', async () => {
+    const fractionalCoords = Array.from(
+      {length: 1000},
+      (_, i) => new Map2DTileCoords(i % 40, Math.floor(i / 40), new AABB2(i * 10.25, 0.5, 10.5, 10.5)),
+    );
+
+    // created at the end and freed as the last slot, so the pool stays at 1000 tiles in use
+    const measure = (tileCoords: Map2DTileCoords[]) =>
+      measureSettledBytes(() => {
+        for (let i = 0; i < 100; i++) {
+          const tile = factory.createTile(tileCoords[i]!);
+          factory.destroyTile(tile as TileSprite);
+        }
+      });
+    const integral = (await measure(coords)) / 100;
+    const fractional = (await measure(fractionalCoords)) / 100;
+
+    expect(
+      fractional - integral,
+      `${fractional.toFixed(2)} bytes per tile with fractional coordinates, ${integral.toFixed(2)} with integral ones`,
+    ).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
 });

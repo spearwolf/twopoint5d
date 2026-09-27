@@ -20,6 +20,12 @@ export interface AnimatedSprite extends VO {
   setInstancePosition(position: [x: number, y: number, z: number]): void;
 }
 
+// V8 boxes a fractional value that a method hands on as an argument of its own to a setter it
+// does not inline in a full frame loop — a heap number of 16 B per value; in a tuple the value
+// stays unboxed, and the setters copy it into the buffer of the sprite, so one tuple serves every call
+const quadSizeScratch: [width: number, height: number] = [0, 0];
+const positionScratch: [x: number, y: number, z: number] = [0, 0, 0];
+
 export class AnimatedSprite {
   [voInitialize]() {
     // the slot createVO() hands out still carries the values of the sprite that stood in it before;
@@ -32,11 +38,16 @@ export class AnimatedSprite {
   }
 
   setSize(width: number, height: number): void {
-    this.setQuadSize(width, height);
+    quadSizeScratch[0] = width;
+    quadSizeScratch[1] = height;
+    this.setQuadSize(quadSizeScratch);
   }
 
   setPosition(x: number, y: number, z = 0): void {
-    this.setInstancePosition(x, y, z);
+    positionScratch[0] = x;
+    positionScratch[1] = y;
+    positionScratch[2] = z;
+    this.setInstancePosition(positionScratch);
   }
 }
 

@@ -4,7 +4,7 @@ import {describe, expect, test} from 'vitest';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
-import type {TouchBuffersType, VO, VertexObjectDescription} from './types.js';
+import type {TouchBuffersType, VO, VOAttrSetter, VertexObjectDescription} from './types.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
@@ -32,6 +32,11 @@ interface QuadVO {
   y3: number;
   z2: number;
   getPosition(target: Float32Array): Float32Array;
+  setPosition: VOAttrSetter;
+}
+
+interface HexVO {
+  setPosition: VOAttrSetter;
 }
 
 const spriteDescription: VertexObjectDescription = {
@@ -74,6 +79,11 @@ const quadDescription: VertexObjectDescription = {
   indices: [0, 1, 2, 0, 2, 3],
 };
 
+// eighteen values, more than a setter declares parameters for
+const hexDescription: VertexObjectDescription = {vertexCount: 6, attributes: {position: {components: ['x', 'y', 'z']}}};
+
+const quadPositions = new Float32Array(12);
+
 describe('vertex objects on the hot path', () => {
   test('the generated accessors of up to four values allocate nothing per call', async () => {
     const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
@@ -101,27 +111,60 @@ describe('vertex objects on the hot path', () => {
     pool.dispose();
   });
 
-  test('the per-vertex component accessors of a multi-vertex object allocate nothing per call', async () => {
+  test('the accessors of a multi-vertex object allocate nothing per call', async () => {
     const pool = new VertexObjectPool<QuadVO>(quadDescription, 1000);
     const vos = Array.from({length: 1000}, () => pool.createVO()!);
     const target = new Float32Array(12);
     let sum = 0;
 
-    // setPosition() of this attribute is left out: with twelve values it takes a rest parameter
-    // and allocates an array per call
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < vos.length; i++) {
         const vo = vos[i]!;
+        vo.setPosition(quadPositions);
+        vo.setPosition(i, 1, 2, i, 1, 2, i, 1, 2, i, 1, 2);
         vo.x0 = i;
         vo.y3 = i;
         sum += vo.z2;
         vo.getPosition(target);
       }
     });
-    const bytesPerCall = bytesPerRound / (vos.length * 4);
+    const bytesPerCall = bytesPerRound / (vos.length * 6);
 
-    expect(sum).toBe(0);
+    // z2 is the third value setPosition() writes to every vertex: 2
+    expect(sum).toBeGreaterThan(0);
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    pool.dispose();
+  });
+
+  test('a setter of more than sixteen values takes an array-like without allocating', async () => {
+    const pool = new VertexObjectPool<HexVO>(hexDescription, 1000);
+    const vos = Array.from({length: 1000}, () => pool.createVO()!);
+    const hexPositions = new Float32Array(18);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < vos.length; i++) vos[i]!.setPosition(hexPositions);
+    });
+    const bytesPerCall = bytesPerRound / vos.length;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    pool.dispose();
+  });
+
+  test('toAttributeArrays() allocates its result and nothing per vertex', async () => {
+    const pool = new VertexObjectPool(quadDescription, 1000);
+    for (let i = 0; i < 1000; i++) pool.createVO();
+
+    const many = await measureSettledBytes(() => {
+      pool.buffer.toAttributeArrays(['position'], 0, 1000);
+    });
+    const few = await measureSettledBytes(() => {
+      pool.buffer.toAttributeArrays(['position'], 0, 10);
+    });
+    const bytesPerObject = (many - few) / 990;
+
+    expect(bytesPerObject, `${bytesPerObject.toFixed(2)} bytes per further vertex object`).toBeLessThan(BYTES_PER_CALL_LIMIT);
 
     pool.dispose();
   });

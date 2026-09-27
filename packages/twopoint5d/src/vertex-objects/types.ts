@@ -232,10 +232,17 @@ export interface VO {
  * The generated method that writes every value of an attribute at once, as separate arguments or
  * as one array-like: `setPos(1, 2)` and `setPos([1, 2])` do the same. Fewer values than the
  * attribute has, or a value of `undefined`, leave the rest of the attribute as it was; values
- * beyond the attribute are ignored. The generated method of an attribute of at most four values
- * (`vertexCount * size`) takes four separate parameters instead of a rest parameter, whatever the
- * attribute's size — parameters beyond its values are ignored — so a call with separate values
- * allocates nothing. It is the type to give the `set…` method of a vertex object interface.
+ * beyond the attribute are ignored. The generated method of an attribute of up to four values
+ * (`vertexCount * size`) declares four parameters, the one of up to sixteen values sixteen, so a
+ * call with separate values allocates nothing; parameters beyond the values of the attribute are
+ * ignored. From seventeen values on the method reads `arguments`: an array-like allocates nothing,
+ * separate values make V8 build an object on every call.
+ *
+ * V8 boxes a fractional value that crosses a call it does not inline as an argument of its own,
+ * a heap number of 16 B. That allocation belongs to the calling code: a loop that writes
+ * fractional values fills a tuple it reuses and hands that on, as `TexturedSprite`,
+ * `AnimatedSprite` and `TileSpritesFactory` do. It is the type to give the `set…` method of a
+ * vertex object interface.
  */
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
 

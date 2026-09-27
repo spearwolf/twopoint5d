@@ -11,6 +11,11 @@ import {TileSpritesGeometry} from './TileSpritesGeometry.js';
 // setTexCoords() copies the four values into the buffer of the sprite, so one tuple serves every call
 const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0, 0];
 
+// the view coordinates go on in tuples as well: V8 boxes a fractional value handed on as an
+// argument of its own to a setter it does not inline, 16 B per value; in a tuple it stays unboxed
+const quadSizeScratch: [width: number, height: number] = [0, 0];
+const positionScratch: [x: number, y: number, z: number] = [0, 0, 0];
+
 export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   readonly tileSprites: TileSprites;
 
@@ -76,8 +81,14 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
     // slot for this tile; the renderer asks for it again once one may have come free
     if (sprite == null) return noTileCapacity;
 
-    sprite.setQuadSize(tileCoords.view.width, tileCoords.view.height);
-    sprite.setInstancePosition(tileCoords.view.left, 0, tileCoords.view.top);
+    const {view} = tileCoords;
+    quadSizeScratch[0] = view.width;
+    quadSizeScratch[1] = view.height;
+    sprite.setQuadSize(quadSizeScratch);
+    positionScratch[0] = view.left;
+    positionScratch[1] = 0;
+    positionScratch[2] = view.top;
+    sprite.setInstancePosition(positionScratch);
     sprite.setTexCoords(texCoords.getTexCoords(texCoordsScratch));
     // written for an upright frame too: a slot that comes back out of the pool still holds the
     // value of the tile before it
@@ -87,7 +98,10 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   }
 
   updateTile(tile: TileSprite, tileCoords: IMap2DTileCoords): void {
-    tile.setInstancePosition(tileCoords.view.left, 0, tileCoords.view.top);
+    positionScratch[0] = tileCoords.view.left;
+    positionScratch[1] = 0;
+    positionScratch[2] = tileCoords.view.top;
+    tile.setInstancePosition(positionScratch);
 
     // the instance attributes carry no `autoTouch`, so the factory says itself which slot it
     // wrote, and update() uploads that slot and no other; createVO() and freeVO() mark theirs

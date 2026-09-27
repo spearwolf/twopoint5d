@@ -696,7 +696,8 @@ export class VertexObjectBuffer {
 
           for (let objIdx = startIndex; objIdx < endIndex; objIdx++) {
             for (let i = 0; i < vertexCount; i++) {
-              targetArray.set(typedArray.subarray(bufferIdx, bufferIdx + attrSize), targetIdx);
+              // element by element, not subarray(): subarray() allocates a new view per vertex
+              for (let j = 0; j < attrSize; j++) targetArray[targetIdx + j] = typedArray[bufferIdx + j]!;
               targetIdx += attrSize;
               bufferIdx += buffer.itemSize;
             }

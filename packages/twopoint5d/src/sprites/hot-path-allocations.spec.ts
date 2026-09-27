@@ -1,3 +1,4 @@
+import {Color} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
@@ -25,22 +26,28 @@ const trimmedFrame: TextureAtlasFrame = {
   data: {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}},
 };
 
+const tint = new Color(0.8, 0.4, 0.2);
+
 describe('sprites on the hot path', () => {
-  test('moving, turning and re-framing a textured sprite allocates nothing per call', async () => {
+  test('moving, turning, re-framing and tinting a textured sprite allocates nothing per call', async () => {
     const sprites = new TexturedSprites(1000);
     const all = Array.from({length: 1000}, () => sprites.createSprite()!);
 
-    // setColor() is left out: next to setFrame() with a trimmed frame, the fractional values of a
-    // Color reach setColorValues() boxed, 32 B per sprite, even after thousands of warm-up rounds
+    // position and color are fractional: V8 boxes a fractional value that crosses a call it does
+    // not inline as an argument of its own, and in a loop this full some calls stay un-inlined —
+    // the methods of the sprite have to hand their values on without that. The rotation stays
+    // integral: a fractional value the loop itself writes through an accessor V8 does not inline
+    // is boxed by the loop, not by the library
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
-        sprite.setPosition(i, 1, 2);
+        sprite.setPosition(i * 0.5 + 0.25, 1.5, 2.5);
         sprite.rotation = i;
         sprite.setFrame(i & 1 ? frame : trimmedFrame);
+        sprite.setColor(tint, 0.5);
       }
     });
-    const bytesPerCall = bytesPerRound / (all.length * 3);
+    const bytesPerCall = bytesPerRound / (all.length * 4);
 
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
 
@@ -55,7 +62,7 @@ describe('sprites on the hot path', () => {
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
-        sprite.setPosition(i, 1, 2);
+        sprite.setPosition(i * 0.5 + 0.25, 1.5, 2.5);
         sprite.rotation = i;
         sprite.animOffset = i;
       }
