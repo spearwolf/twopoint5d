@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-26T14:41:58.654Z"
+    "generatedAt": "2026-09-27T20:55:55.446Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,18 +205,18 @@
     "domains": {
       "code": {
         "executiveSummary": "Zwei `high`-Befunde aus dem Vorlauf sind noch offen. Ein verschachtelter `StageRenderer` ohne eigene Pipeline löscht sein asPassNode-RenderTarget nie, bewegte Sprites ziehen deshalb Schlieren (BUG-113). `PanControl2D` pannt nach einem Fokuswechsel mit gehaltener Taste endlos weiter (BUG-121).\n\nIm rAF-Hot-Path von vertex-objects, sprites und map2d gibt es keine Allokationslawine. Die spürbaren Kosten stecken im Upload-Modell: `autoTouch` lädt Position und Rotation *aller* Sprites jeden Frame über `0 … usedCount − 1` hoch (PERF-006, PERF-003). Ein `freeVO()` mitten im Pool weitet die Dirty-Range bis ans Pool-Ende, auch für static-Buffer (PERF-005). `Display.resize()` misst das DOM in jedem Frame (PERF-001), und `CameraBasedVisibility` hat keine Obergrenze für abzulaufende Tiles (PERF-002). Darunter liegen rund zwei Dutzend kleine Posten pro Frame oder Aufruf, etwa ein string-keyed `Map.get` in jedem generierten Accessor, Generator-Iteratoren im Upload-Pfad und eager gebaute `expectDefined`-Meldungen. Einzeln kosten sie Nanosekunden, bei vielen Layern summieren sie sich.",
-        "score": 72,
-        "penalty": 69.5,
+        "score": 73,
+        "penalty": 67,
         "bySeverity": {
           "critical": 0,
           "high": 2,
-          "medium": 19,
-          "low": 43,
-          "info": 12
+          "medium": 18,
+          "low": 42,
+          "info": 13
         },
         "byCategory": {
-          "correctness": 17,
-          "performance": 25,
+          "correctness": 22,
+          "performance": 16,
           "api": 10,
           "resources": 2,
           "completeness": 3,
@@ -224,57 +224,57 @@
           "async": 2,
           "security": 1,
           "architecture": 1,
-          "readability": 2,
+          "readability": 3,
           "dx": 6,
-          "testing": 2
+          "testing": 4
         }
       },
       "harness": {
         "executiveSummary": "Für den Hot Path gibt es keine automatische Absicherung. Der CHANGELOG verspricht allokationsfreie Setter und schmale Uploads, aber kein `bench()` und keine Allokations-Assertion hält das fest, obwohl der Browser-Runner Chromium bereits mit `--expose-gc` startet (TEST-001). `checkNameableTypes.mjs` ist das einzige Gate-Skript ohne Test und übersieht weiterhin `import(\"…\")`-Typen (TEST-002, TEST-044). Aus dem Vorlauf bleiben vor allem Doku- und Einstiegslücken offen. Grün sind `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` und `pnpm audit --prod`.",
-        "score": 66,
-        "penalty": 30.5,
+        "score": 67,
+        "penalty": 29.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 8,
-          "low": 29,
-          "info": 14
+          "medium": 7,
+          "low": 31,
+          "info": 15
         },
         "byCategory": {
-          "testing": 12,
+          "testing": 11,
           "dependencies": 3,
           "types": 5,
-          "dx": 23,
-          "build": 3,
+          "dx": 24,
+          "build": 4,
           "completeness": 1,
-          "readability": 3,
+          "readability": 4,
           "consistency": 1
         }
       }
     },
     "previousDate": "2026-09-21",
-    "resolvedCount": 0,
+    "resolvedCount": 12,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 21021,
-        "findings": 89,
+        "findings": 90,
         "score": 80
       },
       {
         "name": "workspace",
         "path": ".",
         "reviewedLoc": 1120,
-        "findings": 23,
+        "findings": 24,
         "score": 88
       },
       {
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 9,
-        "score": 94
+        "findings": 8,
+        "score": 96
       },
       {
         "name": "lookbook",
@@ -285,7 +285,7 @@
       }
     ],
     "scoreModel": 2,
-    "score": 69,
+    "score": 70,
     "scoring": {
       "model": 2,
       "weights": {
@@ -302,42 +302,42 @@
     "bySeverity": {
       "critical": 0,
       "high": 2,
-      "medium": 27,
-      "low": 72,
-      "info": 26
+      "medium": 25,
+      "low": 73,
+      "info": 28
     },
     "byCategory": {
-      "correctness": 17,
-      "performance": 25,
-      "testing": 14,
+      "correctness": 22,
+      "performance": 16,
       "api": 10,
       "resources": 2,
+      "testing": 15,
       "completeness": 4,
       "consistency": 6,
       "async": 2,
       "dependencies": 3,
       "types": 5,
-      "dx": 29,
-      "build": 3,
+      "dx": 30,
+      "build": 4,
       "security": 1,
       "architecture": 1,
-      "readability": 5
+      "readability": 7
     },
     "byComponent": {
       "stage": 35,
       "controls": 5,
       "display": 7,
-      "map2d": 8,
-      "sprites": 4,
+      "map2d": 9,
+      "sprites": 5,
       "texture": 8,
-      "vertex-objects": 9
+      "vertex-objects": 8
     },
     "counts": {
-      "findings": 127,
-      "improvements": 18,
+      "findings": 128,
+      "improvements": 16,
       "byStatus": {
         "unchanged": 6,
-        "new": 54,
+        "new": 55,
         "carried-over": 67
       }
     },
@@ -345,6 +345,11 @@
       "code": 51,
       "coverage": 3,
       "unknown": 0
+    },
+    "lastRun": {
+      "source": "remediation",
+      "date": "2026-09-27",
+      "ref": "2026-09-27"
     }
   },
   "portrait": {
@@ -594,25 +599,6 @@
       "effort": "S",
       "status": "new",
       "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-001",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Performance-Regressionstests für den rAF-Hot-Path (vertex-objects, sprites, map2d) ergänzen",
-      "location": "packages/twopoint5d-testing/test/map2d-tile-upload.test.js:1",
-      "locations": [
-        "packages/twopoint5d-testing/web-test-runner.config.js:17",
-        "packages/twopoint5d/package.json:50",
-        "package.json:13",
-        "nx.json:7"
-      ],
-      "description": "Für den performancekritischen rAF-Hot-Path (vertex-objects, sprites, map2d) gibt es in der Harness keine automatisierte Absicherung gegen Allokations- oder Timing-Regressionen. Weder das Root-package.json (Scripts build/test/test:ci/test:coverage/test:browser/test:scripts/test:affected) noch packages/twopoint5d/package.json (compile/typecheck/build/test/coverage/watch/...) noch nx.json (targetDefaults: build/test/typecheck/checkPkgTypes/checkNameableTypes/lintPkg/publishNpmPkg) kennen ein bench- oder perf-Target; Vitest wird nirgends im `bench()`-Modus verwendet. Die Vitest-Stichprobe (VertexObjectPool.spec.ts, FrameLoop.spec.ts, Map2DTileStreamer.spec.ts, TexturedSprites.spec.ts) prüft ausschließlich Korrektheit und Dispose-Lifecycle, nie Allokationszahl oder Zeitbudget pro Frame. Bemerkenswert: web-test-runner.config.js:17-20 startet Chromium bereits mit `--enable-precise-memory-info` und `--js-flags=--expose-gc` — die Infrastruktur für heap-basierte Messungen existiert also —, aber die beiden gesampelten Browsertests (map2d-tile-upload.test.js, sprites-textured-material.test.js) nutzen `performance.memory` oder `gc()` an keiner Stelle; sie prüfen nur, ob ein Buffer-Upload (Versionszähler) passiert oder nicht, nie wie viel dabei alloziert wird. Der CHANGELOG dokumentiert mehrfach handverlesene Allokationsoptimierungen in genau diesem Hot-Path (z. B. \"the generated multi-component setters ... allocate nothing per vertex\", \"an upload ... carries only the objects that were written\") — die Einhaltung dieser Eigenschaft hängt aktuell allein von Code-Review ab, nicht von einem Test, der bei einer Regression fehlschlägt.",
-      "recommendation": "Für vertex-objects/sprites/map2d gezielte Vitest-`bench()`-Suiten oder einfache Allokations-Assertions (z. B. Objektzahl vor/nach einem simulierten Frame-Update über `--expose-gc` und `performance.memory` im Browser-Testrunner, der das bereits aktiviert) ergänzen, die bei einer Regression im Hot-Path (neue Allokation pro Frame, O(n)-Verschlechterung) sichtbar fehlschlagen oder zumindest einen Kennwert für den Menschen sichtbar machen. Mindestens einen CI-Schritt vorsehen, der ein solches Bench-Ergebnis archiviert (wie schon für Coverage in ci.yml geschehen), damit Regressionen über die Zeit auffallen.",
-      "effort": "M",
-      "status": "new",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "BUG-004",
@@ -870,45 +856,6 @@
       "effort": "M",
       "status": "new",
       "package": "workspace"
-    },
-    {
-      "id": "PERF-005",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Dirty-Range bei Pool-Churn nicht auf ein einziges Intervall zusammenziehen",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:245",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:201",
-        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:137",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:187"
-      ],
-      "description": "#markDirty() führt pro Buffer genau ein Intervall dirtyFrom … dirtyTo und weitet es mit Math.min/Math.max. freeVO() auf ein Objekt aus der Mitte schreibt per copyWithin(idx, last, last + 1) den Slot idx in allen Buffern, auch in den static-Buffern; createVO() markiert den neuen Slot am Ende. Beide landen im selben Intervall, das dann von idx bis ans Pool-Ende reicht, und syncUploads() lädt diesen Bereich für jeden Buffer hoch, auch für static-Buffer, die sonst nie wieder hochgeladen würden. So kommt es in den Frame: Map2DTileRenderer beim Scrollen → TileSpritesFactory.destroyTile() → freeVO() und createTile() → createVO() → tileFactory.update() → VertexObjects.update() → InstancedVOBufferGeometry.update() → GeometryRoutes.syncUploads() → pickUpDirtyRange() → setUploadRange(). Genauso bei jeder Partikel- oder Spawn-Logik, die pro Frame Objekte freigibt und neu anlegt. Zwei geänderte Slots kosten dann den Upload von (usedCount − idx) Objekten je Buffer, im schlimmsten Fall den ganzen Pool.",
-      "evidence": "`buf.dirtyFrom = Math.min(buf.dirtyFrom, from); buf.dirtyTo = Math.max(buf.dirtyTo, to);`",
-      "recommendation": "Pro Buffer mehrere disjunkte Intervalle führen, mit kleiner fester Obergrenze (etwa 4–8); erst darüber zusammenfassen. syncUploads()/setUploadRange() setzen dann je Intervall ein addUpdateRange(), denn three.js verarbeitet mehrere updateRanges pro Attribut nativ, sowohl im WebGPU- als auch im WebGL-Backend. Absichern mit einem Test, der auf einem vollen Pool freeVO(ersterSlot) + createVO() ausführt und die Summe der updateRanges.count prüft.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-006",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Schmalen, VO-bezogenen Upload-Pfad in der API anbieten und dokumentieren",
-      "location": "packages/twopoint5d/src/vertex-objects/types.ts:60",
-      "component": "vertex-objects",
-      "kind": "improvement",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:200",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:288"
-      ],
-      "description": "Die generierten Setter markieren nichts. autoTouch, der Default für dynamic/stream, und touch()/touchAttributes()/touchBuffers() der Geometrie laden immer 0 … usedCount − 1 hoch: #touch() räumt vorhandene schmale Ranges sogar ab, und syncUploads() setzt für angeforderte Buffer die volle Range. Für TexturedSprite und AnimatedSprite (instancePosition und rotation sind dynamic und damit autoTouch) heißt das: Jeder Frame lädt Position und Rotation aller Sprites hoch, auch wenn sich nur eine bewegt hat. Einen schmalen Pfad gibt es bereits: pool.buffer.touch(idx, idx) bzw. touchBuffer() füttern #markDirty(), und syncUploads() lädt dann nur diese Objekte hoch. map2d nutzt genau das (TileSpritesFactory.updateTile()). Die Doku zu autoTouch (types.ts:67–68) nennt aber nur den breiten touch() der Geometrie, und eine VO-bezogene Variante fehlt.",
-      "recommendation": "`VertexObjectPool#touchVO(vo, ...attrNames)` anbieten, das für die Buffer der genannten Attribute (oder für alle) buffer.touchBuffer(bufferName, idx, idx) aufruft. Diesen Weg in types.ts:60–69 als Alternative zu autoTouch beschreiben. Optional einen Descriptor-Modus wie `autoTouch: 'written'`, in dem die generierten Setter selbst den Dirty-Range pflegen; das kostet pro Schreibzugriff zwei Min/Max und ein Inkrement und wäre mit der Empfehlung zu mehreren Intervallen pro Buffer kombinierbar.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
     },
     {
       "id": "IMPL-001",
@@ -1613,180 +1560,6 @@
       "effort": "S",
       "status": "new",
       "package": "workspace"
-    },
-    {
-      "id": "PERF-033",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "syncArrays() nur bei getauschtem Pool-Array arbeiten lassen",
-      "location": "packages/twopoint5d/src/vertex-objects/GeometryAttributeSlots.ts:153",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:35",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:191"
-      ],
-      "description": "syncArrays() überspringt ein Attribut nur, wenn bufAttr.version seit dem letzten Aufruf gleich geblieben ist. Die Version steigt aber mit jedem needsUpdate = true (three 0.185.1, BufferAttribute.js:157 und InterleavedBuffer.js:103), und genau das setzt die Bibliothek selbst in jedem Frame: für jeden autoTouch-Buffer in markForUpload() und für jeden Buffer mit Schreibzugriff in syncUploads(). Für alle dynamischen Attribute läuft deshalb jeden Frame der volle Pfad: poolOf(), inklusive der expectDefined()-Meldung, die als Template-Literal eager gebaut wird (String-Allokation); danach zwei weitere Map-Lookups und die Neuzuweisung von bufAttr.array. Bei interleaved Buffern wiederholt sich das für jedes Attribut desselben Buffers. Aufrufpfad: VertexObjects.update() → VOBufferGeometry/InstancedVOBufferGeometry.update() → GeometryAttributeSlots.syncArrays(). Eigentlich soll syncArrays() nur auf ein im Pool getauschtes Array reagieren (fromBuffersData() → setTypedArray()); dieses Signal ist mit der Upload-Version vermischt. Der günstige Aufruf, den der Klassenkommentar (Z. 44–46) verspricht, kommt für dynamische Slots nie zustande.",
-      "evidence": "`const version = bufAttr.version; if (this.#serials.get(attrName) === version) continue;`",
-      "recommendation": "Den Array-Tausch direkt erkennen, etwa nach dem Lookup mit `if (bufAttr.array === poolBuf.typedArray) continue;`. Alternativ im AttributeBuffer eine eigene Array-Generation führen, die nur setTypedArray() erhöht, und syncArrays() darauf vergleichen lassen statt auf bufAttr.version. Pro Buffer statt pro Attribut synchronisieren.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-022",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "expectDefined-Meldungen in Schleifen und im Frame-Pfad nicht eager bauen",
-      "location": "packages/twopoint5d/src/vertex-objects/createIndicesArray.ts:17",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/GeometryAttributeSlots.ts:98"
-      ],
-      "description": "createIndicesArray() ruft für jedes einzelne Element expectDefined(indices[j], `index ${j}`) auf. Das Template-Literal wird bei jedem Aufruf gebaut, auch wenn der Wert vorhanden ist, obwohl j \u003c itemCount ihn ohnehin garantiert. Ein Pool mit capacity 100 000 Quads und 6 Indizes kostet damit beim Bau der Geometrie 600 000 String-Allokationen (VOBufferGeometry-/InstancedVOBufferGeometry-Konstruktor → initializeRoute() → createIndicesArray()).",
-      "evidence": "`arr[i * itemCount + j] = expectDefined(indices[j], `index ${j}`) + i * stride;`",
-      "recommendation": "Die Assertion einmal vor der Schleife machen oder die Indizes vorab in ein lokales Uint32Array kopieren. expectDefined eine Variante mit lazy Meldung geben (`expectDefined(v, () => …)`) und sie in Schleifen und im Frame-Pfad verwenden.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-023",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Generierte Accessoren ohne string-keyed Map-Lookup pro Wert auflösen",
-      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:12",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:23",
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:43",
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:94",
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:119"
-      ],
-      "description": "Jeder generierte Getter und Setter, auch jede einzelne Komponente wie x0 oder y0, löst pro Zugriff `this[voBuffer]!.buffers.get(bufferName)!` auf. Das ist ein Aufruf des Getters VertexObjectBuffer#buffers (mit Brand-Check des Private Fields) plus ein string-keyed Map.get, bevor der eigentliche Typed-Array-Zugriff kommt. Es ist der häufigste Vorgang der Bibliothek; der Code-Kommentar sagt selbst »these accessors run per sprite and per frame«. Aufrufpfad: Anwendungscode im requestAnimationFrame, etwa sprite.x = … oder sprite.setInstancePosition(…) auf TexturedSprite/AnimatedSprite, sowie TileSpritesFactory.updateTile() → setInstancePosition(). Micro-Benchmark (Node/V8, 10 000 VOs, drei Setter je VO, monomorph): 11,6 ns/VO mit Map-Lookup gegenüber 3,4 ns/VO, wenn der Buffer über einen numerischen Index aus einem Array kommt; mit getrennten Callsites 18,6 gegenüber 13,8 ns. In absoluten Zahlen sind das etwa 0,05–0,08 ms pro Frame und 10 000 Sprites.",
-      "evidence": "`const buf = this[voBuffer]!.buffers.get(bufferName)!;`",
-      "recommendation": "VertexObjectBuffer führt die AttributeBuffer-Records zusätzlich als Array in fester Reihenfolge ab dem Konstruktor. createVertexObjectPrototype() gibt den Accessoren den numerischen Index statt des Namens mit: `this[voBuffer]!.bufferList[k]!.typedArray![idx]`. Die Records bleiben über setTypedArray() dieselben Objekte, ein Array-Tausch bleibt also sichtbar; resize() baut einen neuen Buffer mit identischem Layout und damit identischen Indizes.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-034",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Megamorphe Inline-Caches der geteilten Accessor-Fabriken messen und bei Bedarf pro Descriptor erzeugen",
-      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:6",
-      "component": "vertex-objects",
-      "kind": "improvement",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:17",
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:80",
-        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:99"
-      ],
-      "description": "Alle Accessoren aller Descriptoren stammen aus denselben vier Fabrik-Funktionen. V8 teilt den Feedback-Vektor zwischen Closures desselben Funktionsliterals. Die Inline-Caches für `this[voBuffer]`, `.buffers` und `typedArray[idx]` sehen damit die VO-Maps aller Descriptoren der Anwendung (eine Map je Prototyp) und alle Typed-Array-Element-Kinds; ab fünf VO-Typen werden sie megamorph. Die Bibliothek bringt selbst schon TexturedSprite, AnimatedSprite, TileSprite und die zugehörigen Basis-Descriptoren mit. Micro-Benchmark (Node/V8, 10 000 VOs je Descriptor, getrennte Callsites je Descriptor im Aufrufer): 44,6 ns/VO bei sechs Descriptoren gegenüber 18,6 ns/VO bei einem, also ×2,4. In absoluten Zahlen sind das etwa 0,25 ms mehr pro Frame und 10 000 Sprites.",
-      "recommendation": "Zuerst in einer realen Szene mit mehreren Sprite-Typen im DevTools-Profil prüfen. Bestätigt sich der Effekt, die Accessoren pro Descriptor als eigene Funktionsliterale erzeugen, etwa per Codegenerierung mit `new Function`, wegen CSP (`unsafe-eval`) als Opt-in. Mindestens aber den numerischen Buffer-Index aus der Empfehlung zu den Map-Lookups nutzen, der den Map-Load aus dem polymorphen Pfad nimmt.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-025",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "VO-Wrapper in createVO() ohne Property-Deskriptoren anlegen",
-      "location": "packages/twopoint5d/src/vertex-objects/createVertexObject.ts:18",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectPool.ts:215"
-      ],
-      "description": "createVertexObject() baut jedes VO mit `Object.create(proto, {[voBuffer]: {…}, [voIndex]: {…}})`. Das sind pro Aufruf drei Deskriptor-Objekte, dazu der langsame DefineProperties-Pfad statt einer Inline-Allokation. freeVO() verwirft das VO-Objekt (clearBuffer), der nächste createVO() baut ein neues; wiederverwendet wird nur der Slot im Typed Array. Aufrufpfad im Frame: TileSpritesFactory.createTile() → instancedPool.createVO() beim Scrollen der Karte, sowie jede Spawn-Logik im Anwendungscode. Micro-Benchmark (Node/V8): 330 ns je VO mit Deskriptoren gegenüber 9 ns mit Object.create(proto) plus zwei Zuweisungen. 1 000 Spawns pro Frame kosten damit etwa 0,33 ms statt 0,01 ms.",
-      "evidence": "`Object.create(descriptor.voPrototype, { [voBuffer]: {value: buffer, writable: true}, [voIndex]: {value: objectIndex, writable: true} })`",
-      "recommendation": "Auf `const vo = Object.create(proto); vo[voBuffer] = buffer; vo[voIndex] = idx;` umstellen. Symbol-Properties tauchen in for…in und Object.keys ohnehin nicht auf; vorher aber prüfen, ob Tests VOs per toEqual vergleichen, denn dort zählen aufzählbare Symbole mit. Wer die Nicht-Aufzählbarkeit braucht, bekommt sie über eine pro Descriptor erzeugte Klasse, deren Konstruktor die beiden Felder setzt. Optional eine Freiliste freigegebener VO-Objekte im Pool führen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-026",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Allokationen pro update() im Upload-Pfad abbauen",
-      "location": "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:163",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:200",
-        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:271",
-        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:278",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:207"
-      ],
-      "description": "Jedes update() einer Geometrie läuft über `for (const route of this)` in syncUploads() und in autoTouch(). Jeder dieser Durchläufe legt ein Generator-Objekt an, dazu den Array- und den Map-Iterator aus den beiden yield*. pickUpDirtyRange() gibt für jeden Buffer mit Schreibzugriff ein neues {from, to} zurück; syncUploads() baut für jeden autoTouch-/touch()-Buffer zusätzlich `{from: 0, to: usedCount - 1}`. `#fullUploads.clear()` ersetzt in V8 den Backing-Store des Sets. Einzeln ist das wenig, pro Geometrie und Frame kommen aber rund 6–10 kurzlebige Objekte zusammen, in Szenen mit vielen Layern entsprechend mehr für den Minor GC. Aufrufpfad: VertexObjects.update() → geometry.update() → GeometryRoutes.autoTouch()/syncUploads().",
-      "evidence": "`*[Symbol.iterator](): IterableIterator\u003cGeometryRoute> { yield* this.#routes; yield* this.#attached.values(); }`",
-      "recommendation": "Die Routen intern in einem flachen Array halten; die benannten Routen werden bei attach()/detach() dort mit eingetragen oder ausgetragen. Im Hot Path mit einem Index-Loop iterieren und den Generator nur als öffentliche Iteration stehen lassen. pickUpDirtyRange() schreibt from/to in ein wiederverwendetes Ergebnisobjekt (Out-Parameter). Statt des Sets reicht ein Flag pro Route-Buffer oder ein wiederverwendetes Array, das mit length = 0 geleert wird.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-027",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Leere Upload-Range nicht als addUpdateRange(start, 0) an three geben",
-      "location": "packages/twopoint5d/src/vertex-objects/setUploadRange.ts:36",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:278",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:190"
-      ],
-      "description": "Liegt ein Schreibzugriff komplett oberhalb von usedCount, antwortet pickUpDirtyRange() mit {from: 0, to: -1}. Das passiert etwa, wenn in einem Frame freeVO() mitten im Pool markiert und danach so viele VOs freigegeben werden, dass usedCount unter den markierten Slot fällt; ebenso, wenn alle Sprites freigegeben werden oder touch() bei usedCount 0 läuft. syncUploads() setzt trotzdem needsUpdate, setUploadRange() hinterlegt eine Range mit count 0. Im WebGL-Fallback von three 0.185.1 wird daraus `gl.bufferSubData(type, start * BPE, array, start, 0)` (WebGLAttributeUtils.js:216). Nach WebGL2-Spezifikation bedeutet length 0 »bis zum Ende von srcData«, es wird also das ganze Array über die volle Kapazität hochgeladen, obwohl die Bibliothek »nichts zu tragen« meint. Im WebGPU-Backend entsteht ein leerer writeBuffer-Aufruf.",
-      "evidence": "`bufAttr.clearUpdateRanges(); bufAttr.addUpdateRange(start, count);` mit count === 0",
-      "recommendation": "In syncUploads() bei einer leeren Range (from > to und nichts offen auf dem Attribut) nur die Serial übernehmen und weder needsUpdate setzen noch eine Range hinterlegen. setUploadRange() ruft addUpdateRange() nie mit count 0 auf. Mit einem Test absichern, der nach dem Freigeben aller VOs prüft, dass kein Attribut eine Range mit count 0 trägt.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-028",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "touch() im Frame ohne Zwischenarrays und mit gecachter Auswahl auflösen",
-      "location": "packages/twopoint5d/src/vertex-objects/InstancedVOBufferGeometry.ts:499",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/VOBufferGeometry.ts:129",
-        "packages/twopoint5d/src/vertex-objects/parseTouchArgs.ts:30",
-        "packages/twopoint5d/src/vertex-objects/GeometryRoutes.ts:227",
-        "packages/twopoint5d/src/vertex-objects/selectAttributes.ts:9"
-      ],
-      "description": "Für Attribute mit autoTouch: false empfiehlt types.ts:67 geometry.touch('attr') nach jedem Schreiben, also im Frame. Ein solcher Aufruf legt an: das Rest-Array, in parseTouchArgs() ein Ergebnisobjekt plus attrNames-Array (bei geroutetem Aufruf zusätzlich Spread-Objekte), mit touchAttributes(...attrNames) ein zweites Rest-Array, in #select() ein Array plus push(...spread) je Route und in selectAttributes() ein Set plus ein Array. Anders als die autoTouch-Auswahl (#getAutoTouchBuffers) wird diese Auswahl bei jedem Aufruf neu aufgelöst. Das sind etwa 8–10 Allokationen pro touch().",
-      "evidence": "`selected.push(...selectAttributes(route.pool, route.buffers, attrNames));`",
-      "recommendation": "Intern Arrays statt Rest/Spread durchreichen, in Schleifen einzeln pushen und die aufgelöste Auswahl pro Attributnamen-Schlüssel in einer Map cachen, die #dropAutoTouchSelection() mit verwirft.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-029",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Buffer-Stride auf 4 Byte ausrichten, damit three nicht bei jedem Upload neu padded",
-      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:178",
-      "component": "vertex-objects",
-      "locations": [
-        "packages/twopoint5d/src/vertex-objects/initializeAttributes.ts:69"
-      ],
-      "description": "Die itemSize eines Buffers ist die Summe der Attributgrößen, ohne Ausrichtung. Ein nicht-interleavter Buffer mit einem Datentyp unter 32 Bit und einer Stride, die kein Vielfaches von 4 Byte ist (etwa uint8, uint16 oder float16 mit size 3), wird vom WebGPU-Backend von three 0.185.1 gepolstert (WebGPUAttributeUtils.js:117–125). Bei jedem Update allokiert three dafür ein neues Array in voller Länge und kopiert alle Vertices um (WebGPUAttributeUtils.js:202–212), unabhängig von den updateRanges; mit autoTouch passiert das jeden Frame. Die Descriptoren der Bibliothek selbst nutzen solche Typen nicht, die öffentliche API (`type: 'uint8'` usw.) lässt sie aber zu.",
-      "recommendation": "Im Layout von VertexObjectBuffer die itemSize eines Buffers auf ein Vielfaches von 4 Byte aufrunden (Padding-Elemente am Ende der Vertex-Stride). Alternativ lehnt VertexObjectDescriptor solche Layouts mit einer klaren Meldung ab. Mindestens gehört es in die Doku von `type` in types.ts.",
-      "effort": "M",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
     },
     {
       "id": "PERF-030",
@@ -2961,6 +2734,216 @@
         "kind": "discovered",
         "run": "2026-09-26"
       }
+    },
+    {
+      "id": "BUG-123",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Attribute ohne WebGPU-Vertex-Format schon beim Descriptor abweisen",
+      "location": "packages/twopoint5d/src/vertex-objects/types.ts:22",
+      "description": "Die API lässt Attribute zu, für die three 0.185.1 unter WebGPU kein Vertex-Format kennt: `type: 'uint8clamped'` in jeder Größe (keine Zuordnung für `Uint8ClampedArray`, WebGPUAttributeUtils.js:12–20, :32–38) und ein Attribut mit einem Wert je Vertex vom Typ `float16` oder einem 8-/16-Bit-Typ mit `normalized: true` (die Tabelle für itemSize 1 kennt nur 32-Bit-Arrays und die geweiteten 16-Bit-Arrays, :554–556). three meldet »Vertex format not supported yet«, die Pipeline entsteht nicht. Aufgefallen im Remediation-Lauf vom 2026-09-27.",
+      "recommendation": "Solche Layouts in VertexObjectDescriptor mit einer klaren Meldung abweisen oder auf ein unterstütztes Format abbilden; mindestens in der Doku von `type` in types.ts nennen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
+    },
+    {
+      "id": "BUG-124",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Attribute mit abweichendem type oder usage im selben Buffer abweisen",
+      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:250",
+      "description": "Attribute, die per `bufferName` einen Buffer teilen, sich aber in `type` oder `usage` unterscheiden, werden nicht abgewiesen: der Buffer übernimmt still `dataType` und `usageType` seines ersten Attributs, ein `uint8`-Attribut in einem `float32`-Buffer landet ohne Meldung als float32. Aufgefallen im Remediation-Lauf vom 2026-09-27.",
+      "recommendation": "In `VertexObjectDescriptor#validate()` prüfen, dass alle Attribute eines Buffers denselben type und dieselbe usage tragen, und sonst mit Buffer- und Attributnamen werfen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/VertexObjectDescriptor.ts:122"
+      ]
+    },
+    {
+      "id": "BUG-125",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "targetObjectOffset in copyAttributes() prüfen wie in copy()",
+      "location": "packages/twopoint5d/src/vertex-objects/VertexObjectBuffer.ts:614",
+      "description": "`copyAttributes()` prüft `targetObjectOffset` nicht, anders als `copy()` und `copyArray()`: ein negativer Offset schreibt auf negative Indizes, ein gebrochener auf Nicht-Integer-Indizes, beides ohne Wirkung und ohne Meldung. Aufgefallen im Remediation-Lauf vom 2026-09-27.",
+      "recommendation": "Dieselbe Bereichsprüfung wie in `copy()` vorschalten und einen RangeError werfen; mit einem Test für negativen und gebrochenen Offset absichern.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
+    },
+    {
+      "id": "BUG-126",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Ein einzelnes null im generierten Setter nicht als 0 schreiben",
+      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:121",
+      "description": "Ein einzelnes `null` als Wert eines generierten Setters landet in allen drei Setter-Stufen als 0 im Buffer: die Prüfung ist `!== undefined`, das Array-like wird erst bei `!== null` erkannt. Die `VOAttrSetter`-JSDoc spricht nur von `undefined`; TypeScript lässt `null` nicht zu, JavaScript-Aufrufer schon. Aufgefallen im Remediation-Lauf vom 2026-09-27.",
+      "recommendation": "Werte mit `!= null` prüfen, sodass `null` wie `undefined` den Wert stehen lässt, oder das Verhalten in der JSDoc festschreiben.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects",
+      "locations": [
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:171",
+        "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.ts:220"
+      ]
+    },
+    {
+      "id": "TEST-049",
+      "category": "testing",
+      "domain": "code",
+      "severity": "low",
+      "title": "Reihenfolgeabhängige Specs in AABB2 und ChunkQuadTreeNode entkoppeln",
+      "location": "packages/twopoint5d/src/map2d/AABB2.spec.ts:58",
+      "description": "Die Tests in `describe('extend')` von AABB2.spec.ts (z. B. :81 `should return self` ruft `extend()`, :84–95 prüfen das Ergebnis) und `it('subdivide()')` in ChunkQuadTreeNode.spec.ts:83 (baut den Baum um, die folgenden `it()` prüfen ihn) hängen von ihrer Reihenfolge ab: unter `vitest --sequence.shuffle` sind 8 davon rot. Aufgefallen im Remediation-Lauf vom 2026-09-27.",
+      "recommendation": "Den geteilten Zustand je Test in `beforeEach` aufbauen, sodass jeder Test für sich läuft; optional einen CI-Lauf mit `--sequence.shuffle` ergänzen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-27"
+      },
+      "component": "map2d",
+      "locations": [
+        "packages/twopoint5d/src/map2d/chunk-quad-tree/ChunkQuadTreeNode.spec.ts:83"
+      ]
+    },
+    {
+      "id": "CFG-025",
+      "category": "build",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Bench-Schritt in CI hinter das Speichern des Nx-Caches legen",
+      "location": ".github/workflows/ci.yml:94",
+      "description": "Der Schritt »Run the hot-path benchmarks« steht vor »Drop the Nx cache entries this run did not use« und »Save the Nx cache« (beide `if: success()`). Ein abstürzender Bench kostet damit das Speichern des Nx-Caches des ganzen Laufs.",
+      "recommendation": "Den Bench-Schritt hinter »Save the Nx cache« verschieben oder die beiden Cache-Schritte mit `if: always()` laufen lassen.",
+      "effort": "S",
+      "status": "new",
+      "package": "workspace",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "locations": [
+        ".github/workflows/ci.yml:106"
+      ]
+    },
+    {
+      "id": "DOC-074",
+      "category": "dx",
+      "domain": "harness",
+      "severity": "low",
+      "title": "Migrationsabsatz zu InterleavedBufferAttribute präzisieren",
+      "location": "packages/twopoint5d/CHANGELOG.md:569",
+      "description": "Der Migration Guide zählt `updateRanges` und `version` zu dem, was auf einer `InterleavedBufferAttribute` einen `TypeError` wirft. Beide lesen sich dort als `undefined`: ein Schreiben in `updateRanges` wirft, ein Vergleich auf `version` sieht still nie eine Änderung.",
+      "recommendation": "Den Satz in zwei Aussagen trennen: was wirft und was still undefined liefert, jeweils mit dem Weg über `attribute.data`.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
+    },
+    {
+      "id": "BUG-127",
+      "category": "correctness",
+      "domain": "code",
+      "severity": "low",
+      "title": "Kollisionsprüfung mit dem basePrototype auch für geteilte Descriptoren",
+      "location": "packages/twopoint5d/src/vertex-objects/sharedVertexObjectDescriptor.ts:24",
+      "description": "Die Konstruktorregel, dass kein Accessor-Name auf dem `basePrototype` stehen darf, wird für einen Descriptor aus dem Cache nicht erneut geprüft. Bekommt der `basePrototype` nach dem ersten Pool eine kollidierende Eigenschaft, werfen spätere Pools derselben Description nicht.",
+      "recommendation": "Die Prüfung bei einem Cache-Treffer wiederholen oder die Einschränkung in der JSDoc von `sharedVertexObjectDescriptor` festhalten.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
+    },
+    {
+      "id": "TEST-050",
+      "category": "testing",
+      "domain": "code",
+      "severity": "low",
+      "title": "Test der Setter-Grenze so bauen, dass er ohne Guard rot wird",
+      "location": "packages/twopoint5d/src/vertex-objects/createVertexObjectPrototype.spec.ts:305",
+      "description": "`a setter of five to sixteen values ignores values beyond the attribute` kann nicht rot werden: ohne den `count > k`-Guard wäre der Index `NaN`, und ein Schreiben auf ein Typed Array mit `NaN`-Index tut nichts. Das Verhalten stimmt, den Guard beweist der Test nicht.",
+      "recommendation": "Den Test so anlegen, dass ein fehlender Guard in einen gültigen Nachbarslot schreiben würde (etwa ein zweites VO direkt dahinter), und diesen Slot prüfen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
+    },
+    {
+      "id": "READ-022",
+      "category": "readability",
+      "domain": "code",
+      "severity": "info",
+      "title": "Überflüssige optionale Verkettung im Klon-Zweig von TexturedSpritesGeometry",
+      "location": "packages/twopoint5d/src/sprites/TexturedSprites/TexturedSpritesGeometry.ts:67",
+      "description": "Im Klon-Zweig stehen drei `capacity.attributeUsage?.`, obwohl der Zweig nur mit gesetztem `attributeUsage` betreten wird.",
+      "recommendation": "Die optionale Verkettung dort entfernen.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "component": "sprites"
+    },
+    {
+      "id": "READ-023",
+      "category": "readability",
+      "domain": "harness",
+      "severity": "info",
+      "title": "Satz zu nicht inlinten Accessor-Aufrufen in architecture.md glätten",
+      "location": "packages/twopoint5d/docs/architecture.md:89",
+      "description": "»An accessor call V8 does not inline does pay …« liest sich holprig (Relativsatz ohne »that«).",
+      "recommendation": "Umformulieren, etwa »An accessor call that V8 does not inline pays …«.",
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-27"
+      },
+      "component": "vertex-objects"
     }
   ],
   "openQuestions": [
@@ -2978,7 +2961,8 @@
       "Die neuen Findings wurden per `match` über Kategorie und gemeinsame Datei gepaart. Aus den vier mehrdeutigen Gruppen wurden von Hand vier Paare gebildet (asPassNode-RT, gehaltene Pan-Tasten, editierbare Felder, `Stage2D.needsUpdate`). Ein vom Skript als sicher gemeldetes Paar wurde getrennt: Die fehlenden Tests von `checkNameableTypes.mjs` sind ein anderer Befund als der fehlende `ImportTypeNode`. Bei den beiden Pan-Befunden wurde die Severity an den Vorlauf angeglichen, statt eine Verbesserung auszuweisen, die im Code nicht stattfand.",
       "Alle 80 nicht gepaarten alten Findings und alle 14 Anhangpunkte gingen durch den Re-Check (Haiku-Prüfer, sieben Stapel). Alle alten Findings bestehen noch. Zwei Anhangpunkte (BUG-020, DOC-013) meldeten die Prüfer als »Begründung veraltet«; der Orchestrator hat beide am Code nachgeprüft und als weiterhin tragend eingestuft, weil ihre Begründung genau den heutigen Stand beschreibt.",
       "Das Delta zum letzten Eintrag beträgt −9 Punkte. Von den 61 neuen Findings liegen 51 in Dateien, die schon der Vorlauf gelesen hatte. Laut `git blame` gehen 49 davon auf Zeilen zurück, die älter sind als der Vorlauf. Sie sind durch den Hot-Path-Fokus dieses Laufs zutage gekommen und keine Verschlechterung des Codes. 9 gehen auf Remediation-Commits seit dem 2026-09-21 zurück und tragen `origin: induced`.",
-      "Neue Findings bekamen ihr Package über die Fundstelle; zwei mitgeführte Findings ohne Package wurden dabei ebenfalls zugeordnet."
+      "Neue Findings bekamen ihr Package über die Fundstelle; zwei mitgeführte Findings ohne Package wurden dabei ebenfalls zugeordnet.",
+      "Nachgeführt nach dem Remediation-Lauf vom 2026-09-27 (Performance der Feature-Domain vertex-objects samt Hot-Path-Tests): 7 Commits 92facd32..5e4ede07 auf main, 12 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 5 Nebenbefunde und 6 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft."
     ]
   },
   "acknowledged": [
@@ -3096,12 +3080,6 @@
     }
   ],
   "scoreHistory": [
-    {
-      "date": "2026-09-03",
-      "score": 14.5,
-      "source": "remediation",
-      "scoreModel": 1
-    },
     {
       "date": "2026-09-04",
       "score": 19.5,
@@ -3255,6 +3233,17 @@
         "harness": 66
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-27",
+      "score": 70,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 73,
+        "harness": 67
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -3377,6 +3366,16 @@
       "inducedOpen": 9,
       "discovered": 49,
       "attribution": "heuristic"
+    },
+    {
+      "date": "2026-09-27",
+      "source": "remediation",
+      "ref": "2026-09-27",
+      "fixed": 12,
+      "inducedFixed": 7,
+      "inducedOpen": 6,
+      "discovered": 11,
+      "attribution": "reviewed"
     }
   ]
 }</script>
