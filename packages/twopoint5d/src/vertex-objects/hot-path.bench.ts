@@ -1,7 +1,8 @@
 import {test} from 'vitest';
 
-import type {VertexObjectDescription} from './types.js';
+import type {VO, VertexObjectDescription} from './types.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 const options = {time: 500, warmupTime: 200};
@@ -12,7 +13,7 @@ interface PositionVO {
   z: number;
 }
 
-interface SpriteVO extends PositionVO {
+interface SpriteVO extends PositionVO, VO {
   setPosition(x: number, y: number, z: number): void;
   getPosition(target: Float32Array): Float32Array;
 }
@@ -25,6 +26,16 @@ const spriteDescription: VertexObjectDescription = {
     position: {components: ['x', 'y', 'z'], usage: 'dynamic'},
     color: {components: ['r', 'g', 'b', 'a']},
     rotation: {size: 1, usage: 'dynamic'},
+  },
+};
+
+// the sprite of above whose position uploads through touchVO() instead of on every update()
+const untouchedSpriteDescription: VertexObjectDescription = {
+  vertexCount: 1,
+  attributes: {
+    position: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: false},
+    color: {components: ['r', 'g', 'b', 'a']},
+    rotation: {size: 1, usage: 'dynamic', autoTouch: false},
   },
 };
 
@@ -117,4 +128,55 @@ test('createVO() and freeVO()', async ({bench}) => {
   }).run(options);
 
   pool.dispose();
+});
+
+// what a render does to the buffers of a geometry after an update(): three takes the update ranges
+// up as it uploads them, so the next update() names its own ranges again
+const uploaded = (geometry: VertexObjectGeometry<SpriteVO>) => {
+  for (const buffer of geometry.buffers.values()) buffer.clearUpdateRanges();
+};
+
+test('geometry update()', async ({bench}) => {
+  const autoTouched = new VertexObjectGeometry<SpriteVO>(spriteDescription, 10_000);
+  fillPool(autoTouched.pool, 10_000);
+
+  const untouched = new VertexObjectGeometry<SpriteVO>(untouchedSpriteDescription, 10_000);
+  const untouchedVOs = fillPool(untouched.pool, 10_000);
+
+  const churned = new VertexObjectGeometry<SpriteVO>(untouchedSpriteDescription, 10_000);
+  fillPool(churned.pool, 10_000);
+
+  for (const geometry of [autoTouched, untouched, churned]) {
+    geometry.update();
+    uploaded(geometry);
+  }
+
+  let n = 0;
+
+  await bench.compare(
+    bench('update() of 10 000 sprites with autoTouch', () => {
+      autoTouched.update();
+      uploaded(autoTouched);
+    }),
+    bench('touchVO() on 100 of 10 000 sprites without autoTouch, then update()', () => {
+      n++;
+      // every hundredth sprite: more disjoint slots than a buffer keeps ranges for
+      for (let i = 0; i < 100; i++) {
+        const vo = untouchedVOs[i * 100]!;
+        vo.x = n;
+        untouched.pool.touchVO(vo, 'position');
+      }
+      untouched.update();
+      uploaded(untouched);
+    }),
+    bench('freeVO() in the middle and createVO(), then update()', () => {
+      churned.pool.freeVO(churned.pool.getVO(5_000)!);
+      churned.pool.createVO();
+      churned.update();
+      uploaded(churned);
+    }),
+    options,
+  );
+
+  for (const geometry of [autoTouched, untouched, churned]) geometry.dispose();
 });

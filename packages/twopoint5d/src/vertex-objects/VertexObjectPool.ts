@@ -152,6 +152,42 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     return VOUtils.isBuffer(vo, this.buffer);
   }
 
+  /**
+   * Marks the slot of `vo` for upload: the next `update()` of every geometry on this pool uploads
+   * that slot, and the slots marked within one frame go up in at most eight ranges per buffer.
+   * With attribute names only the buffers behind them are marked, without any every buffer of
+   * the pool.
+   *
+   * The narrow way for an attribute with `autoTouch: false`: write through the vertex object, then
+   * say which one was written. An attribute with `autoTouch` uploads every object in use on every
+   * `update()` anyway.
+   *
+   * A silent no-op for a vertex object of another pool, for one that has been freed, and on a
+   * disposed pool — the same cases {@link freeVO} turns away through {@link containsVO}. An
+   * attribute name the descriptor does not know marks nothing.
+   */
+  touchVO(vo: VO, ...attrNames: string[]): void;
+  touchVO(vo: VO): void {
+    if (!this.containsVO(vo)) return;
+
+    const idx = VOUtils.getIndex(vo);
+    if (arguments.length === 1) {
+      this.buffer.touch(idx, idx);
+      return;
+    }
+
+    // the names are read through `arguments` rather than the rest parameter of the signature, as in
+    // the touch() of the geometries: V8 does not keep a rest array off the heap in every state of
+    // the optimizer, `arguments` it did
+    for (let i = 1; i < arguments.length; i++) {
+      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      const layout = this.buffer.bufferAttributes.get(arguments[i] as string);
+      if (layout !== undefined) {
+        this.buffer.touchBuffer(layout.bufferName, idx, idx);
+      }
+    }
+  }
+
   /** @internal */
   protected override onUsedCountShrunk(from: number, to: number): void {
     for (let i = to; i < from; i++) {

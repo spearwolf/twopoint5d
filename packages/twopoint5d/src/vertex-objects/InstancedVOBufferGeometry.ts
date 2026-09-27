@@ -10,11 +10,13 @@ import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';
 import {attributeNamesOf} from './attributeNamesOf.js';
 import {initializeAttributes, initializeInstancedAttributes} from './initializeAttributes.js';
-import type {TouchInstancedBuffersType} from './parseTouchArgs.js';
-import {parseTouchArgs} from './parseTouchArgs.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 
-export type {TouchInstancedBuffersType};
+/** Selects buffers of an instanced geometry by usage type, one half of the geometry at a time. */
+export type TouchInstancedBuffersType = {
+  base?: TouchBuffersType;
+  instanced?: TouchBuffersType;
+};
 
 /**
  * `VOBufferGeometry` for instanced rendering: one base pool and any number of instanced
@@ -471,12 +473,27 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#attachments.clear();
   }
 
-  /** Marks the buffers behind the given attribute names, across every route, for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
-  touchAttributes(...attrNames: string[]): void {
-    this.#routes.touchAttributes(attrNames);
+  /**
+   * Marks the buffers behind the given attribute names, across every route, for GPU upload on the
+   * next `update()`, which uploads every object in use of each pool and nothing for a pool without
+   * one. Does nothing after `dispose()`, which leaves no route to mark.
+   */
+  touchAttributes(...attrNames: string[]): void;
+  touchAttributes(): void {
+    // read through `arguments` rather than the rest parameter of the signature: once the method of
+    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
+    // argument, measured on Node 24), while `arguments` stayed free in every order
+    for (let i = 0; i < arguments.length; i++) {
+      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      this.#routes.touchAttribute(arguments[i] as string);
+    }
   }
 
-  /** Marks every buffer of the given usage types, across every route, for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
+  /**
+   * Marks every buffer of the given usage types, across every route, for GPU upload on the next
+   * `update()`, which uploads every object in use of each pool and nothing for a pool without one.
+   * Does nothing after `dispose()`, which leaves no route to mark.
+   */
   touchBuffers(bufferTypes: TouchInstancedBuffersType | TouchBuffersType): void {
     if ('base' in bufferTypes || 'instanced' in bufferTypes) {
       if (bufferTypes.base) {
@@ -492,21 +509,28 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   /**
    * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
-   * mix of both. This is the counterpart to `autoTouch: false` (see `VADescription#autoTouch`):
-   * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
-   * were written.
+   * mix of both; every argument counts on its own. That `update()` uploads every object in use of
+   * each pool behind the marked buffers, and nothing for a pool without one. This is the
+   * counterpart to `autoTouch: false` (see `VADescription#autoTouch`): an attribute without
+   * `autoTouch` uploads only through an explicit `touch()` after its values were written, or
+   * through `VertexObjectPool#touchVO()`, which uploads the slots it names alone.
    */
-  touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void {
-    const {attrNames, flat, routed} = parseTouchArgs(args);
-
-    if (attrNames.length) {
-      this.touchAttributes(...attrNames);
-    }
-    if (flat) {
-      this.touchBuffers(flat);
-    }
-    if (routed) {
-      this.touchBuffers(routed);
+  touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void;
+  touch(): void {
+    // read through `arguments` rather than the rest parameter of the signature: once the method of
+    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
+    // argument, measured on Node 24), while `arguments` stayed free in every order
+    for (let i = 0; i < arguments.length; i++) {
+      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      const arg = arguments[i] as string | TouchBuffersType | TouchInstancedBuffersType;
+      if (typeof arg === 'string') {
+        this.#routes.touchAttribute(arg);
+      } else if ('base' in arg || 'instanced' in arg) {
+        this.touchBuffers(arg);
+      } else {
+        // both object types have optional keys only, so `in` narrows the one branch and not the other
+        this.#routes.touchByUsage(arg as TouchBuffersType);
+      }
     }
   }
 
@@ -528,7 +552,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     this.#autoTouchAttributes();
     this.#routes.syncUploads();
 
-    this.#slots.syncArrays(this);
+    this.#routes.syncArrays();
   }
 
   #updateDrawRange() {

@@ -46,6 +46,9 @@ const staticQuadDescription = {
   attributes: {position: {components: ['x', 'y', 'z'], type: 'float32', usage: 'static'}},
 };
 
+// one quad per object, side by side along x, so every object carries values of its own
+const quadAt = (i) => [i, 0, 0, i + 1, 0, 0, i + 1, 1, 0, i, 1, 0];
+
 // both attributes share the buffer name `dynamic_float32`, so they interleave into one buffer of stride 6
 /** @type {VertexObjectDescription} */
 const interleavedQuadDescription = {
@@ -121,8 +124,6 @@ describe('vertex-objects — gpu upload', function () {
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
     scene.add(mesh);
 
-    // one quad per object, side by side along x, so every object carries values of its own
-    const quadAt = (i) => [i, 0, 0, i + 1, 0, 0, i + 1, 1, 0, i, 1, 0];
     for (let i = 0; i < 32; i++) {
       geometry.pool.createVO().setPosition(quadAt(i));
     }
@@ -156,6 +157,50 @@ describe('vertex-objects — gpu upload', function () {
 
     expect(onTheGpu.slice(33 * 12, 34 * 12), 'the object that was spawned').to.deep.equal(quadAt(200));
     expect(onTheGpu.slice(32 * 12, 33 * 12), 'the object of the spawn before it').to.deep.equal(quadAt(100));
+    expect(onTheGpu.slice(5 * 12, 6 * 12), 'an object that nobody touched').to.deep.equal(quadAt(5));
+  });
+
+  it('freeing an object in the middle and spawning one uploads both slots and nothing between them', async function () {
+    /** @type {VertexObjectGeometry<QuadVO>} */
+    const geometry = new VertexObjectGeometry(staticQuadDescription, 64);
+    const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
+    scene.add(mesh);
+
+    for (let i = 0; i < 32; i++) {
+      geometry.pool.createVO().setPosition(quadAt(i));
+    }
+
+    // the first pass spends the auto-touch round and builds the gpu buffer out of the whole array;
+    // the spawn after it is the upload that takes that range up, and no range stands afterwards
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    geometry.pool.createVO().setPosition(quadAt(100));
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const position = geometry.getAttribute('position');
+
+    // the object of slot 32 moves down into slot 3, and the spawn takes slot 32 again
+    geometry.pool.freeVO(geometry.pool.getVO(3));
+    geometry.pool.createVO().setPosition(quadAt(200));
+    mesh.update();
+
+    // slot 3 and slot 32, 4 vertices of 3 components each, and none of the 28 objects between them
+    expect(bufferOf(position).updateRanges).to.deep.equal([
+      {start: 3 * 4 * 3, count: 4 * 3},
+      {start: 32 * 4 * 3, count: 4 * 3},
+    ]);
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const onTheGpu = await readBack(display.renderer, position);
+
+    expect(onTheGpu.slice(3 * 12, 4 * 12), 'the object that moved into the freed slot').to.deep.equal(quadAt(100));
+    expect(onTheGpu.slice(32 * 12, 33 * 12), 'the object that was spawned').to.deep.equal(quadAt(200));
     expect(onTheGpu.slice(5 * 12, 6 * 12), 'an object that nobody touched').to.deep.equal(quadAt(5));
   });
 

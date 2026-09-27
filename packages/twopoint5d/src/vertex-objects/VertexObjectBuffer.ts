@@ -3,6 +3,12 @@ import {createTypedArray} from './createTypedArray.js';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
 import type {TypedArray, VertexAttributeDataType, VertexAttributeUsageType, VertexObjectBuffersData} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {insertRange, UPLOAD_RANGES_ARRAY_LENGTH} from './uploadRanges.js';
+
+// read once into a constant of this module, so the loops below never touch an imported binding: a
+// module runner that rewrites imports, as the one Vitest runs specs and benches in does, turns every
+// read of one into a property read on a module object
+const insertDirtyRange: typeof insertRange = insertRange;
 
 /** Where one attribute of a vertex object sits inside the buffer that holds it. */
 export interface AttributeBufferLayout {
@@ -32,9 +38,15 @@ export interface AttributeBuffer {
   typedArray: TypedArray | undefined;
   /** Rises with every write to this buffer — the number a consumer holds its own state against. */
   serial: number;
-  /** The lowest object index written since `dirtySince`; `-1` while nothing is recorded. */
+  /**
+   * The lowest object index written since `dirtySince`; `-1` while nothing is recorded. It is the
+   * lower end of the hull around the ranges in `dirtyRanges`.
+   */
   dirtyFrom: number;
-  /** The highest object index written since `dirtySince`; `-1` while nothing is recorded. */
+  /**
+   * The highest object index written since `dirtySince`; `-1` while nothing is recorded. It is the
+   * upper end of the hull around the ranges in `dirtyRanges`.
+   */
   dirtyTo: number;
   /**
    * The serial this buffer carried when the current range started to collect. A consumer that
@@ -47,6 +59,19 @@ export interface AttributeBuffer {
    * the range gets narrow again without anyone clearing it.
    */
   pickedUpSerial: number;
+  /**
+   * The object ranges written since `dirtySince`, apart from each other, as pairs `[from, to]` in
+   * the shape `insertRange()` keeps them in; the first `dirtyRangeCount` pairs count.
+   *
+   * @internal
+   */
+  dirtyRanges: Int32Array;
+  /**
+   * How many pairs of `dirtyRanges` count; `0` exactly when `dirtyFrom` is `-1`.
+   *
+   * @internal
+   */
+  dirtyRangeCount: number;
 }
 
 // every record is built here with its keys in one order, whichever branch of the constructor builds
@@ -70,6 +95,8 @@ function createAttributeBuffer(
     dirtyTo: -1,
     dirtySince: 0,
     pickedUpSerial: 0,
+    dirtyRanges: new Int32Array(UPLOAD_RANGES_ARRAY_LENGTH),
+    dirtyRangeCount: 0,
   };
 }
 
@@ -261,8 +288,8 @@ export class VertexObjectBuffer {
   }
 
   /**
-   * Book the objects `fromIdx` … `toIdx` of `buf` as written: the range they fall into grows to
-   * hold them, and the serial says that something happened.
+   * Book the objects `fromIdx` … `toIdx` of `buf` as written: they join the recorded ranges, the
+   * hull around them grows to hold them, and the serial says that something happened.
    *
    * The serial rises even when the range comes out empty — a write outside the slots this buffer
    * has is still a write. The range then stays the one that was already there, and only a
@@ -278,9 +305,13 @@ export class VertexObjectBuffer {
         buf.dirtySince = buf.serial;
         buf.dirtyFrom = from;
         buf.dirtyTo = to;
+        buf.dirtyRanges[0] = from;
+        buf.dirtyRanges[1] = to;
+        buf.dirtyRangeCount = 1;
       } else {
         buf.dirtyFrom = Math.min(buf.dirtyFrom, from);
         buf.dirtyTo = Math.max(buf.dirtyTo, to);
+        buf.dirtyRangeCount = insertDirtyRange(buf.dirtyRanges, buf.dirtyRangeCount, from, to);
       }
     }
     buf.serial++;
@@ -293,6 +324,8 @@ export class VertexObjectBuffer {
    * A consumer further behind than the current range reaches gets every object in use — what
    * happened before the range began is recorded nowhere. Taking a range up counts as having
    * caught up, so the next write can start a range of its own.
+   *
+   * The range it answers with is the hull around the ranges the buffer recorded.
    */
   pickUpDirtyRange(bufferName: string, seenSerial: number | undefined, usedCount: number): {from: number; to: number} | null {
     const buf = this.#buffers.get(bufferName);
@@ -312,6 +345,46 @@ export class VertexObjectBuffer {
     const to = Math.min(buf.dirtyTo, usedCount - 1);
     // what was written lies beyond the slots in use, so there is a write but nothing to carry
     return from > to ? {from: 0, to: -1} : {from, to};
+  }
+
+  /**
+   * What a consumer that last saw `seenSerial` has left to upload of `buffer`, a record out of
+   * {@link bufferList}, written into `out` as pairs `[from, to]` of object indices, capped at the
+   * `usedCount` slots in use. Taking the ranges up counts as having caught up, the way
+   * {@link pickUpDirtyRange} does.
+   *
+   * @returns `-1` when the buffer has not moved on since `seenSerial` and nothing is written;
+   *   otherwise the number of pairs written into `out`. A consumer further behind than the recorded
+   *   ranges reach gets one pair over every object in use. `0` means the buffer moved on, but
+   *   nothing of what it recorded lies within the slots in use.
+   *
+   * @internal
+   */
+  pickUpDirtyRanges(buffer: AttributeBuffer, seenSerial: number | undefined, usedCount: number, out: Int32Array): number {
+    if (seenSerial === buffer.serial) return -1;
+
+    buffer.pickedUpSerial = buffer.serial;
+
+    const last = usedCount - 1;
+
+    if (seenSerial === undefined || seenSerial < buffer.dirtySince || buffer.dirtyRangeCount === 0) {
+      if (last < 0) return 0;
+      out[0] = 0;
+      out[1] = last;
+      return 1;
+    }
+
+    const ranges = buffer.dirtyRanges;
+    let written = 0;
+    for (let k = 0; k < buffer.dirtyRangeCount; k++) {
+      const from = ranges[2 * k]!;
+      // the pairs are sorted, so nothing after this one lies within the slots in use either
+      if (from > last) break;
+      out[2 * written] = from;
+      out[2 * written + 1] = Math.min(ranges[2 * k + 1]!, last);
+      written++;
+    }
+    return written;
   }
 
   // an array from buffersData is taken over by reference, so it has to fit the layout exactly
@@ -625,8 +698,9 @@ export class VertexObjectBuffer {
    * Does nothing on the buffer of a disposed pool, which has no buffer left to mark.
    */
   touch(fromIdx = 0, toIdx = this.capacity - 1): void {
-    for (const buffer of this.#buffers.values()) {
-      this.#markDirty(buffer, fromIdx, toIdx);
+    const records = this.bufferList;
+    for (let i = 0; i < records.length; i++) {
+      this.#markDirty(records[i]!, fromIdx, toIdx);
     }
   }
 

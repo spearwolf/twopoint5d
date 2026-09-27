@@ -1,7 +1,11 @@
 import {describe, expect, test} from 'vitest';
 
 import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
-import type {VertexObjectDescription} from './types.js';
+import {measureSettledBytes} from '../testing/measureSettledBytes.js';
+import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
+import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
+import type {TouchBuffersType, VO, VertexObjectDescription} from './types.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths measured below
@@ -13,7 +17,7 @@ const BYTES_PER_CALL_LIMIT = 1;
 // one built with property descriptors 552 B
 const BYTES_PER_VERTEX_OBJECT_LIMIT = 128;
 
-interface SpriteVO {
+interface SpriteVO extends VO {
   x: number;
   y: number;
   z: number;
@@ -37,6 +41,26 @@ const spriteDescription: VertexObjectDescription = {
     color: {components: ['r', 'g', 'b', 'a']},
     rotation: {size: 1, usage: 'dynamic'},
   },
+};
+
+// the position is written through touchVO() or touch(), the colour is static
+const untouchedSpriteDescription: VertexObjectDescription = {
+  vertexCount: 1,
+  attributes: {
+    position: {components: ['x', 'y', 'z'], usage: 'dynamic', autoTouch: false},
+    color: {components: ['r', 'g', 'b', 'a']},
+  },
+};
+
+const instanceDescription: VertexObjectDescription = {
+  attributes: {
+    offset: {components: ['x', 'y', 'z'], usage: 'dynamic'},
+    tint: {components: ['r', 'g', 'b']},
+  },
+};
+
+const extraInstanceDescription: VertexObjectDescription = {
+  attributes: {impact: {size: 1, usage: 'dynamic'}},
 };
 
 const quadDescription: VertexObjectDescription = {
@@ -118,5 +142,96 @@ describe('vertex objects on the hot path', () => {
     expect(bytesPerVO, `${bytesPerVO.toFixed(2)} bytes per vertex object`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
 
     pool.dispose();
+  });
+
+  describe('the upload path', () => {
+    // Not measured here: after a real render three takes the update ranges of an attribute up, and
+    // the next update() adds one {start, count} per range through three's addUpdateRange(). The
+    // geometries below never render, so a range stays standing from one update() to the next —
+    // the state that isolates what the upload path of this library allocates in between.
+
+    test('update() of a geometry allocates nothing per call', async () => {
+      const geometry = new VertexObjectGeometry<SpriteVO>(spriteDescription, 1000);
+      for (let i = 0; i < 1000; i++) geometry.pool.createVO();
+      geometry.update();
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 1000; i++) geometry.update();
+      });
+      const bytesPerCall = bytesPerRound / 1000;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+      geometry.dispose();
+    });
+
+    test('update() of an instanced geometry with an attached pool allocates nothing per call', async () => {
+      const geometry = new InstancedVertexObjectGeometry(instanceDescription, 1000, quadDescription, 1);
+      geometry.basePool!.createVO();
+      for (let i = 0; i < 1000; i++) geometry.instancedPool.createVO();
+      const extra = geometry.attachInstancedPool('extra', extraInstanceDescription);
+      for (let i = 0; i < 1000; i++) extra.createVO();
+      geometry.update();
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 1000; i++) geometry.update();
+      });
+      const bytesPerCall = bytesPerRound / 1000;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+      geometry.dispose();
+    });
+
+    test('touch() allocates nothing per call', async () => {
+      const geometry = new VertexObjectGeometry<SpriteVO>(untouchedSpriteDescription, 1000);
+      for (let i = 0; i < 1000; i++) geometry.pool.createVO();
+      geometry.update();
+
+      const instanced = new InstancedVertexObjectGeometry(instanceDescription, 1000, quadDescription, 1);
+      instanced.basePool!.createVO();
+      for (let i = 0; i < 1000; i++) instanced.instancedPool.createVO();
+      instanced.update();
+
+      // the arguments are built once: an object literal per call would be the allocation of the
+      // caller, not of touch()
+      const dynamicBuffers: TouchBuffersType = {dynamic: true};
+      const dynamicInstances: TouchInstancedBuffersType = {instanced: {dynamic: true}};
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 1000; i++) geometry.touch('position');
+        for (let i = 0; i < 1000; i++) geometry.touch(dynamicBuffers);
+        for (let i = 0; i < 1000; i++) instanced.touch(dynamicInstances);
+      });
+      const bytesPerCall = bytesPerRound / 3000;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+      geometry.dispose();
+      instanced.dispose();
+    });
+
+    test('touchVO() and the update() after it allocate nothing per call', async () => {
+      const geometry = new VertexObjectGeometry<SpriteVO>(untouchedSpriteDescription, 1000);
+      const {pool} = geometry;
+      const vos = Array.from({length: 1000}, () => pool.createVO()!);
+      geometry.update();
+
+      // every tenth object: a hundred disjoint slots, more than a buffer keeps ranges for
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 100; i++) {
+          const vo = vos[i * 10]!;
+          vo.x = i;
+          pool.touchVO(vo, 'position');
+          pool.touchVO(vo);
+        }
+        geometry.update();
+      });
+      const bytesPerCall = bytesPerRound / 201;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+      geometry.dispose();
+    });
   });
 });

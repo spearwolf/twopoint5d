@@ -286,7 +286,8 @@ describe('InstancedVertexObjectGeometry', () => {
     const baseStatic = versionOf('position');
     const instancedStatic = versionOf('strength');
 
-    geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+    // with an object in use: a route without one owes its first upload until it has one
+    geometry.attachInstancedPool('extraPool', extraInstancedDescriptor).createVO();
     geometry.update();
 
     expect(versionOf('position'), 'the static buffer of the base route').toBe(baseStatic);
@@ -316,44 +317,53 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(buffer.version).toBe(versionBeforeBase);
   });
 
-  test('touch() calls touchAttributes() and/or touchBuffers()', () => {
+  /** A geometry with one base and one instanced object, past its first update(), and the version of a static buffer per half. */
+  const settledWithStaticVersions = () => {
     const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor);
+    geometry.basePool!.createVO();
+    geometry.instancedPool.createVO();
+    geometry.update();
 
-    const touchAttributes = sandbox.spy(geometry, 'touchAttributes');
-    const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
+    // `position` is the static attribute of the base half, `strength` the one of the instanced half
+    const versionOf = (attrName: string) => (geometry.getAttribute(attrName) as BufferAttribute).version;
+    return {geometry, base: () => versionOf('position'), instanced: () => versionOf('strength')};
+  };
 
-    geometry.touch('strength', 'position', {instanced: {dynamic: true}});
+  test('touch() reaches the attribute names and the halves it is given, on the next update()', () => {
+    const {geometry, base, instanced} = settledWithStaticVersions();
+    const [baseBefore, instancedBefore] = [base(), instanced()];
 
-    expect(touchAttributes.callCount).toBe(1);
-    expect(touchAttributes.getCall(0).args).toHaveLength(2);
-    expect(touchAttributes.getCall(0).args).toEqual(expect.arrayContaining(['position', 'strength']));
+    geometry.touch('strength', {instanced: {dynamic: true}});
+    expect(instanced(), 'not before update()').toBe(instancedBefore);
+    geometry.update();
 
-    expect(touchBuffers.callCount).toBe(1);
-    expect(touchBuffers.getCall(0).args[0]).toMatchObject({
-      instanced: {dynamic: true},
-    });
-    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('static', true);
-    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
+    expect(instanced(), 'the attribute named').toBeGreaterThan(instancedBefore);
+    expect(base(), 'the half nothing named').toBe(baseBefore);
+
+    const [baseNext, instancedNext] = [base(), instanced()];
+    geometry.touch({base: {static: true}});
+    geometry.update();
+
+    expect(base(), 'the half named').toBeGreaterThan(baseNext);
+    expect(instanced(), 'the other half').toBe(instancedNext);
   });
 
   test('touch() applies both argument forms when they are mixed in one call', () => {
-    const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor);
+    const {geometry, base, instanced} = settledWithStaticVersions();
+    const [baseBefore, instancedBefore] = [base(), instanced()];
 
-    const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
+    geometry.touch({dynamic: true}, {base: {static: true}});
+    geometry.update();
 
+    expect(base(), 'the routed form reaches the half it names').toBeGreaterThan(baseBefore);
+    expect(instanced(), 'the flat form names dynamic buffers alone').toBe(instancedBefore);
+
+    const [baseNext, instancedNext] = [base(), instanced()];
     geometry.touch({static: true}, {instanced: {dynamic: true}});
+    geometry.update();
 
-    expect(touchBuffers.callCount, 'the flat form and the routed form each get their own call').toBe(2);
-
-    const calls = touchBuffers.getCalls().map((call) => call.args[0]);
-
-    expect(calls, 'the usage types named without a route reach touchBuffers()').toContainEqual({static: true});
-    expect(
-      calls.find((arg) => arg != null && 'instanced' in arg),
-      'the routed form reaches it as it was given',
-    ).toMatchObject({
-      instanced: {dynamic: true},
-    });
+    expect(base(), 'the flat form reaches every route').toBeGreaterThan(baseNext);
+    expect(instanced(), 'the flat form reaches every route').toBeGreaterThan(instancedNext);
   });
 
   describe('a pool that has been disposed', () => {

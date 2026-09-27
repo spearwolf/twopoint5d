@@ -336,6 +336,47 @@ describe('VertexObjectPool', () => {
     });
   });
 
+  describe('touchVO()', () => {
+    const serialsOf = (records: Array<{serial: number}>) => records.map((record) => record.serial);
+
+    test('touchVO() marks nothing for a vertex object of another pool, a freed one, or on a disposed pool', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const other = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.createVO();
+      const freed = pool.createVO()!;
+      pool.freeVO(freed);
+      const foreign = other.createVO()!;
+      const own = pool.createVO()!;
+
+      // the records outlive dispose(), which empties the map they sit in
+      const records = [...pool.buffer.buffers.values()];
+      const before = serialsOf(records);
+
+      expect(() => pool.touchVO(foreign), 'a vertex object of another pool').not.toThrow();
+      expect(() => pool.touchVO(freed, 'foo'), 'a freed vertex object').not.toThrow();
+      expect(serialsOf(records)).toEqual(before);
+
+      pool.dispose();
+
+      expect(() => pool.touchVO(own), 'on a disposed pool').not.toThrow();
+      expect(serialsOf(records)).toEqual(before);
+
+      other.dispose();
+    });
+
+    test('touchVO() skips an attribute name the descriptor does not know', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      const vo = pool.createVO()!;
+      const dynamicSerial = pool.buffer.buffers.get('dynamic_float32')!.serial;
+      const staticSerial = pool.buffer.buffers.get('static_float32')!.serial;
+
+      expect(() => pool.touchVO(vo, 'unknown', 'bar')).not.toThrow();
+
+      expect(pool.buffer.buffers.get('dynamic_float32')!.serial, 'the buffer no name reaches').toBe(dynamicSerial);
+      expect(pool.buffer.buffers.get('static_float32')!.serial, 'the buffer of bar').toBeGreaterThan(staticSerial);
+    });
+  });
+
   describe('resize()', () => {
     test('resize to larger capacity preserves existing data', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);

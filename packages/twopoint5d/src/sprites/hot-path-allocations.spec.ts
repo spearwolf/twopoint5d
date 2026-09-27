@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'vitest';
 
 import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
+import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {AnimatedSpritesGeometry} from './AnimatedSprites/AnimatedSpritesGeometry.js';
@@ -89,5 +90,35 @@ describe('sprites on the hot path', () => {
     expect(bytesPerSprite, `${bytesPerSprite.toFixed(2)} bytes per sprite`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
 
     sprites.dispose();
+  });
+
+  test('update() of textured sprites allocates nothing per call', async () => {
+    const sprites = new TexturedSprites(1000);
+    for (let i = 0; i < 1000; i++) sprites.createSprite();
+    sprites.update();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.update();
+    });
+    const bytesPerCall = bytesPerRound / 1000;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    sprites.dispose();
+  });
+
+  test('update() of animated sprites allocates nothing per call', async () => {
+    const geometry = new AnimatedSpritesGeometry(1000);
+    for (let i = 0; i < 1000; i++) geometry.instancedPool.createVO();
+    geometry.update();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) geometry.update();
+    });
+    const bytesPerCall = bytesPerRound / 1000;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    geometry.dispose();
   });
 });

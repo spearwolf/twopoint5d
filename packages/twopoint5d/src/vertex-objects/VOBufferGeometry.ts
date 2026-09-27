@@ -5,7 +5,6 @@ import {GeometryRoutes} from './GeometryRoutes.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {initializeAttributes} from './initializeAttributes.js';
-import {parseTouchArgs} from './parseTouchArgs.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 
 /**
@@ -110,32 +109,56 @@ export class VOBufferGeometry extends BufferGeometry {
     this.#routes.clear();
   }
 
-  /** Marks the buffers behind the given attribute names for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
-  touchAttributes(...attrNames: string[]): void {
-    this.#routes.touchAttributes(attrNames);
+  /**
+   * Marks the buffers behind the given attribute names for GPU upload on the next `update()`,
+   * which uploads every object in use and nothing when there is none. Does nothing after
+   * `dispose()`, which leaves no route to mark.
+   */
+  touchAttributes(...attrNames: string[]): void;
+  touchAttributes(): void {
+    // read through `arguments` rather than the rest parameter of the signature: once the method of
+    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
+    // argument, measured on Node 24), while `arguments` stayed free in every order
+    for (let i = 0; i < arguments.length; i++) {
+      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      this.#routes.touchAttribute(arguments[i] as string);
+    }
   }
 
-  /** Marks every buffer of the given usage types for GPU upload on the next `update()`. Does nothing after `dispose()`, which leaves no route to mark. */
+  /**
+   * Marks every buffer of the given usage types for GPU upload on the next `update()`, which
+   * uploads every object in use and nothing when there is none. Does nothing after `dispose()`,
+   * which leaves no route to mark.
+   */
   touchBuffers(bufferTypes: TouchBuffersType): void {
     this.#routes.touchByUsage(bufferTypes);
   }
 
   /**
    * Marks buffers for GPU upload on the next `update()`, by attribute name, by usage type, or a
-   * mix of both. This is the counterpart to `autoTouch: false` (see `VADescription#autoTouch`):
-   * an attribute without `autoTouch` uploads only through an explicit `touch()` after its values
-   * were written.
+   * mix of both; every argument counts on its own. That `update()` uploads every object in use of
+   * the marked buffers, and nothing when there is none. This is the counterpart to
+   * `autoTouch: false` (see `VADescription#autoTouch`): an attribute without `autoTouch` uploads
+   * only through an explicit `touch()` after its values were written, or through
+   * `VertexObjectPool#touchVO()`, which uploads the slots it names alone.
    */
-  touch(...args: Array<string | TouchBuffersType>): void {
-    // this geometry reaches one pool through one route, so usage types addressed to the half of
-    // an instanced geometry name nothing here and select nothing
-    const {attrNames, flat} = parseTouchArgs(args);
-
-    if (attrNames.length) {
-      this.touchAttributes(...attrNames);
-    }
-    if (flat) {
-      this.touchBuffers(flat);
+  touch(...args: Array<string | TouchBuffersType>): void;
+  touch(): void {
+    // read through `arguments` rather than the rest parameter of the signature: once the method of
+    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
+    // argument, measured on Node 24), while `arguments` stayed free in every order
+    for (let i = 0; i < arguments.length; i++) {
+      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      const arg = arguments[i] as string | TouchBuffersType;
+      if (typeof arg === 'string') {
+        this.#routes.touchAttribute(arg);
+      } else if ('base' in arg || 'instanced' in arg) {
+        // this geometry reaches one pool through one route, so usage types addressed to the half
+        // of an instanced geometry name nothing here and select nothing
+        continue;
+      } else {
+        this.#routes.touchByUsage(arg);
+      }
     }
   }
 
@@ -155,7 +178,7 @@ export class VOBufferGeometry extends BufferGeometry {
     this.#autoTouchAttributes();
     this.#routes.syncUploads();
 
-    this.#slots.syncArrays(this);
+    this.#routes.syncArrays();
   }
 
   #updateDrawRange() {

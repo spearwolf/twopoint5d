@@ -823,7 +823,7 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(updateRangesOf(second, 'position'), 'second, next frame').toEqual([]);
     });
 
-    test('a range still standing on one geometry widens there and nowhere else', () => {
+    test('a range still standing on one geometry is joined there by the next write, and nowhere else', () => {
       const {first, second, write} = twoSettledQuadGeometries(6);
 
       write(1);
@@ -836,9 +836,151 @@ describe('vertex-buffers-geometry-updates', () => {
       first.update();
       second.update();
 
-      // objects 1..4 — the range that was never delivered widens rather than being replaced
-      expect(updateRangesOf(first, 'position'), 'first').toEqual([{start: 1 * 4 * 3, count: 4 * 4 * 3}]);
+      // objects 1 and 4 — the range that was never delivered stays and the new one joins it,
+      // while the objects between them go nowhere
+      expect(updateRangesOf(first, 'position'), 'first').toEqual([
+        {start: 1 * 4 * 3, count: 4 * 3},
+        {start: 4 * 4 * 3, count: 4 * 3},
+      ]);
       expect(updateRangesOf(second, 'position'), 'second').toEqual([{start: 4 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('freeing an object in the middle and spawning one uploads both slots and nothing between them', () => {
+      const [geometry, objects] = settledQuadGeometry(10);
+
+      // the swap fetches the object out of slot 9 and puts it into slot 2, and the spawn takes
+      // slot 9 again
+      geometry.pool.freeVO(objects[2]!);
+      geometry.pool.createVO();
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([
+        {start: 2 * 4 * 3, count: 4 * 3},
+        {start: 9 * 4 * 3, count: 4 * 3},
+      ]);
+    });
+
+    test('more disjoint writes than ranges join where the gap between them is smallest', () => {
+      const geometry = new VertexObjectGeometry<MyBaseVO>(staticQuadDesc, 20);
+      for (let i = 0; i < 20; i++) geometry.pool.createVO();
+      geometry.update();
+      uploaded(geometry, 'position');
+
+      // ten objects with a gap of one between each two: the gaps are all equal, so the lowest
+      // pairs are joined until eight ranges are left
+      for (let i = 0; i < 20; i += 2) {
+        geometry.pool.buffer.touchBuffer('positions', i, i);
+      }
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([
+        {start: 0, count: 60},
+        {start: 72, count: 12},
+        {start: 96, count: 12},
+        {start: 120, count: 12},
+        {start: 144, count: 12},
+        {start: 168, count: 12},
+        {start: 192, count: 12},
+        {start: 216, count: 12},
+      ]);
+    });
+
+    test('writes that all lie beyond the objects in use upload nothing and leave no empty range', () => {
+      const [geometry, objects] = settledQuadGeometry(5);
+      const buffer = bufferInSlot(geometry, 'position')!;
+      const version = buffer.version;
+
+      // the first free swaps slot 4 into slot 1 and marks it; the others take the pool down to
+      // no object at all
+      geometry.pool.freeVO(objects[1]!);
+      for (const idx of [0, 2, 3, 4]) {
+        geometry.pool.freeVO(objects[idx]!);
+      }
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([]);
+      expect(buffer.version).toBe(version);
+    });
+
+    test('a touch on a geometry without an object in use uploads nothing', () => {
+      const [geometry, objects] = settledQuadGeometry(1);
+      geometry.pool.freeVO(objects[0]!);
+      const buffer = bufferInSlot(geometry, 'position')!;
+      const version = buffer.version;
+
+      geometry.touch('position');
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([]);
+      expect(buffer.version).toBe(version);
+    });
+
+    test('an attached pool without an object in use hands three no range', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.basePool!.createVO();
+      for (let i = 0; i < 3; i++) geometry.instancedPool.createVO();
+      geometry.attachInstancedPool(
+        'extra',
+        new VertexObjectDescriptor({attributes: {extraImpact: {size: 1, type: 'float32', usage: 'dynamic'}}}),
+      );
+
+      geometry.update();
+      const buffer = bufferInSlot(geometry, 'extraImpact')!;
+      const version = buffer.version;
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'extraImpact')).toEqual([]);
+      expect(buffer.version).toBe(version);
+    });
+
+    test('touch() marks for the next update() and not before', () => {
+      const [geometry] = settledQuadGeometry(5);
+      const buffer = bufferInSlot(geometry, 'position')!;
+      const version = buffer.version;
+
+      geometry.touch('position');
+
+      expect(buffer.version, 'touch() alone').toBe(version);
+      expect(updateRangesOf(geometry, 'position'), 'touch() alone').toEqual([]);
+
+      geometry.update();
+
+      expect(buffer.version).toBeGreaterThan(version);
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 0, count: 5 * 4 * 3}]);
+    });
+
+    test('touchVO() uploads the slot of that vertex object and nothing else', () => {
+      const [geometry, objects] = settledQuadGeometry(5);
+
+      geometry.pool.touchVO(objects[3]!);
+      geometry.update();
+
+      expect(updateRangesOf(geometry, 'position')).toEqual([{start: 3 * 4 * 3, count: 4 * 3}]);
+    });
+
+    test('touchVO() with attribute names marks the buffers of those attributes alone', () => {
+      const texturedQuadDesc = new VertexObjectDescriptor({
+        vertexCount: 4,
+        attributes: {
+          position: {components: ['x', 'y', 'z'], type: 'float32', bufferName: 'positions'},
+          uv: {size: 2, type: 'float32', bufferName: 'uvs'},
+        },
+      });
+      const geometry = new VertexObjectGeometry<MyBaseVO>(texturedQuadDesc, 10);
+      const objects = Array.from({length: 5}, () => geometry.pool.createVO()!);
+      geometry.update();
+      uploaded(geometry, 'position');
+      uploaded(geometry, 'uv');
+      const positions = bufferInSlot(geometry, 'position')!;
+      const version = positions.version;
+
+      geometry.pool.touchVO(objects[2]!, 'uv');
+      geometry.update();
+
+      // 2 components per vertex, 4 vertices per object
+      expect(updateRangesOf(geometry, 'uv'), 'uv').toEqual([{start: 2 * 4 * 2, count: 4 * 2}]);
+      expect(updateRangesOf(geometry, 'position'), 'position').toEqual([]);
+      expect(positions.version, 'position').toBe(version);
     });
 
     test('the base pool of an instanced geometry uploads every vertex of a used object', () => {
@@ -1262,6 +1404,74 @@ describe('vertex-buffers-geometry-updates', () => {
       const pool = geometry.attachInstancedPool('extra', extraDesc);
 
       expect(pool.capacity).toBe(geometry.instancedPool.capacity);
+    });
+
+    test('a touch resolved before a pool was attached reaches the buffers of that pool afterwards', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.instancedPool.createVO();
+
+      // resolves the name while no route carries it
+      geometry.touch('quux');
+      geometry.update();
+
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+      pool.createVO();
+      geometry.update();
+      uploaded(geometry, 'quux');
+      const buffer = bufferInSlot(geometry, 'quux')!;
+      const version = buffer.version;
+
+      geometry.touch('quux');
+      geometry.update();
+
+      expect(buffer.version).toBeGreaterThan(version);
+      expect(updateRangesOf(geometry, 'quux')).toEqual([{start: 0, count: 1}]);
+    });
+
+    test('an attached route without an object in use keeps its first upload until it has objects', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.instancedPool.createVO();
+      const pool = geometry.attachInstancedPool('extra', extraDesc);
+
+      // `quux` is static: nothing but the first upload of the route carries it to the gpu
+      geometry.update();
+      const buffer = bufferInSlot(geometry, 'quux')!;
+      const version = buffer.version;
+
+      // written straight into the array and counted in through the setter, which marks nothing:
+      // the only thing left to carry these values is the first upload the route still owes
+      const {bufferName} = pool.buffer.bufferAttributes.get('quux')!;
+      pool.buffer.buffers.get(bufferName)!.typedArray!.set([1, 2, 3]);
+      pool.usedCount = 3;
+      geometry.update();
+
+      expect(buffer.version).toBeGreaterThan(version);
+      expect(updateRangesOf(geometry, 'quux')).toEqual([{start: 0, count: 3}]);
+    });
+
+    test('a touch resolved while a pool was attached no longer reaches it after the detach', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.instancedPool.createVO();
+      const pool = geometry.attachInstancedPool('extra', extraDesc, {autoDispose: false});
+      pool.createVO();
+      geometry.update();
+
+      // resolves the name while the route carries it
+      geometry.touch('quux');
+      geometry.update();
+      const buffer = bufferInSlot(geometry, 'quux')!;
+      const version = buffer.version;
+
+      geometry.detachInstancedPool('extra');
+      // a range standing on the buffer of the route that left: a touch that still reached the
+      // buffer would take it off, while update() does not reach the buffer either way
+      buffer.clearUpdateRanges();
+      buffer.addUpdateRange(0, 1);
+      geometry.touch('quux');
+
+      expect(buffer.updateRanges, 'the touch passed the buffer by').toEqual([{start: 0, count: 1}]);
+      expect(() => geometry.update()).not.toThrow();
+      expect(buffer.version).toBe(version);
     });
 
     // guards the auto-touch buffer cache: it is resolved once and must be invalidated whenever a

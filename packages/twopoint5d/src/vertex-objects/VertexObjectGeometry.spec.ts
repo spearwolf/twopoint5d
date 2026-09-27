@@ -1,5 +1,4 @@
-import {createSandbox} from 'sinon';
-import {afterEach, describe, expect, test} from 'vitest';
+import {describe, expect, test} from 'vitest';
 
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
@@ -33,12 +32,6 @@ describe('VertexObjectGeometry', () => {
         usage: 'dynamic',
       },
     },
-  });
-
-  const sandbox = createSandbox();
-
-  afterEach(() => {
-    sandbox.restore();
   });
 
   test('construct with descriptor', () => {
@@ -76,23 +69,32 @@ describe('VertexObjectGeometry', () => {
     expect(Array.from(geometry.index!.array)).toEqual([0, 1, 2, 4, 5, 6]);
   });
 
-  test('touch() calls touchAttributes() and/or touchBuffers()', () => {
-    const capacity = 10;
-    const geometry = new VertexObjectGeometry(descriptor, capacity);
+  test('touch() marks the buffers behind every argument for the next update(), each argument on its own', () => {
+    const geometry = new VertexObjectGeometry(descriptor, 10);
+    geometry.pool.createVO();
+    geometry.update();
 
-    const touchAttributes = sandbox.spy(geometry, 'touchAttributes');
-    const touchBuffers = sandbox.spy(geometry, 'touchBuffers');
+    // `strength` is the one static attribute here, and the only buffer that uploads on nothing but a touch
+    const staticBuffer = geometry.buffers.get('static_float32')!;
+    const settled = staticBuffer.version;
 
-    geometry.touch('strength', 'position', {dynamic: true});
+    geometry.update();
+    expect(staticBuffer.version, 'nothing touched').toBe(settled);
 
-    expect(touchAttributes.callCount).toBe(1);
-    expect(touchAttributes.getCall(0).args).toHaveLength(2);
-    expect(touchAttributes.getCall(0).args).toEqual(expect.arrayContaining(['position', 'strength']));
+    geometry.touch('strength');
+    expect(staticBuffer.version, 'not before update()').toBe(settled);
+    geometry.update();
+    expect(staticBuffer.version, 'by attribute name').toBeGreaterThan(settled);
 
-    expect(touchBuffers.callCount).toBe(1);
-    expect(touchBuffers.getCall(0).args[0]).toMatchObject({dynamic: true});
-    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('static', true);
-    expect(touchBuffers.getCall(0).args[0]).not.toHaveProperty('stream', true);
+    const byName = staticBuffer.version;
+    geometry.touch({static: true}, {static: false});
+    geometry.update();
+    expect(staticBuffer.version, 'a later {static: false} leaves an earlier {static: true} standing').toBeGreaterThan(byName);
+
+    const byUsage = staticBuffer.version;
+    geometry.touch('position', {dynamic: true});
+    geometry.update();
+    expect(staticBuffer.version, 'names and usage types that do not reach it').toBe(byUsage);
   });
 
   describe('a pool that has been disposed', () => {

@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from 'vitest';
 
 import {measureAllocatedBytes} from '../../testing/measureAllocatedBytes.js';
+import {measureSettledBytes} from '../../testing/measureSettledBytes.js';
 import {TextureCoords} from '../../texture/TextureCoords.js';
 import {TileSet} from '../../texture/TileSet.js';
 import {AABB2} from '../AABB2.js';
@@ -50,6 +51,20 @@ describe('tile sprites on the hot path', () => {
       }
     });
     const bytesPerCall = bytesPerRound / tiles.length;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('update() after updateTile() for every tile allocates nothing per call', async () => {
+    factory.update();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < tiles.length; i++) {
+        factory.updateTile(tiles[i]!, coords[i]!);
+      }
+      factory.update();
+    });
+    const bytesPerCall = bytesPerRound / (tiles.length + 1);
 
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });

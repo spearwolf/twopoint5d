@@ -97,7 +97,8 @@ explicit instruction.
   `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
   change to rendering or GPU-buffer code needs both.
   A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
-  `src/testing/measureAllocatedBytes.ts`; the Vitest config starts its workers with
+  `src/testing/measureAllocatedBytes.ts`, and a round through the upload path of a geometry
+  through `measureSettledBytes()` next to it; the Vitest config starts its workers with
   `--expose-gc` for it, and `src/testing/` never reaches `dist/`.
   The browser tests share their fixtures through
   `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second

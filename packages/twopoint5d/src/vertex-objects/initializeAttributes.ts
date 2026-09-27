@@ -58,7 +58,7 @@ function initializeRoute(
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
         attr.name = bufAttr.attributeName;
         geometry.setAttribute(attrDesc.name, attr);
-        slots.claim(attrDesc.name, buffers, pool, attr);
+        slots.claim(attrDesc.name, buffers, attr);
       }
     } else {
       const bufAttr = expectDefined(attributes[0], `the sole attribute of buffer "${buffer.bufferName}"`);
@@ -72,7 +72,7 @@ function initializeRoute(
       buffers.set(buffer.bufferName, attr);
       bufferSerials.set(buffer.bufferName, buffer.serial);
       geometry.setAttribute(attrDesc.name, attr);
-      slots.claim(attrDesc.name, buffers, pool, attr);
+      slots.claim(attrDesc.name, buffers, attr);
     }
   }
 }
