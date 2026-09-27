@@ -91,6 +91,13 @@ jobs:
         run: xvfb-run pnpm run ci
         timeout-minutes: 20
 
+      - name: Run the hot-path benchmarks
+        # the timings are archived, not held to a limit: a shared runner's timings vary too much
+        # for a gate, and it is the series over many runs that shows a regression. The
+        # allocation specs in the gate hold what can be counted
+        run: pnpm bench
+        timeout-minutes: 10
+
       - name: Drop the Nx cache entries this run did not use
         # the server touches every entry it serves; what is older than its start went unused
         if: success() && steps.nx-cache.outputs.cache-hit != 'true'
@@ -114,3 +121,12 @@ jobs:
           name: coverage
           path: packages/twopoint5d/coverage
           retention-days: 3
+
+      - name: Archive benchmark results
+        # kept far longer than the coverage report: a regression shows only in the series over weeks
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: bench
+          path: packages/twopoint5d/bench-results
+          retention-days: 90

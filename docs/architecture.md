@@ -42,8 +42,13 @@ The library's `project.json` adds the target `coverage`, which no other project 
 same Vitest run as `test` with `--coverage`, cached with the inputs of `test`. Its
 output is `{projectRoot}/coverage`, which the CI workflow archives.
 
+It also adds the target `bench`: `vitest bench` over `src/**/*.bench.ts`, uncached, since
+a timing is never a cache hit. Its output is `{projectRoot}/bench-results/results.json`,
+which the CI workflow archives as well.
+
 Per-project `inputs` narrow the cache key further. The library's `build` input list
-excludes `*.spec.ts` — specs do not invalidate a build, which is also why `pnpm build`
+excludes `*.spec.ts`, `*.bench.ts` and `src/testing/` — tests, benches and their helpers
+do not invalidate a build, which is also why `pnpm build`
 alone never type-checks the tests and `pnpm typecheck` exists separately.
 
 The consumers of the library — `twopoint5d-testing:test`, `lookbook:build` and
@@ -125,6 +130,12 @@ the published package declares peer dependencies only (`lintPkg` holds that), so
 whatever the audit finds sits in tooling, and Dependabot proposes the update that fixes
 it (§5). Dependabot also keeps the commit SHAs of the actions, and the version comment
 next to each, current.
+
+After the gate the step `Run the hot-path benchmarks` runs `pnpm bench`, and the
+artifact `bench` keeps `packages/twopoint5d/bench-results` for 90 days, the coverage
+report for 3. The timings are archived, not held to a limit: a shared runner's timings
+vary too much for a gate, and a regression shows only in the series over weeks. What can
+be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
 The browser suite writes one line per browser and run into the "Browser logs" of the
 test output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from

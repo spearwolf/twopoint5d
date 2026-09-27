@@ -12,10 +12,14 @@ export const createVertexObject = <VOType>(
   descriptor: VertexObjectDescriptor,
   buffer: VertexObjectBuffer,
   objectIndex: number,
-): NewVertexObject<VOType> =>
+): NewVertexObject<VOType> => {
   // Object.create() answers any: the accessors come from the prototype the descriptor built out of
   // its description, and VOType is the pool's word for what that description generates
-  Object.create(descriptor.voPrototype, {
-    [voBuffer]: {value: buffer, writable: true},
-    [voIndex]: {value: objectIndex, writable: true},
-  }) as NewVertexObject<VOType>;
+  const vo = Object.create(descriptor.voPrototype) as NewVertexObject<VOType>;
+  // two assignments keep the creation on the fast path; a property descriptor per field would
+  // cost three descriptor objects and the slow define path per vertex object, and createVO()
+  // runs within the frame while a map scrolls
+  vo[voBuffer] = buffer;
+  vo[voIndex] = objectIndex;
+  return vo;
+};

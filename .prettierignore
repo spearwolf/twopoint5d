@@ -8,6 +8,7 @@
 apps/*/dist
 packages/*/dist
 packages/*/coverage
+packages/*/bench-results
 
 pnpm-lock.yaml
 pnpm-workspace.yaml

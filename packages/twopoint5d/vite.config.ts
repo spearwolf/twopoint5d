@@ -7,6 +7,11 @@ export default defineConfig({
     // glob — compiled output under `dist/` carries the same specs as `.js` and must
     // not be collected along with them.
     include: ['src/**/*.spec.ts'],
+    // the allocation specs call gc() before every measurement (`src/testing/measureAllocatedBytes.ts`),
+    // and without this flag the function does not exist
+    execArgv: ['--expose-gc'],
+    // pinned to `src/` like the specs, for the same reason: `dist/` must not contribute a copy
+    benchmark: {include: ['src/**/*.bench.ts']},
     // Every `vi.spyOn` is taken back when its test ends. A spy that outlives the test that
     // installed it lies over every following test of the same file, and a test that measures
     // an order silently stops measuring anything.
@@ -14,7 +19,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts'],
+      // `include` counts every file under `src/`, one no spec loads included, so a bench or a
+      // helper of the specs at 0 % would pull the thresholds down
+      exclude: ['src/**/*.spec.ts', 'src/**/*.bench.ts', 'src/testing/**'],
       reporter: ['text-summary', 'lcov'],
       // The thresholds sit two points under the level measured when they were set — globally
       // and per module, the measured percentage rounded down minus two —, so a regression

@@ -7,6 +7,8 @@
       "inputs": [
         "{projectRoot}/src/**/*.ts",
         "!{projectRoot}/src/**/*.spec.ts",
+        "!{projectRoot}/src/**/*.bench.ts",
+        "!{projectRoot}/src/testing/**",
         "{projectRoot}/tsconfig.build.json",
         "sharedTsconfigs",
         "makePackageJson"
@@ -27,6 +29,9 @@
       "cache": true,
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
       "outputs": ["{projectRoot}/coverage"]
+    },
+    "bench": {
+      "cache": false
     }
   }
 }

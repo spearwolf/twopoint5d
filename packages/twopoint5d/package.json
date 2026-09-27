@@ -49,6 +49,7 @@
     "clean": "pnpm rimraf dist",
     "test": "pnpm vitest --run",
     "coverage": "pnpm vitest --run --coverage",
+    "bench": "pnpm vitest bench --run --reporter=default --reporter=json --outputFile.json=bench-results/results.json",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
     "checkPkgTypes": "pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",

@@ -93,9 +93,8 @@ export class GeometryAttributeSlots {
   /** The pool whose buffers feed the slot `attrName`, or `undefined` if no pool does. */
   poolOf(attrName: string): VOBufferPool | undefined {
     const claims = this.#slots.get(attrName);
-    return claims === undefined || claims.length === 0
-      ? undefined
-      : expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).pool;
+    // the topmost claim owns the slot; an empty list has none
+    return claims === undefined ? undefined : claims[claims.length - 1]?.pool;
   }
 
   /**

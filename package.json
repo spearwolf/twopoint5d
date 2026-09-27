@@ -21,6 +21,7 @@
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:twopoint5d": "pnpm nx run-many -t test --projects=tag:twopoint5d",
     "test:affected": "pnpm nx affected -t test",
+    "bench": "pnpm nx run-many -t bench",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "clean": "pnpm nx run-many -t clean && rimraf dist",

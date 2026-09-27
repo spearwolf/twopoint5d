@@ -49,6 +49,30 @@ export interface AttributeBuffer {
   pickedUpSerial: number;
 }
 
+// every record is built here with its keys in one order, whichever branch of the constructor builds
+// it: the records then share one shape, and the accessors that read `typedArray` from the records of
+// many buffers meet a single hidden class
+function createAttributeBuffer(
+  bufferName: string,
+  itemSize: number,
+  dataType: VertexAttributeDataType,
+  usageType: VertexAttributeUsageType,
+  typedArray: TypedArray,
+): AttributeBuffer {
+  return {
+    bufferName,
+    itemSize,
+    dataType,
+    usageType,
+    typedArray,
+    serial: 0,
+    dirtyFrom: -1,
+    dirtyTo: -1,
+    dirtySince: 0,
+    pickedUpSerial: 0,
+  };
+}
+
 // one message for every method that refuses to work once the pool behind this buffer has
 // given up its typed arrays, so the class, the method and the state are always in the text
 // a caller reads out of a foreign stack
@@ -80,6 +104,18 @@ export class VertexObjectBuffer {
   get buffers(): ReadonlyMap<string, Readonly<AttributeBuffer>> {
     return this.#buffers;
   }
+
+  /**
+   * The records of {@link buffers} in the order of the map, for the generated accessors, which reach
+   * a record by its position instead of by its name. Every buffer built from the same descriptor
+   * lists them in the same order — the constructor builds them from the sorted attribute names or
+   * takes the order over from its source —, so the prototype the first buffer of a descriptor builds
+   * carries the right positions for every later one (`resize()`, `clone()`). Empty once the pool
+   * behind this buffer is disposed, like {@link buffers}.
+   *
+   * @internal
+   */
+  readonly bufferList: AttributeBuffer[] = [];
 
   /**
    * map attribute name to buffer-attribute info; it stays what it is once the pool behind this
@@ -145,18 +181,16 @@ export class VertexObjectBuffer {
       this.bufferNameAttributes = source.bufferNameAttributes;
 
       for (const [bufferName, buffer] of source.#buffers) {
-        this.#buffers.set(bufferName, {
+        this.#buffers.set(
           bufferName,
-          itemSize: buffer.itemSize,
-          dataType: buffer.dataType,
-          usageType: buffer.usageType,
-          typedArray: this.#takeOrCreateArray(buffersData, bufferName, buffer.dataType, buffer.itemSize),
-          serial: 0,
-          dirtyFrom: -1,
-          dirtyTo: -1,
-          dirtySince: 0,
-          pickedUpSerial: 0,
-        });
+          createAttributeBuffer(
+            bufferName,
+            buffer.itemSize,
+            buffer.dataType,
+            buffer.usageType,
+            this.#takeOrCreateArray(buffersData, bufferName, buffer.dataType, buffer.itemSize),
+          ),
+        );
       }
     } else {
       this.descriptor = source;
@@ -166,7 +200,7 @@ export class VertexObjectBuffer {
 
       // a buffer can only be sized once every attribute has contributed its share to itemSize,
       // so the typed arrays come after this loop and the records carry none until then
-      const forming = new Map<string, Omit<AttributeBuffer, 'typedArray'>>();
+      const forming = new Map<string, Pick<AttributeBuffer, 'bufferName' | 'itemSize' | 'dataType' | 'usageType'>>();
 
       for (const attributeName of this.attributeNames) {
         const attribute = this.descriptor.getAttribute(attributeName)!;
@@ -182,11 +216,6 @@ export class VertexObjectBuffer {
             itemSize: attribute.size,
             dataType: attribute.dataType,
             usageType: attribute.usageType,
-            serial: 0,
-            dirtyFrom: -1,
-            dirtyTo: -1,
-            dirtySince: 0,
-            pickedUpSerial: 0,
           });
         }
         bufferAttributes.set(attributeName, {
@@ -197,10 +226,16 @@ export class VertexObjectBuffer {
       }
 
       for (const buffer of forming.values()) {
-        this.#buffers.set(buffer.bufferName, {
-          ...buffer,
-          typedArray: this.#takeOrCreateArray(buffersData, buffer.bufferName, buffer.dataType, buffer.itemSize),
-        });
+        this.#buffers.set(
+          buffer.bufferName,
+          createAttributeBuffer(
+            buffer.bufferName,
+            buffer.itemSize,
+            buffer.dataType,
+            buffer.usageType,
+            this.#takeOrCreateArray(buffersData, buffer.bufferName, buffer.dataType, buffer.itemSize),
+          ),
+        );
       }
 
       const bufferNameAttributes = new Map<string, AttributeBufferLayout[]>();
@@ -217,6 +252,8 @@ export class VertexObjectBuffer {
       this.bufferAttributes = bufferAttributes;
       this.bufferNameAttributes = bufferNameAttributes;
     }
+
+    for (const record of this.#buffers.values()) this.bufferList.push(record);
 
     if (!this.descriptor.voPrototype) {
       this.descriptor.voPrototype = createVertexObjectPrototype(this);
@@ -638,6 +675,7 @@ export class VertexObjectBuffer {
       buffer.typedArray = undefined;
     }
     this.#buffers.clear();
+    this.bufferList.length = 0;
     this.#released = true;
   }
 }

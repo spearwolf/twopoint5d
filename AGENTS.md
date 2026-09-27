@@ -37,6 +37,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
   thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
   single-file run measure nothing
+- `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through `vitest
+  bench`; the timings land in `packages/twopoint5d/bench-results/results.json`, which CI
+  archives. Not part of `pnpm run ci`: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server and the docs' code block check (`scripts/**/*.test.mjs`), plus specs that
   start `makePackageJson.mjs` and `checkPeerDependenciesOnly.mjs` as child processes, one
@@ -93,6 +96,9 @@ explicit instruction.
 - **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and
   `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
   change to rendering or GPU-buffer code needs both.
+  A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
+  `src/testing/measureAllocatedBytes.ts`; the Vitest config starts its workers with
+  `--expose-gc` for it, and `src/testing/` never reaches `dist/`.
   The browser tests share their fixtures through
   `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second
   test file needs goes there, not into both.

@@ -3,30 +3,39 @@ import {voBuffer, voIndex} from './constants.js';
 import {createTypedArray} from './createTypedArray.js';
 import type {TypedArray, VO} from './types.js';
 
-const makeAttributeGetter = (bufferName: string, instanceOffset: number, attrOffset: number) => {
+// read once into constants of this module, so the accessors below never touch an imported binding:
+// a module runner that rewrites imports, as the one Vitest runs specs and benches in does, turns
+// every read of one into a property read on a module object — two per value in each accessor, and
+// the benches would time the runner instead of the accessors
+const bufferKey: typeof voBuffer = voBuffer;
+const indexKey: typeof voIndex = voIndex;
+
+const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
   return function getAttribute(this: VO) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // carries every attribute of its descriptor; these accessors run per sprite and per frame,
-    // so they assert that rather than pay for a check on every value
-    const idx = this[voIndex] * instanceOffset + attrOffset;
-    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    // lists the record of every buffer of its descriptor at the position this accessor was built
+    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
+    // a check on every value
+    const idx = this[indexKey] * instanceOffset + attrOffset;
+    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     return buf.typedArray![idx];
   };
 };
 
-const makeAttributeSetter = (bufferName: string, instanceOffset: number, attrOffset: number) => {
+const makeAttributeSetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
   return function setAttribute(this: VO, value: number) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // carries every attribute of its descriptor; these accessors run per sprite and per frame,
-    // so they assert that rather than pay for a check on every value
-    const idx = this[voIndex] * instanceOffset + attrOffset;
-    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    // lists the record of every buffer of its descriptor at the position this accessor was built
+    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
+    // a check on every value
+    const idx = this[indexKey] * instanceOffset + attrOffset;
+    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     buf.typedArray![idx] = value;
   };
 };
 
 const makeAttributeValuesGetter = (
-  bufferName: string,
+  bufferIndex: number,
   bufferItemSize: number,
   vertexCount: number,
   attrOffset: number,
@@ -37,10 +46,11 @@ const makeAttributeValuesGetter = (
   const count = vertexCount * attrSize;
   return function getAttributeValues(this: VO, target?: TypedArray | number[]) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // carries every attribute of its descriptor; these accessors run per sprite and per frame,
-    // so they assert that rather than pay for a check on every value
-    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const buf = this[voBuffer]!.buffers.get(bufferName)!;
+    // lists the record of every buffer of its descriptor at the position this accessor was built
+    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
+    // a check on every value
+    const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
+    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     const source = buf.typedArray!;
     if (target != null && target.length < count) {
       throw new RangeError(`${getterName}(): the target holds ${target.length} values, attribute "${attrName}" has ${count}`);
@@ -78,7 +88,7 @@ const writeValues = (
 };
 
 const makeAttributeValueSetter = (
-  bufferName: string,
+  bufferIndex: number,
   bufferItemSize: number,
   vertexCount: number,
   attrOffset: number,
@@ -86,18 +96,19 @@ const makeAttributeValueSetter = (
 ) => {
   return function setAttributeValues(this: VO, ...values: number[] | [ArrayLike<number>]) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // carries every attribute of its descriptor; these accessors run per sprite and per frame,
-    // so they assert that rather than pay for a check on every value
+    // lists the record of every buffer of its descriptor at the position this accessor was built
+    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
+    // a check on every value
     const first = values[0];
     const source: ArrayLike<number> = values.length === 1 && typeof first !== 'number' ? first : (values as number[]);
-    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[voBuffer]!.buffers.get(bufferName)!.typedArray!;
+    const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
+    const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
     writeValues(target, idx, source, vertexCount, bufferItemSize, attrSize);
   };
 };
 
 const makeFixedAttributeValueSetter = (
-  bufferName: string,
+  bufferIndex: number,
   bufferItemSize: number,
   vertexCount: number,
   attrOffset: number,
@@ -113,10 +124,11 @@ const makeFixedAttributeValueSetter = (
   // every call, and these setters run per sprite and per frame
   return function setAttributeValues(this: VO, v0?: number | ArrayLike<number>, v1?: number, v2?: number, v3?: number) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // carries every attribute of its descriptor; these accessors run per sprite and per frame,
-    // so they assert that rather than pay for a check on every value
-    const idx = this[voIndex] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[voBuffer]!.buffers.get(bufferName)!.typedArray!;
+    // lists the record of every buffer of its descriptor at the position this accessor was built
+    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
+    // a check on every value
+    const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
+    const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
     if (typeof v0 === 'object' && v0 !== null) {
       writeValues(target, idx, v0, vertexCount, bufferItemSize, attrSize);
       return;
@@ -136,6 +148,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
     const attr = descriptor.getAttribute(attrName)!;
     const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
     const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
+    const bufferIndex = voBuffer.bufferList.indexOf(buf);
 
     const attrEntries: [string, PropertyDescriptor][] = [];
 
@@ -144,8 +157,8 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
         attrName,
         {
           enumerable: true,
-          get: makeAttributeGetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
-          set: makeAttributeSetter(bufAttr.bufferName, buf.itemSize, bufAttr.offset),
+          get: makeAttributeGetter(bufferIndex, buf.itemSize, bufAttr.offset),
+          set: makeAttributeSetter(bufferIndex, buf.itemSize, bufAttr.offset),
         },
       ]);
     } else {
@@ -156,7 +169,7 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
           {
             enumerable: true,
             value: makeAttributeValuesGetter(
-              bufAttr.bufferName,
+              bufferIndex,
               buf.itemSize,
               descriptor.vertexCount,
               bufAttr.offset,
@@ -175,14 +188,8 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
             enumerable: true,
             value:
               count <= 4
-                ? makeFixedAttributeValueSetter(
-                    bufAttr.bufferName,
-                    buf.itemSize,
-                    descriptor.vertexCount,
-                    bufAttr.offset,
-                    attr.size,
-                  )
-                : makeAttributeValueSetter(bufAttr.bufferName, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+                ? makeFixedAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
+                : makeAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
           },
         ]);
       }
@@ -200,8 +207,8 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
               `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
               {
                 enumerable: true,
-                get: makeAttributeGetter(bufAttr.bufferName, instanceOffset, attrOffset),
-                set: makeAttributeSetter(bufAttr.bufferName, instanceOffset, attrOffset),
+                get: makeAttributeGetter(bufferIndex, instanceOffset, attrOffset),
+                set: makeAttributeSetter(bufferIndex, instanceOffset, attrOffset),
               },
             ]);
           }

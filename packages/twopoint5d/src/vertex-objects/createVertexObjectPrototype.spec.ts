@@ -1,5 +1,8 @@
-import {describe, expect, expectTypeOf, test} from 'vitest';
-import type {VOAttrGetter, VOAttrSetter} from './types.js';
+import {describe, expect, expectTypeOf, test, vi} from 'vitest';
+import {createTypedArray} from './createTypedArray.js';
+import type {VertexObjectDescription, VOAttrGetter, VOAttrSetter} from './types.js';
+import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
 describe('the generated attribute accessors', () => {
@@ -298,5 +301,117 @@ describe('the generated attribute accessors', () => {
     restVo.setPos([1, 2, 3, 4, 5, 6]);
     restVo.setPos([9, undefined as unknown as number, 9, 9, 9, 9]);
     expect(Array.from(restVo.getPos())).toEqual([9, 2, 9, 9, 9, 9]);
+  });
+});
+
+describe('how the generated accessors reach their buffer', () => {
+  interface SpriteVO {
+    x: number;
+    y: number;
+    z: number;
+    rotation: number;
+    setPosition(x: number, y: number, z: number): void;
+    getPosition(target?: Float32Array): Float32Array;
+  }
+
+  interface QuadVO {
+    x0: number;
+    setPosition(values: ArrayLike<number>): void;
+  }
+
+  const spriteDescription: VertexObjectDescription = {
+    vertexCount: 1,
+    attributes: {
+      position: {components: ['x', 'y', 'z'], usage: 'dynamic'},
+      color: {components: ['r', 'g', 'b', 'a']},
+      rotation: {size: 1, usage: 'dynamic'},
+    },
+  };
+
+  const quadDescription: VertexObjectDescription = {
+    vertexCount: 4,
+    attributes: {position: {components: ['x', 'y', 'z']}},
+    indices: [0, 1, 2, 0, 2, 3],
+  };
+
+  test('the generated accessors reach their typed array without the buffers getter', () => {
+    const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 2);
+    const vo = pool.createVO()!;
+    const quadPool = new VertexObjectPool<QuadVO>(quadDescription, 2);
+    const quad = quadPool.createVO()!;
+    const target = new Float32Array(3);
+
+    const buffersGetter = vi.spyOn(VertexObjectBuffer.prototype, 'buffers', 'get');
+
+    vo.x = 1;
+    expect(vo.x).toBe(1);
+    vo.setPosition(1, 2, 3);
+    vo.getPosition(target);
+    expect(Array.from(vo.getPosition())).toEqual([1, 2, 3]);
+    quad.x0 = 4;
+    quad.setPosition(new Float32Array(12));
+
+    expect(buffersGetter).not.toHaveBeenCalled();
+    expect(Array.from(target)).toEqual([1, 2, 3]);
+
+    pool.dispose();
+    quadPool.dispose();
+  });
+
+  test('a typed array put in through setTypedArray() is the one the accessors read and write', () => {
+    const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 2);
+    const vo = pool.createVO()!;
+    const {bufferName} = pool.buffer.bufferAttributes.get('position')!;
+    const {dataType, typedArray} = pool.buffer.buffers.get(bufferName)!;
+    const next = createTypedArray(dataType, typedArray!.length);
+    const {offset} = pool.buffer.bufferAttributes.get('position')!;
+    next[offset] = 5;
+
+    pool.buffer.setTypedArray(bufferName, next);
+
+    expect(vo.x).toBe(5);
+    vo.x = 7;
+    expect(next[offset]).toBe(7);
+
+    pool.dispose();
+  });
+
+  test('every buffer built from one descriptor lists its records in the same order', () => {
+    const descriptor = new VertexObjectDescriptor(spriteDescription);
+    const first = new VertexObjectBuffer(descriptor, 2);
+    const clone = first.clone();
+    const wider = new VertexObjectBuffer(descriptor, 5);
+
+    for (const buffer of [first, clone, wider]) {
+      expect(buffer.bufferList.map((b) => b.bufferName)).toEqual([...buffer.buffers.keys()]);
+      expect(buffer.bufferList.map((b) => b.bufferName)).toEqual(first.bufferList.map((b) => b.bufferName));
+    }
+
+    const pool = new VertexObjectPool<SpriteVO>(descriptor, 2);
+    const vo = pool.createVO()!;
+    vo.setPosition(1, 2, 3);
+    vo.rotation = 4;
+
+    pool.resize(8);
+
+    expect(Array.from(vo.getPosition())).toEqual([1, 2, 3]);
+    expect(vo.rotation).toBe(4);
+    vo.x = 9;
+    vo.rotation = 10;
+    const {bufferName, offset} = pool.buffer.bufferAttributes.get('position')!;
+    expect(pool.buffer.buffers.get(bufferName)!.typedArray![offset]).toBe(9);
+    const rotation = pool.buffer.bufferAttributes.get('rotation')!;
+    expect(pool.buffer.buffers.get(rotation.bufferName)!.typedArray![rotation.offset]).toBe(10);
+
+    pool.dispose();
+  });
+
+  test('a released buffer lists no records', () => {
+    const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 2);
+    const {buffer} = pool;
+
+    pool.dispose();
+
+    expect(buffer.bufferList.length).toBe(0);
   });
 });
