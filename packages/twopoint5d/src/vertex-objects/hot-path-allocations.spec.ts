@@ -1,3 +1,4 @@
+import type {BufferAttribute} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
@@ -61,6 +62,11 @@ const instanceDescription: VertexObjectDescription = {
 
 const extraInstanceDescription: VertexObjectDescription = {
   attributes: {impact: {size: 1, usage: 'dynamic'}},
+};
+
+// an integer attribute without `normalized`, whose array three's WebGPU backend widens to 32 bits
+const levelDescription: VertexObjectDescription = {
+  attributes: {level: {components: ['a', 'b'], type: 'uint16', usage: 'dynamic'}},
 };
 
 const quadDescription: VertexObjectDescription = {
@@ -178,6 +184,29 @@ describe('vertex objects on the hot path', () => {
       });
       const bytesPerCall = bytesPerRound / 1000;
 
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+      geometry.dispose();
+    });
+
+    test('update() of a geometry whose array three widened allocates nothing per call', async () => {
+      // few objects: every update() copies all of them into the widened array, and a thousand
+      // would spend the measurement on that copy
+      const geometry = new VertexObjectGeometry(levelDescription, 16);
+      for (let i = 0; i < 16; i++) geometry.pool.createVO();
+      geometry.update();
+
+      // what three's WebGPU backend does as it builds the gpu buffer of this attribute
+      const attr = geometry.getAttribute('level') as BufferAttribute;
+      attr.array = new Uint32Array(attr.array);
+      attr.clearUpdateRanges();
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 1000; i++) geometry.update();
+      });
+      const bytesPerCall = bytesPerRound / 1000;
+
+      expect(attr.array).toBeInstanceOf(Uint32Array);
       expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
 
       geometry.dispose();

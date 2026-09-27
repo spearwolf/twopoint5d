@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - an `update()` whose writes all lie beyond the objects in use uploads nothing, and no attribute is handed an update range with a `count` of 0
 - `touch()`, `touchAttributes()` and `touchBuffers()` of `VOBufferGeometry` and `InstancedVOBufferGeometry` mark for the next `update()`: the version of the attribute moves on there, and a pool without an object in use uploads nothing. Every argument of `touch()` counts on its own, so a later `{static: false}` leaves an earlier `{static: true}` standing. `touch()` resolves its names and plain usage types itself rather than through `touchAttributes()` and `touchBuffers()`, so an override of those two does not see them; a `{base, instanced}` argument of `InstancedVOBufferGeometry#touch()` goes through `touchBuffers()`
 - perf `update()`, `touch()` and `VertexObjectPool#touchVO()` allocate nothing of their own once a frame loop has settled; three's `addUpdateRange()` builds one `{start, count}` per range it is handed, which after a render — three empties the ranges as it uploads them — is at least one per buffer with `autoTouch` and frame. A geometry keeps its attribute arrays in step with its pools by comparing the arrays buffer by buffer
+- every attribute of a vertex object buffer takes a whole number of 4 bytes per vertex, which reaches `float16` and the 8- and 16-bit types alone: an attribute whose values do not end on a 4-byte boundary gets padding elements behind them, the `offset` of the attributes after it in the same buffer and the `itemSize` of the buffer grow by that padding, and a buffer of one attribute with padding reaches the geometry as an `InterleavedBuffer` (`InstancedInterleavedBuffer` on the instanced route). three's WebGPU backend then pads no buffer on an upload, and a render pipeline takes the offsets of interleaved 8-bit, 16-bit and `float16` attributes. The arrays `toBuffersData()` hands out for such layouts are longer by the padding. See the Migration Guide
 - perf a vertex object from `VertexObjectPool#createVO()` or `VertexObjectPool#getVO()` is built by two plain assignments and carries `voBuffer` and `voIndex` as enumerable own properties, so a spread or `Object.assign()` copies both; the generated accessors reach the typed array of their buffer by its position in the buffer instead of by its name
 - a `TextureResource` on its own — no `TextureStore` around it — builds its `TextureFactory` from its `renderer` with no texture class to start from, as the factory of a store does, and builds a new one whenever another renderer is written, with the anisotropy maximum of that renderer; a `textureFactory` written from outside stays
 - the `error` a `TextureResource` reports for an animation entry that carries neither a `duration` nor a `frameRate` is the error `FrameBasedAnimations#add()` throws for it, which names the animation. `add()` refuses a name that another animation already carries and a third argument that is no `TextureAtlas`, no `TileSet` and no array of frames with an error that starts with `FrameBasedAnimations: add()` and names the animation, as every other refusal of `add()` does; the one for the third argument names the value it got
@@ -429,6 +430,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TexturedSprites`, `AnimatedSprites` and `TileSprites` for a frame with `FLIP_DIAGONAL`: they draw it as `TextureCoords` describes it, so a rotated TexturePacker frame stands upright
 - fix `AnimatedSpritesMaterial` with an `animsMap` baked with `includeTextureSize`: it reads every frame at the texel `bakeDataTexture()` writes it to, the second frame of an animation and those after it included
 - fix `TextureStore#dispose()` while a catalog is being fetched: it aborts the fetch, and a `loadAsync()` still waiting for it rejects
+- fix an attribute of type `int8`, `uint8`, `int16` or `uint16` without `normalized: true` under three's WebGPU backend: every write after the first render reaches the gpu. three builds the gpu buffer of such an attribute from a copy of its array widened to 32 bits and uploads from that copy alone; the geometry keeps the copy and writes every upload range of the pool into it
 
 ### Migration Guide
 
@@ -536,6 +538,50 @@ Setting `attribute.needsUpdate = true` by hand is not the way to say it. It asks
 #### `AttributeBuffer` carries four more fields
 
 `AttributeBuffer` holds `dirtyFrom`, `dirtyTo`, `dirtySince` and `pickedUpSerial` besides `serial`. A `VertexObjectBuffer` fills them itself; only code that builds such a record by hand has to. A fresh buffer starts at `-1`, `-1`, `0`, `0`.
+
+#### An attribute of 8 or 16 bits takes whole 4 bytes per vertex
+
+The layouts of `float16`, `int16`, `uint16`, `int8`, `uint8` and `uint8clamped` attributes change; a layout of 32- and 64-bit attributes stays as it is. Every attribute takes its size rounded up to a whole number of 4 bytes per vertex, and the padding sits behind it: a `uint8` attribute of `size: 3` takes 4 elements, a `float16` attribute of `size: 3` as well, a `uint16` attribute of `size: 1` takes 2. Two `uint8` attributes of `size: 3` in one buffer:
+
+```ts check
+import {VertexObjectPool} from '@spearwolf/twopoint5d';
+
+const pool = new VertexObjectPool(
+  {
+    attributes: {
+      base: {components: ['baseR', 'baseG', 'baseB'], type: 'uint8', normalized: true},
+      tint: {components: ['tintR', 'tintG', 'tintB'], type: 'uint8', normalized: true},
+    },
+  },
+  100,
+);
+
+// both share the buffer `static_uint8N`: 3 bytes of `base`, 1 of padding, 3 of `tint`, 1 of padding
+console.log(pool.buffer.buffers.get('static_uint8N')?.itemSize); // 8
+console.log(pool.buffer.bufferAttributes.get('base')?.offset); // 0
+console.log(pool.buffer.bufferAttributes.get('tint')?.offset); // 4
+```
+
+Buffers data taken from a layout without the padding has to be taken anew. The constructors of `VOBufferPool` and `VertexObjectPool` refuse it with a `RangeError` that names the length the layout asks for. `VOBufferPool#fromBuffersData()` takes a shorter array and writes it from the first element on, without an error — every vertex then lands in the grid of the padded layout, beside its slot.
+
+Code that builds arrays of a layout itself — for `VertexObjectBuffer#copyArray()` or as buffers data by hand — writes `itemSize` elements per vertex and puts each attribute at its `AttributeBufferLayout#offset`; the padding elements stay `0`. `VertexObjectBuffer#copyAttributes()` and `VOBufferPool#createFromAttributes()` take the values of each attribute without padding and need no change, and neither do the generated accessors.
+
+An attribute with padding that is alone in its buffer reaches the geometry as an `InterleavedBufferAttribute` over an `InterleavedBuffer` (an `InstancedInterleavedBuffer` on the instanced route), where a buffer without padding gives a `BufferAttribute` or an `InstancedBufferAttribute`: a `uint8` attribute of `size: 3`, say, or a `float16` attribute of `size: 1`. An `InterleavedBufferAttribute` has no `addUpdateRange()`, `clearUpdateRanges()`, `updateRanges`, `setUsage()` or `version` — a call to one of them on such an attribute throws a `TypeError`, and a branch on `isBufferAttribute` takes the other way. Update ranges, the usage and the version sit on the buffer behind it, `attr.data`. The better way is to leave the ranges to the geometry and say what was written through `touch()` or `VertexObjectPool#touchVO()`:
+
+```ts check
+import {VertexObjectGeometry} from '@spearwolf/twopoint5d';
+import type {InterleavedBufferAttribute} from 'three/webgpu';
+
+const geometry = new VertexObjectGeometry({attributes: {glow: {size: 3, type: 'uint8', normalized: true}}}, 100);
+
+// the buffer behind the attribute carries the ranges, the usage and the version
+const glow = geometry.getAttribute('glow') as InterleavedBufferAttribute;
+console.log(glow.isInterleavedBufferAttribute, glow.data.stride); // true 4
+
+// the geometry picks the ranges on its next update()
+geometry.touch('glow');
+geometry.update();
+```
 
 #### An animation needs a frame and a duration
 

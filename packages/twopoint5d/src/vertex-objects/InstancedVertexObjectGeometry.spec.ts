@@ -1,5 +1,6 @@
 import {createSandbox} from 'sinon';
-import type {BufferAttribute} from 'three/webgpu';
+import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
+import {InstancedInterleavedBuffer} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
@@ -364,6 +365,22 @@ describe('InstancedVertexObjectGeometry', () => {
 
     expect(base(), 'the flat form reaches every route').toBeGreaterThan(baseNext);
     expect(instanced(), 'the flat form reaches every route').toBeGreaterThan(instancedNext);
+  });
+
+  test('an instanced attribute whose buffer carries padding reaches the geometry through an InstancedInterleavedBuffer', () => {
+    const geometry = new InstancedVertexObjectGeometry(
+      {attributes: {tint: {size: 3, type: 'uint8', normalized: true}}},
+      4,
+      baseDescriptor,
+      1,
+    );
+
+    const tint = geometry.getAttribute('tint') as InterleavedBufferAttribute;
+    expect(tint.isInterleavedBufferAttribute).toBe(true);
+    expect(tint.data).toBeInstanceOf(InstancedInterleavedBuffer);
+    expect(tint.data.stride).toBe(4);
+    expect(tint.itemSize).toBe(3);
+    expect(tint.offset).toBe(0);
   });
 
   describe('a pool that has been disposed', () => {

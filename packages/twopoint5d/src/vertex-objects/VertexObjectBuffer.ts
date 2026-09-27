@@ -1,3 +1,4 @@
+import {alignedAttributeSize} from './alignedAttributeSize.js';
 import {checkBufferArray} from './checkBufferArray.js';
 import {createTypedArray} from './createTypedArray.js';
 import {createVertexObjectPrototype} from './createVertexObjectPrototype.js';
@@ -16,7 +17,10 @@ export interface AttributeBufferLayout {
   bufferName: string;
   /** The attribute this layout is about, named as the description names it. */
   attributeName: string;
-  /** Where the attribute starts within a vertex of its buffer, counted in elements, not in bytes. */
+  /**
+   * Where the attribute starts within a vertex of its buffer, counted in elements, not in bytes.
+   * It always starts on a 4-byte boundary.
+   */
   offset: number;
 }
 
@@ -24,7 +28,10 @@ export interface AttributeBufferLayout {
 export interface AttributeBuffer {
   /** The name this buffer answers to, in the layout as well as in a geometry built from it. */
   bufferName: string;
-  /** The elements one vertex takes in this buffer, all attributes sharing it counted together. */
+  /**
+   * The elements one vertex takes in this buffer, all attributes sharing it counted together, each
+   * rounded up to whole 4 bytes — the padding behind an attribute included.
+   */
   itemSize: number;
   /** The element type of the typed array, shared by every attribute in this buffer. */
   dataType: VertexAttributeDataType;
@@ -173,8 +180,9 @@ export class VertexObjectBuffer {
    * throws on a mismatch.
    *
    * Every array in `buffersData` has to be the typed array of its buffer's data type and hold
-   * exactly `capacity × vertexCount × itemSize` elements; otherwise the constructor throws a
-   * `TypeError` or a `RangeError` that names the buffer.
+   * exactly `capacity × vertexCount × itemSize` elements, where `itemSize` counts the padding
+   * behind each attribute; otherwise the constructor throws a `TypeError` or a `RangeError` that
+   * names the buffer.
    *
    * @throws when `source` is the buffer of a disposed pool, which has no data to build a second
    * buffer from
@@ -234,13 +242,20 @@ export class VertexObjectBuffer {
         const {bufferName} = attribute;
         let offset = 0;
         const buffer = forming.get(bufferName);
+        // every attribute takes a whole number of 4 bytes per vertex, so the next one starts on a
+        // 4-byte boundary and the stride of the buffer is a multiple of 4 bytes: the vertex layout
+        // WebGPU asks for. Without it three pads a buffer of one attribute anew on every update and
+        // copies the whole array to do so (`WebGPUAttributeUtils.js:202–222`), and a render pipeline
+        // over interleaved attributes on an odd offset is refused. No accessor reads or writes the
+        // padding
         if (buffer) {
           offset = buffer.itemSize;
-          buffer.itemSize += attribute.size;
+          buffer.itemSize += alignedAttributeSize(attribute.size, buffer.dataType);
         } else {
+          // the array of the buffer is built with the data type of its first attribute
           forming.set(bufferName, {
             bufferName,
-            itemSize: attribute.size,
+            itemSize: alignedAttributeSize(attribute.size, attribute.dataType),
             dataType: attribute.dataType,
             usageType: attribute.usageType,
           });
@@ -519,7 +534,9 @@ export class VertexObjectBuffer {
    * Throws on the buffer of a disposed pool, which has no array to write into, and for a
    * buffer name this buffer does not know.
    *
-   * A source shorter than the buffer is taken as it is and fills the objects it reaches.
+   * The source lies in the layout of the buffer: `itemSize` elements per vertex, padding
+   * included, each attribute at its `offset`. A source shorter than the buffer is taken as it is
+   * and fills the objects it reaches.
    *
    * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
    * more, or when the source reaches past the last object of the buffer from that offset on.

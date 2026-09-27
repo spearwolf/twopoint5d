@@ -45,7 +45,13 @@ function initializeRoute(
       pool.buffer.bufferNameAttributes.get(buffer.bufferName),
       `the attributes of buffer "${buffer.bufferName}"`,
     );
-    if (attributes.length > 1) {
+    // a buffer of one attribute with padding behind it goes the interleaved way as well: a
+    // BufferAttribute of the padded itemSize would show the shader the padding as a component, one
+    // of the attribute's size would read the array at the wrong stride. An InterleavedBuffer carries
+    // the stride, and three never pads one — it has no itemSize (`WebGPUAttributeUtils.js:119`), and
+    // its arrayStride is `stride × BYTES_PER_ELEMENT` (`:306`)
+    const padded = attributes.length === 1 && descriptor.attributes.get(attributes[0]!.attributeName)?.size !== buffer.itemSize;
+    if (attributes.length > 1 || padded) {
       const interleavedBuffer = builders.interleavedBuffer(asThreeTypedArray(buffer.typedArray!), buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);

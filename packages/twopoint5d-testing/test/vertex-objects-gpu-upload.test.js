@@ -1,13 +1,24 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
-import {attribute} from 'three/tsl';
-import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay, bufferOf, readBack, quadDescription, instancedDescription} from './helpers/fixtures.js';
+import {attribute, vec3} from 'three/tsl';
+import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarget, Scene} from 'three/webgpu';
+import {
+  makeContainer,
+  disposeDisplay,
+  bufferOf,
+  readBack,
+  quadDescription,
+  instancedDescription,
+  renderToPixels,
+  rgbAt,
+  isNearColor,
+} from './helpers/fixtures.js';
 
 /** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 /** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
 /** @typedef {VO & {setPosition: VOAttrSetter, setColor: VOAttrSetter}} ColoredQuadVO */
+/** @typedef {VO & {setPosition: VOAttrSetter, setBase: VOAttrSetter, setTint: VOAttrSetter}} TintedQuadVO */
 
 /**
  * Reads an interleaved attribute back out of the gpu buffer it shares with its siblings.
@@ -59,6 +70,24 @@ const interleavedQuadDescription = {
     color: {components: ['r', 'g', 'b'], type: 'float32', usage: 'dynamic'},
   },
 };
+
+// `base` and `tint` agree on type, usage and normalized, so both land in one buffer, where each of
+// the two takes three bytes and one of padding per vertex; `glow` has a buffer of its own, in which
+// its three bytes and one of padding are all a vertex takes
+/** @type {VertexObjectDescription} */
+const tintedQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {
+    position: {components: ['x', 'y', 'z'], type: 'float32'},
+    base: {components: ['baseR', 'baseG', 'baseB'], type: 'uint8', normalized: true},
+    tint: {components: ['tintR', 'tintG', 'tintB'], type: 'uint8', normalized: true},
+    glow: {size: 3, type: 'uint8', normalized: true, bufferName: 'glow'},
+  },
+};
+
+// a width of 64 pixels keeps the rows rgbAt() reads unpadded
+const TARGET_SIZE = 64;
 
 describe('vertex-objects — gpu upload', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -309,6 +338,50 @@ describe('vertex-objects — gpu upload', function () {
     expect((await readBackInterleaved(display, position)).slice(0, 24)).to.deep.equal([
       2, 2, 2, 0, 0, 0, 3, 3, 3, 7, 7, 7, 4, 4, 4, 8, 8, 8, 5, 5, 5, 9, 9, 9,
     ]);
+  });
+
+  it('two attributes of three normalized bytes that share a buffer are each drawn from their own four bytes', async function () {
+    /** @type {VertexObjectGeometry<TintedQuadVO>} */
+    const geometry = new VertexObjectGeometry(tintedQuadDescription, 1);
+    const material = new MeshBasicNodeMaterial();
+    // red out of `base`, green out of `tint`: a tint read at the offset of an unpadded layout
+    // would take the padding and the first two bytes of the tint instead. Blue out of `glow`, which
+    // stays 0 — read only so that three builds a gpu buffer for it
+    material.colorNode = vec3(
+      attribute('base', /** @type {const} */ ('vec3')).x,
+      attribute('tint', /** @type {const} */ ('vec3')).y,
+      attribute('glow', /** @type {const} */ ('vec3')).z,
+    );
+    const mesh = new VertexObjects(geometry, material);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+
+    const quad = geometry.pool.createVO();
+    // a quad far wider than the view, so the pixel in the middle of the target is one of its own
+    quad.setPosition([-10, -10, 0, 10, -10, 0, 10, 10, 0, -10, 10, 0]);
+    quad.setBase([255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]);
+    quad.setTint([0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0]);
+    mesh.update();
+
+    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
+    try {
+      const pixels = await renderToPixels(display.renderer, scene, camera, target);
+      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+      expect(isNearColor(middle, [255, 255, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
+    } finally {
+      target.dispose();
+    }
+
+    if (display.isWebGPUBackend) {
+      // three pads a buffer attribute whose stride is no multiple of 4 bytes, and does it again on
+      // every update; `glow` alone in its buffer is the attribute that would be one, and a buffer
+      // three padded carries `_paddedItemSize`
+      const backend = /** @type {{get(object: object): {_paddedItemSize?: number}}} */ (
+        /** @type {unknown} */ (display.renderer.backend)
+      );
+      expect(backend.get(bufferOf(geometry.getAttribute('glow')))._paddedItemSize).to.equal(undefined);
+    }
   });
 
   it('three still reads an interleaved attribute back as an empty buffer on the WebGL backend', async function () {

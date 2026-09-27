@@ -1099,4 +1099,129 @@ describe('VertexObjectBuffer', () => {
       });
     }
   });
+
+  describe('attributes of fewer than 32 bits', () => {
+    // `base` and `tint` agree on type, usage and normalized, so both land in `static_uint8N`
+    const smallTypesDescriptor = (vertexCount: number) =>
+      new VertexObjectDescriptor({
+        vertexCount,
+        attributes: {
+          base: {components: ['br', 'bg', 'bb'], type: 'uint8', normalized: true},
+          tint: {components: ['tr', 'tg', 'tb'], type: 'uint8', normalized: true},
+          uv: {size: 3, type: 'float16'},
+          pos: {size: 3},
+        },
+      });
+
+    interface SmallTypesVO extends VO {
+      setBase(...values: number[]): void;
+      setTint(...values: number[]): void;
+      getBase(): ArrayLike<number>;
+      getTint(): ArrayLike<number>;
+      setUv(...values: number[]): void;
+      getUv(): ArrayLike<number>;
+    }
+
+    test('every attribute starts on a 4-byte boundary and the buffer takes a whole number of 4 bytes per vertex', () => {
+      const capacity = 3;
+      const vertexCount = 2;
+      const vob = new VertexObjectBuffer(smallTypesDescriptor(vertexCount), capacity);
+
+      expect(vob.bufferAttributes.get('base')!.offset).toBe(0);
+      expect(vob.bufferAttributes.get('tint')!.offset).toBe(4);
+
+      expect(vob.buffers.get('static_uint8N')!.itemSize).toBe(8);
+      expect(vob.buffers.get('static_float16')!.itemSize).toBe(4);
+      expect(vob.buffers.get('static_float32')!.itemSize).toBe(3);
+
+      for (const buffer of vob.buffers.values()) {
+        expect(buffer.typedArray!.length, buffer.bufferName).toBe(capacity * vertexCount * buffer.itemSize);
+      }
+    });
+
+    test('the generated accessors write around the padding and leave it at 0', () => {
+      const pool = new VertexObjectPool<SmallTypesVO>(smallTypesDescriptor(1), 1);
+      const vo = pool.createVO()!;
+
+      vo.setBase(1, 2, 3);
+      vo.setTint(4, 5, 6);
+
+      expect(Array.from(pool.buffer.buffers.get('static_uint8N')!.typedArray!)).toEqual([1, 2, 3, 0, 4, 5, 6, 0]);
+      expect(Array.from(vo.getBase())).toEqual([1, 2, 3]);
+      expect(Array.from(vo.getTint())).toEqual([4, 5, 6]);
+    });
+
+    test('toAttributeArrays() answers each attribute without its padding', () => {
+      const pool = new VertexObjectPool<SmallTypesVO>(smallTypesDescriptor(1), 2);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      vo0.setBase(1, 2, 3);
+      vo0.setTint(4, 5, 6);
+      vo0.setUv(0.5, 0.25, 0.125);
+      vo1.setBase(7, 8, 9);
+      vo1.setTint(10, 11, 12);
+      vo1.setUv(1, 2, 3);
+
+      const arrays = pool.buffer.toAttributeArrays(['base', 'tint', 'uv']);
+
+      expect(Array.from(arrays['base']!)).toEqual([1, 2, 3, 7, 8, 9]);
+      expect(Array.from(arrays['tint']!)).toEqual([4, 5, 6, 10, 11, 12]);
+      expect(Array.from(arrays['uv']!)).toEqual([0.5, 0.25, 0.125, 1, 2, 3]);
+    });
+
+    test('copyAttributes() fills the slots of an attribute from values without padding', () => {
+      const vob = new VertexObjectBuffer(smallTypesDescriptor(1), 2);
+
+      expect(
+        vob.copyAttributes({
+          base: [1, 2, 3, 7, 8, 9],
+          tint: [4, 5, 6, 10, 11, 12],
+        }),
+      ).toBe(2);
+
+      // prettier-ignore
+      expect(Array.from(vob.buffers.get('static_uint8N')!.typedArray!)).toEqual([
+        1, 2, 3, 0, 4, 5, 6, 0,
+        7, 8, 9, 0, 10, 11, 12, 0,
+      ]);
+    });
+
+    test('buffers data at the length of a layout without padding is refused with a RangeError that names the padded length', () => {
+      const capacity = 2;
+      const vertexCount = 3;
+      const build = () =>
+        new VertexObjectBuffer(smallTypesDescriptor(vertexCount), {
+          capacity,
+          usedCount: 0,
+          buffers: {static_uint8N: new Uint8Array(capacity * vertexCount * 6)},
+        });
+
+      expect(build).toThrow(RangeError);
+      expect(build).toThrow(`exactly ${capacity * vertexCount * 8}`);
+    });
+
+    test('toBuffersData() of one pool fits a second pool of the same description', () => {
+      const descriptor = smallTypesDescriptor(1);
+      const source = new VertexObjectPool<SmallTypesVO>(descriptor, 4);
+      const vo0 = source.createVO()!;
+      const vo1 = source.createVO()!;
+      vo0.setBase(1, 2, 3);
+      vo0.setTint(4, 5, 6);
+      vo0.setUv(0.5, 0.25, 0.125);
+      vo1.setBase(7, 8, 9);
+      vo1.setTint(10, 11, 12);
+      vo1.setUv(1, 2, 3);
+
+      const target = new VertexObjectPool<SmallTypesVO>(descriptor, source.toBuffersData({copy: true}));
+
+      expect(target.usedCount).toBe(2);
+      const [copy0, copy1] = [target.getVO(0)!, target.getVO(1)!];
+      expect(Array.from(copy0.getBase())).toEqual([1, 2, 3]);
+      expect(Array.from(copy0.getTint())).toEqual([4, 5, 6]);
+      expect(Array.from(copy0.getUv())).toEqual([0.5, 0.25, 0.125]);
+      expect(Array.from(copy1.getBase())).toEqual([7, 8, 9]);
+      expect(Array.from(copy1.getTint())).toEqual([10, 11, 12]);
+      expect(Array.from(copy1.getUv())).toEqual([1, 2, 3]);
+    });
+  });
 });

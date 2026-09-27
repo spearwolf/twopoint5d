@@ -1016,6 +1016,23 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(updateRangesOf(geometry, 'position')).toEqual([{start: 0, count: 3 * 4 * 5}]);
     });
+
+    test('the upload range of a buffer with padding spans its whole stride', () => {
+      const geometry = new VertexObjectGeometry(
+        {
+          vertexCount: 4,
+          attributes: {color: {size: 3, type: 'uint8', normalized: true, usage: 'dynamic'}},
+        },
+        10,
+      );
+
+      geometry.pool.createVO();
+      geometry.pool.createVO();
+      geometry.update();
+
+      // 3 bytes and 1 of padding per vertex, 4 vertices per object, 2 objects in use
+      expect(updateRangesOf(geometry, 'color')).toEqual([{start: 0, count: 2 * 4 * 4}]);
+    });
   });
 
   describe('constructed with a BufferGeometry', () => {
@@ -1757,6 +1774,167 @@ describe('vertex-buffers-geometry-updates', () => {
 
       expect(Object.keys(geometry.attributes).sort()).toEqual(['foo', 'position']);
       expect(Array.from((geometry.getAttribute('foo') as BufferAttribute).array)).toEqual([1, 2, 3, 4]);
+    });
+  });
+
+  // three 0.185.1 builds the gpu buffer of an 8- or 16-bit integer attribute without `normalized`
+  // out of a 32-bit copy of its array, puts that copy in the place of `array` and uploads from it
+  // alone from then on (`WebGPUAttributeUtils#createAttribute()`,
+  // `src/renderers/webgpu/utils/WebGPUAttributeUtils.js:84–109`). Building the gpu buffer leaves
+  // the update ranges standing; the first update after it takes them up
+  // (`src/renderers/common/Attributes.js:73–107`). Each test below widens the array by hand after
+  // the first `update()` and empties the ranges, the state that update leaves behind, since no
+  // renderer runs in this suite
+  describe('an array three widened to 32 bits', () => {
+    interface LevelVO extends VO {
+      a: number;
+      b: number;
+    }
+
+    interface OffsetVO extends VO {
+      dx: number;
+      dy: number;
+    }
+
+    interface RgbaVO extends VO {
+      setRgba(...values: number[]): void;
+    }
+
+    const rgbaDescription = {attributes: {rgba: {components: ['r', 'g', 'b', 'a'], type: 'uint8' as const}}};
+
+    const widen = <T extends Uint32Array | Int32Array>(
+      geometry: BufferGeometry,
+      attrName: string,
+      ArrayType: new (source: ArrayLike<number>) => T,
+    ): T => {
+      const buffer = bufferInSlot(geometry, attrName)!;
+      const widened = new ArrayType(buffer.array);
+      buffer.array = widened;
+      buffer.clearUpdateRanges();
+      return widened;
+    };
+
+    test('a write after the widening reaches the gpu through the widened array', () => {
+      const geometry = new VertexObjectGeometry<LevelVO>(
+        {vertexCount: 1, attributes: {level: {components: ['a', 'b'], type: 'uint16', usage: 'dynamic'}}},
+        4,
+      );
+      const vo0 = geometry.pool.createVO()!;
+      const vo1 = geometry.pool.createVO()!;
+      vo0.a = 1;
+      vo0.b = 2;
+      vo1.b = 3;
+      geometry.update();
+
+      const widened = widen(geometry, 'level', Uint32Array);
+
+      vo1.a = 60000;
+      geometry.update();
+
+      const attr = geometry.getAttribute('level') as BufferAttribute;
+      expect(attr.array).toBe(widened);
+      const poolArray = geometry.pool.buffer.buffers.get('dynamic_uint16')!.typedArray!;
+      expect(Array.from(widened.subarray(0, 4))).toEqual(Array.from(poolArray.subarray(0, 4)));
+      expect(Array.from(widened.subarray(0, 4))).toEqual([1, 2, 60000, 3]);
+      expect(attr.updateRanges).toEqual([{start: 0, count: 4}]);
+    });
+
+    test('an interleaved array keeps the sign of every value it takes', () => {
+      const geometry = new VertexObjectGeometry<OffsetVO>(
+        {
+          attributes: {
+            dx: {size: 1, type: 'int8', bufferName: 'offsets'},
+            dy: {size: 1, type: 'int8', bufferName: 'offsets'},
+          },
+        },
+        4,
+      );
+      const vo = geometry.pool.createVO()!;
+      geometry.update();
+
+      const dx = geometry.getAttribute('dx') as InterleavedBufferAttribute;
+      const dy = geometry.getAttribute('dy') as InterleavedBufferAttribute;
+      expect(dx.isInterleavedBufferAttribute).toBe(true);
+      expect(dx.data).toBe(dy.data);
+      expect(dx.data.stride).toBe(8);
+      expect(dx.offset).toBe(0);
+      expect(dy.offset).toBe(4);
+
+      const widened = widen(geometry, 'dx', Int32Array);
+
+      vo.dx = -5;
+      vo.dy = -128;
+      geometry.pool.touchVO(vo);
+      geometry.update();
+
+      expect(dx.data.array).toBe(widened);
+      expect(widened[0]).toBe(-5);
+      expect(widened[4]).toBe(-128);
+    });
+
+    test('only the objects an upload carries are copied into the widened array', () => {
+      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 8);
+      const vo0 = geometry.pool.createVO()!;
+      const vo1 = geometry.pool.createVO()!;
+      const vo2 = geometry.pool.createVO()!;
+      vo0.setRgba(1, 2, 3, 4);
+      vo1.setRgba(5, 6, 7, 8);
+      vo2.setRgba(9, 10, 11, 12);
+      geometry.update();
+
+      const widened = widen(geometry, 'rgba', Uint32Array);
+      // a value the array of the pool cannot hold, so only a copy of object 0 would replace it
+      widened[0] = 1000;
+
+      vo2.setRgba(13, 14, 15, 16);
+      geometry.pool.touchVO(vo2);
+      geometry.update();
+
+      const attr = geometry.getAttribute('rgba') as BufferAttribute;
+      expect(attr.array).toBe(widened);
+      expect(widened[0]).toBe(1000);
+      expect(Array.from(widened.subarray(8, 12))).toEqual([13, 14, 15, 16]);
+      expect(attr.updateRanges).toEqual([{start: 8, count: 4}]);
+    });
+
+    test('buffers data that comes back in as a whole lands in the widened array', () => {
+      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 4);
+      geometry.pool.createVO()!.setRgba(1, 2, 3, 4);
+      geometry.update();
+
+      const widened = widen(geometry, 'rgba', Uint32Array);
+
+      const other = new VertexObjectPool<RgbaVO>(rgbaDescription, 4);
+      other.createVO()!.setRgba(5, 6, 7, 8);
+      other.createVO()!.setRgba(9, 10, 11, 12);
+      geometry.pool.fromBuffersData(other.toBuffersData());
+      geometry.update();
+
+      const attr = geometry.getAttribute('rgba') as BufferAttribute;
+      expect(attr.array).toBe(widened);
+      expect(Array.from(widened.subarray(0, 8))).toEqual([5, 6, 7, 8, 9, 10, 11, 12]);
+    });
+
+    test('an array three left as it is stays the array of the pool', () => {
+      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 4);
+      const vo = geometry.pool.createVO()!;
+      geometry.update();
+
+      vo.setRgba(1, 2, 3, 4);
+      geometry.pool.touchVO(vo);
+      geometry.update();
+
+      const attr = geometry.getAttribute('rgba') as BufferAttribute;
+      expect(attr.array).toBe(geometry.pool.buffer.buffers.get('static_uint8')!.typedArray);
+
+      // an array of the same element type that comes back in as a whole is the array of the pool, too
+      const other = new VertexObjectPool<RgbaVO>(rgbaDescription, 4);
+      other.createVO()!.setRgba(5, 6, 7, 8);
+      geometry.pool.fromBuffersData(other.toBuffersData());
+      geometry.update();
+
+      expect(attr.array).toBe(geometry.pool.buffer.buffers.get('static_uint8')!.typedArray);
+      expect(attr.array).toBe(other.buffer.buffers.get('static_uint8')!.typedArray);
     });
   });
 });

@@ -2,16 +2,32 @@ import type {AttributeRoute} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectPool} from './VertexObjectPool.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
+import {copyObjectRanges} from './copyObjectRanges.js';
 import {selectAttributes} from './selectAttributes.js';
 import {selectBuffers} from './selectBuffers.js';
 import {setUploadRanges} from './setUploadRanges.js';
-import type {BufferLike, TouchBuffersType} from './types.js';
+import type {BufferLike, TouchBuffersType, TypedArray} from './types.js';
 import {UPLOAD_RANGES_ARRAY_LENGTH} from './uploadRanges.js';
 
 // read once into a constant of this module, so the loop of syncUploads() never touches an imported
 // binding: a module runner that rewrites imports, as the one Vitest runs specs and benches in does,
 // turns every read of one into a property read on a module object
 const applyUploadRanges: typeof setUploadRanges = setUploadRanges;
+const copyUploadRanges: typeof copyObjectRanges = copyObjectRanges;
+
+/**
+ * Whether `bufAttr` holds the 32-bit copy three's WebGPU backend makes of the array of the pool.
+ *
+ * three 0.185.1 builds the gpu buffer of an attribute whose array is an `Int8Array`, `Uint8Array`,
+ * `Int16Array` or `Uint16Array` without `normalized` from a copy widened to 32 bits, puts that copy
+ * in the place of `array` and uploads from it alone from then on
+ * (`WebGPUAttributeUtils#createAttribute()`, `WebGPUAttributeUtils.js:84–109`). A pool swaps its
+ * array only for one of the same data type (`checkBufferArray()`), so an array of another element
+ * size comes from three.
+ */
+function holdsWidenedCopy(bufAttr: BufferLike, source: TypedArray): boolean {
+  return bufAttr.array !== source && bufAttr.array.BYTES_PER_ELEMENT !== source.BYTES_PER_ELEMENT;
+}
 
 /** Which half of an instanced geometry a route feeds. A geometry that draws one pool leaves it unset. */
 export type RouteGroup = 'base' | 'instanced';
@@ -184,6 +200,9 @@ export class GeometryRoutes {
    *
    * A buffer that neither of the two reaches is left as it is, range and all. The serial a route
    * holds per buffer moves on as soon as the pool has, whether or not anything uploads.
+   *
+   * A buffer that holds the 32-bit copy three's WebGPU backend made of the array of the pool gets
+   * the objects it uploads copied into that copy first — exactly those, nothing more.
    */
   syncUploads(): void {
     const all = this.#all;
@@ -209,14 +228,19 @@ export class GeometryRoutes {
           route.bufferSerials.set(record.bufferName, record.serial);
         }
 
+        const source = record.typedArray;
+        const widened = source !== undefined && holdsWidenedCopy(bufAttr, source);
+
         if (this.#askedIn.get(bufAttr) === round) {
           if (usedCount > 0) {
             ranges[0] = 0;
             ranges[1] = usedCount - 1;
+            if (widened) copyUploadRanges(source, bufAttr.array, ranges, 1, vertexCount * record.itemSize);
             applyUploadRanges(bufAttr, ranges, 1, vertexCount, record.itemSize);
             bufAttr.needsUpdate = true;
           }
         } else if (written > 0) {
+          if (widened) copyUploadRanges(source, bufAttr.array, ranges, written, vertexCount * record.itemSize);
           applyUploadRanges(bufAttr, ranges, written, vertexCount, record.itemSize);
           bufAttr.needsUpdate = true;
         }
@@ -230,6 +254,9 @@ export class GeometryRoutes {
    * Point every buffer at the typed array its pool holds for it. The pool swaps an array only when
    * buffers data comes back in as a whole (`fromBuffersData()` → `setTypedArray()`), so the arrays
    * are compared buffer by buffer rather than tracked through an upload version.
+   *
+   * A buffer that holds the 32-bit copy three's WebGPU backend made of the array of the pool keeps
+   * that copy; `syncUploads()` holds it in step with the pool.
    */
   syncArrays(): void {
     const all = this.#all;
@@ -239,7 +266,12 @@ export class GeometryRoutes {
       for (let j = 0; j < records.length; j++) {
         const record = records[j]!;
         const bufAttr = route.buffers.get(record.bufferName);
-        if (bufAttr !== undefined && record.typedArray !== undefined && bufAttr.array !== record.typedArray) {
+        if (
+          bufAttr !== undefined &&
+          record.typedArray !== undefined &&
+          bufAttr.array !== record.typedArray &&
+          !holdsWidenedCopy(bufAttr, record.typedArray)
+        ) {
           bufAttr.array = asThreeTypedArray(record.typedArray);
         }
       }

@@ -271,6 +271,9 @@ export class VOBufferPool {
    * buffer name the layout does not know is skipped. An array or a `usedCount` that breaks a
    * rule throws before anything about the pool has changed.
    *
+   * A shorter array is written from the first element on in the layout of this pool, which
+   * nothing checks: an array in another layout lands beside its slots without an error.
+   *
    * @param copyTypedArrays By default, the typed-array references are simply shared (zero-copy) if possible.
    *                        But if `copyTypedArrays` is set to `true` or the typed-array from the input is smaller
    *                        than the current array from the buffer then the data is copied.

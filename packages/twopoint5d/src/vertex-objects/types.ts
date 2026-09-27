@@ -38,7 +38,17 @@ export type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
  * way each.
  */
 export interface VADescription {
-  /** The element type of the buffer this attribute is stored in. Defaults to `'float32'`. */
+  /**
+   * The element type of the buffer this attribute is stored in. Defaults to `'float32'`.
+   *
+   * An attribute of an 8- or 16-bit type or of `'float16'` takes a whole number of 4 bytes per
+   * vertex in its buffer: one whose values do not end on a 4-byte boundary gets padding elements
+   * behind them — `'uint8'` with `size: 3` takes 4 elements, `'float16'` with `size: 3` as well.
+   * No accessor reads or writes the padding, and `toBuffersData()` carries it along; the gpu asks
+   * for every attribute of a vertex buffer on a 4-byte boundary. Under three's WebGPU backend an
+   * attribute of `'int8'`, `'uint8'`, `'int16'` or `'uint16'` without `normalized` uploads as 32-bit
+   * values, and the geometry holds that copy in step with the pool.
+   */
   type?: VertexAttributeDataType;
   /**
    * Whether the gpu maps the stored integers onto `0` … `1` (`-1` … `1` for a signed type)
@@ -263,6 +273,9 @@ export interface VertexObjectBuffersData {
   capacity: number;
   /** How many of those vertex objects are in use. */
   usedCount: number;
-  /** The typed array of each buffer, keyed by buffer name. */
+  /**
+   * The typed array of each buffer, keyed by buffer name, each in the layout of its buffer:
+   * `itemSize` elements per vertex, the padding behind an attribute included.
+   */
   buffers: Record<string, TypedArray>;
 }

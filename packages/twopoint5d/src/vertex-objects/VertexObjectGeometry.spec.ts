@@ -1,3 +1,4 @@
+import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
@@ -95,6 +96,67 @@ describe('VertexObjectGeometry', () => {
     geometry.touch('position', {dynamic: true});
     geometry.update();
     expect(staticBuffer.version, 'names and usage types that do not reach it').toBe(byUsage);
+  });
+
+  test('an attribute whose buffer carries padding reaches the geometry as an interleaved attribute at offset 0', () => {
+    const geometry = new VertexObjectGeometry(
+      {
+        attributes: {
+          color: {size: 3, type: 'uint8', normalized: true},
+          position: {size: 3},
+        },
+      },
+      4,
+    );
+
+    const color = geometry.getAttribute('color') as InterleavedBufferAttribute;
+    expect(color.isInterleavedBufferAttribute).toBe(true);
+    expect(color.data.stride).toBe(4);
+    expect(color.itemSize).toBe(3);
+    expect(color.offset).toBe(0);
+    expect(color.normalized).toBe(true);
+
+    const position = geometry.getAttribute('position') as BufferAttribute;
+    expect(position.isBufferAttribute).toBe(true);
+    expect(position.itemSize).toBe(3);
+  });
+
+  test('every attribute three draws from starts on a 4-byte boundary of a stride that is a multiple of 4 bytes', () => {
+    const geometry = new VertexObjectGeometry(
+      {
+        vertexCount: 4,
+        indices: [0, 1, 2, 0, 2, 3],
+        attributes: {
+          base: {size: 3, type: 'uint8', normalized: true},
+          tint: {size: 3, type: 'uint8', normalized: true},
+          level: {size: 1, type: 'int16', normalized: true},
+          normal: {size: 3, type: 'int16', normalized: true},
+          uv0: {size: 3, type: 'float16'},
+          uv1: {size: 3, type: 'float16'},
+          position: {size: 3},
+        },
+      },
+      4,
+    );
+
+    // WebGPU takes a vertex buffer layout only when its arrayStride is a multiple of 4 bytes and
+    // every attribute starts on a multiple of min(4, the byte size of its format); three widens the
+    // format of an attribute of more than one value to whole 4 bytes, so a start on a multiple of 4
+    // bytes is what every attribute here needs
+    const names = Object.keys(geometry.attributes);
+    expect(names.sort()).toEqual(['base', 'level', 'normal', 'position', 'tint', 'uv0', 'uv1']);
+
+    for (const name of names) {
+      const attr = geometry.getAttribute(name) as BufferAttribute | InterleavedBufferAttribute;
+      const bpe = attr.array.BYTES_PER_ELEMENT;
+      if ((attr as InterleavedBufferAttribute).isInterleavedBufferAttribute) {
+        const interleaved = attr as InterleavedBufferAttribute;
+        expect((interleaved.offset * bpe) % 4, `${name}: offset in bytes`).toBe(0);
+        expect((interleaved.data.stride * bpe) % 4, `${name}: stride in bytes`).toBe(0);
+      } else {
+        expect((attr.itemSize * bpe) % 4, `${name}: stride in bytes`).toBe(0);
+      }
+    }
   });
 
   describe('a pool that has been disposed', () => {
