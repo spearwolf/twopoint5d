@@ -1,6 +1,5 @@
 import {afterEach, beforeEach, describe, expect, test} from 'vitest';
 
-import {measureAllocatedBytes} from '../../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../../testing/measureSettledBytes.js';
 import {TextureCoords} from '../../texture/TextureCoords.js';
 import {TileSet} from '../../texture/TileSet.js';
@@ -44,8 +43,8 @@ describe('tile sprites on the hot path', () => {
     tileSprites.material?.dispose();
   });
 
-  test('updateTile() allocates nothing per tile', () => {
-    const bytesPerRound = measureAllocatedBytes(() => {
+  test('updateTile() allocates nothing per tile', async () => {
+    const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < tiles.length; i++) {
         factory.updateTile(tiles[i]!, coords[i]!);
       }
@@ -69,24 +68,19 @@ describe('tile sprites on the hot path', () => {
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 
-  test('createTile() and destroyTile() allocate the tile sprite and nothing else', () => {
+  test('createTile() and destroyTile() allocate the tile sprite and nothing else', async () => {
     const probe = factory.createTile(coords[0]!);
     expect(probe).not.toBeUndefined();
     expect(probe).not.toBe(noTileCapacity);
     factory.destroyTile(probe as TileSprite);
 
     // created at the end and freed as the last slot, so the pool stays at 1000 tiles in use
-    // after the default warm-up an occasional run measured three times the bytes of the others;
-    // after 1000 rounds the value holds from run to run
-    const bytesPerRound = measureAllocatedBytes(
-      () => {
-        for (let i = 0; i < 100; i++) {
-          const tile = factory.createTile(coords[i]!);
-          factory.destroyTile(tile as TileSprite);
-        }
-      },
-      {warmUpRounds: 1000},
-    );
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 100; i++) {
+        const tile = factory.createTile(coords[i]!);
+        factory.destroyTile(tile as TileSprite);
+      }
+    });
     const bytesPerTile = bytesPerRound / 100;
 
     expect(bytesPerTile, `${bytesPerTile.toFixed(2)} bytes per tile`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);

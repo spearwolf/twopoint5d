@@ -1,6 +1,5 @@
 import {describe, expect, test} from 'vitest';
 
-import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
@@ -27,13 +26,13 @@ const trimmedFrame: TextureAtlasFrame = {
 };
 
 describe('sprites on the hot path', () => {
-  test('moving, turning and re-framing a textured sprite allocates nothing per call', () => {
+  test('moving, turning and re-framing a textured sprite allocates nothing per call', async () => {
     const sprites = new TexturedSprites(1000);
     const all = Array.from({length: 1000}, () => sprites.createSprite()!);
 
     // setColor() is left out: next to setFrame() with a trimmed frame, the fractional values of a
     // Color reach setColorValues() boxed, 32 B per sprite, even after thousands of warm-up rounds
-    const bytesPerRound = measureAllocatedBytes(() => {
+    const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
         sprite.setPosition(i, 1, 2);
@@ -48,12 +47,12 @@ describe('sprites on the hot path', () => {
     sprites.dispose();
   });
 
-  test('moving and animating an animated sprite allocates nothing per call', () => {
+  test('moving and animating an animated sprite allocates nothing per call', async () => {
     const geometry = new AnimatedSpritesGeometry(1000);
     const pool = geometry.instancedPool;
     const all = Array.from({length: 1000}, () => pool.createVO()!);
 
-    const bytesPerRound = measureAllocatedBytes(() => {
+    const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
         sprite.setPosition(i, 1, 2);
@@ -68,23 +67,18 @@ describe('sprites on the hot path', () => {
     geometry.dispose();
   });
 
-  test('createSprite() allocates the sprite and nothing else', () => {
+  test('createSprite() allocates the sprite and nothing else', async () => {
     const sprites = new TexturedSprites(1100);
     for (let i = 0; i < 1000; i++) sprites.createSprite();
 
     // created at the end and freed as the last slot, so the pool stays at 1000 sprites in use;
     // the voInitialize hook of the sprite runs inside the measurement
-    // after the default warm-up an occasional run measured three times the bytes of the others;
-    // after 1000 rounds the value holds from run to run
-    const bytesPerRound = measureAllocatedBytes(
-      () => {
-        for (let i = 0; i < 100; i++) {
-          const sprite = sprites.createSprite()!;
-          sprites.freeSprite(sprite);
-        }
-      },
-      {warmUpRounds: 1000},
-    );
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 100; i++) {
+        const sprite = sprites.createSprite()!;
+        sprites.freeSprite(sprite);
+      }
+    });
     const bytesPerSprite = bytesPerRound / 100;
 
     expect(bytesPerSprite, `${bytesPerSprite.toFixed(2)} bytes per sprite`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);

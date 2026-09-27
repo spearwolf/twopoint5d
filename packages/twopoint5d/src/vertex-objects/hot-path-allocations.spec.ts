@@ -1,7 +1,6 @@
 import type {BufferAttribute} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
@@ -76,14 +75,14 @@ const quadDescription: VertexObjectDescription = {
 };
 
 describe('vertex objects on the hot path', () => {
-  test('the generated accessors of up to four values allocate nothing per call', () => {
+  test('the generated accessors of up to four values allocate nothing per call', async () => {
     const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
     const vos = Array.from({length: 1000}, () => pool.createVO()!);
     const colorScratch: [number, number, number, number] = [1, 0.5, 0.25, 1];
     const positionTarget = new Float32Array(3);
     let sum = 0;
 
-    const bytesPerRound = measureAllocatedBytes(() => {
+    const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < vos.length; i++) {
         const vo = vos[i]!;
         vo.x = i;
@@ -102,7 +101,7 @@ describe('vertex objects on the hot path', () => {
     pool.dispose();
   });
 
-  test('the per-vertex component accessors of a multi-vertex object allocate nothing per call', () => {
+  test('the per-vertex component accessors of a multi-vertex object allocate nothing per call', async () => {
     const pool = new VertexObjectPool<QuadVO>(quadDescription, 1000);
     const vos = Array.from({length: 1000}, () => pool.createVO()!);
     const target = new Float32Array(12);
@@ -110,7 +109,7 @@ describe('vertex objects on the hot path', () => {
 
     // setPosition() of this attribute is left out: with twelve values it takes a rest parameter
     // and allocates an array per call
-    const bytesPerRound = measureAllocatedBytes(() => {
+    const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < vos.length; i++) {
         const vo = vos[i]!;
         vo.x0 = i;
@@ -127,22 +126,17 @@ describe('vertex objects on the hot path', () => {
     pool.dispose();
   });
 
-  test('createVO() allocates the vertex object and nothing else', () => {
+  test('createVO() allocates the vertex object and nothing else', async () => {
     const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1100);
     for (let i = 0; i < 1000; i++) pool.createVO();
 
     // created at the end and freed as the last slot, so the pool stays at 1000 objects in use
-    // after the default warm-up an occasional run measured three times the bytes of the others;
-    // after 1000 rounds the value holds from run to run
-    const bytesPerRound = measureAllocatedBytes(
-      () => {
-        for (let i = 0; i < 100; i++) {
-          const vo = pool.createVO()!;
-          pool.freeVO(vo);
-        }
-      },
-      {warmUpRounds: 1000},
-    );
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 100; i++) {
+        const vo = pool.createVO()!;
+        pool.freeVO(vo);
+      }
+    });
     const bytesPerVO = bytesPerRound / 100;
 
     expect(bytesPerVO, `${bytesPerVO.toFixed(2)} bytes per vertex object`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
