@@ -75,6 +75,23 @@ independent objects is one shared buffer. Reordering, freeing or copying an obje
 touches other objects' memory. Buffer updates are flagged for upload rather than
 applied immediately — dropping a dirty flag silently renders stale data.
 
+The generated accessors of every descriptor come from the same few factory functions in
+`createVertexObjectPrototype.ts`, and V8 gives all closures of one function literal one set of
+inline caches: the caches inside the accessors see the vertex objects of every descriptor in
+the application. Where it counts, that costs nothing measurable. A loop over the vertex
+objects of one pool sees one prototype, V8 inlines the accessors into its optimized code and
+knows the shape of the object already — in `src/vertex-objects/hot-path.bench.ts`, six pools
+on six descriptors, each written by a loop of its own, run within a few percent of six pools
+on one descriptor. What costs is a call site that sees the vertex objects of more than four
+prototypes: one loop for all six pools takes about eighteen times as long per object there.
+Every pool built from a description builds a descriptor and a prototype of its own, so a loop
+shared by several sprite geometries of one type sees one prototype per geometry; pools handed
+the same `VertexObjectDescriptor` share its prototype. An accessor call V8 does not inline
+does pay for the shared caches, about twice the time per call across six descriptors.
+Accessors generated per descriptor with `new Function` would help only there, and they would
+need `unsafe-eval` in the Content Security Policy of every application that turns them on, so
+the factories are shared on purpose.
+
 ### `texture/`
 
 `TextureAtlas` and `TileSet` describe where a frame lives inside an image;

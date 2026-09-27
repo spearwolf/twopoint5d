@@ -10,6 +10,11 @@ import type {TypedArray, VO} from './types.js';
 const bufferKey: typeof voBuffer = voBuffer;
 const indexKey: typeof voIndex = voIndex;
 
+// every descriptor builds its accessors from the factories below, and V8 gives all closures of one
+// function literal one set of inline caches. A loop over the vertex objects of one pool inlines the
+// accessor and knows the prototype already, so that costs nothing measurable; docs/architecture.md
+// (the section on vertex-objects/) has the numbers and says why the accessors are not generated per
+// descriptor
 const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
   return function getAttribute(this: VO) {
     // a vertex object alive in its pool has its buffer, that buffer holds its typed array and

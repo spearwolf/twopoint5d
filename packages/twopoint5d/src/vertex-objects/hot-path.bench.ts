@@ -49,15 +49,17 @@ const description = (k: number): VertexObjectDescription => ({
   },
 });
 
-// new Function gives every pool a writer with a call site of its own, the way an application has
-// an update loop of its own per sprite type. Closures of one function literal share their inline
-// caches and would make the call site itself megamorphic — what is measured here is the inside of
-// the generated accessors
+// every writer comes from new Function with a source of its own, the way an application has an
+// update loop of its own per sprite type: V8 compiles a source it has already seen only once and
+// hands every function made from it the same inline caches, so writers of one source would share
+// their call sites just as closures of one function literal do. What the first two benches
+// measure is the inside of the generated accessors
+let writers = 0;
 const makeWriter = (): Writer =>
   new Function(
     'vos',
     'n',
-    'for (let i = 0; i < vos.length; i++) { const vo = vos[i]; vo.x = i + n; vo.y = n; vo.z = i; }',
+    `// writer ${writers++}\nfor (let i = 0; i < vos.length; i++) { const vo = vos[i]; vo.x = i + n; vo.y = n; vo.z = i; }`,
   ) as Writer;
 
 const fillPool = <VOType extends object>(pool: VertexObjectPool<VOType>, count: number) =>
@@ -72,15 +74,13 @@ test('generated setters across vertex object descriptors', async ({bench}) => {
 
   const oneVOs = onePools.map((pool) => fillPool(pool, 10_000));
   const sixVOs = sixPools.map((pool) => fillPool(pool, 10_000));
-  const oneWriters = onePools.map(makeWriter);
-  const sixWriters = sixPools.map(makeWriter);
+  const oneWriters = onePools.map(() => makeWriter());
+  const sixWriters = sixPools.map(() => makeWriter());
 
   let n = 0;
 
   // one after the other instead of bench.compare(), which warms up every variant before it measures
-  // the first: the accessors of all descriptors come from the same function literals and share
-  // their inline caches, so the six descriptors would have made them megamorphic before the one
-  // descriptor is timed
+  // the first: the one descriptor is timed before an accessor has seen a second prototype
   await bench('six pools, one descriptor', () => {
     n++;
     for (let k = 0; k < 6; k++) oneWriters[k]!(oneVOs[k]!, n);
@@ -88,6 +88,14 @@ test('generated setters across vertex object descriptors', async ({bench}) => {
   await bench('six pools, six descriptors', () => {
     n++;
     for (let k = 0; k < 6; k++) sixWriters[k]!(sixVOs[k]!, n);
+  }).run(options);
+
+  // the same six pools, all written by one writer: its call sites see the vertex objects of six
+  // prototypes and go megamorphic, which is what a loop costs that serves more than four descriptors
+  const writeAll = makeWriter();
+  await bench('six pools, six descriptors, one writer for all', () => {
+    n++;
+    for (let k = 0; k < 6; k++) writeAll(sixVOs[k]!, n);
   }).run(options);
 
   for (const pool of [...onePools, ...sixPools]) pool.dispose();
