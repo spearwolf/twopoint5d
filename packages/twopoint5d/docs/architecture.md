@@ -84,10 +84,17 @@ knows the shape of the object already — in `src/vertex-objects/hot-path.bench.
 on six descriptors, each written by a loop of its own, run within a few percent of six pools
 on one descriptor. What costs is a call site that sees the vertex objects of more than four
 prototypes: one loop for all six pools takes about eighteen times as long per object there.
-Every pool built from a description builds a descriptor and a prototype of its own, so a loop
-shared by several sprite geometries of one type sees one prototype per geometry; pools handed
-the same `VertexObjectDescriptor` share its prototype. An accessor call V8 does not inline
-does pay for the shared caches, about twice the time per call across six descriptors.
+Pools built from the same description object share one descriptor and with it one prototype:
+the first of them builds the descriptor, and every later one takes it over as long as the
+description still describes what it did then — a description changed in the meantime gets a
+descriptor of its own, and the pools built before keep theirs. `new VertexObjectDescriptor()`
+always builds a new one, and pools handed the same descriptor share it. The sprite and tile
+geometries build their pools from the description constants of their modules, so one loop
+over the sprites of several geometries of one type sees one prototype — in the bench, one
+writer for six pools of one description runs as fast as a writer per pool. A
+`TexturedSpritesGeometry` built with `attributeUsage` copies the sprite description and shares
+its prototype with no other geometry. An accessor call V8 does not inline does pay for the
+shared caches, about twice the time per call across six descriptors.
 Accessors generated per descriptor with `new Function` would help only there, and they would
 need `unsafe-eval` in the Content Security Policy of every application that turns them on, so
 the factories are shared on purpose.

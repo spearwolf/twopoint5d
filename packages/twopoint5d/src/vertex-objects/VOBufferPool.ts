@@ -1,6 +1,7 @@
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {checkBufferArray} from './checkBufferArray.js';
+import {sharedVertexObjectDescriptor} from './sharedVertexObjectDescriptor.js';
 import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 // one message for every method that refuses to work once the pool is gone, so the class, the
@@ -15,7 +16,15 @@ function disposedError(method: string): Error {
  * the vertex objects it hands out.
  */
 export class VOBufferPool {
-  /** What this pool is built from; it goes on saying so once {@link dispose} has run. */
+  /**
+   * What this pool is built from; it goes on saying so once {@link dispose} has run.
+   *
+   * A descriptor handed to the constructor holds as it is. From a description, a descriptor is
+   * built once per description object: pools built from the same description object share one
+   * descriptor, and with it the prototype of their vertex objects, as long as the description
+   * describes what it did when the first of these pools was built; a description changed since
+   * then gets a descriptor of its own.
+   */
   readonly descriptor: VertexObjectDescriptor;
 
   #capacity: number;
@@ -79,7 +88,7 @@ export class VOBufferPool {
   #geometryAttachments = 0;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
-    this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : new VertexObjectDescriptor(descriptor);
+    this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : sharedVertexObjectDescriptor(descriptor);
     const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
     if (capacity < 0 || !Number.isInteger(capacity)) {
       // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at

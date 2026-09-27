@@ -5,7 +5,7 @@ import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
 import type {GeometryRoute} from './GeometryRoutes.js';
 import {GeometryRoutes} from './GeometryRoutes.js';
 import {VOBufferPool} from './VOBufferPool.js';
-import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {asInstancedCopySource} from './asInstancedCopySource.js';
 import {attributeNamesOf} from './attributeNamesOf.js';
@@ -256,8 +256,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     let extraPool: VertexObjectPool<VOType>;
     if (ownsPool) {
-      const descriptor = pool instanceof VertexObjectDescriptor ? pool : new VertexObjectDescriptor(pool);
-      extraPool = new VertexObjectPool(descriptor, this.instancedPool.capacity) as VertexObjectPool<VOType>;
+      extraPool = new VertexObjectPool(pool, this.instancedPool.capacity) as VertexObjectPool<VOType>;
     } else {
       extraPool = pool;
     }

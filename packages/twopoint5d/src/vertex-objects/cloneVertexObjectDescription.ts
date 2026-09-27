@@ -82,7 +82,9 @@ export function cloneVertexObjectDescription(
   const description = 'description' in source ? source.description : source;
   const usageLookup = resolveUsageLookup(attributeUsage);
   // every field of a description belongs in here: `new VertexObjectDescriptor()` builds its own
-  // copy through this function, so a field this list forgets never reaches a descriptor
+  // copy through this function, so a field this list forgets never reaches a descriptor. And
+  // `sameVertexObjectDescription()` compares exactly these fields: a field added here is added
+  // there, or pools share a descriptor across a change to that field
   const target: VertexObjectDescription = {
     vertexCount: description.vertexCount,
     indices: description.indices?.slice(),

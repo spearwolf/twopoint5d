@@ -32,6 +32,11 @@ export interface TexturedSpritesGeometryParameters {
    * three together. A list that names `texFlipDiagonal` or `texTrim` itself does not simply override
    * that: of `dynamic`, `stream` and `static`, the first that names it — directly or through
    * `texCoords` — decides.
+   *
+   * A geometry built with `attributeUsage` copies the sprite description and shares its
+   * descriptor and the prototype of its sprites with no other geometry; one loop over the sprites
+   * of more than four such geometries sees more than four prototypes (see »Library
+   * architecture«, the `vertex-objects/` section).
    */
   attributeUsage?: Omit<VertexAttributeUsageOverrides, 'alias'>;
 }
@@ -57,7 +62,7 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
   ) {
     const cap = typeof capacity === 'number' ? capacity : capacity.capacity;
     const desc =
-      typeof capacity === 'number'
+      typeof capacity === 'number' || capacity.attributeUsage == null
         ? TexturedSpriteDescriptor
         : cloneVertexObjectDescription(TexturedSpriteDescriptor, {
             dynamic: capacity.attributeUsage?.dynamic,

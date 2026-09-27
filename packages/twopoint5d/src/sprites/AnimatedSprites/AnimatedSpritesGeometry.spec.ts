@@ -23,6 +23,18 @@ describe('AnimatedSpritesGeometry', () => {
     geometry.dispose();
   });
 
+  test('shares the descriptors of its pools and the prototype of its sprites with every other geometry', () => {
+    const a = new AnimatedSpritesGeometry(10);
+    const b = new AnimatedSpritesGeometry(10);
+
+    expect(b.instancedPool.descriptor).toBe(a.instancedPool.descriptor);
+    expect(b.basePool.descriptor).toBe(a.basePool.descriptor);
+    expect(Object.getPrototypeOf(b.instancedPool.createVO())).toBe(Object.getPrototypeOf(a.instancedPool.createVO()));
+
+    a.dispose();
+    b.dispose();
+  });
+
   test('makes the base sprite a quad of half width and height 0.5 around the origin', () => {
     const geometry = new AnimatedSpritesGeometry();
     const base = geometry.basePool.getVO(0)!;

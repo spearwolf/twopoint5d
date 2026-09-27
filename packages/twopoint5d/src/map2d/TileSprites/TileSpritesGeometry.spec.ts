@@ -17,6 +17,18 @@ describe('TileSpritesGeometry', () => {
     geometry.dispose();
   });
 
+  test('shares the descriptors of its pools and the prototype of its sprites with every other geometry', () => {
+    const a = new TileSpritesGeometry(4);
+    const b = new TileSpritesGeometry(4);
+
+    expect(b.instancedPool.descriptor).toBe(a.instancedPool.descriptor);
+    expect(b.basePool.descriptor).toBe(a.basePool.descriptor);
+    expect(Object.getPrototypeOf(b.instancedPool.createVO())).toBe(Object.getPrototypeOf(a.instancedPool.createVO()));
+
+    a.dispose();
+    b.dispose();
+  });
+
   test('declares its pools read-only (a type-level check)', () => {
     const geometry = new TileSpritesGeometry(4);
 

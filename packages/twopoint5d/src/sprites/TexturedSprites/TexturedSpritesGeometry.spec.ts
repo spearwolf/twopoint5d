@@ -121,6 +121,42 @@ describe('TexturedSpritesGeometry', () => {
     geometry.dispose();
   });
 
+  test('shares the descriptors of its pools and the prototype of its sprites with every geometry built from a capacity number', () => {
+    const a = new TexturedSpritesGeometry(10);
+    const b = new TexturedSpritesGeometry(10);
+
+    expect(b.instancedPool.descriptor).toBe(a.instancedPool.descriptor);
+    expect(b.basePool.descriptor).toBe(a.basePool.descriptor);
+    expect(Object.getPrototypeOf(b.instancedPool.createVO())).toBe(Object.getPrototypeOf(a.instancedPool.createVO()));
+
+    a.dispose();
+    b.dispose();
+  });
+
+  test('shares them for parameters without attributeUsage as well', () => {
+    const a = new TexturedSpritesGeometry({capacity: 10});
+    const b = new TexturedSpritesGeometry(10);
+
+    expect(a.instancedPool.descriptor).toBe(b.instancedPool.descriptor);
+
+    a.dispose();
+    b.dispose();
+  });
+
+  test('builds a descriptor of its own for parameters with attributeUsage', () => {
+    const a = new TexturedSpritesGeometry({capacity: 10, attributeUsage: {dynamic: ['texCoords']}});
+    const b = new TexturedSpritesGeometry({capacity: 10, attributeUsage: {dynamic: ['texCoords']}});
+    const fromCapacity = new TexturedSpritesGeometry(10);
+
+    expect(b.instancedPool.descriptor).not.toBe(a.instancedPool.descriptor);
+    expect(a.instancedPool.descriptor).not.toBe(fromCapacity.instancedPool.descriptor);
+    expect(b.instancedPool.descriptor).not.toBe(fromCapacity.instancedPool.descriptor);
+
+    a.dispose();
+    b.dispose();
+    fromCapacity.dispose();
+  });
+
   test('throws when the base pool has no room for the base sprite', () => {
     // without the stub this path is unreachable: the base pool is built fresh with a capacity of 1
     sandbox.stub(VertexObjectPool.prototype, 'createVO').returns(undefined);

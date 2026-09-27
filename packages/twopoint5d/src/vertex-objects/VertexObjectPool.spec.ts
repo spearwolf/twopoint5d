@@ -4,6 +4,7 @@ import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
+import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex, voInitialize} from './constants.js';
@@ -119,6 +120,57 @@ describe('VertexObjectPool', () => {
     expect(pool.capacity).toBe(100);
     expect(pool.usedCount).toBe(0);
     expect(pool.availableCount).toBe(100);
+  });
+
+  describe('the descriptor of a pool', () => {
+    test('pools built from one description object share its descriptor and the prototype of their vertex objects', () => {
+      const a = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+      const b = new VertexObjectPool<MyVertexObject>(descriptor, 3);
+
+      expect(b.descriptor).toBe(a.descriptor);
+      expect(Object.getPrototypeOf(b.createVO())).toBe(Object.getPrototypeOf(a.createVO()));
+    });
+
+    test('pools built from two description objects of the same content build a descriptor each', () => {
+      const a = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+      const b = new VertexObjectPool<MyVertexObject>(structuredClone(descriptor), 2);
+
+      expect(b.descriptor).not.toBe(a.descriptor);
+    });
+
+    test('a description changed after a pool was built from it gives the next pool a descriptor of its own, and the pool before keeps its own', () => {
+      const a = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+
+      descriptor.attributes['extra'] = {size: 1};
+      const b = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+
+      expect(b.descriptor).not.toBe(a.descriptor);
+      expect(b.descriptor.getAttribute('extra')).toBeDefined();
+      expect(a.descriptor.getAttribute('extra')).toBeUndefined();
+
+      const c = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+
+      expect(c.descriptor).toBe(b.descriptor);
+    });
+
+    test('a descriptor built with new VertexObjectDescriptor() stays its own', () => {
+      const a = new VertexObjectPool<MyVertexObject>(descriptor, 2);
+      const own = new VertexObjectDescriptor(descriptor);
+
+      expect(own).not.toBe(a.descriptor);
+      expect(new VertexObjectPool(own, 1).descriptor).toBe(own);
+    });
+
+    test('a description the descriptor refuses is refused on every pool, and builds a pool once it is fixed', () => {
+      const broken: VertexObjectDescription = {vertexCount: 0, attributes: {pos: {size: 1}}};
+
+      expect(() => new VertexObjectPool(broken, 1)).toThrow(RangeError);
+      expect(() => new VertexObjectPool(broken, 1)).toThrow(RangeError);
+
+      broken.vertexCount = 1;
+
+      expect(new VertexObjectPool(broken, 1).descriptor.vertexCount).toBe(1);
+    });
   });
 
   describe('createVO()', () => {

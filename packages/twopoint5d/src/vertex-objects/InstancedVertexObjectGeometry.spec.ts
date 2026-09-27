@@ -6,7 +6,7 @@ import {afterEach, describe, expect, test} from 'vitest';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
-import type {VO} from './types.js';
+import type {VO, VertexObjectDescription} from './types.js';
 
 describe('InstancedVertexObjectGeometry', () => {
   const baseDescriptor = new VertexObjectDescriptor({
@@ -99,6 +99,20 @@ describe('InstancedVertexObjectGeometry', () => {
     );
 
     expect(geometry.getAttribute('extra')).toBeDefined();
+  });
+
+  test('pools attached from one description on two geometries share its descriptor', () => {
+    const extraDescription: VertexObjectDescription = {attributes: {extra: {size: 1, bufferName: 'extraBuffer'}}};
+    const firstGeometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+    const secondGeometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+
+    const first = firstGeometry.attachInstancedPool('extraPool', extraDescription);
+    const second = secondGeometry.attachInstancedPool('extraPool', extraDescription);
+
+    expect(second.descriptor).toBe(first.descriptor);
+
+    firstGeometry.dispose();
+    secondGeometry.dispose();
   });
 
   test('index array buffer is created', () => {
