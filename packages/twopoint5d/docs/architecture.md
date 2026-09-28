@@ -160,7 +160,8 @@ and the sprite materials move the corners of the quad by them.
 
 Tiled-map integration on top of the sprite layer. `Map2D` holds a
 `Map2DTileStreamer` and its `Map2DTileRenderer`s. Visibility is pluggable:
-`CameraBasedVisibility` culls tiles against the camera frustum,
+`CameraBasedVisibility` culls tiles against the camera frustum, nearest to the camera
+first and up to `maxVisibleTiles` of them,
 `RectangularVisibilityArea` uses a plain rectangle, and both have `*Helpers` classes
 that visualise what they decided. `Map2DTileCoords`, `Map2DTileCoordsUtil` and
 `tileKeys` define the coordinate and key scheme — every tile coordinate has exactly one

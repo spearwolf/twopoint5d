@@ -1,10 +1,13 @@
-import type {Box3, CoordinateSystem} from 'three/webgpu';
+import type {CoordinateSystem} from 'three/webgpu';
 import {
+  Box3,
   Euler,
   Frustum,
+  Group,
   Matrix4,
   OrthographicCamera,
   PerspectiveCamera,
+  Quaternion,
   Vector3,
   WebGLCoordinateSystem,
   WebGPUCoordinateSystem,
@@ -98,6 +101,19 @@ function makeOrthoCameraLookingDown(): OrthographicCamera {
   const camera = new OrthographicCamera(-100, 100, 100, -100, 0.1, 500);
   camera.position.set(0, 100, 0);
   camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+function makeCameraLookingToTheHorizon(): PerspectiveCamera {
+  // Just above the plane and looking out towards the horizon: the ground it covers grows with the
+  // square of `far`, which is what `maxVisibleTiles` is there to hold. On a grid of 16 × 16 the
+  // view reaches some 5 000 tiles — above what the limit is tried with below, well below the
+  // default.
+  const camera = new PerspectiveCamera(75, 1.6, 0.1, 1000);
+  camera.position.set(0, 40, 0);
+  camera.lookAt(0, 0, -300);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;
@@ -384,6 +400,64 @@ describe('CameraBasedVisibility', () => {
       expect(primaries.length).toBeGreaterThan(0);
     });
 
+    test('takes the box of a tile into world space with one transform', () => {
+      visibility = new CameraBasedVisibility(makeTiltedCamera());
+      const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
+
+      const applyMatrix4 = vi.spyOn(Box3.prototype, 'applyMatrix4');
+      const intersectsBox = vi.spyOn(Frustum.prototype, 'intersectsBox');
+      visibility.computeVisibleTiles([], [0, 0], mapCoords, new Matrix4());
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+      // one for the frustum box of each tile the search looked at — tested, or taken within the
+      // hull of the probe rays, which are among the visible ones — and none for `tile.box`
+      expect(applyMatrix4.mock.calls.length).toBeLessThanOrEqual(intersectsBox.mock.calls.length + visibility.visibles.length);
+    });
+
+    test('the frustum box and the center of a tile are the ones two transforms in a row give', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+      const mapCoords = new Map2DTileCoordsUtil(100, 100, -50, -50);
+      // shifted, turned about Y and scaled unevenly, so that a box taken through the matrix grows
+      // and the order of the two transforms would show
+      const matrix = new Matrix4().compose(
+        new Vector3(40, 0, -30),
+        new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.3),
+        new Vector3(1.5, 1, 0.75),
+      );
+
+      visibility.computeVisibleTiles([], [30, -20], mapCoords, matrix);
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+
+      const {frustumBoxScale: scale, depth} = visibility;
+      const toTileBoxSpace = new Matrix4().makeTranslation(mapCoords.xOffset - 30, 0, mapCoords.yOffset + 20);
+      const expectCloseTo = (actual: Vector3, expected: Vector3, where: string) => {
+        expect(actual.x, `${where}, x`).toBeCloseTo(expected.x, 6);
+        expect(actual.y, `${where}, y`).toBeCloseTo(expected.y, 6);
+        expect(actual.z, `${where}, z`).toBeCloseTo(expected.z, 6);
+      };
+
+      for (const tile of visibility.visibles) {
+        const {left, top, width, height} = tile.coords!;
+        const where = `tile ${tile.x},${tile.y}`;
+
+        // built the way `setBox()` builds it
+        const sw = (width * scale - width) / 2;
+        const sh = (height * scale - height) / 2;
+        const frustumBox = new Box3(
+          new Vector3(left - sw, depth * -0.5 * scale, top - sh),
+          new Vector3(left + width + sw, depth * 0.5 * scale, top + height + sh),
+        )
+          .applyMatrix4(toTileBoxSpace)
+          .applyMatrix4(matrix);
+        const centerWorld = new Vector3(left + width / 2, 0, top + height / 2).applyMatrix4(toTileBoxSpace).applyMatrix4(matrix);
+
+        expectCloseTo(tile.frustumBox!.min, frustumBox.min, `${where}, frustumBox.min`);
+        expectCloseTo(tile.frustumBox!.max, frustumBox.max, `${where}, frustumBox.max`);
+        expectCloseTo(tile.centerWorld!, centerWorld, `${where}, centerWorld`);
+      }
+    });
+
     test('builds tile.view from the underlying tile coords (origin-aligned)', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
       const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
@@ -545,6 +619,53 @@ describe('CameraBasedVisibility', () => {
       for (const tile of second.tiles) {
         expect(ofTheOldGrid.has(tile), `tile ${tile.id} of the new grid is an object of its own`).toBe(false);
       }
+    });
+  });
+
+  describe('a camera under a parent', () => {
+    // the camera of `makeTopDownCamera()`, hung under a rig that neither it nor a scene has
+    // brought up to date
+    const makeRig = (): {rig: Group; camera: PerspectiveCamera} => {
+      const rig = new Group();
+      rig.position.set(300, 0, -200);
+      const camera = new PerspectiveCamera(90, 1, 0.1, 500);
+      camera.position.set(0, 100, 0);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      rig.add(camera);
+      return {rig, camera};
+    };
+
+    test('takes the transforms of its parents into account', () => {
+      const {camera} = makeRig();
+      const visibility = new CameraBasedVisibility(camera);
+
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4());
+
+      expect(visibility.pointOnPlane).toBeDefined();
+      expect(visibility.pointOnPlane!.x).toBeCloseTo(300, 1);
+      expect(visibility.pointOnPlane!.y).toBeCloseTo(0);
+      expect(visibility.pointOnPlane!.z).toBeCloseTo(-200, 1);
+    });
+
+    test('follows a parent that moved after the last recomputation', () => {
+      const {rig, camera} = makeRig();
+      // as a render would
+      rig.updateMatrixWorld(true);
+      const visibility = new CameraBasedVisibility(camera);
+      const tileCoords = new Map2DTileCoordsUtil(100, 100);
+      const matrixWorld = new Matrix4();
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const xBefore = visibility.pointOnPlane!.x;
+      const serialBefore = visibility.serial;
+
+      // moved in the frame, before anything brought its world matrix up to date
+      rig.position.x += 500;
+      visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld);
+
+      expect(visibility.pointOnPlane!.x - xBefore).toBeCloseTo(500, 1);
+      expect(visibility.serial, 'the camera was evaluated again').toBe(serialBefore + 1);
     });
   });
 
@@ -814,6 +935,215 @@ describe('CameraBasedVisibility', () => {
         expect(Math.abs(center.x - tileCenter.x), `${where}, x`).toBeLessThan(1e-6);
         expect(Math.abs(center.z - tileCenter.z), `${where}, z`).toBeLessThan(1e-6);
       }
+    });
+  });
+
+  describe('maxVisibleTiles', () => {
+    const horizonTileCoords = () => new Map2DTileCoordsUtil(16, 16);
+
+    /** Every tile the view reaches, as a fresh visibility without a limit finds them. */
+    function unlimitedVisibles(
+      camera: PerspectiveCamera | OrthographicCamera,
+      tileCoords: Map2DTileCoordsUtil,
+      center: [number, number] = [0, 0],
+    ): TileBox[] {
+      const visibility = new CameraBasedVisibility(camera);
+      visibility.maxVisibleTiles = Infinity;
+      visibility.computeVisibleTiles([], center, tileCoords, new Matrix4());
+      return visibility.visibles;
+    }
+
+    /** The tiles of a limited view are the `limit` of `reference` that lie nearest to the camera. */
+    function expectTheNearest(
+      visibility: CameraBasedVisibility,
+      result: IMap2DVisibleTiles,
+      reference: readonly TileBox[],
+      limit: number,
+      where = `limit ${limit}`,
+    ): void {
+      expect(visibility.visibles, where).toHaveLength(limit);
+      expect(result.tiles, where).toHaveLength(limit);
+      expect(result.createTiles, where).toHaveLength(limit);
+
+      const inReference = new Set(reference.map((tile) => tile.id));
+      for (const tile of visibility.visibles) {
+        expect(inReference.has(tile.id), `${where}: tile ${tile.x},${tile.y} is in the view`).toBe(true);
+      }
+
+      const kept = new Set(visibility.visibles.map((tile) => tile.id));
+      const farthestKept = Math.max(...visibility.visibles.map((tile) => tile.distanceToCamera!));
+      const nearestLeftOut = Math.min(...reference.filter((tile) => !kept.has(tile.id)).map((tile) => tile.distanceToCamera!));
+      expect(farthestKept, `${where}: no tile left out lies nearer than one kept`).toBeLessThanOrEqual(nearestLeftOut + 1e-6);
+
+      const distances = visibility.visibles.map((tile) => tile.distanceToCamera!);
+      expect(distances, `${where}: nearest first`).toEqual([...distances].sort((a, b) => a - b));
+    }
+
+    /** The visible tiles that went in without being held against the frustum. */
+    function untestedVisibles(
+      visibility: CameraBasedVisibility,
+      intersectsBox: MockInstance<Frustum['intersectsBox']>,
+    ): TileBox[] {
+      const tested = new Set<Box3>(intersectsBox.mock.calls.map(([box]) => box));
+      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox!));
+    }
+
+    test('defaults to 10000', () => {
+      expect(new CameraBasedVisibility().maxVisibleTiles).toBe(10_000);
+    });
+
+    test('refuses anything but a whole number above 0 or Infinity', () => {
+      const visibility = new CameraBasedVisibility();
+      visibility.maxVisibleTiles = 42;
+
+      for (const value of [0, -1, 1.5, NaN, -Infinity]) {
+        expect(() => {
+          visibility.maxVisibleTiles = value;
+        }, String(value)).toThrow(RangeError);
+        expect(visibility.maxVisibleTiles, `the value stands after ${value}`).toBe(42);
+      }
+
+      visibility.maxVisibleTiles = 1;
+      expect(visibility.maxVisibleTiles).toBe(1);
+      visibility.maxVisibleTiles = Infinity;
+      expect(visibility.maxVisibleTiles).toBe(Infinity);
+    });
+
+    test('a new value recomputes without the camera having moved', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      const tileCoords = new Map2DTileCoordsUtil(100, 100);
+      const matrixWorld = new Matrix4();
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const serialAfterFirst = visibility.serial;
+
+      // a new value that does not cut this view: the gate alone is what recomputes
+      visibility.maxVisibleTiles = 5_000;
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(second.changed, 'the tile grid stands').toBe(false);
+      expect(visibility.serial, 'the camera was evaluated again').toBe(serialAfterFirst + 1);
+    });
+
+    test('the view to the horizon reaches between 2 000 and 8 000 tiles without a limit', () => {
+      // the scene the limit is tried on below: large enough to be cut, small enough for the suite
+      const count = unlimitedVisibles(makeCameraLookingToTheHorizon(), horizonTileCoords()).length;
+      expect(count).toBeGreaterThanOrEqual(2_000);
+      expect(count).toBeLessThanOrEqual(8_000);
+    });
+
+    test('keeps the maxVisibleTiles tiles nearest to the camera', () => {
+      const reference = unlimitedVisibles(makeCameraLookingToTheHorizon(), horizonTileCoords());
+
+      const visibility = new CameraBasedVisibility(makeCameraLookingToTheHorizon());
+      visibility.maxVisibleTiles = 500;
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const intersectsBox = vi.spyOn(Frustum.prototype, 'intersectsBox');
+      const result = visibility.computeVisibleTiles([], [0, 0], horizonTileCoords(), new Matrix4())!;
+
+      expectTheNearest(visibility, result, reference, 500);
+      // the probe rays reach out to `far`, so the hull between them spans more than 500 tiles
+      // and is not filled in: every tile is tested
+      expect(untestedVisibles(visibility, intersectsBox)).toHaveLength(0);
+    });
+
+    test('keeps the nearest tiles when the hull fits under the limit', () => {
+      // Looking down on a grid of 20 × 20, the probe points at ±100 fall into the tiles -5 to 5:
+      // the box around the hull is 11 × 11 = 121 tiles. With the margin of `frustumBoxScale` the
+      // view reaches over the tiles -6 to 5, 12 × 12 = 144 without a limit. A limit between the
+      // two fills in the hull and still has to leave tiles out.
+      const tileCoords = new Map2DTileCoordsUtil(20, 20);
+      const reference = unlimitedVisibles(makeOrthoCameraLookingDown(), tileCoords);
+      expect(reference).toHaveLength(144);
+
+      const visibility = new CameraBasedVisibility(makeOrthoCameraLookingDown());
+      visibility.maxVisibleTiles = 130;
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const intersectsBox = vi.spyOn(Frustum.prototype, 'intersectsBox');
+      const result = visibility.computeVisibleTiles([], [0, 0], tileCoords, new Matrix4())!;
+
+      expectTheNearest(visibility, result, reference, 130);
+      expect(untestedVisibles(visibility, intersectsBox).length, 'the hull was filled in').toBeGreaterThan(0);
+    });
+
+    test('keeps the nearest tiles under a small limit, also where the nearest tile is none of the seeds', () => {
+      // The frustum box of a tile is `depth` high, so the box of a tile in front of the lower edge
+      // of the view reaches up into the frustum: the tile nearest to the camera lies outside the
+      // area the probe rays span, and the search reaches it only from a tile further away.
+      // Moved and turned, the camera puts that tile at other places relative to the grid.
+      type Vec3 = [number, number, number];
+      type Scene = {fov: number; far: number; position: Vec3; target: Vec3; center: [number, number]};
+      const horizon = (position: Vec3, target: Vec3): Scene => ({fov: 75, far: 1000, position, target, center: [0, 0]});
+      const scenes: Scene[] = [
+        horizon([0, 40, 0], [0, 0, -300]),
+        horizon([7.3, 40, 5.1], [7.3, 0, -295]),
+        horizon([0, 40, 0], [150, 0, -260]),
+        horizon([-11, 52, 3], [-200, 0, -230]),
+        horizon([5, 33, -9], [40, 0, -300]),
+        horizon([3.7, 45, -2.2], [-300, 0, -40]),
+        // High above the plane with a narrow view: the way to the nearest tile runs over tiles a
+        // little further out than the furthest one kept, so the search has to go on past it.
+        {fov: 46, far: 800, position: [-5, 108, -1], target: [-388, 0, 123], center: [-12, -3]},
+        {fov: 51, far: 440, position: [14, 92, -5], target: [-47, 0, 279], center: [5, -11]},
+        {fov: 45, far: 530, position: [10, 110, 18], target: [-376, 0, 158], center: [5, 14]},
+      ];
+      const makeCamera = ({fov, far, position, target}: Scene): PerspectiveCamera => {
+        const camera = new PerspectiveCamera(fov, 1.6, 0.1, far);
+        camera.position.set(...position);
+        camera.lookAt(...target);
+        camera.updateMatrixWorld();
+        camera.updateProjectionMatrix();
+        return camera;
+      };
+
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      for (const scene of scenes) {
+        // one reference per camera, not per limit
+        const reference = unlimitedVisibles(makeCamera(scene), horizonTileCoords(), scene.center);
+
+        for (let limit = 1; limit <= 15; ++limit) {
+          const visibility = new CameraBasedVisibility(makeCamera(scene));
+          visibility.maxVisibleTiles = limit;
+          const result = visibility.computeVisibleTiles([], scene.center, horizonTileCoords(), new Matrix4())!;
+
+          expectTheNearest(
+            visibility,
+            result,
+            reference,
+            limit,
+            `camera at ${scene.position} to ${scene.target}, limit ${limit}`,
+          );
+        }
+      }
+    });
+
+    test('warns once, the first time the limit cuts the view', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const camera = makeCameraLookingToTheHorizon();
+      const visibility = new CameraBasedVisibility(camera);
+      visibility.maxVisibleTiles = 500;
+
+      const first = visibility.computeVisibleTiles([], [0, 0], horizonTileCoords(), new Matrix4())!;
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message] = warn.mock.calls[0]!;
+      expect(message).toMatch(/\b500\b/);
+      expect(message).toMatch(/maxVisibleTiles/);
+
+      camera.position.x += 3;
+      const serialAfterFirst = visibility.serial;
+      visibility.computeVisibleTiles(first.tiles, [0, 0], horizonTileCoords(), new Matrix4());
+      expect(visibility.serial, 'the moved camera was evaluated again').toBe(serialAfterFirst + 1);
+      expect(visibility.visibles, 'and cut again').toHaveLength(500);
+      expect(warn, 'but not warned about again').toHaveBeenCalledTimes(1);
+
+      new CameraBasedVisibility(makeCameraLookingToTheHorizon()).computeVisibleTiles(
+        [],
+        [0, 0],
+        horizonTileCoords(),
+        new Matrix4(),
+      );
+      expect(warn, 'the default does not cut this view').toHaveBeenCalledTimes(1);
     });
   });
 

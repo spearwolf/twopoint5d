@@ -1,6 +1,7 @@
 import type {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {Box3, Frustum, Line3, Matrix4, Plane, Vector2, Vector3, WebGPUCoordinateSystem} from 'three/webgpu';
 import {Dependencies} from '../utils/Dependencies.js';
+import {describeValue} from '../utils/describeValue.js';
 import {AABB2} from './AABB2.js';
 import {convexTileHull, forEachTileWithinConvexHull, type TilePoint} from './convexTileHull.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
@@ -31,6 +32,19 @@ export interface TileBox {
    * such a tile outwards.
    */
   primary?: boolean;
+}
+
+/**
+ * The slot the pool of {@link CameraBasedVisibility} keeps for a tile — the public shape plus what
+ * the search needs on the way.
+ */
+interface PooledTileBox extends TileBox {
+  distanceToCamera: number;
+  /**
+   * Whether the tile came into the frontier from within the hull of the probe rays, and so is
+   * visible without a frustum test. Written each time the tile enters the frontier.
+   */
+  insideProbeHull: boolean;
 }
 
 const _v = new Vector3();
@@ -117,11 +131,18 @@ const poolAt = <T>(pool: T[], index: number, create: () => T): T => {
  * - WebGPU coordinate system: `0` to `1`
  * - reversed depth, in either: `1` to `0`
  *
+ * `far` bounds how far out the plane is searched, and the ground a camera tilted towards the
+ * horizon covers grows with about `far²`. {@link maxVisibleTiles} bounds the tiles of one
+ * recomputation: the search runs from the camera outwards, and at the limit it goes on only as
+ * far as a tile nearer than the furthest kept one can still turn up, so the tiles left out are
+ * the ones furthest away. The first recomputation the limit cuts warns once.
+ *
  * The camera is read as the caller keeps it. `computeVisibleTiles()` brings the world matrix of
- * the camera up to date from its transform, but not its projection: whoever changes `fov`,
- * `aspect`, `near`, `far` or `zoom` of a perspective camera, or the frustum of an orthographic
- * one, calls `camera.updateProjectionMatrix()` before the next call. A projection matrix set by
- * hand — jitter, an off-axis projection — is used as it stands, together with its
+ * the camera up to date from its own transform and those of its parents — the way
+ * `Map2DTileStreamer` brings the map node up to date —, but not its projection: whoever changes
+ * `fov`, `aspect`, `near`, `far` or `zoom` of a perspective camera, or the frustum of an
+ * orthographic one, calls `camera.updateProjectionMatrix()` before the next call. A projection
+ * matrix set by hand — jitter, an off-axis projection — is used as it stands, together with its
  * `projectionMatrixInverse`.
  */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
@@ -134,6 +155,40 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * `1.1` gives a tile that only just leaves the view a margin before it is dropped.
    */
   frustumBoxScale = 1.1;
+
+  #maxVisibleTiles = 10_000;
+
+  /**
+   * The most tiles one recomputation takes into the visible set: the ones nearest to the camera,
+   * measured at the center of each tile, and those it leaves out are the ones furthest away. The
+   * search runs from the camera outwards, nearest tile first. Once it holds this many tiles it
+   * goes on as far as a visible tile nearer than the furthest kept one can still turn up — the
+   * diagonal of a frustum box on the plane beyond it — and such a tile takes the place of the
+   * furthest; a recomputation the limit cuts therefore tests a margin of tiles beyond the ones it
+   * keeps.
+   *
+   * `far` of the camera bounds how far the plane is searched; tilted towards the horizon, the
+   * ground in view grows with about `far²`, and this limit is what holds it. The first
+   * recomputation the limit cuts warns once. `Infinity` turns the limit off.
+   *
+   * The default of 10 000 is more than a `TileSpritesGeometry` usually holds: a view that fits
+   * into its geometry never meets it, and a camera tipped towards the horizon is caught.
+   *
+   * Takes a whole number above 0 or `Infinity` and throws a `RangeError` for anything else,
+   * keeping the value it had. A new value recomputes on the next call.
+   */
+  get maxVisibleTiles(): number {
+    return this.#maxVisibleTiles;
+  }
+
+  set maxVisibleTiles(value: number) {
+    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
+      throw new RangeError(
+        `[CameraBasedVisibility] maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
+      );
+    }
+    this.#maxVisibleTiles = value;
+  }
 
   /**
    * Whether the view center of the map is where the camera looks. With `true`, the point where the
@@ -178,6 +233,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   #cameraFrustum = new Frustum();
 
   #tileBoxMatrix = new Matrix4();
+  // `matrixWorld` after `#tileBoxMatrix`, formed once per recomputation: one transform takes a
+  // tile from where its box is built into world space
+  #tileWorldMatrix = new Matrix4();
+  // the translation of `#tileBoxMatrix`, which is all it does, for the box that stays in the
+  // local space of the map node
+  #tileBoxOffset = new Vector3();
 
   readonly #map2dTileCoords = new Map2DTileCoordsUtil();
 
@@ -194,6 +255,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly #deps = new Dependencies<{
     depth: number;
     frustumBoxScale: number;
+    maxVisibleTiles: number;
     lookAtCenter: boolean;
     centerPoint2D: Vector2;
     map2dTileCoords: Map2DTileCoordsUtil;
@@ -203,6 +265,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }>([
     'depth',
     'frustumBoxScale',
+    'maxVisibleTiles',
     'lookAtCenter',
     Dependencies.cloneable<Vector2>('centerPoint2D'),
     Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
@@ -212,9 +275,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   ]);
 
   /**
-   * The tiles of the last recomputation that met the plane, sorted by their distance to the
-   * camera. A recomputation in which the camera looks past the plane reports an empty tile set
-   * and empties this list along with it.
+   * The tiles of the last recomputation that met the plane, nearest to the camera first — an
+   * order this class promises, not one it happens to produce — and at most
+   * {@link maxVisibleTiles} of them. A recomputation in which the camera looks past the plane
+   * reports an empty tile set and empties this list along with it.
    */
   readonly visibles: TileBox[] = [];
   #visibleTiles?: IMap2DVisibleTiles;
@@ -234,10 +298,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   // Per-frame scratch buffers — reused across calls to keep GC pressure low.
+  // The tiles that entered the frontier in this recomputation, each exactly once.
   readonly #visitedIds = new Set<number>();
-  readonly #nextStack: TileBox[] = [];
+  // A binary min-heap over `distanceToCamera`: the tiles found and not yet taken, nearest on
+  // top, so the search runs from the camera outwards and a cut at the limit leaves out the
+  // furthest.
+  readonly #frontier: PooledTileBox[] = [];
+  // The visible tiles the search keeps, in the order it found them until there are
+  // `maxVisibleTiles` of them, from then on a binary max-heap over `distanceToCamera`: the
+  // furthest on top, where a nearer tile takes its place.
+  readonly #kept: PooledTileBox[] = [];
   readonly #previousTilesById = new Map<number, IMap2DTileCoords>();
-  readonly #withinHull: TileBox[] = [];
   readonly #hullPoints: TilePoint[] = [];
 
   // The lists and the object a recomputation hands out, written again by the next one, as
@@ -258,10 +329,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // new ones.
   // It holds the tiles of the last recomputation that found the map plane, and no others: a frame
   // in which the camera looks past the plane computes no tiles and leaves the pool as it stands.
-  readonly #tileBoxPool = new Map<number, TileBox>();
+  readonly #tileBoxPool = new Map<number, PooledTileBox>();
 
   // Snapshot of the tile-grid parameters that drive `tile.coords`. It answers whether the grid
-  // of the current run differs from the one before — the question `acceptTile()` hangs on — and
+  // of the current run differs from the one before — the question `placeTile()` hangs on — and
   // when it does, the per-slot `coords` caches and the `map2dTile` shells of the pool are
   // released, so the next run builds both against the new grid.
   #cachedTileCoords: Map2DTileCoordsUtil | undefined;
@@ -271,6 +342,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // without a tile streamer can hand it a new grid at any time, and the answer decides whether
   // the tiles of the run before may be handed back for reuse.
   #tileGridChanged = false;
+
+  #warnedCapped = false;
 
   // Hot-path scratch instances — kept on the class to share across frames.
   readonly #scratchTranslate = new Vector3();
@@ -296,6 +369,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.#deps.changed({
       depth: this.depth,
       frustumBoxScale: this.frustumBoxScale,
+      maxVisibleTiles: this.#maxVisibleTiles,
       lookAtCenter: this.lookAtCenter,
       centerPoint2D: this.#centerPoint2D,
       map2dTileCoords: this.#map2dTileCoords,
@@ -344,6 +418,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * other than the one of the previous call those tiles go into `removeTiles`, because their
    * indices belong to a grid this one cannot place. A first call has no earlier grid to hold
    * against and takes `previousTiles` as belonging to the grid it is given.
+   *
+   * `tiles` of the result lists the tiles in the order of {@link visibles}, nearest to the
+   * camera first.
    */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
@@ -358,7 +435,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#map2dTileCoords.copy(map2dTileCoords);
     this.#centerPoint2D.set(centerX, centerY);
 
-    this.camera.updateMatrixWorld();
+    // the parents of the camera — a rig, a player object — are moved in the same frame, so they
+    // are brought up to date along with it, the way `Map2DTileStreamer` brings the map node up to
+    // date: camera and map are compared from the same frame. Its children are left alone; this
+    // class reads none of them.
+    this.camera.updateWorldMatrix(true, false);
 
     if (!this.dependenciesChanged(matrixWorld)) {
       if (this.#visibleTiles) {
@@ -498,11 +579,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.pointsOnPlane.length;
   }
 
-  private acquireTileBox(x: number, y: number): TileBox {
+  private acquireTileBox(x: number, y: number): PooledTileBox {
     const id = packTileCoords(x, y);
     let tile = this.#tileBoxPool.get(id);
     if (tile === undefined) {
-      tile = {id, x, y};
+      tile = {id, x, y, distanceToCamera: 0, insideProbeHull: false};
       this.#tileBoxPool.set(id, tile);
     }
     return tile;
@@ -511,8 +592,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   private findVisibleTiles(previousTiles: IMap2DTileCoords[], hitCount: number, changed: boolean): IMap2DVisibleTiles {
     // Reset reusable working buffers.
     this.#visitedIds.clear();
-    this.#nextStack.length = 0;
-    this.#withinHull.length = 0;
+    // `pop()` and not `length = 0`, which lets V8 drop the backing store the next fill builds
+    // again; what is left here is what a cut at the limit did not take
+    while (this.#frontier.length > 0) this.#frontier.pop();
     this.#probeTileIds.clear();
     this.visibles.length = 0;
 
@@ -538,15 +620,19 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     // the tile boxes are built in the local space of the map node, where the renderers draw the
     // tiles; `matrixWorld` takes them into world space once, where the frustum is tested
-    this.#tileBoxMatrix.makeTranslation(
+    this.#tileBoxOffset.set(
       this.#map2dTileCoords.xOffset - this.#centerPoint2D.x,
       0,
       this.#map2dTileCoords.yOffset - this.#centerPoint2D.y,
     );
+    this.#tileBoxMatrix.makeTranslation(this.#tileBoxOffset);
+    this.#tileWorldMatrix.multiplyMatrices(this.matrixWorld, this.#tileBoxMatrix);
+
+    this.collectTilesWithinProbeHull(hitCount);
 
     // The tiles the probe rays met are where the search starts. Per ray that is the tile its
     // point falls into, together with the tiles a rectangle of one tile size around that point
-    // reaches into — up to four in all.
+    // reaches into — up to four in all. A seed the hull has taken in already stays as it is.
     for (let i = 0; i < hitCount; ++i) {
       // The loop bound is the number of points the probe rays found.
       const coords2D = this.#probePlaneCoords[i]!;
@@ -560,43 +646,74 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         for (let tx = 0; tx < around.columns; tx++) {
           const tile = this.acquireTileBox(around.tileLeft + tx, around.tileTop + ty);
           this.#probeTileIds.add(tile.id);
-          this.#nextStack.push(tile);
+          this.enqueue(tile, false);
         }
       }
     }
 
-    this.collectTilesWithinProbeHull(hitCount);
+    // Nearest first. Once `maxVisibleTiles` tiles are kept, a visible tile nearer than the
+    // furthest of them takes its place, and the search goes on as long as the frontier can still
+    // lead to such a tile — see `stopDistance()`.
+    const limit = this.#maxVisibleTiles;
+    const kept = this.#kept;
+    let footprintDiagonal = 0;
+    let stopDistance = Infinity;
+    let capped = false;
+    while (this.#frontier.length > 0) {
+      if (kept.length >= limit && this.#frontier[0]!.distanceToCamera > stopDistance) break;
 
-    for (let i = 0; i < this.#withinHull.length; ++i) {
-      // The loop bound is `this.#withinHull.length`.
-      const tile = this.#withinHull[i]!;
-      this.prepareTile(tile);
-      this.acceptTile(tile, this.#reuseTiles, this.#createTiles);
+      const tile = this.popFrontier();
+      this.updateFrustumBox(tile);
+      if (!tile.insideProbeHull && !this.#cameraFrustum.intersectsBox(tile.frustumBox!)) continue;
+
+      if (kept.length < limit) {
+        kept.push(tile);
+        if (kept.length === limit) {
+          this.heapifyKept();
+          // the frustum boxes of all tiles have the same size
+          const box = tile.frustumBox!;
+          footprintDiagonal = Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z);
+          stopDistance = this.stopDistance(kept[0]!.distanceToCamera, footprintDiagonal);
+        }
+      } else {
+        // a visible tile goes: this one, or the furthest kept one it takes the place of
+        capped = true;
+        if (tile.distanceToCamera < kept[0]!.distanceToCamera) {
+          this.siftDownKept(0, tile);
+          stopDistance = this.stopDistance(kept[0]!.distanceToCamera, footprintDiagonal);
+        }
+      }
+      // expanded either way: a tile left out can still be the way to a nearer one
       this.pushNeighbors(tile);
     }
 
-    while (this.#nextStack.length > 0) {
-      const tile = this.#nextStack.pop()!;
-      if (this.#visitedIds.has(tile.id)) continue;
-      this.#visitedIds.add(tile.id);
-
-      this.prepareTile(tile);
-
-      if (this.#cameraFrustum.intersectsBox(tile.frustumBox!)) {
-        this.acceptTile(tile, this.#reuseTiles, this.#createTiles);
-        this.pushNeighbors(tile);
+    // A search that stopped at the distance leaves tiles in the frontier. The limit cut the view
+    // only if one of them is visible — a rest that would fail the test does not count.
+    if (!capped && kept.length >= limit) {
+      while (this.#frontier.length > 0) {
+        const tile = this.popFrontier();
+        this.updateFrustumBox(tile);
+        if (tile.insideProbeHull || this.#cameraFrustum.intersectsBox(tile.frustumBox!)) {
+          capped = true;
+          break;
+        }
       }
     }
+    if (capped) this.warnCapped();
 
     // The pool exists to let the next frame mutate the same shells instead of allocating
-    // new ones — that pays off only for a slot the next frame comes back to. A slot that
-    // was not visited this time keeps a Box3, a Vector3 and a Map2DTileCoords alive for a
-    // tile the camera has left behind, so it goes. Both sets are keyed by `packTileCoords()`.
+    // new ones — that pays off only for a slot the next frame comes back to. A slot whose tile
+    // did not enter the frontier this time keeps a Box3, a Vector3 and a Map2DTileCoords alive
+    // for a tile the camera has left behind, so it goes. Both sets are keyed by `packTileCoords()`.
     for (const id of this.#tileBoxPool.keys()) {
       if (!this.#visitedIds.has(id)) {
         this.#tileBoxPool.delete(id);
       }
     }
+
+    // `pop()` empties the list of the kept tiles as it hands them over; the sort below puts them
+    // in order
+    while (kept.length > 0) this.visibles.push(kept.pop()!);
 
     // `primary` is a statement about this recomputation and the pool outlives it, so it is
     // written here rather than kept up to date while the search runs: a tile that is not in the
@@ -608,6 +725,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     this.visibles.sort(sortByDistance);
+
+    // Only the tiles the search kept to the end are placed and sorted into reuse and create: a
+    // tile that was kept for a while and then gave way stays in `#previousTilesById`, and goes out
+    // in `removeTiles` if it was a tile of the last result.
+    for (let i = 0; i < this.visibles.length; ++i) {
+      // The loop bound is `this.visibles.length`.
+      this.placeTile(this.visibles[i]!, this.#reuseTiles, this.#createTiles);
+    }
 
     this.#tiles.length = 0;
     // The loop bound is `this.visibles.length`.
@@ -634,15 +759,22 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   /**
-   * Puts every tile within the convex hull of the tiles the probe rays met into
-   * {@link #withinHull} and marks it visited, so that the search that follows starts on the
-   * border of the hull instead of working its way through its inside.
+   * Puts every tile within the convex hull of the tiles the probe rays met into the frontier,
+   * marked as lying inside it.
    *
    * These tiles are visible without being tested. The frustum is convex and so is the plane, so
    * the area where the two meet is convex as well: it contains every point between the points
    * the rays found, and therefore each of the tiles those points span. A tile on the hull that
    * the rounding to whole tiles leaves out is no loss — it borders one that is in, so the
    * search reaches it and tests it as it tests every other tile.
+   *
+   * The tiles of the hull save the frustum test, not their place in the order: they come out of
+   * the frontier by their distance to the camera like every other tile, and only so are the
+   * tiles kept under {@link maxVisibleTiles} the nearest ones and not those of the hull.
+   *
+   * A hull whose bounding box holds more tiles than {@link maxVisibleTiles} is not filled in:
+   * the box bounds the tiles of the hull from above, and without them the search tests every
+   * tile against the frustum — which costs tests, never the result.
    *
    * Fewer than three rays span no area, and there is nothing to fill in.
    */
@@ -661,16 +793,92 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       points.push(point);
     }
 
-    forEachTileWithinConvexHull(convexTileHull(points), (x, y) => {
-      const id = packTileCoords(x, y);
-      if (this.#visitedIds.has(id)) return;
-      this.#visitedIds.add(id);
-      this.#withinHull.push(this.acquireTileBox(x, y));
+    const hull = convexTileHull(points);
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < hull.length; ++i) {
+      // The loop bound is `hull.length`.
+      const [x, y] = hull[i]!;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if ((maxX - minX + 1) * (maxY - minY + 1) > this.#maxVisibleTiles) return;
+
+    forEachTileWithinConvexHull(hull, (x, y) => {
+      this.enqueue(this.acquireTileBox(x, y), true);
     });
   }
 
-  /** The tile coordinates and the box the frustum test reads, both in the shape of this frame. */
-  private prepareTile(tile: TileBox): void {
+  /**
+   * Puts a tile into the frontier, unless it has been there in this recomputation already. The
+   * mark is set here, on the way in, so that a tile enters the frontier exactly once.
+   */
+  private enqueue(tile: PooledTileBox, insideProbeHull: boolean): void {
+    if (this.#visitedIds.has(tile.id)) return;
+    this.#visitedIds.add(tile.id);
+
+    tile.insideProbeHull = insideProbeHull;
+    this.prepareTile(tile);
+    this.pushFrontier(tile);
+  }
+
+  /** Sift-up: the parent of the entry at `i` sits at `(i - 1) >> 1`. */
+  private pushFrontier(tile: PooledTileBox): void {
+    const heap = this.#frontier;
+    const distance = tile.distanceToCamera;
+    let i = heap.length;
+    heap.push(tile);
+    while (i > 0) {
+      const parentIndex = (i - 1) >> 1;
+      // A heap of this length has an entry at every index below it.
+      const parent = heap[parentIndex]!;
+      if (parent.distanceToCamera <= distance) break;
+      heap[i] = parent;
+      i = parentIndex;
+    }
+    heap[i] = tile;
+  }
+
+  /** Takes the nearest tile off the frontier, which the caller checked to be non-empty. */
+  private popFrontier(): PooledTileBox {
+    const heap = this.#frontier;
+    const nearest = heap[0]!;
+    const last = heap.pop()!;
+    const length = heap.length;
+    if (length === 0) return nearest;
+
+    // sift-down: the last entry drops from the top until neither child lies nearer
+    const distance = last.distanceToCamera;
+    let i = 0;
+    for (;;) {
+      const left = 2 * i + 1;
+      if (left >= length) break;
+      const right = left + 1;
+      // Both indices are checked against the length of the heap.
+      let child = heap[left]!;
+      let childIndex = left;
+      if (right < length && heap[right]!.distanceToCamera < child.distanceToCamera) {
+        child = heap[right]!;
+        childIndex = right;
+      }
+      if (child.distanceToCamera >= distance) break;
+      heap[i] = child;
+      i = childIndex;
+    }
+    heap[i] = last;
+    return nearest;
+  }
+
+  /**
+   * The tile coordinates, the center of the tile in world space and its distance to the camera —
+   * what the frontier orders by —, in the shape of this frame.
+   */
+  private prepareTile(tile: PooledTileBox): void {
     const {tileWidth, tileHeight, xOffset, yOffset} = this.#map2dTileCoords;
 
     // the query reads world coordinates, so the tile coordinate is taken back into that space
@@ -680,29 +888,100 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       1,
       1,
     );
-
-    if (tile.frustumBox === undefined) tile.frustumBox = new Box3();
-    this.setBox(tile.frustumBox, tile.coords, this.frustumBoxScale)
-      .applyMatrix4(this.#tileBoxMatrix)
-      .applyMatrix4(this.matrixWorld);
-  }
-
-  /** Takes a tile into the visible set. Expects {@link prepareTile} to have run on it. */
-  private acceptTile(tile: TileBox, reuseTiles: IMap2DTileCoords[], createTiles: IMap2DTileCoords[]): void {
-    const coords = tile.coords!;
+    const coords = tile.coords;
 
     if (tile.centerWorld === undefined) tile.centerWorld = new Vector3();
-    tile.centerWorld
-      .set(coords.left + coords.width / 2, 0, coords.top + coords.height / 2)
-      .applyMatrix4(this.#tileBoxMatrix)
-      .applyMatrix4(this.matrixWorld);
+    tile.centerWorld.set(coords.left + coords.width / 2, 0, coords.top + coords.height / 2).applyMatrix4(this.#tileWorldMatrix);
 
     tile.distanceToCamera = tile.centerWorld.distanceTo(this.#cameraWorldPosition);
+  }
 
-    this.visibles.push(tile);
+  /**
+   * The box the frustum test reads, for every tile taken off the frontier — those of the hull
+   * too, whose box the visibility helpers draw. Expects {@link prepareTile} to have run on it.
+   */
+  private updateFrustumBox(tile: PooledTileBox): void {
+    if (tile.frustumBox === undefined) tile.frustumBox = new Box3();
+    // the same box two transforms in a row give: `#tileBoxMatrix` only translates, and a box
+    // that is moved stays exact
+    this.setBox(tile.frustumBox, tile.coords!, this.frustumBoxScale).applyMatrix4(this.#tileWorldMatrix);
+  }
+
+  /**
+   * The distance to the camera up to which the search goes on once `maxVisibleTiles` tiles are
+   * kept, the furthest of them at `furthestKept`: past it, no tile in the frontier leads to a
+   * visible tile nearer than that one.
+   *
+   * The center of a tile lies on the map plane, so its distance to the camera is
+   * `√(h² + ρ²)` — `h` the height of the camera above the plane, `ρ` how far the center lies from
+   * the point of the plane below the camera. Take a kept tile and a visible tile nearer than the
+   * furthest kept one, and a point of each frustum box inside the frustum. The straight line
+   * between the two points stays inside the frustum, which is convex, and inside the slab the
+   * frustum boxes fill; each tile it passes over has the point above it inside its box, so it is
+   * visible, and one after the other these tiles are neighbours. Along the line, `ρ` of the point
+   * below it is at most the larger of its two ends, and a point of a frustum box lies at most half
+   * the diagonal of its footprint away from the center of its tile. So `ρ` of every tile on the
+   * way is at most `ρ` of the furthest kept tile plus `footprintDiagonal`, and the search, which
+   * takes the tiles in the order of their distance, reaches each of them before it stops.
+   *
+   * The height of the frustum boxes does not enter the margin, though it is why a margin is
+   * needed at all: a tile whose box reaches into the frustum from below the lower edge of the
+   * view can lie behind tiles a little further out than the furthest kept one. The argument needs
+   * a map on the XZ plane — the plane this class works on — and a `frustumBoxScale` of at least 1,
+   * so that the boxes of neighbouring tiles leave no gap.
+   */
+  private stopDistance(furthestKept: number, footprintDiagonal: number): number {
+    const height = this.planeWorld.distanceToPoint(this.#cameraWorldPosition);
+    const heightSq = height * height;
+    const rho = Math.sqrt(Math.max(furthestKept * furthestKept - heightSq, 0)) + footprintDiagonal;
+    return Math.sqrt(heightSq + rho * rho);
+  }
+
+  /** Builds the max-heap over the kept tiles, bottom-up. */
+  private heapifyKept(): void {
+    const heap = this.#kept;
+    for (let i = (heap.length >> 1) - 1; i >= 0; --i) {
+      // The index runs down from the last entry that has a child.
+      this.siftDownKept(i, heap[i]!);
+    }
+  }
+
+  /**
+   * Puts `tile` at `start` of the max-heap of the kept tiles and lets it drop until neither child
+   * lies further out. At `start` 0 it takes the place of the furthest kept tile.
+   */
+  private siftDownKept(start: number, tile: PooledTileBox): void {
+    const heap = this.#kept;
+    const length = heap.length;
+    const distance = tile.distanceToCamera;
+    let i = start;
+    for (;;) {
+      const left = 2 * i + 1;
+      if (left >= length) break;
+      const right = left + 1;
+      // Both indices are checked against the length of the heap.
+      let child = heap[left]!;
+      let childIndex = left;
+      if (right < length && heap[right]!.distanceToCamera > child.distanceToCamera) {
+        child = heap[right]!;
+        childIndex = right;
+      }
+      if (child.distanceToCamera <= distance) break;
+      heap[i] = child;
+      i = childIndex;
+    }
+    heap[i] = tile;
+  }
+
+  /**
+   * Places a tile the search kept, and sorts it into `reuseTiles` or `createTiles`. Expects
+   * {@link prepareTile} to have run on it.
+   */
+  private placeTile(tile: TileBox, reuseTiles: IMap2DTileCoords[], createTiles: IMap2DTileCoords[]): void {
+    const coords = tile.coords!;
 
     if (tile.box === undefined) tile.box = new Box3();
-    this.setBox(tile.box, coords).applyMatrix4(this.#tileBoxMatrix);
+    this.setBox(tile.box, coords).translate(this.#tileBoxOffset);
 
     if (tile.map2dTile === undefined) {
       tile.map2dTile = new Map2DTileCoords(tile.x, tile.y, new AABB2());
@@ -729,9 +1008,19 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       const tx = tile.x + dx;
       const ty = tile.y + dy;
       if (!this.#visitedIds.has(packTileCoords(tx, ty))) {
-        this.#nextStack.push(this.acquireTileBox(tx, ty));
+        this.enqueue(this.acquireTileBox(tx, ty), false);
       }
     }
+  }
+
+  private warnCapped(): void {
+    if (this.#warnedCapped) return;
+    this.#warnedCapped = true;
+    const limit = this.#maxVisibleTiles;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `CameraBasedVisibility: the view reaches more than ${limit} tiles, so only the ${limit} nearest to the camera are kept. Raise maxVisibleTiles, or lower camera.far, if the tiles further out should be drawn. This warning is shown once per visibility.`,
+    );
   }
 
   private convertToPlaneCoords2D(pointOnPlane3D: Vector3, target: Vector2) {

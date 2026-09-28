@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `AnimatedSpritesGeometryParameters` with `capacity` and `attributeUsage`: the attributes of an `AnimatedSpritesGeometry` that take another usage type, by their names or by `size` for `quadSize` and `position` for `instancePosition`. Animated sprites that stand where they are take `{static: ['position']}` and upload a sprite through `VertexObjectPool#touchVO()` when it moves. A geometry without `attributeUsage` shares its descriptor and the prototype of its sprites with every such geometry
 - add the types `AnimatedSpritesPool`, `AnimatedSpritesBasePool` and `AnimatedSpritesMakeBaseSpriteArgs`, and `AnimatedSpritesGeometry#isAnimatedSpritesGeometry`
 - add `prepareSpriteFrame()`, `PreparedSpriteFrame` and `TexturedSprite#setPreparedFrame()`: `prepareSpriteFrame()` works out once what `setFrame()` writes for a frame — tex coords, diagonal flip and trim margins —, and `setPreparedFrame()` copies those nine numbers into a sprite. The prepared frame is a snapshot; a frame whose `coords` or `data` change afterwards is prepared again
+- add `CameraBasedVisibility#maxVisibleTiles`: the most tiles one recomputation takes into the visible set, 10 000 unless set otherwise — the ones nearest to the camera. `Infinity` turns the limit off; anything but a whole number above 0 or `Infinity` throws a `RangeError` and leaves the value as it was. A new value recomputes on the next `computeVisibleTiles()`, as a new `frustumBoxScale` does
 
 ### Changed
 
@@ -256,6 +257,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the material argument of the `AnimatedSprites` constructor is an `AnimatedSpritesMaterial` or `AnimatedSpritesMaterialParameters`, no other three.js material and no `Texture`; `material` stays typed `AnimatedSpritesMaterial | undefined`. See the Migration Guide
 - perf a `colorMap` of the same kind as the one set takes its place in `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial`, and through `TexturedSprites#texture`, without a rebuild of the color graph and without `needsUpdate`: the texture node gets it as its value. Of the same kind means alike in `colorSpace`, `type` and `format`, in the way three binds the texture — a cube, array, 3d, depth, storage, video or compressed texture each binds in a way of its own, a `DataTexture` as a `Texture` —, in whether both filters are `NearestFilter`, in whether a filter blends texels, and in `compareFunction` and the samples of its render target. An `animsMap` of the same kind with an image takes its place in `AnimatedSpritesMaterial` the same way, its measures going into a uniform. A texture of another kind, and a change between no texture and one, builds the graph anew; three takes program and pipeline out of its caches for a source it has built before and compiles one it has not
 - the setters of `TexturedSprite` and `AnimatedSprite` that write a static attribute — `setSize()`, `setFrame()`, `setPreparedFrame()`, `setColor()`, `animId` and `animOffset` — name in their TSDoc how a later change reaches the gpu: `spritePool.touchVO(sprite, name)` for one sprite, `geometry.touch(name)` for all, or a geometry whose `attributeUsage` makes the attribute dynamic. The TSDoc of `VertexObjects#update()` says what it uploads
+- `CameraBasedVisibility` takes at most `maxVisibleTiles` tiles into the visible set, those nearest to the camera, and warns once, the first time the limit cuts a view. The search runs by the distance of a tile to the camera, nearest first; at the limit it goes on as far as a visible tile nearer than the furthest kept one can still turn up — the diagonal of a frustum box on the plane beyond it — and such a tile takes the place of the furthest. The tiles within the hull of the probe rays go in without a frustum test, in their place in that order. A hull whose bounding box holds more tiles than the limit is not filled in, and its tiles are tested one by one. See the Migration Guide
+- perf `CameraBasedVisibility` takes the box and the center of a tile into world space with one matrix, formed once per recomputation, and moves the box in the local space of the map node by a translation alone; the result is the same
 
 ### Deprecated
 
@@ -444,6 +447,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the generated `set…()` methods of a vertex object leave a value as it was for `null`, as they do for `undefined`, whether it comes as a separate argument or as an element of an array-like
 - `VertexObjectBuffer#copyAttributes()` throws a `RangeError` that names the value for a `targetObjectOffset` that is no integer of 0 or more, as `copy()` and `copyArray()` do, and writes nothing then
 - a pool built on a `VertexObjectDescriptor` that exists already — handed in, or taken over from an earlier pool of the same description — checks its `basePrototype` again and refuses a property added there since that a generated accessor would shadow
+- fix `CameraBasedVisibility#computeVisibleTiles()` for a camera under a parent: it brings the world matrix of the camera up to date together with those of its parents, the way `Map2DTileStreamer` brings the map node up to date. A camera on a rig that is moved in the frame before the render sees the tiles of that frame, not those of the frame before
 
 ### Migration Guide
 
@@ -2997,6 +3001,33 @@ const tint = new Color(1, 0.5, 0.5);
 
 sprite.setPosition(4, 2, 0); // hand in the 0 the sprite goes back to
 sprite.setColor(tint, 1); // and the alpha of 1
+```
+
+#### `CameraBasedVisibility` keeps at most 10 000 tiles
+
+`CameraBasedVisibility#maxVisibleTiles` bounds the tiles of one recomputation to 10 000, and the
+tiles it keeps are the ones nearest to the camera. A view that reaches further — a camera tilted
+towards the horizon with a large `far` over small tiles — keeps its nearest 10 000 tiles and warns
+once. A view that is to keep every tile the view frustum reaches turns the limit off.
+
+**Before**
+
+```ts
+map2d.visibilitor = new CameraBasedVisibility(camera);
+```
+
+**After**
+
+```ts check
+import {CameraBasedVisibility, Map2D} from '@spearwolf/twopoint5d';
+import {PerspectiveCamera} from 'three/webgpu';
+
+const map2d = new Map2D();
+const camera = new PerspectiveCamera(75, 1.6, 0.1, 20000);
+
+const visibility = new CameraBasedVisibility(camera);
+visibility.maxVisibleTiles = Infinity; // every tile the view frustum reaches
+map2d.visibilitor = visibility;
 ```
 
 ## [0.21.2] - 2026-06-19
