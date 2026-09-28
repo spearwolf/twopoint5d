@@ -1,11 +1,13 @@
 import type {Matrix4} from 'three/webgpu';
 import {Vector2, Vector3} from 'three/webgpu';
-import {Dependencies} from '../utils/Dependencies.js';
+import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+import {truncateArray} from '../utils/truncateArray.js';
 import {AABB2} from './AABB2.js';
+import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
-import type {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import type {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
 // 0 is the off switch of an area, so it is as valid as a finite number above 0
@@ -13,6 +15,12 @@ function assertAreaSize(value: number, name: 'width' | 'height'): void {
   if (value !== 0 && !isPositiveFinite(value)) {
     throw new RangeError(`[RectangularVisibilityArea] ${name} must be 0 or a finite number above 0, got ${describeValue(value)}`);
   }
+}
+
+/** The objects the dependency gate of {@link RectangularVisibilityArea} compares. */
+interface AreaDependencies {
+  map2dTileCoords: Map2DTileCoordsUtil;
+  matrixWorld: Matrix4;
 }
 
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
@@ -29,19 +37,29 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   #tileCreated?: Uint8Array;
 
-  readonly #deps = new Dependencies<{
-    centerX: number;
-    centerY: number;
-    map2dTileCoords: Map2DTileCoordsUtil;
-    matrixWorld: Matrix4;
-  }>([
-    'centerX',
-    'centerY',
+  // The objects the gate compares. The center is held against `#seenCenter` instead: a double
+  // read through the generic lookup of `Dependencies` is boxed on every call.
+  readonly #deps = new Dependencies<AreaDependencies>([
     Dependencies.cloneable<Map2DTileCoordsUtil>('map2dTileCoords'),
     Dependencies.cloneable<Matrix4>('matrixWorld'),
   ]);
 
+  // what `#deps` is asked about, written again on every call rather than built as a new literal
+  readonly #dependencyValues: DependencyValues<AreaDependencies> = {map2dTileCoords: null, matrixWorld: null};
+
+  // The center of the last call, x and y, in a typed array, which holds a double as it is. A `#`
+  // field would box every double written to it: the emitted class declares the field before the
+  // constructor assigns it, and that leaves V8 a tagged field. `NaN` equals nothing, so the first
+  // call counts as a change.
+  readonly #seenCenter = new Float64Array([NaN, NaN]);
+
   #visibleTiles?: IMap2DVisibleTiles;
+
+  // What the grid is asked about and what it answers. The rectangle goes in as an object: a
+  // double handed to a call the compiler does not inline is boxed, one held in the field of an
+  // object is not.
+  readonly #queryArea = new AABB2();
+  readonly #tileCoords: TilesWithinCoords = createTilesWithinCoords();
 
   // Per-call scratch — reused across calls, handed out in the result. See IMap2DVisibleTiles.
   readonly #fullViewArea = new AABB2();
@@ -100,13 +118,17 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
-    [centerX, centerY]: [number, number],
+    centerPoint: [number, number],
     map2dTileCoords: Map2DTileCoordsUtil,
     matrixWorld: Matrix4,
   ): IMap2DVisibleTiles | undefined {
     if (this.width === 0 || this.height === 0) {
       return undefined;
     }
+
+    // read by index: a tuple of doubles destructured in the signature costs an allocation per call
+    const centerX = centerPoint[0];
+    const centerY = centerPoint[1];
 
     // asked before changed() writes the new state over it: the answer is what the previous call
     // was given, and `Dependencies` hands out its own clone
@@ -117,9 +139,17 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     // place as taken that nothing covers
     const tileGridChanged = storedTileCoords != null && !storedTileCoords.equals(map2dTileCoords);
 
-    // always ask, even when needsUpdate already forces the recompute: changed() is what keeps
-    // the snapshot current, and a snapshot left behind reports a change on the next call
-    const depsChanged = this.#deps.changed({centerX, centerY, map2dTileCoords, matrixWorld});
+    // always ask both halves, even when needsUpdate already forces the recompute: asking is what
+    // keeps each snapshot current, and a snapshot left behind reports a change on the next call
+    const values = this.#dependencyValues;
+    values.map2dTileCoords = map2dTileCoords;
+    values.matrixWorld = matrixWorld;
+    const objectsChanged = this.#deps.changed(values);
+    const seenCenter = this.#seenCenter;
+    const centerChanged = centerX !== seenCenter[0] || centerY !== seenCenter[1];
+    seenCenter[0] = centerX;
+    seenCenter[1] = centerY;
+    const depsChanged = objectsChanged || centerChanged;
 
     if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null) {
       this.#visibleTiles.createTiles = undefined;
@@ -133,21 +163,20 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     const {width, height} = this;
 
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
-    const left = centerX - halfWidth;
-    const top = centerY - halfHeight;
-
-    const tileCoords = map2dTileCoords.computeTilesWithinCoords(left, top, width, height);
+    const area = this.#queryArea;
+    area.left = centerX - width / 2;
+    area.top = centerY - height / 2;
+    area.width = width;
+    area.height = height;
+    const tileCoords = map2dTileCoords.computeTilesWithinArea(area, this.#tileCoords);
     const fullViewArea = AABB2.from(tileCoords, this.#fullViewArea);
 
     const reuseTiles = this.#reuseTiles;
     const removeTiles = this.#removeTiles;
     const createTiles = this.#createTiles;
-    reuseTiles.length = 0;
-    removeTiles.length = 0;
-    createTiles.length = 0;
+    truncateArray(reuseTiles);
+    truncateArray(removeTiles);
+    truncateArray(createTiles);
 
     const tilesLength = tileCoords.rows * tileCoords.columns;
 
@@ -193,7 +222,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     const translate = this.#translate.setFromMatrixPosition(matrixWorld);
 
     const tiles = this.#tiles;
-    tiles.length = 0;
+    truncateArray(tiles);
     for (let i = 0; i < reuseTiles.length; ++i) tiles.push(reuseTiles[i]!);
     for (let i = 0; i < createTiles.length; ++i) tiles.push(createTiles[i]!);
 

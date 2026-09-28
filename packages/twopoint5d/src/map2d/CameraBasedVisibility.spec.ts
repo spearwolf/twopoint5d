@@ -17,6 +17,7 @@ import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import type {TileBox} from './CameraBasedVisibility.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import {packTileCoords} from './tileKeys.js';
 import type {IMap2DVisibleTiles} from './types.js';
 
 function makeTopDownCamera(): PerspectiveCamera {
@@ -260,6 +261,51 @@ describe('CameraBasedVisibility', () => {
 
       expect(second.tiles).toHaveLength(0);
       expect(ids(second.removeTiles)).toEqual(before);
+    });
+
+    test('gives a tile that comes back after the camera looked past the plane a Map2DTileCoords of its own', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      // the result is written again by the next call
+      const firstCount = first.tiles.length;
+
+      visibility.camera = makeOrthoCameraLookingHorizontally();
+      const second = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+      const removed = new Set(second.removeTiles);
+      expect(removed.size, 'every tile left the view').toBe(firstCount);
+
+      visibility.camera = makeTopDownCamera();
+      const third = visibility.computeVisibleTiles(second.tiles, [0, 0], tileCoords, matrixWorld)!;
+      expect(third.createTiles!.length, 'the tiles come back into the view').toBeGreaterThan(0);
+
+      for (const tile of third.createTiles!) {
+        expect(removed.has(tile), `tile ${tile.id} comes back on another Map2DTileCoords`).toBe(false);
+      }
+    });
+
+    test('a camera that turns away from the plane hands a tile that stands twice in previousTiles back for removal once, at its first place', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      // the result is written again by the next call
+      const firstTiles = [...first.tiles];
+      expect(firstTiles.length).toBeGreaterThan(2);
+
+      visibility.camera = makeOrthoCameraLookingHorizontally();
+      const second = visibility.computeVisibleTiles(
+        [firstTiles[1]!, ...firstTiles, firstTiles[0]!],
+        [0, 0],
+        tileCoords,
+        matrixWorld,
+      )!;
+
+      expect(second.removeTiles).toHaveLength(firstTiles.length);
+      expect(second.removeTiles![0], 'the first place of the tile that stands twice').toBe(firstTiles[1]);
+      expect(second.removeTiles!.slice(1), 'every other tile once, in its order').toEqual([
+        firstTiles[0],
+        ...firstTiles.slice(2),
+      ]);
     });
 
     test('hands back the same result object and lists on every recomputation', () => {
@@ -522,34 +568,121 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
-    test('drops the pooled TileBox of a tile that is no longer visited', () => {
+    test('hands the TileBox of a tile that is no longer visited to a tile that enters the view', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 
       // Warm-up frame around the origin.
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
-      const warmBoxes = new Map(visibility.visibles.map((v) => [v.id, v]));
+      const warmBoxes = new Set<TileBox>(visibility.visibles);
+      const warmShells = new Set(visibility.visibles.map((v) => v.map2dTile));
+      const warmIds = new Set(visibility.visibles.map((v) => v.id));
       expect(warmBoxes.size).toBeGreaterThan(0);
 
       // Drive the center point tens of tile widths away, so none of the warm-up tiles is
       // visited any more — not even as a neighbour of a visible one.
       const second = visibility.computeVisibleTiles(first.tiles, [4000, 0], tileCoords, matrixWorld)!;
-      const third = visibility.computeVisibleTiles(second.tiles, [8000, 0], tileCoords, matrixWorld)!;
+      visibility.computeVisibleTiles(second.tiles, [8000, 0], tileCoords, matrixWorld);
 
-      for (const v of visibility.visibles) {
-        expect(warmBoxes.has(v.id), `tile ${v.x},${v.y} of the far frame is none of the warm-up tiles`).toBe(false);
+      const handedOn = visibility.visibles.filter((v) => warmBoxes.has(v));
+      expect(handedOn.length, 'TileBox objects of the warm-up frame stand for tiles of the far frame').toBeGreaterThan(0);
+
+      for (const v of handedOn) {
+        const where = `tile box now at ${v.x},${v.y}`;
+        expect(warmIds.has(v.id), `${where} carries a tile of the far frame`).toBe(false);
+        expect(v.id, where).toBe(packTileCoords(v.x, v.y));
+        expect(warmShells.has(v.map2dTile), `${where} carries a Map2DTileCoords of its own`).toBe(false);
+        expect(v.map2dTile!.x, where).toBe(v.x);
+        expect(v.map2dTile!.y, where).toBe(v.y);
       }
+    });
 
-      // Back to where the warm-up frame was: the slots it used are gone, so the same tile
-      // coordinates come back on fresh TileBox objects.
-      visibility.computeVisibleTiles(third.tiles, [0, 0], tileCoords, matrixWorld);
+    test('gives a tile that comes back into the view a Map2DTileCoords of its own', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
 
-      expect(
-        visibility.visibles.some((v) => warmBoxes.has(v.id)),
-        'the warm-up tiles are visible again',
-      ).toBe(true);
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const shellsBefore = new Map(first.tiles.map((tile) => [tile.id, tile]));
 
-      for (const v of visibility.visibles) {
-        expect(v, `tile box for ${v.x},${v.y} is a fresh slot`).not.toBe(warmBoxes.get(v.id));
+      // one tile width: the column at the left edge leaves the view, and is still tested as a
+      // neighbour of the visible tiles
+      const second = visibility.computeVisibleTiles(first.tiles, [100, 0], tileCoords, matrixWorld)!;
+      const removed = new Set(second.removeTiles);
+      expect(removed.size, 'tiles that left the view').toBeGreaterThan(0);
+
+      const third = visibility.computeVisibleTiles(second.tiles, [0, 0], tileCoords, matrixWorld)!;
+      const back = third.createTiles!.filter((tile) => removed.has(shellsBefore.get(tile.id)!));
+      expect(back.length, 'tiles that came back into the view').toBeGreaterThan(0);
+
+      for (const tile of back) {
+        expect(removed.has(tile), `tile ${tile.id} comes back on another Map2DTileCoords`).toBe(false);
+      }
+    });
+
+    test('a TileBox handed on to another tile carries what a fresh visibility computes for that tile', () => {
+      const scenes = [
+        {
+          name: 'looking down',
+          makeCamera: makeTopDownCamera,
+          grid: new Map2DTileCoordsUtil(100, 100, 0.25, -0.5),
+          centers: [
+            [0, 0],
+            [4000, 0],
+            [8000, 0],
+            [8150.5, 30.25],
+            [8300.75, 60.5],
+            [0, 0],
+          ] as [number, number][],
+        },
+        {
+          name: 'tilted',
+          makeCamera: makeTiltedCamera,
+          grid: new Map2DTileCoordsUtil(256, 256, -128, -128),
+          centers: [
+            [0, 0],
+            [40000, 0],
+            [80000, 0],
+            [80300.5, -400.25],
+            [80600.75, -800.5],
+            [0, 0],
+          ] as [number, number][],
+        },
+      ];
+      const matrix = new Matrix4().makeTranslation(0.25, 0, 0.75);
+
+      for (const {name, makeCamera, grid, centers} of scenes) {
+        const panned = new CameraBasedVisibility(makeCamera());
+        let previous: IMap2DVisibleTiles['tiles'] = [];
+
+        for (const center of centers) {
+          previous = panned.computeVisibleTiles(previous, center, grid, matrix)!.tiles;
+
+          const fresh = new CameraBasedVisibility(makeCamera());
+          fresh.computeVisibleTiles([], center, grid, matrix);
+
+          const where = `${name}, center ${center}`;
+          expect(panned.visibles.map((v) => v.id).sort(), `${where}: the same tiles`).toEqual(
+            fresh.visibles.map((v) => v.id).sort(),
+          );
+          expect(
+            panned.visibles.map((v) => v.distanceToCamera),
+            `${where}: the same order of the distances`,
+          ).toEqual(fresh.visibles.map((v) => v.distanceToCamera));
+
+          const byId = new Map(fresh.visibles.map((v) => [v.id, v]));
+          for (const tile of panned.visibles) {
+            const reference = byId.get(tile.id)!;
+            const at = `${where}, tile ${tile.x},${tile.y}`;
+            expect(tile.x, at).toBe(reference.x);
+            expect(tile.y, at).toBe(reference.y);
+            expect(tile.coords, `${at}: coords`).toEqual(reference.coords);
+            expect(tile.box, `${at}: box`).toEqual(reference.box);
+            expect(tile.frustumBox, `${at}: frustumBox`).toEqual(reference.frustumBox);
+            expect(tile.centerWorld, `${at}: centerWorld`).toEqual(reference.centerWorld);
+            expect(tile.distanceToCamera, `${at}: distanceToCamera`).toBe(reference.distanceToCamera);
+            expect(tile.primary, `${at}: primary`).toBe(reference.primary);
+            expect(tile.map2dTile!.id, `${at}: map2dTile`).toBe(reference.map2dTile!.id);
+            expect(tile.map2dTile!.view, `${at}: map2dTile.view`).toEqual(reference.map2dTile!.view);
+          }
+        }
       }
     });
 

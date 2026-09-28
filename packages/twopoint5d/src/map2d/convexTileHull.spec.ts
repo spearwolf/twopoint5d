@@ -79,6 +79,42 @@ describe('convexTileHull()', () => {
     ).toEqual(['0,0', '0,4', '4,0']);
   });
 
+  test('writes the hull into the target and answers it', () => {
+    const points: TilePoint[] = [
+      [0, 0],
+      [4, 0],
+      [4, 4],
+      [0, 4],
+      [2, 2],
+    ];
+    const target: TilePoint[] = [];
+
+    expect(convexTileHull(points, target)).toBe(target);
+    expect(target).toEqual(convexTileHull(points));
+  });
+
+  test('a target that held more points holds the hull alone afterwards', () => {
+    const target: TilePoint[] = [
+      [9, 9],
+      [8, 8],
+      [7, 7],
+      [6, 6],
+      [5, 5],
+      [4, 4],
+    ];
+
+    convexTileHull(
+      [
+        [0, 0],
+        [4, 0],
+        [0, 4],
+      ],
+      target,
+    );
+
+    expect(target.map(([x, y]) => `${x},${y}`).sort()).toEqual(['0,0', '0,4', '4,0']);
+  });
+
   test('negative tile coordinates are hull points like any other', () => {
     expect(
       hullOf([

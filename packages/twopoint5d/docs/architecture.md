@@ -163,7 +163,10 @@ Tiled-map integration on top of the sprite layer. `Map2D` holds a
 `CameraBasedVisibility` culls tiles against the camera frustum, nearest to the camera
 first and up to `maxVisibleTiles` of them,
 `RectangularVisibilityArea` uses a plain rectangle, and both have `*Helpers` classes
-that visualise what they decided. `Map2DTileCoords`, `Map2DTileCoordsUtil` and
+that visualise what they decided. Once a frame loop has settled, neither visibility
+allocates anything in `computeVisibleTiles()` — `src/map2d/hot-path-allocations.spec.ts`
+holds them to it —, and a tile that enters the view costs its `Map2DTileCoords`.
+`Map2DTileCoords`, `Map2DTileCoordsUtil` and
 `tileKeys` define the coordinate and key scheme — every tile coordinate has exactly one
 key, and code that invents a second spelling reintroduces duplicate tiles.
 `chunk-quad-tree/` and `Map2DSpatialHashGrid` are the spatial indexes tile providers

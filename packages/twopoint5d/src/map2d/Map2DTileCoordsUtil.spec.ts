@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'vitest';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 
 describe('Map2DTileCoordsUtil', () => {
   describe('new', () => {
@@ -72,6 +72,21 @@ describe('Map2DTileCoordsUtil', () => {
     });
     test('320x240 example', () => {
       expect(new Map2DTileCoordsUtil(300, 200).getTileCoords(-320, -240, 640, 480)).toEqual([-2, -2, 4, 4]);
+    });
+    test('answers the target it is handed', () => {
+      const target: [number, number, number, number] = [0, 0, 0, 0];
+      expect(new Map2DTileCoordsUtil(16, 16, 20, 20).getTileCoords(8, 8, 17, 17, target)).toBe(target);
+    });
+    test('writes the values it answers without a target', () => {
+      const grid = new Map2DTileCoordsUtil(12.5, 10, 0.25, -0.5);
+      const target: [number, number, number, number] = [0, 0, 0, 0];
+      grid.getTileCoords(-31.75, 17.5, 70.25, 20.5, target);
+      expect(target).toEqual(grid.getTileCoords(-31.75, 17.5, 70.25, 20.5));
+    });
+    test('overwrites every field of a target that held other values', () => {
+      const target: [number, number, number, number] = [99, 99, 99, 99];
+      new Map2DTileCoordsUtil(32, 16).getTileCoords(4, 17, 70, 20, target);
+      expect(target).toEqual([0, 1, 3, 2]);
     });
   });
   describe('getTileCoords() boundary matrix', () => {
@@ -188,6 +203,47 @@ describe('Map2DTileCoordsUtil', () => {
         height: 16,
         columns: 3,
         rows: 1,
+      });
+    });
+
+    test('answers the target it is handed', () => {
+      const grid = new Map2DTileCoordsUtil(16, 16, 20, 20);
+      const target = grid.computeTilesWithinCoords(0, 0, 1, 1);
+      expect(grid.computeTilesWithinCoords(8, 8, 17, 17, target)).toBe(target);
+    });
+
+    test('writes the values it answers without a target', () => {
+      const grid = new Map2DTileCoordsUtil(12.5, 10, 0.25, -0.5);
+      const target = grid.computeTilesWithinCoords(0, 0, 1, 1);
+      grid.computeTilesWithinCoords(-31.75, 17.5, 70.25, 20.5, target);
+      expect(target).toEqual(grid.computeTilesWithinCoords(-31.75, 17.5, 70.25, 20.5));
+    });
+
+    test('overwrites every field of a target that held other values', () => {
+      const target: TilesWithinCoords = {
+        top: 99,
+        left: 99,
+        height: 99,
+        width: 99,
+        tileTop: 99,
+        tileLeft: 99,
+        tileHeight: 99,
+        tileWidth: 99,
+        rows: 99,
+        columns: 99,
+      };
+      new Map2DTileCoordsUtil(16, 16, 20, 20).computeTilesWithinCoords(8, 8, 17, 17, target);
+      expect(target).toEqual({
+        top: -16,
+        left: -16,
+        width: 32,
+        height: 32,
+        tileTop: -1,
+        tileLeft: -1,
+        tileWidth: 16,
+        tileHeight: 16,
+        columns: 2,
+        rows: 2,
       });
     });
   });
