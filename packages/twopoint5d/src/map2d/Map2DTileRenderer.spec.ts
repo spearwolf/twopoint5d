@@ -352,6 +352,70 @@ describe('Map2DTileRenderer', () => {
 
       expect(update.calledOnce, 'factory.update()').toBe(true);
     });
+
+    test('hands every tile to destroyTile() once, also when a destroyTile() threw and the clear is repeated', () => {
+      const tiles: FakeTile[] = [];
+      const destroyed: FakeTile[] = [];
+      let throwAt: FakeTile | undefined;
+      const tileFactory: IMapTileFactory<FakeTile> = {
+        ...makeTileFactory(),
+        createTile(tileCoords: IMap2DTileCoords): FakeTile {
+          const tile = {coords: tileCoords};
+          tiles.push(tile);
+          return tile;
+        },
+        destroyTile(tile: FakeTile) {
+          destroyed.push(tile);
+          if (tile === throwAt) {
+            throwAt = undefined;
+            throw new Error('the tile set is gone');
+          }
+        },
+      };
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.addTile(new Map2DTileCoords(1, 0));
+      renderer.addTile(new Map2DTileCoords(2, 0));
+      renderer.endUpdatingTiles();
+
+      throwAt = tiles[1];
+
+      expect(() => renderer.clearTiles(), 'the clear destroyTile() broke off').toThrow('the tile set is gone');
+      renderer.clearTiles();
+
+      expect(destroyed, 'every tile once').toHaveLength(3);
+      expect(new Set(destroyed)).toEqual(new Set(tiles));
+    });
+  });
+
+  describe('endUpdatingTiles()', () => {
+    test('asks the factory to update again in the next cycle after its update() threw', () => {
+      let fail = true;
+      const tileFactory: IMapTileFactory<FakeTile> = {
+        ...makeTileFactory(),
+        update() {
+          if (fail) {
+            fail = false;
+            throw new Error('the upload failed');
+          }
+        },
+      };
+      const update = sandbox.spy(tileFactory, 'update');
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const a = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      expect(() => renderer.endUpdatingTiles(), 'the update() that threw').toThrow('the upload failed');
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
+      renderer.endUpdatingTiles();
+
+      expect(update.callCount, 'factory.update()').toBe(2);
+    });
   });
 
   describe('dispose()', () => {
@@ -633,6 +697,33 @@ describe('Map2DTileRenderer', () => {
       renderer.beginUpdatingTiles(new Vector3(), false);
       renderer.reuseTile(a);
       renderer.reuseTile(b);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the next cycle').toBe(false);
+    });
+
+    test('is true after an endUpdatingTiles() whose factory update() threw, and false again after the next cycle', () => {
+      let fail = true;
+      const factory: IMapTileFactory<FakeTile> = {
+        ...makeTileFactory(),
+        update() {
+          if (fail) {
+            fail = false;
+            throw new Error('the upload failed');
+          }
+        },
+      };
+      const renderer = new Map2DTileRenderer(factory);
+      const a = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      expect(() => renderer.endUpdatingTiles(), 'the update() that threw').toThrow('the upload failed');
+
+      expect(renderer.hasPendingTiles, 'after update() threw').toBe(true);
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
       renderer.endUpdatingTiles();
 
       expect(renderer.hasPendingTiles, 'after the next cycle').toBe(false);

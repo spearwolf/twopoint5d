@@ -46,10 +46,10 @@ export class Map2DTileStreamer {
   #clearTilesOnNextUpdate = false;
 
   // The `serial` of the visibilitor result each renderer last went through a whole update cycle
-  // with. A renderer missing here has laid out nothing since it came on, since the tiles were
-  // cleared or since a cycle of it threw, and goes through the next cycle whatever the result
-  // says. Weak, because `renderers`
-  // is a public set: a renderer taken out of it directly is not held here either.
+  // with. A renderer missing here has laid out nothing since it came on or since the tiles were
+  // cleared — an update cycle that throws clears them —, and goes through the next cycle whatever
+  // the result says. Weak, because `renderers` is a public set: a renderer taken out of it
+  // directly is not held here either.
   #laidOutSerials = new WeakMap<IMap2DTileRenderer, number>();
 
   get tileWidth(): number {
@@ -147,9 +147,12 @@ export class Map2DTileStreamer {
    * back the result the renderer went through its last update cycle with — the same
    * {@link IMap2DVisibleTiles.serial} — and the renderer reports no
    * {@link IMap2DTileRenderer.hasPendingTiles}. Its node then stays where that cycle placed it.
-   * A renderer that has just come on, a renderer whose last cycle threw, every renderer after the
-   * tiles were cleared, and every renderer of a visibilitor whose results carry no `serial` go
-   * through the cycle.
+   * A renderer that has just come on, every renderer after the tiles were cleared, and every
+   * renderer of a visibilitor whose results carry no `serial` go through the cycle.
+   *
+   * An update cycle that throws — in a renderer or in its factory, `endUpdatingTiles()` included —
+   * clears the tiles as {@link clearTiles} does: the next `update()` empties every renderer and
+   * lays out the whole set again. The error goes on unchanged.
    */
   update(node: Object3D): void {
     const visibilitor = this.#visibilitor;
@@ -186,24 +189,34 @@ export class Map2DTileStreamer {
       const position = this.#position.set(offset?.x ?? 0, 0, offset?.y ?? 0);
 
       const serial = visible.serial;
-      for (const tileRenderer of this.renderers) {
-        // nothing to lay out: the renderer holds this very result and misses none of its tiles
-        if (serial !== undefined && tileRenderer.hasPendingTiles === false && this.#laidOutSerials.get(tileRenderer) === serial) {
-          continue;
+      try {
+        for (const tileRenderer of this.renderers) {
+          // nothing to lay out: the renderer holds this very result and misses none of its tiles
+          if (
+            serial !== undefined &&
+            tileRenderer.hasPendingTiles === false &&
+            this.#laidOutSerials.get(tileRenderer) === serial
+          ) {
+            continue;
+          }
+
+          tileRenderer.beginUpdatingTiles(position, visible.changed ?? true);
+
+          if (visible.removeTiles) for (const tile of visible.removeTiles) tileRenderer.removeTile(tile);
+          if (visible.createTiles) for (const tile of visible.createTiles) tileRenderer.addTile(tile);
+          if (visible.reuseTiles) for (const tile of visible.reuseTiles) tileRenderer.reuseTile(tile);
+
+          tileRenderer.endUpdatingTiles();
+
+          if (serial !== undefined) this.#laidOutSerials.set(tileRenderer, serial);
         }
-
-        // out of the books until the cycle has closed: a cycle that throws leaves the renderer
-        // with part of the result, and the next update has to take it through again
-        this.#laidOutSerials.delete(tileRenderer);
-        tileRenderer.beginUpdatingTiles(position, visible.changed ?? true);
-
-        if (visible.removeTiles) for (const tile of visible.removeTiles) tileRenderer.removeTile(tile);
-        if (visible.createTiles) for (const tile of visible.createTiles) tileRenderer.addTile(tile);
-        if (visible.reuseTiles) for (const tile of visible.reuseTiles) tileRenderer.reuseTile(tile);
-
-        tileRenderer.endUpdatingTiles();
-
-        if (serial !== undefined) this.#laidOutSerials.set(tileRenderer, serial);
+      } catch (error) {
+        // No later result carries the removes this cycle had yet to go through, nor the whole
+        // result for the renderers after the one that threw — the visibilitor computes against
+        // `this.tiles`, which holds the new set already. So the next update lays out everything
+        // again.
+        this.clearTiles();
+        throw error;
       }
     }
   }

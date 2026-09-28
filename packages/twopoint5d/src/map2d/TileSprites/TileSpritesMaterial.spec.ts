@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {Node, NodeBuilder, TextureNode} from 'three/webgpu';
+import type {MeshBasicMaterial, Node, NodeBuilder, TextureNode} from 'three/webgpu';
 import {AttributeNode, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
@@ -29,6 +29,21 @@ describe('TileSpritesMaterial', () => {
 
   afterEach(() => {
     sandbox.restore();
+  });
+
+  test('takes its parameters, no three.js material and no texture (a type-level check)', () => {
+    // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as the constructor
+    // takes another material or a texture; Vitest checks nothing here. The functions are never called.
+    const buildWithMaterial = (material: MeshBasicMaterial) => {
+      // @ts-expect-error the constructor takes the parameters of a TileSpritesMaterial only
+      return new TileSpritesMaterial(material);
+    };
+    const buildWithTexture = (texture: Texture) => {
+      // @ts-expect-error the constructor takes the parameters of a TileSpritesMaterial only
+      return new TileSpritesMaterial(texture);
+    };
+    void buildWithMaterial;
+    void buildWithTexture;
   });
 
   describe('node wiring', () => {

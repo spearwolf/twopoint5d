@@ -108,7 +108,7 @@ describe('Map2DSpatialHashGrid', () => {
     expect(tileset).toBeUndefined();
   });
 
-  test('findWithin fills the set it is handed and hands it back', () => {
+  test('findWithin fills the array it is handed with every renderable within once and hands it back', () => {
     const grid = new Map2DSpatialHashGrid(20, 20);
     const a: IMap2DRenderableArea = {aabb: new AABB2(-60, -60, 100, 80)};
     const b: IMap2DRenderableArea = {aabb: new AABB2(30, 10, 80, 70)};
@@ -116,25 +116,69 @@ describe('Map2DSpatialHashGrid', () => {
     grid.add(a, b, c);
 
     const stranger: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 1, 1)};
-    const out = new Set<IMap2DRenderableArea>([stranger]);
+    const out: IMap2DRenderableArea[] = [stranger];
 
-    const tileset = grid.findWithin(new AABB2(-50, -50, 100, 90), out);
+    const query = new AABB2(-50, -50, 100, 90);
+    // a and b reach into several of the 6 × 5 cells of the query each
+    let cellsOfA = 0;
+    let cellsOfB = 0;
+    for (let y = -3; y < 2; y++) {
+      for (let x = -3; x < 3; x++) {
+        if (grid.getTile(x, y)?.has(a)) cellsOfA++;
+        if (grid.getTile(x, y)?.has(b)) cellsOfB++;
+      }
+    }
+    expect(cellsOfA).toBeGreaterThan(1);
+    expect(cellsOfB).toBeGreaterThan(1);
 
-    expect(tileset).toBe(out);
-    expect([...out]).toEqual(expect.arrayContaining([a, b]));
-    expect(out.size, 'the hits and nothing else').toBe(2);
+    const found = grid.findWithin(query, out);
+
+    expect(found).toBe(out);
+    expect(out).toHaveLength(2);
+    expect(out).toContain(a);
+    expect(out).toContain(b);
+    expect(out).not.toContain(stranger);
   });
 
-  test('findWithin hands back the empty set it is handed when nothing lies within', () => {
+  test('findWithin hands back the empty array it is handed when nothing lies within', () => {
     const grid = new Map2DSpatialHashGrid(20, 20);
     grid.add({aabb: new AABB2(-60, -60, 100, 80)});
 
-    const out = new Set<IMap2DRenderableArea>([{aabb: new AABB2(0, 0, 1, 1)}]);
+    const out: IMap2DRenderableArea[] = [{aabb: new AABB2(0, 0, 1, 1)}];
 
-    const tileset = grid.findWithin(new AABB2(200, 200, 50, 50), out);
+    const found = grid.findWithin(new AABB2(200, 200, 50, 50), out);
 
-    expect(tileset).toBe(out);
-    expect(out.size).toBe(0);
+    expect(found).toBe(out);
+    expect(out).toHaveLength(0);
+  });
+
+  test('an out array handed to the next query holds what that query finds and nothing of the one before', () => {
+    const grid = new Map2DSpatialHashGrid(10, 10);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 25, 25)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(100, 100, 25, 25)};
+    grid.add(a, b);
+
+    const out: IMap2DRenderableArea[] = [];
+
+    expect(grid.findWithin(new AABB2(0, 0, 30, 30), out)).toEqual([a]);
+    expect(grid.findWithin(new AABB2(100, 100, 30, 30), out)).toEqual([b]);
+    expect(grid.findWithin(new AABB2(0, 0, 130, 130), out)).toHaveLength(2);
+    expect(grid.findWithin(new AABB2(0, 0, 30, 30), out)).toEqual([a]);
+  });
+
+  test('getTiles with an out array hands a renderable of several cells out once', () => {
+    const grid = new Map2DSpatialHashGrid(10, 10);
+    // reaches into the 3 × 3 cells from (0, 0) on
+    const a: IMap2DRenderableArea = {aabb: new AABB2(5, 5, 20, 20)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(12, 12, 2, 2)};
+    grid.add(a, b);
+
+    const out: IMap2DRenderableArea[] = [];
+
+    expect(grid.getTiles(0, 0, 3, 3, out)).toBe(out);
+    expect(out).toHaveLength(2);
+    expect(out).toContain(a);
+    expect(out).toContain(b);
   });
 
   test('a renderable of zero size on a cell border lies in the cell of its corner', () => {
@@ -177,5 +221,74 @@ describe('Map2DSpatialHashGrid', () => {
     grid.add(p);
 
     expect(grid.findWithin(new AABB2(100, 100, 0, 0))?.has(p)).toBe(true);
+  });
+
+  describe('an aabb that is not finite', () => {
+    test('add() refuses an aabb with NaN in any of its four values', () => {
+      for (const aabb of [
+        new AABB2(NaN, 0, 10, 10),
+        new AABB2(0, NaN, 10, 10),
+        new AABB2(0, 0, NaN, 10),
+        new AABB2(0, 0, 10, NaN),
+      ]) {
+        const grid = new Map2DSpatialHashGrid(10, 10);
+        expect(() => grid.add({aabb}), `${aabb.left}, ${aabb.top}, ${aabb.width}, ${aabb.height}`).toThrow(RangeError);
+      }
+
+      expect(() => new Map2DSpatialHashGrid(10, 10).add({aabb: new AABB2(0, 0, NaN, 10)})).toThrow(
+        '[Map2DSpatialHashGrid] the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
+      );
+    });
+
+    test('add() refuses an aabb with an infinite width or height', () => {
+      for (const aabb of [new AABB2(0, 0, Infinity, 10), new AABB2(0, 0, 10, -Infinity)]) {
+        const grid = new Map2DSpatialHashGrid(10, 10);
+        expect(() => grid.add({aabb}), `${aabb.width}, ${aabb.height}`).toThrow(RangeError);
+      }
+    });
+
+    test('add() leaves the grid as it was when one of the renderables it is handed is refused', () => {
+      const grid = new Map2DSpatialHashGrid(10, 10);
+      const held: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 5, 5)};
+      grid.add(held);
+
+      held.aabb.set(50, 50, 5, 5);
+      const refused: IMap2DRenderableArea = {aabb: new AABB2(0, NaN, 5, 5)};
+
+      expect(() => grid.add(held, refused)).toThrow(RangeError);
+
+      expect(grid.getTile(0, 0)?.has(held)).toBe(true);
+      expect(grid.getTile(5, 5)).toBeUndefined();
+      expect(grid.findWithin(new AABB2(-100, -100, 300, 300), [])).toEqual([held]);
+    });
+
+    test('findWithin() refuses an aabb that is not finite', () => {
+      const grid = new Map2DSpatialHashGrid(10, 10);
+      grid.add({aabb: new AABB2(0, 0, 5, 5)});
+
+      for (const aabb of [
+        new AABB2(NaN, 0, 10, 10),
+        new AABB2(0, 0, 10, NaN),
+        new AABB2(0, 0, Infinity, 10),
+        new AABB2(-Infinity, 0, 10, 10),
+      ]) {
+        expect(() => grid.findWithin(aabb)).toThrow(RangeError);
+        expect(() => grid.findWithin(aabb, [])).toThrow(RangeError);
+      }
+      expect(() => grid.findWithin(new AABB2(0, 0, NaN, 10))).toThrow(
+        '[Map2DSpatialHashGrid] the aabb of findWithin() must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
+      );
+    });
+
+    test('getTiles() refuses a width or height that is not finite', () => {
+      const grid = new Map2DSpatialHashGrid(10, 10);
+      grid.add({aabb: new AABB2(0, 0, 5, 5)});
+
+      expect(() => grid.getTiles(0, 0, Infinity, 1)).toThrow(RangeError);
+      expect(() => grid.getTiles(0, 0, 1, NaN, [])).toThrow(RangeError);
+      expect(() => grid.getTiles(0, 0, 1, Infinity)).toThrow(
+        '[Map2DSpatialHashGrid] the width and height of getTiles() must be finite numbers, got width 1, height Infinity',
+      );
+    });
   });
 });

@@ -52,9 +52,15 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     }
   }
 
+  /**
+   * @param material a `TexturedSpritesMaterial`, a `Texture` the mesh builds one around, or the
+   *   parameters it builds one from. Every field of the parameters is optional, so another three.js
+   *   `Material` would pass for them; the `isMaterial` it carries keeps it out. A `Texture` takes the
+   *   branch of its own.
+   */
   constructor(
     geometry?: number | TexturedSpritesGeometry | TexturedSpritesGeometryParameters,
-    material?: Texture | TexturedSpritesMaterial | TexturedSpritesMaterialParameters,
+    material?: Texture | TexturedSpritesMaterial | (TexturedSpritesMaterialParameters & {isMaterial?: never; isTexture?: never}),
   ) {
     super(
       geometry instanceof TexturedSpritesGeometry ? geometry : new TexturedSpritesGeometry(geometry),

@@ -24,7 +24,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   #cleared = false;
 
   // beginUpdatingTiles() has opened a cycle that endUpdatingTiles() has not closed yet — also one
-  // a throw of the factory broke off, which endUpdatingTiles() never reaches.
+  // a throw broke off, before or within endUpdatingTiles().
   #updating = false;
 
   // addTile(), reuseTile() or removeTile() ran outside an update cycle since the last
@@ -58,7 +58,8 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
    * {@link endUpdatingTiles} of the next cycle: a cycle in which the factory answered
    * {@link noTileCapacity} for a tile, a {@link clearTiles}, and an {@link addTile},
    * {@link reuseTile} or {@link removeTile} outside an update cycle. `true` as well while an update
-   * cycle is open, and so after a cycle that a throw broke off before its endUpdatingTiles(). See
+   * cycle is open, and so after a cycle a throw broke off, in {@link endUpdatingTiles} as well: a
+   * factory whose `update()` throws is asked again in the next one. See
    * {@link IMap2DTileRenderer.hasPendingTiles}. `false` once {@link dispose} has run.
    */
   get hasPendingTiles(): boolean {
@@ -171,30 +172,35 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     if (tileFactory === null) return;
 
     this.#cleared = true;
-
-    const hadTiles = this.#tiles.size > 0;
-
-    for (const tile of this.#tiles.values()) {
-      tileFactory.destroyTile(tile);
-    }
-    this.#tiles.clear();
     this.#declined.clear();
 
     // the serial gate in endUpdatingTiles() exists to keep the attribute buffers off the bus
-    // when nothing was written — and a clear that found nothing wrote nothing. The emptied
-    // `#declined` alone is no reason either: a refused tile never sat in a buffer.
-    if (hadTiles) ++this.#dataSerial;
+    // when nothing was written — and a clear that finds nothing writes nothing. The emptied
+    // `#declined` alone is no reason either: a refused tile never sat in a buffer. Counted before
+    // the loop: a destroyTile() that throws has freed the slots before it already, and their
+    // upload must not get lost.
+    if (this.#tiles.size > 0) ++this.#dataSerial;
+
+    // a tile goes back exactly once: it leaves `#tiles` before its destroyTile(), so when one
+    // throws, only the tiles not yet given back remain for the next call
+    for (const [id, tile] of this.#tiles) {
+      this.#tiles.delete(id);
+      tileFactory.destroyTile(tile);
+    }
   }
 
   endUpdatingTiles(): void {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
+    const dataSerial = this.#dataSerial;
+    if (this.#updateDataSerial < dataSerial) {
+      tileFactory.update();
+      // only once update() has come back: one that throws leaves the upload to the next cycle
+      this.#updateDataSerial = dataSerial;
+    }
+    // closed only now: a throw in update() leaves the cycle open, and hasPendingTiles says so
     this.#updating = false;
-
-    if (this.#updateDataSerial >= this.#dataSerial) return;
-    this.#updateDataSerial = this.#dataSerial;
-    tileFactory.update();
   }
 
   /**

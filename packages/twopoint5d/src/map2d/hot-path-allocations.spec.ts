@@ -257,6 +257,30 @@ describe('Map2DSpatialHashGrid on the hot path', () => {
     expect(hits, 'cells that hold a box').toBeGreaterThan(0);
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
+
+  test('findWithin() with an out array allocates nothing', async () => {
+    const grid = new Map2DSpatialHashGrid<{aabb: AABB2}>(16, 16);
+    // 200 boxes of 20 × 20 spread over 512 × 512, at fractional places
+    for (let i = 0; i < 200; i++) {
+      grid.add({aabb: new AABB2((i * 97.25) % 492, (i * 53.5) % 492, 20, 20)});
+    }
+    const query = new AABB2();
+    const out: {aabb: AABB2}[] = [];
+
+    // a Smi, so that keeping count allocates nothing inside the round
+    let hits = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) {
+        // 64 × 64 queries on an 8 × 8 raster over the area, whole numbers only
+        query.set((i & 7) * 48, ((i >> 3) & 7) * 48, 64, 64);
+        hits += grid.findWithin(query, out).length;
+      }
+    });
+    const bytesPerCall = bytesPerRound / CALLS_PER_ROUND;
+
+    expect(hits, 'renderables found').toBeGreaterThan(0);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
 });
 
 describe('CameraBasedVisibilityHelpers on the hot path', () => {

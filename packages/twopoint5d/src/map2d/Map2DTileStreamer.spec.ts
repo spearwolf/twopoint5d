@@ -413,6 +413,39 @@ describe('Map2DTileStreamer', () => {
         'no tile was built twice',
       ).toEqual(['0,0']);
     });
+
+    test('an update cycle that throws leaves no tile it had yet to remove in any renderer', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      streamer.visibilitor = new RectangularVisibilityArea(300, 300);
+      const first = makeRecordingRenderer();
+      const second = makeRecordingRenderer();
+      streamer.addTileRenderer(first);
+      streamer.addTileRenderer(second);
+
+      // throws at its first call, before it lets go of the tile
+      const {removeTile} = first;
+      let fail = true;
+      first.removeTile = function (coords) {
+        if (fail) {
+          fail = false;
+          throw new Error('the tile set is missing');
+        }
+        removeTile.call(this, coords);
+      };
+
+      const node = new Object3D();
+      streamer.update(node);
+
+      // the view leaves several columns of tiles behind
+      streamer.centerX = 250;
+      expect(() => streamer.update(node), 'the update the renderer broke off').toThrow('the tile set is missing');
+
+      streamer.update(node);
+
+      const tileIds = streamer.tiles.map((tile) => tile.id).sort();
+      expect([...first.held].sort(), 'the renderer that threw').toEqual(tileIds);
+      expect([...second.held].sort(), 'the renderer after it').toEqual(tileIds);
+    });
   });
 
   describe('update() with a visibilitor that names its results', () => {

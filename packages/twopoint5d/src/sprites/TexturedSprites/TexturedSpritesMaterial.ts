@@ -185,7 +185,12 @@ export class TexturedSpritesMaterial extends NodeMaterial {
     this.#renderAsBillboards.set(value);
   }
 
-  constructor(options?: TexturedSpritesMaterialParameters) {
+  /**
+   * @param options the parameters of the material. Every one of them is optional, so another
+   *   three.js `Material` or a `Texture` would pass for them; the `isMaterial` and the `isTexture`
+   *   they carry keep them out.
+   */
+  constructor(options?: TexturedSpritesMaterialParameters & {isMaterial?: never; isTexture?: never}) {
     super();
 
     // the options of this material stay out of setValues(): Material.setValues() skips each key

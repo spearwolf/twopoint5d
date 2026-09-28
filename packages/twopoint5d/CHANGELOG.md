@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `noTileCapacity` (map2d): what `IMapTileFactory#createTile()` answers when the factory has no room for another tile right now. It is a registered symbol, `Symbol.for('twopoint5d:IMapTileFactory.noTileCapacity')`, so two copies of the library in one page answer with the same one
 - add the `{copy: true}` option to `VOBufferPool#toBuffersData()`: it hands out arrays the pool does not hold, `typedArray.slice()` of its own. That is the way to transfer buffers through `postMessage`, or to build a second pool that stays independent of this one — without it, every array is the pool's own, shared by reference with whatever takes the result in
 - add `Stylesheets.getSheet()`: the stylesheet of the document or shadow root that `root` stands for — the sheet `getGlobalSheet()` answers, under the name of what it is
-- add an optional `out` set to `Map2DSpatialHashGrid#findWithin()` and `#getTiles()`: it is emptied, filled and handed back, empty rather than `undefined` when nothing lies within. Without it both answer as before, with a new set or `undefined`
+- add an optional `out` array to `Map2DSpatialHashGrid#findWithin()` and `#getTiles()`: it is emptied, filled with every renderable within once and handed back, empty rather than `undefined` when nothing lies within, and the query allocates nothing. The order of the renderables is not defined. Without it both answer as before, with a new set or `undefined`
 - add the `baseUrl` option of `TextureStoreParseOptions`: the url the relative `imageUrl`, `atlasUrl` and `overrideImageUrl` of the catalog items are resolved against. `TextureStore#load()` sets it to the url it fetches; a caller who fetches the json itself and hands it to `parse()` passes it there
 - add `isTextureOptionClass()`: whether a name is one of the `TextureOptionClasses` a `TextureFactory` applies — the question for names out of json
 - `TexturePackerJson.parse()`, and with it `TextureAtlasLoader` and the atlas resources of `TextureStore`, reads the "JSON Array" format of TexturePacker as well as the "JSON Hash" format: a frame is named by its `filename`. The frame type of the array is the exported `TexturePackerArrayFrameData`, and `isAtlasJsonResponse()` lets both formats through and refuses a `rotated` that is no boolean
@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `CameraBasedVisibility#maxVisibleTiles`: the most tiles one recomputation takes into the visible set, 10 000 unless set otherwise — the ones nearest to the camera. `Infinity` turns the limit off; anything but a whole number above 0 or `Infinity` throws a `RangeError` and leaves the value as it was. A new value recomputes on the next `computeVisibleTiles()`, as a new `frustumBoxScale` does
 - add an optional `target` to `Map2DTileCoordsUtil#getTileCoords()` and `#computeTilesWithinCoords()`: the tuple or the object handed in gets every field of the answer and is returned, and the call allocates nothing. Without a `target` the answer is a new tuple or object
 - add `IMap2DVisibleTiles#serial`: it names the recomputation a result comes from. A visibilitor that hands back the result of its last recomputation as it stands — the same tiles, the same `offset`, nothing to create or to remove — answers the `serial` it answered then, and every recomputation answers one it has not answered before. `CameraBasedVisibility` sets it to its `serial`, and `RectangularVisibilityArea` counts its recomputations for it. A result without it counts as a new one
-- add `IMap2DTileRenderer#hasPendingTiles` and `Map2DTileRenderer#hasPendingTiles`: whether the renderer wants the next update cycle even if the tile set it was last handed has not changed, because it does not hold that tile set as its last cycle laid it out — tiles its factory answered `noTileCapacity` for, every tile after `clearTiles()`, and whatever `addTile()`, `reuseTile()` or `removeTile()` changed outside an update cycle. `Map2DTileRenderer` answers `true` from such a call up to the `endUpdatingTiles()` of the next cycle, `true` while an update cycle is open — also one a throw broke off — and `false` once `dispose()` has run; a renderer that leaves the member out goes through every update cycle
+- add `IMap2DTileRenderer#hasPendingTiles` and `Map2DTileRenderer#hasPendingTiles`: whether the renderer wants the next update cycle even if the tile set it was last handed has not changed, because it does not hold that tile set as its last cycle laid it out — tiles its factory answered `noTileCapacity` for, every tile after `clearTiles()`, and whatever `addTile()`, `reuseTile()` or `removeTile()` changed outside an update cycle. `Map2DTileRenderer` answers `true` from such a call up to the `endUpdatingTiles()` of the next cycle, `true` while an update cycle is open — also one a throw broke off, in `endUpdatingTiles()` as well — and `false` once `dispose()` has run; a renderer that leaves the member out goes through every update cycle
 - add an optional `out` to `ChunkQuadTreeNode#findChunksAt()`: the chunks that hold data at the point are appended to it, from the node down to the leaf the point lies in, and it is returned. The query walks down the tree and allocates nothing with an `out`
 
 ### Changed
@@ -260,12 +260,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturedSprite#setPosition(x, y)` and `AnimatedSprite#setPosition(x, y)` leave `z` as it is, and `TexturedSprite#setColor(color)` leaves the alpha as it is: a value that is not handed in is not written. A sprite out of `createSprite()` starts at `z = 0` with an alpha of 1. See the Migration Guide
 - the tuple overloads of `setInstancePosition()` of `TexturedSprite` and `AnimatedSprite` take `[x, y]` as well, and that of `TexturedSprite#setColorValues()` takes `[r, g, b]`; the value left out stays as it is
 - the material argument of the `AnimatedSprites` constructor is an `AnimatedSpritesMaterial` or `AnimatedSpritesMaterialParameters`, no other three.js material and no `Texture`; `material` stays typed `AnimatedSpritesMaterial | undefined`. See the Migration Guide
+- the material argument of the `TexturedSprites` constructor takes no three.js material but a `TexturedSpritesMaterial`, and the options of `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial` take neither a three.js material nor a `Texture`: every field of those options is optional, so both passed for options and were read as such. `TexturedSprites` still takes a `Texture` and builds its material around it. See the Migration Guide
 - perf a `colorMap` of the same kind as the one set takes its place in `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial`, and through `TexturedSprites#texture`, without a rebuild of the color graph and without `needsUpdate`: the texture node gets it as its value. Of the same kind means alike in `colorSpace`, `type` and `format`, in the way three binds the texture — a cube, array, 3d, depth, storage, video or compressed texture each binds in a way of its own, a `DataTexture` as a `Texture` —, in whether both filters are `NearestFilter`, in whether a filter blends texels, and in `compareFunction` and the samples of its render target. An `animsMap` of the same kind with an image takes its place in `AnimatedSpritesMaterial` the same way, its measures going into a uniform. A texture of another kind, and a change between no texture and one, builds the graph anew; three takes program and pipeline out of its caches for a source it has built before and compiles one it has not
 - the setters of `TexturedSprite` and `AnimatedSprite` that write a static attribute — `setSize()`, `setFrame()`, `setPreparedFrame()`, `setColor()`, `animId` and `animOffset` — name in their TSDoc how a later change reaches the gpu: `spritePool.touchVO(sprite, name)` for one sprite, `geometry.touch(name)` for all, or a geometry whose `attributeUsage` makes the attribute dynamic. The TSDoc of `VertexObjects#update()` says what it uploads
 - `CameraBasedVisibility` takes at most `maxVisibleTiles` tiles into the visible set, those nearest to the camera, and warns once, the first time the limit cuts a view. The search runs by the distance of a tile to the camera, nearest first; at the limit it goes on as far as a visible tile nearer than the furthest kept one can still turn up — the diagonal of a frustum box on the plane beyond it — and such a tile takes the place of the furthest. The tiles within the hull of the probe rays go in without a frustum test, in their place in that order. A hull whose bounding box holds more tiles than the limit is not filled in, and its tiles are tested one by one. See the Migration Guide
 - perf `CameraBasedVisibility` takes the box and the center of a tile into world space with one matrix, formed once per recomputation, and moves the box in the local space of the map node by a translation alone; the result is the same
 - perf `computeVisibleTiles()` of `CameraBasedVisibility` and `RectangularVisibilityArea` allocates nothing once a frame loop has settled, neither per call nor per tile — for a tilted view of a few hundred tiles in `CameraBasedVisibility`, from some 14 000 recomputations with a moving camera on; before that, the three.js calls a recomputation makes once box their doubles until the optimizing compiler has taken them over; a tile that enters the view costs its `Map2DTileCoords`. `CameraBasedVisibility` finds the slot of a tile in a table of its own, hands the slot of a tile that leaves the view to a tile that enters it, and sorts `visibles` without a comparator. A `TileBox` in `CameraBasedVisibility#visibles` whose tile has left the view is written again for a tile that enters it: whoever holds one beyond the next recomputation copies what they need of it. A `Map2DTileCoords` handed out keeps its tile; a tile that comes back into the view gets a new one
-- perf `Map2DTileStreamer#update()` leaves a tile renderer out of the update cycle while the visibilitor hands back the result that renderer last laid out — the same `serial` — and the renderer reports no `hasPendingTiles`: a standing view costs no pass over the tiles. A renderer left out keeps its node where its last cycle placed it. A renderer that has just come on, a renderer whose last cycle threw, every renderer after the tiles were cleared, and every renderer of a visibilitor whose results carry no `serial` go through the cycle
+- perf `Map2DTileStreamer#update()` leaves a tile renderer out of the update cycle while the visibilitor hands back the result that renderer last laid out — the same `serial` — and the renderer reports no `hasPendingTiles`: a standing view costs no pass over the tiles. A renderer left out keeps its node where its last cycle placed it. A renderer that has just come on, every renderer after the tiles were cleared — an update cycle that throws clears them —, and every renderer of a visibilitor whose results carry no `serial` go through the cycle
 - perf `TileSpritesFactory#createTile()` asks the instanced pool for a free slot before it looks the tile up in the tile set, so a tile the full pool cannot take costs one tile id lookup per cycle. With the pool full, a tile id that is no whole number answers `noTileCapacity`; the `RangeError` of `TileSet#frameId()` comes once a slot is free
 - perf `Map2DSpatialHashGrid` finds its cells by tile coordinate, without building a key string per cell or a tuple per query: `getTile()` allocates nothing
 - perf `CameraBasedVisibilityHelpers#update()` allocates nothing once its helper nodes are built, neither on a pass that finds nothing to rebuild nor on a rebuild
@@ -460,6 +461,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a pool built on a `VertexObjectDescriptor` that exists already — handed in, or taken over from an earlier pool of the same description — checks its `basePrototype` again and refuses a property added there since that a generated accessor would shadow
 - fix `CameraBasedVisibility#computeVisibleTiles()` for a camera under a parent: it brings the world matrix of the camera up to date together with those of its parents, the way `Map2DTileStreamer` brings the map node up to date. A camera on a rig that is moved in the frame before the render sees the tiles of that frame, not those of the frame before
 - fix `CameraBasedVisibility` on a grid of tiles smaller than 1, and on a grid whose tile edges come out a rounding step off its offset in floating point — `new Map2DTileCoordsUtil(16, 16, 0.1, 0.3)` for one: `coords` of every visible tile is its own tile, one column and one row of `tileWidth` × `tileHeight`, and its `box`, `frustumBox`, `centerWorld` and the `view` of its `map2dTile` follow from it
+- fix `Map2DTileStreamer#update()` when an update cycle throws — in a renderer or in its factory, `endUpdatingTiles()` included: the tiles are cleared as by `clearTiles()`, and the next `update()` empties every renderer and lays out the whole set again. No later result of the visibilitor carries the removes the broken cycle had yet to go through, nor the whole result for the renderers after the one that threw, so those renderers kept tiles that had left the view. The error goes on unchanged
+- fix `Map2DTileRenderer` when the `update()` of its factory throws: the next `endUpdatingTiles()` asks for it again, and `hasPendingTiles` answers `true` up to then. `clearTiles()`, and with it `dispose()`, hands every tile to `destroyTile()` once, also when a `destroyTile()` throws and the call is repeated; the upload of the slots given back before the throw is not lost
+- fix `Map2DSpatialHashGrid` with an `aabb` that is not finite: `add()` and `findWithin()` throw a `RangeError` for an `aabb` whose left, top, width or height is not a finite number, and `getTiles()` for a `width` or `height` that is not one. An infinite extent ran the loop over the cells without end, and `NaN` put a renderable into no cell at all. `add()` checks every renderable before it moves the first, so one that throws leaves the grid as it was. See the Migration Guide
 
 ### Migration Guide
 
@@ -1823,6 +1827,58 @@ const sprites = new AnimatedSprites(geometry, material);
 
 // or the mesh builds one from its parameters, and releases it in dispose()
 const ownSprites = new AnimatedSprites(1000, {transparent: true, time: 0});
+```
+
+#### The sprite and tile materials take their parameters, no material and no texture
+
+The options of `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial`, and
+the material argument of `TexturedSprites`, no longer compile with another three.js `Material`, and
+the options of the three materials no longer compile with a `Texture`. A material handed in as
+options never had an effect and goes away. A texture handed to one of the three materials goes into
+the options as `colorMap`; `TexturedSprites` still takes a `Texture` itself.
+
+**Before**
+
+```ts
+const material = new TileSpritesMaterial(texture);
+const sprites = new TexturedSprites(1000, new MeshBasicMaterial());
+```
+
+**After**
+
+```ts check
+import {Texture} from 'three/webgpu';
+import {TexturedSprites, TileSpritesMaterial} from '@spearwolf/twopoint5d';
+
+const texture = new Texture();
+
+const material = new TileSpritesMaterial({colorMap: texture});
+
+// TexturedSprites builds its material around a texture
+const sprites = new TexturedSprites(1000, texture);
+```
+
+#### `Map2DSpatialHashGrid` refuses an aabb that is not finite
+
+`add()` and `findWithin()` throw a `RangeError` for an `aabb` whose left, top, width or height is
+`NaN` or infinite, and `getTiles()` for such a `width` or `height`. An infinite `aabb` did not come
+back before; one with `NaN` lay in no cell. A renderable whose box is not known yet stays out of the
+grid until it is.
+
+**Before**
+
+```ts
+grid.add(renderable); // aabb.width is NaN: the renderable lies in no cell and is never found
+```
+
+**After**
+
+```ts
+if (Number.isFinite(renderable.aabb.width) && Number.isFinite(renderable.aabb.height)) {
+  grid.add(renderable);
+}
+
+grid.add(renderable); // → RangeError: [Map2DSpatialHashGrid] the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10
 ```
 
 #### `TexturedSpritesGeometry` keeps the pools it was built with

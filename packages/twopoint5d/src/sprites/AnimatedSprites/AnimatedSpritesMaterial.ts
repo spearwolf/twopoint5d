@@ -96,7 +96,12 @@ export class AnimatedSpritesMaterial extends TexturedSpritesMaterial {
     return this.#timeUniform.value;
   }
 
-  constructor(options?: AnimatedSpritesMaterialParameters) {
+  /**
+   * @param options the parameters of the material. Every one of them is optional, so another
+   *   three.js `Material` or a `Texture` would pass for them; the `isMaterial` and the `isTexture`
+   *   they carry keep them out.
+   */
+  constructor(options?: AnimatedSpritesMaterialParameters & {isMaterial?: never; isTexture?: never}) {
     // animsMap and time belong to this class; left in the options of the base class they would
     // reach the accessors below through setValues() before their private fields exist
     const {animsMap, time, ...texturedSpritesOptions} = options ?? {};

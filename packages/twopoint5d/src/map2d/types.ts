@@ -76,10 +76,11 @@ export interface IMap2DTileRenderer {
    * factory had no room for, every tile after {@link clearTiles}, and whatever {@link addTile},
    * {@link reuseTile} or {@link removeTile} changed outside an update cycle. `Map2DTileStreamer`
    * skips the update cycle of a renderer that answers `false` while the visibilitor hands back the
-   * result the renderer has already laid out — see `IMap2DVisibleTiles#serial`. A cycle that
-   * throws before its {@link endUpdatingTiles} counts as laid out by nobody: the streamer takes the
-   * renderer through the next cycle whatever it answers here. Left out, the renderer goes through
-   * every update cycle.
+   * result the renderer has already laid out — see `IMap2DVisibleTiles#serial`. An update cycle
+   * that throws — in a renderer or in its factory, {@link endUpdatingTiles} included — clears the
+   * tiles of `Map2DTileStreamer`: its next update empties every renderer and lays out the whole
+   * set again, whatever the renderer answers here. Left out, the renderer goes through every
+   * update cycle.
    */
   readonly hasPendingTiles?: boolean;
 

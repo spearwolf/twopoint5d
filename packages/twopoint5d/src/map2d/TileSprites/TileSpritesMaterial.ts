@@ -85,7 +85,12 @@ export class TileSpritesMaterial extends NodeMaterial {
     this.#quadSizeNode.set(node);
   }
 
-  constructor(options: TileSpritesMaterialParameters = {}) {
+  /**
+   * @param options the parameters of the material. Every one of them is optional, so another
+   *   three.js `Material` or a `Texture` would pass for them; the `isMaterial` and the `isTexture`
+   *   they carry keep them out.
+   */
+  constructor(options: TileSpritesMaterialParameters & {isMaterial?: never; isTexture?: never} = {}) {
     super();
 
     this.name = options?.name ?? 'twopoint5d.TileSpritesMaterial';
