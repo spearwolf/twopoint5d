@@ -135,7 +135,7 @@ describe('VertexObjectDescriptor', () => {
     test('a write to the description throws and leaves it as it was', () => {
       const descriptor = makeDescriptor();
 
-      // rule 1 and rule 4 of the constructor were checked against this value
+      // rule 1 and rule 7 of the constructor were checked against this value
       expect(() => {
         // @ts-expect-error the description is typed frozen, and the write throws all the same
         descriptor.description.vertexCount = 0;
@@ -322,6 +322,96 @@ describe('VertexObjectDescriptor', () => {
       );
     });
 
+    test('an attribute of more than four values', () => {
+      expect(build({attributes: {a: {size: 5}}})).toThrow(RangeError);
+      expect(build({attributes: {a: {components: ['a', 'b', 'c', 'd', 'e']}}})).toThrow(RangeError);
+      expect(build({attributes: {a: {size: 5}}})).toThrow(
+        'VertexObjectDescriptor: attribute "a" in buffer "static_float32" has a size of 5, and a WebGPU vertex format holds at most 4 values',
+      );
+    });
+
+    test('an attribute of type float64', () => {
+      expect(build({attributes: {a: {size: 2, type: 'float64'}}})).toThrow(TypeError);
+      expect(build({attributes: {a: {size: 2, type: 'float64'}}})).toThrow(
+        'VertexObjectDescriptor: attribute "a" in buffer "static_float64" is of type float64, for which WebGPU has no vertex format',
+      );
+    });
+
+    test('an attribute of type uint8clamped', () => {
+      expect(build({attributes: {a: {size: 4, type: 'uint8clamped'}}})).toThrow(TypeError);
+      expect(build({attributes: {a: {size: 4, type: 'uint8clamped'}}})).toThrow(
+        /attribute "a" in buffer "static_uint8clamped" is of type uint8clamped/,
+      );
+    });
+
+    test('a normalized attribute of a floating point type', () => {
+      for (const [type, size] of [
+        ['float32', 3],
+        ['float32', 1],
+        ['float16', 2],
+      ] as const) {
+        expect(build({attributes: {a: {size, type, normalized: true}}}), `${type} of ${size}`).toThrow(TypeError);
+      }
+      expect(build({attributes: {a: {size: 3, type: 'float32', normalized: true}}})).toThrow(
+        /attribute "a" in buffer "static_float32N" is normalized and of type float32; WebGPU normalizes int8, uint8, int16 and uint16 only/,
+      );
+    });
+
+    test('a normalized attribute of a 32-bit integer type', () => {
+      for (const [type, size] of [
+        ['int32', 2],
+        ['uint32', 1],
+      ] as const) {
+        expect(build({attributes: {a: {size, type, normalized: true}}}), `${type} of ${size}`).toThrow(TypeError);
+      }
+    });
+
+    test('a normalized attribute of one value', () => {
+      for (const type of ['uint8', 'int16'] as const) {
+        expect(build({attributes: {a: {size: 1, type, normalized: true}}}), type).toThrow(TypeError);
+      }
+      expect(build({attributes: {a: {size: 1, type: 'uint8', normalized: true}}})).toThrow(
+        /attribute "a" in buffer "static_uint8N" is normalized with a size of 1; three builds no normalized vertex format of one value/,
+      );
+    });
+
+    test('a float16 attribute of one value', () => {
+      expect(build({attributes: {a: {size: 1, type: 'float16'}}})).toThrow(TypeError);
+      expect(build({attributes: {a: {size: 1, type: 'float16'}}})).toThrow(
+        /attribute "a" in buffer "static_float16" is of type float16 with a size of 1/,
+      );
+    });
+
+    test('two attributes of different types in one buffer', () => {
+      const run = build({
+        attributes: {a: {size: 2, type: 'float32', bufferName: 'shared'}, b: {size: 4, type: 'uint8', bufferName: 'shared'}},
+      });
+      expect(run).toThrow(TypeError);
+      expect(run).toThrow(/buffer "shared" holds attribute "a" \(float32, static\) and attribute "b" \(uint8, static\)/);
+    });
+
+    test('two attributes of different usage in one buffer', () => {
+      expect(
+        build({
+          attributes: {
+            a: {size: 2, usage: 'static', bufferName: 'shared'},
+            b: {size: 2, usage: 'dynamic', bufferName: 'shared'},
+          },
+        }),
+      ).toThrow(TypeError);
+    });
+
+    test('a normalized and a plain attribute in one buffer', () => {
+      const run = build({
+        attributes: {
+          a: {size: 4, type: 'uint8', normalized: true, bufferName: 'shared'},
+          b: {size: 4, type: 'uint8', bufferName: 'shared'},
+        },
+      });
+      expect(run).toThrow(TypeError);
+      expect(run).toThrow(/\(uint8 normalized, static\) and attribute "b" \(uint8, static\)/);
+    });
+
     test('but takes an accessor named like a property of Object.prototype', () => {
       class Sprite {}
       // a description without a basePrototype builds on Object.prototype and shadows these names
@@ -348,6 +438,33 @@ describe('VertexObjectDescriptor', () => {
         () =>
           new VertexObjectDescriptor({
             attributes: {pos: {components: ['x', 'y'], getter: false}, color: {components: ['r', 'g'], getter: false}},
+          }),
+      ).not.toThrow();
+    });
+
+    test('every attribute layout with a WebGPU vertex format', () => {
+      let n = 0;
+      const attributes: Record<string, VertexAttributeDescription> = {};
+      for (const type of ['float32', 'int32', 'uint32'] as const) {
+        for (const size of [1, 2, 3, 4]) attributes[`a${n++}`] = {size, type};
+      }
+      for (const type of ['int8', 'uint8', 'int16', 'uint16'] as const) {
+        for (const size of [1, 2, 3, 4]) attributes[`a${n++}`] = {size, type};
+        for (const size of [2, 3, 4]) attributes[`a${n++}`] = {size, type, normalized: true};
+      }
+      for (const size of [2, 3, 4]) attributes[`a${n++}`] = {size, type: 'float16'};
+
+      expect(() => new VertexObjectDescriptor({attributes})).not.toThrow();
+    });
+
+    test('attributes that agree on type, normalized and usage in one named buffer', () => {
+      expect(
+        () =>
+          new VertexObjectDescriptor({
+            attributes: {
+              a: {size: 2, type: 'uint8', normalized: true, usage: 'dynamic', bufferName: 'shared'},
+              b: {size: 2, type: 'uint8', normalized: true, usage: 'dynamic', bufferName: 'shared'},
+            },
           }),
       ).not.toThrow();
     });

@@ -20,7 +20,14 @@ export function sharedVertexObjectDescriptor(
   // holds a frozen copy, and a pool built after the change has to see the change, so a
   // description that no longer matches gets a descriptor of its own and the pools built before
   // keep theirs
-  if (known !== undefined && sameVertexObjectDescription(description, known.description)) return known;
+  if (known !== undefined && sameVertexObjectDescription(description, known.description)) {
+    // the basePrototype is behaviour its author may extend after the first pool, and the hit
+    // skips the constructor that would look at it: without this a name added there since would
+    // be shadowed by a generated accessor without a word. The entry stays if this throws — the
+    // pools that use it keep it, and a pool built once the collision is gone takes it again
+    known.checkBasePrototype();
+    return known;
+  }
   // the constructor only reads what it is handed and builds its own copy of it, so a frozen
   // description serves as well as a live one
   const descriptor = new VertexObjectDescriptor(description as VertexObjectDescription);

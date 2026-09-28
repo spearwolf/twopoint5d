@@ -129,7 +129,7 @@ describe('VertexObjectGeometry', () => {
         attributes: {
           base: {size: 3, type: 'uint8', normalized: true},
           tint: {size: 3, type: 'uint8', normalized: true},
-          level: {size: 1, type: 'int16', normalized: true},
+          level: {size: 1, type: 'int16'},
           normal: {size: 3, type: 'int16', normalized: true},
           uv0: {size: 3, type: 'float16'},
           uv1: {size: 3, type: 'float16'},

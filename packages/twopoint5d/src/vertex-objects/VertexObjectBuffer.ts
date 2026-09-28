@@ -13,7 +13,7 @@ const insertDirtyRange: typeof insertRange = insertRange;
 
 /** Where one attribute of a vertex object sits inside the buffer that holds it. */
 export interface AttributeBufferLayout {
-  /** The buffer this attribute shares with every other attribute of the same data and usage type. */
+  /** The buffer this attribute shares with every other attribute that names it; all of them agree on data type, normalization and usage. */
   bufferName: string;
   /** The attribute this layout is about, named as the description names it. */
   attributeName: string;
@@ -252,7 +252,8 @@ export class VertexObjectBuffer {
           offset = buffer.itemSize;
           buffer.itemSize += alignedAttributeSize(attribute.size, buffer.dataType);
         } else {
-          // the array of the buffer is built with the data type of its first attribute
+          // every attribute of a buffer carries the same data type, normalization and usage — the descriptor
+          // refuses a description where they differ — so the first one speaks for all of them
           forming.set(bufferName, {
             bufferName,
             itemSize: alignedAttributeSize(attribute.size, attribute.dataType),
@@ -610,8 +611,23 @@ export class VertexObjectBuffer {
     }
   }
 
-  /** Throws on the buffer of a disposed pool, which has no array to write into. */
+  /**
+   * Copies the values of each named attribute, without padding, from `targetObjectOffset` on: as
+   * many objects as the data and the capacity of the buffer allow. Names that are no attribute of
+   * the buffer are passed over.
+   *
+   * @returns the largest number of objects copied over all attributes
+   *
+   * @throws a `RangeError` that names the value when `targetObjectOffset` is no integer of 0 or
+   * more; nothing is written then. Throws on the buffer of a disposed pool, which has no array to
+   * write into.
+   */
   copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
+    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
+      throw new RangeError(
+        `VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+      );
+    }
     let copiedObjCount = 0;
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);

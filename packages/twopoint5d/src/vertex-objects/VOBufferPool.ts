@@ -24,6 +24,10 @@ export class VOBufferPool {
    * descriptor, and with it the prototype of their vertex objects, as long as the description
    * describes what it did when the first of these pools was built; a description changed since
    * then gets a descriptor of its own.
+   *
+   * A pool built on a descriptor that exists already — handed in, or shared with an earlier pool —
+   * checks its `basePrototype` again and throws, as a new descriptor would, when a generated
+   * accessor would shadow a property added there since.
    */
   readonly descriptor: VertexObjectDescriptor;
 
@@ -88,7 +92,13 @@ export class VOBufferPool {
   #geometryAttachments = 0;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
-    this.descriptor = descriptor instanceof VertexObjectDescriptor ? descriptor : sharedVertexObjectDescriptor(descriptor);
+    if (descriptor instanceof VertexObjectDescriptor) {
+      // the description route checks in the constructor of the descriptor or on the cache hit
+      descriptor.checkBasePrototype();
+      this.descriptor = descriptor;
+    } else {
+      this.descriptor = sharedVertexObjectDescriptor(descriptor);
+    }
     const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
     if (capacity < 0 || !Number.isInteger(capacity)) {
       // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at

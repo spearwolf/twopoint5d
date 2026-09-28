@@ -247,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the instance buffers of `TexturedSprites` and `TileSprites` carry one value more, `texFlipDiagonal`: a `toBuffersData()` snapshot of a layout without it does not fit, and a class of one's own that implements `TexturedSprite` or `TileSprite` needs the field. See the Migration Guide
 - a bake of `FrameBasedAnimations#bakeDataTexture()` with a trimmed frame gives every frame three texels, the third `[left, top, right, bottom]` — the trim margins, four zeros for an untrimmed frame of the same bake —, and its headers name 3 texels per frame. A bake without a trimmed frame keeps its layout. See the Migration Guide
 - the instance buffers of `TexturedSprites` carry four values more, `texTrim`, and the `attributeUsage` a `TexturedSpritesGeometry` names for `texCoords` reaches them as it reaches `texFlipDiagonal`. See the Migration Guide
+- `VertexObjectDescriptor` refuses, when it is built, an attribute layout without a WebGPU vertex format — type `float64` or `uint8clamped`, `normalized` on any type but `int8`, `uint8`, `int16` and `uint16` or on an attribute of one value, `float16` of one value, more than four values per vertex — and a buffer whose attributes disagree on `type`, `normalized` or `usage`; the error names the attribute and its buffer. Such a layout built a pool before and failed only once three built the render pipeline. See the Migration Guide
 
 ### Deprecated
 
@@ -432,6 +433,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `AnimatedSpritesMaterial` with an `animsMap` baked with `includeTextureSize`: it reads every frame at the texel `bakeDataTexture()` writes it to, the second frame of an animation and those after it included
 - fix `TextureStore#dispose()` while a catalog is being fetched: it aborts the fetch, and a `loadAsync()` still waiting for it rejects
 - fix an attribute of type `int8`, `uint8`, `int16` or `uint16` without `normalized: true` under three's WebGPU backend: every write after the first render reaches the gpu. three builds the gpu buffer of such an attribute from a copy of its array widened to 32 bits and uploads from that copy alone; the geometry keeps the copy and writes every upload range of the pool into it
+- the generated `set…()` methods of a vertex object leave a value as it was for `null`, as they do for `undefined`, whether it comes as a separate argument or as an element of an array-like
+- `VertexObjectBuffer#copyAttributes()` throws a `RangeError` that names the value for a `targetObjectOffset` that is no integer of 0 or more, as `copy()` and `copyArray()` do, and writes nothing then
+- a pool built on a `VertexObjectDescriptor` that exists already — handed in, or taken over from an earlier pool of the same description — checks its `basePrototype` again and refuses a property added there since that a generated accessor would shadow
 
 ### Migration Guide
 
@@ -497,7 +501,7 @@ const widerDescriptor = new VertexObjectDescriptor(wider);
 
 #### The description of a descriptor is frozen
 
-`VertexObjectDescriptor#description` is frozen with everything it is made of: its `indices`, the `attributes` record, every attribute description in it and the `components` of each, and the `methods` object. `descriptor.description`, `#indices`, `#methods` and the `components` behind `getAttribute(name)` hand out those very objects, so a write to any of them — `descriptor.description.attributes['pos'].usage = 'dynamic'`, `descriptor.description.attributes.extra = {size: 1}` and `descriptor.methods.extra = fn` included — throws a `TypeError`. The constructor checks the description once — the indices lie inside the vertex count, an attribute names no more components than its size — and holds it as it is for the life of the descriptor. A write from outside would change it without the checks running again.
+`VertexObjectDescriptor#description` is frozen with everything it is made of: its `indices`, the `attributes` record, every attribute description in it and the `components` of each, and the `methods` object. `descriptor.description`, `#indices`, `#methods` and the `components` behind `getAttribute(name)` hand out those very objects, so a write to any of them — `descriptor.description.attributes['pos'].usage = 'dynamic'`, `descriptor.description.attributes.extra = {size: 1}` and `descriptor.methods.extra = fn` included — throws a `TypeError`. The constructor checks the description once — the indices lie inside the vertex count, an attribute names no more components than its size, every attribute has a WebGPU vertex format — and holds it as it is for the life of the descriptor. A write from outside would change it without the checks running again.
 
 A description that is to change is a second description. `cloneVertexObjectDescription()` copies one, the copy is yours to change, and a new descriptor takes it in.
 
@@ -542,7 +546,7 @@ Setting `attribute.needsUpdate = true` by hand is not the way to say it. It asks
 
 #### An attribute of 8 or 16 bits takes whole 4 bytes per vertex
 
-The layouts of `float16`, `int16`, `uint16`, `int8`, `uint8` and `uint8clamped` attributes change; a layout of 32- and 64-bit attributes stays as it is. Every attribute takes its size rounded up to a whole number of 4 bytes per vertex, and the padding sits behind it: a `uint8` attribute of `size: 3` takes 4 elements, a `float16` attribute of `size: 3` as well, a `uint16` attribute of `size: 1` takes 2. Two `uint8` attributes of `size: 3` in one buffer:
+The layouts of `float16`, `int16`, `uint16`, `int8` and `uint8` attributes change; a layout of 32-bit attributes stays as it is. Every attribute takes its size rounded up to a whole number of 4 bytes per vertex, and the padding sits behind it: a `uint8` attribute of `size: 3` takes 4 elements, a `float16` attribute of `size: 3` as well, a `uint16` attribute of `size: 1` takes 2. Two `uint8` attributes of `size: 3` in one buffer:
 
 ```ts check
 import {VertexObjectPool} from '@spearwolf/twopoint5d';
@@ -567,7 +571,7 @@ Buffers data taken from a layout without the padding has to be taken anew. The c
 
 Code that builds arrays of a layout itself — for `VertexObjectBuffer#copyArray()` or as buffers data by hand — writes `itemSize` elements per vertex and puts each attribute at its `AttributeBufferLayout#offset`; the padding elements stay `0`. `VertexObjectBuffer#copyAttributes()` and `VOBufferPool#createFromAttributes()` take the values of each attribute without padding and need no change, and neither do the generated accessors.
 
-An attribute with padding that is alone in its buffer reaches the geometry as an `InterleavedBufferAttribute` over an `InterleavedBuffer` (an `InstancedInterleavedBuffer` on the instanced route), where a buffer without padding gives a `BufferAttribute` or an `InstancedBufferAttribute`: a `uint8` attribute of `size: 3`, say, or a `float16` attribute of `size: 1`. An `InterleavedBufferAttribute` has no `addUpdateRange()`, `clearUpdateRanges()`, `updateRanges`, `setUsage()` or `version` — a call to one of them on such an attribute throws a `TypeError`, and a branch on `isBufferAttribute` takes the other way. Update ranges, the usage and the version sit on the buffer behind it, `attr.data`. The better way is to leave the ranges to the geometry and say what was written through `touch()` or `VertexObjectPool#touchVO()`:
+An attribute with padding that is alone in its buffer reaches the geometry as an `InterleavedBufferAttribute` over an `InterleavedBuffer` (an `InstancedInterleavedBuffer` on the instanced route), where a buffer without padding gives a `BufferAttribute` or an `InstancedBufferAttribute`: a `uint8` attribute of `size: 3`, say, or a `float16` attribute of `size: 3`. `addUpdateRange()`, `clearUpdateRanges()` and `setUsage()` are no methods of an `InterleavedBufferAttribute`, and a call to one of them on such an attribute throws a `TypeError`; `updateRanges` and `version` read `undefined` — pushing a range onto `updateRanges` throws, while a comparison on `version` never sees a change and says nothing. A branch on `isBufferAttribute` takes the other way. Update ranges, the usage and the version sit on the buffer behind it: `attr.data.updateRanges`, `attr.data.addUpdateRange()`, `attr.data.setUsage()` and `attr.data.version`. The better way is to leave the ranges to the geometry and say what was written through `touch()` or `VertexObjectPool#touchVO()`:
 
 ```ts check
 import {VertexObjectGeometry} from '@spearwolf/twopoint5d';
@@ -2904,6 +2908,55 @@ resource.activate();
 const resource = TextureResource.fromImage('hero', 'hero.png', ['nearest']);
 resource.renderer = renderer;
 resource.activate();
+```
+
+#### A description without a WebGPU vertex format is refused
+
+`VertexObjectDescriptor` refuses, when it is built, what WebGPU has no vertex format for: an attribute of type `float64` or `uint8clamped`, `normalized` on any type but `int8`, `uint8`, `int16` and `uint16`, `normalized` or `float16` on an attribute of one value, and more than four values per vertex. It refuses as well a buffer whose attributes disagree on `type`, `normalized` or `usage`. The way out, case by case:
+
+- `float32` instead of `float64`
+- `uint8` instead of `uint8clamped`, with `normalized: true` where the values are to mean 0 … 1
+- a normalized or `float16` attribute of one value gets a second value, or becomes a plain attribute of a 32-bit type (`normalized` is dropped then, as it belongs to `int8`, `uint8`, `int16` and `uint16` alone)
+- more than four values split into two attributes
+- attributes that disagree in a named buffer get a `bufferName` each
+
+**Before**
+
+```ts
+import {VertexObjectPool} from '@spearwolf/twopoint5d';
+
+new VertexObjectPool(
+  {
+    attributes: {
+      tint: {size: 4, type: 'uint8clamped'},
+      mass: {size: 1, type: 'float16'},
+      matrix: {size: 6},
+      a: {size: 2, bufferName: 'mixed'},
+      b: {size: 2, type: 'uint8', bufferName: 'mixed'},
+    },
+  },
+  100,
+); // throws a TypeError or a RangeError
+```
+
+**After**
+
+```ts check
+import {VertexObjectPool} from '@spearwolf/twopoint5d';
+
+const pool = new VertexObjectPool(
+  {
+    attributes: {
+      tint: {size: 4, type: 'uint8', normalized: true},
+      mass: {size: 1},
+      matrixRow0: {size: 3},
+      matrixRow1: {size: 3},
+      a: {size: 2, bufferName: 'floats'},
+      b: {size: 2, type: 'uint8', bufferName: 'bytes'},
+    },
+  },
+  100,
+);
 ```
 
 ## [0.21.2] - 2026-06-19

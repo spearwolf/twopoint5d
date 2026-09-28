@@ -161,6 +161,38 @@ describe('VertexObjectPool', () => {
       expect(new VertexObjectPool(own, 1).descriptor).toBe(own);
     });
 
+    test('a basePrototype that takes a name of the vertex object after the first pool is refused on the next pool', () => {
+      class Base {}
+      const description: VertexObjectDescription = {attributes: {pos: {components: ['x', 'y']}}, basePrototype: Base.prototype};
+      const first = new VertexObjectPool<{x: number; y: number}>(description, 1);
+      const vo = first.createVO()!;
+
+      Object.defineProperty(Base.prototype, 'x', {value: 1, configurable: true});
+      try {
+        expect(() => new VertexObjectPool(description, 1)).toThrow(/"x".*would shadow a property of the basePrototype/);
+
+        vo.x = 5;
+        expect(vo.x).toBe(5);
+      } finally {
+        delete (Base.prototype as {x?: number}).x;
+      }
+    });
+
+    test('a descriptor handed to a second pool is checked against its basePrototype again', () => {
+      class Base {}
+      const description: VertexObjectDescription = {attributes: {pos: {components: ['x', 'y']}}, basePrototype: Base.prototype};
+      const own = new VertexObjectDescriptor(description);
+      const first = new VertexObjectPool<{x: number; y: number}>(own, 1);
+      expect(first.descriptor).toBe(own);
+
+      Object.defineProperty(Base.prototype, 'x', {value: 1, configurable: true});
+      try {
+        expect(() => new VertexObjectPool(own, 1)).toThrow(/"x".*would shadow a property of the basePrototype/);
+      } finally {
+        delete (Base.prototype as {x?: number}).x;
+      }
+    });
+
     test('a description the descriptor refuses is refused on every pool, and builds a pool once it is fixed', () => {
       const broken: VertexObjectDescription = {vertexCount: 0, attributes: {pos: {size: 1}}};
 

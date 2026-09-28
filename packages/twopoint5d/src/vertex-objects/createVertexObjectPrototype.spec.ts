@@ -137,7 +137,10 @@ describe('the generated attribute accessors', () => {
   });
 
   test('a float16 attribute keeps the fraction of a half float', () => {
-    const pool = new VertexObjectPool<{v: number}>({vertexCount: 1, attributes: {v: {size: 1, type: 'float16'}}}, 1);
+    const pool = new VertexObjectPool<{v: number; w: number}>(
+      {vertexCount: 1, attributes: {half: {components: ['v', 'w'], type: 'float16'}}},
+      1,
+    );
     const vo = pool.createVO()!;
     vo.v = 0.1;
     expect(vo.v).toBe(0.0999755859375);
@@ -311,7 +314,8 @@ describe('the generated attribute accessors', () => {
     const a = pool.createVO()!;
     const b = pool.createVO()!;
     b.setFoo(7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7);
-    a.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
+    // a thirteenth value lies where the first value of the next object starts
+    a.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
     expect(Array.from(a.getFoo())).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(Array.from(b.getFoo())).toEqual([7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7]);
   });
@@ -410,6 +414,64 @@ describe('the generated attribute accessors', () => {
     vo.setPos(...values);
     expect(() => vo.setPos(undefined as unknown as number)).not.toThrow();
     expect(Array.from(vo.getPos())).toEqual(values);
+  });
+
+  test('a setter of up to four values leaves a value it is handed null for as it was', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    vo.setPos(4, null as unknown as number, 6);
+    expect(Array.from(vo.getPos())).toEqual([4, 2, 6]);
+    vo.setPos(null as unknown as number);
+    expect(Array.from(vo.getPos())).toEqual([4, 2, 6]);
+  });
+
+  test('a setter of five to sixteen values leaves a value it is handed null for as it was', () => {
+    const pool = new VertexObjectPool<{
+      setFoo: VOAttrSetter;
+      getFoo: VOAttrGetter;
+    }>({vertexCount: 4, attributes: {foo: {components: ['x', 'y', 'z']}, bar: {size: 3}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    vo.setFoo(9, null as unknown as number, 9);
+    expect(Array.from(vo.getFoo())).toEqual([9, 2, 9, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    vo.setFoo(null as unknown as number);
+    expect(Array.from(vo.getFoo())).toEqual([9, 2, 9, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  test('a setter of more than sixteen values handed a single null writes nothing', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 6, attributes: {pos: {size: 3}}}, 1);
+    const vo = pool.createVO()!;
+    const values = Array.from({length: 18}, (_, k) => k + 1);
+    vo.setPos(...values);
+    expect(() => vo.setPos(null as unknown as number)).not.toThrow();
+    expect(Array.from(vo.getPos())).toEqual(values);
+  });
+
+  test('a setter leaves an element of an array-like it is handed null for as it was', () => {
+    const pool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 1, attributes: {pos: {components: ['x', 'y', 'z']}}}, 1);
+    const vo = pool.createVO()!;
+    vo.setPos(1, 2, 3);
+    vo.setPos([9, null as unknown as number, 9]);
+    expect(Array.from(vo.getPos())).toEqual([9, 2, 9]);
+
+    const restPool = new VertexObjectPool<{
+      setPos: VOAttrSetter;
+      getPos: VOAttrGetter;
+    }>({vertexCount: 2, attributes: {pos: {size: 3}}}, 1);
+    const restVo = restPool.createVO()!;
+    restVo.setPos([1, 2, 3, 4, 5, 6]);
+    restVo.setPos([9, null as unknown as number, 9, 9, 9, 9]);
+    expect(Array.from(restVo.getPos())).toEqual([9, 2, 9, 9, 9, 9]);
   });
 
   test('a setter leaves an element it is handed undefined for as it was', () => {

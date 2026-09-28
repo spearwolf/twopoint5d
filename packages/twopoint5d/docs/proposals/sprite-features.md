@@ -39,7 +39,7 @@ A feature is written once and fits every sprite kind whose base satisfies its co
   a name, each with attribute names of its own.
 - `VertexObjectDescriptor` already refuses a description in which two attributes,
   components or methods would give the vertex object the same property name
-  (`VertexObjectDescriptor.ts`, rule 5 of the constructor TSDoc).
+  (`VertexObjectDescriptor.ts`, rule 8 of the constructor TSDoc).
 - Attributes that agree on usage, type and `normalized` share one interleaved buffer by
   default (`VADescription#bufferName`), so they cost one upload together.
 - `TexturedSpritesMaterial` builds `positionNode` and `colorNode` in two `createEffect`s from

@@ -18,7 +18,10 @@ export type TypedArray =
   | Uint8Array
   | Int8Array;
 
-/** The element type of the buffer an attribute is stored in, named as the typed array that holds it: `'float32'` is a `Float32Array`. */
+/**
+ * The element type of the buffer an attribute is stored in, named as the typed array that holds it: `'float32'` is a `Float32Array`.
+ * `'float64'` and `'uint8clamped'` have no WebGPU vertex format, and a `VertexObjectDescriptor` refuses an attribute of either.
+ */
 export type VertexAttributeDataType =
   'float64' | 'float32' | 'float16' | 'uint32' | 'int32' | 'uint16' | 'int16' | 'uint8clamped' | 'uint8' | 'int8';
 
@@ -48,12 +51,19 @@ export interface VADescription {
    * for every attribute of a vertex buffer on a 4-byte boundary. Under three's WebGPU backend an
    * attribute of `'int8'`, `'uint8'`, `'int16'` or `'uint16'` without `normalized` uploads as 32-bit
    * values, and the geometry holds that copy in step with the pool.
+   *
+   * The descriptor refuses an attribute of `'float64'` or `'uint8clamped'`, of `'float16'` with a
+   * single value, and one that holds more than four values per vertex: WebGPU has no vertex
+   * format for them. It does so when it is built, with a message that names the attribute and
+   * its buffer.
    */
   type?: VertexAttributeDataType;
   /**
    * Whether the gpu maps the stored integers onto `0` … `1` (`-1` … `1` for a signed type)
-   * when it reads this attribute, instead of taking each value as the number it is. Has no
-   * effect on a floating point type. Defaults to `false`.
+   * when it reads this attribute, instead of taking each value as the number it is. Only an
+   * attribute of `'int8'`, `'uint8'`, `'int16'` or `'uint16'` with 2 to 4 values takes it: WebGPU
+   * normalizes no other type, and three builds no normalized format of one value. The descriptor
+   * refuses it anywhere else. Defaults to `false`.
    */
   normalized?: boolean;
   /**
@@ -83,7 +93,9 @@ export interface VADescription {
    * `` `${usage}_${type}${normalized ? 'N' : ''}` ``, so attributes that agree on all three end
    * up together by themselves. Every attribute that names the same buffer shares one
    * interleaved buffer with the others, which is one gpu upload for all of them instead of one
-   * each — name a buffer to group attributes that are written in the same breath.
+   * each — name a buffer to group attributes that are written in the same breath. The attributes
+   * that name one buffer have to agree on `type`, `normalized` and `usage`; the descriptor refuses
+   * a description where they do not.
    */
   bufferName?: string;
 }
@@ -173,7 +185,9 @@ export interface VertexObjectDescription {
    *
    * No name a generated accessor takes may appear on it, neither as an own property nor
    * inherited from a prototype below `Object.prototype`: the descriptor refuses such a
-   * description rather than let the accessor shadow that property in silence.
+   * description rather than let the accessor shadow that property in silence. So does every pool
+   * built on a descriptor that exists already — handed in, or taken over from an earlier pool of
+   * the same description — which checks it again.
    *
    * A method under the key `voInitialize` on this prototype is the hook that fills every slot
    * `VertexObjectPool#createVO()` hands out; `voInitialize` says when it runs and when it does
@@ -231,7 +245,7 @@ export interface VO {
 /**
  * The generated method that writes every value of an attribute at once, as separate arguments or
  * as one array-like: `setPos(1, 2)` and `setPos([1, 2])` do the same. Fewer values than the
- * attribute has, or a value of `undefined`, leave the rest of the attribute as it was; values
+ * attribute has, or a value of `undefined` or `null`, leave the rest of the attribute as it was; values
  * beyond the attribute are ignored. The generated method of an attribute of up to four values
  * (`vertexCount * size`) declares four parameters, the one of up to sixteen values sixteen, so a
  * call with separate values allocates nothing; parameters beyond the values of the attribute are

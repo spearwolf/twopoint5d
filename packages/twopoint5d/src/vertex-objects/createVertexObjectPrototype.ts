@@ -84,13 +84,19 @@ const writeValues = (
   for (let i = 0, from = 0; i < vertexCount; i++, from += attrSize) {
     const to = idx + i * bufferItemSize;
     for (let j = 0; j < attrSize && from + j < length; j++) {
-      // the loop's own bound keeps from + j inside source, so undefined here is an element the
-      // caller handed in as undefined: it leaves the value as it was
+      // the loop's own bound keeps from + j inside source, so undefined or null here is an element
+      // the caller handed in as such: it leaves the value as it was
       const value = source[from + j];
-      if (value !== undefined) target[to + j] = value;
+      if (value != null) target[to + j] = value;
     }
   }
 };
+
+// the generated set…() of an attribute takes up to FIXED_SETTER_VALUES values in the setter the
+// sprites call per frame, whose small bytecode keeps it inlinable, up to WIDE_SETTER_VALUES in one
+// with as many declared parameters, and more through `arguments`
+const FIXED_SETTER_VALUES = 4;
+const WIDE_SETTER_VALUES = 16;
 
 const makeFixedAttributeValueSetter = (
   bufferIndex: number,
@@ -118,10 +124,10 @@ const makeFixedAttributeValueSetter = (
       writeValues(target, idx, v0, vertexCount, bufferItemSize, attrSize);
       return;
     }
-    if (v0 !== undefined) target[idx + o0] = v0;
-    if (count > 1 && v1 !== undefined) target[idx + o1] = v1;
-    if (count > 2 && v2 !== undefined) target[idx + o2] = v2;
-    if (count > 3 && v3 !== undefined) target[idx + o3] = v3;
+    if (v0 != null) target[idx + o0] = v0;
+    if (count > 1 && v1 != null) target[idx + o1] = v1;
+    if (count > 2 && v2 != null) target[idx + o2] = v2;
+    if (count > 3 && v3 != null) target[idx + o3] = v3;
   };
 };
 
@@ -136,8 +142,10 @@ const makeWideAttributeValueSetter = (
   attrSize: number,
 ) => {
   const count = vertexCount * attrSize;
-  // the same formula as offsetOf() of the fixed setter above
-  const offsets = Array.from({length: count}, (_, k) => Math.floor(k / attrSize) * bufferItemSize + (k % attrSize));
+  // one offset for each of the sixteen parameters, those beyond the attribute included, like o0 … o3
+  // of the fixed setter — the `count > k` checks below are what keeps a value beyond the attribute
+  // out of the next vertex object
+  const offsets = Array.from({length: WIDE_SETTER_VALUES}, (_, k) => Math.floor(k / attrSize) * bufferItemSize + (k % attrSize));
   return function setAttributeValues(
     this: VO,
     v0?: number | ArrayLike<number>,
@@ -168,22 +176,22 @@ const makeWideAttributeValueSetter = (
       return;
     }
     // v0 needs no check against count, which is five at least
-    if (v0 !== undefined) target[idx + offsets[0]!] = v0;
-    if (count > 1 && v1 !== undefined) target[idx + offsets[1]!] = v1;
-    if (count > 2 && v2 !== undefined) target[idx + offsets[2]!] = v2;
-    if (count > 3 && v3 !== undefined) target[idx + offsets[3]!] = v3;
-    if (count > 4 && v4 !== undefined) target[idx + offsets[4]!] = v4;
-    if (count > 5 && v5 !== undefined) target[idx + offsets[5]!] = v5;
-    if (count > 6 && v6 !== undefined) target[idx + offsets[6]!] = v6;
-    if (count > 7 && v7 !== undefined) target[idx + offsets[7]!] = v7;
-    if (count > 8 && v8 !== undefined) target[idx + offsets[8]!] = v8;
-    if (count > 9 && v9 !== undefined) target[idx + offsets[9]!] = v9;
-    if (count > 10 && v10 !== undefined) target[idx + offsets[10]!] = v10;
-    if (count > 11 && v11 !== undefined) target[idx + offsets[11]!] = v11;
-    if (count > 12 && v12 !== undefined) target[idx + offsets[12]!] = v12;
-    if (count > 13 && v13 !== undefined) target[idx + offsets[13]!] = v13;
-    if (count > 14 && v14 !== undefined) target[idx + offsets[14]!] = v14;
-    if (count > 15 && v15 !== undefined) target[idx + offsets[15]!] = v15;
+    if (v0 != null) target[idx + offsets[0]!] = v0;
+    if (count > 1 && v1 != null) target[idx + offsets[1]!] = v1;
+    if (count > 2 && v2 != null) target[idx + offsets[2]!] = v2;
+    if (count > 3 && v3 != null) target[idx + offsets[3]!] = v3;
+    if (count > 4 && v4 != null) target[idx + offsets[4]!] = v4;
+    if (count > 5 && v5 != null) target[idx + offsets[5]!] = v5;
+    if (count > 6 && v6 != null) target[idx + offsets[6]!] = v6;
+    if (count > 7 && v7 != null) target[idx + offsets[7]!] = v7;
+    if (count > 8 && v8 != null) target[idx + offsets[8]!] = v8;
+    if (count > 9 && v9 != null) target[idx + offsets[9]!] = v9;
+    if (count > 10 && v10 != null) target[idx + offsets[10]!] = v10;
+    if (count > 11 && v11 != null) target[idx + offsets[11]!] = v11;
+    if (count > 12 && v12 != null) target[idx + offsets[12]!] = v12;
+    if (count > 13 && v13 != null) target[idx + offsets[13]!] = v13;
+    if (count > 14 && v14 != null) target[idx + offsets[14]!] = v14;
+    if (count > 15 && v15 != null) target[idx + offsets[15]!] = v15;
   };
 };
 
@@ -217,16 +225,10 @@ const makeAttributeValueSetter = (
     for (let k = 0; k < n; k++) {
       // eslint-disable-next-line prefer-rest-params -- see the comment above the factory
       const value: unknown = arguments[k];
-      if (value !== undefined) target[idx + Math.floor(k / attrSize) * bufferItemSize + (k % attrSize)] = value as number;
+      if (value != null) target[idx + Math.floor(k / attrSize) * bufferItemSize + (k % attrSize)] = value as number;
     }
   };
 };
-
-// the generated set…() of an attribute takes up to FIXED_SETTER_VALUES values in the setter the
-// sprites call per frame, whose small bytecode keeps it inlinable, up to WIDE_SETTER_VALUES in one
-// with as many declared parameters, and more through `arguments`
-const FIXED_SETTER_VALUES = 4;
-const WIDE_SETTER_VALUES = 16;
 
 export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): object {
   const {descriptor} = voBuffer;

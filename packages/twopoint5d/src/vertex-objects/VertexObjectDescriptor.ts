@@ -1,9 +1,23 @@
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
-import type {FrozenVertexObjectDescription, VAComponentsDescription, VertexObjectDescription} from './types.js';
+import type {
+  FrozenVertexObjectDescription,
+  VAComponentsDescription,
+  VertexAttributeDataType,
+  VertexObjectDescription,
+} from './types.js';
 import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
+
+// three 0.185.1 takes the vertex format of an attribute of one value from a table that knows the 32-bit
+// types and the 16-bit integers, which it widens to 32 bits unless they are normalized
+// (`WebGPUAttributeUtils.js:32–38`, `:527–529`), and the format of a larger one from the typed
+// array and `normalized` (`:12–26`, `:533–548`). WebGPU itself has no format for 64-bit values,
+// none that normalizes 32-bit integers or floats, and none of more than four values.
+// `Uint8ClampedArray` is in none of the tables.
+const typesWithoutVertexFormat: ReadonlySet<VertexAttributeDataType> = new Set(['float64', 'uint8clamped']);
+const normalizableTypes: ReadonlySet<VertexAttributeDataType> = new Set(['int8', 'uint8', 'int16', 'uint16']);
 
 const noIndices: readonly number[] = Object.freeze([]);
 
@@ -43,6 +57,7 @@ export class VertexObjectDescriptor {
 
   readonly #attributes: Map<string, VertexAttributeDescriptor> = new Map();
   readonly #bufferNames: Set<string> = new Set();
+  readonly #propertyOrigins = new Map<string, string>();
   readonly #attributeNames: readonly string[];
   readonly #indices: readonly number[];
 
@@ -92,14 +107,21 @@ export class VertexObjectDescriptor {
    *    positive integer `size`, or at least one component (`RangeError`)
    * 3. an attribute that declares both `size` and `components` has no more components than its
    *    size; fewer pad the attribute to its size (`RangeError`)
-   * 4. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
-   * 5. no two attributes, components or methods give the vertex object the same property name
+   * 4. every attribute holds at most 4 values per vertex (`RangeError`)
+   * 5. every attribute has a WebGPU vertex format: its type is neither `'float64'` nor
+   *    `'uint8clamped'`; `normalized` only on `'int8'`, `'uint8'`, `'int16'` or `'uint16'` and with
+   *    at least 2 values; `'float16'` with at least 2 values (`TypeError`)
+   * 6. the attributes that name the same buffer agree on `type`, `normalized` and `usage`
+   *    (`TypeError`)
+   * 7. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
+   * 8. no two attributes, components or methods give the vertex object the same property name
    *    (`Error`)
-   * 6. no property name of the vertex object appears on the `basePrototype`, neither as an own
+   * 9. no property name of the vertex object appears on the `basePrototype`, neither as an own
    *    property nor inherited from a prototype below `Object.prototype` (`Error`)
    *
    * @throws when the description breaks one of the rules above; the message names the rule,
-   * the attribute where there is one, and the value received
+   * the attribute where there is one, and the value received. For the rules 4 to 6 it names the
+   * attribute and its buffer
    */
   constructor(description: VertexObjectDescription) {
     // the copy is what keeps the checks below true for the life of this descriptor: a later
@@ -148,6 +170,8 @@ export class VertexObjectDescriptor {
       }
     }
 
+    this.#checkVertexFormats();
+
     this.indices.forEach((index, position) => {
       if (!Number.isInteger(index) || index < 0 || index >= this.vertexCount) {
         throw new RangeError(
@@ -156,15 +180,85 @@ export class VertexObjectDescriptor {
       }
     });
 
-    const origins = new Map<string, string>();
     for (const {name, origin} of vertexObjectPropertyNames(this.attributes.values(), this.vertexCount, this.methods)) {
-      const first = origins.get(name);
+      const first = this.#propertyOrigins.get(name);
       if (first != null) {
         throw new Error(`VertexObjectDescriptor: the vertex object property "${name}" comes from both ${first} and ${origin}`);
       }
-      origins.set(name, origin);
+      this.#propertyOrigins.set(name, origin);
     }
 
+    this.checkBasePrototype();
+  }
+
+  #checkVertexFormats(): void {
+    for (const attr of this.attributes.values()) {
+      if (attr.size > 4) {
+        throw new RangeError(
+          `VertexObjectDescriptor: attribute "${attr.name}" in buffer "${attr.bufferName}" has a size of ${attr.size}, and a WebGPU vertex format holds at most 4 values`,
+        );
+      }
+    }
+
+    for (const attr of this.attributes.values()) {
+      const where = `attribute "${attr.name}" in buffer "${attr.bufferName}"`;
+      const {dataType, size} = attr;
+      if (typesWithoutVertexFormat.has(dataType)) {
+        throw new TypeError(`VertexObjectDescriptor: ${where} is of type ${dataType}, for which WebGPU has no vertex format`);
+      }
+      if (attr.normalizedData && !normalizableTypes.has(dataType)) {
+        throw new TypeError(
+          `VertexObjectDescriptor: ${where} is normalized and of type ${dataType}; WebGPU normalizes int8, uint8, int16 and uint16 only`,
+        );
+      }
+      if (attr.normalizedData && size === 1) {
+        throw new TypeError(
+          `VertexObjectDescriptor: ${where} is normalized with a size of 1; three builds no normalized vertex format of one value, so it needs a size of 2 to 4`,
+        );
+      }
+      if (dataType === 'float16' && size === 1) {
+        throw new TypeError(
+          `VertexObjectDescriptor: ${where} is of type float16 with a size of 1; three builds no float16 vertex format of one value, so it needs a size of 2 to 4`,
+        );
+      }
+    }
+
+    // the buffer takes the element type and the draw usage of its first attribute (see the
+    // constructor of `VertexObjectBuffer`), and three widens a buffer of 8- or 16-bit integers by
+    // the `normalized` of the attribute that uploads it first (`WebGPUAttributeUtils.js:84–93`) —
+    // an attribute that differs would end up as another type without a word. The default
+    // `bufferName` tells the buffers apart by exactly these three, so a default layout never
+    // breaks the rule
+    const summary = (a: VertexAttributeDescriptor) => `${a.dataType}${a.normalizedData ? ' normalized' : ''}, ${a.usageType}`;
+    const firstOfBuffer = new Map<string, VertexAttributeDescriptor>();
+    for (const attr of this.attributes.values()) {
+      const first = firstOfBuffer.get(attr.bufferName);
+      if (first == null) {
+        firstOfBuffer.set(attr.bufferName, attr);
+      } else if (
+        attr.dataType !== first.dataType ||
+        attr.normalizedData !== first.normalizedData ||
+        attr.usageType !== first.usageType
+      ) {
+        throw new TypeError(
+          `VertexObjectDescriptor: buffer "${attr.bufferName}" holds attribute "${first.name}" (${summary(first)}) and attribute "${attr.name}" (${summary(attr)}); every attribute of a buffer has to agree on type, normalized and usage`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Throws when a property name of the vertex object appears on the `basePrototype`, neither as an
+   * own property nor inherited from a prototype below `Object.prototype` — rule 9 of the
+   * constructor. A pool built on a descriptor that exists already calls it again: a `basePrototype`
+   * is behaviour its author may extend after the first pool, and a generated accessor would shadow
+   * what was added there.
+   *
+   * @throws an `Error` that names the property, where it comes from, and the basePrototype
+   *
+   * @internal
+   */
+  checkBasePrototype(): void {
     const {basePrototype} = this.description;
     if (basePrototype != null) {
       // `Object.prototype` is where the chain stops: a description without a basePrototype builds
@@ -174,7 +268,7 @@ export class VertexObjectDescriptor {
       while (proto != null && proto !== Object.prototype) {
         // only own names per step, and no symbols — a generated accessor always carries a string
         for (const name of Object.getOwnPropertyNames(proto)) {
-          const origin = origins.get(name);
+          const origin = this.#propertyOrigins.get(name);
           if (origin != null) {
             throw new Error(
               `VertexObjectDescriptor: the vertex object property "${name}" from ${origin} would shadow a property of the basePrototype`,

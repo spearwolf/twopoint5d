@@ -760,6 +760,36 @@ describe('VertexObjectBuffer', () => {
         4,
       );
 
+    test('copyAttributes() turns away a negative targetObjectOffset', () => {
+      const vob = makeBuffer();
+      const before = Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial]);
+
+      const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, -1);
+
+      expect(run).toThrow(RangeError);
+      expect(run).toThrow(/VertexObjectBuffer#copyAttributes\(\).*-1/);
+      expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
+    });
+
+    test('copyAttributes() turns away a fractional targetObjectOffset', () => {
+      const vob = makeBuffer();
+      const before = Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial]);
+
+      const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, 1.5);
+
+      expect(run).toThrow(RangeError);
+      expect(run).toThrow(/VertexObjectBuffer#copyAttributes\(\).*1\.5/);
+      expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
+    });
+
+    test('copyAttributes() at an offset of the capacity copies nothing and answers 0', () => {
+      const vob = makeBuffer();
+      const before = Array.from(vob.buffers.values(), (buf) => Array.from(buf.typedArray!));
+
+      expect(vob.copyAttributes({v: [1, 2, 3, 4]}, 4)).toBe(0);
+      expect(Array.from(vob.buffers.values(), (buf) => Array.from(buf.typedArray!))).toEqual(before);
+    });
+
     test('toAttributeArrays() turns away an end beyond the capacity', () => {
       const vob = makeBuffer();
 
