@@ -332,19 +332,32 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     return this.nodes.southWest != null && aabb.isSouthWest(this.originX!, this.originY!);
   }
 
-  findChunksAt(x: number, y: number): ChunkType[] {
-    const chunks: ChunkType[] = this.chunks.filter((chunk: ChunkType) => chunk.containsDataAt(x, y));
-    if (this.isLeaf) return chunks;
-
-    const child =
-      x < this.originX!
-        ? y < this.originY!
-          ? this.nodes.northWest
-          : this.nodes.southWest
-        : y < this.originY!
-          ? this.nodes.northEast
-          : this.nodes.southEast;
-
-    return child === null ? chunks : chunks.concat(child.findChunksAt(x, y));
+  /**
+   * Collects every chunk that holds data at `(x, y)`, from this node down to the leaf the point
+   * lies in.
+   *
+   * Pass an `out` array to reuse storage in hot paths — entries are appended without resetting
+   * `out`. The same array is returned.
+   */
+  findChunksAt(x: number, y: number, out: ChunkType[] = []): ChunkType[] {
+    let node: ChunkQuadTreeNode<ChunkType> | null = this;
+    while (node !== null) {
+      const local = node.chunks;
+      for (let i = 0, n = local.length; i < n; i++) {
+        // The loop bound is `n`, taken from `local.length`.
+        const chunk = local[i]!;
+        if (chunk.containsDataAt(x, y)) out.push(chunk);
+      }
+      if (node.isLeaf) break;
+      node =
+        x < node.originX!
+          ? y < node.originY!
+            ? node.nodes.northWest
+            : node.nodes.southWest
+          : y < node.originY!
+            ? node.nodes.northEast
+            : node.nodes.southEast;
+    }
+    return out;
   }
 }

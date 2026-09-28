@@ -1,10 +1,22 @@
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import type {AABB2} from './AABB2.js';
+import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import type {IMap2DRenderableArea} from './types.js';
-import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 import {tileKey} from './tileKeys.js';
+import {TileSlotTable, type TileSlotTableEntry} from './TileSlotTable.js';
 
+/**
+ * @deprecated The return type of the deprecated {@link Map2DSpatialHashGrid.getKey}; `tileKey()`
+ * answers a `string`.
+ */
 export type Map2DSpatialHashGridKeyType = string;
+
+// A cell of the grid: its tile coordinate and the renderables in it; `nextInBucket` belongs to the
+// table that finds the cell
+interface GridCell<Renderable> extends TileSlotTableEntry<GridCell<Renderable>> {
+  readonly renderables: Set<Renderable>;
+}
 
 /**
  * A spatial index over a grid of tiles: every renderable lies in the cells its `aabb` reaches
@@ -12,20 +24,24 @@ export type Map2DSpatialHashGridKeyType = string;
  */
 export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   /**
-   * The bucket key of the tile at these coordinates: the shared tile key, the same string the
-   * `id` of a `Map2DTileCoords` carries. A tile that comes out of a visibilitor looks itself up
-   * in the grid without any conversion.
+   * The textual key of the tile at these coordinates, the string `tileKey()` builds and the
+   * `id` of a `Map2DTileCoords` carries. The grid finds its cells by coordinate and takes no key.
+   *
+   * @deprecated Use `tileKey()`.
    */
   static getKey(x: number, y: number): Map2DSpatialHashGridKeyType {
     return tileKey(x, y);
   }
 
-  #tiles: Map<Map2DSpatialHashGridKeyType, Set<Renderable>>;
+  readonly #cells = new TileSlotTable<GridCell<Renderable>>();
 
   // The cells `add()` put a renderable into, so `remove()` finds them whatever the `aabb` of the
   // renderable says by then.
-  readonly #cellKeys = new Map<Renderable, Map2DSpatialHashGridKeyType[]>();
+  readonly #cellsOfRenderable = new Map<Renderable, GridCell<Renderable>[]>();
   #tileCoordsUtil: Map2DTileCoordsUtil;
+
+  // what `#cellsOf()` answers, written again on every call
+  readonly #within: TilesWithinCoords = createTilesWithinCoords();
 
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
     // checked here as well as in the util underneath, so the message names the class the caller
@@ -33,7 +49,6 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     assertPositiveFinite(tileWidth, 'Map2DSpatialHashGrid', 'tileWidth');
     assertPositiveFinite(tileHeight, 'Map2DSpatialHashGrid', 'tileHeight');
 
-    this.#tiles = new Map();
     this.#tileCoordsUtil = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
@@ -48,21 +63,20 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     for (const renderable of renderables) {
       this.#takeOut(renderable);
 
-      const [tileLeft, tileTop, tileColumns, tileRows] = this.#cellsOf(renderable.aabb);
-      const keys: Map2DSpatialHashGridKeyType[] = [];
-      for (let y = 0; y < tileRows; y++) {
-        for (let x = 0; x < tileColumns; x++) {
-          const key = Map2DSpatialHashGrid.getKey(tileLeft + x, tileTop + y);
-          let tileSet = this.#tiles.get(key);
-          if (tileSet == null) {
-            tileSet = new Set<Renderable>();
-            this.#tiles.set(key, tileSet);
+      const {tileLeft, tileTop, columns, rows} = this.#cellsOf(renderable.aabb);
+      const cells: GridCell<Renderable>[] = [];
+      for (let y = tileTop; y < tileTop + rows; y++) {
+        for (let x = tileLeft; x < tileLeft + columns; x++) {
+          let cell = this.#cells.get(x, y);
+          if (cell === undefined) {
+            cell = {x, y, nextInBucket: undefined, renderables: new Set()};
+            this.#cells.add(cell);
           }
-          tileSet.add(renderable);
-          keys.push(key);
+          cell.renderables.add(renderable);
+          cells.push(cell);
         }
       }
-      this.#cellKeys.set(renderable, keys);
+      this.#cellsOfRenderable.set(renderable, cells);
     }
     return this;
   }
@@ -79,28 +93,26 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   #takeOut(renderable: Renderable): void {
-    const keys = this.#cellKeys.get(renderable);
-    if (keys == null) return;
+    const cells = this.#cellsOfRenderable.get(renderable);
+    if (cells == null) return;
 
-    for (const key of keys) {
-      const tileSet = this.#tiles.get(key);
-      if (tileSet) {
-        tileSet.delete(renderable);
-        if (tileSet.size === 0) {
-          this.#tiles.delete(key);
-        }
+    for (const cell of cells) {
+      cell.renderables.delete(renderable);
+      if (cell.renderables.size === 0) {
+        this.#cells.remove(cell);
       }
     }
-    this.#cellKeys.delete(renderable);
+    this.#cellsOfRenderable.delete(renderable);
   }
 
   // An aabb reaches into the cell its upper left corner lies in at the very least — also with a
   // width or height of 0 on a cell border, where the plain computation ends up with 0 columns
   // or rows.
-  #cellsOf(aabb: AABB2): [tileLeft: number, tileTop: number, columns: number, rows: number] {
-    const {left, top, width, height} = aabb;
-    const [tileLeft, tileTop, columns, rows] = this.#tileCoordsUtil.getTileCoords(left, top, width, height);
-    return [tileLeft, tileTop, Math.max(1, columns), Math.max(1, rows)];
+  #cellsOf(aabb: AABB2): TilesWithinCoords {
+    const within = this.#tileCoordsUtil.computeTilesWithinArea(aabb, this.#within);
+    within.columns = Math.max(1, within.columns);
+    within.rows = Math.max(1, within.rows);
+    return within;
   }
 
   /**
@@ -114,10 +126,8 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   findWithin(aabb: AABB2): Set<Renderable> | undefined;
   findWithin(aabb: AABB2, out: Set<Renderable>): Set<Renderable>;
   findWithin(aabb: AABB2, out?: Set<Renderable>): Set<Renderable> | undefined {
-    const [tileLeft, tileTop, tileColumns, tileRows] = this.#cellsOf(aabb);
-    return out
-      ? this.getTiles(tileLeft, tileTop, tileColumns, tileRows, out)
-      : this.getTiles(tileLeft, tileTop, tileColumns, tileRows);
+    const {tileLeft, tileTop, columns, rows} = this.#cellsOf(aabb);
+    return out ? this.getTiles(tileLeft, tileTop, columns, rows, out) : this.getTiles(tileLeft, tileTop, columns, rows);
   }
 
   /**
@@ -147,7 +157,6 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   getTile(tileX: number, tileY: number): Set<Renderable> | undefined {
-    const key = Map2DSpatialHashGrid.getKey(tileX, tileY);
-    return this.#tiles.get(key);
+    return this.#cells.get(tileX, tileY)?.renderables;
   }
 }

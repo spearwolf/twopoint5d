@@ -24,7 +24,8 @@ function bucketOf(x: number, y: number, mask: number): number {
 }
 
 /**
- * The slots of a frame loop, found by their tile coordinate: a hash table whose chains run
+ * The entries of a frame loop, found by their tile coordinate — the tile slots of the camera
+ * based visibility, the cells of `Map2DSpatialHashGrid`: a hash table whose chains run
  * through the entries themselves, along {@link TileSlotTableEntry.nextInBucket}. Adding and
  * removing an entry changes links and nothing else, so neither boxes a key nor builds a hash
  * table again the way a `Map` does once deletions and insertions have filled it.

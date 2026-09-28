@@ -100,6 +100,29 @@ describe('RectangularVisibilityArea', () => {
       expect(fourth.createTiles, 'cached again').toBeUndefined();
     });
 
+    test('the serial of the result moves with every recomputation and stands while the result is handed back', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const serials: (number | undefined)[] = [];
+      let previous: IMap2DTileCoords[] = [];
+      const call = (center: [number, number], grid = tileCoords) => {
+        const result = area.computeVisibleTiles(previous, center, grid, matrixWorld)!;
+        previous = result.tiles;
+        serials.push(result.serial);
+      };
+
+      call([0, 0]);
+      call([0, 0]); // unchanged
+      call([50, 0]); // center moved
+      call([50, 0]); // unchanged
+      area.needsUpdate = true;
+      call([50, 0]); // needsUpdate
+      call([50, 0], new Map2DTileCoordsUtil(50, 50)); // another grid
+
+      const [first] = serials;
+      expect(first, 'the first result names a recomputation').toBeTypeOf('number');
+      expect(serials).toEqual([first, first, first! + 1, first! + 1, first! + 2, first! + 3]);
+    });
+
     test('offset and translate are the same instances across calls', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;

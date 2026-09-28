@@ -1,5 +1,5 @@
 import assert from 'assert';
-import {describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vitest';
 
 import {AABB2} from './AABB2.js';
 
@@ -57,10 +57,15 @@ describe('AABB2', () => {
 
   describe('extend', () => {
     describe('not overlapping', () => {
-      const aabb = new AABB2(0, 3, 10, 18);
-      const other = new AABB2(20, 21, 3, 4);
+      let aabb: AABB2;
+      let returned: AABB2;
+      beforeEach(() => {
+        aabb = new AABB2(0, 3, 10, 18);
+        const other = new AABB2(20, 21, 3, 4);
+        returned = aabb.extend(other);
+      });
       it('should return self', () => {
-        expect(aabb.extend(other)).toBe(aabb);
+        expect(returned).toBe(aabb);
       });
       it('left', () => {
         expect(aabb.left).toBe(0);
@@ -76,10 +81,15 @@ describe('AABB2', () => {
       });
     });
     describe('intersecting', () => {
-      const aabb = new AABB2(0, 3, 10, 18);
-      const other = new AABB2(-5, 0, 6, 3);
+      let aabb: AABB2;
+      let returned: AABB2;
+      beforeEach(() => {
+        aabb = new AABB2(0, 3, 10, 18);
+        const other = new AABB2(-5, 0, 6, 3);
+        returned = aabb.extend(other);
+      });
       it('should return self', () => {
-        expect(aabb.extend(other)).toBe(aabb);
+        expect(returned).toBe(aabb);
       });
       it('left', () => {
         expect(aabb.left).toBe(-5);
@@ -95,10 +105,15 @@ describe('AABB2', () => {
       });
     });
     describe('overlaps (inside)', () => {
-      const aabb = new AABB2(0, 3, 10, 18);
-      const other = new AABB2(1, 4, 7, 5);
+      let aabb: AABB2;
+      let returned: AABB2;
+      beforeEach(() => {
+        aabb = new AABB2(0, 3, 10, 18);
+        const other = new AABB2(1, 4, 7, 5);
+        returned = aabb.extend(other);
+      });
       it('should return self', () => {
-        expect(aabb.extend(other)).toBe(aabb);
+        expect(returned).toBe(aabb);
       });
       it('left', () => {
         expect(aabb.left).toBe(0);
@@ -114,10 +129,15 @@ describe('AABB2', () => {
       });
     });
     describe('overlaps', () => {
-      const aabb = new AABB2(0, 3, 10, 18);
-      const other = new AABB2(-10, -10, 100, 100);
+      let aabb: AABB2;
+      let returned: AABB2;
+      beforeEach(() => {
+        aabb = new AABB2(0, 3, 10, 18);
+        const other = new AABB2(-10, -10, 100, 100);
+        returned = aabb.extend(other);
+      });
       it('should return self', () => {
-        expect(aabb.extend(other)).toBe(aabb);
+        expect(returned).toBe(aabb);
       });
       it('left', () => {
         expect(aabb.left).toBe(-10);

@@ -1,10 +1,12 @@
-import {Matrix4, PerspectiveCamera} from 'three/webgpu';
+import {Matrix4, Object3D, PerspectiveCamera, Scene} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import {AABB2} from './AABB2.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
+import {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
+import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor} from './types.js';
@@ -287,5 +289,84 @@ describe('Map2DTileCoordsUtil on the hot path', () => {
     const bytesPerCall = bytesPerRound / (2 * CALLS_PER_ROUND);
 
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+});
+
+describe('Map2DSpatialHashGrid on the hot path', () => {
+  test('getTile() allocates nothing', async () => {
+    const grid = new Map2DSpatialHashGrid<{aabb: AABB2}>(16, 16);
+    // 200 boxes of 20 × 20 spread over 512 × 512, at fractional places
+    for (let i = 0; i < 200; i++) {
+      grid.add({aabb: new AABB2((i * 97.25) % 492, (i * 53.5) % 492, 20, 20)});
+    }
+
+    // a Smi, so that keeping count allocates nothing inside the round
+    let hits = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) {
+        // runs through the 32 × 32 cells of the area
+        if (grid.getTile(i & 31, (i >> 5) & 31) !== undefined) hits++;
+      }
+    });
+    const bytesPerCall = bytesPerRound / CALLS_PER_ROUND;
+
+    expect(hits, 'cells that hold a box').toBeGreaterThan(0);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+});
+
+describe('CameraBasedVisibilityHelpers on the hot path', () => {
+  // the helpers of a top-down view, shown in a scene and built once
+  const makeHelpers = (): {helpers: CameraBasedVisibilityHelpers; visibility: CameraBasedVisibility} => {
+    const visibility = new CameraBasedVisibility(makeTopDownCamera());
+    visibility.computeVisibleTiles([], makeCenter(), makeGrid(), makeMatrixWorld());
+
+    const scene = new Scene();
+    const node = new Object3D();
+    scene.add(node);
+    const helpers = new CameraBasedVisibilityHelpers(visibility);
+    helpers.add(node);
+    helpers.show = true;
+    helpers.update();
+    return {helpers, visibility};
+  };
+
+  test('an update() that finds nothing to rebuild allocates nothing', async () => {
+    const {helpers} = makeHelpers();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) helpers.update();
+    });
+    const bytesPerCall = bytesPerRound / CALLS_PER_ROUND;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('a rebuild allocates nothing once its nodes are built', async () => {
+    const {helpers, visibility} = makeHelpers();
+
+    // a new maxDebugHelpers rebuilds the set without a recomputation of the visibility; 8 and 9
+    // both stay within the nodes the first build left in the pools
+    let flip = 0;
+    const round = () => {
+      for (let i = 0; i < RECOMPUTATIONS_PER_ROUND; i++) {
+        flip ^= 1;
+        helpers.maxDebugHelpers = 8 + flip;
+        helpers.update();
+      }
+    };
+    const bytesPerRound = await measureSettledBytes(round);
+    const bytesPerRebuild = bytesPerRound / RECOMPUTATIONS_PER_ROUND;
+
+    expect(
+      bytesPerRebuild,
+      `${bytesPerRebuild.toFixed(2)} bytes per rebuild of ${visibility.visibles.length} tiles`,
+    ).toBeLessThan(BYTES_PER_RECOMPUTATION_LIMIT);
+
+    // after the measurement, so that the spy costs the measured rounds nothing: every update() of
+    // a round rebuilds, and the bytes above are the bytes of a rebuild
+    const createHelpers = vi.spyOn(helpers as unknown as {createHelpers: () => void}, 'createHelpers');
+    round();
+    expect(createHelpers, 'rebuilds in a round').toHaveBeenCalledTimes(RECOMPUTATIONS_PER_ROUND);
   });
 });

@@ -386,6 +386,28 @@ describe('CameraBasedVisibility', () => {
       expect(second.reuseTiles).toBe(tilesRef);
     });
 
+    test('the result carries the serial of the recomputation it comes from', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstSerial = visibility.serial;
+      expect(first.serial, 'a recomputation').toBe(firstSerial);
+
+      const cached = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+      expect(visibility.serial, 'the serial of the visibility on the cache path').toBe(firstSerial);
+      expect(cached.serial, 'the serial of the result on the cache path').toBe(firstSerial);
+
+      const moved = visibility.computeVisibleTiles(cached.tiles, [100, 0], tileCoords, matrixWorld)!;
+      expect(visibility.serial, 'the serial of the visibility after the next recomputation').toBe(firstSerial + 1);
+      expect(moved.serial, 'the serial of the result after the next recomputation').toBe(visibility.serial);
+
+      visibility.camera = makeOrthoCameraLookingHorizontally();
+      const away = visibility.computeVisibleTiles(moved.tiles, [100, 0], tileCoords, matrixWorld)!;
+      expect(away.tiles, 'the camera looks past the plane').toHaveLength(0);
+      expect(visibility.serial, 'the serial of the visibility without a hit').toBe(firstSerial + 2);
+      expect(away.serial, 'the serial of the result without a hit').toBe(visibility.serial);
+    });
+
     test('classifies tiles into create / reuse / remove across frames with different center points', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
 

@@ -71,6 +71,19 @@ export interface IMap2DTileRenderer {
   node: Object3D;
 
   /**
+   * Whether the renderer wants the next update cycle even if the tile set it was last handed has
+   * not changed, because it does not hold that tile set as its last cycle laid it out: tiles its
+   * factory had no room for, every tile after {@link clearTiles}, and whatever {@link addTile},
+   * {@link reuseTile} or {@link removeTile} changed outside an update cycle. `Map2DTileStreamer`
+   * skips the update cycle of a renderer that answers `false` while the visibilitor hands back the
+   * result the renderer has already laid out — see `IMap2DVisibleTiles#serial`. A cycle that
+   * throws before its {@link endUpdatingTiles} counts as laid out by nobody: the streamer takes the
+   * renderer through the next cycle whatever it answers here. Left out, the renderer goes through
+   * every update cycle.
+   */
+  readonly hasPendingTiles?: boolean;
+
+  /**
    * Start the update cycle for the tiles.
    *
    * `position` is in the local space of the map node, the parent of {@link node}. It is read
@@ -187,6 +200,16 @@ export interface IMap2DVisibleTiles {
    * tile it already holds alone while this is `false`. Left out, it counts as `true`.
    */
   changed?: boolean;
+
+  /**
+   * Names the recomputation this result comes from. A visibilitor that hands back the result of
+   * its last recomputation as it stands — the same tiles, the same `offset`, nothing to create or
+   * to remove — answers the `serial` it answered then, and every recomputation answers one it has
+   * not answered before. `Map2DTileStreamer` leaves a tile renderer out of the update cycle while
+   * the result carries the `serial` that renderer last laid out and the renderer reports no
+   * {@link IMap2DTileRenderer.hasPendingTiles}. Left out, every result counts as a new one.
+   */
+  serial?: number;
 }
 
 /**

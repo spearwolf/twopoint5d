@@ -166,6 +166,10 @@ first and up to `maxVisibleTiles` of them,
 that visualise what they decided. Once a frame loop has settled, neither visibility
 allocates anything in `computeVisibleTiles()` — `src/map2d/hot-path-allocations.spec.ts`
 holds them to it —, and a tile that enters the view costs its `Map2DTileCoords`.
+Both name each recomputation with the `serial` of its result, and `Map2DTileStreamer`
+leaves a renderer out of `update()` while the result carries the `serial` that renderer
+last laid out in a closed cycle and it reports no `hasPendingTiles`: a standing view
+costs no pass over the tiles.
 `Map2DTileCoords`, `Map2DTileCoordsUtil` and
 `tileKeys` define the coordinate and key scheme — every tile coordinate has exactly one
 key, and code that invents a second spelling reintroduces duplicate tiles.

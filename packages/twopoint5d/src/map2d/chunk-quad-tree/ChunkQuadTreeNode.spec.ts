@@ -1,5 +1,5 @@
 import assert from 'assert';
-import {describe, it} from 'vitest';
+import {beforeEach, describe, it} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
@@ -69,32 +69,41 @@ describe('ChunkQuadTreeNode', () => {
       X: new StringDataChunk2D({x: -1, y: 5, width: 3, height: 5, data: 'X'}),
       Y: new StringDataChunk2D({x: 2, y: 4, width: 6, height: 4, data: 'Y'}),
     };
-    const node = new ChunkQuadTreeNode(Object.values(chunks));
+    let node: ChunkQuadTreeNode<StringDataChunk2D>;
 
-    it('is instance of ChunkQuadTreeNode', () => assert(node instanceof ChunkQuadTreeNode));
-    it('is a leaf', () => assert.equal(node.isLeaf, true));
-    it('has chunk nodes', () => assert.equal(node.chunks.length, 25));
+    describe('before subdivide()', () => {
+      beforeEach(() => {
+        node = new ChunkQuadTreeNode(Object.values(chunks));
+      });
 
-    it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-5, -10), true));
-    it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(0, -10), false));
-    it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-2, -6), true));
-    it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(-6, -6), false));
+      it('is instance of ChunkQuadTreeNode', () => assert(node instanceof ChunkQuadTreeNode));
+      it('is a leaf', () => assert.equal(node.isLeaf, true));
+      it('has chunk nodes', () => assert.equal(node.chunks.length, 25));
 
-    it('subdivide()', () => {
-      node.subdivide();
+      it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-5, -10), true));
+      it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(0, -10), false));
+      it('chunk->B->containsDataAt(5, 6)', () => assert.equal(chunks.B.containsDataAt(-2, -6), true));
+      it('chunk->B->containsDataAt(5, 9)', () => assert.equal(chunks.B.containsDataAt(-6, -6), false));
     });
 
-    it('root is NOT a leaf', () => {
-      assert.equal(node.isLeaf, false);
-    });
+    describe('after subdivide()', () => {
+      beforeEach(() => {
+        node = new ChunkQuadTreeNode(Object.values(chunks));
+        node.subdivide();
+      });
 
-    it('root origin is (0, 0)', () => {
-      assert.equal(node.originX, 0);
-      assert.equal(node.originY, 0);
-    });
+      it('root is NOT a leaf', () => {
+        assert.equal(node.isLeaf, false);
+      });
 
-    it('root has chunkNodes: [Q, T, U, V, X]', () => {
-      assert.deepEqual(chunksAsStrings(node.chunks), ['Q', 'T', 'U', 'V', 'X'].sort());
+      it('root origin is (0, 0)', () => {
+        assert.equal(node.originX, 0);
+        assert.equal(node.originY, 0);
+      });
+
+      it('root has chunkNodes: [Q, T, U, V, X]', () => {
+        assert.deepEqual(chunksAsStrings(node.chunks), ['Q', 'T', 'U', 'V', 'X'].sort());
+      });
     });
   });
 
@@ -135,41 +144,50 @@ describe('ChunkQuadTreeNode', () => {
       O: new StringDataChunk2D({x: 0, y: 5, width: 5, height: 5, data: 'O'}),
       P: new StringDataChunk2D({x: 5, y: 5, width: 5, height: 5, data: 'P'}),
     };
-    const node = new ChunkQuadTreeNode(Object.values(chunks));
+    let node: ChunkQuadTreeNode<StringDataChunk2D>;
 
-    it('has chunk nodes', () => assert.equal(node.chunks.length, 16));
+    describe('before subdivide()', () => {
+      beforeEach(() => {
+        node = new ChunkQuadTreeNode(Object.values(chunks));
+      });
 
-    it('subdivide()', () => {
-      node.subdivide();
+      it('has chunk nodes', () => assert.equal(node.chunks.length, 16));
     });
 
-    it('root is NOT a leaf', () => {
-      assert.equal(node.isLeaf, false);
-    });
+    describe('after subdivide()', () => {
+      beforeEach(() => {
+        node = new ChunkQuadTreeNode(Object.values(chunks));
+        node.subdivide();
+      });
 
-    it('root origin is (0, 0)', () => {
-      assert.equal(node.originX, 0);
-      assert.equal(node.originY, 0);
-    });
+      it('root is NOT a leaf', () => {
+        assert.equal(node.isLeaf, false);
+      });
 
-    it('root has no [cross-axis] chunkNodes!', () => {
-      assert.equal(node.chunks.length, 0);
-    });
+      it('root origin is (0, 0)', () => {
+        assert.equal(node.originX, 0);
+        assert.equal(node.originY, 0);
+      });
 
-    it('find chunks contained: (2, 4)[6, 4]', () => {
-      assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(2, 4, 6, 4))), ['K', 'L', 'O', 'P'].sort());
-    });
+      it('root has no [cross-axis] chunkNodes!', () => {
+        assert.equal(node.chunks.length, 0);
+      });
 
-    it('find chunks contained: (-2, -2)[5, 5]', () => {
-      assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(-2, -2, 5, 5))), ['F', 'G', 'J', 'K'].sort());
-    });
+      it('find chunks contained: (2, 4)[6, 4]', () => {
+        assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(2, 4, 6, 4))), ['K', 'L', 'O', 'P'].sort());
+      });
 
-    it('find chunks contained: (-9, -8)[2, 2]', () => {
-      assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(-9, -8, 2, 2))), ['A'].sort());
-    });
+      it('find chunks contained: (-2, -2)[5, 5]', () => {
+        assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(-2, -2, 5, 5))), ['F', 'G', 'J', 'K'].sort());
+      });
 
-    it('find chunks contained: (-20, -20)[2, 2]', () => {
-      assert.equal(node.findChunks(new AABB2(-20, -20, 2, 2)).length, 0);
+      it('find chunks contained: (-9, -8)[2, 2]', () => {
+        assert.deepEqual(chunksAsStrings(node.findChunks(new AABB2(-9, -8, 2, 2))), ['A'].sort());
+      });
+
+      it('find chunks contained: (-20, -20)[2, 2]', () => {
+        assert.equal(node.findChunks(new AABB2(-20, -20, 2, 2)).length, 0);
+      });
     });
   });
 });

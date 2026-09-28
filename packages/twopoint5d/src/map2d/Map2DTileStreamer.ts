@@ -2,7 +2,7 @@ import type {Object3D} from 'three/webgpu';
 import {Vector3} from 'three/webgpu';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
-import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
 /**
  * `Map2DTileStreamer` is a tile streaming manager for 2D maps that loads and discards tiles based on their visibility.
@@ -44,6 +44,13 @@ export class Map2DTileStreamer {
   #tileCoords: Map2DTileCoordsUtil;
 
   #clearTilesOnNextUpdate = false;
+
+  // The `serial` of the visibilitor result each renderer last went through a whole update cycle
+  // with. A renderer missing here has laid out nothing since it came on, since the tiles were
+  // cleared or since a cycle of it threw, and goes through the next cycle whatever the result
+  // says. Weak, because `renderers`
+  // is a public set: a renderer taken out of it directly is not held here either.
+  #laidOutSerials = new WeakMap<IMap2DTileRenderer, number>();
 
   get tileWidth(): number {
     return this.#tileCoords.tileWidth;
@@ -124,7 +131,10 @@ export class Map2DTileStreamer {
     // only update() takes a tile out of a renderer again: one let go with its tiles would keep
     // those that leave the view while it is away, and bring back as a reuse the tiles of a grid
     // that has changed since, with that grid's size and texture coordinates
-    if (this.renderers.delete(renderer)) renderer.clearTiles();
+    if (this.renderers.delete(renderer)) {
+      this.#laidOutSerials.delete(renderer);
+      renderer.clearTiles();
+    }
   }
 
   /**
@@ -132,6 +142,14 @@ export class Map2DTileStreamer {
    *
    * `node` is the node the tile renderer nodes are children of — `Map2D` hands itself over. Its
    * world matrix goes to the visibilitor, and the renderer nodes are placed in its local space.
+   *
+   * A tile renderer sits an update out when there is nothing to lay out: the visibilitor hands
+   * back the result the renderer went through its last update cycle with — the same
+   * {@link IMap2DVisibleTiles.serial} — and the renderer reports no
+   * {@link IMap2DTileRenderer.hasPendingTiles}. Its node then stays where that cycle placed it.
+   * A renderer that has just come on, a renderer whose last cycle threw, every renderer after the
+   * tiles were cleared, and every renderer of a visibilitor whose results carry no `serial` go
+   * through the cycle.
    */
   update(node: Object3D): void {
     const visibilitor = this.#visibilitor;
@@ -144,6 +162,7 @@ export class Map2DTileStreamer {
       // a new list, not `length = 0`: the visibilitor holds this very array as the tile set of
       // its last result, and its cache path hands that result back untouched by previousTiles
       this.tiles = [];
+      this.#laidOutSerials = new WeakMap();
       this.#clearTilesOnNextUpdate = false;
     }
 
@@ -151,7 +170,12 @@ export class Map2DTileStreamer {
 
     this.#viewCenter[0] = this.centerX;
     this.#viewCenter[1] = this.centerY;
-    const visible = visibilitor.computeVisibleTiles(this.tiles, this.#viewCenter, this.#tileCoords, node.matrixWorld);
+    const visible: IMap2DVisibleTiles | undefined = visibilitor.computeVisibleTiles(
+      this.tiles,
+      this.#viewCenter,
+      this.#tileCoords,
+      node.matrixWorld,
+    );
 
     if (visible) {
       this.tiles = visible.tiles;
@@ -161,7 +185,16 @@ export class Map2DTileStreamer {
       const offset = visible.offset;
       const position = this.#position.set(offset?.x ?? 0, 0, offset?.y ?? 0);
 
+      const serial = visible.serial;
       for (const tileRenderer of this.renderers) {
+        // nothing to lay out: the renderer holds this very result and misses none of its tiles
+        if (serial !== undefined && tileRenderer.hasPendingTiles === false && this.#laidOutSerials.get(tileRenderer) === serial) {
+          continue;
+        }
+
+        // out of the books until the cycle has closed: a cycle that throws leaves the renderer
+        // with part of the result, and the next update has to take it through again
+        this.#laidOutSerials.delete(tileRenderer);
         tileRenderer.beginUpdatingTiles(position, visible.changed ?? true);
 
         if (visible.removeTiles) for (const tile of visible.removeTiles) tileRenderer.removeTile(tile);
@@ -169,6 +202,8 @@ export class Map2DTileStreamer {
         if (visible.reuseTiles) for (const tile of visible.reuseTiles) tileRenderer.reuseTile(tile);
 
         tileRenderer.endUpdatingTiles();
+
+        if (serial !== undefined) this.#laidOutSerials.set(tileRenderer, serial);
       }
     }
   }

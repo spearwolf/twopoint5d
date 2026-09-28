@@ -445,4 +445,209 @@ describe('Map2DTileRenderer', () => {
       expect(destroyTile.getCalls().map((call) => (call.args[0] as FakeTile).coords.id)).toEqual(['0,0', '1,0']);
     });
   });
+
+  describe('hasPendingTiles', () => {
+    // a factory with `room` free slots: it answers noTileCapacity while none is left, and a
+    // destroyTile() gives one back; a coordinate in `holes` has no tile
+    function makeFactory(room: number, holes: string[] = []): IMapTileFactory<FakeTile> {
+      return {
+        ...makeTileFactory(),
+        createTile(tileCoords: IMap2DTileCoords): FakeTile | undefined | typeof noTileCapacity {
+          if (holes.includes(tileCoords.id)) return undefined;
+          if (room === 0) return noTileCapacity;
+          --room;
+          return {coords: tileCoords};
+        },
+        destroyTile(_tile: FakeTile) {
+          ++room;
+        },
+      };
+    }
+
+    let warn: MockInstance<typeof console.warn>;
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    test('is false after a cycle that placed every tile', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(2));
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.addTile(new Map2DTileCoords(1, 0));
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles).toBe(false);
+    });
+
+    test('is true after a cycle the factory had no room in, and false again after one that placed the tile', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(1));
+      const a = new Map2DTileCoords(0, 0);
+      const b = new Map2DTileCoords(1, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.addTile(b);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the cycle without room for b').toBe(true);
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.removeTile(a);
+      renderer.reuseTile(b);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the cycle that placed b').toBe(false);
+    });
+
+    test('is true after clearTiles() until the next update cycle has closed', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(1));
+      const tileCoords = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+      renderer.clearTiles();
+
+      expect(renderer.hasPendingTiles, 'after clearTiles()').toBe(true);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+
+      expect(renderer.hasPendingTiles, 'while the cycle is open').toBe(true);
+
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after endUpdatingTiles()').toBe(false);
+    });
+
+    test('a coordinate the factory answers with undefined is not pending', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(1, ['1,0']));
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.addTile(new Map2DTileCoords(1, 0));
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles).toBe(false);
+    });
+
+    test('is true after removeTile() outside an update cycle, and false again after the next cycle', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(2));
+      const a = new Map2DTileCoords(0, 0);
+      const b = new Map2DTileCoords(1, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.addTile(b);
+      renderer.endUpdatingTiles();
+      renderer.removeTile(b);
+
+      expect(renderer.hasPendingTiles, 'after removeTile()').toBe(true);
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
+      renderer.reuseTile(b);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the next cycle').toBe(false);
+    });
+
+    test('is true after removeTile() outside an update cycle for a coordinate without a tile', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(1, ['1,0']));
+      const hole = new Map2DTileCoords(1, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(hole);
+      renderer.endUpdatingTiles();
+      renderer.removeTile(hole);
+
+      expect(renderer.hasPendingTiles).toBe(true);
+    });
+
+    test('is true after addTile() outside an update cycle until the next cycle', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(2));
+      const a = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.endUpdatingTiles();
+      // the renderer holds the tile, so it is written on
+      renderer.addTile(a);
+
+      expect(renderer.hasPendingTiles, 'after addTile()').toBe(true);
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the next cycle').toBe(false);
+    });
+
+    test('is true after reuseTile() outside an update cycle', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(1));
+      const a = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.endUpdatingTiles();
+      // the last cycle said the grid changed, so the tile it holds is written on
+      renderer.reuseTile(a);
+
+      expect(renderer.hasPendingTiles).toBe(true);
+    });
+
+    test('is true after a cycle a throwing factory broke off, and after a removeTile() that follows it', () => {
+      let fail = false;
+      const factory: IMapTileFactory<FakeTile> = {
+        ...makeTileFactory(),
+        createTile(tileCoords: IMap2DTileCoords): FakeTile {
+          if (fail) throw new Error('the tile set is missing');
+          return {coords: tileCoords};
+        },
+      };
+      const renderer = new Map2DTileRenderer(factory);
+      const a = new Map2DTileCoords(0, 0);
+      const b = new Map2DTileCoords(1, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.endUpdatingTiles();
+
+      fail = true;
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      expect(() => renderer.addTile(b), 'the addTile() the factory broke off').toThrow('the tile set is missing');
+
+      expect(renderer.hasPendingTiles, 'after the cycle broke off').toBe(true);
+
+      renderer.removeTile(a);
+
+      expect(renderer.hasPendingTiles, 'after removeTile()').toBe(true);
+
+      fail = false;
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
+      renderer.reuseTile(b);
+      renderer.endUpdatingTiles();
+
+      expect(renderer.hasPendingTiles, 'after the next cycle').toBe(false);
+    });
+
+    test('is false after dispose()', () => {
+      const renderer = new Map2DTileRenderer(makeFactory(0));
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+      renderer.clearTiles();
+      renderer.dispose();
+
+      expect(renderer.hasPendingTiles).toBe(false);
+    });
+  });
 });

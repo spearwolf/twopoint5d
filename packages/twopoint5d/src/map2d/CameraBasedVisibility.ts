@@ -376,6 +376,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * A step says that the camera was evaluated again, not that every field carries a new value:
    * `planeWorld`, `planeOrigin`, `pointOnPlane`, `pointsOnPlane` and `visibles` follow every
    * step, `planeCoords2D` only a step in which the camera met the plane.
+   *
+   * It is also the {@link IMap2DVisibleTiles.serial} of the result `computeVisibleTiles()` hands out.
    */
   get serial(): number {
     return this.#serial;
@@ -617,6 +619,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       result.offset = undefined;
       result.translate = undefined;
       result.changed = changed;
+      result.serial = this.#serial;
 
       this.#visibleTiles = result;
       return result;
@@ -862,6 +865,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     result.offset = this.#scratchOffset;
     result.translate = translate;
     result.changed = changed;
+    result.serial = this.#serial;
 
     return result;
   }

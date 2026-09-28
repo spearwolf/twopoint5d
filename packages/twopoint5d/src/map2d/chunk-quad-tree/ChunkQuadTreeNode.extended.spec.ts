@@ -687,6 +687,64 @@ describe('ChunkQuadTreeNode (extended)', () => {
     });
   });
 
+  describe('findChunksAt(x, y, out)', () => {
+    // T crosses the axes of the south east node and stays there, S lies in the leaf north west of
+    // it: both hold the point (2, 2)
+    const build = () => {
+      const chunks = {
+        A: new StringDataChunk2D({x: -10, y: -10, width: 5, height: 5, data: 'A'}),
+        B: new StringDataChunk2D({x: 5, y: -10, width: 5, height: 5, data: 'B'}),
+        C: new StringDataChunk2D({x: -10, y: 5, width: 5, height: 5, data: 'C'}),
+        D: new StringDataChunk2D({x: 5, y: 5, width: 5, height: 5, data: 'D'}),
+        S: new StringDataChunk2D({x: -3, y: -3, width: 6, height: 6, data: 'S'}),
+        T: new StringDataChunk2D({x: 2, y: 2, width: 6, height: 6, data: 'T'}),
+      };
+      const n = new ChunkQuadTreeNode<StringDataChunk2D>(Object.values(chunks));
+      n.subdivide(1);
+      return n;
+    };
+
+    test('findChunksAt(x, y, out) appends to out and returns it', () => {
+      const n = build();
+      const sentinel = new StringDataChunk2D({x: 999, y: 999, width: 1, height: 1, data: 'Z'});
+      const out: StringDataChunk2D[] = [sentinel];
+
+      const ret = n.findChunksAt(2, 2, out);
+
+      expect(ret).toBe(out);
+      expect(out[0], 'the entry out held before').toBe(sentinel);
+      expect(sortedNames(out)).toEqual(['S', 'T', 'Z']);
+    });
+
+    test('findChunksAt() answers the chunks from the root down', () => {
+      const n = build();
+      const southEast = n.nodes.southEast!;
+      expect(southEast.chunks.map(String), 'the chunks the south east node holds').toEqual(['T']);
+      expect(southEast.nodes.northWest?.chunks.map(String), 'the chunks of the leaf below it').toEqual(['S']);
+
+      expect(n.findChunksAt(2, 2).map(String)).toEqual(['T', 'S']);
+    });
+
+    test('findChunksAt() finds the same chunks with and without out', () => {
+      const n = build();
+      const points: [number, number][] = [
+        [2, 2],
+        [-7, -7],
+        [7, -7],
+        [-7, 7],
+        [7, 7],
+        [0, 0],
+        [-3, -3],
+        [1000, 1000],
+      ];
+      for (const [x, y] of points) {
+        const out: StringDataChunk2D[] = [];
+        n.findChunksAt(x, y, out);
+        expect(out, `at (${x}, ${y})`).toEqual(n.findChunksAt(x, y));
+      }
+    });
+  });
+
   describe('clear()', () => {
     it('resets a non-leaf tree to a fresh empty leaf', () => {
       const chunks = grid4x4();

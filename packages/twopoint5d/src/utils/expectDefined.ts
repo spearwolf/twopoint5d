@@ -8,7 +8,15 @@
  */
 export function expectDefined<T>(value: T | null | undefined, what: string): T {
   if (value == null) {
-    throw new Error(`expected ${what} to be defined`);
+    throw undefinedValueError(what);
   }
   return value;
+}
+
+/**
+ * The error {@link expectDefined} throws for a missing `what`. For a hot path that tests the value
+ * itself, so that the description is put together only when the value is missing.
+ */
+export function undefinedValueError(what: string): Error {
+  return new Error(`expected ${what} to be defined`);
 }

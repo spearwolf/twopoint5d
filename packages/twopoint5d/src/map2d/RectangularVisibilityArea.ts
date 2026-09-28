@@ -55,6 +55,9 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   #visibleTiles?: IMap2DVisibleTiles;
 
+  // counts the recomputations; the result carries it as `serial`
+  #serial = 0;
+
   // What the grid is asked about and what it answers. The rectangle goes in as an object: a
   // double handed to a call the compiler does not inline is boxed, one held in the field of an
   // object is not.
@@ -160,6 +163,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
 
     this.needsUpdate = false;
+    this.#serial += 1;
 
     const {width, height} = this;
 
@@ -236,6 +240,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     // the view of a tile hangs on the grid alone, so a reused tile carries the view it was handed
     // out with unless the grid changed; a first call has no grid before it to say so
     result.changed = storedTileCoords == null || tileGridChanged;
+    result.serial = this.#serial;
 
     this.#visibleTiles = result;
     return result;

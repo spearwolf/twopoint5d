@@ -1,6 +1,6 @@
 import type {Object3D} from 'three/webgpu';
 import type {TileSet} from '../../texture/TileSet.js';
-import {expectDefined} from '../../utils/expectDefined.js';
+import {undefinedValueError} from '../../utils/expectDefined.js';
 import {VOUtils} from '../../vertex-objects/VOUtils.js';
 import {noTileCapacity} from '../constants.js';
 import type {IMap2DTileCoords, IMap2DTileDataProvider, IMapTileFactory} from '../types.js';
@@ -45,8 +45,10 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
    *
    * @throws an `Error` naming the method and the field to set when the factory has no
    * `tileDataProvider`, or no `tileSet` for a coordinate whose tile id is not `0`; the `RangeError`
-   * of `TileSet#frameId()` when the provider answers a tile id that is no whole number. Nothing is
-   * taken out of the pool then
+   * of `TileSet#frameId()` when the provider answers a tile id that is no whole number. The tile set
+   * is asked only while the instanced pool has a free slot: a full pool answers
+   * {@link noTileCapacity} for every coordinate whose tile id is not `0`, a tile id that is no whole
+   * number included. Nothing is taken out of the pool then.
    */
   createTile(tileCoords: IMap2DTileCoords): TileSprite | undefined | typeof noTileCapacity {
     const {tileDataProvider} = this;
@@ -67,18 +69,26 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
           'set TileSpritesFactory#tileSet before the factory builds tiles',
       );
     }
+
+    // asked before the tile set: a full pool answers the same whatever the tile set holds, and the
+    // renderer asks again for every tile it could not place, in every cycle until a slot is free —
+    // a TileSprites without a geometry has no pool and so no slot either
+    const pool = this.#tileSpritesGeometry()?.instancedPool;
+    if (pool === undefined || pool.usedCount >= pool.capacity) return noTileCapacity;
+
     const frameId = tileSet.frameId(tileDataId);
     // frameId() answers a frame id inside the range of the tile set, and its atlas holds a frame for
     // each of them: a missing frame is a broken invariant, not a field the caller left empty
-    const texCoords = expectDefined(tileSet.atlas.get(frameId), `the atlas frame of tile ${tileDataId}`).coords;
+    const frame = tileSet.atlas.get(frameId);
+    if (frame == null) throw undefinedValueError(`the atlas frame of tile ${tileDataId}`);
+    const texCoords = frame.coords;
 
     // everything that can throw has thrown by now: the slot below comes out of the instanced
     // pool, and the `freeVO()` that would book it back is out of reach on this path — whoever
     // gives a tile back is the renderer, and it never sees one this call threw over
-    const sprite = this.createTileSprite();
+    const sprite = pool.createVO();
 
-    // a full instanced pool, or a TileSprites without a geometry and so without a pool, has no
-    // slot for this tile; the renderer asks for it again once one may have come free
+    // a disposed pool hands out no slot even below its capacity
     if (sprite == null) return noTileCapacity;
 
     const {view} = tileCoords;
@@ -118,10 +128,6 @@ export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   #tileSpritesGeometry(): TileSpritesGeometry | undefined {
     const geometry = this.tileSprites.geometry;
     return geometry instanceof TileSpritesGeometry ? geometry : undefined;
-  }
-
-  private createTileSprite(): TileSprite | undefined {
-    return this.#tileSpritesGeometry()?.instancedPool.createVO();
   }
 
   destroyTile(tile: TileSprite): void {

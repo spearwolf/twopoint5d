@@ -134,6 +134,40 @@ describe('TileSpritesFactory', () => {
       expect(pool.usedCount, 'usedCount after the pool refused').toBe(1);
     });
 
+    test('a full instanced pool answers noTileCapacity without looking the tile up in the tile set', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(1));
+      const tileSet = makeTileSet();
+      const tileDataProvider = new RepeatingTilesProvider(1);
+      const factory = new TileSpritesFactory(tileSprites, tileSet, tileDataProvider);
+      factory.createTile(new Map2DTileCoords(0, 0));
+
+      const getTileIdAt = vi.spyOn(tileDataProvider, 'getTileIdAt');
+      const frameId = vi.spyOn(tileSet, 'frameId');
+      const atlasGet = vi.spyOn(tileSet.atlas, 'get');
+
+      expect(factory.createTile(new Map2DTileCoords(1, 0)), 'the tile beyond the capacity').toBe(noTileCapacity);
+      expect(getTileIdAt, 'getTileIdAt()').toHaveBeenCalledTimes(1);
+      expect(frameId, 'TileSet#frameId()').not.toHaveBeenCalled();
+      expect(atlasGet, 'TileSet#atlas.get()').not.toHaveBeenCalled();
+    });
+
+    test('a full instanced pool answers noTileCapacity for a tile id that is no whole number, and throws the RangeError once a slot is free', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(1));
+      // column 0 holds tile id 1, column 1 tile id 1.5
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider([[1, 1.5]]));
+      const pool = tileSprites.geometry!.instancedPool;
+      const first = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
+
+      expect(factory.createTile(new Map2DTileCoords(1, 0)), 'with the pool full').toBe(noTileCapacity);
+
+      factory.destroyTile(first);
+      const error = catchError(() => factory.createTile(new Map2DTileCoords(1, 0)));
+
+      expect(error, 'with a slot free').toBeInstanceOf(RangeError);
+      expect(error).toHaveProperty('message', '[TileSet] tileId must be a whole number, got 1.5');
+      expect(pool.usedCount, 'usedCount after the throw').toBe(0);
+    });
+
     test('a coordinate without a tile answers undefined even when the pool is full', () => {
       const tileSprites = new TileSprites(new TileSpritesGeometry(1));
       const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
