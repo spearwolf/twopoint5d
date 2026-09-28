@@ -133,12 +133,15 @@ export class Map2D extends Group {
   /**
    * Takes a tile renderer off this map: its node leaves the map, and the tile streamer has it give
    * back the tiles laid out in it. The renderer comes off empty and is not disposed — it belongs
-   * to the caller, and it can be added again.
+   * to the caller, and it can be added again. When its `clearTiles()` throws, the renderer stays on
+   * the map — node, streamer and all — and the error goes on; a second call takes it off.
    */
   removeTileRenderer(renderer: IMap2DTileRenderer): void {
     if (this.#renderers.has(renderer)) {
-      this.remove(renderer.node);
+      // the streamer first: when the clearTiles() of the renderer throws, the map stays as it was,
+      // and the renderer does not go on taking tiles nobody sees
       this.#tileStreamer.removeTileRenderer(renderer);
+      this.remove(renderer.node);
       this.#renderers.delete(renderer);
     }
   }

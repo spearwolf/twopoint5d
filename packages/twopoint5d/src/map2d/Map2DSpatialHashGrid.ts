@@ -192,7 +192,15 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     return out ? this.#collect(within, out) : this.#gather(within);
   }
 
-  getTile(tileX: number, tileY: number): Set<Renderable> | undefined {
+  /**
+   * The renderables in the cell at `(tileX, tileY)`, or `undefined` when nothing lies there.
+   *
+   * The set is the one the grid keeps for the cell, handed out read-only and without a copy, so the
+   * lookup allocates nothing. Only {@link add} and {@link remove} change it, and a cell that loses
+   * its last renderable leaves the grid with its set emptied: a caller that keeps the answer past
+   * the next `add()` or `remove()` takes a copy.
+   */
+  getTile(tileX: number, tileY: number): ReadonlySet<Renderable> | undefined {
     return this.#cells.get(tileX, tileY)?.renderables;
   }
 

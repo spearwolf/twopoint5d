@@ -291,4 +291,14 @@ describe('Map2DSpatialHashGrid', () => {
       );
     });
   });
+
+  test('getTile() hands out the set of a cell read-only (a type-level check)', () => {
+    // the @ts-expect-error line carries the claim: `pnpm typecheck` fails as soon as getTile()
+    // hands out a set that can be written to; Vitest checks nothing here. The function is never called.
+    const writeIntoCell = (grid: Map2DSpatialHashGrid<IMap2DRenderableArea>, renderable: IMap2DRenderableArea) => {
+      // @ts-expect-error the grid alone writes the set of a cell
+      return grid.getTile(0, 0)?.add(renderable);
+    };
+    void writeIntoCell;
+  });
 });

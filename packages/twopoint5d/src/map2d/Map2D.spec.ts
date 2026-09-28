@@ -112,6 +112,29 @@ describe('Map2D', () => {
 
       expect([...returning.held].sort()).toEqual([...staying.held].sort());
     });
+
+    test('keeps a renderer whose clearTiles() throws on the map, and takes it off on the next call', () => {
+      const map = new Map2D();
+      const renderer = makeHoldingTileRenderer();
+      const clearTiles = renderer.clearTiles;
+      let threw = false;
+      renderer.clearTiles = function () {
+        if (!threw) {
+          threw = true;
+          throw new Error('the tile set is gone');
+        }
+        clearTiles.call(this);
+      };
+      map.addTileRenderer(renderer);
+
+      expect(() => map.removeTileRenderer(renderer)).toThrow('the tile set is gone');
+      expect(renderer.node.parent, 'node after the throw').toBe(map);
+      expect(map.tileStreamer.renderers.has(renderer), 'streamer after the throw').toBe(true);
+
+      expect(() => map.removeTileRenderer(renderer)).not.toThrow();
+      expect(renderer.node.parent, 'node after the second call').toBeNull();
+      expect(map.tileStreamer.renderers.has(renderer), 'streamer after the second call').toBe(false);
+    });
   });
 
   describe('the tile grid', () => {

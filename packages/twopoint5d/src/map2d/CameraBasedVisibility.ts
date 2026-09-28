@@ -294,7 +294,30 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    */
   lookAtCenter = false;
 
-  depth = 100;
+  #depth = 100;
+
+  /**
+   * How high the box of a tile is along the y axis of the map node's local space — the normal of the
+   * map plane: the box reaches `depth / 2` above and below the plane, and the box the view frustum is
+   * tested against `frustumBoxScale` times as far. Sprites that stand up from the map need a depth
+   * that holds them, or the tiles they stand on leave the view while the sprites are still in it. `0`
+   * tests the flat tile.
+   *
+   * Takes a finite number of at least 0 and throws a `RangeError` for anything else, keeping the
+   * value it had: a negative depth turns the box inside out, which three.js takes for an empty box
+   * and leaves where it is when it transforms it, and a depth that is not finite lets every tile
+   * through the frustum test. A new value recomputes on the next call.
+   */
+  get depth(): number {
+    return this.#depth;
+  }
+
+  set depth(value: number) {
+    if (!(Number.isFinite(value) && value >= 0)) {
+      throw new RangeError(`[CameraBasedVisibility] depth must be a finite number of at least 0, got ${describeValue(value)}`);
+    }
+    this.#depth = value;
+  }
 
   camera?: PerspectiveCamera | OrthographicCamera;
 
@@ -496,11 +519,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const objectsChanged = this.#deps.changed(values);
     const seen = this.#seenScalars;
     const scalarsChanged =
-      this.depth !== seen[SEEN_DEPTH] ||
+      this.#depth !== seen[SEEN_DEPTH] ||
       this.#frustumBoxScale !== seen[SEEN_FRUSTUM_BOX_SCALE] ||
       this.#maxVisibleTiles !== seen[SEEN_MAX_VISIBLE_TILES] ||
       this.lookAtCenter !== this.#seenLookAtCenter;
-    seen[SEEN_DEPTH] = this.depth;
+    seen[SEEN_DEPTH] = this.#depth;
     seen[SEEN_FRUSTUM_BOX_SCALE] = this.#frustumBoxScale;
     seen[SEEN_MAX_VISIBLE_TILES] = this.#maxVisibleTiles;
     this.#seenLookAtCenter = this.lookAtCenter;
@@ -1296,8 +1319,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const scale = forFrustum ? this.#frustumBoxScale : 1;
     const sw = (width * scale - width) / 2;
     const sh = (height * scale - height) / 2;
-    const ground = this.depth * -0.5 * scale;
-    const ceiling = this.depth * 0.5 * scale;
+    const ground = this.#depth * -0.5 * scale;
+    const ceiling = this.#depth * 0.5 * scale;
     const {min, max} = target;
     min.x = left - sw;
     min.y = ground;

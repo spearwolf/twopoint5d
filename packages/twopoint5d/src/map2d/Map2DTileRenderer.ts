@@ -95,10 +95,12 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     // the entry would lose the slot, which goes on drawing with nobody left to give it back
     const existing = this.#tiles.get(tileCoords.id);
     if (existing !== undefined) {
-      tileFactory.updateTile(existing, tileCoords);
       // updateTile() writes the position into the attribute buffer, and without the serial
-      // endUpdatingTiles() leaves it on the CPU side — the same bookkeeping reuseTile() does
+      // endUpdatingTiles() leaves it on the CPU side — the same bookkeeping reuseTile() does.
+      // Counted before the call: a factory that throws may have written or freed a slot already,
+      // and that upload must not get lost; a call that wrote nothing costs at most one upload
       ++this.#dataSerial;
+      tileFactory.updateTile(existing, tileCoords);
       return;
     }
 
@@ -142,8 +144,9 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
       // is already in the buffer, and the call would mark the slot for an upload for nothing
       if (!this.#tilesChanged) return;
 
-      tileFactory.updateTile(tile, tileCoords);
+      // counted before the call, see addTile()
       ++this.#dataSerial;
+      tileFactory.updateTile(tile, tileCoords);
     } else if (!this.#declined.has(tileCoords.id)) {
       this.addTile(tileCoords);
     }
@@ -162,8 +165,9 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     const tile = this.#tiles.get(tileCoords.id);
     if (tile !== undefined) {
       this.#tiles.delete(tileCoords.id);
-      tileFactory.destroyTile(tile);
+      // counted before the call, see addTile()
       ++this.#dataSerial;
+      tileFactory.destroyTile(tile);
     }
   }
 

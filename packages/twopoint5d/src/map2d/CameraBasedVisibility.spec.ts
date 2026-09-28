@@ -910,7 +910,7 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
-    test('takes the primary mark off a pooled tile that no ray of the next recomputation met', () => {
+    test('takes the primary mark off a pooled tile more than one tile away from every tile a ray of the next recomputation met', () => {
       const visibility = new CameraBasedVisibility(makeTiltedCamera());
       const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
 
@@ -934,7 +934,7 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
-    test('leaves no tile marked as primary that no ray met', () => {
+    test('leaves no tile marked as primary more than one tile away from every tile a ray met', () => {
       const visibility = new CameraBasedVisibility(makeTiltedCamera());
       const mapCoords = new Map2DTileCoordsUtil(256, 256, -128, -128);
       visibility.computeVisibleTiles([], [0, 0], mapCoords, matrixWorld);
@@ -1179,6 +1179,44 @@ describe('CameraBasedVisibility', () => {
         tile.box!.getCenter(tileCenter);
         expect(Math.abs(center.x - tileCenter.x), `${where}, x`).toBeLessThan(1e-6);
         expect(Math.abs(center.z - tileCenter.z), `${where}, z`).toBeLessThan(1e-6);
+      }
+    });
+  });
+
+  describe('depth', () => {
+    test('defaults to 100', () => {
+      expect(new CameraBasedVisibility().depth).toBe(100);
+    });
+
+    test('refuses anything but a finite number of at least 0', () => {
+      const visibility = new CameraBasedVisibility();
+      visibility.depth = 42;
+
+      for (const value of [-0.5, -1, -100, NaN, Infinity, -Infinity]) {
+        expect(() => (visibility.depth = value), `depth = ${value}`).toThrow(RangeError);
+        expect(visibility.depth, `depth after ${value}`).toBe(42);
+      }
+
+      expect(() => (visibility.depth = -1)).toThrow(
+        '[CameraBasedVisibility] depth must be a finite number of at least 0, got -1',
+      );
+
+      visibility.depth = 0;
+      expect(visibility.depth).toBe(0);
+    });
+
+    test('a depth of 0 tests the flat tile', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.depth = 0;
+
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4());
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+      for (const tile of visibility.visibles) {
+        const where = `tile ${tile.x},${tile.y}`;
+        // the difference, not the corners: `0 * -0.5` is `-0`
+        expect(tile.box!.max.y - tile.box!.min.y, `${where}, box`).toBe(0);
+        expect(tile.frustumBox!.max.y - tile.frustumBox!.min.y, `${where}, frustum box`).toBe(0);
       }
     });
   });

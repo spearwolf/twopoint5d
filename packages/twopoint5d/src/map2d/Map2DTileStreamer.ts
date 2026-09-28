@@ -126,15 +126,24 @@ export class Map2DTileStreamer {
    * in it, through {@link IMap2DTileRenderer.clearTiles}. A renderer added again — here or to
    * another streamer — therefore starts empty and gets its tiles built in the grid then in place.
    * A renderer this streamer does not hold is left alone.
+   *
+   * When `clearTiles()` throws, the renderer stays on this streamer and the error goes on unchanged:
+   * a second call gives back the tiles that remain and takes it off, and an {@link update} in between
+   * lays out the whole tile set in it again.
    */
   removeTileRenderer(renderer: IMap2DTileRenderer): void {
     // only update() takes a tile out of a renderer again: one let go with its tiles would keep
     // those that leave the view while it is away, and bring back as a reuse the tiles of a grid
     // that has changed since, with that grid's size and texture coordinates
-    if (this.renderers.delete(renderer)) {
-      this.#laidOutSerials.delete(renderer);
-      renderer.clearTiles();
-    }
+    if (!this.renderers.has(renderer)) return;
+
+    // forgotten before the clear: a renderer whose clearTiles() throws stays here, and without a
+    // laid-out serial it goes through the next update, which lays out the whole tile set in it again
+    this.#laidOutSerials.delete(renderer);
+    renderer.clearTiles();
+    // off only once clearTiles() has come back: a renderer let go with tiles it had yet to give back
+    // would keep them, and nothing but a clearTiles() of the caller would reach them again
+    this.renderers.delete(renderer);
   }
 
   /**

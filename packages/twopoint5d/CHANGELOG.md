@@ -185,6 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibility#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before, and lays the new grid out on tile objects of its own. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
 - `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which recomputes and raises `serial`, instead of waiting for the camera to move
 - `CameraBasedVisibility#frustumBoxScale` takes a finite number of at least 1 and throws a `RangeError` for anything else, keeping the value it had: below 1 the frustum boxes of neighbouring tiles leave gaps, and the search, which goes from a visible tile to its neighbours, can miss the visible tiles behind such a gap. See the Migration Guide
+- `CameraBasedVisibility#depth` takes a finite number of at least 0 and throws a `RangeError` for anything else, keeping the value it had: a negative depth turns the box of a tile inside out, which three.js takes for an empty box and leaves where it is when it transforms it, and a depth that is not finite lets every tile through the frustum test. `0` tests the flat tile. See the Migration Guide
+- `Map2DSpatialHashGrid#getTile()` answers `ReadonlySet<Renderable> | undefined`: the set the grid keeps for the cell, which only `add()` and `remove()` change — a write into it goes past the placements the grid takes a renderable out of the cells by, and past the removal of an empty cell. See the Migration Guide
 - `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
 - `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles that are not primary — all but the tiles around the points where a probe ray met the plane, the tile a point lies in and those a rectangle of one tile size around it reaches into; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
 - `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
@@ -437,7 +439,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `PanControl2D#cursorPanStyle` and the `cursorPanStyle` option: they take only a value the browser accepts for the CSS property `cursor` (`CSS.supports()`); any other value is refused with a console warning, the control keeps its cursor style, and the option falls back to `'none'`
 - fix a `Display` constructor that throws after it has built or taken over its renderer: it releases the renderer, gives a canvas handed in back as it found it and takes its own container out of the host
 - fix the release of a renderer whose WebGL init failed: it takes the `webglcontextlost` listener of three off the canvas
-- fix `Map2DTileStreamer#removeTileRenderer()`, and with it `Map2D#removeTileRenderer()`: the renderer goes off empty, through `clearTiles()`, and builds the tiles of the view anew once it is added again. A renderer taken off and added again held tiles that had left the view in the meantime and occupied pool slots with them, and it went on drawing the tiles of a grid that had changed since with their old size and texture coordinates
+- fix `Map2DTileStreamer#removeTileRenderer()`, and with it `Map2D#removeTileRenderer()`: the renderer goes off empty, through `clearTiles()`, and builds the tiles of the view anew once it is added again. A renderer taken off and added again held tiles that had left the view in the meantime and occupied pool slots with them, and it went on drawing the tiles of a grid that had changed since with their old size and texture coordinates. When `clearTiles()` throws, the renderer stays on the streamer and on the map, and the error goes on: a second call gives back the tiles that remain and takes it off, and an `update()` in between lays out the whole tile set in it again
 - fix `Map2DTileRenderer#removeTile()` and `#reuseTile()` for a tile factory whose tiles can be falsy, such as the numeric handle `0`: `removeTile()` gives the tile back through `destroyTile()` instead of losing its slot, and `reuseTile()` keeps to the `tilesChanged` rule
 - fix `CameraBasedVisibility#frustumBoxScale`: it scales the box a tile is tested with by the value in tile width and tile height as it already did in `depth` — each side moves out by `(scale - 1) / 2` of the tile size. A side used to move out by `(scale - 1)` of it, so the default 1.1 tested a box 1.2 times the tile; the tiles at the edge of the view are dropped a little earlier
 - fix `Map2DSpatialHashGrid`: a renderable of width or height 0 on a cell border lies in the cell of its upper left corner, where `findWithin()` finds it; `remove()` takes a renderable out of every cell `add()` put it into, also after its `aabb` changed; `add()` of a renderable the grid holds moves it to the cells of its current `aabb`; `findWithin()` with an `aabb` of width or height 0 looks into the cell its corner lies in
@@ -462,7 +464,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `CameraBasedVisibility#computeVisibleTiles()` for a camera under a parent: it brings the world matrix of the camera up to date together with those of its parents, the way `Map2DTileStreamer` brings the map node up to date. A camera on a rig that is moved in the frame before the render sees the tiles of that frame, not those of the frame before
 - fix `CameraBasedVisibility` on a grid of tiles smaller than 1, and on a grid whose tile edges come out a rounding step off its offset in floating point — `new Map2DTileCoordsUtil(16, 16, 0.1, 0.3)` for one: `coords` of every visible tile is its own tile, one column and one row of `tileWidth` × `tileHeight`, and its `box`, `frustumBox`, `centerWorld` and the `view` of its `map2dTile` follow from it
 - fix `Map2DTileStreamer#update()` when an update cycle throws — in a renderer or in its factory, `endUpdatingTiles()` included: the tiles are cleared as by `clearTiles()`, and the next `update()` empties every renderer and lays out the whole set again. No later result of the visibilitor carries the removes the broken cycle had yet to go through, nor the whole result for the renderers after the one that threw, so those renderers kept tiles that had left the view. The error goes on unchanged
-- fix `Map2DTileRenderer` when the `update()` of its factory throws: the next `endUpdatingTiles()` asks for it again, and `hasPendingTiles` answers `true` up to then. `clearTiles()`, and with it `dispose()`, hands every tile to `destroyTile()` once, also when a `destroyTile()` throws and the call is repeated; the upload of the slots given back before the throw is not lost
+- fix `Map2DTileRenderer` when the `update()` of its factory throws: the next `endUpdatingTiles()` asks for it again, and `hasPendingTiles` answers `true` up to then. `clearTiles()`, and with it `dispose()`, hands every tile to `destroyTile()` once, also when a `destroyTile()` throws and the call is repeated; the upload of the slots given back before the throw is not lost. `removeTile()` counts the slot a `destroyTile()` gave back before it threw, and `addTile()` and `reuseTile()` what an `updateTile()` wrote before it threw, so the next `endUpdatingTiles()` uploads it
 - fix `Map2DSpatialHashGrid` with an `aabb` that is not finite: `add()` and `findWithin()` throw a `RangeError` for an `aabb` whose left, top, width or height is not a finite number, and `getTiles()` for a `width` or `height` that is not one. An infinite extent ran the loop over the cells without end, and `NaN` put a renderable into no cell at all. `add()` checks every renderable before it moves the first, so one that throws leaves the grid as it was. See the Migration Guide
 
 ### Migration Guide
@@ -1834,7 +1836,8 @@ const ownSprites = new AnimatedSprites(1000, {transparent: true, time: 0});
 The options of `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial`, and
 the material argument of `TexturedSprites`, no longer compile with another three.js `Material`, and
 the options of the three materials no longer compile with a `Texture`. A material handed in as
-options never had an effect and goes away. A texture handed to one of the three materials goes into
+options was read as the options themselves — its `name`, `transparent`, `blending` and the like —
+and never as a material: hand in the options you mean, or leave the argument out. A texture handed to one of the three materials goes into
 the options as `colorMap`; `TexturedSprites` still takes a `Texture` itself.
 
 **Before**
@@ -1877,8 +1880,22 @@ grid.add(renderable); // aabb.width is NaN: the renderable lies in no cell and i
 if (Number.isFinite(renderable.aabb.width) && Number.isFinite(renderable.aabb.height)) {
   grid.add(renderable);
 }
+```
 
-grid.add(renderable); // → RangeError: [Map2DSpatialHashGrid] the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10
+#### `Map2DSpatialHashGrid#getTile()` hands out a read-only set
+
+`getTile()` answers `ReadonlySet<Renderable> | undefined`: the set the grid keeps for the cell, without a copy. Reading is unchanged — `has()`, `size` and iteration answer as before. What no longer compiles is a write, and handing the answer to a signature that asks for a `Set`. Writing into the set went past the placements the grid takes a renderable out of its cells by, and past the removal of an empty cell. Only `add()` and `remove()` change a cell; whoever keeps the answer past the next `add()` or `remove()`, or wants to write into it, takes a copy.
+
+**Before**
+
+```ts
+grid.getTile(0, 0)?.delete(renderable);
+```
+
+**After**
+
+```ts
+grid.remove(renderable);
 ```
 
 #### `TexturedSpritesGeometry` keeps the pools it was built with
@@ -3117,6 +3134,24 @@ visibility.frustumBoxScale = 0.9;
 
 ```ts
 visibility.frustumBoxScale = 1; // the tile itself, the least it takes
+```
+
+#### `CameraBasedVisibility#depth` takes nothing below 0
+
+`depth` takes a finite number of at least 0 and throws a `RangeError` for anything else, keeping the value it had. A negative depth turns the box of a tile inside out, which three.js takes for an empty box and leaves where it is when it transforms it, so the frustum test checks the box in tile space. A depth that is not finite lets every tile through the frustum test, and the search runs up to `maxVisibleTiles`. `0` stays valid: it tests the flat tile.
+
+`depth` is an accessor: a subclass sets the value in its constructor rather than declaring the property, which TypeScript refuses with TS2610.
+
+**Before**
+
+```ts
+visibility.depth = -100;
+```
+
+**After**
+
+```ts
+visibility.depth = 100; // 50 below the map plane and 50 above it
 ```
 
 ## [0.21.2] - 2026-06-19

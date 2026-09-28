@@ -390,6 +390,77 @@ describe('Map2DTileRenderer', () => {
     });
   });
 
+  describe('a factory that throws after it wrote', () => {
+    interface ThrowingFactory extends IMapTileFactory<FakeTile> {
+      /** The next `updateTile()` or `destroyTile()` writes, then throws. */
+      arm(): void;
+    }
+
+    /** A factory whose `method` throws once, after the renderer has handed it a tile. */
+    function makeThrowingFactory(method: 'updateTile' | 'destroyTile'): ThrowingFactory {
+      let armed = false;
+      const throwOnce = () => {
+        if (armed) {
+          armed = false;
+          throw new Error('the factory gave up');
+        }
+      };
+      return {
+        ...makeTileFactory(),
+        [method]: throwOnce,
+        arm() {
+          armed = true;
+        },
+      };
+    }
+
+    function holdATile(tileFactory: ThrowingFactory) {
+      const renderer = new Map2DTileRenderer(tileFactory);
+      const tileCoords = new Map2DTileCoords(0, 0);
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(tileCoords);
+      renderer.endUpdatingTiles();
+      tileFactory.arm();
+      return {renderer, tileCoords};
+    }
+
+    test('removeTile() uploads the slot a destroyTile() that threw gave back', () => {
+      const tileFactory = makeThrowingFactory('destroyTile');
+      const {renderer, tileCoords} = holdATile(tileFactory);
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      expect(() => renderer.removeTile(tileCoords)).toThrow('the factory gave up');
+      renderer.endUpdatingTiles();
+
+      expect(update.callCount, 'factory.update()').toBe(1);
+    });
+
+    test('addTile() on a coordinate it holds uploads what an updateTile() that threw wrote', () => {
+      const tileFactory = makeThrowingFactory('updateTile');
+      const {renderer, tileCoords} = holdATile(tileFactory);
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      expect(() => renderer.addTile(tileCoords)).toThrow('the factory gave up');
+      renderer.endUpdatingTiles();
+
+      expect(update.callCount, 'factory.update()').toBe(1);
+    });
+
+    test('reuseTile() uploads what an updateTile() that threw wrote', () => {
+      const tileFactory = makeThrowingFactory('updateTile');
+      const {renderer, tileCoords} = holdATile(tileFactory);
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      expect(() => renderer.reuseTile(tileCoords)).toThrow('the factory gave up');
+      renderer.endUpdatingTiles();
+
+      expect(update.callCount, 'factory.update()').toBe(1);
+    });
+  });
+
   describe('endUpdatingTiles()', () => {
     test('asks the factory to update again in the next cycle after its update() threw', () => {
       let fail = true;

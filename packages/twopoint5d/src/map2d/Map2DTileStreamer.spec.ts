@@ -221,6 +221,50 @@ describe('Map2DTileStreamer', () => {
 
       expect(renderer.cleared).toBe(0);
     });
+
+    test('keeps a renderer whose clearTiles() throws, and takes it off on the next call', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeRecordingRenderer();
+      const clearTiles = renderer.clearTiles;
+      let threw = false;
+      renderer.clearTiles = function () {
+        if (!threw) {
+          threw = true;
+          this.held.delete('0,0');
+          throw new Error('the tile set is gone');
+        }
+        clearTiles.call(this);
+      };
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
+      streamer.update(new Object3D());
+
+      expect(() => streamer.removeTileRenderer(renderer)).toThrow('the tile set is gone');
+      expect(streamer.renderers.has(renderer), 'held after the throw').toBe(true);
+
+      expect(() => streamer.removeTileRenderer(renderer)).not.toThrow();
+      expect(renderer.held.size, 'tiles the renderer holds').toBe(0);
+      expect(streamer.renderers.has(renderer), 'held after the second call').toBe(false);
+    });
+
+    test('a renderer whose clearTiles() threw gets the whole tile set in the next update', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const renderer = makeReportingRenderer(false);
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeNamingVisibilitor([tileA, tileB]);
+      const node = new Object3D();
+      streamer.update(node);
+
+      renderer.clearTiles = function () {
+        this.held.clear();
+        throw new Error('the tile set is gone');
+      };
+
+      expect(() => streamer.removeTileRenderer(renderer)).toThrow('the tile set is gone');
+      streamer.update(node);
+
+      expect([...renderer.held].sort()).toEqual(['0,0', '1,0']);
+    });
   });
 
   describe('update()', () => {
