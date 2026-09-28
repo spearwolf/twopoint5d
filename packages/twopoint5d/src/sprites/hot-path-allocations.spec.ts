@@ -1,5 +1,5 @@
 import {Color} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
@@ -34,15 +34,19 @@ describe('sprites on the hot path', () => {
     const sprites = new TexturedSprites(1000);
     const all = Array.from({length: 1000}, () => sprites.createSprite()!);
 
-    // position and color are fractional: V8 boxes a fractional value that crosses a call it does
-    // not inline as an argument of its own, and in a loop this full some calls stay un-inlined —
-    // the methods of the sprite have to hand their values on without that. The rotation stays
-    // integral: a fractional value the loop itself writes through an accessor V8 does not inline
-    // is boxed by the loop, not by the library
+    // the loop hands the setters whole numbers from its counter, constants and objects, and no
+    // fractional value it works out itself: V8 boxes such a value at each call it leaves
+    // un-inlined, and which calls it inlines shifts with its inlining budget, which the counters
+    // of block coverage use up sooner — the loop would measure a heap number of its own per
+    // sprite. The fractional values here come from the constants, from `tint` and from the
+    // frames, and the setters read the last two themselves: a setter that hands one of them on
+    // as an argument of its own allocates in this round wherever V8 leaves that call un-inlined.
+    // That the setters hand the values of their caller on in one array is checked by the two
+    // tests after the allocation tests of the setters
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
-        sprite.setPosition(i * 0.5 + 0.25, 1.5, 2.5);
+        sprite.setPosition(i, 1.5, 2.5);
         sprite.rotation = i;
         sprite.setFrame(i & 1 ? frame : trimmedFrame);
         sprite.setColor(tint, 0.5);
@@ -62,7 +66,7 @@ describe('sprites on the hot path', () => {
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
-        sprite.setPosition(i * 0.5 + 0.25, 1.5);
+        sprite.setPosition(i, 1.5);
         sprite.setColor(tint);
       }
     });
@@ -99,7 +103,7 @@ describe('sprites on the hot path', () => {
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;
-        sprite.setPosition(i * 0.5 + 0.25, 1.5, 2.5);
+        sprite.setPosition(i, 1.5, 2.5);
         sprite.rotation = i;
         sprite.animOffset = i;
       }
@@ -118,12 +122,61 @@ describe('sprites on the hot path', () => {
 
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
-        all[i]!.setPosition(i * 0.5 + 0.25, 1.5);
+        all[i]!.setPosition(i, 1.5);
       }
     });
     const bytesPerCall = bytesPerRound / all.length;
 
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    geometry.dispose();
+  });
+
+  // a value its caller works out reaches a setter unboxed where V8 inlines the setter into the
+  // caller, and it stays unboxed only while the setter does not hand it on as an argument of its
+  // own to a call V8 leaves un-inlined — which the rounds above cannot show for such a value (see
+  // the first of them). So these check what the setters hand on: one array, which the generated
+  // setter copies into the buffer. The setters write the same array again on the next call, so
+  // every call is checked before the next one
+  test('a textured sprite hands the values of setSize(), setPosition() and setColor() on in one array', () => {
+    const sprites = new TexturedSprites(1);
+    const sprite = sprites.createSprite()!;
+    const setQuadSize = vi.spyOn(sprite, 'setQuadSize');
+    const setInstancePosition = vi.spyOn(sprite, 'setInstancePosition');
+    const setColorValues = vi.spyOn(sprite, 'setColorValues');
+
+    sprite.setSize(0.25, 0.75);
+    expect(setQuadSize.mock.calls).toEqual([[[0.25, 0.75]]]);
+
+    sprite.setPosition(0.25, 1.5, 2.5);
+    expect(setInstancePosition.mock.calls).toEqual([[[0.25, 1.5, 2.5]]]);
+    setInstancePosition.mockClear();
+    sprite.setPosition(0.75, 1.25);
+    expect(setInstancePosition.mock.calls).toEqual([[[0.75, 1.25]]]);
+
+    sprite.setColor(new Color(0.5, 0.25, 0.125), 0.5);
+    expect(setColorValues.mock.calls).toEqual([[[0.5, 0.25, 0.125, 0.5]]]);
+    setColorValues.mockClear();
+    sprite.setColor(new Color(0.75, 0.5, 0.25));
+    expect(setColorValues.mock.calls).toEqual([[[0.75, 0.5, 0.25]]]);
+
+    sprites.dispose();
+  });
+
+  test('an animated sprite hands the values of setSize() and setPosition() on in one array', () => {
+    const geometry = new AnimatedSpritesGeometry(1);
+    const sprite = geometry.instancedPool.createVO()!;
+    const setQuadSize = vi.spyOn(sprite, 'setQuadSize');
+    const setInstancePosition = vi.spyOn(sprite, 'setInstancePosition');
+
+    sprite.setSize(0.25, 0.75);
+    expect(setQuadSize.mock.calls).toEqual([[[0.25, 0.75]]]);
+
+    sprite.setPosition(0.25, 1.5, 2.5);
+    expect(setInstancePosition.mock.calls).toEqual([[[0.25, 1.5, 2.5]]]);
+    setInstancePosition.mockClear();
+    sprite.setPosition(0.75, 1.25);
+    expect(setInstancePosition.mock.calls).toEqual([[[0.75, 1.25]]]);
 
     geometry.dispose();
   });

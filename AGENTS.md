@@ -105,6 +105,12 @@ explicit instruction.
   that the two sizes take turns within one sequence of measurements and a cost that is still
   settling falls on both alike; `measurePerTile()` in
   `src/map2d/hot-path-allocations.tilted-view.spec.ts` shows the sequence.
+  A round hands the calls it measures whole numbers, constants and objects, never a
+  fractional value it works out itself: V8 boxes such a value at each call it leaves
+  un-inlined, and which calls it inlines shifts with the inlining budget, which block
+  coverage uses up sooner — the round would measure heap numbers of its own. Whether a
+  method hands the values of its caller on without boxing them is checked by what it calls,
+  as `src/sprites/hot-path-allocations.spec.ts` does for the sprite setters.
   The Vitest config starts its workers with `--expose-gc` for it, and `src/testing/`
   never reaches `dist/`.
   The browser tests share their fixtures through
