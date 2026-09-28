@@ -180,6 +180,64 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
     expect(rgb, 'the blue of the frame of the second animation').to.satisfy((c) => isNearColor(c, [0, 0, 255]));
   });
 
+  it('an animsMap swapped for a bake of another size draws the frame the new one points at', async function () {
+    const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
+    const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+    camera.position.z = 10;
+
+    const texels = [RED, GREEN, BLUE];
+    const colorMap = makeColorTexture(texels);
+    const frames = new TextureCoords(0, 0, texels.length, 1);
+    const frameOf = (i) => new TextureCoords(frames, i, 0, 1, 1);
+
+    // animation 0 of the first bake shows red; animation 0 of the second shows green, and a second
+    // animation of six frames makes that bake wider
+    const redAnims = new FrameBasedAnimations();
+    redAnims.add('red', 1, [frameOf(0)]);
+    const redBake = redAnims.bakeDataTexture();
+
+    const greenAnims = new FrameBasedAnimations();
+    greenAnims.add('green', 1, [frameOf(1)]);
+    greenAnims.add('padding', 1, [0, 1, 2, 0, 1, 2].map(frameOf));
+    const greenBake = greenAnims.bakeDataTexture();
+
+    const geometry = new AnimatedSpritesGeometry(1);
+    const material = new AnimatedSpritesMaterial({colorMap, animsMap: redBake});
+    const sprites = new AnimatedSprites(geometry, material);
+
+    const sprite = sprites.createSprite();
+    sprite.setSize(4, 4);
+    sprite.setPosition(0, 0, 0);
+
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const before = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
+
+    const {texCoordsNode, colorNode, version} = material;
+    material.animsMap = greenBake;
+    sprites.update();
+
+    const after = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
+
+    // the swap reached the gpu through the texture nodes and the size uniform alone
+    const rebuilt = material.texCoordsNode !== texCoordsNode || material.colorNode !== colorNode || material.version !== version;
+    const widths = [redBake.image.width, greenBake.image.width];
+
+    sprites.dispose();
+    geometry.dispose();
+    material.dispose();
+    colorMap.dispose();
+    redBake.dispose();
+    greenBake.dispose();
+
+    expect(widths[1], 'the width of the second bake').to.not.equal(widths[0]);
+    expect(before, 'the red of the first bake').to.satisfy((c) => isNearColor(c, [255, 0, 0]));
+    expect(rebuilt, 'the lookups were built anew').to.equal(false);
+    expect(after, 'the green of the second bake').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
+  });
+
   // bakeDataTexture() builds one row, so only an animsMap built by hand reaches a texel in a second row
   it('reads a frame out of the second row of an animsMap it is handed', async function () {
     const width = 4;

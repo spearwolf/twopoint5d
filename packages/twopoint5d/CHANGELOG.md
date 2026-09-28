@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the generated `get…()` method of an attribute takes an optional target — a typed array or a plain array — writes the attribute's values into it and answers the target, without allocating anything; without a target it answers a new typed array as before. A target shorter than the attribute throws a `RangeError` and is left unchanged. `VOAttrGetter` carries both call signatures
 - add `CameraBasedVisibility#pointsOnPlane`: the points where the probe rays of the view frustum met the map plane, in probe order. It is empty for a recomputation in which the camera looked past the plane, and its first entry is the point `pointOnPlane` carries. The `Vector3`s belong to the visibility and are written again on the next recomputation. `CameraBasedVisibilityHelpers` marks each of them, the first one as before and the further ones smaller and in blue
 - add the `VOBufferPool#isAttachedToGeometry` getter: it is `true` while at least one geometry has built `THREE.BufferAttribute`s on top of the pool's buffers, and answers up front whether a `resize()` will go through. It is `false` on a disposed pool, which has no buffers left for a geometry to read, whether or not one still holds it — the bookkeeping underneath is left as it is, so a geometry that gives the pool up afterwards still counts down correctly
-- add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture and rebuilds the animation lookup from its current image
+- add `AnimatedSpritesMaterial#touchAnimsMap()`: re-reads the `animsMap` texture. It builds the animation lookup anew once the texture has got its first image, or has changed its kind; an image the texture already had replaced by one of another size goes into the measures the lookup reads, and nothing is built
 - export the `AnimatedSpritesMaterialParameters` interface: a consumer can name the option type of the `AnimatedSpritesMaterial` constructor, as with every sibling material
 - add the `TAttributeNodeVertexPosition` type, `Node<'vec3'>`, for the vertex position of the unit quad a sprite is drawn from: `TexturedSpritesMaterial#vertexPositionNode`, and with it that of `AnimatedSpritesMaterial`, is typed by it, beside `TAttributeNodeInstancePosition` for the position of the sprite
 - export 28 types that stood in public signatures without being nameable from outside — a consumer can now write the type of a value the library hands out, instead of inferring it. Among them `InputControlBase`, `FrameLoop`, `DisplayEventListener`, `TileBox`, `Quadrant`, `IChunkQuadTreeChildNodes`, `StringDataIdsChunk2DParams`, `Uint32DataIdsChunk2DParams`, `StageItem`, `AnimName`, `TextureAtlasArgs`, `TextureAtlasFrameName`, `NamedTextureAtlasArgs`, `TextureResourceSubTypeMap`, `MapTuple`, `MapSubTypes` and `TouchInstancedBuffersType`. The loader callback types keep their meaning under clearer names: `PowerOf2ImageLoadCallback`, `TextureAtlasLoadCallback`, `TextureImageLoadCallback`, `TileSetLoadCallback` and their `…ErrorCallback` siblings
@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `TextureStore#loadAsync()`, the static `TextureStore.loadAsync()` and `TextureStoreLoadOptions` with its `signal`. The instance method resolves with the store once the catalog has parsed. It rejects on a fetch that fails, a response that answers with a status, a body that is no JSON and a `parse()` that throws — each of them goes out as an `error` event as well —, with an `AbortError` once `signal` aborts, and with the error of a disposed store once `dispose()` cuts it short; an item that builds no resource and a texture class name no `TextureFactory` knows stay `error` events, and the promise resolves. Once the parse has begun the load is done: a listener inside `parse()` that aborts `signal` or disposes the store leaves the promise resolving with the store. An `error` listener that throws while it hears one of the failures above does not change how the promise settles: every listener hears the event, and eventize reports the throw on the console. On a disposed store it rejects right away and fetches nothing. The static method builds a store for the attempt, counts every error the attempt reports as a failure — nobody can listen to that store before the method returns it —, names the url, the item or, for a texture class in `defaultTextureClasses`, the url of the catalog in its rejection, and disposes the store before it rejects
 - add `TextureStore#getAsync()`: it answers as `get()` does, and its messages name `getAsync()`
 - add `TextureOptions#anisotropy`, counted as three.js counts it — 1 is none, and a value below 1 counts as 1 —, and the texture classes `anisotropy`, `anisotropy-2`, `anisotropy-4` and `no-anisotropy`. `TextureFactory#getOptions()` answers the anisotropy under both keys, `anisotropy` counted from 1 and `anisotrophy` from 0
+- add the construction and the ownership of `TexturedSprites` to `AnimatedSprites`: it takes a capacity, `AnimatedSpritesGeometryParameters` or an `AnimatedSpritesGeometry`, and `AnimatedSpritesMaterialParameters` or an `AnimatedSpritesMaterial`, and builds what it is not handed. `AnimatedSprites#createSprite()`, `#freeSprite()` and `#spritePool` take a sprite from its pool, give one back and name the pool; after `dispose()` the first and the last answer `undefined` and `freeSprite()` does nothing
+- add `AnimatedSpritesGeometryParameters` with `capacity` and `attributeUsage`: the attributes of an `AnimatedSpritesGeometry` that take another usage type, by their names or by `size` for `quadSize` and `position` for `instancePosition`. Animated sprites that stand where they are take `{static: ['position']}` and upload a sprite through `VertexObjectPool#touchVO()` when it moves. A geometry without `attributeUsage` shares its descriptor and the prototype of its sprites with every such geometry
+- add the types `AnimatedSpritesPool`, `AnimatedSpritesBasePool` and `AnimatedSpritesMakeBaseSpriteArgs`, and `AnimatedSpritesGeometry#isAnimatedSpritesGeometry`
+- add `prepareSpriteFrame()`, `PreparedSpriteFrame` and `TexturedSprite#setPreparedFrame()`: `prepareSpriteFrame()` works out once what `setFrame()` writes for a frame — tex coords, diagonal flip and trim margins —, and `setPreparedFrame()` copies those nine numbers into a sprite. The prepared frame is a snapshot; a frame whose `coords` or `data` change afterwards is prepared again
 
 ### Changed
 
@@ -128,7 +132,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change the return type of `getDescriptorOf()` to `VertexObjectDescriptor | undefined`: a vertex object without a buffer has no descriptor to answer with
 - `VertexObjects<GeoType extends BufferGeometry = BufferGeometry>` is generic over the geometry it holds: `geometry` is typed `GeoType | undefined` and `material` `Material | Material[] | undefined`. Built without a geometry, the mesh holds the plain `BufferGeometry` `THREE.Mesh` puts in its place and is `VertexObjects<BufferGeometry>`; `undefined` only after a caller writes it or `AnimatedSprites#dispose()`/`TexturedSprites#dispose()` gives it up
 - `TileSprites<GeoType extends TileSpritesGeometry | BufferGeometry = BufferGeometry>` is generic the same way: built with a `TileSpritesGeometry`, `geometry` is typed as exactly that; built without one, `BufferGeometry`. The constructor takes any `BufferGeometry`; with one that is not a `TileSpritesGeometry`, `TileSpritesFactory#createTile()` answers `noTileCapacity`. `material` is typed `TileSpritesMaterial | MeshBasicMaterial | undefined`
-- `AnimatedSprites<GeoType extends AnimatedSpritesGeometry | BufferGeometry = BufferGeometry>` is generic the same way: built with an `AnimatedSpritesGeometry`, `geometry` is typed as exactly that; built without one, `BufferGeometry`. `material` is typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined` — built without a material, the mesh holds the `MeshBasicMaterial` `THREE.Mesh` puts in its place — and the constructor takes an `AnimatedSpritesMaterial` as its material
 - `AnimatedSpritesGeometry#basePool` is typed `VertexObjectPool<BaseSprite>`, without `undefined`, as `TexturedSpritesGeometry#basePool` is: both geometries build their base pool in the constructor. `TexturedSpritesGeometry#basePool` and `#instancedPool` are read-only, as `InstancedVertexObjectGeometry` declares them
 - `TileSpritesGeometry#basePool` and `#instancedPool` are read-only, as `InstancedVertexObjectGeometry` declares them; `basePool` stays typed `VertexObjectPool<TileBaseSprite>`, without `undefined`, since the geometry builds its base pool in the constructor
 - `VertexObjects` extends `THREE.Mesh<any, any>`: neither type parameter of `THREE.Mesh` can carry the `undefined` that the `geometry` and `material` declarations of this class need. Both slots are re-declared in the class itself, and those declarations are the types it shows
@@ -149,7 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - upgrade the `three` peer dependency to `~0.185.1` (was `~0.183.1`) and `@types/three` to `~0.185.4`. Under the new types `vec3()` no longer accepts an `AttributeNode<unknown>` in any overload: a bare `attribute('name')` passed into a TSL constructor needs its type argument, as in `attribute<'vec2'>('quadSize')`
 - `DisplayRendererParameters` names the 17 options it carries instead of being the empty type `{}`. An object literal handed to the `Display` constructor is now checked against them; an unknown key is an error where it used to pass unnoticed
 - `TexturedSprites#dispose()` releases exactly the geometry and the material the mesh built for itself, and leaves a `TexturedSpritesGeometry`, a `TexturedSpritesMaterial` or a `Texture` handed to the constructor untouched — those belong to the caller. The mesh also takes itself out of the scene graph before it gives both slots up. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
-- `AnimatedSprites#dispose()` releases neither the geometry nor the material: this mesh builds neither of them, both are handed to its constructor and stay the caller's. It takes itself out of the scene graph and gives both slots up
+- `AnimatedSprites#dispose()` releases exactly the geometry and the material the mesh built for itself, and leaves an `AnimatedSpritesGeometry` or an `AnimatedSpritesMaterial` handed to the constructor untouched — those belong to the caller. The mesh also takes itself out of the scene graph before it gives both slots up. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `AnimatedSpritesMaterial#dispose()` leaves the `animsMap` texture alone — it is handed in through the constructor options or the setter and belongs to the caller. `animsMap` answers `undefined` afterwards
 - `TexturedSpritesMaterial#dispose()` gives up its `colorMap` and its `texCoordsNode`, so both answer `undefined` afterwards; the `colorMap` texture itself is not released, it belongs to the caller. The node accessors typed as always present keep their last node
 - a `Display` states what it is after `dispose()`: `renderer` answers `undefined` and `isDisposed` answers `true`; `canvas` and `getEventProps()` throw an error that names the class and the state, and `start()` rejects with one; `resize()`, `renderFrame()`, `stop()`, a write to `pause` and a further `dispose()` do nothing, and the `pause` getter answers `true`; `width`, `height`, `frameNo`, `now` and `deltaTime` keep their last value, `isRunning` is `false`, and `isWebGPUBackend` and `isWebGLBackend` throw because the renderer they ask about is gone. No further event is emitted, and a listener attached afterwards is never called. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
@@ -248,6 +251,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a bake of `FrameBasedAnimations#bakeDataTexture()` with a trimmed frame gives every frame three texels, the third `[left, top, right, bottom]` — the trim margins, four zeros for an untrimmed frame of the same bake —, and its headers name 3 texels per frame. A bake without a trimmed frame keeps its layout. See the Migration Guide
 - the instance buffers of `TexturedSprites` carry four values more, `texTrim`, and the `attributeUsage` a `TexturedSpritesGeometry` names for `texCoords` reaches them as it reaches `texFlipDiagonal`. See the Migration Guide
 - `VertexObjectDescriptor` refuses, when it is built, an attribute layout without a WebGPU vertex format — type `float64` or `uint8clamped`, `normalized` on any type but `int8`, `uint8`, `int16` and `uint16` or on an attribute of one value, `float16` of one value, more than four values per vertex — and a buffer whose attributes disagree on `type`, `normalized` or `usage`; the error names the attribute and its buffer. Such a layout built a pool before and failed only once three built the render pipeline. See the Migration Guide
+- `TexturedSprite#setPosition(x, y)` and `AnimatedSprite#setPosition(x, y)` leave `z` as it is, and `TexturedSprite#setColor(color)` leaves the alpha as it is: a value that is not handed in is not written. A sprite out of `createSprite()` starts at `z = 0` with an alpha of 1. See the Migration Guide
+- the tuple overloads of `setInstancePosition()` of `TexturedSprite` and `AnimatedSprite` take `[x, y]` as well, and that of `TexturedSprite#setColorValues()` takes `[r, g, b]`; the value left out stays as it is
+- the material argument of the `AnimatedSprites` constructor is an `AnimatedSpritesMaterial` or `AnimatedSpritesMaterialParameters`, no other three.js material and no `Texture`; `material` stays typed `AnimatedSpritesMaterial | undefined`. See the Migration Guide
+- perf a `colorMap` of the same kind as the one set takes its place in `TexturedSpritesMaterial`, `AnimatedSpritesMaterial` and `TileSpritesMaterial`, and through `TexturedSprites#texture`, without a rebuild of the color graph and without `needsUpdate`: the texture node gets it as its value. Of the same kind means alike in `colorSpace`, `type` and `format`, in the way three binds the texture — a cube, array, 3d, depth, storage, video or compressed texture each binds in a way of its own, a `DataTexture` as a `Texture` —, in whether both filters are `NearestFilter`, in whether a filter blends texels, and in `compareFunction` and the samples of its render target. An `animsMap` of the same kind with an image takes its place in `AnimatedSpritesMaterial` the same way, its measures going into a uniform. A texture of another kind, and a change between no texture and one, builds the graph anew; three takes program and pipeline out of its caches for a source it has built before and compiles one it has not
+- the setters of `TexturedSprite` and `AnimatedSprite` that write a static attribute — `setSize()`, `setFrame()`, `setPreparedFrame()`, `setColor()`, `animId` and `animOffset` — name in their TSDoc how a later change reaches the gpu: `spritePool.touchVO(sprite, name)` for one sprite, `geometry.touch(name)` for all, or a geometry whose `attributeUsage` makes the attribute dynamic. The TSDoc of `VertexObjects#update()` says what it uploads
 
 ### Deprecated
 
@@ -1333,7 +1341,9 @@ animsMap.dispose();
 ```
 
 A mesh that builds its own geometry and material still releases them, so
-`new TexturedSprites(1000).dispose()` needs no change.
+`new TexturedSprites(1000).dispose()` needs no change, and
+`new AnimatedSprites(1000, {animsMap}).dispose()` releases the geometry and the material it built
+itself — the `animsMap` stays the caller's.
 
 #### The `three` peer dependency range
 
@@ -1739,13 +1749,11 @@ if (sprites.material != null) {
 
 #### A mesh built without a geometry is typed with the `BufferGeometry` it holds
 
-`VertexObjects<GeoType>`, `TileSprites<GeoType>` and `AnimatedSprites<GeoType>` take their
-geometry type from the constructor argument. Built without one, `geometry` is typed
-`BufferGeometry | undefined`, not `VOBufferGeometry`/`TileSpritesGeometry`/`AnimatedSpritesGeometry`
-— reading a member of the more specific geometry needs an `instanceof` check, or the mesh built
-with its geometry in the first place. The same holds for `tileSprites.material`, typed
-`TileSpritesMaterial | MeshBasicMaterial | undefined`, and for `animatedSprites.material`, typed
-`AnimatedSpritesMaterial | MeshBasicMaterial | undefined`.
+`VertexObjects<GeoType>` and `TileSprites<GeoType>` take their geometry type from the constructor
+argument. Built without one, `geometry` is typed `BufferGeometry | undefined`, not
+`VOBufferGeometry`/`TileSpritesGeometry` — reading a member of the more specific geometry needs an
+`instanceof` check, or the mesh built with its geometry in the first place. The same holds for
+`tileSprites.material`, typed `TileSpritesMaterial | MeshBasicMaterial | undefined`.
 
 **Before**
 
@@ -1772,30 +1780,33 @@ const namedTileSprites = new TileSprites(new TileSpritesGeometry());
 namedTileSprites.geometry!.instancedPool.createVO();
 ```
 
-#### `AnimatedSprites` takes an `AnimatedSpritesMaterial`, and its `material` may be a `MeshBasicMaterial`
+#### `AnimatedSprites` takes an `AnimatedSpritesMaterial` or its parameters
 
-The constructor of `AnimatedSprites` takes an `AnimatedSpritesMaterial` as its material. A mesh
-built without one holds the `MeshBasicMaterial` `THREE.Mesh` puts in its place, so
-`sprites.material` is typed `AnimatedSpritesMaterial | MeshBasicMaterial | undefined`: a member
-of `AnimatedSpritesMaterial` read through it needs an `instanceof` check — or the reference to
-the material you built.
+The material argument of the `AnimatedSprites` constructor is an `AnimatedSpritesMaterial` or
+`AnimatedSpritesMaterialParameters`, from which the mesh builds its own material; another three.js
+`Material` no longer compiles, and neither does a `Texture` — the mesh draws out of two textures, so
+the `colorMap` and the `animsMap` go into the parameters by name. `sprites.material` is typed
+`AnimatedSpritesMaterial | undefined`.
 
 **Before**
 
 ```ts
-const sprites = new AnimatedSprites(geometry, material);
-sprites.material!.time = now;
+const sprites = new AnimatedSprites(geometry, new MeshBasicMaterial());
 ```
 
 **After**
 
-```ts
-const sprites = new AnimatedSprites(geometry, material);
-material.time = now; // the reference you built the mesh with keeps its type
+```ts check
+import {AnimatedSprites, AnimatedSpritesGeometry, AnimatedSpritesMaterial} from '@spearwolf/twopoint5d';
 
-if (sprites.material instanceof AnimatedSpritesMaterial) {
-  sprites.material.time = now;
-}
+const geometry = new AnimatedSpritesGeometry(1000);
+const material = new AnimatedSpritesMaterial({transparent: true});
+
+// a material of your own stays yours
+const sprites = new AnimatedSprites(geometry, material);
+
+// or the mesh builds one from its parameters, and releases it in dispose()
+const ownSprites = new AnimatedSprites(1000, {transparent: true, time: 0});
 ```
 
 #### `TexturedSpritesGeometry` keeps the pools it was built with
@@ -2957,6 +2968,35 @@ const pool = new VertexObjectPool(
   },
   100,
 );
+```
+
+#### `setPosition(x, y)` keeps `z`, `setColor(color)` keeps the alpha
+
+`TexturedSprite#setPosition()` and `AnimatedSprite#setPosition()` write `z` only when they are
+handed one, and `TexturedSprite#setColor()` writes the alpha only when it is handed one. A sprite
+out of `createSprite()` starts at `z = 0` with an alpha of 1, so a sprite that was never given
+either draws as before. A call that relied on the reset to `z = 0` or to an alpha of 1 hands the
+value in.
+
+**Before**
+
+```ts
+sprite.setPosition(x, y); // z went back to 0
+sprite.setColor(tint); // the alpha went back to 1
+```
+
+**After**
+
+```ts check
+import {TexturedSprites} from '@spearwolf/twopoint5d';
+import {Color} from 'three/webgpu';
+
+const sprites = new TexturedSprites(1);
+const sprite = sprites.createSprite()!;
+const tint = new Color(1, 0.5, 0.5);
+
+sprite.setPosition(4, 2, 0); // hand in the 0 the sprite goes back to
+sprite.setColor(tint, 1); // and the alpha of 1
 ```
 
 ## [0.21.2] - 2026-06-19

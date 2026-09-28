@@ -5,6 +5,7 @@ import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {AnimatedSpritesGeometry} from './AnimatedSprites/AnimatedSpritesGeometry.js';
+import {prepareSpriteFrame} from './TexturedSprites/TexturedSprite.js';
 import {TexturedSprites} from './TexturedSprites/TexturedSprites.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths measured below
@@ -54,6 +55,42 @@ describe('sprites on the hot path', () => {
     sprites.dispose();
   });
 
+  test('moving a textured sprite by x and y alone and tinting it without an alpha allocates nothing per call', async () => {
+    const sprites = new TexturedSprites(1000);
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const sprite = all[i]!;
+        sprite.setPosition(i * 0.5 + 0.25, 1.5);
+        sprite.setColor(tint);
+      }
+    });
+    const bytesPerCall = bytesPerRound / (all.length * 2);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    sprites.dispose();
+  });
+
+  test('re-framing a textured sprite with a prepared frame allocates nothing per call', async () => {
+    const sprites = new TexturedSprites(1000);
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+    const prepared = prepareSpriteFrame(frame);
+    const preparedTrimmed = prepareSpriteFrame(trimmedFrame);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        all[i]!.setPreparedFrame(i & 1 ? prepared : preparedTrimmed);
+      }
+    });
+    const bytesPerCall = bytesPerRound / all.length;
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    sprites.dispose();
+  });
+
   test('moving and animating an animated sprite allocates nothing per call', async () => {
     const geometry = new AnimatedSpritesGeometry(1000);
     const pool = geometry.instancedPool;
@@ -68,6 +105,23 @@ describe('sprites on the hot path', () => {
       }
     });
     const bytesPerCall = bytesPerRound / (all.length * 3);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+
+    geometry.dispose();
+  });
+
+  test('moving an animated sprite by x and y alone allocates nothing per call', async () => {
+    const geometry = new AnimatedSpritesGeometry(1000);
+    const pool = geometry.instancedPool;
+    const all = Array.from({length: 1000}, () => pool.createVO()!);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        all[i]!.setPosition(i * 0.5 + 0.25, 1.5);
+      }
+    });
+    const bytesPerCall = bytesPerRound / all.length;
 
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
 

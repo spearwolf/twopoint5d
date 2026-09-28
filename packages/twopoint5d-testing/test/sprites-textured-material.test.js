@@ -11,6 +11,7 @@ const CENTER = TARGET_SIZE / 2;
 
 const WHITE = [255, 255, 255, 255];
 const GREEN = [0, 255, 0, 255];
+const RED = [255, 0, 0, 255];
 
 describe('sprites — TexturedSpritesMaterial draws its color map', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
@@ -83,6 +84,44 @@ describe('sprites — TexturedSpritesMaterial draws its color map', function () 
     const rgb = await renderSprite({colorMap: makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2), color: [1, 0, 0, 1]});
 
     expect(rgb, 'white tinted red').to.satisfy((c) => isNearColor(c, [255, 0, 0]));
+  });
+
+  it('a texture swapped for one of the same kind is drawn from the next frame on', async function () {
+    const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
+    const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+    camera.position.z = 10;
+
+    const red = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const green = makeColorTexture([GREEN, GREEN, GREEN, GREEN], 2, 2);
+
+    const sprites = new TexturedSprites(1, red);
+    const sprite = sprites.createSprite();
+    sprite.setSize(4, 4);
+    sprite.setPosition(0, 0, 0);
+    sprite.setTexCoords(0, 0, 1, 1);
+
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const before = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
+
+    const {colorNode, version} = sprites.material;
+    sprites.texture = green;
+    sprites.update();
+
+    const after = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
+
+    // the swap reached the gpu through the texture node alone, without a new color graph
+    const rebuilt = sprites.material.colorNode !== colorNode || sprites.material.version !== version;
+
+    sprites.dispose();
+    red.dispose();
+    green.dispose();
+
+    expect(before, 'the red of the first texture').to.satisfy((c) => isNearColor(c, [255, 0, 0]));
+    expect(rebuilt, 'the color graph was built anew').to.equal(false);
+    expect(after, 'the green of the second texture').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
   });
 
   it('does not draw a sprite whose color has an alpha of 0', async function () {

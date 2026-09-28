@@ -6,7 +6,7 @@ import {afterEach, describe, expect, test} from 'vitest';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {TextureCoords} from '../../texture/TextureCoords.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
-import type {TexturedSprite} from './TexturedSprite.js';
+import {prepareSpriteFrame, type TexturedSprite} from './TexturedSprite.js';
 import {TexturedSprites} from './TexturedSprites.js';
 import {TexturedSpritesGeometry} from './TexturedSpritesGeometry.js';
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
@@ -98,6 +98,32 @@ describe('TexturedSprites', () => {
     sprites.dispose();
   });
 
+  test('setPosition(x, y) keeps the z the sprite was given', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+
+    sprite.setPosition(1, 2, 3);
+    sprite.setPosition(4, 5);
+
+    expect([sprite.x, sprite.y, sprite.z]).toEqual([4, 5, 3]);
+    expect(readAttribute(sprites.spritePool!, 'instancePosition', 0)).toEqual([4, 5, 3]);
+
+    sprites.dispose();
+  });
+
+  test('setColor(color) keeps the alpha the sprite was given', () => {
+    const sprites = new TexturedSprites(4);
+    const sprite = sprites.createSprite()!;
+
+    sprite.setColor(new Color(0.5, 0.25, 0.125), 0.25);
+    sprite.setColor(new Color(0.75, 0.5, 1));
+
+    expect([sprite.r, sprite.g, sprite.b, sprite.a]).toEqual([0.75, 0.5, 1, 0.25]);
+    expect(readAttribute(sprites.spritePool!, 'color', 0)).toEqual([0.75, 0.5, 1, 0.25]);
+
+    sprites.dispose();
+  });
+
   test('setFrame() writes texFlipDiagonal 1 for a frame with FLIP_DIAGONAL and 0 for an upright one after it', () => {
     const sprites = new TexturedSprites(4);
     const sprite = sprites.createSprite()!;
@@ -132,6 +158,59 @@ describe('TexturedSprites', () => {
     expect(readAttribute(sprites.spritePool!, 'texTrim', 0), 'texTrim in the buffer').toEqual([0, 0, 0, 0]);
 
     sprites.dispose();
+  });
+
+  describe('prepared frames', () => {
+    const turnedCoords = new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2);
+    turnedCoords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
+
+    // what a frame writes to a sprite, read back through the sprite
+    const frameValuesOf = (sprite: TexturedSprite) => [
+      sprite.s,
+      sprite.t,
+      sprite.u,
+      sprite.v,
+      sprite.texFlipDiagonal,
+      sprite.trimLeft,
+      sprite.trimTop,
+      sprite.trimRight,
+      sprite.trimBottom,
+    ];
+
+    test.each([
+      ['the upright frame', frame],
+      ['the turned frame', {coords: turnedCoords}],
+      ['the trimmed frame', trimmedFrame],
+    ] as const)('setPreparedFrame() writes what setFrame() writes, for %s', (_name, atlasFrame: TextureAtlasFrame) => {
+      const sprites = new TexturedSprites(4);
+      const byFrame = sprites.createSprite()!;
+      const byPrepared = sprites.createSprite()!;
+
+      byFrame.setFrame(atlasFrame);
+      byPrepared.setPreparedFrame(prepareSpriteFrame(atlasFrame));
+
+      expect(frameValuesOf(byPrepared)).toEqual(frameValuesOf(byFrame));
+
+      sprites.dispose();
+    });
+
+    test('prepareSpriteFrame() takes a snapshot', () => {
+      const sprites = new TexturedSprites(4);
+      const sprite = sprites.createSprite()!;
+      const coords = new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2);
+      const atlasFrame: TextureAtlasFrame = {coords};
+      const prepared = prepareSpriteFrame(atlasFrame);
+
+      coords.flip = TextureCoords.FLIP_DIAGONAL;
+
+      expect(prepared.texFlipDiagonal, 'the prepared frame').toBe(0);
+      sprite.setPreparedFrame(prepared);
+      expect(sprite.texFlipDiagonal, 'after setPreparedFrame()').toBe(0);
+      sprite.setFrame(atlasFrame);
+      expect(sprite.texFlipDiagonal, 'after setFrame()').toBe(1);
+
+      sprites.dispose();
+    });
   });
 
   test('createSprite() hands out a sprite that starts with its texFlipDiagonal and trim margins at 0, whatever its slot held before', () => {

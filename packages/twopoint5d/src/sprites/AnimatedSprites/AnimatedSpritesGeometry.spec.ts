@@ -2,8 +2,8 @@ import {createSandbox} from 'sinon';
 import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
 
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
-import type {BaseSprite} from '../BaseSprite.js';
-import {AnimatedSpritesGeometry} from './AnimatedSpritesGeometry.js';
+import {AnimatedSpriteDescriptor} from './AnimatedSprite.js';
+import {AnimatedSpritesGeometry, type AnimatedSpritesBasePool, type AnimatedSpritesPool} from './AnimatedSpritesGeometry.js';
 
 describe('AnimatedSpritesGeometry', () => {
   const sandbox = createSandbox();
@@ -19,6 +19,7 @@ describe('AnimatedSpritesGeometry', () => {
     expect(geometry.basePool.capacity).toBe(1);
     expect(geometry.basePool.usedCount).toBe(1);
     expect(geometry.name).toBe('twopoint5d.AnimatedSpritesGeometry');
+    expect(geometry.isAnimatedSpritesGeometry).toBe(true);
 
     geometry.dispose();
   });
@@ -76,6 +77,71 @@ describe('AnimatedSpritesGeometry', () => {
     geometry.dispose();
   });
 
+  test('gives the attributes named in attributeUsage their usage, size and position included', () => {
+    const geometry = new AnimatedSpritesGeometry({
+      capacity: 8,
+      attributeUsage: {dynamic: ['size', 'anim'], static: ['position', 'rotation']},
+    });
+    const usageOf = (name: string) => geometry.instancedPool.descriptor.getAttribute(name)!.usageType;
+
+    expect(geometry.instancedPool.capacity).toBe(8);
+    expect(usageOf('quadSize')).toBe('dynamic');
+    expect(usageOf('anim')).toBe('dynamic');
+    expect(usageOf('instancePosition')).toBe('static');
+    expect(usageOf('rotation')).toBe('static');
+
+    // the copy did not change the shared description
+    expect(AnimatedSpriteDescriptor.attributes['instancePosition']?.usage).toBe('dynamic');
+
+    geometry.dispose();
+  });
+
+  test('gives stream through attributeUsage as well', () => {
+    const geometry = new AnimatedSpritesGeometry({capacity: 8, attributeUsage: {stream: ['position']}});
+
+    expect(geometry.instancedPool.descriptor.getAttribute('instancePosition')!.usageType).toBe('stream');
+
+    geometry.dispose();
+  });
+
+  test('keeps the usage of the sprite description for parameters without attributeUsage', () => {
+    const geometry = new AnimatedSpritesGeometry({capacity: 8});
+    const usageOf = (name: string) => geometry.instancedPool.descriptor.getAttribute(name)!.usageType;
+
+    expect(geometry.instancedPool.capacity).toBe(8);
+    expect(usageOf('quadSize')).toBe('static');
+    expect(usageOf('anim')).toBe('static');
+    expect(usageOf('instancePosition')).toBe('dynamic');
+    expect(usageOf('rotation')).toBe('dynamic');
+
+    geometry.dispose();
+  });
+
+  test('shares them for parameters without attributeUsage as well', () => {
+    const a = new AnimatedSpritesGeometry({capacity: 4});
+    const b = new AnimatedSpritesGeometry(4);
+
+    expect(a.instancedPool.descriptor).toBe(b.instancedPool.descriptor);
+    expect(Object.getPrototypeOf(a.instancedPool.createVO())).toBe(Object.getPrototypeOf(b.instancedPool.createVO()));
+
+    a.dispose();
+    b.dispose();
+  });
+
+  test('builds a descriptor of its own for parameters with attributeUsage', () => {
+    const a = new AnimatedSpritesGeometry({capacity: 10, attributeUsage: {static: ['position']}});
+    const b = new AnimatedSpritesGeometry({capacity: 10, attributeUsage: {static: ['position']}});
+    const fromCapacity = new AnimatedSpritesGeometry(10);
+
+    expect(b.instancedPool.descriptor).not.toBe(a.instancedPool.descriptor);
+    expect(a.instancedPool.descriptor).not.toBe(fromCapacity.instancedPool.descriptor);
+    expect(b.instancedPool.descriptor).not.toBe(fromCapacity.instancedPool.descriptor);
+
+    a.dispose();
+    b.dispose();
+    fromCapacity.dispose();
+  });
+
   test('throws when the base pool has no room for the base sprite', () => {
     // without the stub this path is unreachable: the base pool is built fresh with a capacity of 1
     sandbox.stub(VertexObjectPool.prototype, 'createVO').returns(undefined);
@@ -88,22 +154,24 @@ describe('AnimatedSpritesGeometry', () => {
   test('declares a base pool that is always there', () => {
     const geometry = new AnimatedSpritesGeometry();
 
-    expectTypeOf(geometry.basePool).toEqualTypeOf<VertexObjectPool<BaseSprite>>();
+    expectTypeOf(geometry.basePool).toEqualTypeOf<AnimatedSpritesBasePool>();
     expect(geometry.basePool).toBeDefined();
 
     geometry.dispose();
   });
 
-  test('declares its base pool read-only (a type-level check)', () => {
+  test('declares its pools read-only (a type-level check)', () => {
     const geometry = new AnimatedSpritesGeometry();
 
-    // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as the field takes a
+    // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as a field takes a
     // write; Vitest checks nothing here. The function is never called.
-    const assignPool = (basePool: VertexObjectPool<BaseSprite>) => {
-      // @ts-expect-error the pool is built by the constructor and is read-only
+    const assignPools = (basePool: AnimatedSpritesBasePool, instancedPool: AnimatedSpritesPool) => {
+      // @ts-expect-error the pools are built by the constructor and are read-only
       geometry.basePool = basePool;
+      // @ts-expect-error the pools are built by the constructor and are read-only
+      geometry.instancedPool = instancedPool;
     };
-    void assignPool;
+    void assignPools;
 
     geometry.dispose();
   });

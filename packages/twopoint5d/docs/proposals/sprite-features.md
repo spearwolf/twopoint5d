@@ -239,10 +239,11 @@ export const FlatPlacement = defineFeature<{setPosition(x: number, y: number, z?
   name: 'flatPlacement',
   attributes: {instancePosition: {components: ['x', 'y', 'z'], usage: 'dynamic'}},
   methods: {
-    setPosition(x: number, y: number, z = 0) {
+    // without `z` the sprite keeps its own
+    setPosition(x: number, y: number, z?: number) {
       this.x = x;
       this.y = y;
-      this.z = z;
+      if (z !== undefined) this.z = z;
     },
   },
   placement: (local, {attribute}) => local.add(attribute<'vec3'>('instancePosition')),
@@ -314,7 +315,8 @@ it is a description and a sorted list, not a GPU resource.
 
 Two meshes built from the same kind produce the same shader source, so the renderer's
 program and pipeline caches serve the second one — the same effect the TSDoc of
-`AnimatedSpritesMaterial#touchAnimsMap()` describes.
+`TexturedSpritesMaterial#colorMap` describes for a color map of another kind: a source the
+renderer has built before comes out of its caches, and only a new one is compiled.
 
 ### 5.3 The existing sprites as presets
 

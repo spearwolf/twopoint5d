@@ -2,7 +2,7 @@ import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {float, vec2, vec3, vec4} from 'three/tsl';
 import type {Node, NodeBuilder, OperatorNode, TextureNode, VarNode, VaryingNode, VertexColorNode} from 'three/webgpu';
-import {AdditiveBlending, AttributeNode, Texture} from 'three/webgpu';
+import {AdditiveBlending, AttributeNode, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TexturedSpritesMaterial} from './TexturedSpritesMaterial.js';
@@ -160,6 +160,61 @@ describe('TexturedSpritesMaterial', () => {
       expect(sample.isTextureNode).toBe(true);
       expect(sample.value).toBe(colorMap);
       expect((sample.uvNode as unknown as VaryingNode<unknown>).isVaryingNode).toBe(true);
+      expect((color.bNode as VertexColorNode).isVertexColorNode).toBe(true);
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('a colorMap swapped for a texture of the same kind keeps the colorNode and hands the texture node the new texture', () => {
+      const a = new Texture();
+      const b = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap: a});
+      const {colorNode, version} = material;
+
+      material.colorMap = b;
+
+      expect(material.colorMap).toBe(b);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
+      const sample = operatorOf(material.colorNode).aNode as TextureNode;
+      expect(sample.isTextureNode).toBe(true);
+      expect(sample.value).toBe(b);
+
+      material.dispose();
+      a.dispose();
+      b.dispose();
+    });
+
+    test('a colorMap of another kind builds a new colorNode', () => {
+      const a = new Texture();
+      const b = new Texture();
+      b.colorSpace = SRGBColorSpace;
+      const material = new TexturedSpritesMaterial({colorMap: a});
+      const {colorNode, version} = material;
+
+      material.colorMap = b;
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect((operatorOf(material.colorNode).aNode as TextureNode).value).toBe(b);
+
+      material.dispose();
+      a.dispose();
+      b.dispose();
+    });
+
+    test('clearing the colorMap builds the grey default again', () => {
+      const colorMap = new Texture();
+      const material = new TexturedSpritesMaterial({colorMap});
+      const {colorNode, version} = material;
+
+      material.colorMap = undefined;
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+      const color = operatorOf(material.colorNode);
+      expect((color.aNode as TextureNode).isTextureNode).toBeFalsy();
       expect((color.bNode as VertexColorNode).isVertexColorNode).toBe(true);
 
       material.dispose();

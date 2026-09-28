@@ -34,8 +34,14 @@ export class VertexObjects<GeoType extends BufferGeometry = BufferGeometry> exte
   }
 
   /**
-   * Update the mesh. Must be called after any changes to the vertex-objects,
-   * or in the update loop if you are constantly changing the geometry data.
+   * Uploads what the pools of the geometry have marked for upload and syncs the draw range and the
+   * instance count with them; call it once per frame, before rendering.
+   *
+   * An attribute with `autoTouch` — every usage but `static` — is marked by every call. A static
+   * attribute goes up whole with the first call that finds an object in use; after that it is marked
+   * by `VertexObjectPool#createVO()` for the slot it hands out, by the `touch()` of the geometry and
+   * by `VertexObjectPool#touchVO()`, and a write to it that none of them follows does not reach the
+   * gpu.
    *
    * The caller makes this call itself because `Object3D#onBeforeRender` comes too late for it:
    * by then the renderer has read the attribute data arrays and the draw range of the geometry,

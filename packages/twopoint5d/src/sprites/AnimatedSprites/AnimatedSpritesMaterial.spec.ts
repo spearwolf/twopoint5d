@@ -1,15 +1,15 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import type {Node, NodeBuilder, TextureNode, UniformNode} from 'three/webgpu';
-import {AdditiveBlending, AttributeNode, Texture} from 'three/webgpu';
+import {AdditiveBlending, AttributeNode, Texture, Vector2} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {AnimatedSpritesMaterial} from './AnimatedSpritesMaterial.js';
 
-const makeAnimsMap = (): Texture => {
+const makeAnimsMap = (width = 4, height = 4): Texture => {
   const tex = new Texture();
   // A stub image lets the tests below exercise the animation lookup path.
-  tex.image = {width: 4, height: 4} as unknown as HTMLImageElement;
+  tex.image = {width, height} as unknown as HTMLImageElement;
   return tex;
 };
 
@@ -38,6 +38,24 @@ const numberUniformsOf = (root: Node) =>
     (node): node is UniformNode<'float', number> =>
       (node as UniformNode<'float', number>).isUniformNode === true &&
       typeof (node as UniformNode<'float', number>).value === 'number',
+  );
+
+// the texture nodes the animation lookups of `material` read — the frame, the header, the flip and
+// the trim of a frame
+const lookupTextureNodesOf = (material: AnimatedSpritesMaterial): TextureNode[] => {
+  const nodes = new Set<Node>();
+  for (const root of [material.texCoordsNode, material.texFlipDiagonalNode, material.texTrimNode]) {
+    root?.traverse((node) => nodes.add(node));
+  }
+  return [...nodes].filter((node): node is TextureNode => (node as TextureNode).isTextureNode === true);
+};
+
+// the uniforms of the graph below `root` that hold a Vector2 — the measures of the animsMap
+const vector2UniformsOf = (root: Node) =>
+  [...nodesOf(root)].filter(
+    (node): node is UniformNode<'vec2', Vector2> =>
+      (node as UniformNode<'vec2', Vector2>).isUniformNode === true &&
+      (node as UniformNode<'vec2', Vector2>).value instanceof Vector2,
   );
 
 describe('AnimatedSpritesMaterial', () => {
@@ -118,6 +136,59 @@ describe('AnimatedSpritesMaterial', () => {
       expect((material.texCoordsNode as TextureNode).isTextureNode).toBe(true);
       expect((material.texCoordsNode as TextureNode).value).toBe(animsMap);
       expect(material.colorNode).not.toBe(colorNode);
+
+      material.dispose();
+      colorMap.dispose();
+      animsMap.dispose();
+    });
+
+    test('an animsMap swapped for a loaded texture of the same kind and another size builds no node', () => {
+      const colorMap = new Texture();
+      const a = makeAnimsMap(4, 4);
+      const b = makeAnimsMap(8, 2);
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap: a});
+      const {texCoordsNode, texFlipDiagonalNode, texTrimNode, colorNode, positionNode, version} = material;
+
+      material.animsMap = b;
+
+      expect(material.texCoordsNode).toBe(texCoordsNode);
+      expect(material.texFlipDiagonalNode).toBe(texFlipDiagonalNode);
+      expect(material.texTrimNode).toBe(texTrimNode);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.positionNode).toBe(positionNode);
+      expect(material.version).toBe(version);
+
+      // the header, the frame, the flip and the trim lookup
+      const lookups = lookupTextureNodesOf(material);
+      expect(lookups).toHaveLength(4);
+      for (const lookup of lookups) expect(lookup.value).toBe(b);
+
+      const [size] = vector2UniformsOf(material.texCoordsNode!);
+      expect(size, 'the size uniform').toBeDefined();
+      expect([size!.value.x, size!.value.y]).toEqual([8, 2]);
+
+      material.dispose();
+      colorMap.dispose();
+      a.dispose();
+      b.dispose();
+    });
+
+    test('touchAnimsMap() on a texture that had its image builds no node and takes the new size', () => {
+      const colorMap = new Texture();
+      const animsMap = makeAnimsMap(4, 4);
+      const material = new AnimatedSpritesMaterial({colorMap, animsMap});
+      const {texCoordsNode, colorNode, version} = material;
+
+      animsMap.image = {width: 16, height: 8} as unknown as HTMLImageElement;
+      material.touchAnimsMap();
+
+      expect(material.texCoordsNode).toBe(texCoordsNode);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
+
+      const [size] = vector2UniformsOf(material.texCoordsNode!);
+      expect(size, 'the size uniform').toBeDefined();
+      expect([size!.value.x, size!.value.y]).toEqual([16, 8]);
 
       material.dispose();
       colorMap.dispose();

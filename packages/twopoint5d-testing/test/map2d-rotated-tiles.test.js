@@ -133,4 +133,56 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
       );
     });
   });
+
+  it('draws the tiles out of a color map swapped for one of the same kind from the next frame on', async function () {
+    const {texture} = makeSheetWithTurnedCopy(IMAGE, TILE_SIZE, TILE_SIZE);
+    const white = makeSheetWithTurnedCopy(
+      IMAGE.map(() => [255, 255, 255, 255]),
+      TILE_SIZE,
+      TILE_SIZE,
+    ).texture;
+
+    const tileSet = new TileSet(new TextureCoords(0, 0, 2 * TILE_SIZE, TILE_SIZE), {tileWidth: TILE_SIZE, tileHeight: TILE_SIZE});
+
+    const geometry = new TileSpritesGeometry(1);
+    const material = new TileSpritesMaterial({colorMap: texture});
+    const tileSprites = new TileSprites(geometry, material);
+    tileSprites.frustumCulled = false;
+
+    const factory = new TileSpritesFactory(tileSprites, tileSet, new RepeatingTilesProvider([[1]]));
+    const half = TILE_SIZE / 2;
+    factory.createTile(new Map2DTileCoords(0, 0, new AABB2(UPRIGHT_X - half, -half, TILE_SIZE, TILE_SIZE)));
+    factory.update();
+
+    const extent = TARGET_SIZE / PIXELS_PER_UNIT / 2;
+    const camera = new OrthographicCamera(-extent, extent, extent, -extent, 0.1, 100);
+    camera.position.set(0, 10, 0);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(0, 0, 0);
+
+    const scene = new Scene();
+    scene.add(tileSprites);
+
+    const before = cellColors(await renderToPixels(display.renderer, scene, camera, target), UPRIGHT_X);
+
+    const {colorNode, version} = material;
+    material.colorMap = white;
+
+    const after = cellColors(await renderToPixels(display.renderer, scene, camera, target), UPRIGHT_X);
+
+    // the swap reached the gpu through the texture node alone, without a new color graph
+    const rebuilt = material.colorNode !== colorNode || material.version !== version;
+
+    scene.remove(tileSprites);
+    geometry.dispose();
+    material.dispose();
+    texture.dispose();
+    white.dispose();
+
+    expect(before, 'the four cells of the tile before the swap, all different').to.satisfy(allDifferent);
+    expect(rebuilt, 'the color graph was built anew').to.equal(false);
+    after.forEach((rgb, i) => {
+      expect(rgb, `cell ${i} of the tile after the swap`).to.satisfy((c) => isNearColor(c, [255, 255, 255]));
+    });
+  });
 });

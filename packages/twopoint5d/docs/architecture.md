@@ -143,6 +143,9 @@ Ready-made vertex-object descriptions plus their geometry and `ShaderMaterial`:
 `TexturedSprites` for static atlas frames, `AnimatedSprites` for frame-based
 animation. Each comes as a triple — descriptor, `*Geometry`, `*Material` — and
 `BaseSprite` holds what they share. New sprite types follow that same triple.
+Both meshes take a capacity, geometry parameters or a geometry, and material parameters or
+a material (`TexturedSprites` a `Texture` as well), build what they are not handed, release
+only that in `dispose()`, and offer `createSprite()`, `freeSprite()` and `spritePool`.
 The orientation of a frame reaches the shader in two parts: `s`, `t`, `u` and `v` of the
 tex coords carry where the frame lies and its horizontal and vertical flip, and the
 diagonal flip of a turned frame travels as `texFlipDiagonal` — an instance attribute of

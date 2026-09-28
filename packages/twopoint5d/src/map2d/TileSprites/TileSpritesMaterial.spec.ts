@@ -1,7 +1,7 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {Node, NodeBuilder} from 'three/webgpu';
-import {AttributeNode, Texture} from 'three/webgpu';
+import type {Node, NodeBuilder, TextureNode} from 'three/webgpu';
+import {AttributeNode, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {TileSpritesMaterial} from './TileSpritesMaterial.js';
@@ -15,6 +15,13 @@ const attributeNamesOf = (root: Node): string[] => {
     .filter((node): node is AttributeNode => node instanceof AttributeNode)
     .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
     .sort();
+};
+
+// the texture nodes of the graph below `root`
+const textureNodesOf = (root: Node): TextureNode[] => {
+  const nodes = new Set<Node>();
+  root.traverse((node) => nodes.add(node));
+  return [...nodes].filter((node): node is TextureNode => (node as TextureNode).isTextureNode === true);
 };
 
 describe('TileSpritesMaterial', () => {
@@ -31,6 +38,54 @@ describe('TileSpritesMaterial', () => {
 
       expect(TileSpritesMaterial.TexFlipDiagonalAttributeName).toBe('texFlipDiagonal');
       expect(attributeNamesOf(material.colorNode!)).toEqual(['texCoords', 'texFlipDiagonal', 'uv']);
+
+      material.dispose();
+      colorMap.dispose();
+    });
+
+    test('a colorMap swapped for a texture of the same kind keeps the colorNode and hands the texture node the new texture', () => {
+      const a = new Texture();
+      const b = new Texture();
+      const material = new TileSpritesMaterial({colorMap: a});
+      const {colorNode, version} = material;
+
+      material.colorMap = b;
+
+      expect(material.colorMap).toBe(b);
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.version).toBe(version);
+      expect(textureNodesOf(material.colorNode!).map((node) => node.value)).toEqual([b]);
+
+      material.dispose();
+      a.dispose();
+      b.dispose();
+    });
+
+    test('a colorMap of another kind builds a new colorNode', () => {
+      const a = new Texture();
+      const b = new Texture();
+      b.colorSpace = SRGBColorSpace;
+      const material = new TileSpritesMaterial({colorMap: a});
+      const {colorNode, version} = material;
+
+      material.colorMap = b;
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect(textureNodesOf(material.colorNode!).map((node) => node.value)).toEqual([b]);
+
+      material.dispose();
+      a.dispose();
+      b.dispose();
+    });
+
+    test('clearing the colorMap puts the default color back', () => {
+      const colorMap = new Texture();
+      const material = new TileSpritesMaterial({colorMap});
+
+      material.colorMap = undefined;
+
+      expect(material.colorNode).toBe(TileSpritesMaterial.DefaultColor);
 
       material.dispose();
       colorMap.dispose();

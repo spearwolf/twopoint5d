@@ -10,6 +10,19 @@ import {TexturedSpritesMaterial, type TexturedSpritesMaterialParameters} from '.
 
 const isTexture = (value: Texture | object | undefined): value is Texture => Boolean((value as Texture)?.isTexture);
 
+/**
+ * The mesh that draws textured sprites, one instance of its `TexturedSpritesGeometry` per sprite.
+ *
+ * It takes a capacity, `TexturedSpritesGeometryParameters` or a `TexturedSpritesGeometry`, and a
+ * `Texture`, `TexturedSpritesMaterialParameters` or a `TexturedSpritesMaterial`, and builds what it
+ * is not handed. What it builds belongs to it and goes with {@link dispose}; a geometry, a material
+ * or a texture handed in stays the caller's.
+ *
+ * By default position and rotation of the sprites are dynamic attributes and go up to the gpu
+ * with every `update()`, and the others are static — see the setters of {@link TexturedSprite} for how
+ * a later change of them reaches the gpu. The `attributeUsage` of `TexturedSpritesGeometryParameters` gives any of
+ * them another usage, position and rotation a static one included.
+ */
 export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
   declare geometry: TexturedSpritesGeometry | undefined;
   declare material: TexturedSpritesMaterial | undefined;
@@ -27,7 +40,12 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
     return this.material?.colorMap;
   }
 
-  /** Sets the color map of the material. Does nothing once the sprites have been disposed. */
+  /**
+   * Sets the color map of the material. Does nothing once the sprites have been disposed.
+   *
+   * Which change of the texture costs a rebuild of the shader graph and which does not is told at
+   * {@link TexturedSpritesMaterial.colorMap}.
+   */
   set texture(texture: Texture | undefined) {
     if (this.material != null) {
       this.material.colorMap = texture;

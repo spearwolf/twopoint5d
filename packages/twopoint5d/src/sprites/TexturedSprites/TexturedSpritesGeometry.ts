@@ -61,13 +61,14 @@ export class TexturedSpritesGeometry extends InstancedVertexObjectGeometry<Textu
     makeBaseSpriteArgs: TexturedSpritesMakeBaseSpriteArgs = [0.5, 0.5],
   ) {
     const cap = typeof capacity === 'number' ? capacity : capacity.capacity;
+    const attributeUsage = typeof capacity === 'number' ? undefined : capacity.attributeUsage;
     const desc =
-      typeof capacity === 'number' || capacity.attributeUsage == null
+      attributeUsage == null
         ? TexturedSpriteDescriptor
         : cloneVertexObjectDescription(TexturedSpriteDescriptor, {
-            dynamic: capacity.attributeUsage?.dynamic,
-            stream: capacity.attributeUsage?.stream,
-            static: capacity.attributeUsage?.static,
+            dynamic: attributeUsage.dynamic,
+            stream: attributeUsage.stream,
+            static: attributeUsage.static,
             alias: {
               size: ['quadSize'],
               position: ['instancePosition'],
