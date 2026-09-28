@@ -49,9 +49,10 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   #disposed = false;
 
   /**
-   * How many frustum box helpers are built for tiles no probe ray met directly. The frustum
-   * boxes of the primary tiles and the tile boxes are not meant: those follow the number of
-   * visible tiles.
+   * How many frustum box helpers are built for the tiles that are not primary — every tile but
+   * those around the points where a probe ray met the plane: the tile a point lies in and those a
+   * rectangle of one tile size around it reaches into. The frustum boxes of the primary tiles and
+   * the tile boxes are not meant: those follow the number of visible tiles.
    */
   maxDebugHelpers = 9;
 

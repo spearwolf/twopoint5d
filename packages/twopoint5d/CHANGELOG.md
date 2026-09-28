@@ -184,8 +184,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RectangularVisibilityArea#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
 - `CameraBasedVisibility#computeVisibleTiles()` removes the tiles of the previous call instead of reusing them when the `Map2DTileCoordsUtil` it is given describes another grid than the one before, and lays the new grid out on tile objects of its own. It takes the grid as an argument and can be driven without a `Map2DTileStreamer`, so it guards the case on its own
 - `CameraBasedVisibility#frustumBoxScale` is part of the state a recomputation is held against: a value written to it at runtime reaches the next `computeVisibleTiles()`, which recomputes and raises `serial`, instead of waiting for the camera to move
+- `CameraBasedVisibility#frustumBoxScale` takes a finite number of at least 1 and throws a `RangeError` for anything else, keeping the value it had: below 1 the frustum boxes of neighbouring tiles leave gaps, and the search, which goes from a visible tile to its neighbours, can miss the visible tiles behind such a gap. See the Migration Guide
 - `CameraBasedVisibility#visibles` is empty after a recomputation in which none of the probe rays met the plane. The visibility helpers read the list, and would otherwise draw tile boxes for a view that no longer exists
-- `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles no probe ray met directly; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
+- `CameraBasedVisibilityHelpers#maxDebugHelpers` limits the frustum box helpers that were built, not the tiles the walk passed on the way: with the value at 9, nine such helpers are built wherever the visible tiles are sorted. The number covers the frustum boxes of the tiles that are not primary — all but the tiles around the points where a probe ray met the plane, the tile a point lies in and those a rectangle of one tile size around it reaches into; the frustum boxes of the primary tiles and the tile boxes follow the number of visible tiles, as they always did
 - `RepeatingTilesProvider#tileIds` takes a rectangular pattern only: every row has the length of the first one, and a pattern without a row is none at all. A pattern that breaks either rule is refused with an error naming the row and its length, and the provider keeps the pattern it holds — the width of a pattern describes the whole of it, and a row shorter than that has no id to answer with where the signature promises a `number`
 - `Map2D#tileStreamer` hands the view center over to the streamer that takes over — `centerX` and `centerY` read the same values afterwards as before — and has the tiles built again: the renderers come off the streamer that leaves empty, and the streamer taking over lays out the whole set in its own grid. The tile grid stays with the streamer that carries it, `tileWidth`, `tileHeight`, `xOffset` and `yOffset` among it. The visibilitor goes with the map: when the map has one, the streamer that leaves gives it up — its `visibilitor` answers `undefined` afterwards — and the streamer taking over holds it in place of one of its own; when the map has none, the streamer taking over keeps its own. A visibilitor instance serves exactly one streamer
 - `DataIdsChunk2D#prepareData()` refuses data that names a compression — a field the type does not declare, but data from a map file can carry — at the first read, with an error that names the compression, and writes nothing to the console: the caller reads the reason off the error, in a message that cannot be silenced away
@@ -458,6 +459,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VertexObjectBuffer#copyAttributes()` throws a `RangeError` that names the value for a `targetObjectOffset` that is no integer of 0 or more, as `copy()` and `copyArray()` do, and writes nothing then
 - a pool built on a `VertexObjectDescriptor` that exists already — handed in, or taken over from an earlier pool of the same description — checks its `basePrototype` again and refuses a property added there since that a generated accessor would shadow
 - fix `CameraBasedVisibility#computeVisibleTiles()` for a camera under a parent: it brings the world matrix of the camera up to date together with those of its parents, the way `Map2DTileStreamer` brings the map node up to date. A camera on a rig that is moved in the frame before the render sees the tiles of that frame, not those of the frame before
+- fix `CameraBasedVisibility` on a grid of tiles smaller than 1, and on a grid whose tile edges come out a rounding step off its offset in floating point — `new Map2DTileCoordsUtil(16, 16, 0.1, 0.3)` for one: `coords` of every visible tile is its own tile, one column and one row of `tileWidth` × `tileHeight`, and its `box`, `frustumBox`, `centerWorld` and the `view` of its `map2dTile` follow from it
 
 ### Migration Guide
 
@@ -1049,9 +1051,9 @@ store.parse(moreData);
 Both lines stand for themselves: the fetch is on its way, and `moreData` is parsed right
 away. Put an `await` in front of the load where the second parse should wait for the first.
 
-#### `TileBox#primary` marks every tile the view frustum meets the plane in
+#### `TileBox#primary` marks the tiles of every probe ray that met the plane
 
-`CameraBasedVisibility` tests nine rays through the view frustum against the map plane, and `primary` marks the tiles they met — up to nine places on the map, rather than the one under the center of the view.
+`CameraBasedVisibility` tests nine rays through the view frustum against the map plane, and `primary` marks the tiles around each point where a ray met it — the tile the point lies in and those a rectangle of one tile size around it reaches into —, at up to nine places on the map rather than the one under the center of the view.
 
 **Before**
 
@@ -1067,7 +1069,7 @@ const underTheCamera = visibility.visibles.filter((tile) => tile.primary);
 const [centerPoint] = visibility.pointsOnPlane;
 ```
 
-Whoever wants the tiles the view frustum meets the plane in — all of them — keeps reading `primary`.
+Whoever wants the tiles around the points of all probe rays keeps reading `primary`; every tile of the view is in `visibles`.
 
 #### A disposed display refuses to be used
 
@@ -3038,6 +3040,27 @@ const camera = new PerspectiveCamera(75, 1.6, 0.1, 20000);
 const visibility = new CameraBasedVisibility(camera);
 visibility.maxVisibleTiles = Infinity; // every tile the view frustum reaches
 map2d.visibilitor = visibility;
+```
+
+#### `CameraBasedVisibility#frustumBoxScale` takes nothing below 1
+
+`frustumBoxScale` takes a finite number of at least 1 and throws a `RangeError` for anything else,
+keeping the value it had. Below 1 the frustum boxes of neighbouring tiles leave gaps, and the search,
+which goes from a visible tile to its neighbours, misses the visible tiles behind them.
+
+`frustumBoxScale` is an accessor: a subclass sets the value in its constructor rather than
+declaring the property, which TypeScript refuses with TS2610.
+
+**Before**
+
+```ts
+visibility.frustumBoxScale = 0.9;
+```
+
+**After**
+
+```ts
+visibility.frustumBoxScale = 1; // the tile itself, the least it takes
 ```
 
 ## [0.21.2] - 2026-06-19

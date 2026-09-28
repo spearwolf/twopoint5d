@@ -20,6 +20,10 @@ export interface TileBox {
   id: number;
   x: number;
   y: number;
+  /**
+   * The tile on the grid: its tile coordinate, one column and one row, and its edges relative to
+   * the origin of the grid, without the offset of the grid.
+   */
   coords?: TilesWithinCoords;
   /** The box of the tile in the local space of the map node, where the tile renderers draw it. */
   box?: Box3;
@@ -30,9 +34,11 @@ export interface TileBox {
   distanceToCamera?: number;
   map2dTile?: IMap2DTileCoords;
   /**
-   * `true` for a tile one of the probe rays of the view frustum met directly — see
-   * {@link CameraBasedVisibility.pointsOnPlane}. Every other visible tile was found from
-   * such a tile outwards.
+   * `true` for a tile the search started from in the last recomputation: the tile a probe ray of
+   * the view frustum met the map plane in — see {@link CameraBasedVisibility.pointsOnPlane} —, and
+   * each tile a rectangle of one tile size around that point reaches into, up to four per ray. The
+   * tiles within the hull those points span come in without a frustum test, and every other visible
+   * tile was reached from one of these, neighbour by neighbour.
    */
   primary?: boolean;
 }
@@ -218,13 +224,31 @@ interface CameraDependencies {
 export class CameraBasedVisibility implements IMap2DVisibilitor {
   static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
 
+  #frustumBoxScale = 1.1;
+
   /**
    * How much larger than the tile the box is that the view frustum is tested against: the box is
    * `frustumBoxScale` times the tile in width, height and depth, around the tile — each side moves
    * out by `(frustumBoxScale - 1) / 2` of the tile size. `1` tests the tile itself; the default
    * `1.1` gives a tile that only just leaves the view a margin before it is dropped.
+   *
+   * Takes a finite number of at least 1 and throws a `RangeError` for anything else, keeping the
+   * value it had: below 1 the boxes of neighbouring tiles leave gaps between them, and the search,
+   * which goes from a visible tile to its neighbours, would miss the visible tiles behind such a
+   * gap. A new value recomputes on the next call.
    */
-  frustumBoxScale = 1.1;
+  get frustumBoxScale(): number {
+    return this.#frustumBoxScale;
+  }
+
+  set frustumBoxScale(value: number) {
+    if (!(Number.isFinite(value) && value >= 1)) {
+      throw new RangeError(
+        `[CameraBasedVisibility] frustumBoxScale must be a finite number of at least 1, got ${describeValue(value)}`,
+      );
+    }
+    this.#frustumBoxScale = value;
+  }
 
   #maxVisibleTiles = 10_000;
 
@@ -473,11 +497,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const seen = this.#seenScalars;
     const scalarsChanged =
       this.depth !== seen[SEEN_DEPTH] ||
-      this.frustumBoxScale !== seen[SEEN_FRUSTUM_BOX_SCALE] ||
+      this.#frustumBoxScale !== seen[SEEN_FRUSTUM_BOX_SCALE] ||
       this.#maxVisibleTiles !== seen[SEEN_MAX_VISIBLE_TILES] ||
       this.lookAtCenter !== this.#seenLookAtCenter;
     seen[SEEN_DEPTH] = this.depth;
-    seen[SEEN_FRUSTUM_BOX_SCALE] = this.frustumBoxScale;
+    seen[SEEN_FRUSTUM_BOX_SCALE] = this.#frustumBoxScale;
     seen[SEEN_MAX_VISIBLE_TILES] = this.#maxVisibleTiles;
     this.#seenLookAtCenter = this.lookAtCenter;
 
@@ -711,16 +735,27 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return slot;
   }
 
-  /** Writes `coords` of a slot for its tile, on the current grid. */
+  /**
+   * Writes `coords` of a slot for its tile on the current grid: the tile itself, one column and one
+   * row, taken from the tile coordinate. A query rectangle would meet a neighbouring tile wherever
+   * the grid is finer than the rectangle or an edge comes out a rounding step off in floating
+   * point.
+   */
   private writeTileCoords(slot: PooledTileBox): void {
     const grid = this.#map2dTileCoords;
-    const area = this.#queryArea;
-    // the query reads world coordinates, so the tile coordinate is taken back into that space
-    area.left = slot.x * grid.tileWidth + grid.xOffset;
-    area.top = slot.y * grid.tileHeight + grid.yOffset;
-    area.width = 1;
-    area.height = 1;
-    grid.computeTilesWithinArea(area, slot.coords);
+    const tileWidth = grid.tileWidth;
+    const tileHeight = grid.tileHeight;
+    const coords = slot.coords;
+    coords.tileTop = slot.y;
+    coords.tileLeft = slot.x;
+    coords.top = slot.y * tileHeight;
+    coords.left = slot.x * tileWidth;
+    coords.height = tileHeight;
+    coords.width = tileWidth;
+    coords.tileHeight = tileHeight;
+    coords.tileWidth = tileWidth;
+    coords.rows = 1;
+    coords.columns = 1;
   }
 
   private findVisibleTiles(previousTiles: IMap2DTileCoords[], hitCount: number, changed: boolean): IMap2DVisibleTiles {
@@ -1138,8 +1173,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * The height of the frustum boxes does not enter the margin, though it is why a margin is
    * needed at all: a tile whose box reaches into the frustum from below the lower edge of the
    * view can lie behind tiles a little further out than the furthest kept one. The argument needs
-   * a map on the XZ plane — the plane this class works on — and a `frustumBoxScale` of at least 1,
-   * so that the boxes of neighbouring tiles leave no gap.
+   * a map on the XZ plane — the plane this class works on — and a `frustumBoxScale` of at least 1
+   * — its setter refuses less —, so that the boxes of neighbouring tiles leave no gap.
    *
    * Tiles in and a boolean out: the distances stay in here — see the note on doubles at the top of
    * the module.
@@ -1258,7 +1293,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * and the corners field by field — see the note on doubles at the top of the module.
    */
   private setBox(target: Box3, {top, left, width, height}: TilesWithinCoords, forFrustum: boolean): Box3 {
-    const scale = forFrustum ? this.frustumBoxScale : 1;
+    const scale = forFrustum ? this.#frustumBoxScale : 1;
     const sw = (width * scale - width) / 2;
     const sh = (height * scale - height) / 2;
     const ground = this.depth * -0.5 * scale;

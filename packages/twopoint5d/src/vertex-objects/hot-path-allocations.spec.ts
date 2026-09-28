@@ -1,6 +1,7 @@
 import type {BufferAttribute} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
+import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
@@ -16,6 +17,70 @@ const BYTES_PER_CALL_LIMIT = 1;
 // a vertex object from Object.create(proto) with two fields measured 56 B when this limit was set,
 // one built with property descriptors 552 B
 const BYTES_PER_VERTEX_OBJECT_LIMIT = 128;
+
+// the rounds of each size, taking turns, before the first measurement of `measureDifference()`
+const DIFFERENCE_SETTLE_ROUNDS = 200;
+// the rounds a size runs before each of its measurements, and the rounds measured
+const DIFFERENCE_WARM_UP_ROUNDS = 20;
+const DIFFERENCE_MEASURED_ROUNDS = 50;
+const DIFFERENCE_GROUPS = 5;
+// how far the two measurements of one size in a group may lie apart for the group to count as one
+// in which nothing moved: half the smallest heap object, per call
+const STILL_BYTES = 8;
+
+// long enough for a compile job that waited for a free core to finish, as in
+// `measureSettledBytes()`
+const compilerPause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+const median = (values: readonly number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+};
+
+const measureDifferenceRound = (round: () => void): number =>
+  measureAllocatedBytes(round, {warmUpRounds: DIFFERENCE_WARM_UP_ROUNDS, rounds: DIFFERENCE_MEASURED_ROUNDS});
+
+/**
+ * The bytes a call of `big` allocates beyond a call of `small`, where the two differ only in how
+ * much they take on: what a call costs whatever its size drops out.
+ *
+ * That fixed amount — the result object, the tuple, the shell of the typed array — stands at both
+ * sizes alike, and it falls while the measurements run, until the compiler has taken the function
+ * over. So the two sizes take turns: after the settle rounds, in groups of small, big, big, small,
+ * so that a step inside a group falls on both sides alike, and what counts is the median of the
+ * groups in which the two measurements of each size agree — no full collection and no compile job
+ * landed there —, and the median of all groups where none does. `measurePerTile()` in
+ * `src/map2d/hot-path-allocations.tilted-view.spec.ts` carries the whole argument.
+ */
+async function measureDifference(small: () => void, big: () => void): Promise<{difference: number; message: string}> {
+  for (let i = 0; i < DIFFERENCE_SETTLE_ROUNDS; i++) {
+    small();
+    big();
+  }
+  (globalThis as {gc?: () => void}).gc?.();
+
+  const differences: number[] = [];
+  const stillDifferences: number[] = [];
+  const groups: string[] = [];
+  for (let i = 0; i < DIFFERENCE_GROUPS; i++) {
+    await compilerPause();
+    const small1 = measureDifferenceRound(small);
+    const big1 = measureDifferenceRound(big);
+    const big2 = measureDifferenceRound(big);
+    const small2 = measureDifferenceRound(small);
+    const difference = (big1 + big2 - small1 - small2) / 2;
+    differences.push(difference);
+    if (Math.abs(big1 - big2) < STILL_BYTES && Math.abs(small1 - small2) < STILL_BYTES) stillDifferences.push(difference);
+    groups.push(`${big1.toFixed(1)} ${big2.toFixed(1)} / ${small1.toFixed(1)} ${small2.toFixed(1)}`);
+  }
+
+  const counted = stillDifferences.length > 0 ? stillDifferences : differences;
+  return {
+    difference: median(counted),
+    message: `the median of ${counted.length} of ${DIFFERENCE_GROUPS} groups — per group, the bytes of the big call, twice, against the small one: ${groups.join(', ')}`,
+  };
+}
 
 interface SpriteVO extends VO {
   x: number;
@@ -152,19 +217,25 @@ describe('vertex objects on the hot path', () => {
     pool.dispose();
   });
 
+  // a vertex object that allocates anything costs 16 B at least: one such allocation in every 16
+  // objects reads 1 B per object, the limit
   test('toAttributeArrays() allocates its result and nothing per vertex', async () => {
     const pool = new VertexObjectPool(quadDescription, 1000);
     for (let i = 0; i < 1000; i++) pool.createVO();
 
-    const many = await measureSettledBytes(() => {
-      pool.buffer.toAttributeArrays(['position'], 0, 1000);
-    });
-    const few = await measureSettledBytes(() => {
-      pool.buffer.toAttributeArrays(['position'], 0, 10);
-    });
-    const bytesPerObject = (many - few) / 990;
+    const {difference, message} = await measureDifference(
+      () => {
+        pool.buffer.toAttributeArrays(['position'], 0, 10);
+      },
+      () => {
+        pool.buffer.toAttributeArrays(['position'], 0, 1000);
+      },
+    );
+    const bytesPerObject = difference / 990;
 
-    expect(bytesPerObject, `${bytesPerObject.toFixed(2)} bytes per further vertex object`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(Math.abs(bytesPerObject), `${bytesPerObject.toFixed(2)} bytes per further vertex object, ${message}`).toBeLessThan(
+      BYTES_PER_CALL_LIMIT,
+    );
 
     pool.dispose();
   });

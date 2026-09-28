@@ -9,9 +9,9 @@ const compilerPause = () => new Promise<void>((resolve) => setTimeout(resolve, 2
 /**
  * The heap bytes one call of `round` puts on the V8 heap once a frame loop has settled — the
  * measurement a `hot-path-allocations.spec.ts` goes through, on top of
- * {@link measureAllocatedBytes}. A spec that measures the tiles of a path as the difference of two
- * views calls `measureAllocatedBytes()` directly instead, so that the two views take turns within
- * one sequence of measurements.
+ * {@link measureAllocatedBytes}. A spec that measures the bytes per tile or per vertex object of a
+ * path as the difference of two sizes calls `measureAllocatedBytes()` directly instead, so that the
+ * two sizes take turns within one sequence of measurements.
  *
  * What the setup of a test and the tests before it left behind is collected first, and the round
  * warms up afterwards: the optimized code holds the maps of those objects weakly, and a collection

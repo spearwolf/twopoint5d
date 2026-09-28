@@ -11,9 +11,9 @@ export interface MeasureAllocatedBytesOptions {
  * The bytes one call of `round` puts on the V8 heap, averaged over `rounds` calls — a single
  * measurement. The allocation specs measure through `measureSettledBytes()` next to it, which
  * first collects what the setup of a test and the tests before it left behind and answers the
- * lowest of three of these measurements — but for the specs that measure the tiles of a path as
- * the difference of two views: they call this directly, because the two views have to take turns
- * within one sequence of measurements.
+ * lowest of three of these measurements — but for the specs that measure the bytes per tile or per
+ * vertex object of a path as the difference of two sizes: they call this directly, because the two
+ * sizes have to take turns within one sequence of measurements.
  *
  * What a garbage collection takes back while the rounds run is added back in through the
  * `GCProfiler`, so the number stays put even when a scavenge falls into the middle of the
@@ -23,7 +23,8 @@ export interface MeasureAllocatedBytesOptions {
  * settles far beyond these rounds: on the per-recomputation path of `CameraBasedVisibility`, the
  * three.js calls stand in the optimizing compiler after some 10 000 calls, and their bytes are gone
  * between 12 000 and 14 000. A spec that measures the tiles of such a path takes the difference of
- * two views, from which those calls drop out. The backing stores of typed arrays live outside the heap and do not count.
+ * two views, from which those calls drop out. The backing stores of typed arrays live outside the
+ * heap and do not count.
  *
  * @throws when the process runs without `--expose-gc`, which the Vitest config of
  * `packages/twopoint5d` starts its workers with

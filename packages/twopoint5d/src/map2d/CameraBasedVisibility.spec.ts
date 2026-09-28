@@ -414,8 +414,9 @@ describe('CameraBasedVisibility', () => {
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       const firstIds = new Set(first.tiles.map((t) => t.id));
 
-      // Shift the center point by one whole tile so a different tile band becomes primary.
-      const second = visibility.computeVisibleTiles(first.tiles, [400, 0], tileCoords, matrixWorld)!;
+      // Shift the center point by one whole tile: a column of tiles leaves the view, one enters it,
+      // and the others stay.
+      const second = visibility.computeVisibleTiles(first.tiles, [100, 0], tileCoords, matrixWorld)!;
 
       const secondIds = new Set(second.tiles.map((t) => t.id));
       const reuseIds = new Set(second.reuseTiles!.map((t) => t.id));
@@ -441,6 +442,7 @@ describe('CameraBasedVisibility', () => {
       // The shift moved the view → there must actually be churn.
       expect(removeIds.size).toBeGreaterThan(0);
       expect(createIds.size).toBeGreaterThan(0);
+      expect(reuseIds.size, 'the tiles that stay in view').toBeGreaterThan(0);
     });
 
     test('lists visibles sorted by distance to the camera (ascending)', () => {
@@ -1051,9 +1053,97 @@ describe('CameraBasedVisibility', () => {
     );
   });
 
+  describe('the coordinates of a tile', () => {
+    /**
+     * Every visible tile carries its own tile: one column and one row, `tileWidth` × `tileHeight`.
+     */
+    function expectTilesOfTheirOwn(visibility: CameraBasedVisibility, grid: Map2DTileCoordsUtil): void {
+      expect(visibility.visibles.length, 'visible tiles').toBeGreaterThan(0);
+      const size = new Vector3();
+      for (const tile of visibility.visibles) {
+        const at = `tile ${tile.x},${tile.y}`;
+        expect(tile.coords, `${at}: coords`).toEqual({
+          tileTop: tile.y,
+          tileLeft: tile.x,
+          top: tile.y * grid.tileHeight,
+          left: tile.x * grid.tileWidth,
+          height: grid.tileHeight,
+          width: grid.tileWidth,
+          tileHeight: grid.tileHeight,
+          tileWidth: grid.tileWidth,
+          rows: 1,
+          columns: 1,
+        });
+        const {view} = tile.map2dTile!;
+        expect([view.left, view.top, view.width, view.height], `${at}: map2dTile.view`).toEqual([
+          tile.x * grid.tileWidth,
+          tile.y * grid.tileHeight,
+          grid.tileWidth,
+          grid.tileHeight,
+        ]);
+        tile.box!.getSize(size);
+        expect(size.x, `${at}: box width`).toBeCloseTo(grid.tileWidth, 9);
+        expect(size.z, `${at}: box depth`).toBeCloseTo(grid.tileHeight, 9);
+      }
+    }
+
+    test('a grid of tiles smaller than 1 gives every tile its own tile', () => {
+      const camera = new PerspectiveCamera(90, 1, 0.01, 10);
+      camera.position.set(0, 2, 0);
+      camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      const visibility = new CameraBasedVisibility(camera);
+      // boxes as high as a few tiles, so that the view stays at some hundred tiles
+      visibility.depth = 1;
+      const grid = new Map2DTileCoordsUtil(0.5, 0.5);
+
+      visibility.computeVisibleTiles([], [0, 0], grid, new Matrix4());
+
+      expectTilesOfTheirOwn(visibility, grid);
+    });
+
+    test('a grid whose tile edges come out a rounding step off its offset gives every tile its own tile', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      // (4 * 16 + 0.1) - 0.1 is 63.99999999999999,
+      // and 2 * 16 + 0.3 less 0.3 falls short of 32 as well
+      const grid = new Map2DTileCoordsUtil(16, 16, 0.1, 0.3);
+
+      visibility.computeVisibleTiles([], [0, 0], grid, new Matrix4());
+
+      expect(
+        visibility.visibles.some((tile) => tile.x === 4),
+        'column 4 is in view',
+      ).toBe(true);
+      expect(
+        visibility.visibles.some((tile) => tile.y === 2),
+        'row 2 is in view',
+      ).toBe(true);
+      expectTilesOfTheirOwn(visibility, grid);
+    });
+  });
+
   describe('frustumBoxScale', () => {
     test('defaults to 1.1', () => {
       expect(new CameraBasedVisibility().frustumBoxScale).toBeCloseTo(1.1);
+    });
+
+    test('refuses anything but a finite number of at least 1', () => {
+      const visibility = new CameraBasedVisibility();
+      visibility.frustumBoxScale = 1.5;
+
+      for (const value of [0.99, 0.5, 0, -1, NaN, Infinity, -Infinity]) {
+        expect(() => {
+          visibility.frustumBoxScale = value;
+        }, String(value)).toThrow(RangeError);
+        expect(visibility.frustumBoxScale, `the value stands after ${value}`).toBe(1.5);
+      }
+      expect(() => {
+        visibility.frustumBoxScale = 0.5;
+      }).toThrow('[CameraBasedVisibility] frustumBoxScale must be a finite number of at least 1, got 0.5');
+
+      visibility.frustumBoxScale = 1;
+      expect(visibility.frustumBoxScale).toBe(1);
     });
 
     test('a new value recomputes without the camera having moved', () => {

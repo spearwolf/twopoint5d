@@ -10,9 +10,10 @@ import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 // with a tilted view. What the path allocates before the compiler has taken it over is accounted
 // for in `measurePerTile()`, not left to the tests that happen to run before.
 
-// a tile that allocates anything costs 16 B at least; one allocation in 16 tiles reads 2 B per
-// tile. When this limit was set, both tests measured 0.00 B per tile — alone, in either order, with
-// the order of a group turned around and with V8 coverage
+// a tile that allocates anything costs 16 B at least: one such allocation in every 16 tiles reads
+// 1 B per tile, the limit, and one of 32 B — a small object — in every 16 tiles reads 2 B. When
+// this limit was set, both tests measured 0.00 B per tile — alone, in either order, with the order
+// of a group turned around and with V8 coverage
 const BYTES_PER_CALL_LIMIT = 1;
 
 const RECOMPUTATIONS_PER_ROUND = 4;

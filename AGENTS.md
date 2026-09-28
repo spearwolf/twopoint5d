@@ -100,9 +100,11 @@ explicit instruction.
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of
   `measureAllocatedBytes()`, which empties only the young generation before its rounds.
-  A spec that measures bytes per tile as the difference of two views calls
-  `measureAllocatedBytes()` directly, so that the two views take turns within one sequence
-  of measurements and a cost that is still settling falls on both alike.
+  A spec that measures bytes per tile or per vertex object as the difference of two sizes —
+  two views of a camera, two ranges of a pool — calls `measureAllocatedBytes()` directly, so
+  that the two sizes take turns within one sequence of measurements and a cost that is still
+  settling falls on both alike; `measurePerTile()` in
+  `src/map2d/hot-path-allocations.tilted-view.spec.ts` shows the sequence.
   The Vitest config starts its workers with `--expose-gc` for it, and `src/testing/`
   never reaches `dist/`.
   The browser tests share their fixtures through

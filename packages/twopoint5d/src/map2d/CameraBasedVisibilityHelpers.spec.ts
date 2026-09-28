@@ -45,8 +45,9 @@ function boxHelperColors(scene: Object3D): string[] {
 }
 
 /**
- * The frustum box helpers on show for tiles no probe ray met directly — what `maxDebugHelpers`
- * limits. They are told apart by `frustumBoxHelperColor`, the one colour only they carry.
+ * The frustum box helpers on show for the tiles that are not primary — not around a point where a
+ * probe ray met the plane — and what `maxDebugHelpers` limits. They are told apart by
+ * `frustumBoxHelperColor`, the one colour only they carry.
  */
 function debugFrustumBoxes(scene: Object3D): Box3Helper[] {
   return boxHelpers(scene).filter(
