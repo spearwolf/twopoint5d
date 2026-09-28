@@ -100,6 +100,9 @@ explicit instruction.
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of
   `measureAllocatedBytes()`, which empties only the young generation before its rounds.
+  A spec that measures bytes per tile as the difference of two views calls
+  `measureAllocatedBytes()` directly, so that the two views take turns within one sequence
+  of measurements and a cost that is still settling falls on both alike.
   The Vitest config starts its workers with `--expose-gc` for it, and `src/testing/`
   never reaches `dist/`.
   The browser tests share their fixtures through

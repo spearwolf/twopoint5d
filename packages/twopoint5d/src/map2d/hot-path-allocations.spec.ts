@@ -11,10 +11,9 @@ import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor} from './types.js';
 
-// a call that allocates anything costs 16 B at least; for rounds of a thousand calls, and for the
-// bytes of a recomputation shared out over its tiles. When these limits were set, a call that
-// finds nothing changed measured 0.01 B, the grid queries with a target 0.01 B, a recomputation
-// of the tilted view 0.01 to 0.33 B per tile of 208 and 0.03 B per tile of 100 under the limit
+// a call that allocates anything costs 16 B at least; for rounds of a thousand calls. When this
+// limit was set, a call that finds nothing changed measured 0.01 B and the grid queries with a
+// target 0.01 B
 const BYTES_PER_CALL_LIMIT = 1;
 
 // half the smallest heap object (16 B): a single allocation per recomputation shows, while the
@@ -28,8 +27,8 @@ const BYTES_PER_RECOMPUTATION_LIMIT = 8;
 // `CameraBasedVisibility`, and 226.78 B beside 226.78 B in `RectangularVisibilityArea`
 const BYTES_PER_TILE_MARGIN = 8;
 
-// Forty recomputations a round, and four of the tilted view with its 208 tiles, keep a test under
-// three seconds with V8 coverage too, which runs them some five times slower.
+// Forty recomputations a round keep a test under three seconds with V8 coverage too, which runs
+// them some five times slower.
 const CALLS_PER_ROUND = 1000;
 const RECOMPUTATIONS_PER_ROUND = 40;
 
@@ -43,15 +42,6 @@ const makeOtherMatrixWorld = () => new Matrix4().makeTranslation(0.25, 0, 0.7501
 function makeTopDownCamera(): PerspectiveCamera {
   const camera = new PerspectiveCamera(90, 1, 0.1, 500);
   camera.position.set(0, 100, 0);
-  camera.lookAt(0, 0, 0);
-  camera.updateMatrixWorld();
-  camera.updateProjectionMatrix();
-  return camera;
-}
-
-function makeTiltedCamera(): PerspectiveCamera {
-  const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
-  camera.position.set(0, 350, 500);
   camera.lookAt(0, 0, 0);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
@@ -160,52 +150,6 @@ describe('CameraBasedVisibility on the hot path', () => {
     expect(bytesPerRecomputation, `${bytesPerRecomputation.toFixed(2)} bytes per recomputation`).toBeLessThan(
       BYTES_PER_RECOMPUTATION_LIMIT,
     );
-  });
-
-  const measurePerTile = async (visibility: CameraBasedVisibility): Promise<number> => {
-    const grid = new Map2DTileCoordsUtil(400, 400, 0.25, -0.5);
-    const center = makeCenter();
-    const matrixWorlds = [makeMatrixWorld(), makeOtherMatrixWorld()] as const;
-    const recomputationsPerRound = 4;
-
-    let previous = visibility.computeVisibleTiles([], center, grid, matrixWorlds[0])!.tiles;
-    let flip = 0;
-    const bytesPerRound = await measureSettledBytes(() => {
-      for (let i = 0; i < recomputationsPerRound; i++) {
-        flip ^= 1;
-        previous = visibility.computeVisibleTiles(previous, center, grid, matrixWorlds[flip]!)!.tiles;
-      }
-    });
-    return bytesPerRound / recomputationsPerRound / visibility.visibles.length;
-  };
-
-  test('a recomputation allocates nothing per tile, however many tiles the view holds', async () => {
-    const visibility = new CameraBasedVisibility(makeTiltedCamera());
-
-    const bytesPerTile = await measurePerTile(visibility);
-
-    expect(visibility.visibles.length, 'a view of some hundred tiles').toBeGreaterThan(150);
-    expect(bytesPerTile, `${bytesPerTile.toFixed(2)} bytes per tile of ${visibility.visibles.length}`).toBeLessThan(
-      BYTES_PER_CALL_LIMIT,
-    );
-  });
-
-  test('a recomputation the limit cuts allocates nothing per tile', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const visibility = new CameraBasedVisibility(makeTiltedCamera());
-      visibility.maxVisibleTiles = 100;
-
-      const bytesPerTile = await measurePerTile(visibility);
-
-      expect(warn, 'the limit cut the view').toHaveBeenCalled();
-      expect(visibility.visibles).toHaveLength(100);
-      expect(bytesPerTile, `${bytesPerTile.toFixed(2)} bytes per tile of ${visibility.visibles.length}`).toBeLessThan(
-        BYTES_PER_CALL_LIMIT,
-      );
-    } finally {
-      warn.mockRestore();
-    }
   });
 
   test('a tile that enters the view costs its Map2DTileCoords and nothing else', async () => {

@@ -102,6 +102,9 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
    * afterwards does not move the state along with it.
    */
   update(nextProps: DependencyValues<Shape>): void {
+    // Destructured, unlike the read in `equals()`: a frame loop only writes here when something
+    // changed, and by the time it has settled the optimizing compiler has taken this over, where
+    // the iterator costs nothing.
     for (const [name, callbacks] of this.#props) {
       // every declared key is written, one the argument leaves out as absent: equals() reads a
       // missing key as absent, and a state that kept an earlier value for it would answer
@@ -137,8 +140,12 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
    */
   equals(nextProps: DependencyValues<Shape>): boolean {
     for (let i = 0; i < this.#props.length; i++) {
-      // The loop bound is `this.#props.length`.
-      const [name, callbacks] = this.#props[i]!;
+      // The loop bound is `this.#props.length`. The pair is read by index: destructured, it runs
+      // the iterator protocol — an iterator and a result object per step — until the optimizing
+      // compiler takes the function over, and a frame loop asks this on every frame.
+      const prop = this.#props[i]!;
+      const name = prop[0];
+      const callbacks = prop[1];
 
       // `name` comes from the declared props and is a plain string, which the mapped shape
       // type does not know about
