@@ -2,6 +2,7 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
+import {isObject} from '../utils/isObject.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
@@ -137,8 +138,6 @@ const getBufferSize = (
 
 const isTextureSize = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1;
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
-
 // The limit of the device behind `renderer`, or `undefined` when it names none. `@types/three`
 // types `renderer.backend` as a plain `Backend`, so the device is read through `unknown`: the
 // `device` of a WebGPU backend — `null` until `init()` has run — or the `gl` context of the WebGL2
@@ -247,8 +246,8 @@ export class FrameBasedAnimations {
    * stepping over every name already taken — so it is reachable through `animId()` like
    * any other. The empty string counts as no name: an animation added under it gets a name of the
    * counter too, `hasAnimation('')` answers `false`, and `animId('')` throws as it does for any
-   * name that was never registered. The counter moves for an animation that was registered: an `add()` that throws
-   * spends no name.
+   * name that was never registered. The counter moves for an animation that was registered: an
+   * `add()` that throws spends no name.
    */
   add(
     ...args:
@@ -380,8 +379,8 @@ export class FrameBasedAnimations {
     }
 
     // the counter hands out a name only once the animation can be built: an add() that throws
-    // spends none, and the names follow the animations that were registered
-    // the empty string counts as no name
+    // spends none, and the names follow the animations that were registered. The empty string
+    // counts as no name and gets one from the counter as well
     if (!name) {
       name = this.#nextAnonymousName();
     }

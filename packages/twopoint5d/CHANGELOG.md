@@ -3187,7 +3187,7 @@ visibility.depth = 100; // 50 below the map plane and 50 above it
 ```ts
 const atlas = new TextureAtlas();
 atlas.add('hero', coords, {hitBox: {x: 4, y: 4, w: 24, h: 28}});
-const width = atlas.frame('hero').data.sourceSize.w; // any
+const width = atlas.frame('hero')?.data?.sourceSize.w; // any
 ```
 
 **After**

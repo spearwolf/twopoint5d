@@ -3,15 +3,15 @@
 // a shape no loop over the items can start on — or a single item, which then builds nothing.
 
 import {describeValue} from '../utils/describeValue.js';
+import {isObject} from '../utils/isObject.js';
 import {isTextureOptionClass, type TextureOptionClasses} from './TextureFactory.js';
 import type {TextureStoreData} from './types.js';
 
 // an object or an array quoted into a message says nothing as `String()` writes it
 const describeCatalogValue = (value: unknown): string =>
-  Array.isArray(value) ? 'an array' : typeof value === 'object' && value !== null ? 'an object' : describeValue(value);
+  Array.isArray(value) ? 'an array' : isObject(value) ? 'an object' : describeValue(value);
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isPlainObject = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
 
 /**
  * Throws a `TypeError` for data whose shape `parse()` cannot even start on: no object, an
