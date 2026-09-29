@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-29T12:27:56.301Z"
+    "generatedAt": "2026-09-29T22:33:32.516Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,46 +205,42 @@
     "domains": {
       "code": {
         "executiveSummary": "Zwei `high`-Befunde aus dem Vorlauf sind noch offen. Ein verschachtelter `StageRenderer` ohne eigene Pipeline löscht sein asPassNode-RenderTarget nie, bewegte Sprites ziehen deshalb Schlieren (BUG-113). `PanControl2D` pannt nach einem Fokuswechsel mit gehaltener Taste endlos weiter (BUG-121).\n\nIm rAF-Hot-Path von vertex-objects, sprites und map2d gibt es keine Allokationslawine. Die spürbaren Kosten stecken im Upload-Modell: `autoTouch` lädt Position und Rotation *aller* Sprites jeden Frame über `0 … usedCount − 1` hoch (PERF-006, PERF-003). Ein `freeVO()` mitten im Pool weitet die Dirty-Range bis ans Pool-Ende, auch für static-Buffer (PERF-005). `Display.resize()` misst das DOM in jedem Frame (PERF-001), und `CameraBasedVisibility` hat keine Obergrenze für abzulaufende Tiles (PERF-002). Darunter liegen rund zwei Dutzend kleine Posten pro Frame oder Aufruf, etwa ein string-keyed `Map.get` in jedem generierten Accessor, Generator-Iteratoren im Upload-Pfad und eager gebaute `expectDefined`-Meldungen. Einzeln kosten sie Nanosekunden, bei vielen Layern summieren sie sich.",
-        "score": 89,
-        "penalty": 21,
+        "score": 99,
+        "penalty": 2.5,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 5,
-          "low": 22,
-          "info": 13
+          "medium": 0,
+          "low": 5,
+          "info": 9
         },
         "byCategory": {
-          "performance": 6,
-          "correctness": 6,
-          "completeness": 3,
-          "api": 8,
-          "resources": 1,
-          "async": 1,
+          "completeness": 1,
+          "performance": 1,
           "security": 1,
-          "architecture": 1,
-          "readability": 2,
-          "consistency": 2,
-          "dx": 7,
+          "api": 2,
+          "consistency": 1,
+          "dx": 5,
+          "readability": 1,
           "testing": 2
         }
       },
       "harness": {
         "executiveSummary": "Für den Hot Path gibt es keine automatische Absicherung. Der CHANGELOG verspricht allokationsfreie Setter und schmale Uploads, aber kein `bench()` und keine Allokations-Assertion hält das fest, obwohl der Browser-Runner Chromium bereits mit `--expose-gc` startet (TEST-001). `checkNameableTypes.mjs` ist das einzige Gate-Skript ohne Test und übersieht weiterhin `import(\"…\")`-Typen (TEST-002, TEST-044). Aus dem Vorlauf bleiben vor allem Doku- und Einstiegslücken offen. Grün sind `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` und `pnpm audit --prod`.",
-        "score": 68,
-        "penalty": 28.5,
+        "score": 73,
+        "penalty": 22,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 7,
-          "low": 29,
+          "medium": 6,
+          "low": 20,
           "info": 17
         },
         "byCategory": {
-          "testing": 12,
+          "testing": 7,
           "dependencies": 3,
           "types": 4,
-          "dx": 24,
+          "dx": 19,
           "build": 4,
           "completeness": 1,
           "readability": 4,
@@ -253,14 +249,14 @@
       }
     },
     "previousDate": "2026-09-21",
-    "resolvedCount": 66,
+    "resolvedCount": 110,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 21021,
-        "findings": 54,
-        "score": 90
+        "findings": 22,
+        "score": 97
       },
       {
         "name": "workspace",
@@ -273,19 +269,19 @@
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 8,
-        "score": 96
+        "findings": 5,
+        "score": 99
       },
       {
         "name": "lookbook",
         "path": "apps/lookbook",
         "reviewedLoc": 0,
-        "findings": 6,
-        "score": 95.5
+        "findings": 5,
+        "score": 96
       }
     ],
     "scoreModel": 2,
-    "score": 78,
+    "score": 85,
     "scoring": {
       "model": 2,
       "weights": {
@@ -302,38 +298,35 @@
     "bySeverity": {
       "critical": 0,
       "high": 0,
-      "medium": 12,
-      "low": 51,
-      "info": 30
+      "medium": 6,
+      "low": 25,
+      "info": 26
     },
     "byCategory": {
-      "performance": 6,
-      "correctness": 6,
-      "testing": 14,
-      "completeness": 4,
+      "testing": 9,
+      "completeness": 2,
       "dependencies": 3,
       "types": 4,
-      "api": 8,
-      "resources": 1,
-      "async": 1,
-      "dx": 31,
+      "performance": 1,
+      "dx": 24,
       "build": 4,
       "security": 1,
-      "architecture": 1,
-      "readability": 6,
-      "consistency": 3
+      "api": 2,
+      "consistency": 2,
+      "readability": 5
     },
     "byComponent": {
-      "stage": 35,
-      "controls": 5
+      "controls": 6,
+      "display": 1,
+      "stage": 3
     },
     "counts": {
-      "findings": 93,
-      "improvements": 12,
+      "findings": 57,
+      "improvements": 9,
       "byStatus": {
-        "new": 24,
-        "unchanged": 2,
-        "carried-over": 67
+        "new": 19,
+        "unchanged": 1,
+        "carried-over": 37
       }
     },
     "deltaBreakdown": {
@@ -343,7 +336,7 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-09-29",
+      "date": "2026-09-30",
       "ref": "2026-09-29"
     }
   },
@@ -512,44 +505,6 @@
   },
   "findings": [
     {
-      "id": "PERF-004",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Canvas-Textur in `Canvas2DStage` wiederverwenden statt pro Inhaltsänderung neu zu bauen",
-      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:135",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/Canvas2DStage.ts:127"
-      ],
-      "description": "Jedes `render()` mit `needsUpdate === true` ruft `makeTexture()`, das über `TextureFactory.create()` eine neue `THREE.Texture` baut (TextureFactory.ts:237–239), setzt sie als `sprite.material.map`, markiert das Material mit `material.needsUpdate = true` und disposed die Vorgängertextur. Für eine animierte 2D-Canvas — der Zweck der Klasse, und die Lookbook-Demo `QuadTreeVisualization.render()` setzt `needsUpdate` bei jedem Aufruf — heißt das pro Frame: eine neue GPU-Textur allozieren und hochladen, die alte zerstören, und den Node-Material-Build samt Pipeline-Lookup erneut anstoßen. Nötig wäre pro Frame nur ein Re-Upload in dieselbe Textur. Aufrufpfad: Anwendung → Canvas2DStage.render → updateTexture → makeTexture → TextureFactory.create.",
-      "evidence": "`this.sprite.material.map = this.makeTexture();\\nthis.sprite.material.needsUpdate = true;` … `previous?.dispose();`",
-      "recommendation": "Die Textur einmal bauen (bzw. nach einem `setCanvasSize()`, weil sich die GPU-Größe ändert) und bei `needsUpdate` nur `this.texture.needsUpdate = true` setzen; `material.needsUpdate` nur beim Wechsel der Textur selbst. Den Vertrag zu `texture` (Stage besitzt, was im Feld steht) beibehalten.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-006",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Ausgabeknoten des komponierten Modus bei einem Wechsel von `Stage2D.scene` neu bauen",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:44",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:876",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:599",
-        "packages/twopoint5d/src/stage/Stage2D.ts:332"
-      ],
-      "description": "`Stage2D.scene` ist ein frei beschreibbares Feld ohne Setter und ohne Event. `StageRenderer` markiert seinen `pipeline.outputNode` nur bei `OnStageAfterCameraChanged` als dirty (StageRenderer.ts:876–878) und fragt `asPassNode()` nur, solange `#outputDirty` gilt (StageRenderer.ts:599–605). Die Doku von `asPassNode()` verspricht, dass ein Szenenwechsel den alten Knoten »on the next call of this method« ersetzt — dieser Aufruf kommt im komponierten Modus aber nicht. Folge: Nach `stage.scene = otherScene` rendert der Plain-Modus und Modus C die neue Szene (über `renderTo()` → `renderer.render(this.scene, …)`), Modus D und E zeigen weiter den `pass(alteSzene, camera)`, bis zufällig ein `add()`, `remove()` oder Kamerawechsel den Knoten neu baut.",
-      "evidence": "`on(stage, OnStageAfterCameraChanged, () => this.invalidateOutputNode())` — kein Pendant für die Szene",
-      "recommendation": "`scene` als Accessor mit Setter führen, der bei Änderung ein Event (z. B. das bestehende `OnStageAfterCameraChanged` verallgemeinert oder ein eigenes) auslöst, auf das `StageRenderer.add()` ebenfalls `invalidateOutputNode()` legt. Alternativ im komponierten Pfad pro Frame Szene und Kamera jeder `Stage2D` gegen den gebauten Knoten vergleichen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-002",
       "category": "testing",
       "domain": "harness",
@@ -636,43 +591,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "API-006",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "`Stage2D.needsUpdate` im Frame-Pfad auswerten oder als reinen Merker für manuelles `updateProjection()` dokumentieren",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:50",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/Stage2D.ts:195",
-        "packages/twopoint5d/src/stage/Stage2D.ts:257"
-      ],
-      "description": "Das öffentliche Flag `needsUpdate` wird nur in `updateProjection(false)` gelesen. Im ganzen Paket ruft niemand `updateProjection()` ohne `forceUpdate` auf (`Canvas2DStage` und der `projection`-/`camera`-Setter immer mit `true`), und weder `updateFrame()` noch `renderTo()` noch `StageRenderer` schauen auf das Flag. Wer nach einer Änderung an `projection.viewSpecs` (z. B. `pixelZoom`) `stage.needsUpdate = true` setzt, sieht bis zur nächsten Änderung der Containergröße keine Wirkung. Das spart zwar pro Frame jede Projektionsrechnung, lässt das Flag aber ohne Verbraucher.",
-      "evidence": "`if ((forceUpdate || this.needsUpdate) && this.projection) {` — einzige Lesestelle",
-      "recommendation": "In `updateFrame()` vor dem Emit `this.updateProjection()` aufrufen: ohne gesetztes Flag kostet das einen Boolean-Check, mit Flag genau eine Neuberechnung. Alternativ JSDoc des Flags ausdrücklich auf »wird nur von einem manuellen `updateProjection()` gelesen« setzen.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-017",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Allokationen pro Frame im Stage-Render-Pfad vermeiden",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:273",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:652"
-      ],
-      "description": "`Stage2D.updateFrame()` baut in jedem Frame für jede Stage ein neues `StageUpdateFrameProps`-Objekt und emittiert `OnStageUpdateFrame` auch dann, wenn niemand zuhört (Zeile 273–285). Bei vielen Stages bzw. verschachtelten Renderern summiert sich das zu N Objekten pro Frame für den GC. Im Pipeline-Modus C und für Kind-Renderer ruft `#ensureRT()` → `#resizeRenderTarget()` pro Frame `#renderTargetSize()`, das jedes Mal ein neues Tupel `[w, h]` zurückgibt. Projektions- und Kamera-Updates selbst laufen dagegen nicht pro Frame, sondern nur bei Größen- oder Spezifikationswechseln.",
-      "evidence": "`const updateFrameProps: StageUpdateFrameProps = {stage: this, now, deltaTime, frameNo};`",
-      "recommendation": "Pro Stage ein Props-Objekt halten und je Frame nur `now`, `deltaTime`, `frameNo` überschreiben; für `OnStageFirstFrame` ein eigenes Objekt verwenden, weil `retain()` es für späte Abonnenten aufbewahrt. In der JSDoc der Props festhalten, dass sie nur während des Aufrufs gelten. `#renderTargetSize()` in zwei Felder oder einen wiederverwendeten Scratch-Vektor schreiben.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "PERF-018",
       "category": "performance",
       "domain": "code",
@@ -688,96 +606,6 @@
       "description": "`update()` läuft pro Frame und ruft `mergePan(Array.from(this.#pointersDown.values()))`: ein neues Array plus über `reduce` ein Akkumulator-Objekt pro gedrücktem Pointer und das Startobjekt — auch wenn gar kein Pointer unten ist. `#restoreCursorUnlessMouseDown()` kopiert die Map-Werte ebenfalls per `Array.from(...).some(...)`; es läuft über Zeile 573–575 bei jedem `pointermove` einer Maus ohne gedrückten Pan-Button, also bei jeder Hover-Bewegung über die gesamte Seite. Wirkung: dauernder kleiner GC-Druck im rAF- und Input-Pfad.",
       "evidence": "`let {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));`",
       "recommendation": "Mit `for (const state of this.#pointersDown.values())` direkt in zwei lokale Zahlen summieren und die States dabei nullen; für den Maus-Check eine Schleife mit frühem `return` verwenden bzw. einen Zähler gedrückter Maus-Pointer führen. Bei leerer Map `update()` den Pointer-Zweig ganz überspringen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-019",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Pipeline im Modus C nur beim Wechsel von Pipeline oder RenderTarget neu aufbauen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:549",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:871",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:877",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:900",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:757"
-      ],
-      "description": "Im Modus C (Pipeline ohne `buildOutputNode`) hängt der Ausgabeknoten von keiner Stage ab — er ist immer `texture(#internalRT.texture)`. Trotzdem setzt jedes `add()`, `remove()`, jeder Kamerawechsel einer Stage, jede Umbenennung unter explizitem `renderOrder` und jede Änderung von `renderOrder` `#outputDirty`, und der nächste Frame baut einen neuen `texture()`-Knoten und setzt `pipeline.needsUpdate = true`. Das stößt einen neuen Node-Build des Fullscreen-Quads an. Bei Szenenwechseln, die Stages zur Laufzeit hinzufügen oder entfernen, oder bei häufig getauschten Kameras entsteht so ein vermeidbarer Hitch.",
-      "evidence": "`if (this.#outputDirty) { this.pipeline!.outputNode = texture(rt.texture); this.pipeline!.needsUpdate = true; … }`",
-      "recommendation": "Im Modus C den gebauten Knoten zusammen mit der Pipeline und dem RenderTarget merken und nur neu bauen, wenn sich eines davon geändert hat; `#outputDirty` bleibt dem komponierten Modus vorbehalten.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-002",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "title": "Interne RenderTargets beim Verlassen ihres Modus freigeben",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:399",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:437",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:894",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:736"
-      ],
-      "description": "`#internalRT` (Modus C) und `#asPassNodeRT` (Kind in einem komponierenden Parent) werden lazy in voller Containergröße × Pixel Ratio gebaut und erst in `dispose()` freigegeben. Setzt der Aufrufer `pipeline = undefined` oder `buildOutputNode`, bleibt `#internalRT` ungenutzt allokiert und wird bei jedem `resize()` sogar weiter mitskaliert (Zeile 320–321). Ebenso behält ein per `remove()` aus dem Parent genommenes Kind sein `#asPassNodeRT`. Bei 4K und DPR 2 sind das je RenderTarget rund 130 MB Farbe plus Depth auf der GPU.",
-      "evidence": "`if (this.#internalRT) this.#resizeRenderTarget(this.#internalRT);` — auch ohne Pipeline",
-      "recommendation": "Im `pipeline`- und `buildOutputNode`-Setter das `#internalRT` disposen, wenn der neue Zustand nicht mehr Modus C ist; in `#removeFromParent()` das `#asPassNodeRT` freigeben. Beide werden beim nächsten Bedarf wieder lazy gebaut.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ASYNC-002",
-      "category": "async",
-      "domain": "code",
-      "severity": "low",
-      "title": "Stage-Liste in `updateFrame()` und `renderTo()` über einen Schnappschuss iterieren",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:762",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:372",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:896"
-      ],
-      "description": "Mit dem Default `renderOrder = '*'` gibt `orderedStages` das interne, veränderliche `this.stages`-Array selbst zurück (Zeile 762–764). Ruft ein `OnStageUpdateFrame`-Listener während `updateFrame()` `renderer.remove(stage)` auf — etwa eine Stage, die sich nach einer Überblendung selbst entfernt —, spliced `remove()` das Array mitten in der `for…of`-Schleife, und die nachfolgende Stage bekommt in diesem Frame kein `updateFrame()`, wird aber gerendert. Mit explizitem `renderOrder` iteriert die Schleife dagegen das alte Cache-Array, und die entfernte Stage bekommt ihr `updateFrame()` noch. Das Verhalten beim Reentrancy-Fall hängt so vom Sortiermodus ab; außerdem kann jeder Aufrufer über den öffentlichen Getter die interne Liste verändern.",
-      "evidence": "`if (renderOrder.length === 0 || (renderOrder.length === 1 && renderOrder[0] === '*')) { return this.stages; }`",
-      "recommendation": "Im `'*'`-Fall ebenfalls ein gecachtes Array (`this.stages.slice()`, bei `add`/`remove` invalidiert) liefern, sodass beide Modi während eines Frames einen stabilen Schnappschuss iterieren; die Reentrancy-Regel (Änderungen wirken ab dem nächsten Frame) in der JSDoc festhalten.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-013",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Interne RenderTargets mit HalfFloat und den Samples des Renderers anlegen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:666",
-      "component": "stage",
-      "description": "`#ensureRT()` baut `#internalRT` und `#asPassNodeRT` als `new RenderTarget(w, h)` mit den three.js-Defaults: `UnsignedByteType`, `samples = 0`. Die `pass()`-Knoten der Stages im komponierten Modus nutzen dagegen `HalfFloatType` und `renderer.samples` (three PassNode.js:246, :766). Wer von Modus D auf Modus C oder auf einen verschachtelten Renderer wechselt, bekommt dadurch ein lineares 8-Bit-Zwischenbild mit sichtbarem Banding in dunklen Verläufen und verliert das MSAA, das der Plain-Modus auf dem Canvas hatte.",
-      "evidence": "`return new RenderTarget(w, h);`",
-      "recommendation": "`new RenderTarget(w, h, {type: HalfFloatType, samples: renderer.samples})` verwenden (oder die Optionen konfigurierbar machen) und bei einem geänderten `renderer.samples` in `#ensureRT()` nachziehen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-002",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "low",
-      "title": "`Canvas2DStage.render()` den Frame-Tick an seine Stage weitergeben lassen",
-      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:173",
-      "component": "stage",
-      "description": "`render()` emittiert `render`, aktualisiert die Textur und ruft `stageRenderer.renderTo()` — aber nie `stageRenderer.updateFrame()`. Die `Stage2D` hinter `canvas2DStage.stage` bekommt dadurch kein `updateFrame()`: `OnStageFirstFrame` und `OnStageUpdateFrame` feuern nie, und die Warnung nach 100 Frames ohne Kamera (Stage2D.ts:262–269) greift nicht. Ruft der Aufrufer nie `setContainerSize()` — die Lookbook-Demo `QuadTreeVisualization` tut das nicht —, hat die Stage keine Kamera und `render()` zeichnet stumm nichts.",
-      "evidence": "`this.dispatchEvent('render');\\nthis.updateTexture();\\nthis.stageRenderer.renderTo(this.renderer);`",
-      "recommendation": "`render()` um die Frame-Parameter (`now`, `deltaTime`, `frameNo`) erweitern oder einen eigenen Zähler führen und vor `renderTo()` `this.stageRenderer.updateFrame(…)` aufrufen; in der JSDoc festhalten, dass ohne `setContainerSize()` keine Kamera entsteht.",
       "effort": "S",
       "status": "new",
       "package": "@spearwolf/twopoint5d"
@@ -854,130 +682,6 @@
       "package": "workspace"
     },
     {
-      "id": "BUG-114",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Den Output-Transform einer Kind-Pipeline im komponierten Modus abschalten",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:587-595",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:608",
-        "packages/twopoint5d/src/stage/README.md"
-      ],
-      "description": "`RenderPipeline.render()` wendet in three 0.185 bei `outputColorTransform === true` (Default) Tone-Mapping und die Kodierung nach `outputColorSpace` an, unabhängig vom Target. Die Kind-Pipeline schreibt so sRGB-kodierte Werte in ihr lineares Pass-RT. Der Parent sampelt sie als linear und kodiert erneut. Im dokumentierten Mode E wirkt das Kind-Bild dadurch ausgewaschen oder doppelt tone-mapped. Das ist aus dem three-Quelltext abgeleitet und nicht per Pixel-Test verifiziert.",
-      "recommendation": "Beim Vorrendern eines Kindes `pipeline.outputColorTransform = false` setzen und danach zurücksetzen. Das Verhalten für `outputRenderTarget` in der TSDoc festhalten und einen Pixel-Test für Mode E ergänzen.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "ARCH-007",
-      "category": "architecture",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Die Beziehung zwischen StageRenderer und seinen Stages zweiseitig machen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:859-884",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:641-646",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:722-745",
-        "packages/twopoint5d/src/stage/Stage2D.ts:386-395"
-      ],
-      "description": "`root.add(child)` setzt bei einem Kind-Renderer weder `parent` noch `OnAddToParent`. Ein späteres `child.attach(display)` lässt ihn doppelt treiben, vom Display und vom Root. `child.dispose()` lässt ihn in der Liste des Parents stehen, und der komponierende Parent wirft ab dem nächsten Frame jedes Mal. `StageRenderer.dispose()` emittiert kein `dispose`-Event, obwohl resource-lifecycle.md §4/§6.3 das für abonnierte Objekte verlangt. Für `Stage2D` ist dieselbe Falle nur als Pitfall dokumentiert.",
-      "recommendation": "In `add()` bei einem `StageRenderer` den `parent` setzen, auf `dispose` der Stage hören und sie dann per `remove()` austragen. `StageRenderer.dispose()` emittiert vor `off(this)` ein `dispose`-Event.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-021",
-      "category": "performance",
-      "domain": "code",
-      "severity": "medium",
-      "kind": "improvement",
-      "title": "In Canvas2DStage eine Texture wiederverwenden statt pro Update eine neue zu bauen",
-      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:127-147",
-      "description": "Jedes `needsUpdate` erzeugt über `TextureFactory.create()` eine neue `Texture` samt GPU-Allokation, setzt `material.needsUpdate` und disposed die alte. Bei einem animierten Canvas passiert das jeden Frame, das Lookbook setzt `needsUpdate` bei jeder Datenänderung.",
-      "recommendation": "Die Textur einmal bauen und danach `texture.needsUpdate = true` setzen. Neu bauen nur bei geänderter Canvas-Größe.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-062",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Canvas2DStage.texture wirksam oder lesend machen und den ersten Frame zeichnen",
-      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:62-67",
-      "locations": [
-        "packages/twopoint5d/src/stage/Canvas2DStage.ts:74"
-      ],
-      "description": "Eine von außen zugewiesene Textur landet nie in `sprite.material.map`. Sie wird nur beim nächsten Update oder in `dispose()` freigegeben, obwohl die TSDoc sie »the texture the canvas content is drawn from« nennt. `needsUpdate` startet mit false, deshalb bleibt ein schon bemalter, übergebener Canvas unsichtbar, bis der Aufrufer das Flag setzt.",
-      "recommendation": "`texture` nur lesend exponieren oder im Setter aufs Material anwenden und `needsUpdate` initial auf true setzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-063",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "Stage-, Canvas2DStage- und PanControl2D-Events als Konstanten mit Payload-Typ exportieren",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:391",
-      "locations": [
-        "packages/twopoint5d/src/stage/Canvas2DStage.ts:177-227",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:406",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:451",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:514"
-      ],
-      "description": "Die übrigen Events der Library stehen als `On*`-Konstanten mit Interface in `events.ts`. `Stage2D` (`dispose`), `Canvas2DStage` (`resize`, `render`) und `PanControl2D` (`update`, `hideCursor`, `restoreCursor`) emittieren dagegen nackte Strings. Ein Tippfehler beim Abonnieren wird so kein Compilerfehler, und die Payloads sind nicht typisiert.",
-      "recommendation": "Konstanten und Interfaces in `events.ts` ergänzen, für `PanControl2D` zusätzlich typisierte `on*()`-Helfer analog zu `Display`.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-064",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "StageRenderer.stages und renderOrderArray nicht mutierbar herausgeben",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:149",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:177-195",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:361"
-      ],
-      "description": "`readonly stages: StageItem[]` schützt nur die Referenz. Ein `push` oder `splice` von außen umgeht Kamera-Subscription, Cache und Dirty-Flag. `renderOrderArray` gibt den internen Cache heraus. Die protected Hooks, etwa `onRenderOrderChanged` ohne TSDoc, haben im Repo keinen Nutzer, und `renderStage` greift nur im Plain-Modus und in Mode C.",
-      "recommendation": "`stages` als `ReadonlyArray` typisieren, `renderOrderArray` kopiert herausgeben, die Hooks dokumentieren oder privat machen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "MEM-016",
-      "category": "resources",
-      "domain": "code",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Interne RenderTargets beim Moduswechsel und beim Entfernen freigeben",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:443-446",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:399-406"
-      ],
-      "description": "Nach `pipeline = undefined` oder einer Zuweisung von `buildOutputNode` belegt `#internalRT` weiter Speicher in voller Größe mal Pixel Ratio. Dasselbe gilt für `#asPassNodeRT` nach `remove()`. Ein Leak ist das nicht, weil `dispose()` beides freigibt, es kostet aber VRAM.",
-      "recommendation": "`#internalRT` beim Verlassen von Mode C freigeben und `#asPassNodeRT` bei `OnRemoveFromParent`.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "PERF-031",
       "category": "performance",
       "domain": "code",
@@ -991,22 +695,6 @@
       "status": "carried-over",
       "component": "controls",
       "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-042",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Mode E der Stage mit einem Pixel-Test absichern",
-      "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:587-595"
-      ],
-      "description": "Der Display-Anteil ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`), der Sprites-Anteil im Lauf vom 2026-09-26 (`324ab4a1`). Im Lauf vom 2026-09-29 (`e2026856`) kamen der Zwei-Frame-Pixel-Readback für ein verschachteltes Plain-Kind (`stage-pipeline.test.js`) und Vitest-Tests für ein verlorenes `keyup` (`PanControl2D.spec.ts`) dazu. Offen bleibt Mode E, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für ein verschachteltes Kind mit eigener Pipeline. Ein solcher Test dürfte am doppelten Output-Transform (BUG-114) scheitern und gehört mit dessen Fix zusammen.",
-      "recommendation": "Für Mode E einen Browser-Test mit Pixel-Readback ergänzen, zusammen mit dem Abschalten des Output-Transforms der Kind-Pipeline.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
     },
     {
       "id": "TEST-043",
@@ -1182,20 +870,6 @@
       "package": "workspace"
     },
     {
-      "id": "API-005",
-      "category": "api",
-      "domain": "code",
-      "severity": "medium",
-      "title": "IProjection.getViewRect() gibt ein anonymes Tuple zurück",
-      "location": "packages/twopoint5d/src/stage/IProjection.ts:6",
-      "description": "\u003ccode>getViewRect(): [width, height, pixelRatioHorizontal, pixelRatioVertical]\u003c/code>. Tuple-Rückgaben sind in IDEs schwer lesbar; am Aufrufort in \u003ccode>Stage2D\u003c/code> steht \u003ccode>const [w, h] = …\u003c/code>, die beiden übrigen Werte sind unsichtbar. Re-Check: unverändert.",
-      "recommendation": "Auf \u003ccode>{width, height, pixelRatioX, pixelRatioY}\u003c/code> umstellen. Breaking Change, aber ein kleiner — Projection-Implementierungen sind praktisch intern.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "TEST-004",
       "category": "testing",
       "domain": "harness",
@@ -1210,20 +884,6 @@
       "component": "controls"
     },
     {
-      "id": "TEST-022",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die ungetesteten öffentlichen Verhalten der stage-Schicht abdecken",
-      "location": "packages/twopoint5d/src/stage/ProjectionPlane.spec.ts:6",
-      "description": "Keine Spec übt: \u003ccode>Stage2D\u003c/code> \u003ccode>projection\u003c/code>-Wechsel / \u003ccode>camera\u003c/code>-Override-Vorrang / \u003ccode>OnStageAfterCameraChanged\u003c/code>, \u003ccode>OnStageResize\u003c/code>, \u003ccode>OnStageFirstFrame\u003c/code> (retained), \u003ccode>OnStageUpdateFrame\u003c/code>, \u003ccode>updateProjection(needsUpdate)\u003c/code>; \u003ccode>ParallaxProjection.updateCamera\u003c/code>/\u003ccode>OrthographicProjection.updateCamera\u003c/code> (CONS-025); \u003ccode>ProjectionPlane.applyRotation\u003c/code>, \u003ccode>clone\u003c/code>, \u003ccode>equals\u003c/code>, den »up is mandatory«-Throw; \u003ccode>fitIntoRectangle\u003c/code> im \u003ccode>cover\u003c/code>-Modus komplett und die beidseitigen \u003ccode>contain\u003c/code>-Zweige (fitIntoRectangle.ts:220-233); im \u003ccode>StageRenderer\u003c/code> den Transparent-Black-Pfad von \u003ccode>#clearForInternalRT\u003c/code> (454-457), \u003ccode>#applyClear\u003c/code> in Pipeline-Modi, ein verschachteltes Kind mit eigener Pipeline (Mode E), erneutes \u003ccode>attach()\u003c/code> an einen zweiten Host, \u003ccode>asPassNodeRT\u003c/code>-Resize; \u003ccode>Canvas2DStage.fit\u003c/code>-Setter und \u003ccode>setContainerSize()\u003c/code>. Die drei High/Medium-Bugs dieses Laufs in der stage-Schicht (BUG-078, BUG-079, MEM-005) liegen alle in diesen Lücken.",
-      "recommendation": "Die aufgezählten Specs ergänzen, beginnend mit Kamera-Wechsel + Pipeline-Rebuild, Mode E und \u003ccode>cover\u003c/code>.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "API-049",
       "category": "api",
       "domain": "code",
@@ -1234,118 +894,6 @@
       "recommendation": "In die Lookbook verschieben (oder einen \u003ccode>/devtools\u003c/code>-Subpath, sollte je einer entstehen) und aus \u003ccode>utils/public-api.ts\u003c/code> streichen (CHANGELOG »Removed«); bleibt sie, einen \u003ccode>log\u003c/code>-Senken-Parameter und ein \u003ccode>maxDepth\u003c/code> nehmen, eine Zeile pro Knoten statt \u003ccode>console.dir\u003c/code>.",
       "effort": "S",
       "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "IMPL-008",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die README-Clear-Policy-Tabelle mit dem erzwungenen autoClear = false in Einklang bringen",
-      "location": "packages/twopoint5d/src/stage/README.md:192",
-      "description": "Mit dem Default \u003ccode>clear=false\u003c/code> wird das \u003ccode>autoClear\u003c/code> des Renderers (three-Default \u003ccode>true\u003c/code>) für jeden Stage-Draw auf \u003ccode>false\u003c/code> übersteuert, nichts löscht also je den Canvas: Wer \u003ccode>clear\u003c/code> auslässt, weil »der Renderer ohnehin löscht«, bekommt akkumulierende Frames. Die Tabellenzeile »Renderer state untouched« ist falsch, und der Pitfalls-Eintrag irrt in die andere Richtung — \u003ccode>autoClear\u003c/code> wird immer wiederhergestellt, Farbe/Alpha nur, wenn ein Clear stattfand.",
-      "recommendation": "Entweder dokumentieren (»\u003ccode>clear\u003c/code> ist das einzige Clear; \u003ccode>autoClear\u003c/code> ist während der Stage-Draws immer aus«) an beiden Stellen, oder \u003ccode>renderer.autoClear\u003c/code> für die erste Stage respektieren, wenn \u003ccode>clear=false\u003c/code> (autoClear erst nach dem ersten \u003ccode>renderStage\u003c/code> auf false). Spec für die gewählte Variante.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "READ-001",
-      "category": "readability",
-      "domain": "code",
-      "severity": "low",
-      "title": "StageRenderer.ts mit 733 Zeilen entwirren",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts",
-      "description": "Der `Display.ts`-Anteil ist im Remediation-Lauf vom 2026-09-24 behoben (`resize()` als Pipeline benannter Schritte, `a33a6961`). `StageRenderer.ts` ist seit dem Vorlauf (624 Zeilen) auf 733 Zeilen gewachsen und mischt Modusauswahl, RenderTarget-Verwaltung und Pass-Komposition.",
-      "recommendation": "Modusauswahl und RenderTarget-Verwaltung in eigene Module oder private Methoden mit sprechenden Namen ziehen, sodass `render()` sich als Folge von Schritten liest.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-027",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "TSDoc von StageRenderer#stages auf den Getter orderedStages verweisen lassen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:147",
-      "description": "Das TSDoc von \u003ccode>stages\u003c/code> verweist auf \u003ccode>getOrderedStages()\u003c/code>; eine solche Methode gibt es nicht, gemeint ist der Getter \u003ccode>orderedStages\u003c/code>. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "\u003ccode>{@link orderedStages}\u003c/code> statt \u003ccode>getOrderedStages()\u003c/code>.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-028",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Den Hook onRenderOrderChanged() dokumentieren",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:177",
-      "description": "Der protected Hook \u003ccode>onRenderOrderChanged()\u003c/code> trägt nur \u003ccode>// ntdh\u003c/code>; wann er läuft und wofür eine Unterklasse ihn überschreibt, steht nirgends. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Ein TSDoc: läuft nach jeder Änderung von \u003ccode>renderOrder\u003c/code>, bevor der nächste Frame die Reihenfolge liest; Default tut nichts.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-037",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Fehlermeldung von Stage2D#asPassNode() vollständig machen",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:327",
-      "description": "»no scene or camera yet — call resize() first« ist ungenau: ein \u003ccode>resize()\u003c/code> reicht nicht, wenn die Specs keine View ergeben oder die Projektion fehlt. \u003ccode>updateFrame()\u003c/code> nennt die Bedingung vollständig. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Die Meldung an \u003ccode>updateFrame()\u003c/code> angleichen: Projektion gesetzt, Specs ergeben eine View mit Fläche, \u003ccode>resize()\u003c/code> mit Breite und Höhe &gt; 0.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-044",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Im Stage-README nicht behaupten, ein Projektionswechsel nehme die Nutzerkamera mit",
-      "location": "packages/twopoint5d/src/stage/README.md:491",
-      "description": "»puts them back to 0 with the camera«: bei einer vom Nutzer gesetzten Kamera bleibt die Kamera, nur \u003ccode>width\u003c/code>/\u003ccode>height\u003c/code> gehen auf 0. Die TSDoc von \u003ccode>width\u003c/code> ist genau, das README nicht. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "»with the camera« streichen oder »with the projection camera« schreiben.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-026",
-      "category": "api",
-      "domain": "code",
-      "severity": "info",
-      "title": "Keine Helper-Builder für gängige Effekt-Stacks",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:422",
-      "description": "\u003ccode>buildOutputNode\u003c/code> ist der richtige Hook, aber jeder Nutzer schreibt seinen bloom-, chromatic- oder film-grain-Graph von Hand. Unverändert.",
-      "recommendation": "Ein kleines Set an Factory-Funktionen, die fertige \u003ccode>buildOutputNode\u003c/code>-Callbacks liefern. Erst sinnvoll, wenn sich abzeichnet, welche Stacks tatsächlich wiederkehren.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-008",
-      "category": "performance",
-      "domain": "code",
-      "severity": "info",
-      "title": "Kein RenderTarget-Pool für gleich dimensionierte Renderer",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:444",
-      "description": "Jeder \u003ccode>StageRenderer\u003c/code> mit Pipeline hält sein eigenes internes RenderTarget. Mehrere Renderer gleicher Auflösung könnten sich eines teilen. Unverändert; im Remediation-Lauf bewusst zurückgestellt.",
-      "recommendation": "Nice-to-have. Erst angehen, wenn eine reale Szene mehr als zwei, drei verschachtelte Pipelines fährt — vorher ist der Pool teurer als das, was er spart.",
-      "effort": "M",
-      "status": "carried-over",
-      "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1363,62 +911,6 @@
       "package": "@spearwolf/twopoint5d"
     },
     {
-      "id": "PERF-024",
-      "category": "performance",
-      "domain": "code",
-      "severity": "info",
-      "title": "Den Kamerawechsel einer Stage den Output-Node nur im komponierten Modus invalidieren lassen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:877",
-      "description": "Das Abo auf \u003ccode>OnStageAfterCameraChanged\u003c/code> invalidiert den Output-Node in jedem Modus. Im Plain-Modus ist das folgenlos, in Mode C baut ein Kamerawechsel \u003ccode>texture(rt.texture)\u003c/code> neu und stößt eine unnötige Shader-Neukompilierung an. Nur bei Kamerawechsel, deshalb harmlos. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Nur invalidieren, wenn der Renderer pass nodes komponiert (\u003ccode>buildOutputNode\u003c/code> oder \u003ccode>RootRenderPipeline\u003c/code>).",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "API-056",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "getZoom() beantwortet unter einem Namen zwei verschiedene Fragen",
-      "location": "packages/twopoint5d/src/stage/ParallaxProjection.ts:164",
-      "description": "Beide Implementierungen von \u003ccode>IProjection#getZoom()\u003c/code> liefern Unvergleichbares: die parallaktische rechnet \u003ccode>1 - d/D\u003c/code> — 1 an der Kamera, 0 auf der Projektionsebene, negativ dahinter —, die orthografische gibt konstant \u003ccode>1\u003c/code> mit der Begründung, der Zoomfaktor sei bei orthografischer Sicht immer derselbe. Wer gegen das Interface programmiert, bekommt von der einen einen Parallax-Faktor und von der anderen einen Skalierungsfaktor. Außerhalb der beiden Specs ruft die Methode im Repository niemand. Aufgefallen im Remediation-Lauf vom 2026-09-20, dort bewusst nicht behoben: der Fix ändert entweder den Rückgabewert einer veröffentlichten Interface-Methode oder schneidet \u003ccode>IProjection\u003c/code> neu — die Entscheidung gehört vor einen Lauf, nicht in einen.",
-      "recommendation": "Erst entscheiden, was \u003ccode>getZoom()\u003c/code> auf dem Interface bedeuten soll: entweder eine Semantik für beide (und die orthografische Implementierung zieht nach), oder zwei getrennt benannte Methoden. Danach TSDoc an \u003ccode>IProjection\u003c/code>, die die gewählte Bedeutung festschreibt.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-098",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "low",
-      "title": "add() hinterlässt eine halb hinzugefügte Stage, wenn sie die Größe abweist",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:880",
-      "description": "\u003ccode>add()\u003c/code> ruft \u003ccode>resizeStage(si, this.width, this.height)\u003c/code> nach \u003ccode>stages.push(si)\u003c/code> und nach dem Setzen des Kamera-Listeners, aber vor \u003ccode>emit(this, OnStageAdded, …)\u003c/code>. Weist die Stage die Größe ab, steht sie in \u003ccode>stages\u003c/code>, \u003ccode>OnStageAdded\u003c/code> bleibt aus, und der Aufrufer bekommt einen Fehler statt \u003ccode>this\u003c/code> — eine Stage im Renderer, deren Aufnahme nie angekündigt wurde. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Dieselbe Transaktionsregel wie in \u003ccode>resize()\u003c/code>: entweder vor dem \u003ccode>push\u003c/code> resizen, oder die Stage bei einem Wurf wieder aus \u003ccode>stages\u003c/code> nehmen und den Listener abhängen, bevor der Fehler nach oben geht.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-046",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "info",
-      "title": "Fünf Methoden der Canvas2DStage tragen keinen Rückgabetyp",
-      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:135",
-      "description": "\u003ccode>updateTexture()\u003c/code>, \u003ccode>setContainerSize()\u003c/code>, \u003ccode>setCanvasSize()\u003c/code>, \u003ccode>render()\u003c/code> und \u003ccode>dispatchEvent()\u003c/code> stehen ohne Rückgabetyp, anders als der Rest der Klasse und die Module ringsum.",
-      "recommendation": "Die fünf Signaturen um ihren Rückgabetyp ergänzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "CONS-047",
       "category": "consistency",
       "domain": "code",
@@ -1429,62 +921,6 @@
       "recommendation": "Die beiden Aussagen trennen — was seinen Wert behält, und was weiter Schreibzugriffe annimmt — und die CHANGELOG-Zeile nachziehen.",
       "effort": "S",
       "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-047",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Das IPassProvider-Beispiel im README widerspricht der Zusage von Stage2D",
-      "location": "packages/twopoint5d/src/stage/README.md:397",
-      "description": "\u003ccode>MyStage#asPassNode()\u003c/code> im Beispiel baut nach dem eigenen \u003ccode>dispose()\u003c/code> wieder einen Knoten, statt zu werfen wie \u003ccode>Stage2D\u003c/code>. Für eine Vorlage vertretbar — wer die Semantik von \u003ccode>Stage2D\u003c/code> will, ergänzt den Guard selbst —, aber ein Leser übernimmt die Vorlage, nicht die Fußnote.",
-      "recommendation": "Dem Beispiel den Guard geben, den \u003ccode>Stage2D\u003c/code> trägt, oder in einem Halbsatz sagen, dass die Vorlage ihn bewusst auslässt.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-050",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die TSDoc des camera-Setters fasst »every updateProjection()« zu weit",
-      "location": "packages/twopoint5d/src/stage/Stage2D.ts:127",
-      "description": "Ohne Argument tut der Aufruf nur etwas, wenn \u003ccode>needsUpdate\u003c/code> gesetzt ist (\u003ccode>Stage2D.ts:186\u003c/code>). Für einen Konsumenten, der die Kamera zuweist, ist der Satz in der Sache richtig, im Wortlaut aber zu weit.",
-      "recommendation": "Den Satz auf den Fall einschränken, in dem die Projektion tatsächlich neu rechnet.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-029",
-      "category": "testing",
-      "domain": "code",
-      "severity": "info",
-      "title": "Zwei zugesagte Verhaltensweisen der Stage-Kamerapfade haben keinen Test",
-      "location": "packages/twopoint5d/src/stage/ParallaxProjection.ts:136",
-      "description": "Der Wurf von \u003ccode>updateCamera()\u003c/code> auf einer Projektion ohne Projektionsebene und der Frühausstieg von \u003ccode>setContainerSize()\u003c/code> bei unveränderter Größe stehen beide im CHANGELOG, aber in keiner Spec.",
-      "recommendation": "Je einen Test ergänzen: eine Projektion ohne Plane, und ein \u003ccode>setContainerSize()\u003c/code> mit der Größe, die der Renderer schon trägt.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-031",
-      "category": "testing",
-      "domain": "code",
-      "severity": "info",
-      "title": "Der AggregateError des Renderers ist nur im Einzelfall getestet",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:723",
-      "description": "Beide Tests decken den einen ablehnenden Fall ab; dass mehrere ablehnende Stages zu einem \u003ccode>AggregateError\u003c/code> zusammenlaufen und in welcher Reihenfolge sie in \u003ccode>errors\u003c/code> stehen, prüft keiner. Die Assertions auf \u003ccode>sr.width\u003c/code>/\u003ccode>sr.height\u003c/code> im ersten Test gelten mit und ohne den Fix, den sie begleiten.",
-      "recommendation": "Einen Test mit zwei ablehnenden Stages ergänzen und die Assertions so schärfen, dass sie ohne den Fix fallen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "stage",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1538,19 +974,6 @@
       "effort": "S",
       "status": "carried-over",
       "package": "workspace"
-    },
-    {
-      "id": "DOC-009",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Keine dedizierte Demo für Projections",
-      "location": "apps/lookbook/src/pages/demos/display-minimal.astro",
-      "description": "Für \u003ccode>stage/\u003c/code> gibt es \u003ccode>stage-postprocessing\u003c/code> und \u003ccode>stage-nested-pipelines\u003c/code>. Die Projektionen — Orthographic und Parallax, der Kern der 2.5D-Idee — kommen weiterhin nur nebenbei vor. Re-Check: unverändert.",
-      "recommendation": "Eine Demo, die dieselbe Szene unter beiden Projektionen zeigt und die \u003ccode>fit\u003c/code>-Modi durchschaltet.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
     },
     {
       "id": "IMPL-004",
@@ -1787,28 +1210,6 @@
       "package": "workspace"
     },
     {
-      "id": "DOC-066",
-      "category": "dx",
-      "domain": "code",
-      "severity": "low",
-      "title": "Die Stage-README verweist auf nummerierte Abschnitte, die sie nicht hat",
-      "location": "packages/twopoint5d/src/stage/README.md:22-25",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. Die Verweise auf \u003ccode>§3.2\u003c/code>, \u003ccode>§6.2\u003c/code>, \u003ccode>§6.3\u003c/code> und \u003ccode>§6.4\u003c/code> führen ins Leere, weil die README keine nummerierten Abschnitte hat.",
-      "recommendation": "Die Verweise durch Überschriften-Links ersetzen oder die Abschnitte nummerieren.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      },
-      "locations": [
-        "packages/twopoint5d/src/stage/README.md:246",
-        "packages/twopoint5d/src/stage/README.md:262",
-        "packages/twopoint5d/src/stage/README.md:313"
-      ]
-    },
-    {
       "id": "DOC-067",
       "category": "dx",
       "domain": "code",
@@ -1841,23 +1242,6 @@
         "kind": "induced",
         "run": "2026-09-22"
       }
-    },
-    {
-      "id": "TEST-045",
-      "category": "testing",
-      "severity": "low",
-      "title": "Der Testtitel »runs once per frame« prüft nur runs > 0",
-      "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js:23",
-      "description": "Der Titel verspricht, dass der Pass einmal pro Frame läuft; geprüft wird nur, dass er überhaupt lief. Ein doppelter Aufruf pro Frame bliebe grün. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "Frames und Läufe zählen und `runs === frames` prüfen, oder den Titel auf das Geprüfte zurücknehmen.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "harness",
-      "status": "carried-over",
-      "package": "twopoint5d-testing",
-      "effort": "S"
     },
     {
       "id": "TEST-046",
@@ -1911,23 +1295,6 @@
       "effort": "S"
     },
     {
-      "id": "TEST-047",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Kein Browser-Test rendert Canvas2DStage oder OrthographicProjection und liest ein Pixel zurück",
-      "location": "packages/twopoint5d-testing/test/",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Die Sprite-Materialien haben inzwischen Pixel-Tests (\u003ccode>sprites-textured-material.test.js\u003c/code>, \u003ccode>sprites-animated-material.test.js\u003c/code>, \u003ccode>sprites-billboard.test.js\u003c/code>). \u003ccode>Canvas2DStage\u003c/code> und \u003ccode>OrthographicProjection\u003c/code> werden in der Browser-Suite dagegen nie instanziiert und nie gerendert. Ein kaputter Render-Pfad dort passiert das volle Gate. Das Finding hängt mit TEST-022 zusammen, dort fehlen die Specs der stage-Schicht.",
-      "recommendation": "Je eine Smoke-Datei: Stage mit bekannter Füllung in ein \u003ccode>RenderTarget\u003c/code> rendern und das Pixel über \u003ccode>renderToPixels\u003c/code>/\u003ccode>rgbAt\u003c/code> aus \u003ccode>test/helpers/fixtures.js\u003c/code> assertieren.",
-      "effort": "S",
-      "status": "carried-over",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-25"
-      },
-      "package": "twopoint5d-testing"
-    },
-    {
       "id": "DOC-070",
       "category": "dx",
       "domain": "code",
@@ -1948,28 +1315,6 @@
       "package": "workspace"
     },
     {
-      "id": "TEST-048",
-      "category": "testing",
-      "domain": "harness",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "low",
-      "title": "describe-Namen der StageRenderer-Spec verweisen auf Abschnitte eines Dokuments, das nicht im Repo liegt",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:526",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:546",
-        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:759"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Drei describe-Namen tragen `§6.2`, `§6.3` und `§6.4` (»outputRenderTarget (§6.4 RT only, no pipeline)«, »pipeline without buildOutputNode (§6.4 Mode C)«, »asPassNode + buildOutputNode (§6.2 / §6.3)«). Ein Dokument mit diesen Abschnitten liegt nicht im Repo; wer einen roten Test liest, erfährt nicht, welche Zusage gemeint ist. Dieselben Verweise in `src/stage/README.md` führt DOC-066.",
-      "recommendation": "Die Verweise durch den Satz ersetzen, den sie meinen, etwa den Namen des Modus oder die Zusage selbst.",
-      "effort": "S",
-      "status": "carried-over",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-26"
-      }
-    },
-    {
       "id": "DOC-071",
       "category": "dx",
       "domain": "harness",
@@ -1983,27 +1328,6 @@
       "status": "carried-over",
       "origin": {
         "kind": "induced",
-        "run": "2026-09-26"
-      }
-    },
-    {
-      "id": "DOC-072",
-      "category": "dx",
-      "domain": "code",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "Ein fehlendes projectionPlane meldet sich ohne Klasse und Methode",
-      "location": "packages/twopoint5d/src/stage/OrthographicProjection.ts:133",
-      "locations": [
-        "packages/twopoint5d/src/stage/ParallaxProjection.ts:136"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. `expectDefined(this.projectionPlane, …)` meldet `expected the projection plane of this projection to be defined`: die Meldung nennt weder Klasse noch Methode, und `projectionPlane` ist ein optionales öffentliches Feld des Aufrufers, keine Invariante, für die `expectDefined()` laut TSDoc gedacht ist. `TileSpritesFactory#createTile()` löst dasselbe Muster mit einem `Error`, der Methode, Feld und Wert nennt.",
-      "recommendation": "Einen `Error` werfen, der Klasse, Methode und das zu setzende Feld nennt, wie `TileSpritesFactory#createTile()`; die Meldung im Test festhalten.",
-      "effort": "S",
-      "status": "carried-over",
-      "origin": {
-        "kind": "discovered",
         "run": "2026-09-26"
       }
     },
@@ -2061,48 +1385,6 @@
       }
     },
     {
-      "id": "BUG-129",
-      "category": "correctness",
-      "domain": "code",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "low",
-      "title": "Internes RenderTarget von Modus C zu echtem transparentem Schwarz leeren",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:560",
-      "locations": [
-        "packages/twopoint5d/src/stage/README.md:204-206"
-      ],
-      "description": "`#clearForInternalRT()` leert das interne RT von Modus C mit der aktuellen Clear-Farbe des Renderers bei Alpha 0, während die Stage-README »transparent black« verspricht. Bei einer Clear-Farbe ungleich Schwarz bleibt deren RGB im Target stehen und färbt über die Pipeline ins Bild, sobald ein Pass die Farbkanäle ohne Alpha-Gewichtung nutzt. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
-      "recommendation": "Wie für verschachtelte Kinder die Clear-Farbe für den Clear kurz auf (0, 0, 0, 0) setzen und danach wiederherstellen, oder die README auf das tatsächliche Verhalten zurücknehmen.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "id": "BUG-130",
-      "category": "correctness",
-      "domain": "code",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "low",
-      "title": "Modus C mit clear = true und abgeschaltetem Buffer-Clear leert sein internes RT nur teilweise",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:567-576",
-      "locations": [
-        "packages/twopoint5d/src/stage/README.md:204-206"
-      ],
-      "description": "Bei `clear = true` ruft `#clearForInternalRT()` nur `#applyClear()`. Steht `clearColorBuffer` oder `clearDepthBuffer` auf `false`, bleibt Farbe bzw. Depth des Vorframes im internen RT stehen, während die README »always cleared … so frame content does not accumulate« zusagt. Tritt nur auf, wenn ein Aufrufer einen Buffer-Clear ausdrücklich abschaltet; dort kann Akkumulation gewollt sein. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
-      "recommendation": "Entscheiden, was gilt: entweder das interne RT immer vollständig leeren und die Farbe des Renderers danach per eigenem Clear auftragen (wie beim verschachtelten Kind), oder die README-Zusage auf den Default einschränken.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-29"
-      }
-    },
-    {
       "id": "DOC-078",
       "category": "dx",
       "domain": "code",
@@ -2139,19 +1421,98 @@
       }
     },
     {
-      "id": "PERF-035",
-      "category": "performance",
-      "domain": "code",
-      "component": "stage",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "Doppelten Clear für ein verschachteltes Kind mit eigenem clear einsparen",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:602",
-      "description": "Der komponierende Parent leert das Pass-Target jedes verschachtelten Kindes pro Frame zu transparentem Schwarz; ein Kind mit `clear = true` leert danach selbst mit seiner Farbe. Das ist gewollt, damit keine Renderer-Clear-Farbe mitaddiert wird und ein teilweise abgeschalteter Buffer-Clear keine Schlieren hinterlässt, kostet aber einen zweiten Clear pro Frame. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
-      "recommendation": "Den Vorab-Clear überspringen, wenn das Kind `clear`, `clearColorBuffer` und `clearDepthBuffer` gesetzt hat und seine Farbe vollständig schreibt.",
       "effort": "S",
       "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "id": "DOC-079",
+      "category": "dx",
+      "domain": "code",
+      "severity": "info",
+      "component": "display",
+      "title": "Die Klassen-TSDoc von Display steht über der mergenden Interface-Deklaration",
+      "location": "packages/twopoint5d/src/display/Display.ts:593",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Die Klassen-TSDoc von \u003ccode>Display\u003c/code> steht über \u003ccode>export interface Display extends EventizedObject {}\u003c/code> statt über der Klasse; Editoren und API-Extraktion ordnen sie damit dem Interface zu. Bei \u003ccode>Stage2D\u003c/code> ist derselbe Versatz im selben Lauf behoben worden.",
+      "recommendation": "Die TSDoc direkt über die Klassendeklaration setzen und die mergende Interface-Deklaration darunter ohne eigenen Block führen.",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "id": "API-065",
+      "category": "api",
+      "domain": "code",
+      "severity": "info",
+      "component": "controls",
+      "title": "PanControl2D: Listener, die nach dispose() über onUpdate() hinzukommen, hören update() weiter",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.spec.ts:344",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. \u003ccode>dispose()\u003c/code> leert nur die vorhandenen Listener; \u003ccode>update()\u003c/code> emittiert und bewegt die View auch danach, und über die typisierten \u003ccode>on*()\u003c/code>-Helfer lassen sich neue Listener anhängen. TSDoc und Test halten das Verhalten fest, statt es zu unterbinden — offen ist, ob es gewollt ist.",
+      "recommendation": "Entscheiden, ob update() und die on*()-Helfer nach dispose() zu No-ops werden sollen wie onRestoreCursor(), und TSDoc und Test danach ausrichten.",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "id": "DOC-080",
+      "category": "dx",
+      "domain": "code",
+      "severity": "info",
+      "component": "stage",
+      "title": "TSDoc von StageRenderer#add() verschweigt, dass die Stage schon auf die Größe gebracht ist, wenn der Umzug abbricht",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:1152",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.ts:1178",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:1194-1197"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. \u003ccode>add()\u003c/code> ruft \u003ccode>resizeStage()\u003c/code> vor dem Auszug eines Kind-Renderers aus seinem vorigen Halter; bricht der Umzug ab, weil ein Listener einen der Renderer disposed oder dem Kind einen anderen Halter gibt, ist die Größe schon gesetzt. Die TSDoc sagt nur »the child is not added«.",
+      "recommendation": "In der TSDoc festhalten, dass die Stage in diesem Fall bereits auf die Größe des Renderers gebracht ist.",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "id": "TEST-052",
+      "category": "testing",
+      "domain": "code",
+      "severity": "info",
+      "component": "stage",
+      "title": "Test zum Umzug per parent-Setter prüft die Abmeldung vom alten Host nicht",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:1217",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Der Test »a write to parent leaves a renderer that a listener of OnRemoveFromParent disposes off the new host« prüft nicht, dass der Renderer seine Abonnements am alten Host vollständig abgemeldet hat (\u003ccode>hostA._unsubs === 2\u003c/code>).",
+      "recommendation": "Die Assertion auf die Abmeldungen am alten Host ergänzen.",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "effort": "S",
+      "status": "new",
+      "package": "@spearwolf/twopoint5d",
+      "id": "TEST-053",
+      "category": "testing",
+      "domain": "code",
+      "severity": "info",
+      "component": "stage",
+      "title": "Tests zum abgebrochenen Umzug in add() prüfen nicht, dass ein Fehler aus dem Auszug beim Aufrufer ankommt",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:978",
+      "locations": [
+        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:992",
+        "packages/twopoint5d/src/stage/StageRenderer.ts:1195"
+      ],
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Die beiden Tests zum Abbruch des Umzugs in \u003ccode>add()\u003c/code> decken den frühen \u003ccode>return\u003c/code>-Pfad ab, prüfen aber nicht, dass ein beim Auszug gesammelter Fehler über \u003ccode>throwCollected()\u003c/code> beim Aufrufer ankommt.",
+      "recommendation": "Einen werfenden Listener des Auszugs ergänzen und den geworfenen Fehler beim Aufrufer assertieren.",
       "origin": {
         "kind": "induced",
         "run": "2026-09-29"
@@ -2177,7 +1538,8 @@
       "Nachgeführt nach dem Remediation-Lauf vom 2026-09-27 (Performance der Feature-Domain vertex-objects samt Hot-Path-Tests): 7 Commits 92facd32..5e4ede07 auf main, 12 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 5 Nebenbefunde und 6 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft.",
       "Nachgeführt nach dem Remediation-Lauf vom 2026-09-28 (Feature-Domänen vertex-objects, sprites und map2d, jede Severity): 10 Commits 93628b3c..28d2cff0 auf main, 26 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 1 Nebenbefund aus der dritten Drain-Runde und 9 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-29 (Features Vertex Objects, Texturen & Atlanten, Display & Frame-Loop, Sprites, Map2D): 5 Commits 801906f3..35e7942e auf main, 24 Findings nach Reviewer-Urteil geschlossen, 13 Nebenbefunde und 4 Folgen im selben Lauf behoben, keines mangels Beleg offen. Der Code wurde seit dem Audit vom 2026-09-28 nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
-      "Remediation-Lauf vom 2026-09-29 (Stage und Input-Controls): 1 Commit e2026856 auf main, 4 Findings nach Reviewer-Urteil geschlossen, zwei Testlücken-Findings teilweise erfüllt und nachgeführt, 2 Nebenbefunde und 3 kleine Reviewer-Befunde ins Backlog, keines mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
+      "Remediation-Lauf vom 2026-09-29 (Stage und Input-Controls): 1 Commit e2026856 auf main, 4 Findings nach Reviewer-Urteil geschlossen, zwei Testlücken-Findings teilweise erfüllt und nachgeführt, 2 Nebenbefunde und 3 kleine Reviewer-Befunde ins Backlog, keines mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
+      "Remediation-Lauf vom 2026-09-29/30 (Stages & Render-Pipeline): 15 Commits 676eefa7..51e8b330 auf main, 44 Findings nach Reviewer-Urteil geschlossen (die 38 der Komponente stage, fünf stage-Findings ohne Komponente und ein durch den Lauf gegenstandslos gewordenes), 14 Nebenbefunde und 32 kleine Folgen im selben Lauf behoben, keines mangels Beleg offen; ins Backlog gehen 4 kleine Reviewer-Befunde und 1 Nebenbefund außerhalb der Domain. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
     ]
   },
   "acknowledged": [
@@ -2295,12 +1657,6 @@
     }
   ],
   "scoreHistory": [
-    {
-      "date": "2026-09-06",
-      "score": 0,
-      "source": "remediation",
-      "scoreModel": 1
-    },
     {
       "date": "2026-09-07",
       "score": 6.5,
@@ -2469,6 +1825,17 @@
         "harness": 68
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-09-30",
+      "score": 85,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 99,
+        "harness": 73
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
@@ -2630,6 +1997,16 @@
       "inducedFixed": 0,
       "inducedOpen": 3,
       "discovered": 2,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-30",
+      "source": "remediation",
+      "ref": "2026-09-29",
+      "fixed": 44,
+      "inducedFixed": 12,
+      "inducedOpen": 4,
+      "discovered": 14,
       "attribution": "reviewed"
     }
   ]
