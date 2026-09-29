@@ -26,6 +26,9 @@ function disposedError(member: string): Error {
   return new Error(`Stage2D#${member} is not available: this stage has been disposed`);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Stage2D extends EventizedObject {}
+
 /**
  * A 2D stage has a scene with 3D objects and a 2D projection.
  * The camera is automatically generated based on the projection.
@@ -37,9 +40,6 @@ function disposedError(member: string): Error {
  * but this is not always the case.
  * The StageRenderer passes the container size to the stage by calling the resize() method.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Stage2D extends EventizedObject {}
-
 export class Stage2D implements IStage, IRenderable, IPassProvider {
   isStage2D = true;
 
@@ -304,10 +304,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // gets its camera in this very frame
     this.updateProjection();
 
-    const {scene, camera} = this;
+    const {camera} = this;
 
-    if (scene == null || camera == null) {
-      if (!camera && !this.#warnedNoCamera && ++this.#framesWithoutCamera >= FRAMES_WITHOUT_CAMERA_BEFORE_WARNING) {
+    if (camera == null) {
+      if (!this.#warnedNoCamera && ++this.#framesWithoutCamera >= FRAMES_WITHOUT_CAMERA_BEFORE_WARNING) {
         this.#warnedNoCamera = true;
         // eslint-disable-next-line no-console
         console.warn(
@@ -331,14 +331,14 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Render this stage's scene with its camera. No-op until both are present
-   * (i.e. until the first `resize()` with an area has created the camera from the projection),
-   * and on a disposed stage.
+   * Render this stage's scene with its camera. No-op until the stage has a camera (until the first
+   * `resize()` with an area has created it from the projection, or one is assigned), and on a
+   * disposed stage.
    */
   renderTo(renderer: WebGPURenderer): void {
     if (this.#disposed) return;
 
-    if (this.scene && this.camera) {
+    if (this.camera) {
       renderer.render(this.scene, this.camera);
     }
   }
@@ -369,10 +369,6 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
 
     const {scene, camera} = this;
-
-    if (!scene) {
-      throw new Error('Stage2D#asPassNode() has no scene to build a pass node from: assign one to stage.scene');
-    }
 
     if (!camera) {
       throw new Error(

@@ -382,7 +382,8 @@ after a stage announced a new camera or a new scene through
 `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` (every `Stage2D`
 does), or after `invalidateOutputNode()`. While the renderer
 has no area, or while a `Stage2D` it composes has no camera yet, the composed
-mode draws nothing.
+mode draws nothing. A composing renderer without a stage draws its own clear and
+calls neither `buildOutputNode` nor the pipeline, until a stage joins it.
 
 #### Writing your own `buildOutputNode`
 
@@ -661,7 +662,8 @@ What this layer does on top of the general rules in
   0, for which the projection's specs give a view with an area, creates the
   camera (or you assign your own). `Stage2D#asPassNode` throws in that
   state, and a `StageRenderer` composing pass nodes draws nothing while it
-  has no area or while one of its `Stage2D`s has no camera. Until then its `width` and
+  has no area or while one of its `Stage2D`s has no camera, and without a stage only its
+  clear. Until then its `width` and
   `height` are 0, and assigning another `projection` — or `undefined` — puts
   them back to 0 until the new projection gives a view. The camera the previous
   projection created goes with them; a camera you assigned to `stage.camera`
@@ -677,9 +679,10 @@ What this layer does on top of the general rules in
   after it. While the renderer draws into a target its own pipeline samples,
   `toneMapping` and `outputColorSpace` are `NoToneMapping` and the working
   color space, and are restored afterwards — also when a stage throws.
-- **`buildOutputNode` + non-pass stages**: every stage in the list must
-  implement `asPassNode()`. `ClearStage` doesn't — keep it for non-pipeline
-  layering only. The renderer throws with a clear message in that case.
+- **Composing + non-pass stages**: under a pipeline with `buildOutputNode` or a
+  `RootRenderPipeline`, every stage in the list must implement `asPassNode()`.
+  `ClearStage` doesn't — keep it for non-pipeline layering only. The renderer
+  throws with a clear message in that case.
 - **Pipeline lifecycle**: a `pipeline` and an `outputRenderTarget` belong to
   whoever assigned them. Dispose the previous instance yourself when you replace
   one, and dispose the current one when you dispose the renderer; the renderer

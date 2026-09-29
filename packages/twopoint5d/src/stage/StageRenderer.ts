@@ -518,7 +518,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * output node is rebuilt on the next render. Under a `RootRenderPipeline`
    * the renderer composes either way. While this renderer's `width`
    * or `height` is 0, or while a `Stage2D` it composes has no camera, the
-   * composed mode draws nothing. Assigning it to a renderer whose pipeline
+   * composed mode draws nothing. Without a stage it draws its own clear and calls neither this
+   * callback nor the pipeline. Assigning it to a renderer whose pipeline
    * samples the internal target releases the GPU memory of that target;
    * clearing it again allocates that memory again on the next frame.
    *
@@ -677,7 +678,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * a Stage2D has no pass node to give before that: while this renderer has no area, or a Stage2D
    * of the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
    * expects one pass per stage, so no stage is left out, and the output node stays dirty until the
-   * first frame in which every Stage2D has a camera.
+   * first frame in which every Stage2D has a camera. An empty list passes:
+   * #renderPipelineComposed() then draws the own clear alone.
    */
   #canCompose(stages: ReadonlyArray<StageItem>): boolean {
     if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return false;
@@ -822,10 +824,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `StageRenderer` children into their pass-targets first, with linear
    * output (see `#beginLinearOutput()`). Then run the pipeline with
    * `buildOutputNode(passes)` as `outputNode`; it applies the output
-   * transform of the caller.
+   * transform of the caller. Without a stage it draws its own clear and neither builds an output
+   * node nor runs the pipeline.
    */
   #renderPipelineComposed(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     if (!this.#canCompose(stages)) return;
+    // without a stage there is no pass to compose: the own clear is all this renderer draws, and
+    // the output node waits for the first stage that joins
+    if (stages.length === 0) {
+      if (this.clear) this.#applyClear(renderer);
+      return;
+    }
     this.#prerenderNestedRenderers(renderer, stages);
     if (this.#outputDirty) this.#rebuildComposedOutputNode(renderer, stages);
     if (this.clear) this.#applyClear(renderer);
@@ -888,7 +897,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const stage = stageItem.stage;
     if (!hasAsPassNode(stage)) {
       throw new TypeError(
-        `StageRenderer.buildOutputNode: stage ${JSON.stringify(stage.name)} does not implement asPassNode() — incompatible with the buildOutputNode composition path`,
+        `StageRenderer#renderTo() cannot compose the stage ${JSON.stringify(stage.name)}: that stage has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage`,
       );
     }
     return stage.asPassNode(renderer);

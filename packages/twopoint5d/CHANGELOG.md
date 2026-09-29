@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- the error `StageRenderer#renderTo()` throws for a stage without `asPassNode()` names the call and both setups that compose — a pipeline with `buildOutputNode` and a `RootRenderPipeline`
 - perf the writes a pool collects between two `update()` calls go up in up to eight disjoint ranges per buffer: freeing an object in the middle of a pool and spawning one uploads those two slots and nothing between them. More than eight ranges join where the gap between two of them is smallest
 - an `update()` whose writes all lie beyond the objects in use uploads nothing, and no attribute is handed an update range with a `count` of 0
 - `touch()`, `touchAttributes()` and `touchBuffers()` of `VOBufferGeometry` and `InstancedVOBufferGeometry` mark for the next `update()`: the version of the attribute moves on there, and a pool without an object in use uploads nothing. Every argument of `touch()` counts on its own, so a later `{static: false}` leaves an earlier `{static: true}` standing. `touch()` resolves its names and plain usage types itself rather than through `touchAttributes()` and `touchBuffers()`, so an override of those two does not see them; a `{base, instanced}` argument of `InstancedVOBufferGeometry#touch()` goes through `touchBuffers()`
@@ -298,7 +299,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a nested `StageRenderer` whose own clear covers color and depth, and reaches its target in that frame, clears its pass target alone: the composing parent clears it to transparent black first only for a child without such a clear
 - `Stage2D#updateFrame()` applies a pending `needsUpdate` before it emits the frame events: a new value in the view specs of the projection together with `needsUpdate = true` takes effect from the next frame on, and a stage whose specs give a view only then gets its camera in that frame
 - perf `Stage2D` hands every `OnStageUpdateFrame` the same props object per stage, rewritten before each emit — the values hold for the call they arrive in; `OnStageFirstFrame` carries an object of its own. `StageRenderer` checks the size of its internal render targets without allocating, and so does its check whether every `Stage2D` of a composition has a camera
-- the error of `Stage2D#asPassNode()` without a camera says when the projection creates one, and a stage without a scene gets an error of its own
+- the error of `Stage2D#asPassNode()` without a camera says when the projection creates one
 - `StageRenderer#add()` makes a `StageRenderer` it adds its child: `parent` of the child answers the renderer, and the child gets its `OnAddToParent` after `OnStageAdded` went out at the renderer. `root.add(child)`, `child.parent = root`, `child.attach(root)` and `new StageRenderer(root)` set up the same relation. A renderer has one holder: an `add()` to a second renderer or an `attach(host)` takes it out of the first — see the migration guide
 - `StageRenderer#stages` is a getter of the type `ReadonlyArray<StageItem>`, a read-only view of the live list, and `orderedStages` answers a `ReadonlyArray<StageItem>` snapshot: `add()`, `remove()`, a write to `renderOrder` and — while `renderOrder` lists names — a renamed stage give the next read a new array, and an array handed out before stays as it was. `renderOrderArray` answers a copy — see the migration guide
 - `StageRenderer#add()` refuses a stage whose `isDisposed` is `true` with an `Error` naming the call and the state
@@ -335,6 +336,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fix `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — without a stage: it draws its own clear and calls neither `buildOutputNode` nor the pipeline until a stage joins it, so neither `RootRenderPipeline.buildOutputNode()` nor a callback that reads its first pass gets an empty list
 - fix `TextureStore#onResource()`: it calls its callback once — right away if the resource is there, otherwise with the first `parse()` that brings it — and no longer with every later `parse()` that names the id again, nor with a resource that takes the place of an evicted one
 - fix the error `TextureResource` reports for an atlas json that names no image: it names the url the json came from, whatever `atlasUrl` names by then
 - fix the messages of `TextureAtlasLoader` about a response that is no atlas json and about a json that names no image: they name the `path` of the `fileLoader` and the `url`, the url the json came from

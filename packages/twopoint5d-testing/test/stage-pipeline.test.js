@@ -39,6 +39,12 @@ describe('StageRenderer — pipeline integration', () => {
     sr.pipeline = new RenderPipeline(display.renderer);
     // No buildOutputNode → Mode C (samples internal RT as texture)
 
+    // subscribed after the renderer, so it runs in the same emit right behind it
+    let frames = 0;
+    display.onRenderFrame(() => {
+      frames += 1;
+    });
+
     let runs = 0;
     const origRender = sr.pipeline.render.bind(sr.pipeline);
     sr.pipeline.render = (...a) => {
@@ -50,7 +56,8 @@ describe('StageRenderer — pipeline integration', () => {
     await display.nextFrame();
     await display.nextFrame();
 
-    expect(runs).to.be.greaterThan(0);
+    expect(frames, 'frames').to.be.at.least(2);
+    expect(runs, 'pipeline runs').to.equal(frames);
     expect(sr.pipeline.outputNode).to.exist;
   });
 
@@ -358,6 +365,44 @@ describe('StageRenderer — pipeline integration', () => {
     // the pipeline and the target belong to this test: the renderers let go first
     root.dispose();
     child.dispose();
+    stage.dispose();
+    pipeline.dispose();
+    target.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('Mode D: a RootRenderPipeline without stages shows the clear color of its renderer, and composes the first stage that joins it', async () => {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+
+    // 64 pixels wide: rgbAt() reads the rows at that length
+    const target = new RenderTarget(64, 64);
+    const root = new StageRenderer().setClearColor(new Color('#f00'), 1);
+    const pipeline = new RootRenderPipeline(display.renderer);
+    root.pipeline = pipeline;
+    root.outputRenderTarget = target;
+    root.resize(64, 64);
+
+    expect(() => root.renderTo(display.renderer), 'a frame without stages').not.to.throw();
+    const empty = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    // pure colors, so the color transform of the pipeline does not shift the result
+    expect(isNearColor(rgbAt(empty, 64, 32, 32), [255, 0, 0]), 'the clear color without a stage').to.be.true;
+
+    // no specs: 64 x 64 units on 64 x 64 pixels, the camera centred on the origin
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    stage.scene.add(new Mesh(geometry, material));
+    root.add(stage);
+
+    root.renderTo(display.renderer);
+    const joined = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    expect(isNearColor(rgbAt(joined, 64, 32, 32), [0, 255, 0]), 'the first stage that joined').to.be.true;
+
+    // the pipeline and the target belong to this test: the renderer and the stage let go first
+    root.dispose();
     stage.dispose();
     pipeline.dispose();
     target.dispose();

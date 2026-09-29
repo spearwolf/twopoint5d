@@ -188,6 +188,16 @@ describe('StageRenderer', () => {
     return log;
   }
 
+  function makePipelineMock() {
+    return {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+  }
+
+  function fakeRootPipeline() {
+    const pipeline = makePipelineMock();
+    Object.setPrototypeOf(pipeline, RootRenderPipeline.prototype);
+    return pipeline;
+  }
+
   function clearsBeforeFirstDraw(log: LogEntry[]): {draw: LogEntry; clears: LogEntry[]} {
     const drawIndex = log.findIndex((entry) => entry.kind === 'draw');
     expect(drawIndex, 'a stage is drawn').toBeGreaterThanOrEqual(0);
@@ -1709,6 +1719,59 @@ describe('StageRenderer', () => {
       expect(() => stage.asPassNode(renderer as any), 'after resize(100, 100)').not.toThrow();
     });
 
+    it('a composing renderer without stages draws its own clear and calls neither buildOutputNode nor the pipeline', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.setClearColor(new Color(0xff0000), 1);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      const log = logClearsAndDraws();
+
+      expect(() => sr.renderTo(renderer as any)).not.toThrow();
+
+      expect(buildOutputNode).not.toHaveBeenCalled();
+      expect(pipeline.render).not.toHaveBeenCalled();
+      expect(log).toHaveLength(1);
+      expect(log[0]).toMatchObject({kind: 'clear', color: 0xff0000});
+    });
+
+    it('a RootRenderPipeline without stages draws the clear of its renderer and does not throw', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.setClearColor(new Color(0xff0000), 1);
+      const pipeline = fakeRootPipeline();
+      sr.pipeline = pipeline as any;
+      const log = logClearsAndDraws();
+
+      expect(() => sr.renderTo(renderer as any)).not.toThrow();
+
+      expect(pipeline.render).not.toHaveBeenCalled();
+      expect(log).toHaveLength(1);
+      expect(log[0]).toMatchObject({kind: 'clear', color: 0xff0000});
+    });
+
+    it('a composing renderer composes the first stage that joins it after frames without stages', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+
+      sr.renderTo(renderer as any);
+      sr.renderTo(renderer as any);
+
+      const passNode = fakePassNode('first');
+      sr.add({...fakeStage('first'), asPassNode: vi.fn(() => passNode)} as any);
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(buildOutputNode).toHaveBeenCalledWith([passNode]);
+      expect(pipeline.render).toHaveBeenCalledTimes(1);
+    });
+
     function makeComposedSetup() {
       const sr = new StageRenderer();
       const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
@@ -2031,10 +2094,18 @@ describe('StageRenderer', () => {
       sr.add(fakeStage('bare'));
       sr.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
       sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
-      expect(() => sr.renderTo(renderer as any)).toThrow(/asPassNode/);
+      expect(() => sr.renderTo(renderer as any)).toThrow(/StageRenderer#renderTo\(\) cannot compose the stage "bare"/);
     });
 
-    it('nested StageRenderer is pre-rendered into its asPassNode-RT before parent pipeline runs', () => {
+    it('throws the same error under a RootRenderPipeline without buildOutputNode', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('bare'));
+      sr.pipeline = fakeRootPipeline() as any;
+      expect(() => sr.renderTo(renderer as any)).toThrow(/StageRenderer#renderTo\(\) cannot compose the stage "bare"/);
+    });
+
+    it('nested StageRenderer is pre-rendered into its pass target before parent pipeline runs', () => {
       const parent = new StageRenderer();
       parent.resize(100, 100);
       const child = new StageRenderer();
@@ -2195,16 +2266,6 @@ describe('StageRenderer', () => {
     afterEach(() => {
       sandbox.restore();
     });
-
-    function makePipelineMock() {
-      return {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
-    }
-
-    function fakeRootPipeline() {
-      const pipeline = makePipelineMock();
-      Object.setPrototypeOf(pipeline, RootRenderPipeline.prototype);
-      return pipeline;
-    }
 
     // a Mode C renderer after its first frame, and the internal target its stage drew into
     function makeModeC() {

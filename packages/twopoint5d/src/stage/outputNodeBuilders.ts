@@ -51,7 +51,7 @@ export interface BloomOutputNodeBuilderOptions {
  * renderers share releases the bloom of one of them whenever the other rebuilds. Take the
  * builder off the renderer before you dispose it (`buildOutputNode = undefined`, or dispose the
  * renderer): a renderer that still holds a disposed builder throws on its next rebuild, and a
- * `StageRenderer` does not take a disposed builder. An empty list of passes throws.
+ * `StageRenderer` does not take a disposed builder. An empty list of passes throws; a `StageRenderer` without stages does not call the builder.
  *
  * ```ts
  * const pipeline = new RenderPipeline(display.renderer!);
