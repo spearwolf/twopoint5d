@@ -189,7 +189,7 @@ below.
 
 | `clear` | `clearColor` | `clearAlpha` | Effect |
 |---|---|---|---|
-| `false` (default) | — | — | No clear. Renderer state untouched. |
+| `false` (default) | — | — | Nothing clears, not even the renderer's `autoClear`: it is `false` while the stages draw and restored afterwards. Frames accumulate unless something else clears. |
 | `true` | `Color` | n | Clear color + alpha; restores previous renderer state after. |
 | `true` | `null` | n | Clear with the renderer's current color, alpha = n. |
 
@@ -201,14 +201,20 @@ Buffer-level control: `clearColorBuffer`, `clearDepthBuffer`,
 `clearStencilBuffer` — all `true` by default. They map 1:1 to the three
 arguments of `WebGPURenderer.clear()`.
 
-When the renderer has a `pipeline`, the **internal pass-target** is always
-cleared each frame (using your `clear`-color when `clear=true`, transparent
-black otherwise) so frame content does not accumulate.
+When the renderer has a `pipeline` without `buildOutputNode` (Mode C), the
+**internal pass-target** is cleared in full to transparent black every frame,
+color and depth, so frame content does not accumulate. With `clear = true`
+your own clear applies after that; one that covers color and depth
+(`clearColorBuffer` and `clearDepthBuffer` both `true`) replaces the black
+clear.
 
 The **pass-target of a nested `StageRenderer`** — the one its parent samples
 through `asPassNode()` — is cleared by the parent every frame to transparent
-black, color and depth, whatever the child's `clear` says. A child with
-`clear = true` then clears it once more with its own color.
+black, color and depth. A child with `clear = true` then clears it once more
+with its own color. A child whose own clear covers color and depth, and
+reaches the target in that frame, clears it alone: the parent leaves out the
+black clear. A composing child without an area or with a `Stage2D` that has
+no camera yet returns before its own clear, and gets the black one.
 
 ---
 
@@ -230,6 +236,17 @@ sr.outputRenderTarget = offscreen;
 ```
 
 Combines with `pipeline` — the post-pass output also lands in the target.
+
+Without a pipeline, the stages draw into the target linear in the working
+color space and without tone mapping, as three.js draws into every
+`RenderTarget`. With a pipeline, its output transform applies — tone mapping
+and the encoding to `renderer.outputColorSpace`, as long as
+`pipeline.outputColorTransform` is `true` — just as on the canvas. A renderer
+that a parent draws into a target of the parent's own pipeline writes linear
+in both cases; the outermost pipeline applies the transform. Under a Mode C
+parent (a `pipeline` without `buildOutputNode`), a child writes linear into
+its own `outputRenderTarget` as well: the parent switches to linear output for
+all of its stage draws, whichever target they write to.
 
 ---
 
@@ -263,6 +280,12 @@ sr.pipeline = new RenderPipeline(display.renderer!);
 ```
 
 The pipeline writes to `outputRenderTarget` if set, otherwise the canvas.
+
+The output node is rebuilt only for a new `pipeline` or after
+`invalidateOutputNode()`; stages, `renderOrder`, stage names and cameras
+leave it standing. The internal target has the type and the samples of the
+renderer (`renderer.getOutputBufferType()`, `renderer.samples`), the values
+three.js' `PassNode` gives the pass targets of Mode D.
 
 ### Mode D (§6.2) — compose a TSL graph from per-stage pass nodes
 
@@ -345,6 +368,12 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 `worldRenderer.asPassNode()` returns a `texture()` node sampling the
 renderer's `asPassNodeRT`; the root clears that RT and pre-renders the child
 into it before its own pipeline runs.
+
+The child's pipeline writes linear: for the pre-render, the root sets
+`renderer.toneMapping` to `NoToneMapping` and `renderer.outputColorSpace` to
+the working color space, and restores both before its own pipeline runs. Tone
+mapping and the output encoding apply once, in the outermost pipeline. The
+same holds for a child with a pipeline under a Mode C renderer.
 
 > **Important — only one writer to the canvas per frame.**
 > The three.js `RenderPipeline.render()` call expects to own the final
@@ -455,10 +484,18 @@ What this layer does on top of the general rules in
 [docs/resource-lifecycle.md](../../docs/resource-lifecycle.md):
 
 - Internal `RenderTarget`s are created lazily on first render and resized
-  in `resize(width, height)`.
-- `StageRenderer.dispose()` releases both internal RTs, and nothing else. It also
-  detaches from its host and drops its stages, so a disposed renderer is no longer
-  driven by any frame loop.
+  in `resize(width, height)`. They have the type and the samples of the
+  renderer (`getOutputBufferType()`, `samples`); a changed `samples` reaches
+  them on the next frame, as the same target objects.
+- Leaving Mode C — `pipeline = undefined`, a `buildOutputNode`, a
+  `RootRenderPipeline` — releases the GPU memory of the internal pass-target,
+  and `remove(child)` releases that of the pass-target of a removed child
+  `StageRenderer`. The target objects stay, so every `texture()` node on them
+  stays valid; three.js allocates the memory again on the next draw.
+- `StageRenderer.dispose()` releases both internal RTs. It also detaches from its
+  host and drops its stages through `remove()`, so a disposed renderer is no longer
+  driven by any frame loop, and a nested `StageRenderer` among its stages releases
+  the GPU memory of its pass-target — the child itself is not disposed.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
   write to `pipeline` falls through.
@@ -512,8 +549,11 @@ What this layer does on top of the general rules in
   to `renderOrder`; give your stages unique names when the order between
   them matters.
 - **Mid-frame state on the WebGPU renderer**: `StageRenderer.renderTo()`
-  restores `autoClear`, clear color and clear alpha to what it found
-  on entry — but only if it actually performed a clear.
+  sets `autoClear` to `false` for the stage draws and always restores it.
+  Clear color and clear alpha change only for a clear and are restored right
+  after it. While the renderer draws into a target its own pipeline samples,
+  `toneMapping` and `outputColorSpace` are `NoToneMapping` and the working
+  color space, and are restored afterwards — also when a stage throws.
 - **`buildOutputNode` + non-pass stages**: every stage in the list must
   implement `asPassNode()`. `ClearStage` doesn't — keep it for non-pipeline
   layering only. The renderer throws with a clear message in that case.

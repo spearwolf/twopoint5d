@@ -1,6 +1,15 @@
 import {emit, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
-import {Color, type Node, RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
+import {
+  Color,
+  ColorManagement,
+  type Node,
+  NoToneMapping,
+  RenderTarget,
+  type RenderPipeline,
+  type Texture,
+  type WebGPURenderer,
+} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {
   OnAddToParent,
@@ -67,19 +76,31 @@ export interface StageRenderer extends EventizedObject {}
  *
  * ## Clearing
  *
- * Clearing is opt-in via {@link clear} (default `false`). When `clear` is
+ * {@link clear} is the only clear of the target this renderer writes to
+ * (default `false`). When `clear` is
  * `true`, the renderer clears the active render target before drawing its
  * stages, using {@link clearColor} / {@link clearAlpha} and the
  * `clearColorBuffer` / `clearDepthBuffer` / `clearStencilBuffer` flags.
  *
+ * While the stages draw, `renderer.autoClear` is `false`, whatever the caller
+ * set, and it is restored afterwards. With `clear = false` nothing clears the
+ * target, and frames accumulate unless something else clears it.
+ *
+ * With a {@link pipeline} and without {@link buildOutputNode}, the stages
+ * draw into an internal pass-target that the renderer clears to transparent
+ * black (color and depth) every frame, whatever `clear` says; the own
+ * `clear` then applies on top, and one that covers color and depth replaces
+ * the black clear.
+ *
  * Setting `clearColor` to a non-null value also sets `clear = true` as a
- * convenience. Multiple stages are drawn additively into the same target
- * (the renderer sets `autoClear = false` while iterating stages) — use this
- * to layer stages on top of each other in a single pass.
+ * convenience. Multiple stages are drawn additively into the same target —
+ * use this to layer stages on top of each other in a single pass.
  *
  * A renderer that a parent composes through {@link asPassNode} draws into a
  * pass-target which the parent clears to transparent black (color and depth)
  * at the start of every frame; the child's own `clear` then applies on top.
+ * A child whose own clear covers color and depth, and reaches the target in
+ * that frame, clears it alone.
  */
 export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
@@ -96,8 +117,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * When `true`, the active render target is cleared before drawing the
-   * stages. Defaults to `false`. Setting {@link clearColor} to a non-null
-   * value flips this to `true` automatically.
+   * stages. Defaults to `false`. This is the only clear: `renderer.autoClear`
+   * is `false` while the stages draw, so with `clear = false` nothing clears
+   * the target. Setting {@link clearColor} to a non-null value flips this to
+   * `true` automatically.
    */
   clear: boolean = false;
 
@@ -398,6 +421,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * answers `undefined` here and takes no new one: like `parent`, `add()` and
    * `attach()`, the write is a silent no-op. Assigning a different pipeline
    * gives it this renderer's `outputNode` on the next render.
+   *
+   * Without `buildOutputNode`, the output node is rebuilt only for a new
+   * pipeline or after {@link invalidateOutputNode}; stages, their order and
+   * names and their cameras leave it standing. A write that leaves this mode
+   * releases the GPU memory of the internal pass-target; returning to it
+   * allocates that memory again on the next frame.
    */
   get pipeline(): RenderPipeline | undefined {
     return this.#pipeline;
@@ -406,9 +435,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   set pipeline(pipeline: RenderPipeline | undefined) {
     if (this.#disposed) return;
     if (this.#pipeline !== pipeline) {
+      const wasPipelineOnly = this.#isPipelineOnly();
       this.#pipeline = pipeline;
       // a pipeline arrives with an outputNode of its own; the next render writes this renderer's into it
       this.#outputDirty = true;
+      if (wasPipelineOnly && !this.#isPipelineOnly()) this.#internalRT?.dispose();
     }
   }
 
@@ -417,6 +448,18 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Default `undefined` = writes to the renderer's current target (usually
    * the canvas). Useful for picking, screenshots, or driving a downstream
    * pass.
+   *
+   * Without a {@link pipeline}, the stages draw into it linear in the working
+   * color space and without tone mapping, as three.js draws into every
+   * `RenderTarget`. With a pipeline, its output transform applies — tone
+   * mapping and the encoding to `renderer.outputColorSpace`, as long as
+   * `pipeline.outputColorTransform` is `true` — just as on the canvas. A
+   * renderer that a parent draws into a target of the parent's own pipeline
+   * writes linear in both cases; the outermost pipeline applies the transform.
+   * Under a parent with a pipeline but without `buildOutputNode`, a child
+   * writes linear into its own `outputRenderTarget` as well: the parent
+   * switches to linear output for all of its stage draws, whichever target
+   * they write to.
    */
   outputRenderTarget?: RenderTarget;
 
@@ -434,7 +477,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Assigning or clearing it switches between the two pipeline modes; the
    * output node is rebuilt on the next render. While this renderer's `width`
    * or `height` is 0, or while a `Stage2D` it composes has no camera, the
-   * composed mode draws nothing.
+   * composed mode draws nothing. Assigning it to a renderer whose pipeline
+   * samples the internal pass-target releases the GPU memory of that target;
+   * clearing it again allocates that memory again on the next frame.
    */
   get buildOutputNode(): StageRendererBuildOutputNode | undefined {
     return this.#buildOutputNode;
@@ -442,8 +487,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   set buildOutputNode(buildOutputNode: StageRendererBuildOutputNode | undefined) {
     if (this.#buildOutputNode !== buildOutputNode) {
+      const wasPipelineOnly = this.#isPipelineOnly();
       this.#buildOutputNode = buildOutputNode;
       this.#outputDirty = true;
+      if (wasPipelineOnly && !this.#isPipelineOnly()) this.#internalRT?.dispose();
     }
   }
 
@@ -451,9 +498,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #internalRT?: RenderTarget;
   /** Internal RT used when a parent calls `asPassNode()` on this renderer. */
   #asPassNodeRT?: RenderTarget;
+  /** The `texture()` node Mode C gives its pipeline as `outputNode`, and the texture it samples. */
+  #internalOutputNode?: Node;
+  #internalOutputTexture?: Texture;
   /**
-   * Marks `pipeline.outputNode` as needing a rebuild: the stages, their order or names, the
-   * pipeline, `buildOutputNode` or the camera of a stage changed.
+   * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their
+   * order or names, the pipeline, `buildOutputNode` or the camera of a stage changed. Only the
+   * composed mode reads it; Mode C keeps its own node, see `#renderPipelineSimple()`.
    */
   #outputDirty = true;
 
@@ -464,9 +515,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #pixelRatio = 1;
 
-  /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it. */
+  /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it, in either pipeline mode. */
   invalidateOutputNode(): void {
     this.#outputDirty = true;
+    this.#internalOutputNode = undefined;
   }
 
   /**
@@ -504,15 +556,44 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * composed path automatically via its static `buildOutputNode`.
    */
   #renderToCurrentTarget(renderer: WebGPURenderer): void {
-    if (this.pipeline) {
-      if (this.buildOutputNode || this.pipeline instanceof RootRenderPipeline) {
-        this.#renderPipelineComposed(renderer);
-      } else {
-        this.#renderPipelineSimple(renderer);
-      }
+    if (this.#isComposing()) {
+      this.#renderPipelineComposed(renderer);
+    } else if (this.#pipeline) {
+      this.#renderPipelineSimple(renderer);
     } else {
       this.#renderStagesInline(renderer);
     }
+  }
+
+  /** Composed mode: a pipeline with `buildOutputNode`, or a `RootRenderPipeline`. */
+  #isComposing(): boolean {
+    return this.#pipeline != null && (this.#buildOutputNode != null || this.#pipeline instanceof RootRenderPipeline);
+  }
+
+  /** Mode C: a pipeline that samples the internal pass-target. */
+  #isPipelineOnly(): boolean {
+    return this.#pipeline != null && !this.#isComposing();
+  }
+
+  /**
+   * The stages take their camera from the first resize() with an area whose specs give a view, and
+   * a Stage2D has no pass node to give before that: while this renderer has no area, or a Stage2D
+   * of the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
+   * expects one pass per stage, so no stage is left out, and the output node stays dirty until the
+   * first frame in which every Stage2D has a camera.
+   */
+  #canCompose(): boolean {
+    if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return false;
+    return !this.orderedStages.some(({stage}) => isStage2DWithoutCamera(stage));
+  }
+
+  /**
+   * The own clear of this renderer overwrites color and depth of its target in full, and it
+   * reaches the target in this frame — a composing renderer without an area or without a camera
+   * returns before its clear.
+   */
+  #clearsWholeTarget(): boolean {
+    return this.clear && this.clearColorBuffer && this.clearDepthBuffer && (!this.#isComposing() || this.#canCompose());
   }
 
   /** Plain mode: clear (if requested), then render stages into the current target. */
@@ -532,14 +613,27 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Mode C (§6.4): render stages into the internal pass-target, then run
    * the pipeline sampling that target as `texture()`. The internal RT is
-   * always cleared per frame (transparent black, or the user's
-   * `clear`-color/alpha if set); the user's `clear` additionally clears the
-   * final output target before the pipeline writes.
+   * cleared in full to transparent black every frame before the user's
+   * `clear` applies; the stages draw into it with linear output. The user's
+   * `clear` additionally clears the final output target before the pipeline
+   * writes, and the pipeline applies the output transform of the caller.
    */
   #renderPipelineSimple(renderer: WebGPURenderer): void {
+    const pipeline = this.#pipeline!;
     const rt = this.#ensureInternalRT(renderer);
     const prev = renderer.getRenderTarget();
+    // three.js' RenderPipeline bakes tone mapping and the encoding to renderer.outputColorSpace
+    // into its quad whatever target it draws into, and rebuilds the quad when either value
+    // changes: as long as both are linear, a nested pipeline writes linear values into the target
+    // this pipeline samples, and the transform applies once, in the outermost pipeline.
+    // pipeline.outputColorTransform is no way to get there — the pipeline reads it only when it
+    // rebuilds, and the field belongs to the caller. A plain renderer.render() into a
+    // RenderTarget writes linear anyway.
+    const toneMapping = renderer.toneMapping;
+    const outputColorSpace = renderer.outputColorSpace;
     renderer.setRenderTarget(rt);
+    renderer.toneMapping = NoToneMapping;
+    renderer.outputColorSpace = ColorManagement.workingColorSpace;
     try {
       this.#clearForInternalRT(renderer);
       const wasPreviouslyAutoClear = renderer.autoClear;
@@ -550,62 +644,77 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         renderer.autoClear = wasPreviouslyAutoClear;
       }
     } finally {
+      renderer.toneMapping = toneMapping;
+      renderer.outputColorSpace = outputColorSpace;
       renderer.setRenderTarget(prev);
     }
 
-    if (this.#outputDirty) {
-      this.pipeline!.outputNode = texture(rt.texture);
-      this.pipeline!.needsUpdate = true;
-      this.#outputDirty = false;
+    // the node depends on the internal target alone: stages, their order and cameras leave it
+    // standing. Comparing with pipeline.outputNode catches a new pipeline, the return from the
+    // composed mode and a node written into the pipeline from outside.
+    if (this.#internalOutputNode == null || this.#internalOutputTexture !== rt.texture) {
+      this.#internalOutputNode = texture(rt.texture);
+      this.#internalOutputTexture = rt.texture;
+    }
+    if (pipeline.outputNode !== this.#internalOutputNode) {
+      pipeline.outputNode = this.#internalOutputNode;
+      pipeline.needsUpdate = true;
     }
 
     if (this.clear) this.#applyClear(renderer);
-    this.pipeline!.render();
+    pipeline.render();
   }
 
-  /** Clears the currently bound internal RT each frame to avoid accumulation. */
+  /**
+   * The internal RT belongs to nobody else who would clear it. It is cleared in full to
+   * transparent black every frame, color and depth, so that neither the clear color of the
+   * renderer nor a rest of the previous frame stays in it; the own `clear` then applies as it
+   * does for a nested child, and an own clear that covers color and depth replaces the black one.
+   */
   #clearForInternalRT(renderer: WebGPURenderer): void {
-    if (this.clear) {
-      this.#applyClear(renderer);
-    } else {
-      const oldClearAlpha = renderer.getClearAlpha();
-      renderer.setClearAlpha(0);
-      renderer.clear(true, true, false);
-      renderer.setClearAlpha(oldClearAlpha);
-    }
+    if (!this.#clearsWholeTarget()) this.#clearToTransparentBlack(renderer);
+    if (this.clear) this.#applyClear(renderer);
   }
 
   /**
    * Mode D (§6.2): for each stage, get its pass node; pre-render nested
-   * `StageRenderer` children into their asPassNode-RTs first. Then run the
-   * pipeline with `buildOutputNode(passes)` as `outputNode`.
+   * `StageRenderer` children into their asPassNode-RTs first, with linear
+   * output (see `#renderPipelineSimple()`). Then run the pipeline with
+   * `buildOutputNode(passes)` as `outputNode`; it applies the output
+   * transform of the caller.
    */
   #renderPipelineComposed(renderer: WebGPURenderer): void {
-    // the stages take their camera from the first resize() with an area whose specs give a view, and
-    // a Stage2D has no pass node to give before that: while this renderer has no area, or a Stage2D
-    // of the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
-    // expects one pass per stage, so no stage is left out, and the output node stays dirty until the
-    // first frame in which every Stage2D has a camera.
-    if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return;
-    if (this.orderedStages.some(({stage}) => isStage2DWithoutCamera(stage))) return;
+    if (!this.#canCompose()) return;
 
-    for (const stageItem of this.orderedStages) {
-      const stage = stageItem.stage;
-      if (stage instanceof StageRenderer) {
-        const childRT = stage.#ensureAsPassNodeRT(renderer);
-        const prev = renderer.getRenderTarget();
-        renderer.setRenderTarget(childRT);
-        try {
-          // the pass target of the child belongs to nobody else who would clear it: a child
-          // without clear draws its stages straight into it, and a child with clear but
-          // clearColorBuffer/clearDepthBuffer off clears only part of it — the previous frame
-          // would stay underneath
-          this.#clearToTransparentBlack(renderer);
-          stage.#renderToCurrentTarget(renderer);
-        } finally {
-          renderer.setRenderTarget(prev);
+    // linear output while the children draw into targets this pipeline samples, for the reason
+    // given in #renderPipelineSimple()
+    const toneMapping = renderer.toneMapping;
+    const outputColorSpace = renderer.outputColorSpace;
+    renderer.toneMapping = NoToneMapping;
+    renderer.outputColorSpace = ColorManagement.workingColorSpace;
+    try {
+      for (const stageItem of this.orderedStages) {
+        const stage = stageItem.stage;
+        if (stage instanceof StageRenderer) {
+          const childRT = stage.#ensureAsPassNodeRT(renderer);
+          const prev = renderer.getRenderTarget();
+          renderer.setRenderTarget(childRT);
+          try {
+            // the pass target of the child belongs to nobody else who would clear it: a child
+            // without clear draws its stages straight into it, and a child with clear but
+            // clearColorBuffer/clearDepthBuffer off clears only part of it — the previous frame
+            // would stay underneath. A child whose own clear covers color and depth and reaches
+            // the target in this frame overwrites it itself.
+            if (!stage.#clearsWholeTarget()) this.#clearToTransparentBlack(renderer);
+            stage.#renderToCurrentTarget(renderer);
+          } finally {
+            renderer.setRenderTarget(prev);
+          }
         }
       }
+    } finally {
+      renderer.toneMapping = toneMapping;
+      renderer.outputColorSpace = outputColorSpace;
     }
 
     if (this.#outputDirty) {
@@ -650,7 +759,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * The parent is responsible for ensuring the texture is up-to-date before
    * the pipeline runs (`StageRenderer` does that automatically for nested
    * `StageRenderer` children: it clears the target to transparent black
-   * first, then renders the child into it).
+   * first, unless the child's own clear covers color and depth, then renders
+   * the child into it with linear output).
    *
    * A disposed renderer throws here instead of building a fresh pass-target
    * that nothing would release again.
@@ -687,10 +797,15 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   #ensureRT(rt: RenderTarget | undefined, renderer: WebGPURenderer): RenderTarget {
     this.#pixelRatio = renderer.getPixelRatio?.() ?? 1;
+    // the values three.js' PassNode gives the pass targets of the composed mode. The type stands
+    // per renderer from its constructor on; a changed sample count is taken into the target by
+    // three.js on the next draw, and target and texture stay the same objects — every texture()
+    // node on them stays valid.
     if (!rt) {
       const [w, h] = this.#renderTargetSize();
-      return new RenderTarget(w, h);
+      return new RenderTarget(w, h, {type: renderer.getOutputBufferType(), samples: renderer.samples});
     }
+    if (rt.samples !== renderer.samples) rt.samples = renderer.samples;
     this.#resizeRenderTarget(rt);
     return rt;
   }
@@ -723,6 +838,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Release the `RenderTarget`s this renderer built for itself, let go of the host that
    * drives it, and give up its stages. Call when this renderer is no longer needed.
+   *
+   * The stages go through {@link remove}, so a nested `StageRenderer` among them releases
+   * the GPU memory of its pass-target as well; the child itself is not disposed, and three.js
+   * allocates that memory again on its next draw into the target.
    *
    * A {@link pipeline}, an {@link outputRenderTarget} and every stage were handed in and
    * belong to the caller: none of them is disposed here. Dispose them where they were built.
@@ -761,6 +880,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     this.#internalRT?.dispose();
     this.#internalRT = undefined;
+    this.#internalOutputNode = undefined;
+    this.#internalOutputTexture = undefined;
     this.#asPassNodeRT?.dispose();
     this.#asPassNodeRT = undefined;
 
@@ -879,8 +1000,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `name` and another stage already carries it.
    *
    * On an eventized stage — every `Stage2D` — it listens for
-   * `OnStageAfterCameraChanged` and rebuilds the output node on the next
-   * render; `remove()` stops listening.
+   * `OnStageAfterCameraChanged` and, in the composed mode, rebuilds the
+   * output node on the next render; `remove()` stops listening.
    */
   add(stage: IStage & IRenderable): this {
     if (this.#disposed) return this;
@@ -897,10 +1018,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#outputDirty = true;
       if (isEventized(stage)) {
         // a pass node keeps the camera it was built with: a stage that announces a new camera
-        // needs a new pass node, and with it a new output node
+        // needs a new pass node, and with it a new output node — in the composed mode only, since
+        // the node of Mode C samples the internal target and holds no camera, and so the flag is
+        // set here rather than through invalidateOutputNode(), which drops that node as well
         this.#cameraSubscriptions.set(
           stage,
-          on(stage, OnStageAfterCameraChanged, () => this.invalidateOutputNode()),
+          on(stage, OnStageAfterCameraChanged, () => {
+            this.#outputDirty = true;
+          }),
         );
       }
       this.resizeStage(si, this.width, this.height);
@@ -913,8 +1038,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Remove a stage. Returns `this` for chaining. Emits `OnStageRemoved`.
    *
    * A removed child `StageRenderer` answers `undefined` as its `parent`
-   * afterwards and gets its `OnRemoveFromParent`. Stops listening for the
-   * stage's camera changes.
+   * afterwards and gets its `OnRemoveFromParent`, and releases the GPU memory
+   * of its pass-target. Stops listening for the stage's camera changes.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);
@@ -925,10 +1050,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#orderedStages = undefined;
       this.#outputDirty = true;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
-      if (stage instanceof StageRenderer && stage.parent === this) {
-        // the child still names this renderer as its holder; letting go is a move both
-        // sides make, whichever of them started it
-        stage.#removeFromParent();
+      if (stage instanceof StageRenderer) {
+        // the pass target belongs to the child, and this renderer, which let go of it, samples it
+        // no longer. The object stays, so every texture() node another parent built from it stays
+        // valid; three.js allocates the memory again on the next draw.
+        stage.#asPassNodeRT?.dispose();
+        if (stage.parent === this) {
+          // the child still names this renderer as its holder; letting go is a move both
+          // sides make, whichever of them started it
+          stage.#removeFromParent();
+        }
       }
     }
     return this;

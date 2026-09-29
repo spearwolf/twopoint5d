@@ -1,11 +1,23 @@
 import {createSandbox} from 'sinon';
-import {Color, PerspectiveCamera, RenderTarget} from 'three/webgpu';
+import {
+  ACESFilmicToneMapping,
+  Color,
+  ColorManagement,
+  FloatType,
+  NoToneMapping,
+  PerspectiveCamera,
+  RenderTarget,
+  SRGBColorSpace,
+  type ColorSpace,
+  type ToneMapping,
+} from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
+import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
@@ -24,6 +36,10 @@ interface RendererMock {
   setRenderTarget: Mock;
   getRenderTarget: Mock;
   getPixelRatio: Mock;
+  samples: number;
+  getOutputBufferType: Mock;
+  toneMapping: ToneMapping;
+  outputColorSpace: ColorSpace;
 }
 
 function createRendererMock(): RendererMock {
@@ -41,6 +57,11 @@ function createRendererMock(): RendererMock {
     setRenderTarget: vi.fn(),
     getRenderTarget: vi.fn(),
     getPixelRatio: vi.fn(() => 1),
+    samples: 4,
+    // not the three.js default: the type of the internal targets has to come from the renderer
+    getOutputBufferType: vi.fn(() => FloatType),
+    toneMapping: ACESFilmicToneMapping,
+    outputColorSpace: SRGBColorSpace,
   };
   m.setRenderTarget.mockImplementation((rt) => {
     m.__renderTarget = rt;
@@ -115,7 +136,54 @@ describe('StageRenderer', () => {
     };
   }
 
+  type LogEntry =
+    {kind: 'clear'; target: unknown; color: number; alpha: number; args: unknown[]} | {kind: 'draw'; target: unknown};
+
+  // every clear with the target and the clear state it hit, and every draw of the given stages
+  function logClearsAndDraws(...stages: {renderTo: Mock}[]): LogEntry[] {
+    const log: LogEntry[] = [];
+    renderer.clear.mockImplementation((...args: unknown[]) =>
+      log.push({
+        kind: 'clear',
+        target: renderer.__renderTarget,
+        color: renderer.__clearColor.getHex(),
+        alpha: renderer.__clearAlpha,
+        args,
+      }),
+    );
+    for (const stage of stages) {
+      stage.renderTo.mockImplementation(() => log.push({kind: 'draw', target: renderer.__renderTarget}));
+    }
+    return log;
+  }
+
+  function clearsBeforeFirstDraw(log: LogEntry[]): {draw: LogEntry; clears: LogEntry[]} {
+    const drawIndex = log.findIndex((entry) => entry.kind === 'draw');
+    expect(drawIndex, 'a stage is drawn').toBeGreaterThanOrEqual(0);
+    return {draw: log[drawIndex]!, clears: log.slice(0, drawIndex).filter((entry) => entry.kind === 'clear')};
+  }
+
   describe('clear policy', () => {
+    it('clears nothing with clear = false, not even through the autoClear of the renderer', () => {
+      renderer.autoClear = true;
+      const sr = new StageRenderer();
+      const a = fakeStage('a');
+      const b = fakeStage('b');
+      for (const stage of [a, b]) {
+        stage.renderTo.mockImplementation(() => {
+          expect(renderer.autoClear, `autoClear while ${stage.name} draws`).toBe(false);
+        });
+      }
+      sr.add(a)
+        .add(b)
+        .renderTo(renderer as any);
+
+      expect(a.renderTo).toHaveBeenCalledTimes(1);
+      expect(b.renderTo).toHaveBeenCalledTimes(1);
+      expect(renderer.clear).not.toHaveBeenCalled();
+      expect(renderer.autoClear, 'autoClear restored').toBe(true);
+    });
+
     it('does not clear by default', () => {
       new StageRenderer().renderTo(renderer as any);
       expect(renderer.clear).not.toHaveBeenCalled();
@@ -262,6 +330,31 @@ describe('StageRenderer', () => {
       expect(() => sr.renderTo(renderer as any)).toThrow('stage failed');
       expect(renderer.autoClear).toBe(true);
       expect(renderer.__renderTarget).toBe(before);
+      expect(renderer.toneMapping).toBe(ACESFilmicToneMapping);
+      expect(renderer.outputColorSpace).toBe(SRGBColorSpace);
+    });
+
+    it('restores the render state when a nested renderer throws while the composed mode pre-renders it', () => {
+      renderer.autoClear = true;
+      const before = {tag: 'screen'};
+      renderer.__renderTarget = before;
+      const parent = new StageRenderer();
+      parent.resize(100, 100);
+      const child = new StageRenderer();
+      parent.add(child);
+      const stage = fakeStage('s');
+      stage.renderTo.mockImplementation(() => {
+        throw new Error('stage failed');
+      });
+      child.add(stage);
+      parent.buildOutputNode = (passes) => passes[0]!;
+      parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+
+      expect(() => parent.renderTo(renderer as any)).toThrow('stage failed');
+      expect(renderer.autoClear).toBe(true);
+      expect(renderer.__renderTarget).toBe(before);
+      expect(renderer.toneMapping).toBe(ACESFilmicToneMapping);
+      expect(renderer.outputColorSpace).toBe(SRGBColorSpace);
     });
 
     it('renders every stage of a listed name, in the order they were added', () => {
@@ -583,27 +676,167 @@ describe('StageRenderer', () => {
       expect(pipeline.outputNode).toBeDefined();
     });
 
-    it('rebuilds outputNode only when stage list changes', () => {
+    it('keeps the output node of Mode C through changes of stages, order, names and cameras', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
-      sr.add(stage);
-      const pipeline = {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      const stage2D = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      sr.add(stage).add(stage2D);
+      const pipeline = makePipelineMock();
       sr.pipeline = pipeline as any;
 
       sr.renderTo(renderer as any);
       const firstNode = pipeline.outputNode;
       pipeline.needsUpdate = false;
-      sr.renderTo(renderer as any);
-      // outputNode kept (rebuild only when invalidated)
-      expect(pipeline.outputNode).toBe(firstNode);
-      expect(pipeline.needsUpdate).toBe(false);
 
-      // Add a stage → invalidate
-      sr.add(fakeStage('t'));
-      pipeline.needsUpdate = false;
+      const extra = fakeStage('t');
+      const changes: [string, () => void][] = [
+        ['add()', () => sr.add(extra)],
+        ['remove()', () => sr.remove(extra)],
+        ['a renderOrder write', () => (sr.renderOrder = 's,*')],
+        ['a rename under an explicit renderOrder', () => (stage.name = 'u')],
+        ['a camera change of a Stage2D', () => (stage2D.camera = new PerspectiveCamera())],
+      ];
+      for (const [change, apply] of changes) {
+        apply();
+        sr.renderTo(renderer as any);
+        expect(pipeline.outputNode, `output node after ${change}`).toBe(firstNode);
+        expect(pipeline.needsUpdate, `needsUpdate after ${change}`).toBe(false);
+      }
+    });
+
+    it('clears the internal target of Mode C without clear to transparent black, color and depth', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+      const log = logClearsAndDraws(stage);
+
       sr.renderTo(renderer as any);
-      expect(pipeline.needsUpdate).toBe(true);
+
+      const {draw, clears} = clearsBeforeFirstDraw(log);
+      expect((draw.target as any)?.isRenderTarget, 'the stage draws into the internal target').toBe(true);
+      expect(clears).toEqual([{kind: 'clear', target: draw.target, color: 0x000000, alpha: 0, args: [true, true, false]}]);
+      expect(
+        log.filter((entry) => entry.kind === 'clear'),
+        'no clear anywhere else',
+      ).toHaveLength(1);
+      expect(renderer.__clearColor.getHex(), 'clear color restored').toBe(0x111111);
+      expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
+    });
+
+    it('clears the internal target of Mode C in full before its own clear leaves out the color buffer', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.setClearColor(new Color(0x123456), 0.25);
+      sr.clearColorBuffer = false;
+      sr.pipeline = makePipelineMock() as any;
+      const log = logClearsAndDraws(stage);
+
+      sr.renderTo(renderer as any);
+
+      const {draw, clears} = clearsBeforeFirstDraw(log);
+      expect(clears).toEqual([
+        {kind: 'clear', target: draw.target, color: 0x000000, alpha: 0, args: [true, true, false]},
+        {kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [false, true, true]},
+      ]);
+    });
+
+    it('clears the internal target of Mode C once when its own clear covers color and depth', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.setClearColor(new Color(0x123456), 0.25);
+      sr.pipeline = makePipelineMock() as any;
+      const log = logClearsAndDraws(stage);
+
+      sr.renderTo(renderer as any);
+
+      const {draw, clears} = clearsBeforeFirstDraw(log);
+      expect(clears).toEqual([{kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]}]);
+    });
+
+    it('lets the stages of Mode C draw linear, and its own pipeline apply the output transform of the caller', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+
+      const seen: Record<string, [unknown, unknown]> = {};
+      stage.renderTo.mockImplementation(() => {
+        seen['stage'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+      pipeline.render.mockImplementation(() => {
+        seen['pipeline'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+
+      sr.renderTo(renderer as any);
+
+      expect(seen['stage']).toEqual([NoToneMapping, ColorManagement.workingColorSpace]);
+      expect(seen['pipeline']).toEqual([ACESFilmicToneMapping, SRGBColorSpace]);
+      expect([renderer.toneMapping, renderer.outputColorSpace], 'after renderTo()').toEqual([
+        ACESFilmicToneMapping,
+        SRGBColorSpace,
+      ]);
+    });
+
+    it('lets a nested renderer with a pipeline under Mode C write linear', () => {
+      const parent = new StageRenderer();
+      parent.resize(100, 100);
+      parent.add(fakeStage('s'));
+      const parentPipeline = makePipelineMock();
+      parent.pipeline = parentPipeline as any;
+      const child = new StageRenderer();
+      child.resize(100, 100);
+      child.add(fakeStage('inner'));
+      const childPipeline = makePipelineMock();
+      child.pipeline = childPipeline as any;
+      parent.add(child);
+
+      const seen: Record<string, [unknown, unknown]> = {};
+      childPipeline.render.mockImplementation(() => {
+        seen['child'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+      parentPipeline.render.mockImplementation(() => {
+        seen['parent'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+
+      parent.renderTo(renderer as any);
+
+      expect(seen['child']).toEqual([NoToneMapping, ColorManagement.workingColorSpace]);
+      expect(seen['parent']).toEqual([ACESFilmicToneMapping, SRGBColorSpace]);
+      expect([renderer.toneMapping, renderer.outputColorSpace], 'after renderTo()').toEqual([
+        ACESFilmicToneMapping,
+        SRGBColorSpace,
+      ]);
+    });
+
+    it('builds the internal target with the output buffer type and the samples of the renderer', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+      let rt: RenderTarget | undefined;
+      stage.renderTo.mockImplementation(() => {
+        rt = renderer.__renderTarget as RenderTarget;
+      });
+
+      sr.renderTo(renderer as any);
+      const first = rt!;
+      expect(first.texture.type).toBe(FloatType);
+      expect(first.samples).toBe(4);
+
+      renderer.samples = 0;
+      sr.renderTo(renderer as any);
+      expect(rt, 'the same target').toBe(first);
+      expect(first.samples).toBe(0);
     });
 
     it('replacing the pipeline rebuilds the output node', () => {
@@ -1051,19 +1284,7 @@ describe('StageRenderer', () => {
       parent.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
       parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
 
-      const log: (
-        {kind: 'clear'; target: unknown; color: number; alpha: number; args: unknown[]} | {kind: 'draw'; target: unknown}
-      )[] = [];
-      renderer.clear.mockImplementation((...args: unknown[]) =>
-        log.push({
-          kind: 'clear',
-          target: renderer.__renderTarget,
-          color: renderer.__clearColor.getHex(),
-          alpha: renderer.__clearAlpha,
-          args,
-        }),
-      );
-      inner.renderTo.mockImplementation(() => log.push({kind: 'draw', target: renderer.__renderTarget}));
+      const log = logClearsAndDraws(inner);
 
       return {parent, child, log};
     }
@@ -1090,18 +1311,88 @@ describe('StageRenderer', () => {
       }
     });
 
-    it('a nested StageRenderer with clear applies its own clear color on top of the transparent black clear', () => {
+    it('a nested StageRenderer whose own clear covers color and depth gets only that clear', () => {
       const {parent, child, log} = makeNestedSetup();
       child.setClearColor(new Color(0x123456), 0.25);
 
       parent.renderTo(renderer as any);
 
-      const drawIndex = log.findIndex((entry) => entry.kind === 'draw');
-      const draw = log[drawIndex]!;
-      expect(log.slice(0, drawIndex).filter((entry) => entry.kind === 'clear')).toEqual([
+      const {draw, clears} = clearsBeforeFirstDraw(log);
+      expect(clears).toEqual([{kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]}]);
+    });
+
+    it('a nested StageRenderer whose own clear leaves out the depth buffer gets the transparent black clear first', () => {
+      const {parent, child, log} = makeNestedSetup();
+      child.setClearColor(new Color(0x123456), 0.25);
+      child.clearDepthBuffer = false;
+
+      parent.renderTo(renderer as any);
+
+      const {draw, clears} = clearsBeforeFirstDraw(log);
+      expect(clears).toEqual([
         {kind: 'clear', target: draw.target, color: 0x000000, alpha: 0, args: [true, true, false]},
-        {kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]},
+        {kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, false, true]},
       ]);
+    });
+
+    it('a composing nested StageRenderer that cannot compose yet gets the transparent black clear despite its own clear', () => {
+      const parent = new StageRenderer();
+      parent.resize(100, 100);
+      const child = new StageRenderer();
+      parent.add(child);
+      // a Stage2D without projection has no camera: the child returns before its own clear
+      child.add(new Stage2D());
+      child.resize(100, 100);
+      child.setClearColor(new Color(0x123456), 0.25);
+      child.buildOutputNode = (passes) => passes[0]!;
+      child.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      parent.buildOutputNode = (passes) => passes[0]!;
+      parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      const log = logClearsAndDraws();
+
+      parent.renderTo(renderer as any);
+
+      const childRT = (child.asPassNode(renderer as any) as any).value.renderTarget;
+      expect(log.filter((entry) => entry.target === childRT)).toEqual([
+        {kind: 'clear', target: childRT, color: 0x000000, alpha: 0, args: [true, true, false]},
+      ]);
+    });
+
+    it('lets a nested renderer with a pipeline under a composing parent write linear', () => {
+      const {parent, child} = makeNestedSetup();
+      const childPipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      child.pipeline = childPipeline as any;
+
+      const seen: Record<string, [unknown, unknown]> = {};
+      childPipeline.render.mockImplementation(() => {
+        seen['child'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+      (parent.pipeline!.render as Mock).mockImplementation(() => {
+        seen['parent'] = [renderer.toneMapping, renderer.outputColorSpace];
+      });
+
+      parent.renderTo(renderer as any);
+
+      expect(seen['child']).toEqual([NoToneMapping, ColorManagement.workingColorSpace]);
+      expect(seen['parent']).toEqual([ACESFilmicToneMapping, SRGBColorSpace]);
+      expect([renderer.toneMapping, renderer.outputColorSpace], 'after renderTo()').toEqual([
+        ACESFilmicToneMapping,
+        SRGBColorSpace,
+      ]);
+    });
+
+    it('builds the pass target with the output buffer type and the samples of the renderer', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+
+      const rt = (sr.asPassNode(renderer as any) as any).value.renderTarget as RenderTarget;
+      expect(rt.texture.type).toBe(FloatType);
+      expect(rt.samples).toBe(4);
+
+      renderer.samples = 0;
+      const next = (sr.asPassNode(renderer as any) as any).value.renderTarget as RenderTarget;
+      expect(next, 'the same target').toBe(rt);
+      expect(rt.samples).toBe(0);
     });
 
     it('invalidateOutputNode() forces a rebuild on next render', () => {
@@ -1115,6 +1406,100 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(sr.pipeline!.needsUpdate).toBe(true);
     });
+  });
+
+  describe('release of the internal render targets', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    function makePipelineMock() {
+      return {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+    }
+
+    function fakeRootPipeline() {
+      const pipeline = makePipelineMock();
+      Object.setPrototypeOf(pipeline, RootRenderPipeline.prototype);
+      return pipeline;
+    }
+
+    // a Mode C renderer after its first frame, and the internal target its stage drew into
+    function makeModeC() {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      const passNode = {isNode: true, label: 's', type: 'pass', add: () => passNode};
+      const stage = {...fakeStage('s'), asPassNode: vi.fn(() => passNode)};
+      const targets: unknown[] = [];
+      stage.renderTo.mockImplementation(() => targets.push(renderer.__renderTarget));
+      sr.add(stage as any);
+      sr.pipeline = makePipelineMock() as any;
+      sr.renderTo(renderer as any);
+      return {sr, targets, internalRT: targets[0]};
+    }
+
+    const leavingModeC: [string, (sr: StageRenderer) => void][] = [
+      ['pipeline = undefined', (sr) => (sr.pipeline = undefined)],
+      ['buildOutputNode', (sr) => (sr.buildOutputNode = (passes) => passes[0]!)],
+      ['a RootRenderPipeline', (sr) => (sr.pipeline = fakeRootPipeline() as any)],
+    ];
+
+    for (const [leave, apply] of leavingModeC) {
+      it(`releases the internal target of Mode C once on leaving it through ${leave}, and draws into it on return`, () => {
+        const {sr, targets, internalRT} = makeModeC();
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        apply(sr);
+
+        expect(rtDispose.callCount).toBe(1);
+        expect(rtDispose.firstCall.thisValue).toBe(internalRT);
+
+        sr.buildOutputNode = undefined;
+        sr.pipeline = makePipelineMock() as any;
+        sr.renderTo(renderer as any);
+
+        expect(targets.at(-1), 'the same target').toBe(internalRT);
+        expect(rtDispose.callCount, 'nothing released on return').toBe(1);
+      });
+    }
+
+    it('releases nothing on a change between two Mode C pipelines', () => {
+      const {sr} = makeModeC();
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+      sr.pipeline = makePipelineMock() as any;
+
+      expect(rtDispose.callCount).toBe(0);
+    });
+
+    type Relation = (parent: StageRenderer, child: StageRenderer) => void;
+    const lettingGo: [string, join: Relation, part: Relation][] = [
+      ['parent.remove(child) after add()', (parent, child) => parent.add(child), (parent, child) => parent.remove(child)],
+      ['child.detach() after child.parent = parent', (parent, child) => (child.parent = parent), (_, child) => child.detach()],
+    ];
+
+    for (const [way, join, part] of lettingGo) {
+      it(`releases the pass target of a nested renderer once through ${way}`, () => {
+        const parent = new StageRenderer();
+        parent.resize(50, 50);
+        const child = new StageRenderer();
+        child.add(fakeStage('inner'));
+        join(parent, child);
+        parent.buildOutputNode = (passes) => passes[0]!;
+        parent.pipeline = makePipelineMock() as any;
+        parent.renderTo(renderer as any);
+
+        const passTexture = (child.asPassNode(renderer as any) as any).value;
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        part(parent, child);
+
+        expect(rtDispose.callCount).toBe(1);
+        expect(rtDispose.firstCall.thisValue).toBe(passTexture.renderTarget);
+        expect((child.asPassNode(renderer as any) as any).value, 'a node on the same texture').toBe(passTexture);
+      });
+    }
   });
 
   describe('dispose()', () => {

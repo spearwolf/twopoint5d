@@ -285,4 +285,178 @@ describe('StageRenderer — pipeline integration', () => {
     geometry.dispose();
     material.dispose();
   });
+
+  /**
+   * Draws a mid-gray square through a child with a pipeline of its own under `root`, into a
+   * 64 x 64 target, and answers the pixel in its middle. The gray is linear 0.216: encoded to
+   * sRGB once it reads 128, encoded twice about 187.
+   *
+   * @param {(renderer: import('three/webgpu').WebGPURenderer) => RenderPipeline} makeRootPipeline
+   * @param {boolean} childComposes whether the child composes its pass through `buildOutputNode`
+   */
+  async function grayThroughNestedPipeline(makeRootPipeline, childComposes) {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+    const renderer = display.renderer;
+
+    const target = new RenderTarget(64, 64);
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(32, 32);
+    const material = new MeshBasicMaterial({color: new Color('#808080')});
+    stage.scene.add(new Mesh(geometry, material));
+
+    const child = new StageRenderer().add(stage);
+    const childPipeline = new RenderPipeline(renderer);
+    child.pipeline = childPipeline;
+    if (childComposes) child.buildOutputNode = ([p]) => p;
+
+    const root = new StageRenderer().add(child);
+    const rootPipeline = makeRootPipeline(renderer);
+    root.pipeline = rootPipeline;
+    root.outputRenderTarget = target;
+    root.resize(64, 64);
+
+    root.renderTo(renderer);
+    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    root.dispose();
+    child.dispose();
+    stage.dispose();
+    rootPipeline.dispose();
+    childPipeline.dispose();
+    target.dispose();
+    geometry.dispose();
+    material.dispose();
+
+    return rgbAt(pixels, 64, 32, 32);
+  }
+
+  it('Mode E: a nested pipeline under a composing root applies the output transform once', async () => {
+    const rgb = await grayThroughNestedPipeline((renderer) => new RootRenderPipeline(renderer), true);
+    expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
+  });
+
+  it('Mode C: a nested pipeline under a pipeline-only root applies the output transform once', async () => {
+    const rgb = await grayThroughNestedPipeline((renderer) => new RenderPipeline(renderer), false);
+    expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
+  });
+
+  it('Mode C without clear leaves no tint of the renderer clear color in its internal target', async () => {
+    host = makeContainer({width: 64, height: 64});
+    // a WebGPU clear premultiplies its color only for a renderer with alpha: without it, a clear
+    // at alpha 0 keeps the RGB of the clear color. The WebGL2 backend premultiplies always.
+    display = new Display(host, {alpha: false});
+    await display.start();
+    const renderer = display.renderer;
+    renderer.setClearColor(new Color('#f00'), 1);
+
+    const target = new RenderTarget(64, 64);
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const mesh = new Mesh(geometry, material);
+    mesh.position.x = -16;
+    stage.scene.add(mesh);
+
+    const root = new StageRenderer().add(stage);
+    const pipeline = new RenderPipeline(renderer);
+    // without the output transform the pipeline hands the RGB of the internal target through as
+    // it is, whatever its alpha
+    pipeline.outputColorTransform = false;
+    root.pipeline = pipeline;
+    root.outputRenderTarget = target;
+    root.resize(64, 64);
+
+    root.renderTo(renderer);
+    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    const rgb = rgbAt(pixels, 64, 48, 32);
+    expect(isNearColor(rgb, [0, 0, 0]), `where no stage draws, got ${rgb}`).to.be.true;
+
+    root.dispose();
+    stage.dispose();
+    pipeline.dispose();
+    target.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('Mode C with a clear that leaves out the color buffer shows only the content of the current frame', async () => {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+    const renderer = display.renderer;
+
+    const target = new RenderTarget(64, 64);
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const mesh = new Mesh(geometry, material);
+    mesh.position.x = -16;
+    stage.scene.add(mesh);
+
+    const root = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
+    root.clearColorBuffer = false;
+    const pipeline = new RenderPipeline(renderer);
+    root.pipeline = pipeline;
+    root.outputRenderTarget = target;
+    root.resize(64, 64);
+
+    root.renderTo(renderer);
+    const first = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    mesh.position.x = 16;
+    root.renderTo(renderer);
+    const second = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    // pure green and black, so the color transform of the pipeline does not shift the result
+    expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;
+    expect(isNearColor(rgbAt(second, 64, 16, 32), [0, 0, 0]), 'where the content stood a frame before').to.be.true;
+    expect(isNearColor(rgbAt(second, 64, 48, 32), [0, 255, 0]), 'the content in the second frame').to.be.true;
+
+    root.dispose();
+    stage.dispose();
+    pipeline.dispose();
+    target.dispose();
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('the internal targets have the output buffer type and the samples of the renderer', async () => {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+    const renderer = display.renderer;
+
+    /** @type {RenderTarget | null} */
+    let captured = null;
+    const stage = {
+      name: 'capture',
+      resize() {},
+      updateFrame() {},
+      /** @param {import('three/webgpu').WebGPURenderer} r */
+      renderTo(r) {
+        captured = r.getRenderTarget();
+      },
+    };
+
+    const sr = new StageRenderer().add(stage);
+    const pipeline = new RenderPipeline(renderer);
+    sr.pipeline = pipeline;
+    sr.resize(64, 64);
+    sr.renderTo(renderer);
+
+    const internalRT = /** @type {RenderTarget} */ (/** @type {unknown} */ (captured));
+    expect(internalRT, 'the stage draws into the internal target').to.exist;
+    expect(internalRT.samples, 'internal target samples').to.equal(renderer.samples);
+    expect(internalRT.texture.type, 'internal target type').to.equal(renderer.getOutputBufferType());
+
+    const passRT = /** @type {any} */ (sr.asPassNode(renderer)).value.renderTarget;
+    expect(passRT.samples, 'pass target samples').to.equal(renderer.samples);
+    expect(passRT.texture.type, 'pass target type').to.equal(renderer.getOutputBufferType());
+
+    sr.dispose();
+    pipeline.dispose();
+  });
 });
