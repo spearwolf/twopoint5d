@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, retain} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, off, retain} from '@spearwolf/eventize';
 import {pass} from 'three/tsl';
 import {type Camera, type Node, type PassNode, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
@@ -428,16 +428,22 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to
    * `scene.name` as it always does, and so reaches the scene the caller may have handed in. A
    * `dispose` event goes out to every subscriber before this stage stops listening; no event
-   * follows it.
+   * follows it. A listener of the `dispose` event that throws does not hold up the teardown:
+   * every subscriber hears the event, the instance is torn down completely, and the error reaches
+   * the caller afterwards — one unchanged, several as an `AggregateError`.
    */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
 
-    // the listeners are still attached here: this event is what tells them to let go
-    emit(this, 'dispose', this);
-    off(this);
-
-    this.#disposePassNode();
+    // the listeners are still attached here: this event is what tells them to let go. Every one
+    // of them hears it, also behind one that throws — so every StageRenderer that holds this stage
+    // lets go of it; the error goes to the caller after the teardown
+    try {
+      emitStrict(this, 'dispose', this);
+    } finally {
+      off(this);
+      this.#disposePassNode();
+    }
   }
 }

@@ -41,8 +41,8 @@ import {description, title} from './_quadtree-playground.json';
       visual.canvasStage.setContainerSize(width, height);
     },
 
-    [OnDisplayRenderFrame]: () => {
-      visual.canvasStage.render();
+    [OnDisplayRenderFrame]: ({now, deltaTime, frameNo}: DisplayEventProps) => {
+      visual.canvasStage.render(now, deltaTime, frameNo);
     },
   });
 

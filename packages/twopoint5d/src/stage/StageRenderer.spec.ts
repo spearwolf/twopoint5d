@@ -699,6 +699,24 @@ describe('StageRenderer', () => {
       expect(second.hasStage(stage)).toBe(false);
     });
 
+    it('lets go of a Stage2D that is disposed even behind a dispose listener that throws', () => {
+      const first = new StageRenderer();
+      const second = new StageRenderer();
+      const stage = new Stage2D();
+      const failure = new Error('the listener failed');
+      // ahead of both renderers: their own listeners come after it
+      on(stage, 'dispose', () => {
+        throw failure;
+      });
+      first.add(stage);
+      second.add(stage);
+
+      expect(thrownBy(() => stage.dispose())).toBe(failure);
+
+      expect(first.hasStage(stage)).toBe(false);
+      expect(second.hasStage(stage)).toBe(false);
+    });
+
     for (const order of ['*', 'a,b,c']) {
       describe(`with renderOrder = ${JSON.stringify(order)}`, () => {
         function makeStages() {
@@ -1977,6 +1995,20 @@ describe('StageRenderer', () => {
       expect(thrownBy(() => sr.dispose())).toBe(failure);
       expect(getSubscriptionCount(sr)).toBe(0);
       expect(sr.isDisposed).toBe(true);
+    });
+
+    it('every dispose listener hears the event, even behind one that throws', () => {
+      const sr = new StageRenderer();
+      const failure = new Error('the listener failed');
+      const heard = vi.fn();
+      on(sr, 'dispose', () => {
+        throw failure;
+      });
+      on(sr, 'dispose', heard);
+
+      expect(thrownBy(() => sr.dispose())).toBe(failure);
+
+      expect(heard).toHaveBeenCalledExactlyOnceWith(sr);
     });
 
     // (d) the second call throws nothing and releases nothing a second time

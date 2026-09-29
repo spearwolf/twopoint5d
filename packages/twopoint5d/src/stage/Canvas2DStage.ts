@@ -1,7 +1,9 @@
-import {emit, type EventizedObject, eventize, off} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, off} from '@spearwolf/eventize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
+import {Chronometer} from '../display/Chronometer.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
+import {throwCollected} from '../texture/internals.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
@@ -59,19 +61,31 @@ export class Canvas2DStage {
   // one the factory built — after that this field is all that still points at it
   #placeholderTexture: Texture;
 
+  #texture?: Texture;
+
+  // the canvas size `#texture` was built for
+  #textureWidth = 0;
+  #textureHeight = 0;
+
   /**
-   * The texture the canvas content is drawn from. The stage owns whatever sits in this field:
-   * `render()` releases it once its successor sits on the sprite material, and so does
+   * The texture the sprite shows the canvas through. The stage builds it on the first `render()`
+   * and anew on the first upload after the canvas has changed its size, and releases the previous
+   * one as soon as the new one sits on the sprite material; each of them belongs to the stage,
+   * and {@link dispose} releases the last. `undefined` before the first `render()` and after
    * {@link dispose}.
    */
-  texture?: Texture;
+  get texture(): Texture | undefined {
+    return this.#texture;
+  }
 
   #textureFactory?: TextureFactory;
 
   /**
-   * You should set `needsUpdate` to `true` if the canvas content has changed
+   * Set `needsUpdate` to `true` after every change of the canvas content: the next `render()`
+   * uploads it. It starts out `true`, so the first `render()` shows what the canvas already
+   * carries — a canvas handed to the constructor that was painted before included.
    */
-  needsUpdate = false;
+  needsUpdate = true;
 
   #lastWidth = 0;
   #lastHeight = 0;
@@ -124,29 +138,36 @@ export class Canvas2DStage {
     this.scene.add(this.sprite);
   }
 
-  private makeTexture(): Texture {
+  private updateTexture(): void {
+    if (!this.needsUpdate) return;
+
+    this.needsUpdate = false;
+
+    // three.js allocates the GPU texture once, in the size of the first upload, and copies every
+    // later needsUpdate upload into it (Textures#updateTexture() creates the backend texture only
+    // as long as the texture is the default one): a canvas of another size needs a texture of its own
+    if (this.#texture != null && this.canvas.width === this.#textureWidth && this.canvas.height === this.#textureHeight) {
+      this.#texture.needsUpdate = true;
+      return;
+    }
+
     this.#textureFactory ||= new TextureFactory(this.renderer, ['nearest', 'flipy', 'srgb']);
 
-    this.texture = this.#textureFactory.create(this.canvas);
+    const previous = this.#texture;
 
-    return this.texture;
+    this.#texture = this.#textureFactory.create(this.canvas);
+    this.#textureWidth = this.canvas.width;
+    this.#textureHeight = this.canvas.height;
+
+    this.sprite.material.map = this.#texture;
+    this.sprite.material.needsUpdate = true;
+
+    // the material points at the successor before the predecessor falls: nothing ever reads
+    // a texture that is already released
+    previous?.dispose();
   }
 
-  private updateTexture() {
-    if (this.needsUpdate) {
-      const previous = this.texture;
-
-      this.sprite.material.map = this.makeTexture();
-      this.sprite.material.needsUpdate = true;
-      this.needsUpdate = false;
-
-      // the material points at the successor before the predecessor falls: nothing ever reads
-      // a texture that is already released
-      previous?.dispose();
-    }
-  }
-
-  setContainerSize(width: number, height: number) {
+  setContainerSize(width: number, height: number): void {
     if (this.#disposed) return;
 
     // the renderer hands the size on to every stage it holds, this one included: its own
@@ -155,7 +176,7 @@ export class Canvas2DStage {
     this.stageRenderer.resize(width, height);
   }
 
-  setCanvasSize(width: number, height: number) {
+  setCanvasSize(width: number, height: number): void {
     // the canvas may have been handed in, and a disposed stage does not write to it
     if (this.#disposed || (this.width === width && this.height === height)) return;
 
@@ -170,7 +191,26 @@ export class Canvas2DStage {
     this.stage.updateProjection(true);
   }
 
-  render() {
+  #clock?: Chronometer;
+  #frameNo = 0;
+
+  /**
+   * Draws one frame, in this order: the `resize` event if the canvas size changed since the last
+   * frame, the `render` event — the moment to draw into the canvas and set `needsUpdate` —, the
+   * upload of the canvas, `stageRenderer.updateFrame()` and `stageRenderer.renderTo()`.
+   *
+   * The values typically come from the `DisplayEventProps` of `OnDisplayRenderFrame`. Called
+   * without them, the stage takes all three from a clock of its own: the first such call passes
+   * `0`, `0` and frame `1`, every further one the seconds since that call and since the one
+   * before, counting frames from 1. A call with values touches neither the clock nor the count.
+   *
+   * Without `setContainerSize()` the {@link stage} has no camera and nothing is drawn; after 100
+   * such frames the stage warns once. This method drives {@link stageRenderer} itself — hung on
+   * a host such as a `Display`, it would update and draw twice per frame.
+   */
+  render(): void;
+  render(now: number, deltaTime: number, frameNo: number): void;
+  render(now?: number, deltaTime?: number, frameNo?: number): void {
     if (this.#disposed) return;
 
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
@@ -184,10 +224,24 @@ export class Canvas2DStage {
 
     this.updateTexture();
 
+    if (now === undefined || deltaTime === undefined || frameNo === undefined) {
+      if (this.#clock) {
+        this.#clock.update();
+        now = this.#clock.time;
+        deltaTime = this.#clock.deltaTime;
+      } else {
+        this.#clock = new Chronometer();
+        now = 0;
+        deltaTime = 0;
+      }
+      frameNo = ++this.#frameNo;
+    }
+
+    this.stageRenderer.updateFrame(now, deltaTime, frameNo);
     this.stageRenderer.renderTo(this.renderer);
   }
 
-  private dispatchEvent(eventName: string) {
+  private dispatchEvent(eventName: string): void {
     emit(this, eventName, this);
   }
 
@@ -202,8 +256,7 @@ export class Canvas2DStage {
    * Release the three.js resources this stage built for itself: the sprite material, both
    * textures that ever sat behind it, the {@link StageRenderer} and the {@link Stage2D} behind
    * {@link stage}. The sprite leaves the scene before its material goes, so no frame reaches a
-   * sprite without one. {@link texture} is the one field the stage owns whoever wrote it — a
-   * texture assigned there from outside is released here as well.
+   * sprite without one. The stage releases the textures it built.
    *
    * The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are
    * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares
@@ -218,13 +271,24 @@ export class Canvas2DStage {
    * answer with the same instance as before, and both of them report `isDisposed === true`. A
    * `dispose` event goes out to every subscriber before this stage stops listening; no event
    * follows it.
+   *
+   * A listener of the `dispose` event that throws does not hold up the teardown: every subscriber
+   * hears the event, the instance is torn down completely, and the error reaches the caller
+   * afterwards — one unchanged, several as an `AggregateError`. That holds for the `dispose`
+   * listeners of the {@link StageRenderer} and the {@link Stage2D} as well.
    */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
 
+    const errors: unknown[] = [];
+
     // the listeners are still attached here: this event is what tells them to let go
-    this.dispatchEvent('dispose');
+    try {
+      emitStrict(this, 'dispose', this);
+    } catch (error) {
+      errors.push(error);
+    }
     off(this);
 
     // out of the scene graph before the material goes — a sprite without one cannot be drawn
@@ -232,13 +296,26 @@ export class Canvas2DStage {
 
     this.sprite.material.dispose();
     this.#placeholderTexture.dispose();
-    this.texture?.dispose();
-    this.texture = undefined;
+    this.#texture?.dispose();
+    this.#texture = undefined;
     this.#textureFactory = undefined;
 
-    this.stageRenderer.dispose();
+    try {
+      this.stageRenderer.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
 
     // the stage was built in the constructor of this class, and the renderer above has let go of it
-    this.stage.dispose();
+    try {
+      this.stage.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+
+    throwCollected(
+      errors,
+      'Canvas2DStage#dispose(): listeners of the dispose events of the stage, its stage renderer and its Stage2D threw',
+    );
   }
 }

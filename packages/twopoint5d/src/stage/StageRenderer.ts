@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {
   Color,
@@ -931,7 +931,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * nothing.
    *
    * A `dispose` event goes out to every subscriber before this renderer stops listening; no
-   * event follows it. Every listener on this renderer goes with it, including the
+   * event follows it. A listener of the event that throws does not hold up the teardown: every
+   * subscriber hears the event, the renderer is torn down completely, and the error reaches the
+   * caller afterwards — one unchanged, several as an `AggregateError`. Every listener on this
+   * renderer goes with it, including the
    * `OnStageAdded` and `OnStageRemoved` subscriptions a caller placed on it, and so do the
    * camera, scene and dispose listeners it placed on its stages (through `remove()`).
    *
@@ -972,9 +975,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#buildOutputNode = undefined;
 
     // the listeners are still attached here: this event is what tells them to let go, and no
-    // event follows it. A listener that throws does not leave the renderer half torn down
+    // event follows it. A listener that throws neither keeps the ones behind it from the event nor
+    // leaves the renderer half torn down
     try {
-      emit(this, 'dispose', this);
+      emitStrict(this, 'dispose', this);
     } finally {
       off(this);
     }

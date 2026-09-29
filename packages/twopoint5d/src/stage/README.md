@@ -45,7 +45,7 @@ fast and need the canonical idioms.
 | `Display` | Owns the `WebGPURenderer` and its canvas (a canvas handed to the constructor stays the caller's), drives the frame loop, emits resize/render events. Source of truth for size + time. |
 | `Stage2D` | Holds a `THREE.Scene` and a camera derived from an `IProjection`. Implements `IStage + IRenderable + IPassProvider`. |
 | `StageRenderer` | Container for stages. Implements `IStage + IRenderable + IPassProvider` so it can be nested. Optional clearing policy and `RenderPipeline` post-processing. |
-| `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. What its `dispose()` releases is in [Resource lifecycle](#resource-lifecycle). |
+| `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. Call `render(now, deltaTime, frameNo)` from your own frame loop; the stage has a camera as soon as `setContainerSize()` has given it a size. What its `dispose()` releases is in [Resource lifecycle](#resource-lifecycle). |
 | `ClearStage` | Marker stage that emits `renderer.clear(...)` between siblings (depth-only by default). |
 | `RootRenderPipeline` | `RenderPipeline` subclass with a built-in additive composition (`p0.add(p1).add(p2)…`). Assign as `StageRenderer.pipeline` to skip `buildOutputNode` for the common "compose every stage" case. |
 
@@ -541,9 +541,9 @@ What this layer does on top of the general rules in
   scene, the camera and the projection were handed in and stay the caller's. Afterwards
   `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
   write to `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
-  it out on its `dispose` event.
+  it out on its `dispose` event, even behind a listener of that event that throws.
 - `Canvas2DStage.dispose()` releases the sprite material, both textures that ever sat behind it —
-  a texture assigned to `texture` from outside as much as one the stage built — its
+  the placeholder and the one the stage built — its
   `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
   canvas handed to the constructor alone. The sprite geometry is shared by every `THREE.Sprite`
   of the module and stays.

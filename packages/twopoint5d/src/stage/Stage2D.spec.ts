@@ -1,4 +1,4 @@
-import {emit, on} from '@spearwolf/eventize';
+import {emit, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, type WebGPURenderer} from 'three/webgpu';
@@ -520,6 +520,30 @@ describe('Stage2D', () => {
       stage.dispose();
 
       expect(passNodeDispose.calledOnce).toBe(true);
+    });
+
+    it('a dispose listener that throws does not keep the stage from releasing its pass node and its listeners', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const passNodeDispose = sandbox.spy(passNode, 'dispose');
+      const failure = new Error('the listener failed');
+      const heard = vi.fn();
+      on(stage, 'dispose', () => {
+        throw failure;
+      });
+      on(stage, 'dispose', heard);
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBe(failure);
+      expect(heard, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(passNodeDispose.calledOnce).toBe(true);
+      expect(getSubscriptionCount(stage)).toBe(0);
     });
 
     // (b) a resource handed in belongs to the caller and is not touched

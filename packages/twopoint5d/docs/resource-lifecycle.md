@@ -27,11 +27,9 @@ takes its place, when its `imageUrl` is cleared and on `dispose()`, and a subscr
 `TextureStore` only borrows it.
 
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
-the constructor parameter, at the field, at the method that accepts the resource. Two
-exist today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its
-constructor receives, and [`Canvas2DStage`](../src/stage/Canvas2DStage.ts) takes over
-every texture that lands in its `texture` field, assigned from outside or built
-in-house. An undocumented take-over is a bug.
+the constructor parameter, at the field, at the method that accepts the resource. One
+exists today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its
+constructor receives. An undocumented take-over is a bug.
 
 A canvas handed to the `Display` constructor is not taken over, and `dispose()` gives it
 back as the display found it: its classes, the inline `width`, `height` and

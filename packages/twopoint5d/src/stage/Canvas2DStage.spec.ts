@@ -3,6 +3,7 @@ import {createSandbox} from 'sinon';
 import type {WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
+import {OnStageUpdateFrame, type StageUpdateFrameProps} from '../events.js';
 import {Canvas2DStage} from './Canvas2DStage.js';
 
 // the stage asks the renderer for its anisotropy and hands it to the stage renderer, nothing else
@@ -62,7 +63,6 @@ describe('Canvas2DStage', () => {
   test('puts the new texture in place before it releases the one it replaces', () => {
     const stage = makeStage();
 
-    stage.needsUpdate = true;
     stage.render();
 
     const first = stage.texture!;
@@ -77,6 +77,8 @@ describe('Canvas2DStage', () => {
       releaseFirst();
     });
 
+    // a canvas of another size is what makes the stage build a second texture
+    stage.setCanvasSize(64, 32);
     stage.needsUpdate = true;
     stage.render();
 
@@ -92,6 +94,132 @@ describe('Canvas2DStage', () => {
 
     expect([stage.stageRenderer.width, stage.stageRenderer.height]).toEqual([320, 240]);
     expect([stage.stage.containerWidth, stage.stage.containerHeight]).toEqual([320, 240]);
+  });
+
+  test('uploads a change of the same size into the texture it has', () => {
+    const stage = makeStage();
+
+    stage.render();
+    const texture = stage.texture!;
+    const materialVersion = stage.sprite.material.version;
+    const textureVersion = texture.version;
+
+    stage.needsUpdate = true;
+    stage.render();
+
+    expect(stage.texture, 'the same texture object').toBe(texture);
+    expect(texture.version, 'flagged for another upload').toBeGreaterThan(textureVersion);
+    expect(stage.sprite.material.version, 'the material is not rebuilt').toBe(materialVersion);
+    expect(stage.needsUpdate, 'the flag is spent').toBe(false);
+  });
+
+  test('builds a new texture for a canvas of another size', () => {
+    const stage = makeStage();
+
+    stage.render();
+    const first = stage.texture!;
+    const firstDispose = sandbox.spy(first, 'dispose');
+
+    stage.setCanvasSize(64, 32);
+    stage.needsUpdate = true;
+    stage.render();
+
+    expect(stage.texture).not.toBe(first);
+    expect(stage.sprite.material.map, 'the material shows the new texture').toBe(stage.texture);
+    expect(firstDispose.calledOnce, 'the previous texture is released').toBe(true);
+  });
+
+  test('builds a new texture when a canvas handed in changes its size itself', () => {
+    const canvas = makeCanvas();
+    const stage = new Canvas2DStage(makeRenderer(), canvas);
+
+    stage.render();
+    const first = stage.texture!;
+
+    canvas.width = 48;
+    stage.needsUpdate = true;
+    stage.render();
+
+    expect(stage.texture).not.toBe(first);
+    expect(stage.sprite.material.map).toBe(stage.texture);
+  });
+
+  test('shows the canvas on the first render() without needsUpdate', () => {
+    const stage = makeStage();
+
+    expect(stage.texture, 'nothing is built before the first render()').toBeUndefined();
+
+    stage.render();
+
+    expect(stage.texture).toBeDefined();
+    expect(stage.texture).toBe(stage.sprite.material.map);
+  });
+
+  test('hands out its texture read-only', () => {
+    const stage = makeStage();
+
+    expect(() => {
+      // @ts-expect-error texture has a getter and no setter
+      stage.texture = undefined;
+    }).toThrow(TypeError);
+    expect(() => {
+      (stage as unknown as {texture: unknown}).texture = undefined;
+    }).toThrow(TypeError);
+  });
+
+  describe('render()', () => {
+    test('render(now, deltaTime, frameNo) hands the frame to the stage renderer before it draws', () => {
+      const stage = makeStage();
+      const updateFrame = sandbox.spy(stage.stageRenderer, 'updateFrame');
+      const renderTo = sandbox.stub(stage.stageRenderer, 'renderTo');
+
+      stage.render(1.5, 0.25, 7);
+
+      expect(updateFrame.calledOnceWithExactly(1.5, 0.25, 7)).toBe(true);
+      expect(renderTo.calledOnce).toBe(true);
+      expect(updateFrame.calledBefore(renderTo)).toBe(true);
+    });
+
+    test('render() without frame values counts frames of its own', () => {
+      const stage = makeStage();
+      const updateFrame = sandbox.spy(stage.stageRenderer, 'updateFrame');
+
+      stage.render();
+      stage.render();
+
+      expect(updateFrame.firstCall.args).toEqual([0, 0, 1]);
+      const [now, deltaTime, frameNo] = updateFrame.secondCall.args;
+      expect(frameNo).toBe(2);
+      expect(now).toBeGreaterThanOrEqual(0);
+      expect(deltaTime).toBeGreaterThanOrEqual(0);
+    });
+
+    test('a call with values leaves the clock and the frame count alone', () => {
+      const stage = makeStage();
+      const updateFrame = sandbox.spy(stage.stageRenderer, 'updateFrame');
+
+      stage.render();
+      stage.render(10, 1, 99);
+      stage.render();
+
+      expect(updateFrame.thirdCall.args[2], 'the second call without values counts 2').toBe(2);
+    });
+
+    test('the Stage2D gets OnStageUpdateFrame once the container has a size', () => {
+      const stage = makeStage();
+      stage.setContainerSize(320, 240);
+      // under node nothing draws
+      sandbox.stub(stage.stageRenderer, 'renderTo');
+
+      const frames: {now: number; deltaTime: number; frameNo: number}[] = [];
+      on(stage.stage, OnStageUpdateFrame, ({now, deltaTime, frameNo}: StageUpdateFrameProps) => {
+        frames.push({now, deltaTime, frameNo});
+      });
+
+      stage.render(2, 0.5, 3);
+
+      expect(frames).toEqual([{now: 2, deltaTime: 0.5, frameNo: 3}]);
+    });
   });
 
   describe('dispose()', () => {
@@ -188,6 +316,55 @@ describe('Canvas2DStage', () => {
       stage.dispose();
 
       expect(innerStageDispose.calledOnce).toBe(true);
+    });
+
+    test('a dispose listener that throws does not hold up the teardown', () => {
+      const stage = makeStage();
+      const boom = new Error('boom');
+      const materialDispose = sandbox.spy(stage.sprite.material, 'dispose');
+      const placeholderDispose = sandbox.spy(stage.sprite.material.map!, 'dispose');
+      const heard = vi.fn();
+      on(stage, 'dispose', () => {
+        throw boom;
+      });
+      on(stage, 'dispose', heard);
+
+      expect(() => stage.dispose()).toThrow(boom);
+
+      expect(heard, 'a listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(materialDispose.calledOnce).toBe(true);
+      expect(placeholderDispose.calledOnce).toBe(true);
+      expect(stage.sprite.parent).toBe(null);
+      expect(stage.stageRenderer.isDisposed).toBe(true);
+      expect(stage.stage.isDisposed).toBe(true);
+    });
+
+    test('collects the errors of the dispose listeners of the stage, its stage renderer and its Stage2D', () => {
+      const stage = makeStage();
+      const stageError = new Error('stage');
+      const rendererError = new Error('stage renderer');
+      const stage2DError = new Error('Stage2D');
+      on(stage, 'dispose', () => {
+        throw stageError;
+      });
+      on(stage.stageRenderer, 'dispose', () => {
+        throw rendererError;
+      });
+      on(stage.stage, 'dispose', () => {
+        throw stage2DError;
+      });
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([stageError, rendererError, stage2DError]);
+      expect(stage.stageRenderer.isDisposed).toBe(true);
+      expect(stage.stage.isDisposed).toBe(true);
     });
 
     // (e) has no subject here: no class in this module creates a signal or an effect.
