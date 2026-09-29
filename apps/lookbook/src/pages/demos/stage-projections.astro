@@ -1,0 +1,176 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-projections.json';
+---
+
+<Layout title={title} description={description}>
+  <div class="pt-[28px] h-full">
+    <section class="gridContainer">
+      <div class="gridCell">
+        <div class="canvasContainer" data-projection="orthographic"></div>
+        <div class="gridInfo"><b>OrthographicProjection</b></div>
+      </div>
+      <div class="gridCell">
+        <div class="canvasContainer" data-projection="parallax"></div>
+        <div class="gridInfo"><b>ParallaxProjection</b></div>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    Display,
+    OnStageUpdateFrame,
+    OrthographicProjection,
+    ParallaxProjection,
+    Stage2D,
+    StageRenderer,
+    TextureFactory,
+    type StageUpdateFrameProps,
+  } from '@spearwolf/twopoint5d';
+  import {
+    Color,
+    EdgesGeometry,
+    Group,
+    LineBasicMaterial,
+    LineSegments,
+    PlaneGeometry,
+    Sprite,
+    SpriteMaterial,
+  } from 'three/webgpu';
+  import GUI from 'lil-gui';
+  import assetsUrl from '~demos/utils/assetsUrl';
+
+  // one specs object for both projections: they keep the object they are given, so a write to
+  // `fit` reaches both, and `needsUpdate` on the stages applies it in the next frame.
+  // 300 keeps the camera of the orthographic projection behind the near layer at z = 150
+  const specs: {fit: 'contain' | 'cover' | 'fill'; width: number; height: number; distanceToProjectionPlane: number} = {
+    fit: 'contain',
+    width: 800,
+    height: 600,
+    distanceToProjectionPlane: 300,
+  };
+
+  const layerTints = [
+    {z: -150, color: '#118ab2'},
+    {z: 0, color: '#06d6a0'},
+    {z: 150, color: '#ef476f'},
+  ];
+
+  function setupPane(container: HTMLElement, projection: OrthographicProjection | ParallaxProjection): Stage2D {
+    const display = new Display(container);
+    const stage = new Stage2D(projection);
+    const stageRenderer = new StageRenderer(display).setClearColor(new Color('#0a0a1f'), 1).add(stage);
+
+    // the frame of the 800x600 rectangle of the specs at z = 0: it shows how each fit lays the
+    // rectangle into the cell
+    const frameGeometry = new EdgesGeometry(new PlaneGeometry(800, 600));
+    const frameMaterial = new LineBasicMaterial({color: '#ffd166'});
+    stage.scene.add(new LineSegments(frameGeometry, frameMaterial));
+
+    const texture = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']).load(assetsUrl('skinball-256.png'));
+
+    const layers = new Group();
+    const materials: SpriteMaterial[] = [];
+    const sprites: Sprite[] = [];
+
+    for (const {z, color} of layerTints) {
+      const material = new SpriteMaterial({map: texture, color: new Color(color)});
+      materials.push(material);
+
+      for (const x of [-320, -160, 0, 160, 320]) {
+        for (const y of [-180, 0, 180]) {
+          const sprite = new Sprite(material);
+          sprite.position.set(x, y, z);
+          sprite.scale.set(60, 60, 1);
+          layers.add(sprite);
+          sprites.push(sprite);
+        }
+      }
+    }
+
+    stage.scene.add(layers);
+
+    // under the parallax projection the near layer travels further than the far one, under the
+    // orthographic projection all layers travel alike
+    on(stage, OnStageUpdateFrame, ({now}: StageUpdateFrameProps) => {
+      layers.position.x = Math.sin(now * 0.5) * 120;
+    });
+
+    display.onDispose(() => {
+      stageRenderer.dispose();
+      stage.dispose();
+      layers.removeFromParent();
+      for (const sprite of sprites) sprite.removeFromParent();
+      for (const material of materials) material.dispose();
+      frameGeometry.dispose();
+      frameMaterial.dispose();
+      texture.dispose();
+    });
+
+    display.start();
+
+    return stage;
+  }
+
+  const [orthographicContainer, parallaxContainer] = Array.from(document.querySelectorAll<HTMLElement>('.canvasContainer'));
+
+  const stages = [
+    setupPane(orthographicContainer!, new OrthographicProjection('xy|bottom-left', specs)),
+    setupPane(parallaxContainer!, new ParallaxProjection('xy|bottom-left', specs)),
+  ];
+
+  const gui = new GUI({title: 'stage projections'});
+  gui.add(specs, 'fit', ['contain', 'cover', 'fill']).onChange(() => {
+    for (const stage of stages) stage.needsUpdate = true;
+  });
+</script>
+
+<style>
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    color: #f0f0f0;
+    background-color: #123;
+    font-family: sans-serif;
+  }
+
+  .gridContainer {
+    display: grid;
+    height: 100%;
+    margin: 2px;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background-color: #123;
+  }
+  .gridCell {
+    outline: 1px dashed #4a4c50;
+    padding: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+  .canvasContainer {
+    width: 100%;
+    height: 100%;
+  }
+
+  .gridInfo {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: #d2d9e0;
+    font-size: 16px;
+    font-family: monospace;
+  }
+  .gridInfo b {
+    color: #ffffdd;
+  }
+</style>

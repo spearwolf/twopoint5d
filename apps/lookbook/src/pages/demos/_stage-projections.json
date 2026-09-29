@@ -1,0 +1,6 @@
+{
+  "title": "stage projections",
+  "description": "The same scene under an `OrthographicProjection` and a `ParallaxProjection` side by side, with the `fit` of both switched in one place",
+  "url": "/demos/stage-projections",
+  "tags": ["Display", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer", "vanilla"]
+}

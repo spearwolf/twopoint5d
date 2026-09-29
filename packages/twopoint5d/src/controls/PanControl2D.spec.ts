@@ -1,6 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
+import {OnPanControl2DUpdate, type PanControl2DUpdateProps} from '../events.js';
 import {PanControl2D, type PanControl2DOptions} from './PanControl2D.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
@@ -298,7 +299,7 @@ describe('PanControl2D', () => {
       expect(control.panView).toBe(state);
 
       const updates: unknown[] = [];
-      on(control, 'update', (props: unknown) => updates.push(props));
+      on(control, OnPanControl2DUpdate, (props: unknown) => updates.push(props));
 
       control.update(0);
       expect(updates).toEqual([{x: 3, y: 4}]);
@@ -306,6 +307,62 @@ describe('PanControl2D', () => {
       key('keydown', {code: 'KeyD'});
       control.update(1);
       expect(state.x).toBe(103);
+    });
+  });
+
+  describe('on…() shorthands', () => {
+    it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
+      const control = makeControl();
+      const seen: PanControl2DUpdateProps[] = [];
+      const off = control.onUpdate((props) => seen.push(props));
+
+      control.update(0);
+      off();
+      control.speedEast = 10;
+      control.update(1);
+
+      expect(seen).toEqual([{x: 0, y: 0}]);
+    });
+
+    it('onHideCursor() and onRestoreCursor() hear a drag that hides the cursor and gives it back, with the control', () => {
+      const control = makeControl();
+      const hidden = vi.fn();
+      const restored = vi.fn();
+      control.onHideCursor(hidden);
+      control.onRestoreCursor(restored);
+
+      drag(1);
+
+      expect(hidden).toHaveBeenCalledExactlyOnceWith(control);
+      expect(restored).not.toHaveBeenCalled();
+
+      pointer('pointerup', {buttons: 0});
+
+      expect(restored).toHaveBeenCalledExactlyOnceWith(control);
+    });
+
+    it('a listener added through onUpdate() after dispose() still hears update(), which keeps moving the view', () => {
+      const control = makeControl();
+      control.dispose();
+      const spy = vi.fn();
+      control.onUpdate(spy);
+
+      control.panView = {x: 1, y: 1};
+      control.update(0);
+
+      expect(spy).toHaveBeenCalledExactlyOnceWith({x: 1, y: 1});
+    });
+
+    it('a listener added through onRestoreCursor() after dispose() hears nothing', () => {
+      const control = makeControl();
+      control.dispose();
+      const spy = vi.fn();
+      control.onRestoreCursor(spy);
+
+      drag(1);
+      pointer('pointerup', {buttons: 0});
+
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 });

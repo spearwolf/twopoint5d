@@ -4,6 +4,7 @@ import {type Camera, type Node, type PassNode, Scene, type WebGPURenderer} from 
 import {
   OnStageAfterCameraChanged,
   OnStageAfterSceneChanged,
+  OnStageDispose,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
@@ -414,7 +415,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * by whoever built it, and a camera has no `dispose()` either, the one the projection created as
    * little as one assigned here.
    *
-   * Every `StageRenderer` that holds this stage takes it out itself on the `dispose` event below,
+   * Every `StageRenderer` that holds this stage takes it out itself on `OnStageDispose` below,
    * and its next frame composes without it.
    *
    * Afterwards `isDisposed` is `true` and {@link asPassNode} throws an error naming the class and
@@ -425,9 +426,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a
    * write to `scene` goes through and has no effect, since the stage no longer builds a node from
    * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to
-   * `scene.name` as it always does, and so reaches the scene the caller may have handed in. A
-   * `dispose` event goes out to every subscriber before this stage stops listening; no event
-   * follows it. A listener of the `dispose` event that throws does not hold up the teardown:
+   * `scene.name` as it always does, and so reaches the scene the caller may have handed in. An
+   * `OnStageDispose` goes out to every subscriber before this stage stops listening; no event
+   * follows it. A listener of `OnStageDispose` that throws does not hold up the teardown:
    * every subscriber hears the event, the instance is torn down completely, and the error reaches
    * the caller afterwards — one unchanged, several as an `AggregateError`.
    */
@@ -439,7 +440,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // of them hears it, also behind one that throws — so every StageRenderer that holds this stage
     // lets go of it; the error goes to the caller after the teardown
     try {
-      emitStrict(this, 'dispose', this);
+      emitStrict(this, OnStageDispose, this);
     } finally {
       off(this);
       this.#disposePassNode();

@@ -4,8 +4,10 @@ import {createSandbox} from 'sinon';
 import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
+  type IStageDispose,
   OnStageAfterCameraChanged,
   OnStageAfterSceneChanged,
+  OnStageDispose,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
@@ -678,10 +680,10 @@ describe('Stage2D', () => {
       const passNodeDispose = sandbox.spy(passNode, 'dispose');
       const failure = new Error('the listener failed');
       const heard = vi.fn();
-      on(stage, 'dispose', () => {
+      on(stage, OnStageDispose, () => {
         throw failure;
       });
-      on(stage, 'dispose', heard);
+      on(stage, OnStageDispose, heard);
 
       let caught: unknown;
       try {
@@ -694,6 +696,17 @@ describe('Stage2D', () => {
       expect(heard, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
       expect(passNodeDispose.calledOnce).toBe(true);
       expect(getSubscriptionCount(stage)).toBe(0);
+    });
+
+    it('announces its dispose to a listener of IStageDispose with the stage', () => {
+      const stage = makeStage();
+      const heard = vi.fn();
+      const listener: IStageDispose = {[OnStageDispose]: heard};
+      on(stage, listener);
+
+      stage.dispose();
+
+      expect(heard).toHaveBeenCalledExactlyOnceWith(stage);
     });
 
     // (b) a resource handed in belongs to the caller and is not touched
@@ -798,7 +811,7 @@ describe('Stage2D', () => {
       const stage = makeStage();
       const disposed = vi.fn();
       const updated = vi.fn();
-      on(stage, 'dispose', disposed);
+      on(stage, OnStageDispose, disposed);
       on(stage, OnStageUpdateFrame, updated);
 
       stage.dispose();

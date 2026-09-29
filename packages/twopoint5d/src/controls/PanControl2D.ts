@@ -1,6 +1,12 @@
-import {emit, type EventizedObject, eventize, off} from '@spearwolf/eventize';
+import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
 
 import {Stylesheets} from '../display/Stylesheets.js';
+import {
+  OnPanControl2DHideCursor,
+  OnPanControl2DRestoreCursor,
+  OnPanControl2DUpdate,
+  type PanControl2DUpdateProps,
+} from '../events.js';
 import {InputControlBase} from './InputControlBase.js';
 import {readOption} from './readOption.js';
 
@@ -348,7 +354,7 @@ export class PanControl2D extends InputControlBase {
    * `undefined` puts a fresh state at `0, 0` in its place.
    *
    * The first `update()` after a state is assigned — in the constructor through
-   * `options.state`, or here — emits `update` even when nothing moved, so a listener learns
+   * `options.state`, or here — emits `OnPanControl2DUpdate` even when nothing moved, so a listener learns
    * where the view starts. Assigning the state this control already holds changes nothing:
    * before that first `update()` the announcement stays due, after it none is added.
    */
@@ -435,7 +441,7 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Move {@link panView} by what the speed fields, the keys and the pointer collected since
-   * the last call, and emit `update` with the new `x` and `y` when that moved the view — and
+   * the last call, and emit `OnPanControl2DUpdate` with the new `x` and `y` when that moved the view — and
    * on the first call after a state was assigned to {@link panView}, whether it moved or not.
    *
    * @param t delta time since last `update()` call in seconds
@@ -465,7 +471,7 @@ export class PanControl2D extends InputControlBase {
     // the movement decides, not the input source: the speed fields move the view whether a
     // pointer and a keyboard reach this control or not
     if (this.#isFirstPanViewUpdate || prevX !== this.panView.x || prevY !== this.panView.y) {
-      emit(this, 'update', {x: this.panView.x, y: this.panView.y});
+      emit(this, OnPanControl2DUpdate, {x: this.panView.x, y: this.panView.y} satisfies PanControl2DUpdateProps);
     }
 
     if (this.#isFirstPanViewUpdate) {
@@ -510,7 +516,7 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.add(this.#cursorPanClass);
     }
-    emit(this, 'hideCursor', this);
+    emit(this, OnPanControl2DHideCursor, this);
   }
 
   #onPointerUp = (event: PointerEvent): void => {
@@ -573,7 +579,7 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
-    emit(this, 'restoreCursor', this);
+    emit(this, OnPanControl2DRestoreCursor, this);
   }
 
   #onPointerMove = (event: PointerEvent): void => {
@@ -689,7 +695,7 @@ export class PanControl2D extends InputControlBase {
    * a stylesheet that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`,
    * `keyboardDisabled`, `pointerDisabled`,
    * `panView` and the four `speed…` fields still take values, they just drive nothing. A
-   * control that was hiding the cursor emits one last `restoreCursor` while its subscribers
+   * control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor` while its subscribers
    * can still hear it; after that every listener on this control goes with it, and a further
    * `dispose()` does nothing.
    */
@@ -713,4 +719,28 @@ export class PanControl2D extends InputControlBase {
     // last: the restoreCursor above still has to reach the listeners that act on it
     off(this);
   }
+
+  /**
+   * Subscribes `listener` to `OnPanControl2DUpdate`: the position {@link update} moved the view to.
+   * Returns the function that takes the listener off again. {@link update} keeps moving the view
+   * after {@link dispose}, so a listener attached then still hears it.
+   */
+  readonly onUpdate = (listener: (props: PanControl2DUpdateProps) => unknown): UnsubscribeFunc =>
+    on(this, OnPanControl2DUpdate, listener);
+
+  /**
+   * Subscribes `listener` to `OnPanControl2DHideCursor`: a mouse drag with the pan button started to
+   * move, and the control hid the cursor. Returns the function that takes the listener off again.
+   */
+  readonly onHideCursor = (listener: (control: PanControl2D) => unknown): UnsubscribeFunc =>
+    on(this, OnPanControl2DHideCursor, listener);
+
+  /**
+   * Subscribes `listener` to `OnPanControl2DRestoreCursor`: a cursor this control hid came back.
+   * Returns the function that takes the listener off again. {@link dispose} of a control that is
+   * hiding the cursor emits it one last time; a disposed control hides no cursor, so a listener
+   * attached after that hears nothing.
+   */
+  readonly onRestoreCursor = (listener: (control: PanControl2D) => unknown): UnsubscribeFunc =>
+    on(this, OnPanControl2DRestoreCursor, listener);
 }

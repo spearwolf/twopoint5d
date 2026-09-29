@@ -2,6 +2,7 @@ import {emit, emitStrict, type EventizedObject, eventize, off} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
 import {Chronometer} from '../display/Chronometer.js';
+import {OnCanvas2DStageDispose, OnCanvas2DStageRender, OnCanvas2DStageResize} from '../events.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -195,8 +196,8 @@ export class Canvas2DStage {
   #frameNo = 0;
 
   /**
-   * Draws one frame, in this order: the `resize` event if the canvas size changed since the last
-   * frame, the `render` event — the moment to draw into the canvas and set `needsUpdate` —, the
+   * Draws one frame, in this order: `OnCanvas2DStageResize` if the canvas size changed since the last
+   * frame, `OnCanvas2DStageRender` — the moment to draw into the canvas and set `needsUpdate` —, the
    * upload of the canvas, `stageRenderer.updateFrame()` and `stageRenderer.renderTo()`.
    *
    * The values typically come from the `DisplayEventProps` of `OnDisplayRenderFrame`. Called
@@ -214,13 +215,13 @@ export class Canvas2DStage {
     if (this.#disposed) return;
 
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
-      this.dispatchEvent('resize');
+      this.dispatchEvent(OnCanvas2DStageResize);
 
       this.#lastWidth = this.width;
       this.#lastHeight = this.height;
     }
 
-    this.dispatchEvent('render');
+    this.dispatchEvent(OnCanvas2DStageRender);
 
     this.updateTexture();
 
@@ -241,7 +242,7 @@ export class Canvas2DStage {
     this.stageRenderer.renderTo(this.renderer);
   }
 
-  private dispatchEvent(eventName: string): void {
+  private dispatchEvent(eventName: typeof OnCanvas2DStageResize | typeof OnCanvas2DStageRender): void {
     emit(this, eventName, this);
   }
 
@@ -269,13 +270,13 @@ export class Canvas2DStage {
    * values the stage was left with. {@link width} and {@link height} read `canvas.width` and
    * `canvas.height`, so they keep answering with whatever stands at the canvas — including what
    * the caller sets there later. The `readonly` fields {@link stage} and {@link stageRenderer}
-   * answer with the same instance as before, and both of them report `isDisposed === true`. A
-   * `dispose` event goes out to every subscriber before this stage stops listening; no event
+   * answer with the same instance as before, and both of them report `isDisposed === true`. An
+   * `OnCanvas2DStageDispose` goes out to every subscriber before this stage stops listening; no event
    * follows it.
    *
-   * A listener of the `dispose` event that throws does not hold up the teardown: every subscriber
+   * A listener of `OnCanvas2DStageDispose` that throws does not hold up the teardown: every subscriber
    * hears the event, the instance is torn down completely, and the error reaches the caller
-   * afterwards — one unchanged, several as an `AggregateError`. That holds for the `dispose`
+   * afterwards — one unchanged, several as an `AggregateError`. That holds for the `OnStageDispose`
    * listeners of the {@link StageRenderer} and the {@link Stage2D} as well.
    */
   dispose(): void {
@@ -286,7 +287,7 @@ export class Canvas2DStage {
 
     // the listeners are still attached here: this event is what tells them to let go
     try {
-      emitStrict(this, 'dispose', this);
+      emitStrict(this, OnCanvas2DStageDispose, this);
     } catch (error) {
       errors.push(error);
     }

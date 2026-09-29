@@ -17,6 +17,7 @@ import {
   OnStageAdded,
   OnStageAfterCameraChanged,
   OnStageAfterSceneChanged,
+  OnStageDispose,
   OnStageRemoved,
   type StageAddedProps,
   type StageRemovedProps,
@@ -974,7 +975,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * its stages. A write to `parent`, `attach()`, `detach()`, `add()`, `remove()` and a further
    * `dispose()` do nothing.
    *
-   * A `dispose` event goes out to every subscriber before this renderer stops listening; no
+   * An `OnStageDispose` goes out to every subscriber before this renderer stops listening; no
    * event follows it. A listener of the event that throws does not hold up the teardown: every
    * subscriber hears the event, the renderer is torn down completely, and the error reaches the
    * caller afterwards — one unchanged, several as an `AggregateError`. Every listener on this
@@ -1019,7 +1020,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // event follows it. A listener that throws neither keeps the ones behind it from the event nor
     // leaves the renderer half torn down
     try {
-      emitStrict(this, 'dispose', this);
+      emitStrict(this, OnStageDispose, this);
     } finally {
       off(this);
     }
@@ -1056,7 +1057,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Unsubscribe handle of the listeners on each eventized stage: its camera and scene changes, and
-   * its `dispose`. One handle ends all of them.
+   * its `OnStageDispose`. One handle ends all of them.
    */
   #stageSubscriptions = new Map<IStage, () => void>();
 
@@ -1089,7 +1090,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`
    * and, in the composed mode, rebuilds the output node on the next render,
-   * and for `dispose`, on which it takes the stage out through
+   * and for `OnStageDispose`, on which it takes the stage out through
    * {@link remove}; `remove()` stops listening. A child `StageRenderer` does
    * not wait for that event: its own `dispose()` takes it out of this
    * renderer first.
@@ -1131,7 +1132,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         this.#outputDirty = true;
       });
       // a disposed stage has no pass node left to give: the renderer lets go of it on the spot
-      const unsubscribeDispose = on(stage, 'dispose', () => {
+      const unsubscribeDispose = on(stage, OnStageDispose, () => {
         this.remove(stage);
       });
       this.#stageSubscriptions.set(stage, () => {
@@ -1154,7 +1155,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * A removed child `StageRenderer` answers `undefined` as its `parent`
    * afterwards and gets its `OnRemoveFromParent`, and releases the GPU memory
    * of its pass-target. Stops listening for the stage's camera and scene
-   * changes and for its `dispose`.
+   * changes and for its `OnStageDispose`.
    *
    * A stage removed during `updateFrame()`, `renderTo()` or `resize()` is
    * still reached by that call and left out from the next call on, see

@@ -532,7 +532,7 @@ class MyStage implements IStage, IRenderable, IPassProvider {
 
 A `StageRenderer` takes a stage out by itself when the stage announces its
 end: an eventized stage (`eventize(this)` from `@spearwolf/eventize`) that
-emits `dispose` in its `dispose()`, as `Stage2D` does. Take any other stage
+emits `OnStageDispose` (`'dispose'`) in its `dispose()`, as `Stage2D` does. Take any other stage
 out of every renderer that holds it — `remove(stage)` — before you call its
 `dispose()`. A stage whose `isDisposed` is `true` is refused by `add()`.
 
@@ -544,7 +544,7 @@ On `StageRenderer`:
 
 - `OnStageAdded` / `OnStageRemoved` — emitted at the **parent** with `{stage, renderer}`.
 - `OnAddToParent` / `OnRemoveFromParent` — emitted at the **child** when its `parent` changes.
-- `dispose` — once, from `dispose()`, before the renderer stops listening.
+- `OnStageDispose` — once, from `dispose()`, before the renderer stops listening.
 
 On `Stage2D`:
 
@@ -555,6 +555,16 @@ On `Stage2D`:
   `StageRenderer` listens to it on each stage it holds.
 - `OnStageAfterSceneChanged` — emitted on every change of `scene` with the replaced scene; a
   `StageRenderer` listens to it on each stage it holds as well.
+- `OnStageDispose` — once, from `dispose()`, before the stage stops listening; every
+  `StageRenderer` that holds the stage takes it out on it.
+
+On `Canvas2DStage`:
+
+- `OnCanvas2DStageResize` — from `render()`, when the canvas has another size than at the
+  previous `render()`, the first `render()` included.
+- `OnCanvas2DStageRender` — from every `render()`, before the canvas is uploaded: draw into the
+  canvas here and set `needsUpdate`.
+- `OnCanvas2DStageDispose` — once, from `dispose()`, before the stage stops listening.
 
 All event names are exported from `@spearwolf/twopoint5d`.
 
@@ -598,7 +608,7 @@ What this layer does on top of the general rules in
   disposed. It also detaches from its host or from the parent `StageRenderer` that holds
   it, and drops its stages through `remove()`, so a disposed renderer is no longer driven
   by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
-  of its pass-target — the child itself is not disposed. A `dispose` event goes out
+  of its pass-target — the child itself is not disposed. An `OnStageDispose` goes out
   before the renderer stops listening.
 - A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for one
   draw at a time; while it is set the renderer builds no internal target of its own, and
@@ -630,7 +640,7 @@ What this layer does on top of the general rules in
   scene, the camera and the projection were handed in and stay the caller's. Afterwards
   `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
   write to `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
-  it out on its `dispose` event, even behind a listener of that event that throws.
+  it out on its `OnStageDispose`, even behind a listener of that event that throws.
 - `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material starts
   out with and the texture the stage built last from the canvas — each earlier one was released
   when its successor took its place —, its `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
@@ -688,7 +698,7 @@ What this layer does on top of the general rules in
   one, and dispose the current one when you dispose the renderer; the renderer
   only releases what it owns — its internal RTs.
 - **Disposing a custom stage a renderer still holds**: take a custom stage that
-  emits no `dispose` event out of every `StageRenderer` that has it —
+  emits no `OnStageDispose` out of every `StageRenderer` that has it —
   `remove(stage)` — before you call its `dispose()`. A renderer that still lists
   a disposed stage keeps its released pass node in the composed output node, and
   the backend silently allocates a render target for it again on the next frame;

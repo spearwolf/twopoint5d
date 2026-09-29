@@ -15,7 +15,7 @@ import {
   type ToneMapping,
 } from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
-import {OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageRemoved} from '../events.js';
+import {type IStageDispose, OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageDispose, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
@@ -734,7 +734,7 @@ describe('StageRenderer', () => {
       const stage = new Stage2D();
       const failure = new Error('the listener failed');
       // ahead of both renderers: their own listeners come after it
-      on(stage, 'dispose', () => {
+      on(stage, OnStageDispose, () => {
         throw failure;
       });
       first.add(stage);
@@ -2469,11 +2469,22 @@ describe('StageRenderer', () => {
       builder.dispose();
     });
 
+    it('announces its dispose to a listener of IStageDispose with the renderer', () => {
+      const sr = new StageRenderer();
+      const heard = vi.fn();
+      const listener: IStageDispose = {[OnStageDispose]: heard};
+      on(sr, listener);
+
+      sr.dispose();
+
+      expect(heard).toHaveBeenCalledExactlyOnceWith(sr);
+    });
+
     it('emits dispose once before it stops listening', () => {
       const sr = new StageRenderer();
       const listening: number[] = [];
       const spy = vi.fn(() => listening.push(getSubscriptionCount(sr)));
-      on(sr, 'dispose', spy);
+      on(sr, OnStageDispose, spy);
 
       sr.dispose();
 
@@ -2481,7 +2492,7 @@ describe('StageRenderer', () => {
       expect(listening[0], 'the listener is still attached when the event arrives').toBeGreaterThan(0);
       expect(getSubscriptionCount(sr), 'and nothing is attached afterwards').toBe(0);
 
-      on(sr, 'dispose', spy);
+      on(sr, OnStageDispose, spy);
       sr.dispose();
       expect(spy, 'a second dispose() emits nothing').toHaveBeenCalledTimes(1);
     });
@@ -2489,7 +2500,7 @@ describe('StageRenderer', () => {
     it('stops listening even when a dispose listener throws', () => {
       const sr = new StageRenderer();
       const failure = new Error('the listener failed');
-      on(sr, 'dispose', () => {
+      on(sr, OnStageDispose, () => {
         throw failure;
       });
 
@@ -2502,10 +2513,10 @@ describe('StageRenderer', () => {
       const sr = new StageRenderer();
       const failure = new Error('the listener failed');
       const heard = vi.fn();
-      on(sr, 'dispose', () => {
+      on(sr, OnStageDispose, () => {
         throw failure;
       });
-      on(sr, 'dispose', heard);
+      on(sr, OnStageDispose, heard);
 
       expect(thrownBy(() => sr.dispose())).toBe(failure);
 

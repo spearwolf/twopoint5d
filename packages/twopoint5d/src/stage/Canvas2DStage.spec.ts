@@ -3,7 +3,18 @@ import {createSandbox} from 'sinon';
 import type {WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
-import {OnStageResize, OnStageUpdateFrame, type StageUpdateFrameProps} from '../events.js';
+import {
+  type ICanvas2DStageDispose,
+  type ICanvas2DStageRender,
+  type ICanvas2DStageResize,
+  OnCanvas2DStageDispose,
+  OnCanvas2DStageRender,
+  OnCanvas2DStageResize,
+  OnStageDispose,
+  OnStageResize,
+  OnStageUpdateFrame,
+  type StageUpdateFrameProps,
+} from '../events.js';
 import {Canvas2DStage} from './Canvas2DStage.js';
 
 // the stage asks the renderer for its anisotropy and hands it to the stage renderer, nothing else
@@ -38,8 +49,8 @@ describe('Canvas2DStage', () => {
     const stage = makeStage();
     const disposed = vi.fn();
     const rendered = vi.fn();
-    on(stage, 'dispose', disposed);
-    on(stage, 'render', rendered);
+    on(stage, OnCanvas2DStageDispose, disposed);
+    on(stage, OnCanvas2DStageRender, rendered);
 
     stage.dispose();
 
@@ -47,9 +58,41 @@ describe('Canvas2DStage', () => {
 
     // straight into the emitter, past the guard in render(): the question here is whether anyone
     // is still subscribed, not whether the stage would emit
-    emit(stage, 'render', stage);
+    emit(stage, OnCanvas2DStageRender, stage);
 
     expect(rendered, 'no event follows the dispose').not.toHaveBeenCalled();
+  });
+
+  test('emits OnCanvas2DStageResize before OnCanvas2DStageRender on the first render(), each with the stage', () => {
+    const stage = makeStage();
+    const log: [string, unknown][] = [];
+    const listener: ICanvas2DStageResize & ICanvas2DStageRender = {
+      [OnCanvas2DStageResize]: (s) => log.push([OnCanvas2DStageResize, s]),
+      [OnCanvas2DStageRender]: (s) => log.push([OnCanvas2DStageRender, s]),
+    };
+    on(stage, listener);
+
+    stage.render();
+
+    expect(log).toEqual([
+      ['resize', stage],
+      ['render', stage],
+    ]);
+
+    stage.render();
+
+    expect(log.slice(2), 'a second render() without a size change only renders').toEqual([['render', stage]]);
+  });
+
+  test('announces its dispose to a listener of ICanvas2DStageDispose with the stage', () => {
+    const stage = makeStage();
+    const heard = vi.fn();
+    const listener: ICanvas2DStageDispose = {[OnCanvas2DStageDispose]: heard};
+    on(stage, listener);
+
+    stage.dispose();
+
+    expect(heard).toHaveBeenCalledExactlyOnceWith(stage);
   });
 
   test('carries a canvas resize into the specs its projection reads', () => {
@@ -372,10 +415,10 @@ describe('Canvas2DStage', () => {
       const materialDispose = sandbox.spy(stage.sprite.material, 'dispose');
       const placeholderDispose = sandbox.spy(stage.sprite.material.map!, 'dispose');
       const heard = vi.fn();
-      on(stage, 'dispose', () => {
+      on(stage, OnCanvas2DStageDispose, () => {
         throw boom;
       });
-      on(stage, 'dispose', heard);
+      on(stage, OnCanvas2DStageDispose, heard);
 
       expect(() => stage.dispose()).toThrow(boom);
 
@@ -392,13 +435,13 @@ describe('Canvas2DStage', () => {
       const stageError = new Error('stage');
       const rendererError = new Error('stage renderer');
       const stage2DError = new Error('Stage2D');
-      on(stage, 'dispose', () => {
+      on(stage, OnCanvas2DStageDispose, () => {
         throw stageError;
       });
-      on(stage.stageRenderer, 'dispose', () => {
+      on(stage.stageRenderer, OnStageDispose, () => {
         throw rendererError;
       });
-      on(stage.stage, 'dispose', () => {
+      on(stage.stage, OnStageDispose, () => {
         throw stage2DError;
       });
 
