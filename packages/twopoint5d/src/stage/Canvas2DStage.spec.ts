@@ -1,6 +1,6 @@
 import {emit, on} from '@spearwolf/eventize';
 import {createSandbox} from 'sinon';
-import type {WebGPURenderer} from 'three/webgpu';
+import type {PassNode, WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {
@@ -454,6 +454,45 @@ describe('Canvas2DStage', () => {
 
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([stageError, rendererError, stage2DError]);
+      expect(stage.stageRenderer.isDisposed).toBe(true);
+      expect(stage.stage.isDisposed).toBe(true);
+    });
+
+    test('hands on the error of each part as it was thrown: two listeners of the stage, and a listener and the release of the pass node of the Stage2D', () => {
+      const stage = makeStage();
+      stage.setContainerSize(320, 240);
+      const first = new Error('first');
+      const second = new Error('second');
+      const stage2DError = new Error('Stage2D');
+      const releaseFailure = new Error('the release failed');
+      const passNode = stage.stage.asPassNode(stage.renderer) as PassNode;
+      sandbox.stub(passNode, 'dispose').throws(releaseFailure);
+      on(stage, OnCanvas2DStageDispose, () => {
+        throw first;
+      });
+      on(stage, OnCanvas2DStageDispose, () => {
+        throw second;
+      });
+      on(stage.stage, OnStageDispose, () => {
+        throw stage2DError;
+      });
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).message).toMatch(/^Canvas2DStage#dispose\(\)/);
+      const {errors} = caught as AggregateError;
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBeInstanceOf(AggregateError);
+      expect((errors[0] as AggregateError).errors).toEqual([first, second]);
+      expect(errors[1]).toBeInstanceOf(AggregateError);
+      expect((errors[1] as AggregateError).errors).toEqual([stage2DError, releaseFailure]);
+      expect((errors[1] as AggregateError).message).toMatch(/^Stage2D#dispose\(\)/);
       expect(stage.stageRenderer.isDisposed).toBe(true);
       expect(stage.stage.isDisposed).toBe(true);
     });

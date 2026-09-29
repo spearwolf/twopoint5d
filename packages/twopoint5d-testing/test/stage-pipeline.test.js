@@ -427,8 +427,9 @@ describe('StageRenderer — pipeline integration', () => {
     const sr = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
 
     // a display of its own, released here: a test that calls this twice must not leave the first one to
-    // the afterEach of the suite, which knows only the last one. Everything from the container on sits
-    // in the try, so a display that fails to start or a builder that throws leaves nothing behind
+    // the afterEach of the suite, which knows only the last one. The try begins with the display, and
+    // its finally releases what was built before it as well, the container included, so a display that
+    // fails to start or a builder that throws leaves nothing behind
     const squareHost = makeContainer({width: 64, height: 64});
     /** @type {Display | undefined} */
     let squareDisplay;

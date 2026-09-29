@@ -725,6 +725,65 @@ describe('Stage2D', () => {
       expect(getSubscriptionCount(stage)).toBe(0);
     });
 
+    it('two dispose listeners that throw reach the caller as one AggregateError of both errors, after the teardown', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const passNodeDispose = sandbox.spy(passNode, 'dispose');
+      const first = new Error('the first listener failed');
+      const second = new Error('the second listener failed');
+      on(stage, OnStageDispose, () => {
+        throw first;
+      });
+      on(stage, OnStageDispose, () => {
+        throw second;
+      });
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([first, second]);
+      expect(passNodeDispose.calledOnce).toBe(true);
+      expect(stage.isDisposed).toBe(true);
+      expect(getSubscriptionCount(stage)).toBe(0);
+    });
+
+    it('two dispose listeners that throw and a failing release of the pass node reach the caller as an AggregateError of the AggregateError of the listeners and the error of the release', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const first = new Error('the first listener failed');
+      const second = new Error('the second listener failed');
+      const releaseFailure = new Error('the release failed');
+      sandbox.stub(passNode, 'dispose').throws(releaseFailure);
+      on(stage, OnStageDispose, () => {
+        throw first;
+      });
+      on(stage, OnStageDispose, () => {
+        throw second;
+      });
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).message).toMatch(/^Stage2D#dispose\(\)/);
+      const {errors} = caught as AggregateError;
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBeInstanceOf(AggregateError);
+      expect((errors[0] as AggregateError).errors).toEqual([first, second]);
+      expect(errors[1]).toBe(releaseFailure);
+      expect(stage.isDisposed).toBe(true);
+      expect(getSubscriptionCount(stage)).toBe(0);
+    });
+
     it('an error from releasing the pass node reaches the caller unchanged when no listener throws', () => {
       const stage = makeStage();
       const passNode = stage.asPassNode(noRenderer) as PassNode;
