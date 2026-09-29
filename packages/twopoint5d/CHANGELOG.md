@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add an optional `out` to `ChunkQuadTreeNode#findChunksAt()`: the chunks that hold data at the point are appended to it, from the node down to the leaf the point lies in, and it is returned. The query walks down the tree and allocates nothing with an `out`
 - add `BakeTextureOptions#maxTextureSize` and `#renderer`: `FrameBasedAnimations#bakeDataTexture()` builds a data texture at most as wide as `maxTextureSize`, else as the limit of the device of `renderer` — `maxTextureDimension2D` of a WebGPU device, `MAX_TEXTURE_SIZE` of a WebGL2 context —, else as `FrameBasedAnimations.MaxTextureSize`. A renderer that has not been initialized names no limit, and a `maxTextureSize` that is no whole number of 1 or more throws a `RangeError`
 - add `Chronometer#rawDeltaTime` and the field `rawDeltaTime` of `DisplayEventProps`: the delta between the previous and the current time with the pauses subtracted, before `maxDeltaTime` cuts it — equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded. `Display#getEventProps()` fills it from its chronometer
+- add the event `OnStageAfterSceneChanged` of `Stage2D`, with the types `StageAfterSceneChangedArgs` and `IStageAfterSceneChanged`: every change of `Stage2D#scene` emits it with the scene it replaced
 
 ### Changed
 
@@ -288,9 +289,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Display` takes the document and the window of its canvas instead of the global ones: for the `visibilitychange` that pauses it, `devicePixelRatio`, the size of the window under `resize-to="window"` or `"fullscreen"`, the default of `styleSheetRoot` — the `head` of that document — the container and canvas it builds inside a host element, and the size watch. A canvas or a host element in the document of a same-origin iframe is taken
 - `FixedFrameLoop` accumulates the `rawDeltaTime` of every render frame, not the `deltaTime` that `Display#maxDeltaTime` has cut: on a display that stays below `1 / maxDeltaTime` fps — 30 with the default — the simulation keeps up with the wall clock, with up to `maxStepsPerFrame` ticks per frame. Props without a finite `rawDeltaTime` count their `deltaTime`
 - `PanControl2D` pans by no key pressed with Ctrl, Meta or Alt and by no key that goes into an `input`, `textarea`, `select` or `contenteditable` element, in an open shadow root as well: such a key is meant for a shortcut or for the element. The `keyup` of a key held before still lets go of it, wherever it comes from. There is no option for it
-- `StageRenderer` releases the GPU memory of its internal render targets when their mode ends: the internal target of the pipeline-only mode (a `pipeline` without `buildOutputNode`) on a write to `pipeline` or `buildOutputNode` that leaves that mode, and the pass target of a nested `StageRenderer` on `remove()` from a parent — `detach()` of a child included. The target objects stay, so every `texture()` node on them stays valid, and three.js allocates the memory again on the next draw
-- `StageRenderer` in the pipeline-only mode builds `pipeline.outputNode` for a new pipeline or after `invalidateOutputNode()` only; stages, `renderOrder`, stage names and cameras leave it standing
+- `StageRenderer` releases the GPU memory of its internal render targets when their mode ends: the internal target of the pipeline-only mode (a `pipeline` without `buildOutputNode` that is not a `RootRenderPipeline`) on a write to `pipeline` or `buildOutputNode` that leaves that mode, and the pass target of a nested `StageRenderer` on `remove()` from a parent — `detach()` of a child included. The target objects stay, so every `texture()` node on them stays valid, and three.js allocates the memory again on the next draw
+- `StageRenderer` in the pipeline-only mode builds `pipeline.outputNode` for a new pipeline or after `invalidateOutputNode()` only; stages, `renderOrder`, stage names, scenes and cameras leave it standing
 - a nested `StageRenderer` whose own clear covers color and depth, and reaches its target in that frame, clears its pass target alone: the composing parent clears it to transparent black first only for a child without such a clear
+- `Stage2D#updateFrame()` applies a pending `needsUpdate` before it emits the frame events: a new value in the view specs of the projection together with `needsUpdate = true` takes effect from the next frame on, and a stage whose specs give a view only then gets its camera in that frame
+- perf `Stage2D` hands every `OnStageUpdateFrame` the same props object per stage, rewritten before each emit — the values hold for the call they arrive in; `OnStageFirstFrame` carries an object of its own. `StageRenderer` checks the size of its internal render targets without allocating, and so does its check whether every `Stage2D` of a composition has a camera
+- the error of `Stage2D#asPassNode()` without a camera says when the projection creates one, and a stage without a scene gets an error of its own
 
 ### Deprecated
 
@@ -500,6 +504,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `StageRenderer` with a nested `StageRenderer` that has a pipeline of its own, under a composing parent (Mode E) or under a pipeline-only parent: tone mapping and the output encoding apply once, in the outermost pipeline. While a renderer draws into a target its own pipeline samples, `renderer.toneMapping` is `NoToneMapping` and `renderer.outputColorSpace` the working color space, both restored afterwards, also when a stage throws
 - fix the internal target of the pipeline-only mode of `StageRenderer`: it is cleared in full to transparent black every frame, color and depth, before the renderer's own `clear` — no tint of the clear color of the renderer stays in it, and with `clear = true` and `clearColorBuffer` or `clearDepthBuffer` off no rest of the previous frame either
 - fix the internal render targets of `StageRenderer`: they have the type `renderer.getOutputBufferType()` and the sample count `renderer.samples`, as the pass targets of the composed mode do, and a changed `renderer.samples` reaches them on the next frame
+- fix `StageRenderer` that composes pass nodes — with `buildOutputNode` or a `RootRenderPipeline`: it builds its output node anew after a change of `Stage2D#scene` and shows the new scene from the next frame on
 
 ### Migration Guide
 
@@ -3363,6 +3368,26 @@ await display.nextFrame();
 #### `styleSheetRoot` follows the document of the canvas
 
 Without `styleSheetRoot` the display installs its rules in the `head` of the document its canvas sits in, not in the global `document.head`. For a canvas in the page nothing changes; for a canvas in a same-origin iframe the rules land in the iframe's document, where they apply. Pass `styleSheetRoot` to pick another root.
+
+#### The props of `OnStageUpdateFrame` hold for the call they arrive in
+
+A `Stage2D` hands every `OnStageUpdateFrame` of a stage the same props object and rewrites it before each emit. A listener that keeps the object sees the values of the latest frame in it; copy what you need after the call.
+
+**Before**
+
+```ts
+const frames: StageUpdateFrameProps[] = [];
+on(stage, OnStageUpdateFrame, (props: StageUpdateFrameProps) => frames.push(props));
+```
+
+**After**
+
+```ts
+const frames: StageUpdateFrameProps[] = [];
+on(stage, OnStageUpdateFrame, (props: StageUpdateFrameProps) => frames.push({...props}));
+```
+
+`OnStageFirstFrame` carries an object of its own, which the stage keeps for late subscribers.
 
 ## [0.21.2] - 2026-06-19
 

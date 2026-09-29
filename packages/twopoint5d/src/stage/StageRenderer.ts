@@ -16,6 +16,7 @@ import {
   OnRemoveFromParent,
   OnStageAdded,
   OnStageAfterCameraChanged,
+  OnStageAfterSceneChanged,
   OnStageRemoved,
   type StageAddedProps,
   type StageRemovedProps,
@@ -86,8 +87,8 @@ export interface StageRenderer extends EventizedObject {}
  * set, and it is restored afterwards. With `clear = false` nothing clears the
  * target, and frames accumulate unless something else clears it.
  *
- * With a {@link pipeline} and without {@link buildOutputNode}, the stages
- * draw into an internal pass-target that the renderer clears to transparent
+ * With a {@link pipeline} that is not a `RootRenderPipeline` and without
+ * {@link buildOutputNode} (Mode C), the stages draw into an internal pass-target that the renderer clears to transparent
  * black (color and depth) every frame, whatever `clear` says; the own
  * `clear` then applies on top, and one that covers color and depth replaces
  * the black clear.
@@ -412,19 +413,22 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Optional `THREE.RenderPipeline` running between the stages and the
-   * output. Without `buildOutputNode`, the stages render into an internal
+   * output. For a pipeline that is not a `RootRenderPipeline`, without
+   * `buildOutputNode` (Mode C), the stages render into an internal
    * pass-target whose texture is sampled by the pipeline. With
-   * `buildOutputNode`, the pipeline runs a user-defined TSL graph composed
-   * from each stage's pass node.
+   * `buildOutputNode`, or as a `RootRenderPipeline`, the pipeline runs a TSL
+   * graph composed from each stage's pass node — the user-defined one of
+   * `buildOutputNode`, or the additive composition of the
+   * `RootRenderPipeline`.
    *
    * The pipeline is handed in and stays the caller's. A disposed renderer
    * answers `undefined` here and takes no new one: like `parent`, `add()` and
    * `attach()`, the write is a silent no-op. Assigning a different pipeline
    * gives it this renderer's `outputNode` on the next render.
    *
-   * Without `buildOutputNode`, the output node is rebuilt only for a new
-   * pipeline or after {@link invalidateOutputNode}; stages, their order and
-   * names and their cameras leave it standing. A write that leaves this mode
+   * In Mode C, the output node is rebuilt only for a new pipeline or after
+   * {@link invalidateOutputNode}; stages, their order and names, their scenes
+   * and their cameras leave it standing. A write that leaves this mode
    * releases the GPU memory of the internal pass-target; returning to it
    * allocates that memory again on the next frame.
    */
@@ -456,7 +460,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `pipeline.outputColorTransform` is `true` — just as on the canvas. A
    * renderer that a parent draws into a target of the parent's own pipeline
    * writes linear in both cases; the outermost pipeline applies the transform.
-   * Under a parent with a pipeline but without `buildOutputNode`, a child
+   * Under a Mode C parent — a pipeline without `buildOutputNode` that is not
+   * a `RootRenderPipeline` — a child
    * writes linear into its own `outputRenderTarget` as well: the parent
    * switches to linear output for all of its stage draws, whichever target
    * they write to.
@@ -471,11 +476,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * resulting node array into this function. Return the composed TSL graph
    * to use as `pipeline.outputNode` (e.g. bloom, blur, mix).
    *
-   * Without `buildOutputNode` but with `pipeline`, the renderer falls back
-   * to "render stages into an internal target, sample as `texture()`".
+   * Without `buildOutputNode`, a `pipeline` that is not a
+   * `RootRenderPipeline` falls back to "render stages into an internal
+   * target, sample as `texture()`".
    *
    * Assigning or clearing it switches between the two pipeline modes; the
-   * output node is rebuilt on the next render. While this renderer's `width`
+   * output node is rebuilt on the next render. Under a `RootRenderPipeline`
+   * the renderer composes either way. While this renderer's `width`
    * or `height` is 0, or while a `Stage2D` it composes has no camera, the
    * composed mode draws nothing. Assigning it to a renderer whose pipeline
    * samples the internal pass-target releases the GPU memory of that target;
@@ -494,7 +501,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  /** Internal RT used in Mode C (pipeline without buildOutputNode). */
+  /** Internal RT used in Mode C (a pipeline without buildOutputNode that is not a RootRenderPipeline). */
   #internalRT?: RenderTarget;
   /** Internal RT used when a parent calls `asPassNode()` on this renderer. */
   #asPassNodeRT?: RenderTarget;
@@ -503,7 +510,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #internalOutputTexture?: Texture;
   /**
    * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their
-   * order or names, the pipeline, `buildOutputNode` or the camera of a stage changed. Only the
+   * order or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only the
    * composed mode reads it; Mode C keeps its own node, see `#renderPipelineSimple()`.
    */
   #outputDirty = true;
@@ -584,7 +591,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #canCompose(): boolean {
     if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return false;
-    return !this.orderedStages.some(({stage}) => isStage2DWithoutCamera(stage));
+    for (const {stage} of this.orderedStages) {
+      if (isStage2DWithoutCamera(stage)) return false;
+    }
+    return true;
   }
 
   /**
@@ -783,13 +793,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return (this.#asPassNodeRT = this.#ensureRT(this.#asPassNodeRT, renderer));
   }
 
-  /** Size a `RenderTarget` has to have, in device pixels, for the current `width`/`height`. */
-  #renderTargetSize(): [width: number, height: number] {
-    return [Math.max(1, Math.floor(this.width * this.#pixelRatio)), Math.max(1, Math.floor(this.height * this.#pixelRatio))];
+  /** Width a `RenderTarget` has to have, in device pixels, for the current `width`. */
+  #renderTargetWidth(): number {
+    return Math.max(1, Math.floor(this.width * this.#pixelRatio));
+  }
+
+  /** Height a `RenderTarget` has to have, in device pixels, for the current `height`. */
+  #renderTargetHeight(): number {
+    return Math.max(1, Math.floor(this.height * this.#pixelRatio));
   }
 
   #resizeRenderTarget(rt: RenderTarget): void {
-    const [w, h] = this.#renderTargetSize();
+    const w = this.#renderTargetWidth();
+    const h = this.#renderTargetHeight();
     if (rt.width !== w || rt.height !== h) {
       rt.setSize(w, h);
     }
@@ -802,8 +818,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // three.js on the next draw, and target and texture stay the same objects — every texture()
     // node on them stays valid.
     if (!rt) {
-      const [w, h] = this.#renderTargetSize();
-      return new RenderTarget(w, h, {type: renderer.getOutputBufferType(), samples: renderer.samples});
+      return new RenderTarget(this.#renderTargetWidth(), this.#renderTargetHeight(), {
+        type: renderer.getOutputBufferType(),
+        samples: renderer.samples,
+      });
     }
     if (rt.samples !== renderer.samples) rt.samples = renderer.samples;
     this.#resizeRenderTarget(rt);
@@ -851,8 +869,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `updateFrame()` and `renderTo()` have no stage left to drive. A write to `parent`,
    * `attach()`, `detach()`, `add()`, `remove()` and a further `dispose()` do nothing.
    * Every listener on this renderer goes with it, including the `OnStageAdded` and
-   * `OnStageRemoved` subscriptions a caller placed on it, and so do the camera listeners it
-   * placed on its stages (through `remove()`).
+   * `OnStageRemoved` subscriptions a caller placed on it, and so do the camera and scene
+   * listeners it placed on its stages (through `remove()`).
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
@@ -981,8 +999,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  /** Unsubscribe handle of the `OnStageAfterCameraChanged` listener on each eventized stage. */
-  #cameraSubscriptions = new Map<IStage, () => void>();
+  /** Unsubscribe handle of the listener on each eventized stage: its camera and scene changes. */
+  #stageSubscriptions = new Map<IStage, () => void>();
 
   #getIndex(stage: IStage): number {
     return this.stages.findIndex((item) => item.stage === stage);
@@ -1000,8 +1018,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `name` and another stage already carries it.
    *
    * On an eventized stage — every `Stage2D` — it listens for
-   * `OnStageAfterCameraChanged` and, in the composed mode, rebuilds the
-   * output node on the next render; `remove()` stops listening.
+   * `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged` and, in the
+   * composed mode, rebuilds the output node on the next render; `remove()`
+   * stops listening.
    */
   add(stage: IStage & IRenderable): this {
     if (this.#disposed) return this;
@@ -1017,13 +1036,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#orderedStages = undefined;
       this.#outputDirty = true;
       if (isEventized(stage)) {
-        // a pass node keeps the camera it was built with: a stage that announces a new camera
-        // needs a new pass node, and with it a new output node — in the composed mode only, since
-        // the node of Mode C samples the internal target and holds no camera, and so the flag is
-        // set here rather than through invalidateOutputNode(), which drops that node as well
-        this.#cameraSubscriptions.set(
+        // a pass node keeps the scene and the camera it was built with: a stage that announces a
+        // new one of either needs a new pass node, and with it a new output node — in the composed
+        // mode only, since the node of Mode C samples the internal target and holds neither scene
+        // nor camera, and so the flag is set here rather than through invalidateOutputNode(),
+        // which drops that node as well
+        this.#stageSubscriptions.set(
           stage,
-          on(stage, OnStageAfterCameraChanged, () => {
+          on(stage, [OnStageAfterCameraChanged, OnStageAfterSceneChanged], () => {
             this.#outputDirty = true;
           }),
         );
@@ -1039,14 +1059,15 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * A removed child `StageRenderer` answers `undefined` as its `parent`
    * afterwards and gets its `OnRemoveFromParent`, and releases the GPU memory
-   * of its pass-target. Stops listening for the stage's camera changes.
+   * of its pass-target. Stops listening for the stage's camera and scene
+   * changes.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);
     if (index !== -1) {
       this.stages.splice(index, 1);
-      this.#cameraSubscriptions.get(stage)?.();
-      this.#cameraSubscriptions.delete(stage);
+      this.#stageSubscriptions.get(stage)?.();
+      this.#stageSubscriptions.delete(stage);
       this.#orderedStages = undefined;
       this.#outputDirty = true;
       emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);

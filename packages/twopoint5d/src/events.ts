@@ -1,4 +1,4 @@
-import type {Camera} from 'three/webgpu';
+import type {Camera, Scene} from 'three/webgpu';
 import type {Display} from './display/Display.js';
 import type {DisplayEventProps} from './display/types.js';
 import type {IStage} from './stage/IStage.js';
@@ -90,6 +90,12 @@ export interface IStageResize {
 export const OnStageUpdateFrame = 'stageUpdateFrame';
 export const OnStageFirstFrame = 'stageFirstFrame';
 
+/**
+ * A `Stage2D` hands every `OnStageUpdateFrame` of its frames the same object, rewritten before
+ * each emit: the values hold for the call they arrive in, and whoever needs one of them later
+ * copies it. The props of `OnStageFirstFrame` are an object of their own, which the stage keeps
+ * for a subscriber that comes after the first frame.
+ */
 export interface StageUpdateFrameProps {
   stage: IStage;
   now: number;
@@ -113,6 +119,14 @@ export type StageAfterCameraChangedArgs = [stage: IStage, prevCamera: Camera | u
 
 export interface IStageAfterCameraChanged {
   [OnStageAfterCameraChanged](...args: StageAfterCameraChangedArgs): void;
+}
+
+export const OnStageAfterSceneChanged = 'stageAfterSceneChanged';
+
+export type StageAfterSceneChangedArgs = [stage: IStage, prevScene: Scene];
+
+export interface IStageAfterSceneChanged {
+  [OnStageAfterSceneChanged](...args: StageAfterSceneChangedArgs): void;
 }
 
 // ------------------------------------------------------------

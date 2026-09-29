@@ -201,8 +201,8 @@ Buffer-level control: `clearColorBuffer`, `clearDepthBuffer`,
 `clearStencilBuffer` — all `true` by default. They map 1:1 to the three
 arguments of `WebGPURenderer.clear()`.
 
-When the renderer has a `pipeline` without `buildOutputNode` (Mode C), the
-**internal pass-target** is cleared in full to transparent black every frame,
+When the renderer has a `pipeline` without `buildOutputNode` that is not a
+`RootRenderPipeline` (Mode C), the **internal pass-target** is cleared in full to transparent black every frame,
 color and depth, so frame content does not accumulate. With `clear = true`
 your own clear applies after that; one that covers color and depth
 (`clearColorBuffer` and `clearDepthBuffer` both `true`) replaces the black
@@ -244,7 +244,8 @@ and the encoding to `renderer.outputColorSpace`, as long as
 `pipeline.outputColorTransform` is `true` — just as on the canvas. A renderer
 that a parent draws into a target of the parent's own pipeline writes linear
 in both cases; the outermost pipeline applies the transform. Under a Mode C
-parent (a `pipeline` without `buildOutputNode`), a child writes linear into
+parent (a `pipeline` without `buildOutputNode` that is not a
+`RootRenderPipeline`), a child writes linear into
 its own `outputRenderTarget` as well: the parent switches to linear output for
 all of its stage draws, whichever target they write to.
 
@@ -267,6 +268,10 @@ composes — and the comment next to the cast names the reason the pass is there
 
 ### Mode C (§6.4) — pipeline samples an internal RT
 
+Mode C applies to a `pipeline` without `buildOutputNode` that is not a
+`RootRenderPipeline`; a `RootRenderPipeline` composes as Mode D does (see
+[Shortcut: `RootRenderPipeline`](#shortcut-rootrenderpipeline--additive-composition-out-of-the-box)).
+
 The simplest path: render the stages into an internally managed
 `RenderTarget`, then run the pipeline with `outputNode = texture(rt.texture)`.
 No TSL knowledge required.
@@ -282,8 +287,8 @@ sr.pipeline = new RenderPipeline(display.renderer!);
 The pipeline writes to `outputRenderTarget` if set, otherwise the canvas.
 
 The output node is rebuilt only for a new `pipeline` or after
-`invalidateOutputNode()`; stages, `renderOrder`, stage names and cameras
-leave it standing. The internal target has the type and the samples of the
+`invalidateOutputNode()`; stages, `renderOrder`, stage names, scenes and
+cameras leave it standing. The internal target has the type and the samples of the
 renderer (`renderer.getOutputBufferType()`, `renderer.samples`), the values
 three.js' `PassNode` gives the pass targets of Mode D.
 
@@ -315,8 +320,9 @@ sr.buildOutputNode = ([scenePass]) => {
 
 `buildOutputNode` runs again on the next render after the stages,
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
-after a stage announced a new camera through `OnStageAfterCameraChanged`
-(every `Stage2D` does), or after `invalidateOutputNode()`. While the renderer
+after a stage announced a new camera or a new scene through
+`OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` (every `Stage2D`
+does), or after `invalidateOutputNode()`. While the renderer
 has no area, or while a `Stage2D` it composes has no camera yet, the composed
 mode draws nothing.
 
@@ -428,12 +434,17 @@ class MyStage implements IStage, IRenderable, IPassProvider {
 
   // the node owns a render target: build it once and keep it, as long as scene and camera stand
   #passNode?: PassNode;
+  #disposed = false;
 
   asPassNode(renderer: WebGPURenderer) {
+    // like Stage2D, a disposed stage builds no further node: its render target would hang on a
+    // node that nobody releases any more
+    if (this.#disposed) throw new Error('MyStage#asPassNode() is not available: this stage has been disposed');
     return (this.#passNode ??= pass(myScene, myCamera));
   }
 
   dispose() {
+    this.#disposed = true;
     this.#passNode?.dispose();
     this.#passNode = undefined;
   }
@@ -451,9 +462,13 @@ On `StageRenderer`:
 
 On `Stage2D`:
 
-- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`.
+- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`. `OnStageUpdateFrame` hands every
+  frame the same props object, rewritten — copy the values you need after the call.
+  `OnStageFirstFrame` is kept for late subscribers and carries an object of its own.
 - `OnStageAfterCameraChanged` — emitted on every camera change with the replaced camera; a
   `StageRenderer` listens to it on each stage it holds.
+- `OnStageAfterSceneChanged` — emitted on every change of `scene` with the replaced scene; a
+  `StageRenderer` listens to it on each stage it holds as well.
 
 All event names are exported from `@spearwolf/twopoint5d`.
 
@@ -503,7 +518,8 @@ What this layer does on top of the general rules in
   answers `undefined` as its `parent` and gets its `OnRemoveFromParent`.
 - `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what
   they were, and releases the node built for the pair before it on the next `asPassNode()` after
-  either of them has changed.
+  either of them has changed; a composing `StageRenderer` asks again on its next render after
+  each of the two changes.
   `Stage2D.dispose()` releases that node and the render target behind it, and nothing else: the
   scene, the camera and the projection were handed in and stay the caller's. Afterwards
   `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a

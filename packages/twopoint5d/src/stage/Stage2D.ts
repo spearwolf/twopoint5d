@@ -3,10 +3,12 @@ import {pass} from 'three/tsl';
 import {type Camera, type Node, type PassNode, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
+  OnStageAfterSceneChanged,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
   type StageAfterCameraChangedArgs,
+  type StageAfterSceneChangedArgs,
   type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
@@ -41,20 +43,48 @@ export interface Stage2D extends EventizedObject {}
 export class Stage2D implements IStage, IRenderable, IPassProvider {
   isStage2D = true;
 
-  scene: Scene;
+  #scene: Scene;
 
   /**
-   * with this flag you can tell the updateProjection() method that the projection calculation needs an update
-   * (e.g. the settings in the projection have changed)
+   * The `THREE.Scene` this stage renders. A new scene applies from the next frame on, in every
+   * mode of a `StageRenderer`: every change emits `OnStageAfterSceneChanged` with the scene it
+   * replaced, and a renderer that composes pass nodes builds its output node anew on it.
+   *
+   * The scene belongs to the caller: a new one leaves the previous one as it is. After
+   * {@link dispose} a write goes through and announces nothing.
+   */
+  get scene(): Scene {
+    return this.#scene;
+  }
+
+  set scene(scene: Scene) {
+    if (this.#scene === scene) return;
+
+    const prevScene = this.#scene;
+    this.#scene = scene;
+
+    if (this.#disposed) return;
+
+    const args: StageAfterSceneChangedArgs = [this, prevScene];
+    emit(this, OnStageAfterSceneChanged, ...args);
+  }
+
+  /**
+   * Set to `true` after a change the stage does not see itself — a new value in the view specs of
+   * its projection, such as `pixelZoom`. The next `updateFrame()` computes view and camera anew,
+   * or an own `updateProjection()` before it.
+   *
+   * The flag stays `true` as long as the container has no area, and turns `false` as soon as the
+   * projection has been asked; a projection that cannot place the camera leaves it set.
    */
   needsUpdate = false;
 
   get name(): string {
-    return this.scene.name;
+    return this.#scene.name;
   }
 
   set name(name: string) {
-    this.scene.name = name;
+    this.#scene.name = name;
   }
 
   #containerWidth = 0;
@@ -160,10 +190,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.projection = projection;
 
     if (scene) {
-      this.scene = scene;
+      this.#scene = scene;
     } else {
-      this.scene = new Scene();
-      this.scene.name = 'Stage2D';
+      this.#scene = new Scene();
+      this.#scene.name = 'Stage2D';
     }
   }
 
@@ -251,11 +281,25 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   isFirstFrame = true;
 
+  // one object per stage for OnStageUpdateFrame, rewritten in every frame; OnStageFirstFrame gets
+  // one of its own, since the stage keeps that one for subscribers that come later
+  readonly #updateFrameProps: StageUpdateFrameProps = {stage: this, now: 0, deltaTime: 0, frameNo: 0};
+
   #framesWithoutCamera = 0;
   #warnedNoCamera = false;
 
+  /**
+   * Applies a pending {@link needsUpdate} first — what the projection throws on it comes out of
+   * this call, and the flag then stays set —, then emits `OnStageFirstFrame` in the first frame
+   * with a camera and `OnStageUpdateFrame` in every frame with a camera. Does nothing on a
+   * disposed stage.
+   */
   updateFrame(now: number, deltaTime: number, frameNo: number): void {
     if (this.#disposed) return;
+
+    // ahead of the check for a camera: a stage whose specs give a view only after a needsUpdate
+    // gets its camera in this very frame
+    this.updateProjection();
 
     const {scene, camera} = this;
 
@@ -270,19 +314,17 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       return;
     }
 
-    const updateFrameProps: StageUpdateFrameProps = {
-      stage: this,
-      now,
-      deltaTime,
-      frameNo,
-    };
+    const props = this.#updateFrameProps;
+    props.now = now;
+    props.deltaTime = deltaTime;
+    props.frameNo = frameNo;
 
     if (this.isFirstFrame) {
-      emit(this, OnStageFirstFrame, updateFrameProps);
+      emit(this, OnStageFirstFrame, {stage: this, now, deltaTime, frameNo} satisfies StageUpdateFrameProps);
       this.isFirstFrame = false;
     }
 
-    emit(this, OnStageUpdateFrame, updateFrameProps);
+    emit(this, OnStageUpdateFrame, props);
   }
 
   /**
@@ -309,7 +351,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * The same node comes back for as long as {@link scene} and {@link camera} stay what they
    * were. The comparison sits in this call and not in the assignment: a change of either
    * releases the node built for the pair before it, and its render target with it, on the next
-   * call of this method, or in {@link dispose} if none comes. A stage added to two
+   * call of this method, or in {@link dispose} if none comes. A `StageRenderer` that composes this
+   * stage listens for both changes — `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged` —
+   * and calls this method again on its next render. A stage added to two
    * `StageRenderer`s hands both the very same node — one node that renders its scene once per
    * frame, and two readers of that one result.
    *
@@ -323,8 +367,14 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
     const {scene, camera} = this;
 
-    if (!scene || !camera) {
-      throw new Error('Stage2D.asPassNode(): no scene or camera yet — call resize() first');
+    if (!scene) {
+      throw new Error('Stage2D#asPassNode() has no scene to build a pass node from: assign one to stage.scene');
+    }
+
+    if (!camera) {
+      throw new Error(
+        'Stage2D#asPassNode() has no camera to build a pass node with: the projection creates one on the first resize() whose width and height are finite numbers above 0 and for which its specs give a view with an area, and a stage without a projection needs one assigned to stage.camera',
+      );
     }
 
     // the node renders one scene through one camera; either of them moving makes a node
@@ -379,7 +429,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage
    * was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a
    * write to `scene` goes through and has no effect, since the stage no longer builds a node from
-   * it. `name` writes through to `scene.name` as it always does, and so reaches the scene the
+   * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to `scene.name` as it always does, and so reaches the scene the
    * caller may have handed in. A `dispose` event goes out to every subscriber before this stage
    * stops listening; no event follows it.
    */

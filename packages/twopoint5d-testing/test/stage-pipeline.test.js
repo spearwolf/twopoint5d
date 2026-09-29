@@ -7,7 +7,7 @@ import {
   Stage2D,
   StageRenderer,
 } from '@spearwolf/twopoint5d';
-import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget} from 'three/webgpu';
+import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
 import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
@@ -107,6 +107,39 @@ describe('StageRenderer — pipeline integration', () => {
 
     expect(buildCalls, 'the new camera needs a new pass node').to.equal(2);
     expect(lastPasses[0].camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
+  });
+
+  it('Mode D: swapping the stage scene after the first frame rebuilds the output node for the new scene', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
+    sr.pipeline = new RenderPipeline(display.renderer);
+
+    let buildCalls = 0;
+    /** @type {PassNode[] | undefined} */
+    let lastPasses;
+    sr.buildOutputNode = (passes) => {
+      buildCalls += 1;
+      lastPasses = /** @type {PassNode[]} */ (passes);
+      return passes[0];
+    };
+
+    await display.start();
+    await display.nextFrame();
+    await display.nextFrame();
+
+    expect(buildCalls).to.equal(1);
+
+    const scene = new Scene();
+    scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+    stage.scene = scene;
+    await display.nextFrame();
+
+    expect(buildCalls, 'the new scene needs a new pass node').to.equal(2);
+    expect(lastPasses[0].scene, 'the pass node renders the new scene').to.equal(stage.scene);
   });
 
   it('Mode D: a rebuild without a camera change keeps the pass node and its render target', async () => {

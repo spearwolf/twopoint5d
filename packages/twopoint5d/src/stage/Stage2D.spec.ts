@@ -5,6 +5,7 @@ import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, t
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   OnStageAfterCameraChanged,
+  OnStageAfterSceneChanged,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
@@ -150,6 +151,120 @@ describe('Stage2D', () => {
     expect(changed).toHaveBeenCalledTimes(1);
     expect(changed.mock.calls[0]![1]).toBe(cam2);
     expect(stage.camera).toBeUndefined();
+  });
+
+  it('announces a scene change with the scene it replaced', () => {
+    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+    const previous = stage.scene;
+    const next = new Scene();
+
+    const changed = vi.fn();
+    on(stage, OnStageAfterSceneChanged, changed);
+
+    stage.scene = next;
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenCalledWith(stage, previous);
+    expect(stage.scene).toBe(next);
+
+    stage.scene = next;
+    expect(changed, 'the same scene once more is no change').toHaveBeenCalledTimes(1);
+  });
+
+  describe('needsUpdate in updateFrame()', () => {
+    it('applies needsUpdate on the next updateFrame()', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(320, 200);
+      expect([stage.width, stage.height]).toEqual([640, 400]);
+
+      const resized = vi.fn();
+      on(stage, OnStageResize, resized);
+
+      projection.viewSpecs = {fit: 'contain', width: 320};
+      stage.needsUpdate = true;
+      stage.updateFrame(1, 0.016, 1);
+
+      expect([stage.width, stage.height]).toEqual([320, 200]);
+      expect(stage.needsUpdate).toBe(false);
+      expect(resized).toHaveBeenCalledTimes(1);
+      expect(resized.mock.calls[0]![0]).toMatchObject({stage, width: 320, height: 200});
+    });
+
+    it('leaves the projection alone in a frame without needsUpdate', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(320, 200);
+
+      const updateViewRect = vi.spyOn(projection, 'updateViewRect');
+      stage.updateFrame(1, 0.016, 1);
+
+      expect(updateViewRect).not.toHaveBeenCalled();
+    });
+
+    it('creates the camera in the frame that applies needsUpdate', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {});
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+      expect(stage.camera, 'specs without a view give no camera').toBeUndefined();
+
+      projection.viewSpecs = {fit: 'contain', width: 640};
+      stage.needsUpdate = true;
+
+      const firstFrame = vi.fn();
+      on(stage, OnStageFirstFrame, firstFrame);
+
+      stage.updateFrame(1, 0.016, 1);
+
+      expect(stage.camera).toBeDefined();
+      expect(firstFrame).toHaveBeenCalledTimes(1);
+      expect(firstFrame.mock.calls[0]![0]).toMatchObject({stage, frameNo: 1});
+    });
+  });
+
+  describe('frame props', () => {
+    const makeStage = () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(320, 200);
+      return stage;
+    };
+
+    it('hands every OnStageUpdateFrame the same props object, rewritten per frame', () => {
+      const stage = makeStage();
+      const seen: {props: unknown; frameNo: number}[] = [];
+      on(stage, OnStageUpdateFrame, (props: {frameNo: number}) => {
+        seen.push({props, frameNo: props.frameNo});
+      });
+
+      stage.updateFrame(1, 0.016, 1);
+      stage.updateFrame(2, 0.016, 2);
+
+      expect(seen).toHaveLength(2);
+      expect(seen[1]!.props, 'one object for every frame').toBe(seen[0]!.props);
+      expect(
+        seen.map(({frameNo}) => frameNo),
+        'each call reads the values of its own frame',
+      ).toEqual([1, 2]);
+    });
+
+    it('keeps the retained first-frame props apart from the per-frame props', () => {
+      const stage = makeStage();
+      let updateFrameProps: unknown;
+      on(stage, OnStageUpdateFrame, (props: unknown) => {
+        updateFrameProps = props;
+      });
+
+      stage.updateFrame(1, 0.016, 1);
+      stage.updateFrame(2, 0.016, 2);
+
+      const firstFrame = vi.fn();
+      on(stage, OnStageFirstFrame, firstFrame);
+
+      expect(firstFrame).toHaveBeenCalledTimes(1);
+      expect(firstFrame.mock.calls[0]![0]).toMatchObject({stage, frameNo: 1});
+      expect(firstFrame.mock.calls[0]![0], 'a late subscriber reads the first frame, not the current one').not.toBe(
+        updateFrameProps,
+      );
+    });
   });
 
   it('hands back to the projection camera when the assigned one is cleared', () => {
@@ -460,6 +575,20 @@ describe('Stage2D', () => {
     });
 
     // (d) the second call throws nothing and releases nothing a second time
+    it('takes a scene after dispose() and announces nothing', () => {
+      const stage = makeStage();
+      stage.dispose();
+
+      const changed = vi.fn();
+      on(stage, OnStageAfterSceneChanged, changed);
+
+      const next = new Scene();
+      stage.scene = next;
+
+      expect(stage.scene).toBe(next);
+      expect(changed).not.toHaveBeenCalled();
+    });
+
     it('is safe to call twice', () => {
       const stage = makeStage();
       const passNode = stage.asPassNode(noRenderer) as PassNode;

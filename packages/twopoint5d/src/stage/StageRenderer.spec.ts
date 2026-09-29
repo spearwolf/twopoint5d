@@ -7,6 +7,7 @@ import {
   NoToneMapping,
   PerspectiveCamera,
   RenderTarget,
+  Scene,
   SRGBColorSpace,
   type ColorSpace,
   type ToneMapping,
@@ -676,7 +677,7 @@ describe('StageRenderer', () => {
       expect(pipeline.outputNode).toBeDefined();
     });
 
-    it('keeps the output node of Mode C through changes of stages, order, names and cameras', () => {
+    it('keeps the output node of Mode C through changes of stages, order, names, scenes and cameras', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -696,6 +697,7 @@ describe('StageRenderer', () => {
         ['a renderOrder write', () => (sr.renderOrder = 's,*')],
         ['a rename under an explicit renderOrder', () => (stage.name = 'u')],
         ['a camera change of a Stage2D', () => (stage2D.camera = new PerspectiveCamera())],
+        ['a scene change of a Stage2D', () => (stage2D.scene = new Scene())],
       ];
       for (const [change, apply] of changes) {
         apply();
@@ -996,9 +998,9 @@ describe('StageRenderer', () => {
 
     it('Stage2D.asPassNode requires a camera: none before the first resize() with an area', () => {
       const stage = new Stage2D();
-      expect(() => stage.asPassNode(renderer as any)).toThrow(/no scene or camera/);
+      expect(() => stage.asPassNode(renderer as any)).toThrow(/has no camera/);
       stage.projection = new ParallaxProjection('xy|bottom-left');
-      expect(() => stage.asPassNode(renderer as any), 'a projection alone').toThrow(/no scene or camera/);
+      expect(() => stage.asPassNode(renderer as any), 'a projection alone').toThrow(/has no camera/);
       stage.resize(100, 100);
       expect(() => stage.asPassNode(renderer as any), 'after resize(100, 100)').not.toThrow();
     });
@@ -1043,7 +1045,22 @@ describe('StageRenderer', () => {
       expect(buildOutputNode.mock.calls[1]![0][0].camera).toBe(camera);
     });
 
-    it('remove() stops listening to the camera of a stage', () => {
+    it('assigning a scene to a Stage2D rebuilds the output node', () => {
+      const {sr, stage, buildOutputNode} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.renderTo(renderer as any);
+
+      stage.scene = new Scene();
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      const firstPass = buildOutputNode.mock.calls[0]![0][0];
+      const secondPass = buildOutputNode.mock.calls[1]![0][0];
+      expect(secondPass).not.toBe(firstPass);
+      expect(secondPass.scene).toBe(stage.scene);
+    });
+
+    it('remove() stops listening to the camera and the scene of a stage', () => {
       const sr = new StageRenderer();
       const stage = new Stage2D(new ParallaxProjection('xy|bottom-left'));
       const before = getSubscriptionCount(stage);
