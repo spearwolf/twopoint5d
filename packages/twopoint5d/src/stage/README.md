@@ -286,7 +286,7 @@ import {RenderPipeline} from 'three/webgpu';
 
 const sr = new StageRenderer(display).setClearColor(new Color('#000')).add(stage);
 sr.pipeline = new RenderPipeline(display.renderer!);
-// nothing else — the renderer wires `texture(internalRT)` into `pipeline.outputNode`
+// nothing else — the renderer wires a texture() node of its internal target into `pipeline.outputNode`
 ```
 
 The pipeline writes to `outputRenderTarget` if set, otherwise the canvas.
@@ -319,9 +319,8 @@ sr.buildOutputNode = ([scenePass]) => {
 - `Stage2D.asPassNode()` returns `pass(scene, camera)` — handled per frame by
   the pipeline.
 - A nested `StageRenderer.asPassNode()` returns a `texture()` node sampling
-  the child's own pass-target (not `internalRT`, which is the target of Mode
-  C); before the pipeline runs, the parent clears that target and renders the
-  child into it.
+  the child's own pass-target (not the internal target of Mode C); before the
+  pipeline runs, the parent clears that target and renders the child into it.
 
 `buildOutputNode` runs again on the next render after the stages,
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
@@ -377,8 +376,8 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 ```
 
 `worldRenderer.asPassNode()` returns a `texture()` node sampling the
-renderer's `asPassNodeRT`; the root clears that RT and pre-renders the child
-into it before its own pipeline runs.
+renderer's own pass-target; the root clears that target and pre-renders the
+child into it before its own pipeline runs.
 
 The child's pipeline writes linear: for the pre-render, the root sets
 `renderer.toneMapping` to `NoToneMapping` and `renderer.outputColorSpace` to

@@ -9,7 +9,6 @@ import {
   loadFailureFor,
   type TextureImageSource,
   type TextureResourceLoadFailure,
-  throwCollected,
 } from './internals.js';
 import {
   assertTextureStoreData,
@@ -24,6 +23,7 @@ import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {TextureResource, TextureResourceEvents, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
+import {throwCollected} from '../utils/throwCollected.js';
 
 /**
  * Maps each TextureResourceSubType to its corresponding TypeScript type.

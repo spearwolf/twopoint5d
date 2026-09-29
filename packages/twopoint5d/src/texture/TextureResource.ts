@@ -4,6 +4,7 @@ import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/
 import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {
   changeRefCount,
@@ -12,7 +13,6 @@ import {
   loadFailureFor,
   type TextureImageSource,
   type TextureResourceLoadFailure,
-  throwCollected,
 } from './internals.js';
 import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';

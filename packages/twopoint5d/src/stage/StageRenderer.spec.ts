@@ -1761,7 +1761,7 @@ describe('StageRenderer', () => {
 
       parent.renderTo(renderer as any);
 
-      // Child's inner stage rendered into a non-null target (the child's asPassNodeRT)
+      // Child's inner stage rendered into a non-null target (the child's pass-target)
       expect(rtDuringInner).not.toBeNull();
       expect((rtDuringInner as any)?.isRenderTarget).toBe(true);
       // buildOutputNode received exactly one pass node (the child as a texture node)

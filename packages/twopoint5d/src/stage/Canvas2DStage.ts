@@ -3,7 +3,7 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
 import {Chronometer} from '../display/Chronometer.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
-import {throwCollected} from '../texture/internals.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
