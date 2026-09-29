@@ -542,9 +542,9 @@ What this layer does on top of the general rules in
   `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
   write to `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
   it out on its `dispose` event, even behind a listener of that event that throws.
-- `Canvas2DStage.dispose()` releases the sprite material, both textures that ever sat behind it —
-  the placeholder and the one the stage built — its
-  `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
+- `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material starts
+  out with and the texture the stage built last from the canvas — each earlier one was released
+  when its successor took its place —, its `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
   canvas handed to the constructor alone. The sprite geometry is shared by every `THREE.Sprite`
   of the module and stays.
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
@@ -575,7 +575,9 @@ What this layer does on top of the general rules in
   state, and a `StageRenderer` composing pass nodes draws nothing while it
   has no area or while one of its `Stage2D`s has no camera. Until then its `width` and
   `height` are 0, and assigning another `projection` — or `undefined` — puts
-  them back to 0 with the camera until the new projection gives a view.
+  them back to 0 until the new projection gives a view. The camera the previous
+  projection created goes with them; a camera you assigned to `stage.camera`
+  stays, and the new projection places it once it gives a view.
 - **Non-unique stage names + `renderOrder`**: stages sharing a name that
   `renderOrder` lists render at that name's position in the order they were
   added. The renderer warns about such a name on `add()` and on every write

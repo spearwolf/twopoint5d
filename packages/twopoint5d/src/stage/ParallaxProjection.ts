@@ -1,10 +1,9 @@
 import type {Camera} from 'three/webgpu';
 import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
-import {expectDefined} from '../utils/expectDefined.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
-import type {IProjection} from './IProjection.js';
+import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
@@ -68,7 +67,7 @@ export class ParallaxProjection implements IProjection {
    * number above 0 leaves the projection as it is. Specs that give no view with an area keep the
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
-   * `[0, 0, 0, 0]`. A call that gives a view with an area also takes `near`, `far` and
+   * `{width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0}`. A call that gives a view with an area also takes `near`, `far` and
    * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not
    * given, as `ParallaxProjectionSpecs` describes.
    */
@@ -108,13 +107,25 @@ export class ParallaxProjection implements IProjection {
     this.#fovy = (2 * Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) * 180) / Math.PI;
   }
 
-  getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number] {
-    return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
+  getViewRect(): ProjectionViewRect {
+    return {
+      width: this.#viewRect.width,
+      height: this.#viewRect.height,
+      pixelRatioX: this.#pixelRatio.x,
+      pixelRatioY: this.#pixelRatio.y,
+    };
   }
 
+  /**
+   * Builds a camera with the setup of the last {@link updateViewRect}, aimed at the projection plane
+   * and placed at its distance.
+   *
+   * @throws {Error} if the projection has no {@link projectionPlane}.
+   */
   createCamera(): PerspectiveCamera {
+    const projectionPlane = this.#requireProjectionPlane('createCamera()');
     const camera = new PerspectiveCamera();
-    this.#applyToCamera(camera);
+    this.#applyToCamera(camera, projectionPlane);
     return camera;
   }
 
@@ -124,17 +135,27 @@ export class ParallaxProjection implements IProjection {
    * position at its distance. Whatever the camera carried in these is replaced.
    *
    * @throws {TypeError} if `camera` is not a `PerspectiveCamera`.
+   * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   updateCamera(camera: Camera): void {
     if ((camera as PerspectiveCamera)?.isPerspectiveCamera !== true) {
       throw new TypeError(`ParallaxProjection: updateCamera() needs a PerspectiveCamera, got ${camera?.type ?? String(camera)}`);
     }
-    this.#applyToCamera(camera as PerspectiveCamera);
+    const projectionPlane = this.#requireProjectionPlane('updateCamera()');
+    this.#applyToCamera(camera as PerspectiveCamera, projectionPlane);
   }
 
-  #applyToCamera(camera: PerspectiveCamera): void {
-    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
+  #requireProjectionPlane(method: 'createCamera()' | 'updateCamera()'): ProjectionPlane {
+    if (this.projectionPlane == null) {
+      throw new Error(
+        `ParallaxProjection#${method} has no projectionPlane to aim the camera at: ` +
+          'set ParallaxProjection#projectionPlane or hand one to the constructor',
+      );
+    }
+    return this.projectionPlane;
+  }
 
+  #applyToCamera(camera: PerspectiveCamera, projectionPlane: ProjectionPlane): void {
     camera.fov = this.#fovy;
     camera.aspect = this.#aspect;
     camera.near = this.#near;
@@ -151,6 +172,19 @@ export class ParallaxProjection implements IProjection {
   }
 
   /**
+   * `D / distanceToCamera`, with `D` the distance at which this projection puts the camera from its
+   * projection plane (`distanceToProjectionPlane` of the specs, `300` by default): `1` on the
+   * projection plane, `2` halfway between it and the camera. `Infinity` at the camera itself,
+   * negative behind it. `NaN` until the first `updateViewRect()` that gives a view with an area,
+   * since `D` is taken from the specs there.
+   *
+   * @param distanceToCamera - How far the thing sits from the camera.
+   */
+  getScaleFactor(distanceToCamera: number): number {
+    return this.#distanceToProjectionPlane / distanceToCamera;
+  }
+
+  /**
    * The factor a plane sitting `distanceToCamera` in front of the camera is carried along with,
    * measured against the projection plane.
    *
@@ -159,9 +193,12 @@ export class ParallaxProjection implements IProjection {
    * `1 - distanceToCamera / D`: `1` at the camera, `0` on the projection plane, negative behind
    * it, and falling linearly in between.
    *
+   * Not part of {@link IProjection}: an orthographic projection carries nothing along. For how large
+   * something appears at that distance, see {@link getScaleFactor}.
+   *
    * @param distanceToCamera - How far the plane sits from the camera.
    */
-  getZoom(distanceToCamera: number): number {
+  getParallaxFactor(distanceToCamera: number): number {
     if (distanceToCamera === 0) return 1;
 
     const d = this.#distanceToProjectionPlane - distanceToCamera;

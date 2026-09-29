@@ -154,11 +154,14 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * A camera assigned here takes precedence over the projection's. Assigning `undefined` hands
    * back to the projection's camera, created on the spot if the container already has an area.
    *
-   * A projection places a camera assigned here as it places its own: every `updateProjection()`
-   * — and every `resize()` that brings a new container size — gives it the frustum or the field
-   * of view of the specs, their `near` and `far`, the direction of the projection plane and the
-   * position at its `distanceToProjectionPlane`, as long as container and specs give a view with
-   * an area. A stage whose camera you place yourself gets no projection.
+   * A projection places a camera assigned here as it places its own, in every call that computes
+   * the view anew: a `resize()` that brings a new container size, `updateProjection(true)`, an
+   * assignment to `projection`, and `updateProjection()` or `updateFrame()` while
+   * {@link needsUpdate} is set. Each gives the camera the frustum or the field of view of the
+   * specs, their `near` and `far`, the direction of the projection plane and the position at its
+   * `distanceToProjectionPlane`, as long as container and specs give a view with an area. The
+   * assignment itself leaves the camera where it is; the next of these calls places it. A stage
+   * whose camera you place yourself gets no projection.
    *
    * Every change of the camera emits `OnStageAfterCameraChanged` with the camera it replaced.
    */
@@ -240,7 +243,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.needsUpdate = false;
 
     this.projection!.updateViewRect(width, height);
-    const [w, h] = this.projection!.getViewRect();
+    const {width: w, height: h} = this.projection!.getViewRect();
 
     // specs that give no view with an area leave the projection without one: there is nothing to
     // build a camera from, so the stage keeps the camera and the size it has

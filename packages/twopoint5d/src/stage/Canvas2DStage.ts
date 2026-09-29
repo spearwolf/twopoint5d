@@ -253,10 +253,11 @@ export class Canvas2DStage {
   }
 
   /**
-   * Release the three.js resources this stage built for itself: the sprite material, both
-   * textures that ever sat behind it, the {@link StageRenderer} and the {@link Stage2D} behind
-   * {@link stage}. The sprite leaves the scene before its material goes, so no frame reaches a
-   * sprite without one. The stage releases the textures it built.
+   * Release the three.js resources this stage built for itself: the sprite material, the blank
+   * texture the material starts out with, the texture the stage built last from the canvas — each
+   * earlier one was released when its successor took its place —, the {@link StageRenderer} and
+   * the {@link Stage2D} behind {@link stage}. The sprite leaves the scene before its material goes,
+   * so no frame reaches a sprite without one.
    *
    * The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are
    * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares

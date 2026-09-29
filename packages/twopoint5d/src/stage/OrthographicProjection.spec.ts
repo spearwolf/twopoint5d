@@ -25,7 +25,7 @@ describe('OrthographicProjection', () => {
       const projection = new OrthographicProjection();
       expect(projection.viewSpecs).toEqual({fit: 'fill'});
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
+      expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
 
       const withPlane = new OrthographicProjection('xy|bottom-left');
       withPlane.updateViewRect(800, 600);
@@ -41,10 +41,21 @@ describe('OrthographicProjection', () => {
       width: 640,
     });
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual([640, 480, 1.25, 1.25]);
+    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
   });
 
-  it('getZoom', () => {
+  it('getViewRect() hands out a new object on every call', () => {
+    const projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640});
+    projection.updateViewRect(800, 600);
+
+    const rect = projection.getViewRect();
+    expect(projection.getViewRect()).not.toBe(rect);
+
+    rect.width = 1;
+    expect(projection.getViewRect().width).toBe(640);
+  });
+
+  it('getScaleFactor', () => {
     const projection = new OrthographicProjection(ProjectionPlane.get('xy|bottom-left'), {
       fit: 'contain',
       width: 640,
@@ -52,10 +63,10 @@ describe('OrthographicProjection', () => {
     });
     projection.updateViewRect(800, 600);
 
-    expect(projection.getZoom(666)).toEqual(1);
-    expect(projection.getZoom(300)).toEqual(1);
-    expect(projection.getZoom(23)).toEqual(1);
-    expect(projection.getZoom(0)).toEqual(1);
+    expect(projection.getScaleFactor(666)).toEqual(1);
+    expect(projection.getScaleFactor(300)).toEqual(1);
+    expect(projection.getScaleFactor(23)).toEqual(1);
+    expect(projection.getScaleFactor(0)).toEqual(1);
   });
 
   it('createCamera', () => {
@@ -71,7 +82,7 @@ describe('OrthographicProjection', () => {
     const projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640});
     projection.updateViewRect(800, 600);
     const camera = projection.createCamera();
-    expect(projection.getViewRect()).toEqual([640, 480, 1.25, 1.25]);
+    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
 
     const noArea: [number, number][] = [
       [0, 600],
@@ -83,7 +94,7 @@ describe('OrthographicProjection', () => {
     ];
     for (const [w, h] of noArea) {
       projection.updateViewRect(w, h);
-      expect(projection.getViewRect(), `${w}×${h}`).toEqual([640, 480, 1.25, 1.25]);
+      expect(projection.getViewRect(), `${w}×${h}`).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
 
       projection.updateCamera(camera);
       expect([camera.left, camera.right, camera.top, camera.bottom], `${w}×${h}`).toEqual([-320, 320, 240, -240]);
@@ -143,13 +154,43 @@ describe('OrthographicProjection', () => {
     });
   });
 
+  describe('without a projection plane', () => {
+    const projectionWithoutPlane = () => {
+      const projection = new OrthographicProjection(undefined, {fit: 'contain', width: 640});
+      projection.updateViewRect(800, 600);
+      return projection;
+    };
+
+    it('refuses createCamera() with the class, the method and the field to set', () => {
+      expect(() => projectionWithoutPlane().createCamera()).toThrow(
+        'OrthographicProjection#createCamera() has no projectionPlane to aim the camera at: set OrthographicProjection#projectionPlane or hand one to the constructor',
+      );
+    });
+
+    it('refuses updateCamera() with the class, the method and the field to set and leaves the camera alone', () => {
+      const camera = new OrthographicCamera();
+      camera.position.set(1, 2, 3);
+      camera.near = 7;
+
+      expect(() => projectionWithoutPlane().updateCamera(camera)).toThrow(
+        'OrthographicProjection#updateCamera() has no projectionPlane to aim the camera at: set OrthographicProjection#projectionPlane or hand one to the constructor',
+      );
+      expect(camera.position.toArray()).toEqual([1, 2, 3]);
+      expect(camera.near).toBe(7);
+    });
+
+    it('refuses a camera that is no OrthographicCamera with a TypeError first', () => {
+      expect(() => projectionWithoutPlane().updateCamera(new PerspectiveCamera())).toThrow(TypeError);
+    });
+  });
+
   it('has no view before a container with area', () => {
     const projection = new OrthographicProjection('xy|bottom-left');
     projection.updateViewRect(0, 600);
-    expect(projection.getViewRect()).toEqual([0, 0, 0, 0]);
+    expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
 
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
   });
 
   it.each([{}, {fit: 'contain'}, {fit: 'contain', width: -640}] as const satisfies Partial<OrthographicProjectionSpecs>[])(
@@ -157,14 +198,14 @@ describe('OrthographicProjection', () => {
     (specs) => {
       const projection = new OrthographicProjection('xy|bottom-left', specs);
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual([0, 0, 0, 0]);
+      expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
     },
   );
 
   it('takes a pixelZoom of 0 as the container', () => {
     const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 0});
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual([800, 600, 1, 1]);
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
   });
 
   describe('camera values from the specs', () => {

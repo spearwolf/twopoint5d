@@ -3,7 +3,7 @@ import {createSandbox} from 'sinon';
 import type {WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
-import {OnStageUpdateFrame, type StageUpdateFrameProps} from '../events.js';
+import {OnStageResize, OnStageUpdateFrame, type StageUpdateFrameProps} from '../events.js';
 import {Canvas2DStage} from './Canvas2DStage.js';
 
 // the stage asks the renderer for its anisotropy and hands it to the stage renderer, nothing else
@@ -94,6 +94,21 @@ describe('Canvas2DStage', () => {
 
     expect([stage.stageRenderer.width, stage.stageRenderer.height]).toEqual([320, 240]);
     expect([stage.stage.containerWidth, stage.stage.containerHeight]).toEqual([320, 240]);
+  });
+
+  test('a container size the stage renderer already carries reaches no stage again', () => {
+    const stage = makeStage();
+    stage.setContainerSize(320, 240);
+
+    const resize = sandbox.spy(stage.stage, 'resize');
+    const resized = vi.fn();
+    on(stage.stage, OnStageResize, resized);
+
+    stage.setContainerSize(320, 240);
+
+    expect(resize.called).toBe(false);
+    expect(resized).not.toHaveBeenCalled();
+    expect([stage.stageRenderer.width, stage.stageRenderer.height]).toEqual([320, 240]);
   });
 
   test('uploads a change of the same size into the texture it has', () => {

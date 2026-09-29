@@ -1,10 +1,9 @@
 import type {Camera} from 'three/webgpu';
 import {OrthographicCamera, Vector2} from 'three/webgpu';
 
-import {expectDefined} from '../utils/expectDefined.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
-import type {IProjection} from './IProjection.js';
+import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
 
@@ -66,7 +65,7 @@ export class OrthographicProjection implements IProjection {
    * number above 0 leaves the projection as it is. Specs that give no view with an area keep the
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
-   * `[0, 0, 0, 0]`. A call that gives a view with an area also takes `near`, `far` and
+   * `{width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0}`. A call that gives a view with an area also takes `near`, `far` and
    * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not
    * given, as `OrthographicProjectionSpecs` describes.
    */
@@ -103,13 +102,25 @@ export class OrthographicProjection implements IProjection {
       : DEFAULT_DISTANCE_TO_PROJECTION_PLANE;
   }
 
-  getViewRect(): [width: number, height: number, pixelRatioHorizontal: number, pixelRatioVertical: number] {
-    return [this.#viewRect.width, this.#viewRect.height, this.#pixelRatio.x, this.#pixelRatio.y];
+  getViewRect(): ProjectionViewRect {
+    return {
+      width: this.#viewRect.width,
+      height: this.#viewRect.height,
+      pixelRatioX: this.#pixelRatio.x,
+      pixelRatioY: this.#pixelRatio.y,
+    };
   }
 
+  /**
+   * Builds a camera with the setup of the last {@link updateViewRect}, aimed at the projection plane
+   * and placed at its distance.
+   *
+   * @throws {Error} if the projection has no {@link projectionPlane}.
+   */
   createCamera(): OrthographicCamera {
+    const projectionPlane = this.#requireProjectionPlane('createCamera()');
     const camera = new OrthographicCamera();
-    this.#applyToCamera(camera);
+    this.#applyToCamera(camera, projectionPlane);
     return camera;
   }
 
@@ -119,6 +130,7 @@ export class OrthographicProjection implements IProjection {
    * distance. Whatever the camera carried in these is replaced.
    *
    * @throws {TypeError} if `camera` is not an `OrthographicCamera`.
+   * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   updateCamera(camera: Camera): void {
     if ((camera as OrthographicCamera)?.isOrthographicCamera !== true) {
@@ -126,12 +138,21 @@ export class OrthographicProjection implements IProjection {
         `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${camera?.type ?? String(camera)}`,
       );
     }
-    this.#applyToCamera(camera as OrthographicCamera);
+    const projectionPlane = this.#requireProjectionPlane('updateCamera()');
+    this.#applyToCamera(camera as OrthographicCamera, projectionPlane);
   }
 
-  #applyToCamera(camera: OrthographicCamera): void {
-    const projectionPlane = expectDefined(this.projectionPlane, 'the projection plane of this projection');
+  #requireProjectionPlane(method: 'createCamera()' | 'updateCamera()'): ProjectionPlane {
+    if (this.projectionPlane == null) {
+      throw new Error(
+        `OrthographicProjection#${method} has no projectionPlane to aim the camera at: ` +
+          'set OrthographicProjection#projectionPlane or hand one to the constructor',
+      );
+    }
+    return this.projectionPlane;
+  }
 
+  #applyToCamera(camera: OrthographicCamera, projectionPlane: ProjectionPlane): void {
     camera.left = -this.#halfWidth;
     camera.right = this.#halfWidth;
     camera.top = this.#halfHeight;
@@ -149,8 +170,11 @@ export class OrthographicProjection implements IProjection {
     camera.updateProjectionMatrix();
   }
 
-  getZoom(_distanceToCamera: number): number {
-    // since this is an orthographic view, the zoom factor is always the same
+  /**
+   * Always `1`: an orthographic projection shows everything at the size it has on the projection
+   * plane, whatever its distance to the camera.
+   */
+  getScaleFactor(_distanceToCamera: number): number {
     return 1;
   }
 }

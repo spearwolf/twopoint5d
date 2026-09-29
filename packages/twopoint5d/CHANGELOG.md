@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the `evictMissing` option to `TextureStore#parse()` and `TextureStore#load()`, carried by the exported `TextureStoreParseOptions`: with `{evictMissing: true}` a parse disposes and removes every resource the new data no longer names and whose `refCount` is 0. `refCount` counts the live `TextureStore#on()` subscriptions of a resource — a value fetched through `TextureStore#get()` does not raise it, because that promise gives its subscription up as it settles, so a texture sitting in a material counts for nothing here; a caller who wants to keep such a value keeps a subscription as well. The option defaults to `false`, which keeps every resource until `TextureStore#clearUnused()` is called — `clearUnused()` still sweeps the whole store, `evictMissing` only the resources that fell out of the data
 - add the static `FrameLoop.resetRAF()`: it drops the rAF drivers all `FrameLoop`s of the module share, so the next loop starts on a fresh frame counter and an unmeasured fps — for test files that build several loops in one worker
 - add `StageRenderer#isDisposed`: `true` once `dispose()` has run, so a caller holding a renderer it did not create has a question it can ask
-- add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, both textures that ever sat behind it, and the `StageRenderer` and the `Stage2D` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. A listener of the `dispose` event that throws does not hold up the teardown: every subscriber hears the event, the instance is torn down completely, and the error reaches the caller afterwards — one unchanged, several as an `AggregateError`. That holds for the `dispose` listeners of its `StageRenderer` and its `Stage2D` as well. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- add `Canvas2DStage#dispose()` and `Canvas2DStage#isDisposed`: the stage releases the sprite material, the blank texture the material starts out with, the texture it built last from the canvas, and the `StageRenderer` and the `Stage2D` it built in its constructor — everything it created itself. The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are left as they are, and the geometry every `THREE.Sprite` of the module shares is not this stage's to release. A `dispose` event goes out to every subscriber before the stage stops listening. A listener of the `dispose` event that throws does not hold up the teardown: every subscriber hears the event, the instance is torn down completely, and the error reaches the caller afterwards — one unchanged, several as an `AggregateError`. That holds for the `dispose` listeners of its `StageRenderer` and its `Stage2D` as well. Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`, `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `Canvas2DStage#render()` takes `now`, `deltaTime` and `frameNo` and hands them to `stageRenderer.updateFrame()` before it draws; without them the stage counts frames and measures time with a clock of its own. `OnStageFirstFrame` and `OnStageUpdateFrame` reach the listeners of `canvasStage.stage` this way, and a stage without a camera warns after 100 frames. Whoever called `stageRenderer.updateFrame()` next to `render()` leaves that call out
 - add `InputControlBase#dispose()` and `InputControlBase#isDisposed`: `dispose()` takes every listener the control put on a host back off again — the hosts themselves are handed in and stay the caller's — and puts the control out of service. Afterwards `isDisposed` is `true`, `isActive` is `false`, and the control cannot be brought back: `subscribe()`, a write of `true` to `isActive` and every `addEventListener()` of a subclass do nothing. `destroyAllListeners()` is unaffected and stays what it is, a reset after which a control takes listeners again. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - add the `coordsTarget` option and the `PanControl2D#coordsTarget` field: the element every pointer position is measured against, through its `getBoundingClientRect()`. It defaults to the `cursorStylesTarget`, and with that to `document.body`. A canvas inside a shadow root belongs here, because the browser retargets `event.target` onto the shadow host there
@@ -69,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `BakeTextureOptions#maxTextureSize` and `#renderer`: `FrameBasedAnimations#bakeDataTexture()` builds a data texture at most as wide as `maxTextureSize`, else as the limit of the device of `renderer` — `maxTextureDimension2D` of a WebGPU device, `MAX_TEXTURE_SIZE` of a WebGL2 context —, else as `FrameBasedAnimations.MaxTextureSize`. A renderer that has not been initialized names no limit, and a `maxTextureSize` that is no whole number of 1 or more throws a `RangeError`
 - add `Chronometer#rawDeltaTime` and the field `rawDeltaTime` of `DisplayEventProps`: the delta between the previous and the current time with the pauses subtracted, before `maxDeltaTime` cuts it — equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded. `Display#getEventProps()` fills it from its chronometer
 - add the event `OnStageAfterSceneChanged` of `Stage2D`, with the types `StageAfterSceneChangedArgs` and `IStageAfterSceneChanged`: every change of `Stage2D#scene` emits it with the scene it replaced
+- add `IProjection#getScaleFactor(distanceToCamera)` and both implementations: how many times larger something at that distance from the camera appears than on the projection plane — `D / distanceToCamera` for `ParallaxProjection`, with `D` its `distanceToProjectionPlane`, and `1` for `OrthographicProjection`. Add `ParallaxProjection#getParallaxFactor(distanceToCamera)`: `1 - distanceToCamera / D`, `1` at the camera and `0` on the projection plane — the factor a plane at that distance is carried along with; it is not part of `IProjection`. See the Migration Guide
+- export the `ProjectionViewRect` type, what `IProjection#getViewRect()` answers
 
 ### Changed
 
@@ -97,7 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AttributeBuffer` carries `dirtyFrom`, `dirtyTo`, `dirtySince` and `pickedUpSerial` next to `serial`: the object range written since the range began, the serial it began at, and the highest serial a consumer has taken a range for. Code that builds such a record itself has to fill them
 - `TexturedSpritesGeometryParameters#attributeUsage` takes `Omit<VertexAttributeUsageOverrides, 'alias'>`. The shape is the same as before, so this is no breaking change, but the type now stands under a name a caller can write down. `alias` is left out because the geometry sets the aliases of the sprite layout itself
 - `map2d` exports its interfaces as types, `export type *`, as every other module does
-- `IProjection#getZoom()` and both implementations, `ParallaxProjection` and `OrthographicProjection`, name their parameter `distanceToCamera` — it carries the distance a plane sits from the camera, while the `distanceToProjectionPlane` of the view specs carries the distance from the camera to the projection plane. Callers are unaffected, JavaScript having no named arguments; a type that writes the signature down sees the new name
 - `new FixedFrameLoop(display)` throws when the display handed to it has been disposed, with a message naming the class and the state. A loop over such a display subscribes to an emitter that never fires again: it reports `isDisposed === false`, emits neither `OnTick` nor `OnRender` and never disposes itself, because the `OnDisplayDispose` it waits for has already gone out. `Display#isDisposed` is the question to ask wherever a loop is built from a display that belongs to someone else
 - change a `tileWidth` or `tileHeight` that is not a finite number above 0 into a `RangeError` naming class, property and value, thrown where the value is set: the constructors and setters of `Map2DTileCoordsUtil`, `Map2DTileStreamer` and `Map2DSpatialHashGrid`, and through the streamer also `Map2D#tileWidth` and `#tileHeight`. Every mapping from 2D coordinates to tile coordinates divides by these two, and a grid of 0 carried `±Infinity` and `NaN` tile indices into the visibilitors, where the map went on rendering nothing without a word. The default grid of `Map2DTileStreamer` and `Map2DSpatialHashGrid` is 1x1, the one `Map2DTileCoordsUtil` has always had. A value that is a string is quoted in the message — `got "16"` — as `TileSet` quotes it
 - change a `width` or `height` of `RectangularVisibilityArea` that is neither 0 nor a finite number above 0 into a `RangeError` naming class, property and value, thrown by the constructor and the setters; 0 stays the switch that turns the area off. A value that is a string is quoted in the message
@@ -224,7 +225,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameBasedAnimations#add()` gives an animation added without a name, or with the empty string as its name, one of its own — `anim_0`, `anim_1`, and so on, stepping over every name already registered. It goes into the same lookup as a name the caller picked, so `hasAnimation()` and `animId()` reach such an animation like any other. A caller who hands out names of that shape themselves meets the usual "must be unique" error when they ask for one the counter has already spent
 - the guard of `FrameBasedAnimations#bakeDataTexture()` against a data texture wider than `FrameBasedAnimations.MaxTextureSize` names the numbers behind the refusal: how many frames in how many animations are registered, how wide the texture they ask for would be, and what the maximum is
 - `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
-- `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own. A projection that has no projection plane refuses the call with an `Error` naming what is missing, as `createCamera()` does: the direction and the position `updateCamera()` writes are read off that plane.
+- `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own. A projection that has no projection plane refuses the call with an `Error` that names the class, the method and the field to set, as `createCamera()` does: the direction and the position `updateCamera()` writes are read off that plane.
 - `FrameBasedAnimations#add()` refuses an animation that carries no frames — an atlas query that matches none, an empty tile range, an empty frame list — and one whose duration is not a finite number at or above zero. Either of them put a number into the data texture that no shader can play with: a frame count of 0, or a frame time that is negative, infinite or `NaN`. A duration of zero stays what it always was, a still image. Each error names the case and the animation it belongs to, and neither of them spends a name of the auto counter. A `frameRate` that is not a number above 0 — `NaN` and a string such as `"12"` among them — is refused with an error that names the `frameRate`, timing that carries neither a `duration` nor a `frameRate` with one that says so, and a `duration` or `frameRate` that is a string is quoted in the message
 - `new VertexObjectDescriptor()` copies the description it is handed and answers from that copy, so a change to the original object no longer reaches the descriptor and cannot slip past the checks the constructor ran. `VertexObjectDescriptor#description` is that copy
 - pools built from the same description object share one `VertexObjectDescriptor` and with it the prototype of their vertex objects, as long as the description still describes what it did when the first of them was built; a description changed since then gets a descriptor of its own, and the pools built before keep theirs. It holds for `new VOBufferPool()`, `new VertexObjectPool()`, every geometry that builds its pools from a description and `InstancedVOBufferGeometry#attachInstancedPool()`, and with them for `TexturedSpritesGeometry` — from a capacity number or from parameters without `attributeUsage` —, `AnimatedSpritesGeometry` and `TileSpritesGeometry`: one loop over the sprites of several geometries of one type sees one prototype. A property added to the prototype of a vertex object reaches the vertex objects of every pool built from the same description. `new VertexObjectDescriptor()` builds a descriptor of its own on every call
@@ -303,6 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage#texture` is a getter — see the migration guide
 - `Canvas2DStage` uploads a change of its canvas into the texture it has and builds a new one only for a canvas of another size; the sprite material is rebuilt only then
 - `Canvas2DStage#needsUpdate` starts out `true`: the first `render()` shows what the canvas already carries
+- `IProjection#getViewRect()`, and with it `ParallaxProjection#getViewRect()` and `OrthographicProjection#getViewRect()`, answers a `ProjectionViewRect` `{width, height, pixelRatioX, pixelRatioY}`, a new object on every call. See the Migration Guide
 
 ### Deprecated
 
@@ -327,6 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove the declaration maps and the source maps from the published package: both pointed at the TypeScript sources under `src/`, which the package does not contain, so neither "Go to definition" nor a debugger found anything behind them. The `.d.ts` and `.js` files only lose their `sourceMappingURL` comment
 - remove the exports `postFixID` and `globalStylesID`: the class name `Stylesheets` hands out comes whole from the return value of `installRule()`, `retainRule()` and `addRule()`, and `globalStylesID` named a `<style>` element the module does not create — see the migration guide
 - remove `compression` from `StringDataIdsChunk2DParams`: the chunk decodes plain base64 only. See the Migration Guide
+- remove `IProjection#getZoom()`, `ParallaxProjection#getZoom()` and `OrthographicProjection#getZoom()`: the name answered two different questions. `getScaleFactor()` answers how large something appears, `ParallaxProjection#getParallaxFactor()` what the parallax value of `ParallaxProjection#getZoom()` answered. See the Migration Guide
 
 ### Fixed
 
@@ -378,7 +381,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a generated setter and `VertexObjectBuffer#copyAttributes()`: when the caller passes fewer values than `vertexCount * size`, unwritten components keep their previous value; single- and multi-component attributes behave the same way
 - fix `OrthographicProjection#updateViewRect()` for a projection built without specs: `viewSpecs` holds `{fit: 'fill'}` from construction on, the default `ParallaxProjection` starts from as well
 - fix `fitIntoRectangle()` for spec numbers that are not finite or not above 0: such a `pixelZoom` zooms by 1, so the view is the container, the same as a `Display#pixelZoom` of 0; such a `width` or `height` is a side `contain` and `cover` do not constrain, as `0` is; such a `minPixelZoom` or `maxPixelZoom` does not apply. None of them turns the container into a view that is infinite, negative or `NaN`
-- fix `OrthographicProjection#updateViewRect()` and `ParallaxProjection#updateViewRect()` for a container or a view without area: a width or a height that is not a finite number above 0 leaves the view, the pixel ratio and the camera values of the projection as they are. Specs that give no view with an area keep the last view, while the pixel ratio follows the new container; a projection that has no view yet stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports `[0, 0, 0, 0]`
+- fix `OrthographicProjection#updateViewRect()` and `ParallaxProjection#updateViewRect()` for a container or a view without area: a width or a height that is not a finite number above 0 leaves the view, the pixel ratio and the camera values of the projection as they are. Specs that give no view with an area keep the last view, while the pixel ratio follows the new container; a projection that has no view yet stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports `{width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0}`
 - fix `ParallaxProjection` and `OrthographicProjection` for camera values in their specs that no camera can be built from: a `distanceToProjectionPlane`, `near` or `far` that is not a finite number counts as not given, and so does a `distanceToProjectionPlane` or `near` of 0 or below on a `ParallaxProjection`, whose field of view follows from that distance. A `far` that is not above the `near` in effect sends both back to their defaults, `0.1` and `100000`
 - fix `InstancedVertexObjectGeometry`: a base capacity of `0` passed to the constructor reaches the base pool instead of becoming `1` — the same value `InstancedVOBufferGeometry` takes at that place
 - fix `Display#canvas` after `dispose()`: it answers with `Display#canvas is not available: this display has been disposed` instead of a `TypeError` about a property of `undefined`
@@ -750,7 +753,7 @@ new ParallaxProjection('xy|bottom-left').updateCamera(new OrthographicCamera());
 // → TypeError: ParallaxProjection: updateCamera() needs a PerspectiveCamera, got OrthographicCamera
 
 new ParallaxProjection().updateCamera(new PerspectiveCamera());
-// → Error: expected the projection plane of this projection to be defined
+// → Error: ParallaxProjection#updateCamera() has no projectionPlane to aim the camera at: set ParallaxProjection#projectionPlane or hand one to the constructor
 ```
 
 #### The `FixedFrameLoop` constructor refuses a disposed display
@@ -3470,6 +3473,52 @@ const ctx = canvasStage.canvas.getContext('2d')!;
 ctx.fillStyle = '#ff0000';
 ctx.fillRect(0, 0, 256, 256);
 canvasStage.needsUpdate = true;
+```
+
+#### `IProjection#getViewRect()` answers an object
+
+`getViewRect()` of `ParallaxProjection`, `OrthographicProjection` and every other `IProjection` answers a `ProjectionViewRect`: `width` and `height` of the view, and `pixelRatioX` and `pixelRatioY` for what stood at the third and the fourth position — container pixels per view unit. Every call hands out a new object, so a write to it leaves the projection as it is. A class of your own that implements `IProjection` answers the same object from its `getViewRect()`.
+
+**Before**
+
+```ts
+const [width, height] = projection.getViewRect();
+```
+
+**After**
+
+```ts check
+import {ParallaxProjection} from '@spearwolf/twopoint5d';
+
+const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+projection.updateViewRect(800, 600);
+
+const {width, height, pixelRatioX, pixelRatioY} = projection.getViewRect();
+```
+
+#### `getZoom()` gives way to `getScaleFactor()` and `getParallaxFactor()`
+
+`getZoom()` answered two different questions under one name, and both have a name of their own. A call of `ParallaxProjection#getZoom(d)` gets the same value from `getParallaxFactor(d)`: `1 - d / D`, the factor a plane at that distance is carried along with. A call of `OrthographicProjection#getZoom(d)` gets the same `1` from `getScaleFactor(d)`. Code written against `IProjection` calls `getScaleFactor(d)` and gets the same question answered by both projections: how many times larger something at that distance appears than on the projection plane. A class of your own that implements `IProjection` needs a `getScaleFactor()` in place of `getZoom()`.
+
+**Before**
+
+```ts
+const parallax = parallaxProjection.getZoom(150);
+const scale = orthographicProjection.getZoom(150); // always 1
+```
+
+**After**
+
+```ts check
+import {OrthographicProjection, ParallaxProjection} from '@spearwolf/twopoint5d';
+
+const parallaxProjection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+const orthographicProjection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640});
+parallaxProjection.updateViewRect(800, 600);
+orthographicProjection.updateViewRect(800, 600);
+
+const parallax = parallaxProjection.getParallaxFactor(150);
+const scale = orthographicProjection.getScaleFactor(150); // always 1
 ```
 
 ## [0.21.2] - 2026-06-19

@@ -1282,6 +1282,28 @@ describe('StageRenderer', () => {
       expect([rt.width, rt.height], 'resized in device pixels').toEqual([600, 300]);
     });
 
+    it('a resize() to the size the renderer and its stages already carry leaves the internal target and the stages alone', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 50);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+
+      let rt: any;
+      stage.renderTo.mockImplementation(() => {
+        rt = renderer.__renderTarget;
+      });
+      sr.renderTo(renderer as any);
+
+      const setSize = vi.spyOn(rt, 'setSize');
+      stage.resize.mockClear();
+
+      sr.resize(100, 50);
+
+      expect(setSize).not.toHaveBeenCalled();
+      expect(stage.resize).not.toHaveBeenCalled();
+    });
+
     it('a fractional css size reaches the internal target as whole device pixels', () => {
       const sr = new StageRenderer();
       sr.resize(100, 50);
