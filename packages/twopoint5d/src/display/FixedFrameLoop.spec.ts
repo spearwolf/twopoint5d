@@ -208,7 +208,7 @@ describe('FixedFrameLoop', () => {
     expect(loopTicks).toHaveLength(1);
   });
 
-  it.each([0, -1, 0.5, NaN, Infinity])('maxStepsPerFrame refuses %s', (value) => {
+  it.each([0, -1, 0.5, 2.5, NaN, Infinity])('maxStepsPerFrame refuses %s', (value) => {
     sim.maxStepsPerFrame = value;
     expect(sim.maxStepsPerFrame).toBe(5);
 
@@ -225,6 +225,16 @@ describe('FixedFrameLoop', () => {
   it('maxStepsPerFrame takes 1 and above', () => {
     sim.maxStepsPerFrame = 2;
     expect(sim.maxStepsPerFrame).toBe(2);
+  });
+
+  it('keeps the whole number it has when it is handed a fraction, and runs no tick above it', () => {
+    sim.maxStepsPerFrame = 2;
+    sim.maxStepsPerFrame = 2.5;
+
+    expect(sim.maxStepsPerFrame).toBe(2);
+
+    emit(display, OnDisplayRenderFrame, makeFrame(10 / 60));
+    expect(ticks).toHaveLength(2);
   });
 
   it('reset() clears accumulator, tickTime, tickNo and alpha', () => {
@@ -270,7 +280,7 @@ describe('FixedFrameLoop', () => {
       expect(loop.fixedDelta).toBeCloseTo(1 / 60);
     });
 
-    it.each([0, -1, 0.5, NaN, Infinity])('ignores a DefaultMaxStepsPerFrame of %s and takes 5', (value) => {
+    it.each([0, -1, 0.5, 2.5, NaN, Infinity])('ignores a DefaultMaxStepsPerFrame of %s and takes 5', (value) => {
       FixedFrameLoop.DefaultMaxStepsPerFrame = value;
       const loop = new FixedFrameLoop(makeFakeDisplay());
       const loopTicks: FixedFrameLoopTickProps[] = [];

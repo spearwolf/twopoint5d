@@ -268,4 +268,25 @@ describe('TileSet', () => {
       expect(tiles.frameId(-3)).toBe(tiles.firstFrameId);
     });
   });
+
+  describe('tileCount and firstFrameId are read-only', () => {
+    test('a write to either throws a TypeError and leaves the layout as it is', () => {
+      const tiles = new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16});
+
+      expect(() => {
+        // @ts-expect-error tileCount is read-only
+        tiles.tileCount = 8;
+      }).toThrow(TypeError);
+      expect(() => {
+        // @ts-expect-error firstFrameId is read-only
+        tiles.firstFrameId = 3;
+      }).toThrow(TypeError);
+
+      expect(tiles.tileCount).toBe(16);
+      expect(tiles.firstFrameId).toBe(0);
+      expect(tiles.lastId).toBe(16);
+      expect(tiles.lastFrameId).toBe(15);
+      expect(tiles.frameId(1)).toBe(0);
+    });
+  });
 });

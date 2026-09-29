@@ -30,6 +30,19 @@ const imageLoaderAnswering = () =>
     });
   });
 
+// the real `TextureImageLoader` calls back from the `load` event of an `Image`, a task queued
+// outside the synchronous call stack a test is set up in — `queueMicrotask` reproduces that boundary
+const imageLoaderAnsweringLater = (texture: Texture) =>
+  vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
+    queueMicrotask(() =>
+      onLoad({
+        texture,
+        imgEl: {} as TextureSource,
+        texCoords: new TextureCoords(0, 0, 16, 16),
+      }),
+    );
+  });
+
 const atlasJsonWithoutImage = {
   frames: {'walk.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
   meta: {size: {w: 16, h: 16}},
@@ -131,21 +144,11 @@ describe('TextureAtlasLoader', () => {
   });
 
   test('a parse that throws rejects instead of leaving the promise open', async () => {
-    // the real `TextureImageLoader` calls back from the `load` event of an `Image`, a task
-    // queued outside the synchronous call stack this test is set up in — `queueMicrotask`
-    // reproduces that boundary. Without it a throw from the mocked `parse()` would unwind
-    // synchronously through `this.load(...)` and land in the `new Promise((resolve, reject) =>
-    // ...)` executor above `loadAsync()`, which the JS engine itself turns into a rejection —
-    // masking the very bug this test is for
-    const imageLoad = vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
-      queueMicrotask(() =>
-        onLoad({
-          texture: {dispose() {}} as unknown as Texture,
-          imgEl: {} as TextureSource,
-          texCoords: new TextureCoords(0, 0, 16, 16),
-        }),
-      );
-    });
+    // without the boundary a throw from the mocked `parse()` would unwind synchronously through
+    // `this.load(...)` and land in the `new Promise((resolve, reject) => ...)` executor above
+    // `loadAsync()`, which the JS engine itself turns into a rejection — masking the very bug this
+    // test is for
+    const imageLoad = imageLoaderAnsweringLater({dispose() {}} as unknown as Texture);
     const parseSpy = vi.spyOn(TexturePackerJson, 'parse').mockImplementation(() => {
       throw new Error('boom');
     });
@@ -161,18 +164,8 @@ describe('TextureAtlasLoader', () => {
   });
 
   test('a parse that throws releases the texture the image loader handed out', async () => {
-    // the same microtask boundary as the test above: the callback of the image loader runs
-    // outside the call stack this test is set up in
     const texture = {dispose: vi.fn()} as unknown as Texture;
-    const imageLoad = vi.fn((_url: string, _textureClasses: Array<TextureOptionClasses>, onLoad: TextureImageLoadCallback) => {
-      queueMicrotask(() =>
-        onLoad({
-          texture,
-          imgEl: {} as TextureSource,
-          texCoords: new TextureCoords(0, 0, 16, 16),
-        }),
-      );
-    });
+    const imageLoad = imageLoaderAnsweringLater(texture);
     const parseSpy = vi.spyOn(TexturePackerJson, 'parse').mockImplementation(() => {
       throw new Error('boom');
     });

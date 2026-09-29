@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {Chronometer} from './Chronometer.js';
 
 describe('Chronometer', () => {
@@ -387,5 +387,57 @@ describe('Chronometer', () => {
     chronus.start(1005);
 
     expect(chronus.time).toBe(time);
+  });
+
+  describe('a time that is not finite', () => {
+    beforeEach(() => {
+      vi.spyOn(performance, 'now').mockReturnValue(5000);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it.each([Infinity, -Infinity, NaN])('the constructor reads the clock for %s', (value) => {
+      expect(new Chronometer(value).timeStart).toBe(5);
+    });
+
+    it.each([Infinity, -Infinity, NaN])('update() reads the clock for %s', (value) => {
+      const chronus = new Chronometer(1);
+      chronus.update(value);
+
+      expect(chronus.time).toBe(4);
+      expect(chronus.deltaTime).toBe(4);
+
+      chronus.update(6);
+
+      expect(chronus.time).toBe(5);
+    });
+
+    it.each([Infinity, -Infinity, NaN])('stop() reads the clock for %s', (value) => {
+      const chronus = new Chronometer(1);
+      chronus.stop(value);
+      chronus.start(7);
+
+      expect(chronus.time).toBe(4);
+      expect(Number.isFinite(chronus.time)).toBe(true);
+    });
+
+    it.each([Infinity, -Infinity, NaN])('start() reads the clock for %s', (value) => {
+      const chronus = new Chronometer(1);
+      chronus.stop(2);
+      chronus.start(value);
+
+      expect(chronus.time).toBe(1);
+      expect(chronus.lostTime).toBe(3);
+    });
+
+    it.each([Infinity, -Infinity, NaN])('reset() reads the clock for %s', (value) => {
+      const chronus = new Chronometer(1);
+      chronus.reset(value);
+
+      expect(chronus.timeStart).toBe(5);
+      expect(chronus.time).toBe(0);
+    });
   });
 });

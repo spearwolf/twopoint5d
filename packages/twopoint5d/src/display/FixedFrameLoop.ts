@@ -106,7 +106,7 @@ export class FixedFrameLoop {
 
   /**
    * The `maxStepsPerFrame` a loop starts with when its options name none, or one it refuses.
-   * Read each time a loop is built; a value that is not finite or smaller than 1 is ignored
+   * Read each time a loop is built; a value that is not a whole number of 1 or more is ignored
    * there, and the loop starts with 5.
    */
   static DefaultMaxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
@@ -133,7 +133,7 @@ export class FixedFrameLoop {
    * is discarded (sim time stays consistent with the ticks that did
    * run; `alpha` drops back to ~0 on the next frame).
    *
-   * A value that is not finite or smaller than 1 is ignored, in the
+   * A value that is not a whole number of 1 or more is ignored, in the
    * constructor as well as here; the constructor then keeps `DefaultMaxStepsPerFrame`, or 5 when
    * that is such a value too.
    */
@@ -142,9 +142,10 @@ export class FixedFrameLoop {
   }
 
   set maxStepsPerFrame(value: number) {
-    // an unbounded value would take away the very guard this field is, and one below 1 runs no
-    // tick at all while discarding the backlog of every frame
-    if (!Number.isFinite(value) || value < 1) return;
+    // an unbounded value would take away the very guard this field is, one below 1 runs no
+    // tick at all while discarding the backlog of every frame, and a fraction lets the check
+    // `steps < maxStepsPerFrame` run one tick more than the bound says
+    if (!Number.isInteger(value) || value < 1) return;
     this.#maxStepsPerFrame = value;
   }
 

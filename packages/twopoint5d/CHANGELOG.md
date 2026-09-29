@@ -215,11 +215,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VOBufferPool#usedCount` throws a `RangeError` for `NaN` and a fraction, on a disposed pool as well; `Infinity` and `-Infinity` are clamped to the capacity and to `0`
 - `PanControl2D` recognises its keys by `event.code` against `keys`, so the default keys sit at the WASD position on every keyboard layout
 - a `resize-to` value that selects an element is looked up in the root node of `Display#resizeToAttributeEl` — the document, or the shadow root the element sits in
-- `FixedFrameLoop` ignores an `fps` or `maxStepsPerFrame` the loop cannot run with, in the constructor as well as in the setters: an `fps` that is not finite or not greater than `0` keeps `DefaultFps`, a `maxStepsPerFrame` that is not finite or smaller than `1` keeps its value. The constructor holds the writable statics `DefaultFps` and `DefaultMaxStepsPerFrame` to the same rule: a default the loop cannot run with is ignored, and the loop starts at 60 fps and 5 steps per frame. `maxStepsPerFrame` is an accessor pair on the prototype
+- `FixedFrameLoop` ignores an `fps` or `maxStepsPerFrame` the loop cannot run with, in the constructor as well as in the setters: an `fps` that is not finite or not greater than `0` keeps `DefaultFps`, a `maxStepsPerFrame` that is not a whole number of `1` or more keeps its value. The constructor holds the writable statics `DefaultFps` and `DefaultMaxStepsPerFrame` to the same rule: a default the loop cannot run with is ignored, and the loop starts at 60 fps and 5 steps per frame. `maxStepsPerFrame` is an accessor pair on the prototype
 - `getContentAreaSize()` takes any `Element`
 - every cursor style of `PanControl2D` has a style rule of its own, so controls with different `cursorPanStyle` in one root each show their own cursor, and a write to `cursorPanStyle` affects only the control written to — during a drag as well. A cursor rule is in the stylesheet only while a control shows it: a write to `cursorPanStyle` and `dispose()` give back the rule of the control
 - the protected `InputControlBase#addEventListener()` and `#removeEventListener()` take a typed callback, `((event: E) => void) | EventListenerObject` with `E extends Event`
-- `FrameBasedAnimations#add()` gives an animation added without a name one of its own — `anim_0`, `anim_1`, and so on, stepping over every name already registered. It goes into the same lookup as a name the caller picked, so `hasAnimation()` and `animId()` reach such an animation like any other. A caller who hands out names of that shape themselves meets the usual "must be unique" error when they ask for one the counter has already spent
+- `FrameBasedAnimations#add()` gives an animation added without a name, or with the empty string as its name, one of its own — `anim_0`, `anim_1`, and so on, stepping over every name already registered. It goes into the same lookup as a name the caller picked, so `hasAnimation()` and `animId()` reach such an animation like any other. A caller who hands out names of that shape themselves meets the usual "must be unique" error when they ask for one the counter has already spent
 - the guard of `FrameBasedAnimations#bakeDataTexture()` against a data texture wider than `FrameBasedAnimations.MaxTextureSize` names the numbers behind the refusal: how many frames in how many animations are registered, how wide the texture they ask for would be, and what the maximum is
 - `TileSetLoader`, `TextureImageLoader` and `TextureAtlasLoader` ask for `textureClasses` under one contract: `load()` reads `Array<TextureOptionClasses> | null | undefined`, `loadAsync()` an optional `Array<TextureOptionClasses> | null`. An absent value means an empty list at each of the three, so a caller with no classes to pass leaves the argument out or writes `null`, whichever of the loaders they hold
 - `ParallaxProjection#updateCamera()` and `OrthographicProjection#updateCamera()` apply the whole camera setup `createCamera()` applies: the field of view and aspect or the frustum, `near`, `far`, the direction of the projection plane and the position at its `distanceToProjectionPlane`. A camera of the wrong type is refused with a `TypeError` that names the class, the call and the type it got. The parameter is a `Camera`, as `IProjection#updateCamera()` has it. A camera set on `Stage2D#camera` is put back at the projection plane by every resize, since the stage calls `updateCamera()` on it as it does on its own. A projection that has no projection plane refuses the call with an `Error` naming what is missing, as `createCamera()` does: the direction and the position `updateCamera()` writes are read off that plane.
@@ -279,6 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameBasedAnimations.MaxTextureSize` is 8192, the `maxTextureDimension2D` every WebGPU device offers, and with it the upper bound of a `tileCount` in `FrameBasedAnimations#add()`. See the Migration Guide
 - `BakeTextureOptions#includeTextureSize` is optional
 - `TileSet#options` is a frozen copy of the options the tile set was built with, typed `Readonly<TileSetOptions>`, and `TextureResource#tileSetOptions` stores a frozen copy of what is written: a change to the object handed in reaches neither, and writing the same object again after a change builds a new tile set. See the Migration Guide
+- `TileSet#tileCount` and `TileSet#firstFrameId` are getters: the constructor lays the tiles out once, and a write to either does not compile and throws a `TypeError` in strict-mode code. See the Migration Guide
 - the `error` events of `TextureStore` and `TextureResource` reach every listener: eventize reports a listener that throws on the console, and the store or the resource goes on as it would without it — a `TextureStore#getAsync()` that waits on the resource hears the failure, and the other entries of an animation map are registered
 - a listener of `ready`, `resource:<id>` or `error` that throws inside `TextureStore#parse()` no longer reaches its caller: every listener hears its event, `parse()` runs to its end, and `loadAsync()` resolves with the store. See the Migration Guide
 - perf `TextureAtlas#randomFrameName()` and `randomFrameNames()` draw a name by its index in the order the names were added instead of walking the names up to it; `frameNames()` without an argument answers a copy of that list
@@ -333,6 +334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix a `stop()` or a `pause = true` that lands while `Display#start()` waits for the renderer or for its `beforeStartCallback`: the display does not start, and the promise resolves with it. A `pause = false` after it lets the start through
 - fix `Display#pause` before the first start: once `stop()` or `pause = true` has been called it answers `true` — also when that call keeps a pending `start()` from starting the display — until a `pause = false` or the next `start()` lets the display run
 - fix `Chronometer#update()`, `#start()` and `#stop()` with a time before the latest one the chronometer has seen: `deltaTime` is `0` and `time` stays where it is, across a pause as well, so `FixedFrameLoop#alpha` stays in `[0, 1)` when a frame timestamp lies before the start of the display
+- fix `Chronometer` with a `time` of `Infinity` or `-Infinity`: it counts as not given, as `NaN` does, the chronometer reads `performance.now() / 1000` in its place, and `time` stays finite
 - fix `TexturedSpritesMaterial` (and `AnimatedSpritesMaterial`, which builds on it): a sprite is scaled to its `quadSize` before it is rotated, so a sprite that is not square turns as the rectangle it is. The unit quad used to be rotated first and stretched afterwards, which drew a rotated sprite of 4 × 1 at a quarter turn as 4 × 1 again and every other angle as a parallelogram; flat sprites and billboards alike. Sprites without rotation, and square ones, draw exactly as before
 - fix `billboardVertexByInstancePosition()`, and with it `TexturedSpritesMaterial` and `AnimatedSpritesMaterial` with `renderAsBillboards`: a billboard faces the camera position also when its mesh or a parent of it is moved, turned or scaled evenly on all axes
 - fix the color of a `TexturedSprite`: `TexturedSpritesMaterial` multiplies what it draws by it, alpha included, so `setColor()` and `setColorValues()` tint the sprite; white, the color every sprite starts with, leaves it as it is. `AnimatedSpritesMaterial` does the same for a geometry with a `color` attribute; `AnimatedSprite` has none, so its sprites draw untinted
@@ -3243,6 +3245,22 @@ resource.tileSetOptions!.tileWidth = 32; // the tile set was not rebuilt
 
 ```ts
 resource.tileSetOptions = {...resource.tileSetOptions, tileWidth: 32};
+```
+
+#### `TileSet#tileCount` and `#firstFrameId` are read-only
+
+`TileSet#tileCount` and `TileSet#firstFrameId` are getters. The constructor lays the tiles out once and the layout does not change afterwards, so a write to either does not compile and throws a `TypeError` in strict-mode code. Name the number of tiles in the options of a new `TileSet`:
+
+**Before**
+
+```ts
+tileSet.tileCount = 8;
+```
+
+**After**
+
+```ts
+const tileSet = new TileSet(coords, {tileCount: 8});
 ```
 
 #### The `defaultOptions` of a `TextureFactory` lie over its seed

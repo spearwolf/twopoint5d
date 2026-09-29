@@ -1,4 +1,4 @@
-const getCurrentTime = (time?: number) => (typeof time === 'number' && !Number.isNaN(time) ? time : performance.now() / 1000);
+const getCurrentTime = (time?: number) => (typeof time === 'number' && Number.isFinite(time) ? time : performance.now() / 1000);
 
 /**
  * Wall-clock-aware time source with pause/resume support.
@@ -8,6 +8,10 @@ const getCurrentTime = (time?: number) => (typeof time === 'number' && !Number.i
  * (`performance.now() / 1000`) must use the **same unit**. The default unit
  * is seconds. If you pass milliseconds (or any other unit) to one method,
  * pass the same unit to all others — including the optional `maxDeltaTime`.
+ *
+ * A `time` that is not a finite number (`NaN`, `Infinity`, `-Infinity`) counts as not given, and
+ * the chronometer reads `performance.now() / 1000` in its place. That holds for the constructor,
+ * `update()`, `start()`, `stop()` and `reset()`.
  */
 export class Chronometer {
   #timeStart: number;

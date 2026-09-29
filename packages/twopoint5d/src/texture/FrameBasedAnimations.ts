@@ -60,8 +60,9 @@ export interface BakeTextureOptions {
 export type AnimationTimingOptions = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
 
 // the name is what tells one entry of an animation map from the next in an error message, and an
-// add() that was given none has nothing else to be recognized by
-const animNameInError = (name: AnimName | undefined): string => name?.toString() ?? '(no name)';
+// add() that was given none — or the empty string, which counts as none — has nothing else to be
+// recognized by
+const animNameInError = (name: AnimName | undefined): string => (name ? name.toString() : '(no name)');
 
 /**
  * Calculates the duration of an animation based on frame count and frame rate.
@@ -244,7 +245,9 @@ export class FrameBasedAnimations {
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
    * stepping over every name already taken — so it is reachable through `animId()` like
-   * any other. The counter moves for an animation that was registered: an `add()` that throws
+   * any other. The empty string counts as no name: an animation added under it gets a name of the
+   * counter too, `hasAnimation('')` answers `false`, and `animId('')` throws as it does for any
+   * name that was never registered. The counter moves for an animation that was registered: an `add()` that throws
    * spends no name.
    */
   add(
@@ -267,6 +270,7 @@ export class FrameBasedAnimations {
   ): number {
     let [name] = args;
 
+    // the empty string is no name, so there is nothing for the uniqueness check to compare
     if (name && this.#animations.has(name)) {
       throw new Error(
         `FrameBasedAnimations: add() got the name \`${animNameInError(name)}\`, which another animation already carries — an animation name must be unique`,
@@ -377,6 +381,7 @@ export class FrameBasedAnimations {
 
     // the counter hands out a name only once the animation can be built: an add() that throws
     // spends none, and the names follow the animations that were registered
+    // the empty string counts as no name
     if (!name) {
       name = this.#nextAnonymousName();
     }

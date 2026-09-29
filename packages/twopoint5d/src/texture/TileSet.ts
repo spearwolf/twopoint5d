@@ -63,9 +63,9 @@ const assertFits = (fits: boolean, message: () => string): void => {
 };
 
 /**
- * The [[TileSet]] maps _tileIds_ to _frameIds_.
- * Unlike the `frameId` of [[TextureAtlas]], the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
- * The `frameId` range of a [[TileSet]] starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
+ * The `TileSet` maps _tileIds_ to _frameIds_.
+ * Unlike the `frameId` of {@link TextureAtlas}, the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
+ * The `frameId` range of a `TileSet` starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
  *
  * `D` is the type of the frame data of its atlas: a `TileSet` over an atlas with a data type of its
  * own takes that type on. The frames the `TileSet` lays out itself carry no data.
@@ -81,12 +81,25 @@ export class TileSet<D = TextureAtlasFrameData> {
    */
   readonly options: Readonly<TileSetOptions>;
 
-  tileCount = 0;
+  #tileCount = 0;
+
+  #firstFrameId = -1;
 
   /**
-   * The `frameId` of the _first_ tile
+   * How many tiles the layout holds: the option `tileCount`, or as many as fit into the `baseCoords`
+   * when none is given. The constructor lays the tiles out once, and the number does not change afterwards.
    */
-  firstFrameId = -1;
+  get tileCount(): number {
+    return this.#tileCount;
+  }
+
+  /**
+   * The `frameId` of the _first_ tile. Set by the constructor; the frames of the tiles follow
+   * without a gap up to `lastFrameId`.
+   */
+  get firstFrameId(): number {
+    return this.#firstFrameId;
+  }
 
   /**
    * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
@@ -237,8 +250,8 @@ export class TileSet<D = TextureAtlasFrameData> {
 
       const frameId = this.atlas.add(coords);
 
-      if (this.firstFrameId === -1) {
-        this.firstFrameId = frameId;
+      if (this.#firstFrameId === -1) {
+        this.#firstFrameId = frameId;
       }
 
       ++tileCount;
@@ -260,6 +273,6 @@ export class TileSet<D = TextureAtlasFrameData> {
       }
     }
 
-    this.tileCount = tileCount;
+    this.#tileCount = tileCount;
   };
 }

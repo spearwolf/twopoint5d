@@ -39,6 +39,23 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animId('anim_0')).toBe(0);
     });
 
+    test('an animation added with the empty string as its name gets a name of the counter', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32), new TextureCoords(32, 0, 32, 32)];
+
+      const id = animations.add('', 0.5, frames);
+
+      expect(animations.hasAnimation('anim_0')).toBe(true);
+      expect(animations.animId('anim_0')).toBe(id);
+      expect(animations.hasAnimation('')).toBe(false);
+    });
+
+    test('a refusal of an animation with the empty string as its name calls it (no name)', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('', 1, [])).toThrow('`(no name)`');
+    });
+
     test('a second animation without a name gets the next name of the counter', () => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];

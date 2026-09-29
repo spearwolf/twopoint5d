@@ -90,11 +90,17 @@ export class VertexObjectDescriptor {
   }
 
   /**
-   * Written once, by the first `VertexObjectBuffer` built on this descriptor.
+   * Written once, by the first `VertexObjectBuffer` built on this descriptor; a second write
+   * throws and leaves the first prototype in place.
    *
    * @internal
    */
   set voPrototype(prototype: object) {
+    if (this.#voPrototype !== undefined) {
+      throw new Error(
+        'VertexObjectDescriptor: voPrototype is written once, by the first VertexObjectBuffer built on this descriptor, and this descriptor has one already',
+      );
+    }
     this.#voPrototype = prototype;
   }
 
@@ -248,8 +254,8 @@ export class VertexObjectDescriptor {
   }
 
   /**
-   * Throws when a property name of the vertex object appears on the `basePrototype`, neither as an
-   * own property nor inherited from a prototype below `Object.prototype` — rule 9 of the
+   * Throws when a property name of the vertex object appears on the `basePrototype`, as an
+   * own property or inherited from a prototype below `Object.prototype` — rule 9 of the
    * constructor. A pool built on a descriptor that exists already calls it again: a `basePrototype`
    * is behaviour its author may extend after the first pool, and a generated accessor would shadow
    * what was added there.

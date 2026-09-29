@@ -217,6 +217,19 @@ describe('VertexObjectDescriptor', () => {
       expect(descriptor.voPrototype, 'the buffer has built it').toBeDefined();
       expect(Object.keys(descriptor)).not.toContain('voPrototype');
     });
+
+    test('is written once: a second write throws and leaves the first prototype in place', () => {
+      const descriptor = makeDescriptorWithPrototype();
+      const prototype = descriptor.voPrototype;
+
+      expect(() => {
+        descriptor.voPrototype = {};
+      }).toThrow(/written once/);
+      expect(descriptor.voPrototype).toBe(prototype);
+
+      expect(() => new VertexObjectBuffer(descriptor, 1)).not.toThrow();
+      expect(descriptor.voPrototype).toBe(prototype);
+    });
   });
 
   describe('refuses a description the layout cannot hold', () => {
