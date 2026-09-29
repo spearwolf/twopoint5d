@@ -43,10 +43,17 @@ import {description, title} from './_stage-projections.json';
   import GUI from 'lil-gui';
   import assetsUrl from '~demos/utils/assetsUrl';
 
+  type SharedSpecs = {
+    fit: 'contain' | 'cover' | 'fill';
+    width: number;
+    height: number;
+    distanceToProjectionPlane: number;
+  };
+
   // one specs object for both projections: they keep the object they are given, so a write to
   // `fit` reaches both, and `needsUpdate` on the stages applies it in the next frame.
   // 300 keeps the camera of the orthographic projection behind the near layer at z = 150
-  const specs: {fit: 'contain' | 'cover' | 'fill'; width: number; height: number; distanceToProjectionPlane: number} = {
+  const specs: SharedSpecs = {
     fit: 'contain',
     width: 800,
     height: 600,

@@ -84,21 +84,20 @@ export interface StageRenderer extends EventizedObject {}
  *
  * ## Clearing
  *
- * {@link clear} is the only clear of the target this renderer writes to
- * (default `false`). When `clear` is
- * `true`, the renderer clears the active render target before drawing its
- * stages, using {@link clearColor} / {@link clearAlpha} and the
- * `clearColorBuffer` / `clearDepthBuffer` / `clearStencilBuffer` flags.
+ * {@link clear} is the only clear of the target this renderer writes to (default
+ * `false`). When `clear` is `true`, the renderer clears the active render target
+ * before drawing its stages, using {@link clearColor} / {@link clearAlpha} and
+ * the `clearColorBuffer` / `clearDepthBuffer` / `clearStencilBuffer` flags.
  *
  * While the stages draw, `renderer.autoClear` is `false`, whatever the caller
  * set, and it is restored afterwards. With `clear = false` nothing clears the
  * target, and frames accumulate unless something else clears it.
  *
  * With a {@link pipeline} that is not a `RootRenderPipeline` and without
- * {@link buildOutputNode} (Mode C), the stages draw into an internal target that the renderer clears to transparent
- * black (color and depth) every frame, whatever `clear` says; the own
- * `clear` then applies on top, and one that covers color and depth replaces
- * the black clear.
+ * {@link buildOutputNode} (Mode C), the stages draw into an internal target
+ * that the renderer clears to transparent black (color and depth) every frame,
+ * whatever `clear` says; the own `clear` then applies on top, and one that
+ * covers color and depth replaces the black clear.
  *
  * Setting `clearColor` to a non-null value also sets `clear = true` as a
  * convenience. Multiple stages are drawn additively into the same target —
@@ -495,11 +494,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `pipeline.outputColorTransform` is `true` — just as on the canvas. A
    * renderer that a parent draws into a target of the parent's own pipeline
    * writes linear in both cases; the outermost pipeline applies the transform.
-   * Under a Mode C parent — a pipeline without `buildOutputNode` that is not
-   * a `RootRenderPipeline` — a child
-   * writes linear into its own `outputRenderTarget` as well: the parent
-   * switches to linear output for all of its stage draws, whichever target
-   * they write to.
+   * Under a Mode C parent — a pipeline without `buildOutputNode` that is not a
+   * `RootRenderPipeline` — a child writes linear into its own
+   * `outputRenderTarget` as well: the parent switches to linear output for all
+   * of its stage draws, whichever target they write to.
    */
   outputRenderTarget?: RenderTarget;
 
@@ -516,10 +514,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * target, sample as `texture()`".
    *
    * Assigning or clearing it switches between the two pipeline modes; the
-   * output node is rebuilt on the next render. Under a `RootRenderPipeline`
-   * the renderer composes either way. While this renderer's `width`
-   * or `height` is 0, or while a `Stage2D` it composes has no camera, the
-   * composed mode draws nothing. Without a stage it draws its own clear and calls neither this
+   * output node is rebuilt on the next render. Under a `RootRenderPipeline` the
+   * renderer composes either way. While this renderer's `width` or `height` is
+   * 0, or while a `Stage2D` it composes has no camera, the composed mode draws
+   * nothing. Without a stage it draws its own clear and calls neither this
    * callback nor the pipeline. Assigning it to a renderer whose pipeline
    * samples the internal target releases the GPU memory of that target;
    * clearing it again allocates that memory again on the next frame.
@@ -602,9 +600,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #internalOutputNode?: Node;
   #internalOutputTexture?: Texture;
   /**
-   * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their
-   * order or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only the
-   * composed mode reads it; Mode C keeps its own node, see `#wireInternalOutputNode()`.
+   * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their order
+   * or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only
+   * the composed mode reads it; Mode C keeps its own node, see `#wireInternalOutputNode()`.
    */
   #outputDirty = true;
 
@@ -822,11 +820,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Mode D, and Mode E for nested renderers: for each stage, get its pass node; pre-render nested
-   * `StageRenderer` children into their pass-targets first, with linear
-   * output (see `#beginLinearOutput()`). Then run the pipeline with
-   * `buildOutputNode(passes)` as `outputNode`; it applies the output
-   * transform of the caller. Without a stage it draws its own clear and neither builds an output
-   * node nor runs the pipeline.
+   * `StageRenderer` children into their pass-targets first, with linear output (see
+   * `#beginLinearOutput()`). Then run the pipeline with `buildOutputNode(passes)` as `outputNode`;
+   * it applies the output transform of the caller. Without a stage it draws its own clear and
+   * neither builds an output node nor runs the pipeline.
    */
   #renderPipelineComposed(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     if (!this.#canCompose(stages)) return;
@@ -979,9 +976,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * event follows it. A listener of the event that throws does not hold up the teardown: every
    * subscriber hears the event, the renderer is torn down completely, and the error reaches the
    * caller afterwards — one unchanged, several as an `AggregateError`. Every listener on this
-   * renderer goes with it, including the
-   * `OnStageAdded` and `OnStageRemoved` subscriptions a caller placed on it, and so do the
-   * camera, scene and dispose listeners it placed on its stages (through `remove()`).
+   * renderer goes with it, including the `OnStageAdded` and `OnStageRemoved` subscriptions a
+   * caller placed on it, and so do the camera, scene and dispose listeners it placed on its
+   * stages (through `remove()`).
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,

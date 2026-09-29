@@ -67,9 +67,9 @@ export class ParallaxProjection implements IProjection {
    * number above 0 leaves the projection as it is. Specs that give no view with an area keep the
    * last view, while the pixel ratio follows the new container; a projection that has no view yet
    * stays as it is. Until the first call that gives a view with an area, `getViewRect()` reports
-   * `{width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0}`. A call that gives a view with an area also takes `near`, `far` and
-   * `distanceToProjectionPlane` from the specs; a value no camera can be built from counts as not
-   * given, as `ParallaxProjectionSpecs` describes.
+   * `{width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0}`. A call that gives a view with an area
+   * also takes `near`, `far` and `distanceToProjectionPlane` from the specs; a value no camera can
+   * be built from counts as not given, as `ParallaxProjectionSpecs` describes.
    */
   updateViewRect(width: number, height: number): void {
     // a container without area has no aspect ratio to fit a view into, and a view without area

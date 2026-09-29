@@ -210,12 +210,13 @@ Buffer-level control: `clearColorBuffer`, `clearDepthBuffer`,
 arguments of `WebGPURenderer.clear()`.
 
 When the renderer has a `pipeline` without `buildOutputNode` that is not a
-`RootRenderPipeline` (Mode C), the **internal target** is cleared in full to transparent black every frame,
-color and depth, so frame content does not accumulate. With `clear = true`
-your own clear applies after that; one that covers color and depth
-(`clearColorBuffer` and `clearDepthBuffer` both `true`) replaces the black
-clear. A target borrowed from an `internalTargetPool` is cleared the same way,
-so nothing of the renderer that borrowed it before stays in it.
+`RootRenderPipeline` (Mode C), the **internal target** is cleared in full to
+transparent black every frame, color and depth, so frame content does not
+accumulate. With `clear = true` your own clear applies after that; one that
+covers color and depth (`clearColorBuffer` and `clearDepthBuffer` both
+`true`) replaces the black clear. A target borrowed from an
+`internalTargetPool` is cleared the same way, so nothing of the renderer that
+borrowed it before stays in it.
 
 The **pass-target of a nested `StageRenderer`** — the one its parent samples
 through `asPassNode()` — is cleared by the parent every frame to transparent
@@ -246,17 +247,16 @@ sr.outputRenderTarget = offscreen;
 
 Combines with `pipeline` — the post-pass output also lands in the target.
 
-Without a pipeline, the stages draw into the target linear in the working
-color space and without tone mapping, as three.js draws into every
-`RenderTarget`. With a pipeline, its output transform applies — tone mapping
-and the encoding to `renderer.outputColorSpace`, as long as
-`pipeline.outputColorTransform` is `true` — just as on the canvas. A renderer
-that a parent draws into a target of the parent's own pipeline writes linear
-in both cases; the outermost pipeline applies the transform. Under a Mode C
-parent (a `pipeline` without `buildOutputNode` that is not a
-`RootRenderPipeline`), a child writes linear into
-its own `outputRenderTarget` as well: the parent switches to linear output for
-all of its stage draws, whichever target they write to.
+Without a pipeline, the stages draw into the target linear in the working color
+space and without tone mapping, as three.js draws into every `RenderTarget`.
+With a pipeline, its output transform applies — tone mapping and the encoding to
+`renderer.outputColorSpace`, as long as `pipeline.outputColorTransform` is
+`true` — just as on the canvas. A renderer that a parent draws into a target of
+the parent's own pipeline writes linear in both cases; the outermost pipeline
+applies the transform. Under a Mode C parent (a `pipeline` without
+`buildOutputNode` that is not a `RootRenderPipeline`), a child writes linear
+into its own `outputRenderTarget` as well: the parent switches to linear output
+for all of its stage draws, whichever target they write to.
 
 ---
 
@@ -295,8 +295,8 @@ sr.pipeline = new RenderPipeline(display.renderer!);
 The pipeline writes to `outputRenderTarget` if set, otherwise the canvas.
 
 The output node is rebuilt only for a new `pipeline` or after
-`invalidateOutputNode()`; stages, `renderOrder`, stage names, scenes and
-cameras leave it standing. The internal target has the type and the samples of the
+`invalidateOutputNode()`; stages, `renderOrder`, stage names, scenes and cameras
+leave it standing. The internal target has the type and the samples of the
 renderer (`renderer.getOutputBufferType()`, `renderer.samples`), the values
 three.js' `PassNode` gives the pass targets of Mode D.
 
@@ -541,9 +541,10 @@ class MyStage implements IStage, IRenderable, IPassProvider {
 
 A `StageRenderer` takes a stage out by itself when the stage announces its
 end: an eventized stage (`eventize(this)` from `@spearwolf/eventize`) that
-emits `OnStageDispose` (`'dispose'`) in its `dispose()`, as `Stage2D` does. Take any other stage
-out of every renderer that holds it — `remove(stage)` — before you call its
-`dispose()`. A stage whose `isDisposed` is `true` is refused by `add()`.
+emits `OnStageDispose` (`'dispose'`) in its `dispose()`, as `Stage2D` does.
+Take any other stage out of every renderer that holds it — `remove(stage)` —
+before you call its `dispose()`. A stage whose `isDisposed` is `true` is
+refused by `add()`.
 
 ---
 
@@ -652,9 +653,9 @@ What this layer does on top of the general rules in
   it out on its `OnStageDispose`, even behind a listener of that event that throws.
 - `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material starts
   out with and the texture the stage built last from the canvas — each earlier one was released
-  when its successor took its place —, its `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
-  canvas handed to the constructor alone. The sprite geometry is shared by every `THREE.Sprite`
-  of the module and stays.
+  when its successor took its place —, its `StageRenderer` and the `Stage2D` its constructor
+  built, and leaves the `WebGPURenderer` and a canvas handed to the constructor alone. The sprite
+  geometry is shared by every `THREE.Sprite` of the module and stays.
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
   handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
   The field is gone as soon as `dispose()` returns; the renderer itself is released once its
@@ -677,17 +678,17 @@ What this layer does on top of the general rules in
 
 - **Double frame loop**: passing `display` to the constructor *and* calling
   `renderTo` from your own handler renders every frame twice. Pick one.
-- **Stage with no camera yet**: `Stage2D#renderTo` is a no-op until the
-  first `resize()` with a width and a height that are finite numbers above
-  0, for which the projection's specs give a view with an area, creates the
-  camera (or you assign your own). `Stage2D#asPassNode` throws in that
-  state, and a `StageRenderer` composing pass nodes draws nothing while it
-  has no area or while one of its `Stage2D`s has no camera, and without a stage only its
-  clear. Until then its `width` and
-  `height` are 0, and assigning another `projection` — or `undefined` — puts
-  them back to 0 until the new projection gives a view. The camera the previous
-  projection created goes with them; a camera you assigned to `stage.camera`
-  stays, and the new projection places it once it gives a view.
+- **Stage with no camera yet**: `Stage2D#renderTo` is a no-op until the first
+  `resize()` with a width and a height that are finite numbers above 0, for
+  which the projection's specs give a view with an area, creates the camera (or
+  you assign your own). `Stage2D#asPassNode` throws in that state, and a
+  `StageRenderer` composing pass nodes draws nothing while it has no area or
+  while one of its `Stage2D`s has no camera, and without a stage only its clear.
+  Until that first `resize()` the stage's `width` and `height` are 0, and
+  assigning another `projection` — or `undefined` — puts them back to 0 until
+  the new projection gives a view. The camera the previous projection created
+  goes with them; a camera you assigned to `stage.camera` stays, and the new
+  projection places it once it gives a view.
 - **Non-unique stage names + `renderOrder`**: stages sharing a name that
   `renderOrder` lists render at that name's position in the order they were
   added. The renderer warns about such a name on `add()` and on every write

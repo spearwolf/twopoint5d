@@ -353,10 +353,10 @@ export class PanControl2D extends InputControlBase {
    * fields, the keys and the pointer, and writes them into this very object. Assigning
    * `undefined` puts a fresh state at `0, 0` in its place.
    *
-   * The first `update()` after a state is assigned — in the constructor through
-   * `options.state`, or here — emits `OnPanControl2DUpdate` even when nothing moved, so a listener learns
-   * where the view starts. Assigning the state this control already holds changes nothing:
-   * before that first `update()` the announcement stays due, after it none is added.
+   * The first `update()` after a state is assigned — in the constructor through `options.state`, or
+   * here — emits `OnPanControl2DUpdate` even when nothing moved, so a listener learns where the
+   * view starts. Assigning the state this control already holds changes nothing: before that first
+   * `update()` the announcement stays due, after it none is added.
    */
   get panView(): PanViewState {
     return this.#panView;
@@ -440,9 +440,9 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
-   * Move {@link panView} by what the speed fields, the keys and the pointer collected since
-   * the last call, and emit `OnPanControl2DUpdate` with the new `x` and `y` when that moved the view — and
-   * on the first call after a state was assigned to {@link panView}, whether it moved or not.
+   * Move {@link panView} by what the speed fields, the keys and the pointer collected since the
+   * last call, and emit `OnPanControl2DUpdate` with the new `x` and `y` when that moved the view —
+   * and on the first call after a state was assigned to {@link panView}, whether it moved or not.
    *
    * @param t delta time since last `update()` call in seconds
    */
@@ -688,16 +688,15 @@ export class PanControl2D extends InputControlBase {
    * stylesheet for as long as another control in the same root shows the same cursor style.
    *
    * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
-   * reaches this control any more. {@link update} still moves {@link panView} by the speed
-   * fields a caller sets by hand; a key that was still held down when `dispose()` ran has given
-   * its field back, and what it no longer delivers is a pan from a drag before the call. A
-   * write to {@link cursorPanStyle} is refused: a disposed control retains no more rules from
-   * a stylesheet that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`,
-   * `keyboardDisabled`, `pointerDisabled`,
-   * `panView` and the four `speed…` fields still take values, they just drive nothing. A
-   * control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor` while its subscribers
-   * can still hear it; after that every listener on this control goes with it, and a further
-   * `dispose()` does nothing.
+   * reaches this control any more. {@link update} still moves {@link panView} by the speed fields a
+   * caller sets by hand; a key that was still held down when `dispose()` ran has given its field
+   * back, and what it no longer delivers is a pan from a drag before the call. A write to
+   * {@link cursorPanStyle} is refused: a disposed control retains no more rules from a stylesheet
+   * that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`, `keyboardDisabled`,
+   * `pointerDisabled`, `panView` and the four `speed…` fields still take values, they just drive
+   * nothing. A control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor`
+   * while its subscribers can still hear it; after that every listener on this control goes with
+   * it, and a further `dispose()` does nothing.
    */
   override dispose(): void {
     if (this.isDisposed) return;

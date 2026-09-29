@@ -196,9 +196,10 @@ export class Canvas2DStage {
   #frameNo = 0;
 
   /**
-   * Draws one frame, in this order: `OnCanvas2DStageResize` if the canvas size changed since the last
-   * frame, `OnCanvas2DStageRender` — the moment to draw into the canvas and set `needsUpdate` —, the
-   * upload of the canvas, `stageRenderer.updateFrame()` and `stageRenderer.renderTo()`.
+   * Draws one frame, in this order: `OnCanvas2DStageResize` if the canvas size changed since the
+   * last frame, `OnCanvas2DStageRender` — the moment to draw into the canvas and set
+   * `needsUpdate` —, the upload of the canvas, `stageRenderer.updateFrame()` and
+   * `stageRenderer.renderTo()`.
    *
    * The values typically come from the `DisplayEventProps` of `OnDisplayRenderFrame`. Called
    * without them, the stage takes all three from a clock of its own: the first such call passes
@@ -265,19 +266,18 @@ export class Canvas2DStage {
    * one geometry across every sprite of the module; it is not this stage's to release.
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
-   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do
-   * nothing. `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the
-   * values the stage was left with. {@link width} and {@link height} read `canvas.width` and
-   * `canvas.height`, so they keep answering with whatever stands at the canvas — including what
-   * the caller sets there later. The `readonly` fields {@link stage} and {@link stageRenderer}
-   * answer with the same instance as before, and both of them report `isDisposed === true`. An
-   * `OnCanvas2DStageDispose` goes out to every subscriber before this stage stops listening; no event
-   * follows it.
+   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing.
+   * `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the values the
+   * stage was left with. {@link width} and {@link height} read `canvas.width` and `canvas.height`,
+   * so they keep answering with whatever stands at the canvas — including what the caller sets
+   * there later. The `readonly` fields {@link stage} and {@link stageRenderer} answer with the same
+   * instance as before, and both of them report `isDisposed === true`. An `OnCanvas2DStageDispose`
+   * goes out to every subscriber before this stage stops listening; no event follows it.
    *
-   * A listener of `OnCanvas2DStageDispose` that throws does not hold up the teardown: every subscriber
-   * hears the event, the instance is torn down completely, and the error reaches the caller
-   * afterwards — one unchanged, several as an `AggregateError`. That holds for the `OnStageDispose`
-   * listeners of the {@link StageRenderer} and the {@link Stage2D} as well.
+   * A listener of `OnCanvas2DStageDispose` that throws does not hold up the teardown: every
+   * subscriber hears the event, the instance is torn down completely, and the error reaches the
+   * caller afterwards — one unchanged, several as an `AggregateError`. That holds for the
+   * `OnStageDispose` listeners of the {@link StageRenderer} and the {@link Stage2D} as well.
    */
   dispose(): void {
     if (this.#disposed) return;

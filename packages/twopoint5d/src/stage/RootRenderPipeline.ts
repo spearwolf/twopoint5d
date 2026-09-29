@@ -20,8 +20,9 @@ export class RootRenderPipeline extends RenderPipeline {
   }
 
   /**
-   * Additively combine `passes` (`p0.add(p1).add(p2)…`) into a single
-   * output node. Throws when `passes` is empty; a `StageRenderer` without stages does not call it.
+   * Additively combine `passes` (`p0.add(p1).add(p2)…`) into a single output
+   * node. Throws when `passes` is empty; a `StageRenderer` without stages does
+   * not call it.
    */
   static buildOutputNode(passes: Node[]): Node {
     if (passes.length === 0) {

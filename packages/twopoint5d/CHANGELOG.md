@@ -3401,10 +3401,9 @@ on(stage, OnStageUpdateFrame, (props: StageUpdateFrameProps) => frames.push({...
 `StageRenderer#add()` makes a renderer it adds the child of the renderer it joins, exactly as
 `child.parent = root` does: `parent` answers that renderer, and the child gets its `OnAddToParent`.
 A renderer has one holder. Adding it to a second renderer takes it out of the first, and attaching
-it to a host takes it out of the renderer that held it — a renderer that loses the child hears of
-it through `remove()`, with its `OnStageRemoved`. A child that was meant to be driven twice per
-frame, by two renderers or by a renderer and the display, is driven once, by the holder it joined
-last.
+it to a host takes it out of the renderer that held it — a renderer that loses the child hears of it
+through `remove()`, with its `OnStageRemoved`. A child that was meant to be driven twice per frame,
+by two renderers or by a renderer and the display, is driven once, by the holder it joined last.
 
 **Before**
 
