@@ -1,6 +1,9 @@
-import {describe, expect, test} from 'vitest';
-import {TextureAtlas} from './TextureAtlas.js';
+import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
+import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
+import type {TexturePackerFrameData} from './TexturePackerJson.js';
+import {TileSet} from './TileSet.js';
 
 const Bar = Symbol('bar');
 const NO_LONGER_BE_A_COINCIDENCE = 23;
@@ -23,7 +26,7 @@ describe('TextureAtlas', () => {
       expect(atlas.size).toBe(1);
     });
     test('with coords + data', () => {
-      const atlas = new TextureAtlas();
+      const atlas = new TextureAtlas<{foo?: number; bar?: number; abc?: string}>();
       const texCoords = new TextureCoords();
 
       const frameId = atlas.add(texCoords, {foo: 123, abc: 'xyz'});
@@ -57,7 +60,7 @@ describe('TextureAtlas', () => {
       expect(atlas.frameId(Bar)).toBe(frameId1);
     });
     test('with name + coords + data', () => {
-      const atlas = new TextureAtlas();
+      const atlas = new TextureAtlas<{foo?: number; bar?: number; abc?: string}>();
       const texCoords0 = new TextureCoords();
       const texCoords1 = new TextureCoords();
 
@@ -162,6 +165,41 @@ describe('TextureAtlas', () => {
       expect(Array.isArray(names)).toBeTruthy();
       expect(names).toEqual(['foo', Bar, 'img_001', 'img_002']);
     });
+    describe('a RegExp with the g or the y flag', () => {
+      const walkAtlas = () => {
+        const atlas = new TextureAtlas();
+        for (const name of ['walk.1', 'walk.2', 'walk.3', 'walk.4']) atlas.add(name, new TextureCoords());
+        return atlas;
+      };
+
+      test('with g, every name is tested from its start', () => {
+        const atlas = walkAtlas();
+        const regex = /walk/g;
+
+        expect(atlas.frameNames(regex)).toEqual(['walk.1', 'walk.2', 'walk.3', 'walk.4']);
+        // the same RegExp object a second time
+        expect(atlas.frameNames(regex)).toEqual(['walk.1', 'walk.2', 'walk.3', 'walk.4']);
+      });
+
+      test('the RegExp handed in keeps its lastIndex', () => {
+        const atlas = walkAtlas();
+        const regex = /walk/g;
+        regex.lastIndex = 3;
+
+        atlas.frameNames(regex);
+
+        expect(regex.lastIndex).toBe(3);
+      });
+
+      test('with y, a name matches only where the match begins at its start', () => {
+        const atlas = new TextureAtlas();
+        atlas.add('walk.1', new TextureCoords());
+        atlas.add('mywalk.1', new TextureCoords());
+        atlas.add('walk.2', new TextureCoords());
+
+        expect(atlas.frameNames(/walk/y)).toEqual(['walk.1', 'walk.2']);
+      });
+    });
   });
   test('randomFrameId', () => {
     const atlas = new TextureAtlas();
@@ -256,6 +294,79 @@ describe('TextureAtlas', () => {
       expect(atlas.frameId('first')).toBe(0);
       expect(atlas.frameId('not-assigned')).toBeUndefined();
       expect(atlas.frame('not-assigned')).toBeUndefined();
+    });
+  });
+
+  describe('randomFrameName() draws a name by its index', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    test('the name at the index the draw lands on, in the order the names were added', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('foo', new TextureCoords());
+      atlas.add(new TextureCoords());
+      atlas.add(Bar, new TextureCoords());
+      atlas.add('img_001', new TextureCoords());
+
+      const random = vi.spyOn(Math, 'random');
+
+      // three names, so a draw of 0.4 lands on index 1 and one of 0.9 on index 2
+      random.mockReturnValue(0);
+      expect(atlas.randomFrameName()).toBe('foo');
+      random.mockReturnValue(0.4);
+      expect(atlas.randomFrameName()).toBe(Bar);
+      random.mockReturnValue(0.9);
+      expect(atlas.randomFrameName()).toBe('img_001');
+    });
+
+    test('an atlas without named frames has no name to draw', () => {
+      const atlas = new TextureAtlas();
+      atlas.add(new TextureCoords());
+
+      expect(atlas.randomFrameName()).toBeUndefined();
+    });
+
+    test('a change to the array frameNames() answers leaves the atlas alone', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('foo', new TextureCoords());
+      atlas.add('bar', new TextureCoords());
+
+      const names = atlas.frameNames();
+      names.length = 0;
+      names.push('baz');
+
+      expect(atlas.frameNames()).toEqual(['foo', 'bar']);
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      expect(atlas.randomFrameName()).toBe('foo');
+    });
+  });
+
+  describe('the type of the frame data', () => {
+    test('an atlas that names no type carries the entry of a TexturePacker json', () => {
+      const atlas = new TextureAtlas();
+
+      expectTypeOf(atlas.get(0)).toEqualTypeOf<TextureAtlasFrame<TexturePackerFrameData> | undefined>();
+      // @ts-expect-error — data of another shape needs an atlas that names its type
+      atlas.add('a', new TextureCoords(), {foo: 1});
+    });
+
+    test('an atlas that names a type of its own carries that type', () => {
+      const atlas = new TextureAtlas<{foo: number}>();
+      atlas.add('a', new TextureCoords(0, 0, 4, 4), {foo: 1});
+
+      expectTypeOf(atlas.get(0)?.data).toEqualTypeOf<{foo: number} | undefined>();
+      expect(atlas.get(0)?.data).toEqual({foo: 1});
+
+      const tileSet = new TileSet(atlas, new TextureCoords(0, 0, 4, 4), {tileWidth: 1, tileHeight: 1});
+      expectTypeOf(tileSet.frame(1).data).toEqualTypeOf<{foo: number} | undefined>();
+    });
+
+    test('an atlas that names a type of its own goes into FrameBasedAnimations#add()', () => {
+      const atlas = new TextureAtlas<{foo: number}>();
+      atlas.add('walk.1', new TextureCoords(0, 0, 4, 4), {foo: 1});
+
+      expect(new FrameBasedAnimations().add('walk', 1, atlas, 'walk')).toBe(0);
     });
   });
 

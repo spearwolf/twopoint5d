@@ -1,3 +1,4 @@
+import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
@@ -21,7 +22,19 @@ export interface BakeTextureOptions {
    * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake with a
    * trimmed frame.
    */
-  includeTextureSize: boolean;
+  includeTextureSize?: boolean;
+  /**
+   * The widest data texture the bake may build, in texels — a whole number of 1 or more. It takes
+   * the place of the limit of `renderer` and of {@link FrameBasedAnimations.MaxTextureSize}.
+   */
+  maxTextureSize?: number;
+  /**
+   * The renderer the data texture is meant for. Without a `maxTextureSize` the bake reads the limit
+   * of its device — `maxTextureDimension2D` of a WebGPU device, `MAX_TEXTURE_SIZE` of a WebGL2
+   * context. A renderer that has not been initialized has no device to ask, and the bake falls back
+   * to {@link FrameBasedAnimations.MaxTextureSize}.
+   */
+  renderer?: WebGPURenderer;
 }
 
 /**
@@ -121,6 +134,33 @@ const getBufferSize = (
   return bufSize;
 };
 
+const isTextureSize = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1;
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+// The limit of the device behind `renderer`, or `undefined` when it names none. `@types/three`
+// types `renderer.backend` as a plain `Backend`, so the device is read through `unknown`: the
+// `device` of a WebGPU backend — `null` until `init()` has run — or the `gl` context of the WebGL2
+// fallback. An optional limit must not stop a bake, so a renderer that throws on the way names none.
+const readMaxTextureSize = (renderer: WebGPURenderer): number | undefined => {
+  try {
+    const backend: unknown = renderer.backend;
+    if (!isObject(backend)) return undefined;
+    const {device, gl} = backend;
+    let limit: unknown;
+    if (isObject(device)) {
+      const {limits} = device;
+      limit = isObject(limits) ? limits['maxTextureDimension2D'] : undefined;
+    } else if (isObject(gl)) {
+      const {getParameter, MAX_TEXTURE_SIZE} = gl;
+      limit = typeof getParameter === 'function' ? getParameter.call(gl, MAX_TEXTURE_SIZE) : undefined;
+    }
+    return isTextureSize(limit) ? limit : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const renderFloatsBuffer = (
   floatsBuffer: Float32Array,
   names: AnimName[],
@@ -155,7 +195,14 @@ const renderFloatsBuffer = (
 };
 
 export class FrameBasedAnimations {
-  static MaxTextureSize = 16384;
+  /**
+   * The widest data texture a bake builds when it is told no limit: 8192 texels, the
+   * `maxTextureDimension2D` every WebGPU device offers. A WebGL2 device offers only 2048 — a bake
+   * that is handed its renderer, `bakeDataTexture({renderer})`, gets the limit of that device.
+   *
+   * It is also the upper bound of a `tileCount` in {@link FrameBasedAnimations.add}.
+   */
+  static MaxTextureSize = 8192;
 
   #animations: AnimationsMap = new Map();
 
@@ -206,17 +253,17 @@ export class FrameBasedAnimations {
       | [
           name: AnimName | undefined,
           timing: number | AnimationTimingOptions,
-          atlas: TextureAtlas,
+          atlas: TextureAtlas<unknown>,
           frameNameQuery?: string | RegExp,
         ]
       | [
           name: AnimName | undefined,
           timing: number | AnimationTimingOptions,
-          tileSet: TileSet,
+          tileSet: TileSet<unknown>,
           firstTileId?: number,
           tileCount?: number,
         ]
-      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, tileSet: TileSet, tileIds: number[]]
+      | [name: AnimName | undefined, timing: number | AnimationTimingOptions, tileSet: TileSet<unknown>, tileIds: number[]]
   ): number {
     let [name] = args;
 
@@ -396,10 +443,27 @@ export class FrameBasedAnimations {
    *   `includeTextureSize` is set or a registered frame carries `FLIP_DIAGONAL`, and `1` otherwise
    *   — the same for every animation of a bake
    *
+   * The texture is at most as wide as the device it is meant for can take: `options.maxTextureSize`
+   * when it is given, else the limit of the device of `options.renderer`, else
+   * {@link FrameBasedAnimations.MaxTextureSize}. A bake that needs a wider texture is refused with
+   * an error that names the frames, the width they ask for and the limit. A `maxTextureSize` that
+   * is no whole number of 1 or more is refused with a `RangeError`.
+   *
    * Every call builds a new `DataTexture` and keeps no reference to it: the caller owns it and
    * disposes it. A material it is handed to as `animsMap` borrows it and does not dispose it.
    */
   bakeDataTexture(options?: BakeTextureOptions): DataTexture {
+    const givenMaxTextureSize = options?.maxTextureSize;
+    if (givenMaxTextureSize !== undefined && !isTextureSize(givenMaxTextureSize)) {
+      throw new RangeError(
+        `FrameBasedAnimations: bakeDataTexture() got a maxTextureSize of ${describeValue(givenMaxTextureSize)} — a maxTextureSize is a whole number of 1 or more`,
+      );
+    }
+    const maxTextureSize =
+      givenMaxTextureSize ??
+      (options?.renderer ? readMaxTextureSize(options.renderer) : undefined) ??
+      FrameBasedAnimations.MaxTextureSize;
+
     const anims = Array.from(this.#animations.values());
     // a turned frame needs the second texel to carry its diagonal flip to the shader
     const hasTurnedFrame = anims.some(({frames}) => frames.some((coords) => coords.flipD));
@@ -407,7 +471,7 @@ export class FrameBasedAnimations {
     const hasTrimmedFrame = anims.some(({trims}) => trims.some((margins) => margins.some((margin) => margin !== 0)));
     const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
 
-    const bufSize = getBufferSize(this.#animations, texelsPerFrame, FrameBasedAnimations.MaxTextureSize);
+    const bufSize = getBufferSize(this.#animations, texelsPerFrame, maxTextureSize);
 
     const floatsBuffer = renderFloatsBuffer(new Float32Array(bufSize * 4), this.#names, this.#animations, texelsPerFrame);
 

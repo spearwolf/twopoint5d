@@ -1,7 +1,7 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
+import {ImageLoader, Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -333,6 +333,64 @@ describe('TextureResource', () => {
       expect(() => resource.dispose()).not.toThrow();
     });
 
+    test('dispose() tears the resource down whole behind a dispose listener that throws, and throws afterwards', async () => {
+      const {resource, textures} = await loadTexture('throwing', 'throwing');
+      const textureDispose = sandbox.spy(textures[0]!, 'dispose');
+
+      on(resource, 'dispose', () => {
+        throw new Error('boom');
+      });
+      const second = vi.fn();
+      on(resource, 'dispose', second);
+
+      expect(() => resource.dispose()).toThrow('boom');
+
+      expect(second).toHaveBeenCalledOnce();
+      expect(textureDispose.calledOnce).toBe(true);
+      expect(resource.texture).toBeUndefined();
+      expect(getSubscriptionCount(resource)).toBe(0);
+      expect(() => resource.dispose()).not.toThrow();
+      expect(textureDispose.calledOnce).toBe(true);
+    });
+
+    test('a dispose listener of the texture that throws does not hold up the teardown', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 8, height: 8}) as unknown as HTMLImageElement,
+      );
+      // a three.js texture of its own: its dispose() dispatches the dispose event of the texture
+      const factory = {create: () => new Texture()};
+
+      const resource = TextureResource.fromImage('texture-listener', 'texture-listener.png');
+      resource.activate();
+      resource.textureFactory = factory as never;
+      await flushMicrotasks();
+
+      const texture = resource.texture!;
+      expect(texture).toBeInstanceOf(Texture);
+
+      const resourceError = new Error('a dispose listener of the resource');
+      const textureError = new Error('a dispose listener of the texture');
+      on(resource, 'dispose', () => {
+        throw resourceError;
+      });
+      texture.addEventListener('dispose', () => {
+        throw textureError;
+      });
+
+      let thrown: unknown;
+      try {
+        resource.dispose();
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([resourceError, textureError]);
+      expect(resource.texture).toBeUndefined();
+      expect(getSubscriptionCount(resource)).toBe(0);
+      expect(() => resource.dispose()).not.toThrow();
+    });
+
     // (e) no signal or effect outlives the instance
     test('does not leak signals or effects', () => {
       const baselineSignals = getSignalsCount();
@@ -451,6 +509,36 @@ describe('TextureResource', () => {
       expect(errors[0]!.animation).toBe('walk');
       expect(errors.some((e) => e.source === 'texture')).toBe(false);
 
+      expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+
+      resource.dispose();
+    });
+
+    test('an error listener that throws keeps the report from no other listener, and the other entries of the animation map are registered', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        walk: {duration: 1, frameNameQuery: 'walk.*'},
+        run: {duration: 1, tileIds: [1, 2]},
+      });
+      resource.activate();
+
+      on(resource, 'error', () => {
+        throw new Error('an error listener that throws');
+      });
+      const errors: Array<{source: string; animation?: string}> = [];
+      on(resource, 'error', (payload: {source: string; animation?: string}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toMatchObject([{source: 'frameBasedAnimations', animation: 'walk'}]);
       expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
       expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
 
@@ -1560,6 +1648,50 @@ describe('TextureResource', () => {
       resource.dispose();
 
       expect(textures[0]!.disposed).toBe(true);
+    });
+  });
+
+  describe('tileSetOptions are kept as a frozen copy', () => {
+    const loadTileSet = async (options: {tileWidth: number; tileHeight: number}) => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', options);
+      resource.activate();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      return resource;
+    };
+
+    test('the same object written again after a change builds a new tile set with the new values', async () => {
+      const options = {tileWidth: 16, tileHeight: 16};
+      const resource = await loadTileSet(options);
+      const before = resource.tileSet!;
+      expect(before.tileWidth).toBe(16);
+
+      options.tileWidth = 32;
+      resource.tileSetOptions = options;
+
+      expect(resource.tileSet).not.toBe(before);
+      expect(resource.tileSet!.tileWidth).toBe(32);
+
+      resource.dispose();
+    });
+
+    test('a change to the object without a write leaves the tile set and the options as they were', async () => {
+      const options = {tileWidth: 16, tileHeight: 16};
+      const resource = await loadTileSet(options);
+      const before = resource.tileSet!;
+
+      options.tileWidth = 32;
+
+      expect(resource.tileSet).toBe(before);
+      expect(before.tileWidth).toBe(16);
+      expect(resource.tileSetOptions).toEqual({tileWidth: 16, tileHeight: 16});
+      expect(Object.isFrozen(resource.tileSetOptions)).toBe(true);
+
+      resource.dispose();
     });
   });
 

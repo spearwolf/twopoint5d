@@ -1,4 +1,4 @@
-import {emit, emitSafe, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
+import {emitSafe, emitStrict, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
@@ -9,6 +9,7 @@ import {
   loadFailureFor,
   type TextureImageSource,
   type TextureResourceLoadFailure,
+  throwCollected,
 } from './internals.js';
 import {
   assertTextureStoreData,
@@ -60,9 +61,12 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  * Public event-name constants emitted by `TextureStore`.
  *
  * - `Ready` (retained): fires once per `parse()` call after all signals have settled.
- *   Payload: the `TextureStore` instance.
+ *   Payload: the `TextureStore` instance. Every listener hears it and the retained value is
+ *   written, even behind one that throws.
  * - `RendererChanged` (retained): fires whenever `renderer` is reassigned (incl. `undefined`).
- *   Payload: the new `WebGPURenderer | undefined`.
+ *   Payload: the new `WebGPURenderer | undefined`. Every listener hears it and the retained
+ *   value is written, even behind one that throws; the throw goes on to whoever wrote
+ *   `renderer`.
  * - `Resource`: prefix for per-id events emitted as `resource:<id>` with every `parse()` that
  *   names the id. `onResource(id, cb)` gives the resource once, as soon as it is there;
  *   `on(id, type, cb)` follows its values across every `parse()`, a resource that takes the
@@ -73,10 +77,13 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  *   `fetch` covers a request that failed and a response that answered with a status;
  *   `parse` a body that is no JSON, a `parse()` that threw — data without an items object
  *   among it —, an item that builds no resource because it names no source or carries a
- *   field of the wrong type, and texture class names no `TextureFactory` knows, which are
- *   left out. The `atlas`, `image` and `texture` failures of a resource are emitted by
+ *   field of the wrong type, texture class names no `TextureFactory` knows, which are
+ *   left out, and a listener of the `dispose` event of a resource that `evictMissing` disposes
+ *   that throws. The `atlas`, `image` and `texture` failures of a resource are emitted by
  *   `TextureResource` and are subscribed there; {@link TextureStore.getAsync} is rejected on
- *   those that keep a value it asks for from arriving, as its TSDoc sets out.
+ *   those that keep a value it asks for from arriving, as its TSDoc sets out. An `error`
+ *   listener that throws takes the event from no other listener: eventize reports the throw on
+ *   the console.
  */
 export const TextureStoreEvents = {
   Ready: 'ready',
@@ -136,6 +143,9 @@ export interface TextureStoreParseOptions {
    *
    * Defaults to `false`, which keeps every resource until
    * {@link TextureStore.clearUnused} is called.
+   *
+   * A resource this disposes is removed even when a listener of its `dispose` event throws;
+   * that throw goes out as an `error` event with `source: 'parse'` and the id of the resource.
    */
   evictMissing?: boolean;
 
@@ -340,7 +350,9 @@ export class TextureStore {
 
     this.#renderer.onChange((renderer) => {
       this.#textureFactory.set(renderer ? new TextureFactory(renderer, []) : undefined);
-      emit(this, OnRendererChanged, renderer);
+      // every listener hears it and the retained value is written, even behind one that throws;
+      // the throw goes on to whoever wrote `renderer`
+      emitStrict(this, OnRendererChanged, renderer);
     });
 
     this.#textureFactory.onChange((factory) => {
@@ -450,7 +462,8 @@ export class TextureStore {
    * throws changes nothing of this: every listener hears the event, eventize reports the throw
    * on the console, and the promise rejects as described. A catalog item that
    * builds no resource and a texture class name no `TextureFactory` knows are `error` events
-   * only: the rest of the catalog is parsed, and the promise resolves.
+   * only: the rest of the catalog is parsed, and the promise resolves. A listener of the store
+   * that throws inside the parse changes nothing either — the promise resolves with the store.
    *
    * `options.signal` cuts the load short, and so does {@link TextureStore.dispose}: the fetch
    * is aborted, nothing is parsed, and no `error` event goes out. The promise rejects with an
@@ -617,6 +630,13 @@ export class TextureStore {
    * of the data. See {@link TextureStoreParseOptions.evictMissing} for what that count
    * covers, and what it does not.
    *
+   * A listener of `ready`, `resource:<id>` or `error` that throws changes nothing of the parse:
+   * every listener hears its event, eventize reports the throw on the console, and `parse()`
+   * goes on and returns as usual. `parse()` throws only for data it refuses before anything is
+   * written or emitted. A resource that `evictMissing` disposes is removed even when a listener
+   * of its `dispose` event throws; that throw goes out as an `error` event with
+   * `source: 'parse'` and the id of the resource.
+   *
    * On a disposed store this does nothing: no resource is built, and none is updated.
    */
   parse(data: TextureStoreData, options?: TextureStoreParseOptions) {
@@ -662,7 +682,7 @@ export class TextureStore {
       this.defaultTextureClasses = defaults.known;
     }
     if (defaults?.unknown.length) {
-      emit(this, OnError, {
+      emitSafe(this, OnError, {
         source: 'parse',
         error: new Error(
           `[TextureStore] defaultTextureClasses names ${listCatalogValues(defaults.unknown)}, which no TextureFactory knows — left out`,
@@ -674,14 +694,14 @@ export class TextureStore {
     for (const [id, item] of Object.entries(data.items)) {
       const why = skipped.get(id);
       if (why) {
-        emit(this, OnError, {source: 'parse', id, error: why});
+        emitSafe(this, OnError, {source: 'parse', id, error: why});
         continue;
       }
       if (item.texture === undefined) continue;
       const {known, unknown} = partitionTextureClasses(item.texture);
       itemClasses.set(id, known);
       if (unknown.length) {
-        emit(this, OnError, {
+        emitSafe(this, OnError, {
           source: 'parse',
           id,
           error: new Error(
@@ -773,10 +793,15 @@ export class TextureStore {
       }
     });
 
-    emit(this, OnReady, this);
+    // From here on the data is parsed and written, and a listener that throws changes nothing of
+    // it: emitSafe() lets every listener hear its event, reports the throw on the console, and the
+    // parse goes on to its end — the ready value is retained, every resource is announced, and
+    // evictMissing runs. A throw that reached the caller would tell loadAsync() the catalog had
+    // failed to parse
+    emitSafe(this, OnReady, this);
 
     updatedResources.forEach((resource) => {
-      emit(this, `${OnResource}:${resource.id}`, resource);
+      emitSafe(this, `${OnResource}:${resource.id}`, resource);
     });
 
     if (options?.evictMissing) {
@@ -786,8 +811,14 @@ export class TextureStore {
       const keep = new Set(updatedResources.map((resource) => resource.id));
       for (const [id, resource] of this.#resources) {
         if (keep.has(id) || resource.refCount > 0) continue;
-        resource.dispose();
+        // removed before it is disposed: a dispose listener that throws leaves no disposed
+        // resource behind in the store, and the throw goes out as an error of this parse
         this.#resources.delete(id);
+        try {
+          resource.dispose();
+        } catch (error) {
+          emitSafe(this, OnError, {source: 'parse', id, error});
+        }
       }
     }
   }
@@ -1068,16 +1099,28 @@ export class TextureStore {
   /**
    * Dispose all resources whose `refCount` is 0 and remove them from the store.
    * Returns the number of resources that were cleared.
+   *
+   * A listener of the `dispose` event of a resource that throws holds up none of the others:
+   * every unused resource is disposed and removed, and the throw goes on to the caller
+   * afterwards — several as an `AggregateError`.
    */
   clearUnused(): number {
     let removed = 0;
+    const errors: unknown[] = [];
     for (const [id, resource] of this.#resources) {
       if (resource.refCount <= 0) {
-        resource.dispose();
+        // removed before it is disposed: a dispose listener that throws leaves no disposed
+        // resource behind in the store and keeps the others from nothing
         this.#resources.delete(id);
         removed++;
+        try {
+          resource.dispose();
+        } catch (error) {
+          errors.push(error);
+        }
       }
     }
+    throwCollected(errors, 'TextureStore#clearUnused(): listeners of the dispose events of the resources it cleared threw');
     return removed;
   }
 
@@ -1098,6 +1141,10 @@ export class TextureStore {
    * {@link TextureStore.parse}, {@link TextureStore.on}, {@link TextureStore.onResource} and a
    * write to `renderer` do nothing. {@link TextureStore.defaultTextureClasses} keeps its last
    * value.
+   *
+   * A listener of the `dispose` event of this store or of one of its resources that throws does
+   * not hold up the teardown: every pending promise is rejected, every resource is disposed,
+   * and the throw goes on to the caller afterwards — several as an `AggregateError`.
    */
   dispose() {
     if (this.#disposed) return;
@@ -1106,8 +1153,15 @@ export class TextureStore {
     // the listeners are still attached here: this event is what tells them to let go,
     // and off(this) below is what makes it the last event this store ever emits — the
     // clean-up underneath gives the renderer up, and the change bridge would otherwise
-    // follow the dispose event with a rendererChanged
-    emit(this, OnDispose);
+    // follow the dispose event with a rendererChanged. A listener that throws does not hold up
+    // the teardown: its error waits until the store is down, so a caller that catches it holds
+    // a disposed store, not half of one
+    const errors: unknown[] = [];
+    try {
+      emitStrict(this, OnDispose);
+    } catch (error) {
+      errors.push(error);
+    }
     off(this);
 
     // before the resources go: no catalog fetch of this store outlives this call, and no
@@ -1115,12 +1169,18 @@ export class TextureStore {
     this.#disposal.abort();
 
     for (const resource of this.#resources.values()) {
-      resource.dispose();
+      try {
+        resource.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
     }
     this.#resources.clear();
     this.#images.clear();
 
     this.#renderer.set(undefined);
     SignalGroup.delete(this);
+
+    throwCollected(errors, 'TextureStore#dispose(): listeners of the dispose events of the store and of its resources threw');
   }
 }

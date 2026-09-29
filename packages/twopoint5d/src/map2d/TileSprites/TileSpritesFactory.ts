@@ -19,11 +19,11 @@ const positionScratch: [x: number, y: number, z: number] = [0, 0, 0];
 export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   readonly tileSprites: TileSprites;
 
-  tileSet?: TileSet;
+  tileSet?: TileSet<unknown>;
 
   tileDataProvider?: IMap2DTileDataProvider;
 
-  constructor(tileSprites: TileSprites, tileSet?: TileSet, tileDataProvider?: IMap2DTileDataProvider) {
+  constructor(tileSprites: TileSprites, tileSet?: TileSet<unknown>, tileDataProvider?: IMap2DTileDataProvider) {
     this.tileSprites = tileSprites;
     this.tileSprites.update();
     this.tileSet = tileSet;

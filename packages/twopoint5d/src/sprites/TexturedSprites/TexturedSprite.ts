@@ -78,8 +78,11 @@ export interface PreparedSpriteFrame {
  *
  * The result is a snapshot of the frame at the time of the call: once the `coords` or the `data` of
  * the frame change — a new `flip`, another parent — prepare it again.
+ *
+ * `frame` is a frame of any atlas, whatever the type of its data: the trim margins come from
+ * TexturePacker data and are zero for every other.
  */
-export function prepareSpriteFrame(frame: TextureAtlasFrame): PreparedSpriteFrame {
+export function prepareSpriteFrame(frame: TextureAtlasFrame<unknown>): PreparedSpriteFrame {
   return {
     texCoords: frame.coords.getTexCoords(),
     texFlipDiagonal: frame.coords.flipD ? 1 : 0,
@@ -155,6 +158,8 @@ export class TexturedSprite {
 
   /**
    * Writes the tex coords, the diagonal flip and the trim margins of the frame to the sprite.
+   * `frame` is a frame of any atlas, whatever the type of its data: the trim margins come from
+   * TexturePacker data and are zero for every other.
    *
    * The quad of the sprite — `width`, `height` — stands for the untrimmed sprite: a trimmed frame lies
    * in the part of it the packer cut the frame out of. A sprite that shows trimmed frames is therefore
@@ -171,7 +176,7 @@ export class TexturedSprite {
    * every sprite in use. A frame that changes every frame belongs in a geometry built with
    * `attributeUsage: {dynamic: ['texCoords']}`, whose attributes upload with every `update()`.
    */
-  setFrame(frame: TextureAtlasFrame): void {
+  setFrame(frame: TextureAtlasFrame<unknown>): void {
     this.setTexCoords(frame.coords.getTexCoords(texCoordsScratch));
     this.texFlipDiagonal = frame.coords.flipD ? 1 : 0;
     this.setTexTrim(frameTrimMargins(frame.data, trimScratch));

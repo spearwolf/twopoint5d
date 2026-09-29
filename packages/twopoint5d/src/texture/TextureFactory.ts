@@ -174,6 +174,13 @@ export class TextureFactory {
 
   textureLoader: TextureLoader;
 
+  /**
+   * @param maxAnisotropyOrRenderer The anisotropy maximum, or the renderer that names it.
+   * @param defaultClassNames The texture classes every texture of this factory gets before the
+   *   classes of the call.
+   * @param defaultOptions Options laid over the seed `{anisotropy: 0, flipY: false}`: a key they
+   *   leave out or give as `undefined` keeps the value of the seed, and the classes lie over both.
+   */
   constructor(
     maxAnisotropyOrRenderer: WebGPURenderer | number = 0,
     defaultClassNames: Array<TextureOptionClasses> = ['nearest'],
@@ -183,11 +190,14 @@ export class TextureFactory {
       typeof maxAnisotropyOrRenderer === 'number'
         ? toMaxAnisotropy(maxAnisotropyOrRenderer)
         : readMaxAnisotropy(maxAnisotropyOrRenderer);
+    // every factory starts from this seed; `defaultOptions` are laid over it, and a key they leave out
+    // or give as `undefined` keeps the value of the seed
+    const {anisotrophy, ...given} = defaultOptions ?? {};
+    const defined = Object.fromEntries(
+      Object.entries(given).filter(([, value]) => value !== undefined),
+    ) as Partial<TextureOptions>;
     // the deprecated key stands in for the one it names while that one is missing
-    const seedOptions: Partial<TextureOptions> = defaultOptions ?? {anisotropy: 0, flipY: false};
-    const {anisotrophy, ...seed} = seedOptions;
-    const anisotropy = seed.anisotropy ?? anisotrophy;
-    this.#defaultOptions = anisotropy === undefined ? seed : {...seed, anisotropy};
+    this.#defaultOptions = {flipY: false, ...defined, anisotropy: defined.anisotropy ?? anisotrophy ?? 0};
     // resolve defaults against the supplied class names; the seed assignment
     // above acts as the "no classes" fallback inside #mergeOptions().
     this.#defaultOptions = this.#mergeOptions(defaultClassNames);

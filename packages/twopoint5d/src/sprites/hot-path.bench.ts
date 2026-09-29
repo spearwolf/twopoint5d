@@ -12,7 +12,7 @@ const options = {time: 500, warmupTime: 200};
 const frame: TextureAtlasFrame = {coords: new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2)};
 
 // a frame TexturePacker trimmed, so that setFrame() works out the margins as well
-const trimmedFrame: TextureAtlasFrame = {
+const trimmedFrame: TextureAtlasFrame<unknown> = {
   coords: new TextureCoords(new TextureCoords(0, 0, 8, 4), 5, 0, 2, 1),
   data: {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}},
 };

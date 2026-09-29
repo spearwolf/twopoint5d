@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `IMap2DVisibleTiles#serial`: it names the recomputation a result comes from. A visibilitor that hands back the result of its last recomputation as it stands — the same tiles, the same `offset`, nothing to create or to remove — answers the `serial` it answered then, and every recomputation answers one it has not answered before. `CameraBasedVisibility` sets it to its `serial`, and `RectangularVisibilityArea` counts its recomputations for it. A result without it counts as a new one
 - add `IMap2DTileRenderer#hasPendingTiles` and `Map2DTileRenderer#hasPendingTiles`: whether the renderer wants the next update cycle even if the tile set it was last handed has not changed, because it does not hold that tile set as its last cycle laid it out — tiles its factory answered `noTileCapacity` for, every tile after `clearTiles()`, and whatever `addTile()`, `reuseTile()` or `removeTile()` changed outside an update cycle. `Map2DTileRenderer` answers `true` from such a call up to the `endUpdatingTiles()` of the next cycle, `true` while an update cycle is open — also one a throw broke off, in `endUpdatingTiles()` as well — and `false` once `dispose()` has run; a renderer that leaves the member out goes through every update cycle
 - add an optional `out` to `ChunkQuadTreeNode#findChunksAt()`: the chunks that hold data at the point are appended to it, from the node down to the leaf the point lies in, and it is returned. The query walks down the tree and allocates nothing with an `out`
+- add `BakeTextureOptions#maxTextureSize` and `#renderer`: `FrameBasedAnimations#bakeDataTexture()` builds a data texture at most as wide as `maxTextureSize`, else as the limit of the device of `renderer` — `maxTextureDimension2D` of a WebGPU device, `MAX_TEXTURE_SIZE` of a WebGL2 context —, else as `FrameBasedAnimations.MaxTextureSize`. A renderer that has not been initialized names no limit, and a `maxTextureSize` that is no whole number of 1 or more throws a `RangeError`
 
 ### Changed
 
@@ -272,6 +273,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - perf `TileSpritesFactory#createTile()` asks the instanced pool for a free slot before it looks the tile up in the tile set, so a tile the full pool cannot take costs one tile id lookup per cycle. With the pool full, a tile id that is no whole number answers `noTileCapacity`; the `RangeError` of `TileSet#frameId()` comes once a slot is free
 - perf `Map2DSpatialHashGrid` finds its cells by tile coordinate, without building a key string per cell or a tuple per query: `getTile()` allocates nothing
 - perf `CameraBasedVisibilityHelpers#update()` allocates nothing once its helper nodes are built, neither on a pass that finds nothing to rebuild nor on a rebuild
+- `TextureAtlas`, `TextureAtlasFrame`, `TextureAtlasArgs`, `NamedTextureAtlasArgs` and `TileSet` take the type of the frame data as a type parameter, the entry of a TexturePacker json by default: `TextureAtlasFrameData` is `TexturePackerFrameData`, and the `data` of a frame is typed instead of `any`. An atlas with data of another shape names its type, `new TextureAtlas<MyFrameData>()`, and a `TileSet` over such an atlas takes the type on. See the Migration Guide
+- `TexturedSprite#setFrame()`, `prepareSpriteFrame()`, `FrameBasedAnimations#add()` and `TileSpritesFactory` take frames, atlases and tile sets of every data type; `frameTrimMargins()` takes `unknown` and reads the margins out of TexturePacker data alone, four zeros for every other
+- `FrameBasedAnimations.MaxTextureSize` is 8192, the `maxTextureDimension2D` every WebGPU device offers, and with it the upper bound of a `tileCount` in `FrameBasedAnimations#add()`. See the Migration Guide
+- `BakeTextureOptions#includeTextureSize` is optional
+- `TileSet#options` is a frozen copy of the options the tile set was built with, typed `Readonly<TileSetOptions>`, and `TextureResource#tileSetOptions` stores a frozen copy of what is written: a change to the object handed in reaches neither, and writing the same object again after a change builds a new tile set. See the Migration Guide
+- the `error` events of `TextureStore` and `TextureResource` reach every listener: eventize reports a listener that throws on the console, and the store or the resource goes on as it would without it — a `TextureStore#getAsync()` that waits on the resource hears the failure, and the other entries of an animation map are registered
+- a listener of `ready`, `resource:<id>` or `error` that throws inside `TextureStore#parse()` no longer reaches its caller: every listener hears its event, `parse()` runs to its end, and `loadAsync()` resolves with the store. See the Migration Guide
+- perf `TextureAtlas#randomFrameName()` and `randomFrameNames()` draw a name by its index in the order the names were added instead of walking the names up to it; `frameNames()` without an argument answers a copy of that list
 
 ### Deprecated
 
@@ -466,6 +475,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `Map2DTileStreamer#update()` when an update cycle throws — in a renderer or in its factory, `endUpdatingTiles()` included: the tiles are cleared as by `clearTiles()`, and the next `update()` empties every renderer and lays out the whole set again. No later result of the visibilitor carries the removes the broken cycle had yet to go through, nor the whole result for the renderers after the one that threw, so those renderers kept tiles that had left the view. The error goes on unchanged
 - fix `Map2DTileRenderer` when the `update()` of its factory throws: the next `endUpdatingTiles()` asks for it again, and `hasPendingTiles` answers `true` up to then. `clearTiles()`, and with it `dispose()`, hands every tile to `destroyTile()` once, also when a `destroyTile()` throws and the call is repeated; the upload of the slots given back before the throw is not lost. `removeTile()` counts the slot a `destroyTile()` gave back before it threw, and `addTile()` and `reuseTile()` what an `updateTile()` wrote before it threw, so the next `endUpdatingTiles()` uploads it
 - fix `Map2DSpatialHashGrid` with an `aabb` that is not finite: `add()` and `findWithin()` throw a `RangeError` for an `aabb` whose left, top, width or height is not a finite number, and `getTiles()` for a `width` or `height` that is not one. An infinite extent ran the loop over the cells without end, and `NaN` put a renderable into no cell at all. `add()` checks every renderable before it moves the first, so one that throws leaves the grid as it was. See the Migration Guide
+- fix `TextureAtlas#frameNames()` with a `RegExp` that carries `g` or `y`: every name is tested from its start, and the `RegExp` handed in keeps its `lastIndex`. `FrameBasedAnimations#add()` with such a query takes every frame it matches, not every second one
+- fix `TextureFactory` with `defaultOptions`: they lie over the seed `{anisotropy: 0, flipY: false}`, so `{colorSpace: SRGBColorSpace}` keeps `flipY` at `false` instead of leaving the `true` of three.js on the texture, and a key given as `undefined` keeps the value of the seed. See the Migration Guide
+- fix `TextureResource#dispose()`, `TextureStore#dispose()` and `TextureStore#clearUnused()` behind a `dispose` listener that throws — of the store, of a resource or of the texture of a resource: every listener hears the event, the teardown runs to its end — the texture is released, effects and listeners are gone, every pending promise of the store is rejected, every resource is disposed and removed — and the throw goes on to the caller afterwards, several as an `AggregateError`. A second `dispose()` does nothing
+- fix the `ready`, `resource:<id>` and `rendererChanged` events of `TextureStore` behind a listener that throws: every listener hears them and the retained value is written, so a `whenReady()`, an `on()` or a `getAsync()` that waits or comes later is answered. The throw of a `rendererChanged` listener goes on to whoever wrote `renderer`
+- fix `evictMissing` of `TextureStore#parse()` behind a `dispose` listener of a resource that throws: the resource is removed, the other resources are evicted as well, and the throw goes out as an `error` event with `source: 'parse'` and the id of the resource
 
 ### Migration Guide
 
@@ -3153,6 +3167,120 @@ visibility.depth = -100;
 ```ts
 visibility.depth = 100; // 50 below the map plane and 50 above it
 ```
+
+#### A `TextureAtlas` names the type of its frame data
+
+`TextureAtlasFrameData` was `Record<string, any>`, and the `data` of a frame compiled whatever was read from it. It is the entry of a TexturePacker json now, `TexturePackerFrameData`, which is what `TexturePackerJson.parse()` registers and what a `TextureAtlas` without a type parameter carries. A read of it needs the checks its type asks for, and an atlas filled with data of another shape names that shape:
+
+**Before**
+
+```ts
+const atlas = new TextureAtlas();
+atlas.add('hero', coords, {hitBox: {x: 4, y: 4, w: 24, h: 28}});
+const width = atlas.frame('hero').data.sourceSize.w; // any
+```
+
+**After**
+
+```ts check
+import {TextureAtlas, TextureCoords, TexturePackerJson, type TexturePackerJsonData} from '@spearwolf/twopoint5d';
+
+interface HitBoxData {
+  hitBox: {x: number; y: number; w: number; h: number};
+}
+
+const atlas = new TextureAtlas<HitBoxData>();
+atlas.add('hero', new TextureCoords(0, 0, 32, 32), {hitBox: {x: 4, y: 4, w: 24, h: 28}});
+const hitBoxWidth = atlas.frame('hero')?.data?.hitBox.w ?? 0;
+
+declare const json: TexturePackerJsonData;
+const [packed] = TexturePackerJson.parse(json);
+// a frame may carry no data, and a TexturePacker frame names its sourceSize only when it has one
+const sourceWidth = packed.frame('hero')?.data?.sourceSize?.w ?? 0;
+
+console.log(hitBoxWidth, sourceWidth);
+```
+
+A `TileSet` over such an atlas takes the type on, `new TileSet(atlas, coords, options)` is a `TileSet<HitBoxData>`. A signature of your own that takes an atlas, a frame or a tile set of any data type names `TextureAtlas<unknown>`, `TextureAtlasFrame<unknown>` or `TileSet<unknown>`, as `TexturedSprite#setFrame()` and `FrameBasedAnimations#add()` do.
+
+#### `FrameBasedAnimations.MaxTextureSize` is 8192
+
+`bakeDataTexture()` refuses a data texture wider than 8192 texels where it took up to 16384: a WebGPU device that three.js requests without limits of its own offers no more, and a wider texture failed on the gpu instead of with the error of the bake. `add()` refuses a `tileCount` above 8192 for the same reason. Hand the bake the renderer the texture is meant for, and it takes the limit of that device — 2048 on some WebGL2 devices; name a `maxTextureSize` where you know better:
+
+**Before**
+
+```ts
+material.animsMap = animations.bakeDataTexture();
+```
+
+**After**
+
+```ts
+material.animsMap = animations.bakeDataTexture({renderer});
+// a device requested with a higher maxTextureDimension2D
+material.animsMap = animations.bakeDataTexture({maxTextureSize: 16384});
+```
+
+#### The options of a `TileSet` are a frozen copy
+
+`TileSet#options` is a frozen copy of the object handed to the constructor. A change to that object afterwards changes nothing of the tile set, and a write to `tileSet.options` throws a `TypeError` in strict-mode code. Build a new `TileSet` with the options it should have. The same goes for `TextureResource#tileSetOptions`: write the options again after a change — the same object will do — and the resource builds a new tile set:
+
+**Before**
+
+```ts
+resource.tileSetOptions!.tileWidth = 32; // the tile set was not rebuilt
+```
+
+**After**
+
+```ts
+resource.tileSetOptions = {...resource.tileSetOptions, tileWidth: 32};
+```
+
+#### The `defaultOptions` of a `TextureFactory` lie over its seed
+
+A `TextureFactory` starts from `{anisotropy: 0, flipY: false}`, with or without `defaultOptions`: they are laid over that seed, and a key they leave out keeps its value. `defaultOptions` without a `flipY` used to replace the seed whole and left three.js's `flipY: true` on every texture. Code that relied on that names it:
+
+**Before**
+
+```ts
+const factory = new TextureFactory(renderer, [], {colorSpace: SRGBColorSpace}); // textures flipped
+```
+
+**After**
+
+```ts
+const factory = new TextureFactory(renderer, [], {colorSpace: SRGBColorSpace, flipY: true});
+```
+
+#### A listener that throws inside `TextureStore#parse()` no longer reaches its caller
+
+`parse()` throws only for data it refuses before it writes or emits anything. A listener of `ready`, `resource:<id>` or `error` that throws is reported on the console by eventize, and `parse()` goes on; `loadAsync()` resolves with the store instead of rejecting at the parse step. Code that caught such a throw around `parse()` or `loadAsync()` catches it in the listener:
+
+**Before**
+
+```ts
+on(store, 'ready', () => setUpScene());
+try {
+  store.parse(data);
+} catch (error) {
+  report(error); // a throw of setUpScene()
+}
+```
+
+**After**
+
+```ts
+on(store, 'ready', () => {
+  try {
+    setUpScene();
+  } catch (error) {
+    report(error);
+  }
+});
+store.parse(data);
+```
+
 
 ## [0.21.2] - 2026-06-19
 

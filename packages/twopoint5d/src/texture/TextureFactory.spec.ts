@@ -16,6 +16,20 @@ const rendererWithMaxAnisotropy = (max: number): WebGPURenderer => ({getMaxAniso
 const rendererWithoutMaxAnisotropy = (): WebGPURenderer => ({}) as unknown as WebGPURenderer;
 
 describe('TextureFactory', () => {
+  describe('defaultOptions lie over the seed {anisotropy: 0, flipY: false}', () => {
+    test('a key they leave out keeps the value of the seed', () => {
+      const texture = new TextureFactory(16, [], {colorSpace: SRGBColorSpace}).update(new Texture());
+
+      expect(texture.flipY).toBe(false);
+      expect(texture.colorSpace).toBe(SRGBColorSpace);
+    });
+
+    test('a flipY of undefined keeps the flipY of the seed, and one of true replaces it', () => {
+      expect(new TextureFactory(16, [], {flipY: undefined}).update(new Texture()).flipY).toBe(false);
+      expect(new TextureFactory(16, [], {flipY: true}).update(new Texture()).flipY).toBe(true);
+    });
+  });
+
   describe('anisotropy reaches the texture', () => {
     test('a class below the maximum is written to texture.anisotropy', () => {
       const factory = new TextureFactory(16, []);

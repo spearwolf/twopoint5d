@@ -1,9 +1,11 @@
-import type {TextureAtlasFrameData} from './TextureAtlas.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 
 /** `[left, top, right, bottom]`, the margins of {@link frameTrimMargins}. */
 export type FrameTrimMargins = [left: number, top: number, right: number, bottom: number];
 
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+// a guard, and not an object pattern with defaults: setFrame() calls this on the hot path, and a
+// call allocates nothing
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 /**
  * The margins a packer cut off a sprite when it trimmed the frame out of it, `[left, top, right, bottom]`:
@@ -20,21 +22,21 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
  * of a frame the packer turned only turn it back, and a flip set on the `TextureCoords` by hand mirrors
  * the lookup inside the trimmed area, not where that area lies.
  *
+ * `data` is the `data` of an atlas frame, of whatever type its atlas names it: only `spriteSourceSize`
+ * and `sourceSize` are read, and a value without them — or one that is no object — gets four zeros.
+ *
  * Writes into `target` and answers it; with a `target` of its own the call allocates nothing.
  */
-export function frameTrimMargins(
-  data: TextureAtlasFrameData | undefined,
-  target: FrameTrimMargins = [0, 0, 0, 0],
-): FrameTrimMargins {
-  const spriteSourceSize = data?.['spriteSourceSize'];
-  const sourceSize = data?.['sourceSize'];
+export function frameTrimMargins(data: unknown, target: FrameTrimMargins = [0, 0, 0, 0]): FrameTrimMargins {
+  const spriteSourceSize = isObject(data) ? data['spriteSourceSize'] : undefined;
+  const sourceSize = isObject(data) ? data['sourceSize'] : undefined;
 
-  const x: unknown = spriteSourceSize?.x;
-  const y: unknown = spriteSourceSize?.y;
-  const w: unknown = spriteSourceSize?.w;
-  const h: unknown = spriteSourceSize?.h;
-  const W: unknown = sourceSize?.w;
-  const H: unknown = sourceSize?.h;
+  const x = isObject(spriteSourceSize) ? spriteSourceSize['x'] : undefined;
+  const y = isObject(spriteSourceSize) ? spriteSourceSize['y'] : undefined;
+  const w = isObject(spriteSourceSize) ? spriteSourceSize['w'] : undefined;
+  const h = isObject(spriteSourceSize) ? spriteSourceSize['h'] : undefined;
+  const W = isObject(sourceSize) ? sourceSize['w'] : undefined;
+  const H = isObject(sourceSize) ? sourceSize['h'] : undefined;
 
   if (
     isFiniteNumber(x) &&

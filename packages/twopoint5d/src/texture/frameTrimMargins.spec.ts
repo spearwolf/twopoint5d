@@ -1,7 +1,6 @@
 import {describe, expect, test} from 'vitest';
 
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
-import type {TextureAtlasFrameData} from './TextureAtlas.js';
 
 describe('frameTrimMargins()', () => {
   test('answers the margins of a sprite of 5 × 4 trimmed to 2 × 1 at (1, 2) as fractions of its width and height', () => {
@@ -16,13 +15,17 @@ describe('frameTrimMargins()', () => {
     expect(margins).toEqual([0, 0, 0, 0]);
   });
 
-  test.each<[string, TextureAtlasFrameData | undefined]>([
+  test.each<[string, unknown]>([
     ['no data', undefined],
     ['no spriteSourceSize', {sourceSize: {w: 5, h: 4}}],
     ['no sourceSize', {spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}}],
     ['a sourceSize of width 0', {spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 0, h: 4}}],
     ['a NaN among the numbers', {spriteSourceSize: {x: NaN, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}}],
     ['a string for a number', {spriteSourceSize: {x: 1, y: '2', w: 2, h: 1}, sourceSize: {w: 5, h: 4}}],
+    ['data that is no object', 'trimmed'],
+    ['data of null', null],
+    ['a spriteSourceSize that is no object', {spriteSourceSize: 5, sourceSize: {w: 5, h: 4}}],
+    ['a sourceSize of null', {spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: null}],
   ])('answers four zeros for %s', (_, data) => {
     expect(frameTrimMargins(data)).toEqual([0, 0, 0, 0]);
   });

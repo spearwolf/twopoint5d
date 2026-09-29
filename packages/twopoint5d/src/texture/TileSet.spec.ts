@@ -155,6 +155,33 @@ describe('TileSet', () => {
     });
   });
 
+  describe('the options are a frozen copy', () => {
+    test('a change to the object handed in reaches neither the getters nor frameId()', () => {
+      const options = {tileWidth: 16, tileHeight: 16, firstId: 1};
+      const tileSet = new TileSet(new TextureCoords(0, 0, 64, 64), options);
+
+      options.firstId = 5;
+      options.tileWidth = 32;
+
+      expect(tileSet.firstId).toBe(1);
+      expect(tileSet.tileWidth).toBe(16);
+      expect(tileSet.frameId(1)).toBe(0);
+    });
+
+    test('the options are frozen and are not the object handed in', () => {
+      const options = {tileWidth: 16, tileHeight: 16};
+      const withAtlas = new TileSet(new TextureAtlas(), new TextureCoords(0, 0, 64, 64), options);
+      const withoutAtlas = new TileSet(new TextureCoords(0, 0, 64, 64), options);
+
+      for (const tileSet of [withAtlas, withoutAtlas]) {
+        expect(Object.isFrozen(tileSet.options)).toBe(true);
+        expect(tileSet.options).not.toBe(options);
+        expect(tileSet.options).toEqual(options);
+      }
+      expect(Object.isFrozen(new TileSet(new TextureCoords(0, 0, 64, 64)).options)).toBe(true);
+    });
+  });
+
   test('a tile set built without options holds an empty options object', () => {
     expect(new TileSet(new TextureCoords(0, 0, 64, 64)).options).toEqual({});
     expect(new TileSet(new TextureAtlas(), new TextureCoords(0, 0, 64, 64)).options).toEqual({});

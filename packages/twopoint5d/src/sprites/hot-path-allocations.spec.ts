@@ -22,7 +22,7 @@ const frame: TextureAtlasFrame = {coords: new TextureCoords(new TextureCoords(0,
 
 // the frame data TexturePacker writes for a sprite of 5 × 4 trimmed to 2 × 1 at (1, 2): its margins are
 // 1/5, 2/4, 2/5 and 1/4 — four different values, so that a mix-up of two sides shows
-const trimmedFrame: TextureAtlasFrame = {
+const trimmedFrame: TextureAtlasFrame<unknown> = {
   coords: new TextureCoords(new TextureCoords(0, 0, 8, 4), 5, 0, 2, 1),
   data: {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}},
 };

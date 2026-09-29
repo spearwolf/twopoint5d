@@ -1,5 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
-import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
+import {TextureAtlas, type TextureAtlasFrame, type TextureAtlasFrameData} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
 //
@@ -66,11 +66,20 @@ const assertFits = (fits: boolean, message: () => string): void => {
  * The [[TileSet]] maps _tileIds_ to _frameIds_.
  * Unlike the `frameId` of [[TextureAtlas]], the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
  * The `frameId` range of a [[TileSet]] starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
+ *
+ * `D` is the type of the frame data of its atlas: a `TileSet` over an atlas with a data type of its
+ * own takes that type on. The frames the `TileSet` lays out itself carry no data.
  */
-export class TileSet {
-  readonly atlas: TextureAtlas;
+export class TileSet<D = TextureAtlasFrameData> {
+  readonly atlas: TextureAtlas<D>;
   readonly baseCoords: TextureCoords;
-  readonly options: TileSetOptions;
+
+  /**
+   * A frozen copy of the options the tile set was built with: the layout, the checks and the getters
+   * read the same values, and a change to the object handed in reaches none of them. A write to it
+   * throws a `TypeError` in strict-mode code.
+   */
+  readonly options: Readonly<TileSetOptions>;
 
   tileCount = 0;
 
@@ -85,17 +94,17 @@ export class TileSet {
    * of 1 or more, if `firstId` is not a whole number, if the width or height of the `baseCoords`
    * is not finite, or if the first tile does not fit into the `baseCoords` with its `margin` and `padding`.
    */
-  constructor(...args: [TextureAtlas, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
+  constructor(...args: [TextureAtlas<D>, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
-      const [atlas, baseCoords, options] = args as [TextureAtlas, TextureCoords, TileSetOptions?];
+      const [atlas, baseCoords, options] = args as [TextureAtlas<D>, TextureCoords, TileSetOptions?];
       this.atlas = atlas;
       this.baseCoords = baseCoords;
-      this.options = options ?? {};
+      this.options = Object.freeze({...options});
     } else {
-      this.atlas = new TextureAtlas();
+      this.atlas = new TextureAtlas<D>();
       const [baseCoords, options] = args as [TextureCoords, TileSetOptions?];
       this.baseCoords = baseCoords;
-      this.options = options ?? {};
+      this.options = Object.freeze({...options});
     }
     this.#createTextureCoords();
   }
@@ -164,12 +173,12 @@ export class TileSet {
   /**
    * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
    */
-  frame(tileId: number): TextureAtlasFrame {
+  frame(tileId: number): TextureAtlasFrame<D> {
     // frameId() answers a whole number inside the range of the tiles, and the atlas holds a frame for each of them
     return this.atlas.get(this.frameId(tileId))!;
   }
 
-  randomFrame(): TextureAtlasFrame {
+  randomFrame(): TextureAtlasFrame<D> {
     return this.atlas.get(this.randomFrameId())!;
   }
 

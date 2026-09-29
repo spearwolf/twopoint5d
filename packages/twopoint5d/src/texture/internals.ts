@@ -1,6 +1,6 @@
 // The keys and types through which `TextureStore` reaches the parts of a `TextureResource`
-// that belong to the store and not to its callers. This module is not in `public-api.ts`,
-// so that nobody outside `src/texture/` can name them.
+// that belong to the store and not to its callers, and what the teardowns of both share. This
+// module is not in `public-api.ts`, so that nobody outside `src/texture/` can name them.
 
 /**
  * One image lent out by a {@link TextureImageSource}: the promise of the image, and the
@@ -44,3 +44,12 @@ export const imageSource: unique symbol = Symbol('TextureResource.imageSource');
  * given subtypes from arriving, if there is one. `TextureStore#getAsync()` asks it.
  */
 export const loadFailureFor: unique symbol = Symbol('TextureResource.loadFailureFor');
+
+/**
+ * Throws what a teardown collected once it is done: nothing for no error, a single error
+ * unchanged, several as an `AggregateError` with `message`.
+ */
+export function throwCollected(errors: readonly unknown[], message: string): void {
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, message);
+}

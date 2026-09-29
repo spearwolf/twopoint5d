@@ -1,4 +1,4 @@
-import {emit, getRetainedEventNames, getSubscriptionCount, on} from '@spearwolf/eventize';
+import {emit, getRetainedEventNames, getSubscriptionCount, on, once} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
@@ -2607,6 +2607,247 @@ describe('TextureStore', () => {
       const withoutBase = new TextureStore();
       withoutBase.parse({items: {a: {imageUrl: 'a.png'}}});
       expect((await withoutBase.whenResource('a')).imageUrl).toBe('a.png');
+    });
+  });
+
+  // eventize reports the throw of a listener that emitSafe() isolates with a console.warn line that
+  // shows up in the test output; it is not asserted, as in the loadAsync() tests above
+  describe('a listener that throws', () => {
+    const stubImage = () => ({width: 4, height: 4}) as unknown as HTMLImageElement;
+    const messageOf = (settled: unknown) => (settled instanceof Error ? settled.message : settled);
+    const thrower = (message: string) => () => {
+      throw new Error(message);
+    };
+    const resourceOf = (store: TextureStore, id: string): TextureResource | undefined => {
+      let found: TextureResource | undefined;
+      store.onResource(id, (resource) => {
+        found = resource;
+      })();
+      return found;
+    };
+
+    test('getAsync() rejects on a failure of its resource even behind an error listener of the resource that throws', async () => {
+      const loaderError = new Error('404');
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(loaderError);
+
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+      on(resourceOf(store, 'a')!, TextureResourceEvents.Error, thrower('an error listener that throws'));
+
+      const settled = await settleWithin(store.getAsync('a', 'texture'));
+
+      expect(messageOf(settled)).toBe('[TextureStore] getAsync(a, texture) failed at the image step: "a.png"');
+      expect((settled as Error).cause).toBe(loaderError);
+
+      store.dispose();
+    });
+
+    test('a ready listener that throws keeps the ready value, a waiting getAsync(), the resource announcements and evictMissing', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
+
+      const store = new TextureStore(makeRendererStub());
+      on(store, TextureStoreEvents.Ready, thrower('a ready listener that throws'));
+      const pending = store.getAsync('a', 'texture');
+      const announced = vi.fn();
+      on(store, `${TextureStoreEvents.Resource}:a`, announced);
+
+      expect(() => store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
+
+      const a = resourceOf(store, 'a')!;
+      expect(announced).toHaveBeenCalledExactlyOnceWith(a);
+      expect(await settleWithin(store.whenReady())).toBe(store);
+      const lateReady = vi.fn();
+      once(store, TextureStoreEvents.Ready, lateReady);
+      expect(lateReady).toHaveBeenCalledExactlyOnceWith(store);
+
+      const texture = await settleWithin(pending);
+      expect(texture).toBe(a.texture);
+      expect(texture).toBeDefined();
+
+      const aDisposed = vi.fn();
+      on(a, TextureResourceEvents.Dispose, aDisposed);
+      expect(() => store.parse({defaultTextureClasses: [], items: {b: {imageUrl: 'b.png'}}}, {evictMissing: true})).not.toThrow();
+
+      expect(aDisposed).toHaveBeenCalledOnce();
+      expect(resourceOf(store, 'a')).toBeUndefined();
+      expect(resourceOf(store, 'b')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test('an error listener that throws lets every other listener hear an item error, and the parse goes on', () => {
+      const store = new TextureStore();
+      on(store, TextureStoreEvents.Error, thrower('an error listener that throws'));
+      const errors: Array<{source: string; id?: string}> = [];
+      on(store, TextureStoreEvents.Error, (payload: {source: string; id?: string}) => errors.push(payload));
+
+      expect(() =>
+        store.parse({
+          defaultTextureClasses: ['nearest', 'no-such-class' as never],
+          items: {bad: {}, good: {imageUrl: 'good.png', texture: ['linear', 'no-such-class' as never]}},
+        }),
+      ).not.toThrow();
+
+      // the unknown default class first, which belongs to the catalog and names no item
+      expect(errors.map(({source, id}) => [source, id])).toEqual([
+        ['parse', undefined],
+        ['parse', 'bad'],
+        ['parse', 'good'],
+      ]);
+      expect(resourceOf(store, 'good')).toBeInstanceOf(TextureResource);
+      expect(resourceOf(store, 'bad')).toBeUndefined();
+
+      store.dispose();
+    });
+
+    test('loadAsync() resolves with the store when a listener throws inside the parse', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
+      const store = new TextureStore();
+      on(store, TextureStoreEvents.Ready, thrower('a ready listener that throws'));
+
+      expect(await settleWithin(store.loadAsync('http://example.test/data.json'))).toBe(store);
+      expect(resourceOf(store, 'a')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test('evictMissing removes a resource whose dispose listener throws and reports the throw as an error event', () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}, b: {imageUrl: 'b.png'}}});
+
+      const disposeError = new Error('a dispose listener that throws');
+      on(resourceOf(store, 'a')!, TextureResourceEvents.Dispose, () => {
+        throw disposeError;
+      });
+      const bDisposed = vi.fn();
+      on(resourceOf(store, 'b')!, TextureResourceEvents.Dispose, bDisposed);
+      const errors: unknown[] = [];
+      on(store, TextureStoreEvents.Error, (payload: unknown) => errors.push(payload));
+
+      expect(() => store.parse({defaultTextureClasses: [], items: {c: {imageUrl: 'c.png'}}}, {evictMissing: true})).not.toThrow();
+
+      expect(errors).toEqual([{source: 'parse', id: 'a', error: disposeError}]);
+      expect(bDisposed).toHaveBeenCalledOnce();
+      expect(resourceOf(store, 'a')).toBeUndefined();
+      expect(resourceOf(store, 'b')).toBeUndefined();
+      expect(resourceOf(store, 'c')).toBeInstanceOf(TextureResource);
+
+      store.dispose();
+    });
+
+    test('dispose(): a dispose listener of the store that throws keeps no pending getAsync() from rejecting and no resource from its dispose, and throws afterwards', async () => {
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      const storeError = new Error('a dispose listener of the store that throws');
+      on(store, TextureStoreEvents.Dispose, () => {
+        throw storeError;
+      });
+      const afterIt = vi.fn();
+      on(store, TextureStoreEvents.Dispose, afterIt);
+      // the image never arrives, so the getAsync() is still waiting when the store goes
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockReturnValue(new Promise(() => {}));
+      const pending = store.getAsync('a', 'texture');
+      const aDisposed = vi.fn();
+      on(resourceOf(store, 'a')!, TextureResourceEvents.Dispose, aDisposed);
+
+      expect(() => store.dispose()).toThrow(storeError);
+
+      expect(afterIt).toHaveBeenCalledOnce();
+      expect(messageOf(await settleWithin(pending))).toBe(
+        '[TextureStore] getAsync(a, texture) was cancelled: this store has been disposed',
+      );
+      expect(aDisposed).toHaveBeenCalledOnce();
+      expect(getSubscriptionCount(store)).toBe(0);
+      expect(store.renderer).toBeUndefined();
+      expect(() => store.dispose()).not.toThrow();
+    });
+
+    test('dispose(): dispose listeners of two resources that throw — every resource is disposed and the store throws an AggregateError of both', () => {
+      const store = new TextureStore();
+      store.parse({
+        defaultTextureClasses: [],
+        items: {a: {imageUrl: 'a.png'}, b: {imageUrl: 'b.png'}, c: {imageUrl: 'c.png'}},
+      });
+
+      const aError = new Error('a');
+      const cError = new Error('c');
+      const a = resourceOf(store, 'a')!;
+      const b = resourceOf(store, 'b')!;
+      const c = resourceOf(store, 'c')!;
+      on(a, TextureResourceEvents.Dispose, () => {
+        throw aError;
+      });
+      const bDisposed = vi.fn();
+      on(b, TextureResourceEvents.Dispose, bDisposed);
+      on(c, TextureResourceEvents.Dispose, () => {
+        throw cError;
+      });
+
+      let thrown: unknown;
+      try {
+        store.dispose();
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([aError, cError]);
+      expect(bDisposed).toHaveBeenCalledOnce();
+      for (const resource of [a, b, c]) {
+        expect(getSubscriptionCount(resource)).toBe(0);
+      }
+      expect(resourceOf(store, 'a')).toBeUndefined();
+    });
+
+    test('clearUnused(): a resource whose dispose listener throws is removed, the others are cleared as well, and the throw goes on afterwards', () => {
+      const store = new TextureStore();
+      store.parse({
+        defaultTextureClasses: [],
+        items: {a: {imageUrl: 'a.png'}, b: {imageUrl: 'b.png'}, c: {imageUrl: 'c.png'}},
+      });
+
+      const disposeError = new Error('a dispose listener that throws');
+      on(resourceOf(store, 'a')!, TextureResourceEvents.Dispose, () => {
+        throw disposeError;
+      });
+      const bDisposed = vi.fn();
+      on(resourceOf(store, 'b')!, TextureResourceEvents.Dispose, bDisposed);
+
+      expect(() => store.clearUnused()).toThrow(disposeError);
+
+      expect(bDisposed).toHaveBeenCalledOnce();
+      expect(resourceOf(store, 'a')).toBeUndefined();
+      expect(resourceOf(store, 'b')).toBeUndefined();
+      expect(resourceOf(store, 'c')).toBeUndefined();
+      expect(store.clearUnused()).toBe(0);
+
+      store.dispose();
+    });
+
+    test('rendererChanged: a listener that throws keeps the retained renderer from no later subscriber', () => {
+      const store = new TextureStore();
+      const listenerError = new Error('a rendererChanged listener that throws');
+      on(store, TextureStoreEvents.RendererChanged, (renderer: WebGPURenderer | undefined) => {
+        if (renderer) throw listenerError;
+      });
+      const heard = vi.fn();
+      on(store, TextureStoreEvents.RendererChanged, heard);
+      heard.mockClear();
+
+      const renderer = makeRendererStub();
+      // every listener hears the renderer before the throw goes on to the writer of `renderer`
+      expect(() => {
+        store.renderer = renderer;
+      }).toThrow(listenerError);
+
+      expect(heard).toHaveBeenCalledExactlyOnceWith(renderer);
+      expect(store.renderer).toBe(renderer);
+      const late = vi.fn();
+      on(store, TextureStoreEvents.RendererChanged, late);
+      expect(late).toHaveBeenCalledExactlyOnceWith(renderer);
+
+      store.dispose();
     });
   });
 });

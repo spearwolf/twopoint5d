@@ -4,7 +4,7 @@ import type {MeshBasicMaterial} from 'three/webgpu';
 import {Color, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
-import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
+import {TextureAtlas, type TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {TextureCoords} from '../../texture/TextureCoords.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {prepareSpriteFrame, type TexturedSprite} from './TexturedSprite.js';
@@ -17,7 +17,7 @@ const frame: TextureAtlasFrame = {coords: new TextureCoords(new TextureCoords(0,
 
 // the frame data TexturePacker writes for a sprite of 5 × 4 trimmed to 2 × 1 at (1, 2): its margins are
 // 1/5, 2/4, 2/5 and 1/4 — four different values, so that a mix-up of two sides shows
-const trimmedFrame: TextureAtlasFrame = {
+const trimmedFrame: TextureAtlasFrame<unknown> = {
   coords: new TextureCoords(new TextureCoords(0, 0, 8, 4), 5, 0, 2, 1),
   data: {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}},
 };
@@ -194,7 +194,7 @@ describe('TexturedSprites', () => {
       ['the upright frame', frame],
       ['the turned frame', {coords: turnedCoords}],
       ['the trimmed frame', trimmedFrame],
-    ] as const)('setPreparedFrame() writes what setFrame() writes, for %s', (_name, atlasFrame: TextureAtlasFrame) => {
+    ] as const)('setPreparedFrame() writes what setFrame() writes, for %s', (_name, atlasFrame: TextureAtlasFrame<unknown>) => {
       const sprites = new TexturedSprites(4);
       const byFrame = sprites.createSprite()!;
       const byPrepared = sprites.createSprite()!;
@@ -203,6 +203,20 @@ describe('TexturedSprites', () => {
       byPrepared.setPreparedFrame(prepareSpriteFrame(atlasFrame));
 
       expect(frameValuesOf(byPrepared)).toEqual(frameValuesOf(byFrame));
+
+      sprites.dispose();
+    });
+
+    test('setFrame() and prepareSpriteFrame() take a frame of an atlas with frame data of its own, with no trim', () => {
+      const atlas = new TextureAtlas<{foo: number}>();
+      atlas.add('a', new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2), {foo: 1});
+      const sprites = new TexturedSprites(4);
+      const sprite = sprites.createSprite()!;
+
+      sprite.setFrame(atlas.frame('a')!);
+
+      expect([sprite.trimLeft, sprite.trimTop, sprite.trimRight, sprite.trimBottom]).toEqual([0, 0, 0, 0]);
+      expect(prepareSpriteFrame(atlas.frame('a')!).texTrim).toEqual([0, 0, 0, 0]);
 
       sprites.dispose();
     });

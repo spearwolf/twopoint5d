@@ -1,3 +1,4 @@
+import type {WebGPURenderer} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
@@ -289,6 +290,21 @@ describe('FrameBasedAnimations', () => {
 
       const buffer = animations.bakeDataTexture().image.data as Float32Array;
       expect(buffer[0]).toBe(2); // frames.length
+    });
+
+    test('a RegExp query with the g flag takes every frame it matches', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+      const frames = [0, 1, 2, 3].map((i) => new TextureCoords(i * 8, 0, 8, 8));
+      frames.forEach((coords, i) => atlas.add(`walk.${i + 1}`, coords));
+
+      animations.add('walk', 1, atlas, /walk/g);
+
+      const texture = animations.bakeDataTexture();
+      const data = texture.image.data as Float32Array;
+      // header: [frameCount, duration, first frame texel, texelsPerFrame]
+      expect(Array.from(data.subarray(0, 4))).toEqual([4, 1, 1, 1]);
+      texture.dispose();
     });
 
     test('an atlas query that matches no frame is refused', () => {
@@ -711,6 +727,95 @@ describe('FrameBasedAnimations', () => {
     });
   });
 
+  describe('the widest data texture a bake may build', () => {
+    // one animation of `frameCount` frames at one texel each, one header texel before them
+    const animationsOf = (frameCount: number) => {
+      const animations = new FrameBasedAnimations();
+      animations.add(
+        'walk',
+        1,
+        Array.from({length: frameCount}, () => new TextureCoords(0, 0, 8, 8)),
+      );
+      return animations;
+    };
+    const refusal = (texels: number, maximum: number) =>
+      new RegExp(`a data texture of ${texels} texels, over the maximum of ${maximum}$`);
+
+    // stubs of the one thing the bake asks a renderer for, the limit of its device
+    const webgpuRenderer = (maxTextureDimension2D: number) =>
+      ({backend: {device: {limits: {maxTextureDimension2D}}}}) as unknown as WebGPURenderer;
+    const webglRenderer = (maxTextureSize: number) =>
+      ({
+        backend: {gl: {MAX_TEXTURE_SIZE: 0x0d33, getParameter: (p: number) => (p === 0x0d33 ? maxTextureSize : 0)}},
+      }) as unknown as WebGPURenderer;
+    const rendererWithoutDevice = () => ({backend: {}}) as unknown as WebGPURenderer;
+    const rendererThatThrows = () =>
+      ({
+        get backend() {
+          throw new Error('no backend');
+        },
+      }) as unknown as WebGPURenderer;
+
+    test('MaxTextureSize is 8192 texels, the maxTextureDimension2D every WebGPU device offers', () => {
+      expect(FrameBasedAnimations.MaxTextureSize).toBe(8192);
+    });
+
+    test('without a limit named a bake of 16384 texels is refused, naming 8192', () => {
+      // 1 header texel and 8192 frame texels ask for 16384
+      expect(() => animationsOf(8192).bakeDataTexture()).toThrow(refusal(16384, 8192));
+    });
+
+    test('a maxTextureSize of 4 refuses a bake of 8 texels, naming 4', () => {
+      expect(() => animationsOf(4).bakeDataTexture({maxTextureSize: 4})).toThrow(refusal(8, 4));
+    });
+
+    test('the limit of a WebGPU device refuses a bake over it, naming it', () => {
+      expect(() => animationsOf(4).bakeDataTexture({renderer: webgpuRenderer(4)})).toThrow(refusal(8, 4));
+    });
+
+    test('the MAX_TEXTURE_SIZE of a WebGL2 context refuses a bake over it, naming it', () => {
+      expect(() => animationsOf(4).bakeDataTexture({renderer: webglRenderer(4)})).toThrow(refusal(8, 4));
+    });
+
+    test.each([
+      ['a renderer without a device', rendererWithoutDevice],
+      ['a renderer whose backend throws', rendererThatThrows],
+    ])('%s falls back to MaxTextureSize', (_, renderer) => {
+      const texture = animationsOf(4).bakeDataTexture({renderer: renderer()});
+      expect(texture.image.width).toBe(8);
+      texture.dispose();
+
+      expect(() => animationsOf(8192).bakeDataTexture({renderer: renderer()})).toThrow(refusal(16384, 8192));
+    });
+
+    test('a maxTextureSize takes the place of the limit of the renderer', () => {
+      const texture = animationsOf(4).bakeDataTexture({maxTextureSize: 8, renderer: webgpuRenderer(4)});
+      expect(texture.image.width).toBe(8);
+      texture.dispose();
+
+      expect(() => animationsOf(4).bakeDataTexture({maxTextureSize: 4, renderer: webgpuRenderer(16)})).toThrow(refusal(8, 4));
+    });
+
+    test.each([
+      ['0', 0],
+      ['1.5', 1.5],
+      ['NaN', NaN],
+      ['"8"', '8' as unknown as number],
+    ])('a maxTextureSize of %s is refused', (described, maxTextureSize) => {
+      expect(() => animationsOf(1).bakeDataTexture({maxTextureSize})).toThrow(
+        new RangeError(
+          `FrameBasedAnimations: bakeDataTexture() got a maxTextureSize of ${described} — a maxTextureSize is a whole number of 1 or more`,
+        ),
+      );
+    });
+
+    test('a bake names a maxTextureSize without includeTextureSize', () => {
+      const texture = animationsOf(1).bakeDataTexture({maxTextureSize: 4096});
+      expect(texture.image.width).toBe(2);
+      texture.dispose();
+    });
+  });
+
   describe('frameRate support', () => {
     test('add animation with frameRate option', () => {
       const animations = new FrameBasedAnimations();
@@ -887,7 +992,7 @@ describe('FrameBasedAnimations', () => {
       ['"5"', '5' as unknown as number],
       ['2.5', 2.5],
       ['NaN', NaN],
-      ['16385', FrameBasedAnimations.MaxTextureSize + 1],
+      [String(FrameBasedAnimations.MaxTextureSize + 1), FrameBasedAnimations.MaxTextureSize + 1],
       // the tileCount message, not the one about an animation without frames
       ['0', 0],
     ])('a tileCount of %s is refused', (described, tileCount) => {

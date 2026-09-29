@@ -69,7 +69,7 @@ import {description, title} from './_animated-billboards.json';
 
     const material = new AnimatedSpritesMaterial({
       colorMap: texture,
-      animsMap: anims.bakeDataTexture(),
+      animsMap: anims.bakeDataTexture({renderer}),
       depthTest: true,
       depthWrite: true,
       renderAsBillboards: true,

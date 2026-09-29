@@ -1,4 +1,4 @@
-import {emit, emitStrict, type EventizedObject, eventize, off, retain, retainClear} from '@spearwolf/eventize';
+import {emitSafe, emitStrict, type EventizedObject, eventize, off, retain, retainClear} from '@spearwolf/eventize';
 import type {Signal} from '@spearwolf/signalize';
 import {batch, createEffect, createSignal, SignalGroup, touch} from '@spearwolf/signalize';
 import type {WebGPURenderer} from 'three/webgpu';
@@ -12,6 +12,7 @@ import {
   loadFailureFor,
   type TextureImageSource,
   type TextureResourceLoadFailure,
+  throwCollected,
 } from './internals.js';
 import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';
@@ -89,7 +90,14 @@ export const TextureResourceSubtypes = {
  * a `frameNameQuery` that is neither a string nor a `RegExp` — and one whose frames come out empty,
  * a `frameNameQuery` that matches nothing or an empty list of `tileIds`.
  * Every other entry of the same map is registered all the same.
- * `dispose` fires once at the start of `dispose()`.
+ *
+ * An `error` listener that throws takes the event from no other listener: eventize reports the
+ * throw on the console, and the resource goes on as it would without it — the other entries of
+ * an animation map are registered, and a `TextureStore#getAsync()` that waits on the resource
+ * hears the failure.
+ *
+ * `dispose` fires once at the start of `dispose()`. Every listener hears it, even behind one
+ * that throws.
  */
 export const TextureResourceEvents = {
   ImageCoords: TextureResourceSubtypes.ImageCoords,
@@ -290,7 +298,7 @@ export class TextureResource {
   // the inputs of one shape each, created by the constructor for that shape and no other: a
   // setter of another shape finds none and throws, and activate() registers the effects of the
   // shape they belong to
-  readonly #tileSetOptions?: Signal<TileSetOptions | undefined>;
+  readonly #tileSetOptions?: Signal<Readonly<TileSetOptions> | undefined>;
   readonly #atlasSignals?: AtlasSignals;
 
   // outputs sit on every resource, like the texture: a shape that builds no atlas or no tile
@@ -427,7 +435,12 @@ export class TextureResource {
     return this.#disposed ? undefined : this.#atlas.value;
   }
 
-  get tileSetOptions(): TileSetOptions | undefined {
+  /**
+   * The options of the tile set of a tile set resource. What is stored is a frozen copy: a change
+   * to the object after the write reaches the tile set only once it is written again, and writing
+   * it again after a change builds a new tile set.
+   */
+  get tileSetOptions(): Readonly<TileSetOptions> | undefined {
     return this.#disposed ? undefined : this.#tileSetOptions?.value;
   }
 
@@ -435,7 +448,7 @@ export class TextureResource {
     if (this.#disposed) return;
     const signal = this.#tileSetOptions;
     if (!signal) throw wrongShapeError(this, 'tileSetOptions');
-    signal.set(value);
+    signal.set(value == null ? undefined : Object.freeze({...value}));
   }
 
   get tileSet(): TileSet | undefined {
@@ -545,7 +558,7 @@ export class TextureResource {
     this.type = type;
 
     if (type === 'tileset') {
-      this.#tileSetOptions = createSignal<TileSetOptions | undefined>(undefined, {compare: cmpShallow, attach: this});
+      this.#tileSetOptions = createSignal<Readonly<TileSetOptions> | undefined>(undefined, {compare: cmpShallow, attach: this});
     } else if (type === 'atlas') {
       this.#atlasSignals = {
         atlasUrl: createSignal<string | undefined>(undefined, {attach: this}),
@@ -569,12 +582,26 @@ export class TextureResource {
    * this was and {@link TextureResource.refCount} how many subscriptions still hold it. A
    * write to any setter, an {@link TextureResource.activate} and a second `dispose()` do
    * nothing — a setter that would throw on the shape of this resource stays silent as well.
+   *
+   * A listener of the `dispose` event of this resource or of its texture that throws does not
+   * hold up the teardown: the resource is torn down whole, and the throw goes on to the caller
+   * afterwards — both together as an `AggregateError`, the one of the resource first. A second
+   * `dispose()` does nothing and throws nothing.
    */
   dispose() {
     if (this.#disposed) return;
     this.#disposed = true;
 
-    emit(this, OnDispose);
+    // a listener that throws does not hold up the teardown: its error waits until the resource
+    // is down, so a caller that catches it holds a disposed resource, not half of one
+    const errors: unknown[] = [];
+
+    try {
+      // every listener hears it, even behind one that throws
+      emitStrict(this, OnDispose);
+    } catch (error) {
+      errors.push(error);
+    }
 
     // the dispose event above is how subscribers learn this resource is gone; muting
     // keeps the clean-up below from following it with a texture update that would hand
@@ -583,20 +610,30 @@ export class TextureResource {
     this.#texture.set(undefined);
 
     // released only after the signal has given it up, so no reader can ever reach a
-    // texture that is already freed
-    this.#ownTexture?.dispose();
+    // texture that is already freed. three dispatches the dispose event of the texture in
+    // here, and a listener of that event may throw as well
+    try {
+      this.#ownTexture?.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
     this.#ownTexture = undefined;
 
     this.#loadFailures.clear();
 
     SignalGroup.delete(this);
     off(this);
+
+    throwCollected(
+      errors,
+      `TextureResource#dispose(): listeners of the dispose events of resource "${this.id}" and of its texture threw`,
+    );
   }
 
   // the record goes in before the event goes out: a listener of the error event reads it
   #fail(step: LoadStep, failure: TextureResourceLoadFailure): void {
     this.#loadFailures.set(step, failure);
-    emit(this, OnError, failure);
+    emitSafe(this, OnError, failure);
   }
 
   /** @internal */
@@ -718,11 +755,11 @@ export class TextureResource {
         // swapped in between cannot make this run give back what it never took
         const lease: ImageLease | undefined = this[imageSource]?.acquire(url);
 
-        // No closing .catch(): what either handler below still throws comes from a listener, is no
-        // failure of this step and ends as an unhandled rejection — an error listener that throws,
-        // or a dispose listener of the texture this run replaces. The latter throws out of the
-        // `finally` below before a throw that the batch handed back has gone out as an `error`
-        // event, and takes its place
+        // No closing .catch(): the `error` events below go out with emitSafe() and throw nothing,
+        // so what either handler still throws is a dispose listener of the texture this run
+        // replaces. It throws out of the `finally` below before a throw that the batch handed back
+        // has gone out as an `error` event, takes its place, is no failure of this step and ends
+        // as an unhandled rejection
         (lease?.image ?? new ImageLoader().loadAsync(url)).then(
           (image) => {
             if (aborted) return;
@@ -767,7 +804,7 @@ export class TextureResource {
               previous?.dispose();
             }
             if (publishError) {
-              emit(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+              emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
             }
           },
           (error) => {
@@ -809,7 +846,7 @@ export class TextureResource {
     }
   }
 
-  #registerTileSetEffects(tileSetOptions: Signal<TileSetOptions | undefined>): void {
+  #registerTileSetEffects(tileSetOptions: Signal<Readonly<TileSetOptions> | undefined>): void {
     createEffect(
       () => {
         this.#loadFailures.delete('tileSet');
@@ -895,10 +932,9 @@ export class TextureResource {
         if (!atlasUrl) return;
         const ac = new AbortController();
         this.#atlasFetch = ac;
-        // No closing .catch() here either: once the try below is over, what still throws — the
-        // #fail() of a fetch without a result, or the emit() of a throw while publishing — comes
-        // from an error listener that throws itself, is no failure of this step and ends as an
-        // unhandled rejection, as in the image effect
+        // No closing .catch() here either: once the try below is over, nothing throws any more —
+        // the #fail() of a fetch without a result and the `error` of a throw while publishing both
+        // go out with emitSafe()
         (async () => {
           // the try holds the fetch and nothing else: writing the json publishes whatever it
           // brings — with its image already there, the atlas within this very call — and a
@@ -957,7 +993,7 @@ export class TextureResource {
           } catch (error) {
             // signalize hands the throw of a subscriber to the writer once every effect has
             // run: the json and what is built from it are published, so no record is kept
-            emit(this, OnError, {source: 'texture', id: this.id, error});
+            emitSafe(this, OnError, {source: 'texture', id: this.id, error});
           }
         })();
         return () => {
@@ -1100,8 +1136,9 @@ export class TextureResource {
           } catch (error) {
             // One bad entry skips itself. Without this the throw leaves the effect through the
             // global error channel of signalize, no animation of the whole map is registered,
-            // and the caller is told nothing.
-            emit(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+            // and the caller is told nothing. emitSafe() for the same reason: an error listener
+            // that throws would take the rest of the map with it.
+            emitSafe(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
           }
         }
         this.#frameBasedAnimations.set(animations);

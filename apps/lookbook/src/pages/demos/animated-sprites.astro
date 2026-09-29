@@ -103,7 +103,7 @@ import {description, title} from './_animated-sprites.json';
     const material = new AnimatedSpritesMaterial();
 
     material.colorMap = texture;
-    material.animsMap = frameBasedAnimations.bakeDataTexture();
+    material.animsMap = frameBasedAnimations.bakeDataTexture({renderer});
 
     material.renderAsBillboards = false;
     material.depthTest = false;
