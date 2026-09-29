@@ -41,8 +41,10 @@ describe('sprites on the hot path', () => {
     // sprite. The fractional values here come from the constants, from `tint` and from the
     // frames, and the setters read the last two themselves: a setter that hands one of them on
     // as an argument of its own allocates in this round wherever V8 leaves that call un-inlined.
-    // That the setters hand the values of their caller on in one array is checked by the two
-    // tests after the allocation tests of the setters
+    // That the setters hand the values of their caller on in one array is checked by the tests
+    // `a textured sprite hands the values of setSize(), setPosition() and setColor() on in one
+    // array` and `an animated sprite hands the values of setSize() and setPosition() on in one
+    // array`
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < all.length; i++) {
         const sprite = all[i]!;

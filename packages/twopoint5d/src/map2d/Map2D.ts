@@ -16,6 +16,11 @@ export class Map2D extends Group {
    * it, in place of any visibilitor it brought along; when the map has none, the streamer taking
    * over keeps its own. The tile grid stays with the streamer that carries it, and the next
    * {@link update} lays out the whole tile set in that grid.
+   *
+   * When the `clearTiles()` of a renderer throws as it comes off the streamer that leaves, the map
+   * stays on that streamer with every renderer on it — those taken off before the throw go back
+   * onto it empty, and the next {@link update} lays out the whole tile set in them again — and the
+   * error goes on unchanged. Assigning the streamer again takes the move up.
    */
   get tileStreamer(): Map2DTileStreamer {
     return this.#tileStreamer;
@@ -26,8 +31,23 @@ export class Map2D extends Group {
 
     const previous = this.#tileStreamer;
 
-    for (const renderer of this.#renderers) {
-      previous.removeTileRenderer(renderer);
+    // every renderer comes off the streamer that leaves before anything else moves. When the
+    // clearTiles() of one throws, the renderers taken off before it go back onto that streamer and
+    // the error goes on: the map stays where it was, every renderer on exactly one streamer, and the
+    // next assignment takes the move up. The renderer that threw is still on the streamer, as
+    // Map2DTileStreamer#removeTileRenderer() leaves it
+    const takenOff: IMap2DTileRenderer[] = [];
+    try {
+      for (const renderer of this.#renderers) {
+        // `renderers` of a streamer is a public set: a renderer taken out of it directly is not
+        // put back onto it
+        if (!previous.renderers.has(renderer)) continue;
+        previous.removeTileRenderer(renderer);
+        takenOff.push(renderer);
+      }
+    } catch (error) {
+      for (const renderer of takenOff) previous.addTileRenderer(renderer);
+      throw error;
     }
 
     this.#tileStreamer = streamer;
@@ -167,7 +187,9 @@ export class Map2D extends Group {
    * Releases nothing: the tile renderers, the visibilitor and a `Map2DTileStreamer` handed to
    * the constructor all belong to the caller, and whoever wants a renderer disposed disposes it.
    * Every member answers afterwards as it did before — `tileStreamer` included — because nothing
-   * was given up. A second call does nothing.
+   * was given up. When the `clearTiles()` of a renderer throws, the error goes on, and that
+   * renderer and those not reached yet stay on the map; a second call takes off what is left.
+   * Otherwise a second call does nothing.
    */
   dispose(): void {
     // this map is a scene-graph node itself: it goes before it lets its renderers go,

@@ -73,11 +73,21 @@ describe('textureShapeKey()', () => {
     expect(textureShapeKey(comparing)).not.toBe(textureShapeKey(new DepthTexture(4, 4)));
   });
 
-  test('answers another key for the texture of a multisampled render target', () => {
+  test('answers another key for the depth texture of a multisampled render target', () => {
+    const multisampled = new RenderTarget(4, 4, {samples: 4, depthTexture: new DepthTexture(4, 4)});
+    const single = new RenderTarget(4, 4, {depthTexture: new DepthTexture(4, 4)});
+
+    expect(textureShapeKey(multisampled.depthTexture!)).not.toBe(textureShapeKey(single.depthTexture!));
+
+    multisampled.dispose();
+    single.dispose();
+  });
+
+  test('answers the same key for the color textures of a multisampled and a single-sampled render target', () => {
     const multisampled = new RenderTarget(4, 4, {samples: 4});
     const single = new RenderTarget(4, 4);
 
-    expect(textureShapeKey(multisampled.texture)).not.toBe(textureShapeKey(single.texture));
+    expect(textureShapeKey(multisampled.texture)).toBe(textureShapeKey(single.texture));
 
     multisampled.dispose();
     single.dispose();

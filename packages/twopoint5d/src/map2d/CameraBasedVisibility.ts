@@ -177,6 +177,12 @@ const SEEN_DEPTH = 0;
 const SEEN_FRUSTUM_BOX_SCALE = 1;
 const SEEN_MAX_VISIBLE_TILES = 2;
 
+// where `CameraBasedVisibility` keeps what the search compares against at the limit, see
+// `searchCanStop()`
+const SEARCH_STOP_HEIGHT_SQ = 0;
+const SEARCH_STOP_FOOTPRINT_DIAGONAL = 1;
+const SEARCH_STOP_DISTANCE_SQ = 2;
+
 /** The objects the dependency gate of {@link CameraBasedVisibility} compares. */
 interface CameraDependencies {
   centerPoint2D: Vector2;
@@ -440,6 +446,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // `maxVisibleTiles` of them, from then on a binary max-heap over `distanceToCamera`: the
   // furthest on top, where a nearer tile takes its place.
   readonly #kept: PooledTileBox[] = [];
+  // What `searchCanStop()` compares against, at the `SEARCH_STOP_…` indices: the height of the
+  // camera above the plane squared and the diagonal of the footprint of a frustum box — the same
+  // for every tile of one recomputation, written once the search holds `maxVisibleTiles` tiles —
+  // and the stop distance squared, written again each time another tile becomes the furthest kept
+  // one. A typed array for the reason `#seenScalars` is one.
+  readonly #searchStop = new Float64Array(3);
   readonly #hullPoints: TilePoint[] = [];
   readonly #hull: TilePoint[] = [];
 
@@ -850,7 +862,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const kept = this.#kept;
     let capped = false;
     while (this.#frontier.length > 0) {
-      if (kept.length >= limit && this.searchCanStop(this.#frontier[0]!, kept[0]!)) break;
+      if (kept.length >= limit && this.searchCanStop(this.#frontier[0]!)) break;
 
       const tile = this.popFrontier();
       this.updateFrustumBox(tile);
@@ -858,11 +870,17 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
       if (kept.length < limit) {
         kept.push(tile);
-        if (kept.length === limit) this.heapifyKept();
+        if (kept.length === limit) {
+          this.heapifyKept();
+          this.beginSearchStop();
+        }
       } else {
         // a visible tile goes: this one, or the furthest kept one it takes the place of
         capped = true;
-        if (tile.distanceToCamera < kept[0]!.distanceToCamera) this.siftDownKept(0, tile);
+        if (tile.distanceToCamera < kept[0]!.distanceToCamera) {
+          this.siftDownKept(0, tile);
+          this.updateSearchStop();
+        }
       }
       // expanded either way: a tile left out can still be the way to a nearer one
       this.pushNeighbors(tile);
@@ -1177,9 +1195,42 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   /**
+   * Writes what stays the same for the rest of the recomputation once the search holds
+   * `maxVisibleTiles` tiles — the height of the camera above the plane and the diagonal of the
+   * footprint of a frustum box — and then the stop distance for the furthest kept tile. Expects the
+   * kept tiles to be a heap.
+   */
+  private beginSearchStop(): void {
+    const stop = this.#searchStop;
+    // `planeWorld.distanceToPoint()` written out — see the note on doubles at the top of the module
+    const {normal, constant} = this.planeWorld;
+    const camera = this.#cameraWorldPosition;
+    const height = normal.x * camera.x + normal.y * camera.y + normal.z * camera.z + constant;
+    stop[SEARCH_STOP_HEIGHT_SQ] = height * height;
+    // the frustum boxes of all tiles have the same size. The search calls this once it holds
+    // maxVisibleTiles tiles, at least one
+    const {min, max} = this.#kept[0]!.frustumBox;
+    const dx = max.x - min.x;
+    const dz = max.z - min.z;
+    stop[SEARCH_STOP_FOOTPRINT_DIAGONAL] = Math.sqrt(dx * dx + dz * dz);
+    this.updateSearchStop();
+  }
+
+  /** Writes the stop distance squared for the furthest kept tile, the top of the heap. */
+  private updateSearchStop(): void {
+    const stop = this.#searchStop;
+    // fixed indices of an array of three, and a heap of at least one tile
+    const heightSq = stop[SEARCH_STOP_HEIGHT_SQ]!;
+    const furthestKept = this.#kept[0]!.distanceToCamera;
+    const rho = Math.sqrt(Math.max(furthestKept * furthestKept - heightSq, 0)) + stop[SEARCH_STOP_FOOTPRINT_DIAGONAL]!;
+    stop[SEARCH_STOP_DISTANCE_SQ] = heightSq + rho * rho;
+  }
+
+  /**
    * Whether the search stops before `next`, the nearest tile in the frontier, once
-   * `maxVisibleTiles` tiles are kept and `furthest` is the furthest of them: past the distance
-   * worked out here, no tile in the frontier leads to a visible tile nearer than that one.
+   * `maxVisibleTiles` tiles are kept: past the distance worked out for the furthest kept tile, the
+   * top of the heap, in `beginSearchStop()` and `updateSearchStop()`, no tile in the frontier leads
+   * to a visible tile nearer than that one.
    *
    * The center of a tile lies on the map plane, so its distance to the camera is
    * `√(h² + ρ²)` — `h` the height of the camera above the plane, `ρ` how far the center lies from
@@ -1193,29 +1244,26 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * way is at most `ρ` of the furthest kept tile plus the diagonal of a footprint, and the search,
    * which takes the tiles in the order of their distance, reaches each of them before it stops.
    *
+   * The argument holds for every tile whose frustum box meets the frustum.
+   * `Frustum#intersectsBox()` tests a box against the six planes one by one and also takes a box
+   * that passes by an edge or a corner of the frustum without meeting it; such a tile, taken as
+   * visible and nearer than the furthest kept one, can in rare cases be left out for a tile
+   * further away.
+   *
    * The height of the frustum boxes does not enter the margin, though it is why a margin is
    * needed at all: a tile whose box reaches into the frustum from below the lower edge of the
    * view can lie behind tiles a little further out than the furthest kept one. The argument needs
    * a map on the XZ plane — the plane this class works on — and a `frustumBoxScale` of at least 1
    * — its setter refuses less —, so that the boxes of neighbouring tiles leave no gap.
    *
-   * Tiles in and a boolean out: the distances stay in here — see the note on doubles at the top of
-   * the module.
+   * A tile in and a boolean out: the distance it is held against lies in `#searchStop`, see the
+   * note on doubles at the top of the module.
    */
-  private searchCanStop(next: PooledTileBox, furthest: PooledTileBox): boolean {
-    // `planeWorld.distanceToPoint()` written out, for the same reason
-    const {normal, constant} = this.planeWorld;
-    const camera = this.#cameraWorldPosition;
-    const height = normal.x * camera.x + normal.y * camera.y + normal.z * camera.z + constant;
-    const heightSq = height * height;
-    // the frustum boxes of all tiles have the same size
-    const {min, max} = furthest.frustumBox;
-    const dx = max.x - min.x;
-    const dz = max.z - min.z;
-    const footprintDiagonal = Math.sqrt(dx * dx + dz * dz);
-    const furthestKept = furthest.distanceToCamera;
-    const rho = Math.sqrt(Math.max(furthestKept * furthestKept - heightSq, 0)) + footprintDiagonal;
-    return next.distanceToCamera > Math.sqrt(heightSq + rho * rho);
+  private searchCanStop(next: PooledTileBox): boolean {
+    const distance = next.distanceToCamera;
+    // both sides squared: both are at least 0, so the order stays, and no square root is taken.
+    // A fixed index of an array of three
+    return distance * distance > this.#searchStop[SEARCH_STOP_DISTANCE_SQ]!;
   }
 
   /** Builds the max-heap over the kept tiles, bottom-up. */

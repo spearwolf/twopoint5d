@@ -1224,6 +1224,19 @@ describe('CameraBasedVisibility', () => {
   describe('maxVisibleTiles', () => {
     const horizonTileCoords = () => new Map2DTileCoordsUtil(16, 16);
 
+    type Vec3 = [number, number, number];
+    type Scene = {fov: number; far: number; position: Vec3; target: Vec3; center: [number, number]};
+    const horizon = (position: Vec3, target: Vec3): Scene => ({fov: 75, far: 1000, position, target, center: [0, 0]});
+
+    const makeCamera = ({fov, far, position, target}: Scene): PerspectiveCamera => {
+      const camera = new PerspectiveCamera(fov, 1.6, 0.1, far);
+      camera.position.set(...position);
+      camera.lookAt(...target);
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      return camera;
+    };
+
     /** Every tile the view reaches, as a fresh visibility without a limit finds them. */
     function unlimitedVisibles(
       camera: PerspectiveCamera | OrthographicCamera,
@@ -1354,9 +1367,6 @@ describe('CameraBasedVisibility', () => {
       // of the view reaches up into the frustum: the tile nearest to the camera lies outside the
       // area the probe rays span, and the search reaches it only from a tile further away.
       // Moved and turned, the camera puts that tile at other places relative to the grid.
-      type Vec3 = [number, number, number];
-      type Scene = {fov: number; far: number; position: Vec3; target: Vec3; center: [number, number]};
-      const horizon = (position: Vec3, target: Vec3): Scene => ({fov: 75, far: 1000, position, target, center: [0, 0]});
       const scenes: Scene[] = [
         horizon([0, 40, 0], [0, 0, -300]),
         horizon([7.3, 40, 5.1], [7.3, 0, -295]),
@@ -1370,15 +1380,6 @@ describe('CameraBasedVisibility', () => {
         {fov: 51, far: 440, position: [14, 92, -5], target: [-47, 0, 279], center: [5, -11]},
         {fov: 45, far: 530, position: [10, 110, 18], target: [-376, 0, 158], center: [5, 14]},
       ];
-      const makeCamera = ({fov, far, position, target}: Scene): PerspectiveCamera => {
-        const camera = new PerspectiveCamera(fov, 1.6, 0.1, far);
-        camera.position.set(...position);
-        camera.lookAt(...target);
-        camera.updateMatrixWorld();
-        camera.updateProjectionMatrix();
-        return camera;
-      };
-
       vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       for (const scene of scenes) {
@@ -1398,6 +1399,27 @@ describe('CameraBasedVisibility', () => {
             `camera at ${scene.position} to ${scene.target}, limit ${limit}`,
           );
         }
+      }
+    });
+
+    test('keeps the nearest tiles of each view when one visibility follows a camera that moves and climbs', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const visibility = new CameraBasedVisibility();
+      visibility.maxVisibleTiles = 12;
+
+      // low, high, low again, each time looking another way
+      const scenes: Scene[] = [
+        horizon([0, 40, 0], [0, 0, -300]),
+        {fov: 46, far: 800, position: [-5, 108, -1], target: [-388, 0, 123], center: [-12, -3]},
+        horizon([-11, 52, 3], [-200, 0, -230]),
+      ];
+
+      for (const scene of scenes) {
+        visibility.camera = makeCamera(scene);
+        const result = visibility.computeVisibleTiles([], scene.center, horizonTileCoords(), new Matrix4())!;
+        const reference = unlimitedVisibles(makeCamera(scene), horizonTileCoords(), scene.center);
+        expectTheNearest(visibility, result, reference, 12, `camera at ${scene.position} to ${scene.target}`);
       }
     });
 

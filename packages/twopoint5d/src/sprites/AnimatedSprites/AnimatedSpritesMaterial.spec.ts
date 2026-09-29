@@ -103,11 +103,11 @@ describe('AnimatedSpritesMaterial', () => {
     // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as the constructor
     // takes another material or a texture; Vitest checks nothing here. The functions are never called.
     const buildWithMaterial = (material: MeshBasicMaterial) => {
-      // @ts-expect-error the constructor takes the parameters of a AnimatedSpritesMaterial only
+      // @ts-expect-error the constructor takes the parameters of an AnimatedSpritesMaterial only
       return new AnimatedSpritesMaterial(material);
     };
     const buildWithTexture = (texture: Texture) => {
-      // @ts-expect-error the constructor takes the parameters of a AnimatedSpritesMaterial only
+      // @ts-expect-error the constructor takes the parameters of an AnimatedSpritesMaterial only
       return new AnimatedSpritesMaterial(texture);
     };
     void buildWithMaterial;

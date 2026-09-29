@@ -10,8 +10,8 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
-// three 0.185.1 takes the vertex format of an attribute of one value from a table that knows the 32-bit
-// types and the 16-bit integers, which it widens to 32 bits unless they are normalized
+// three 0.185.1 takes the vertex format of an attribute of one value from a table that knows the
+// 32-bit types and the 16-bit integers, which it widens to 32 bits unless they are normalized
 // (`WebGPUAttributeUtils.js:32–38`, `:527–529`), and the format of a larger one from the typed
 // array and `normalized` (`:12–26`, `:533–548`). WebGPU itself has no format for 64-bit values,
 // none that normalizes 32-bit integers or floats, and none of more than four values.

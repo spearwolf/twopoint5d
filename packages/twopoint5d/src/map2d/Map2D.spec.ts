@@ -90,6 +90,65 @@ describe('Map2D', () => {
       map.update();
       expect(renderer.held.size, 'tiles after the next update').toBeGreaterThan(0);
     });
+
+    test('leaves the map and every renderer on the streamer it has when a clearTiles() throws, and moves them with the next assignment', () => {
+      const map = new Map2D();
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      const first = makeHoldingTileRenderer();
+      const throwing = makeHoldingTileRenderer();
+      const last = makeHoldingTileRenderer();
+      const clearTiles = throwing.clearTiles;
+      // the first update clears every renderer as well: the throw is armed once the view is laid out
+      let threw = true;
+      throwing.clearTiles = function () {
+        if (!threw) {
+          threw = true;
+          throw new Error('the tile set is gone');
+        }
+        clearTiles.call(this);
+      };
+      map.addTileRenderer(first);
+      map.addTileRenderer(throwing);
+      map.addTileRenderer(last);
+      const visibilitor = new RectangularVisibilityArea(100, 100);
+      map.visibilitor = visibilitor;
+      map.update();
+      const tilesOfTheView = [...last.held].sort();
+      expect(tilesOfTheView.length, 'tiles before the switch').toBeGreaterThan(0);
+      threw = false;
+
+      const leaving = map.tileStreamer;
+      const taking = new Map2DTileStreamer(100, 100);
+
+      expect(() => (map.tileStreamer = taking)).toThrow('the tile set is gone');
+      expect(map.tileStreamer, 'the streamer of the map after the throw').toBe(leaving);
+      expect(map.visibilitor, 'the visibilitor of the map after the throw').toBe(visibilitor);
+      expect(taking.visibilitor, 'the streamer that was to take over').toBeUndefined();
+      for (const [name, renderer] of [
+        ['first', first],
+        ['throwing', throwing],
+        ['last', last],
+      ] as const) {
+        expect(leaving.renderers.has(renderer), `${name} on the streamer the map has`).toBe(true);
+        expect(taking.renderers.has(renderer), `${name} on the streamer that was to take over`).toBe(false);
+      }
+
+      map.update();
+      for (const renderer of [first, throwing, last]) {
+        expect([...renderer.held].sort(), 'tiles after the next update').toEqual(tilesOfTheView);
+      }
+
+      map.tileStreamer = taking;
+      expect(map.tileStreamer).toBe(taking);
+      expect(leaving.renderers.size, 'renderers left on the streamer that left').toBe(0);
+      for (const renderer of [first, throwing, last]) expect(taking.renderers.has(renderer)).toBe(true);
+
+      map.update();
+      for (const renderer of [first, throwing, last]) {
+        expect([...renderer.held].sort(), 'tiles after the move').toEqual(tilesOfTheView);
+      }
+    });
   });
 
   describe('removeTileRenderer()', () => {
@@ -323,6 +382,37 @@ describe('Map2D', () => {
       }).not.toThrow();
 
       expect(removeTileRenderer.calledOnce).toBe(true);
+    });
+
+    test('a second call after a clearTiles() that threw takes off the renderers that are left', () => {
+      const map = new Map2D();
+      const parent = new Group();
+      parent.add(map);
+      const throwing = makeHoldingTileRenderer();
+      const staying = makeHoldingTileRenderer();
+      const clearTiles = throwing.clearTiles;
+      let threw = false;
+      throwing.clearTiles = function () {
+        if (!threw) {
+          threw = true;
+          throw new Error('the tile set is gone');
+        }
+        clearTiles.call(this);
+      };
+      map.addTileRenderer(throwing);
+      map.addTileRenderer(staying);
+
+      expect(() => map.dispose()).toThrow('the tile set is gone');
+      expect(map.parent, 'map after the throw').toBeNull();
+      expect(throwing.node.parent, 'first renderer after the throw').toBe(map);
+      expect(staying.node.parent, 'second renderer after the throw').toBe(map);
+      expect(map.tileStreamer.renderers.has(throwing)).toBe(true);
+      expect(map.tileStreamer.renderers.has(staying)).toBe(true);
+
+      expect(() => map.dispose()).not.toThrow();
+      expect(throwing.node.parent, 'first renderer after the second call').toBeNull();
+      expect(staying.node.parent, 'second renderer after the second call').toBeNull();
+      expect(map.tileStreamer.renderers.size).toBe(0);
     });
 
     // (e) has no subject here: a Map2D creates neither signals nor effects.

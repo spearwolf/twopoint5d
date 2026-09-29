@@ -50,8 +50,9 @@ const bit = (value: boolean): string => (value ? '1' : '0');
  * - whether a filter blends texels: a texture that cannot be filtered on the device is then
  *   filtered in the shader, and read texel by texel otherwise
  * - whether a `compareFunction` is set, which a depth texture samples with a comparison sampler
- * - whether the render target of the texture takes more than one sample, which makes the binding
- *   multisampled for a depth texture
+ * - whether the render target of a depth texture takes more than one sample, which makes its
+ *   binding multisampled; the color texture of such a target binds as the single-sampled texture
+ *   it resolves into
  *
  * Everything else — the image, its size, wrapping, `flipY`, and a change between two filters on
  * the same side of the two filter tests — three takes at run time from the `value` of the node: the
@@ -73,7 +74,7 @@ export const textureShapeKey = (texture: Texture | undefined): string | undefine
   flags += bit(minFilter === NearestFilter && magFilter === NearestFilter);
   flags += bit(blends(minFilter) || blends(magFilter));
   flags += bit(((texture as {compareFunction?: unknown}).compareFunction ?? null) !== null);
-  flags += bit((texture.renderTarget?.samples ?? 0) > 1);
+  flags += bit((texture as {isDepthTexture?: unknown}).isDepthTexture === true && (texture.renderTarget?.samples ?? 0) > 1);
 
   return `${texture.colorSpace}|${texture.type}|${texture.format}|${flags}`;
 };
