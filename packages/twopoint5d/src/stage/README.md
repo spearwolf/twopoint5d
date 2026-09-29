@@ -50,6 +50,7 @@ fast and need the canonical idioms.
 | `ClearStage` | Marker stage that emits `renderer.clear(...)` between siblings (depth-only by default). |
 | `RootRenderPipeline` | `RenderPipeline` subclass with a built-in additive composition (`p0.add(p1).add(p2)…`). Assign as `StageRenderer.pipeline` to skip `buildOutputNode` for the common "compose every stage" case. |
 | `StageRenderTargetPool` | Lends the internal target of Mode C to the `StageRenderer`s it is set on, one draw at a time, so renderers of the same size share one target. Built, handed in and disposed by the caller. |
+| `createBloomOutputNodeBuilder()` | Returns a ready-made `buildOutputNode`: every pass composed additively, the bloom of the composition on top. Releases the bloom it built when it builds the next one and on `dispose()`. Built, assigned and disposed by the caller, one per `StageRenderer`. |
 
 ### Interfaces
 
@@ -270,9 +271,8 @@ Two notes on the types in the examples below. `Display.renderer` is
 that is up and running asserts it with `!`. And `buildOutputNode` hands you its
 passes as plain `Node`s: neither the concrete `Node<'vec4'>` that `bloom()` asks
 for nor the arithmetic operators that TSL attaches through the ShaderNodeProxy at
-runtime are visible to the static type. Each example casts for what it needs —
-`Node<'vec4'>` alone where it only feeds the pass onward, plus `.add()` where it
-composes — and the comment next to the cast names the reason the pass is there at all.
+runtime are visible to the static type. An example that writes its own callback casts
+for both, and the comment next to the cast names the reason the pass is there at all.
 
 ### Mode C — pipeline samples an internal RT
 
@@ -351,17 +351,23 @@ When you want a real effect (bloom, blur, FXAA, etc.), provide
 `buildOutputNode(stagePasses)`. It receives the list of nodes returned by
 each stage's `asPassNode()` and returns the composed TSL graph.
 
+For the stack that comes up again and again — every pass composed additively,
+the bloom of that composition on top — `createBloomOutputNodeBuilder()` hands you
+a ready-made `buildOutputNode`:
+
 ```ts
-import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
-import type {Node} from 'three/webgpu';
+import {createBloomOutputNodeBuilder} from '@spearwolf/twopoint5d';
 
 const sr = new StageRenderer(display).setClearColor(new Color('#000')).add(stage);
-sr.pipeline = new RenderPipeline(display.renderer!);
-sr.buildOutputNode = ([scenePass]) => {
-  // `sr` was given exactly one stage above, so the pass list has its first entry
-  const pass = scenePass as Node<'vec4'>;
-  return bloom(pass, 1.2, 0.6, 0.0);
-};
+const pipeline = new RenderPipeline(display.renderer!);
+const withBloom = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.6});
+sr.pipeline = pipeline;
+sr.buildOutputNode = withBloom;
+
+// teardown: the renderer lets go first, then the builder and the pipeline go
+sr.dispose();
+withBloom.dispose();
+pipeline.dispose();
 ```
 
 - `Stage2D.asPassNode()` returns `pass(scene, camera)` — handled per frame by
@@ -377,6 +383,30 @@ after a stage announced a new camera or a new scene through
 does), or after `invalidateOutputNode()`. While the renderer
 has no area, or while a `Stage2D` it composes has no camera yet, the composed
 mode draws nothing.
+
+#### Writing your own `buildOutputNode`
+
+Neither the renderer nor three's `RenderPipeline` releases the `outputNode` a
+rebuild replaces. An effect node your callback builds with render targets of
+its own — `bloom()` has them — is yours to release, or every rebuild leaves one
+behind. Release the one of the previous call once the next one stands, and the
+last one when you are done, as `createBloomOutputNodeBuilder()` does:
+
+```ts
+import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
+import type {Node} from 'three/webgpu';
+
+let lastGlow: {dispose(): void} | undefined;
+sr.buildOutputNode = ([scenePass]) => {
+  // `sr` was given exactly one stage above, so the pass list has its first entry,
+  // and `.add()` lives on the ShaderNodeProxy rather than on `Node`
+  const pass = scenePass as Node<'vec4'> & {add(other: Node): Node};
+  const glow = bloom(pass, 1.2, 0.6);
+  lastGlow?.dispose();
+  lastGlow = glow;
+  return pass.add(glow);
+};
+```
 
 ### Shortcut: `RootRenderPipeline` — additive composition out of the box
 
@@ -394,8 +424,8 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 ```
 
 Setting `stageRenderer.buildOutputNode` overrides the default — use it
-when you want a non-additive composition (e.g. bloom wrapping a single
-pass).
+when you want more than the additive composition, such as the bloom on top
+of it that `createBloomOutputNodeBuilder()` adds.
 
 ### Mode E — nested renderers, each with its own post-effect
 
@@ -406,15 +436,11 @@ one node in its own pipeline composition.
 ```ts
 const root = new StageRenderer(display).setClearColor(new Color('#000'));
 
-// World layer with its own bloom (Mode D — custom composition)
+// World layer with its own bloom (Mode D — a ready-made composition)
 const worldRenderer = new StageRenderer(root).add(worldStage);
+const worldBloom = createBloomOutputNodeBuilder({strength: 1.5, radius: 0.5});
 worldRenderer.pipeline = new RenderPipeline(display.renderer!);
-worldRenderer.buildOutputNode = ([scenePass]) => {
-  // `worldRenderer` was given exactly one stage above, so the pass list has its
-  // first entry, and `.add()` lives on the ShaderNodeProxy rather than on `Node`
-  const pass = scenePass as Node<'vec4'> & {add(other: Node): Node};
-  return pass.add(bloom(pass, 1.5, 0.5));
-};
+worldRenderer.buildOutputNode = worldBloom;
 
 // UI layer plain
 root.add(uiStage);
@@ -580,7 +606,16 @@ What this layer does on top of the general rules in
   back; a disposed pool lends nothing — `acquire()` throws, and a `StageRenderer` refuses it.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
-  write to `pipeline` falls through.
+  write to `pipeline`, `buildOutputNode` or `internalTargetPool` falls through.
+- A builder from `createBloomOutputNodeBuilder()` belongs to the caller. Each call releases
+  the bloom node the call before built, once the new output node stands — neither the
+  renderer nor three's `RenderPipeline` releases an `outputNode` a rebuild replaces —, and
+  `dispose()` releases the last one; the pass nodes it composes belong to the stages and
+  stay. `StageRenderer#dispose()` lets go of the builder and leaves it alone. Give every
+  renderer a builder of its own: one that two renderers share releases the bloom of one of
+  them whenever the other rebuilds. A disposed builder throws when it is called, and a
+  `StageRenderer` refuses it; take the builder off the renderer — `buildOutputNode =
+  undefined`, or dispose the renderer — before you dispose it.
 - `add(stage)` sets both sides of the relation: an added child `StageRenderer` answers
   the renderer as its `parent` and gets its `OnAddToParent`; it has one holder, and
   leaves the host or the renderer that held it. `remove(stage)` clears both sides: a

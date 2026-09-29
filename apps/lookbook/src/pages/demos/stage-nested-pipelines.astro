@@ -10,6 +10,7 @@ import {description, title} from './_stage-nested-pipelines.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {
+    createBloomOutputNodeBuilder,
     Display,
     OnStageUpdateFrame,
     ParallaxProjection,
@@ -19,8 +20,7 @@ import {description, title} from './_stage-nested-pipelines.json';
     TextureFactory,
     type StageUpdateFrameProps,
   } from '@spearwolf/twopoint5d';
-  import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
-  import {Color, RenderPipeline, Sprite, SpriteMaterial, type Node} from 'three/webgpu';
+  import {Color, RenderPipeline, Sprite, SpriteMaterial} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
 
   const canvas = document.getElementById('twopoint5d')!;
@@ -50,13 +50,7 @@ import {description, title} from './_stage-nested-pipelines.json';
   worldRenderer.name = 'world-renderer';
   // the display was constructed above, so it holds its renderer; only dispose() takes it away again
   worldRenderer.pipeline = new RenderPipeline(display.renderer!);
-  worldRenderer.buildOutputNode = ([scenePass]) => {
-    // worldRenderer was given exactly one stage above, so the pass list has its first entry.
-    // TSL nodes expose their arithmetic operators via the ShaderNodeProxy at runtime; the
-    // static `Node` type does not surface `.add()`.
-    const pass = scenePass as Node<'vec4'> & {add(other: Node): Node};
-    return pass.add(bloom(pass, 1.5, 0.5, 0.0));
-  };
+  worldRenderer.buildOutputNode = createBloomOutputNodeBuilder({strength: 1.5, radius: 0.5});
 
   const palette = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffe0b3'];
   const worldSprites: Sprite[] = [];

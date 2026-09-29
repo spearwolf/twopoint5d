@@ -26,6 +26,7 @@ import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost} from './IStageRendererHost.js';
+import type {OutputNodeBuilder} from './outputNodeBuilders.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import type {Stage2D} from './Stage2D.js';
 import {StageRendererTargets} from './StageRendererTargets.js';
@@ -521,6 +522,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * samples the internal target releases the GPU memory of that target;
    * clearing it again allocates that memory again on the next frame.
    *
+   * The callback runs again on every rebuild of the output node, and neither this renderer nor
+   * the pipeline releases the output node a rebuild replaces: an effect node the callback builds
+   * with render targets of its own, such as a `bloom()` of three.js, is the callback's to release.
+   * A builder from `createBloomOutputNodeBuilder()` does that itself; once disposed it is refused
+   * here with an error naming the call and the state, and the callback set before stays.
+   *
    * A disposed renderer answers `undefined` here and takes no new one: like
    * `pipeline`, the write is a silent no-op.
    */
@@ -531,6 +538,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   set buildOutputNode(buildOutputNode: StageRendererBuildOutputNode | undefined) {
     if (this.#disposed) return;
     if (this.#buildOutputNode !== buildOutputNode) {
+      if ((buildOutputNode as Partial<OutputNodeBuilder> | undefined)?.isDisposed === true) {
+        throw new Error('StageRenderer#buildOutputNode cannot take the builder: that builder has been disposed');
+      }
       const previousMode = this.#renderMode();
       this.#buildOutputNode = buildOutputNode;
       this.#modeInputChanged(previousMode);

@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {
+  createBloomOutputNodeBuilder,
   Display,
   OrthographicProjection,
   ParallaxProjection,
@@ -362,6 +363,120 @@ describe('StageRenderer — pipeline integration', () => {
     target.dispose();
     geometry.dispose();
     material.dispose();
+  });
+
+  /**
+   * A 16 x 16 square on black in a 64 x 64 target, drawn by a renderer without a host through
+   * a `RenderPipeline` and the `buildOutputNode` `makeBuild` answers.
+   *
+   * @param {() => import('@spearwolf/twopoint5d').StageRendererBuildOutputNode & {dispose?: () => void}} makeBuild
+   * @param {(ctx: {sr: StageRenderer, target: RenderTarget, renderer: import('three/webgpu').WebGPURenderer}) => Promise<void>} run
+   * @param {string} [color] the color of the square, white by default
+   */
+  async function withSquare(makeBuild, run, color = '#fff') {
+    // a display of its own, released here: a test that calls this twice must not leave the first one to
+    // the afterEach of the suite, which knows only the last one
+    const squareHost = makeContainer({width: 64, height: 64});
+    const squareDisplay = new Display(squareHost);
+    await squareDisplay.start();
+    const renderer = squareDisplay.renderer;
+
+    const target = new RenderTarget(64, 64);
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color(color)});
+    stage.scene.add(new Mesh(geometry, material));
+
+    const sr = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
+    const pipeline = new RenderPipeline(renderer);
+    const build = makeBuild();
+    sr.pipeline = pipeline;
+    sr.buildOutputNode = build;
+    sr.outputRenderTarget = target;
+    sr.resize(64, 64);
+
+    try {
+      await run({sr, target, renderer});
+    } finally {
+      // the renderer lets go first, then the builder, the stage, the pipeline and the rest, the display last
+      sr.dispose();
+      build.dispose?.();
+      stage.dispose();
+      pipeline.dispose();
+      target.dispose();
+      geometry.dispose();
+      material.dispose();
+      disposeDisplay(squareDisplay);
+      squareHost.remove();
+    }
+  }
+
+  it('Mode D: createBloomOutputNodeBuilder() keeps the stage and lays a glow around what is bright', async () => {
+    const readProbe = async () => {
+      let pixels;
+      await withSquare(
+        () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}),
+        async ({sr, target, renderer}) => {
+          sr.renderTo(renderer);
+          pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+        },
+      );
+      return pixels;
+    };
+    const withBloom = await readProbe();
+
+    let control;
+    await withSquare(
+      () =>
+        ([pass]) =>
+          pass,
+      async ({sr, target, renderer}) => {
+        sr.renderTo(renderer);
+        control = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+      },
+    );
+
+    const center = rgbAt(withBloom, 64, 32, 32);
+    const probe = rgbAt(withBloom, 64, 46, 32);
+    const controlProbe = rgbAt(control, 64, 46, 32);
+
+    // measured under Chromium and Firefox, both on the WebGL2 backend: center 255, probe 116, control 0 —
+    // the threshold sits well below the glow and far above the control
+    expect(isNearColor(center, [255, 255, 255], 8), 'the stage stands in the output').to.be.true;
+    expect(probe[0], 'a glow 6 px outside the edge of the square').to.be.above(60);
+    expect(isNearColor(controlProbe, [0, 0, 0]), 'the same point without the builder').to.be.true;
+  });
+
+  it('Mode D: createBloomOutputNodeBuilder() draws what stays below its threshold as the stage draws it', async () => {
+    let pixels;
+    await withSquare(
+      () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0.9}),
+      async ({sr, target, renderer}) => {
+        sr.renderTo(renderer);
+        pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+      },
+      '#808080',
+    );
+
+    // linear 0.216 is far below the threshold, so no glow is added and the composition alone stands
+    // in the output: encoded to sRGB once it reads 128
+    expect(isNearColor(rgbAt(pixels, 64, 32, 32), [128, 128, 128], 4), 'the middle of the square').to.be.true;
+    expect(isNearColor(rgbAt(pixels, 64, 46, 32), [0, 0, 0]), 'six pixels outside its edge').to.be.true;
+  });
+
+  it('Mode D: a rebuild through createBloomOutputNodeBuilder() leaves the texture count of the renderer where the first build left it', async () => {
+    await withSquare(
+      () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}),
+      async ({sr, renderer}) => {
+        sr.renderTo(renderer);
+        const texturesAfterFirstBuild = renderer.info.memory.textures;
+
+        sr.invalidateOutputNode();
+        sr.renderTo(renderer);
+
+        expect(renderer.info.memory.textures).to.equal(texturesAfterFirstBuild);
+      },
+    );
   });
 
   /**

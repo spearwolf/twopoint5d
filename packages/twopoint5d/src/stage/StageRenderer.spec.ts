@@ -1,3 +1,4 @@
+import BloomNode from 'three/examples/jsm/tsl/display/BloomNode.js';
 import {createSandbox} from 'sinon';
 import {
   ACESFilmicToneMapping,
@@ -18,12 +19,27 @@ import {OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageRemoved} from '.
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
+import {createBloomOutputNodeBuilder} from './outputNodeBuilders.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
 import {StageRenderTargetPool} from './StageRenderTargetPool.js';
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
+
+// the BloomNodes reachable from `root`, found through Node#getChildren()
+function findBlooms(root: Node): BloomNode[] {
+  const seen = new Set<Node>();
+  const blooms: BloomNode[] = [];
+  const visit = (node: Node) => {
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (node instanceof BloomNode) blooms.push(node);
+    for (const child of node.getChildren()) visit(child);
+  };
+  visit(root);
+  return blooms;
+}
 
 interface RendererMock {
   autoClear: boolean;
@@ -1674,6 +1690,12 @@ describe('StageRenderer', () => {
   });
 
   describe('Mode D and E: composing the pass nodes of the stages', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
     function fakePassNode(label: string) {
       return {isNode: true, label, type: 'pass'} as any;
     }
@@ -1752,6 +1774,39 @@ describe('StageRenderer', () => {
 
       sr.remove(stage);
       expect(getSubscriptionCount(stage), 'after remove()').toBe(before);
+    });
+
+    it('a rebuild through a builder of createBloomOutputNodeBuilder() releases the bloom node of the build before', () => {
+      const {sr, pipeline} = makeComposedSetup();
+      const builder = createBloomOutputNodeBuilder();
+      sr.buildOutputNode = builder;
+      sr.resize(100, 100);
+      sr.renderTo(renderer as any);
+
+      const first = findBlooms(pipeline.outputNode as Node);
+      expect(first).toHaveLength(1);
+      const firstDispose = sandbox.spy(first[0]!, 'dispose');
+
+      sr.invalidateOutputNode();
+      sr.renderTo(renderer as any);
+
+      const second = findBlooms(pipeline.outputNode as Node);
+      expect(firstDispose.calledOnce).toBe(true);
+      expect(second).toHaveLength(1);
+      expect(second[0]).not.toBe(first[0]);
+
+      builder.dispose();
+    });
+
+    it('refuses a disposed builder with an error naming the call and the state, and keeps the callback it had', () => {
+      const {sr, buildOutputNode} = makeComposedSetup();
+      const builder = createBloomOutputNodeBuilder();
+      builder.dispose();
+
+      expect(() => (sr.buildOutputNode = builder)).toThrow(
+        'StageRenderer#buildOutputNode cannot take the builder: that builder has been disposed',
+      );
+      expect(sr.buildOutputNode).toBe(buildOutputNode);
     });
 
     it('a composing renderer draws nothing while it is 0×0', () => {
@@ -2331,6 +2386,26 @@ describe('StageRenderer', () => {
       sr.buildOutputNode = buildOutputNode;
       expect(sr.buildOutputNode, 'buildOutputNode after a write').toBeUndefined();
       expect(() => sr.renderTo(renderer as any), 'renderTo() on a disposed renderer').not.toThrow();
+    });
+
+    it('leaves a builder of createBloomOutputNodeBuilder() alone', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100})));
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      const builder = createBloomOutputNodeBuilder();
+      sr.buildOutputNode = builder;
+      sr.renderTo(renderer as any);
+      const bloomDispose = sandbox.spy(findBlooms(pipeline.outputNode as Node)[0]!, 'dispose');
+
+      sr.dispose();
+
+      expect(builder.isDisposed).toBe(false);
+      expect(bloomDispose.called).toBe(false);
+      expect(sr.buildOutputNode).toBeUndefined();
+
+      builder.dispose();
     });
 
     it('emits dispose once before it stops listening', () => {

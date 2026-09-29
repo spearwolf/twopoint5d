@@ -1,6 +1,6 @@
 {
   "title": "stage post-processing",
-  "description": "Stage2D with a `RenderPipeline` post-pass (bloom) wired via `StageRenderer.buildOutputNode`",
+  "description": "Stage2D with a `RenderPipeline` post-pass (bloom) from `createBloomOutputNodeBuilder()`, wired via `StageRenderer.buildOutputNode`",
   "url": "/demos/stage-postprocessing",
   "tags": ["Display", "ParallaxProjection", "Stage2D", "StageRenderer", "RenderPipeline", "post-processing", "vanilla"]
 }

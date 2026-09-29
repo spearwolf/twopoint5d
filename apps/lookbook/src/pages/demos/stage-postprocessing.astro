@@ -10,6 +10,7 @@ import {description, title} from './_stage-postprocessing.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {
+    createBloomOutputNodeBuilder,
     Display,
     OnStageUpdateFrame,
     ParallaxProjection,
@@ -18,8 +19,7 @@ import {description, title} from './_stage-postprocessing.json';
     TextureFactory,
     type StageUpdateFrameProps,
   } from '@spearwolf/twopoint5d';
-  import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
-  import {Color, RenderPipeline, Sprite, SpriteMaterial, type Node} from 'three/webgpu';
+  import {Color, RenderPipeline, Sprite, SpriteMaterial} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
 
   const canvas = document.getElementById('twopoint5d')!;
@@ -29,17 +29,10 @@ import {description, title} from './_stage-postprocessing.json';
 
   const stageRenderer = new StageRenderer(display).setClearColor(new Color('#0a0a1f'), 1).add(stage);
 
-  // Build a tiny post-pass: bloom on top of the rendered scene.
+  // A tiny post-pass: bloom on top of the rendered scene.
   // The display was constructed above, so it holds its renderer; only dispose() takes it away again.
   stageRenderer.pipeline = new RenderPipeline(display.renderer!);
-  // stageRenderer.buildOutputNode = ([scenePass]) => bloom(scenePass as Node<'vec4'>, 1.2, 0.6, 0.0);
-  stageRenderer.buildOutputNode = ([scenePass]) => {
-    // stageRenderer was given exactly one stage above, so the pass list has its first entry.
-    // TSL nodes expose their arithmetic operators via the ShaderNodeProxy at runtime; the
-    // static `Node` type does not surface `.add()`.
-    const pass = scenePass as Node<'vec4'> & {add(other: Node): Node};
-    return pass.add(bloom(pass, 1.2, 0.6, 0.0));
-  };
+  stageRenderer.buildOutputNode = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.6});
 
   const textureFactory = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']);
 
