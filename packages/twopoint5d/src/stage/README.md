@@ -556,6 +556,11 @@ On `StageRenderer`:
 - `OnAddToParent` / `OnRemoveFromParent` — emitted at the **child** when its `parent` changes.
 - `OnStageDispose` — once, from `dispose()`, before the renderer stops listening.
 
+A listener of one of these events that throws does not cut short the call that sends it:
+every listener hears the event, `add()`, `remove()`, a write to `parent`, `attach()`,
+`detach()` and `dispose()` run to their end, and the error reaches the caller afterwards —
+one unchanged, several as an `AggregateError`.
+
 On `Stage2D`:
 
 - `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`. `OnStageUpdateFrame` hands every
@@ -619,7 +624,9 @@ What this layer does on top of the general rules in
   it, and drops its stages through `remove()`, so a disposed renderer is no longer driven
   by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
   of its pass-target — the child itself is not disposed. An `OnStageDispose` goes out
-  before the renderer stops listening.
+  before the renderer stops listening. A listener of `OnStageRemoved`,
+  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this; its error
+  reaches the caller once the renderer is down.
 - A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for one
   draw at a time; while it is set the renderer builds no internal target of its own, and
   assigning it releases the one it had. The pool belongs to the caller: `pool.dispose()`

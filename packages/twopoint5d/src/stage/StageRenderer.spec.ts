@@ -858,6 +858,151 @@ describe('StageRenderer', () => {
       sr.renderTo(renderer as any);
       expect(x.renderTo, 'the order is the one renderOrder names').not.toHaveBeenCalled();
     });
+
+    describe('listeners that throw or dispose', () => {
+      const sandbox = createSandbox();
+
+      afterEach(() => {
+        sandbox.restore();
+      });
+
+      it('remove() lets go of both sides of a child behind an OnStageRemoved listener that throws', () => {
+        const parent = new StageRenderer();
+        const child = new StageRenderer(parent);
+        child.resize(50, 50);
+        const passTarget = (child.asPassNode(renderer as any) as any).value.renderTarget;
+        const failure = new Error('the listener failed');
+        on(parent, OnStageRemoved, () => {
+          throw failure;
+        });
+        const heard = vi.fn();
+        on(parent, OnStageRemoved, heard);
+        const left = vi.fn();
+        on(child, OnRemoveFromParent, left);
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        expect(thrownBy(() => parent.remove(child))).toBe(failure);
+
+        expect(heard).toHaveBeenCalledTimes(1);
+        expect(left).toHaveBeenCalledTimes(1);
+        expect(child.parent).toBeUndefined();
+        expect(parent.hasStage(child)).toBe(false);
+        expect(rtDispose.calledOn(passTarget)).toBe(true);
+      });
+
+      it('remove() hands on the errors of OnStageRemoved and of OnRemoveFromParent at the child as an AggregateError', () => {
+        const parent = new StageRenderer();
+        const child = new StageRenderer(parent);
+        const e1 = new Error('removed');
+        const e2 = new Error('left');
+        on(parent, OnStageRemoved, () => {
+          throw e1;
+        });
+        on(child, OnRemoveFromParent, () => {
+          throw e2;
+        });
+
+        const error = thrownBy(() => parent.remove(child)) as AggregateError;
+
+        expect(error).toBeInstanceOf(AggregateError);
+        expect(error.message).toBe(
+          'StageRenderer#remove(): more than one listener of OnStageRemoved and OnRemoveFromParent threw',
+        );
+        expect(error.errors).toHaveLength(2);
+        expect(error.errors[0]).toBe(e1);
+        expect(error.errors[1]).toBe(e2);
+      });
+
+      it('add() gives an added child its OnAddToParent behind an OnStageAdded listener that throws', () => {
+        const root = new StageRenderer();
+        const child = new StageRenderer();
+        const failure = new Error('the listener failed');
+        on(root, OnStageAdded, () => {
+          throw failure;
+        });
+        const heard = vi.fn();
+        on(root, OnStageAdded, heard);
+        const joined = vi.fn();
+        on(child, OnAddToParent, joined);
+
+        expect(thrownBy(() => root.add(child))).toBe(failure);
+
+        expect(heard).toHaveBeenCalledTimes(1);
+        expect(joined).toHaveBeenCalledTimes(1);
+        expect(child.parent).toBe(root);
+        expect(root.hasStage(child)).toBe(true);
+      });
+
+      it('add() moves a child whose OnRemoveFromParent listener throws out of its previous holder and in', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const child = new StageRenderer(a);
+        const failure = new Error('the listener failed');
+        on(child, OnRemoveFromParent, () => {
+          throw failure;
+        });
+        const joined = vi.fn();
+        on(child, OnAddToParent, joined);
+
+        expect(thrownBy(() => b.add(child))).toBe(failure);
+
+        expect(a.hasStage(child)).toBe(false);
+        expect(b.hasStage(child)).toBe(true);
+        expect(child.parent).toBe(b);
+        expect(joined).toHaveBeenCalledTimes(1);
+      });
+
+      it('add() hands on the errors of OnStageAdded and of OnAddToParent at the child as an AggregateError', () => {
+        const root = new StageRenderer();
+        const child = new StageRenderer();
+        const e1 = new Error('added');
+        const e2 = new Error('joined');
+        on(root, OnStageAdded, () => {
+          throw e1;
+        });
+        on(child, OnAddToParent, () => {
+          throw e2;
+        });
+
+        const error = thrownBy(() => root.add(child)) as AggregateError;
+
+        expect(error).toBeInstanceOf(AggregateError);
+        expect(error.message).toBe(
+          'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent threw',
+        );
+        expect(error.errors).toHaveLength(2);
+        expect(error.errors[0]).toBe(e1);
+        expect(error.errors[1]).toBe(e2);
+      });
+
+      it('add() leaves out a child that a listener disposes while it leaves its previous holder', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const child = new StageRenderer(a);
+        on(child, OnRemoveFromParent, () => child.dispose());
+
+        expect(() => b.add(child)).not.toThrow();
+
+        expect(b.hasStage(child)).toBe(false);
+        expect(a.hasStage(child)).toBe(false);
+        expect(child.parent).toBeUndefined();
+        expect(child.isDisposed).toBe(true);
+      });
+
+      it('add() takes no child into a renderer that a listener disposes while the child leaves its previous holder', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const child = new StageRenderer(a);
+        on(child, OnRemoveFromParent, () => b.dispose());
+
+        expect(() => b.add(child)).not.toThrow();
+
+        expect(b.isDisposed).toBe(true);
+        expect(b.stages).toHaveLength(0);
+        expect(child.parent).toBeUndefined();
+        expect(child.isDisposed).toBe(false);
+      });
+    });
   });
 
   describe('parent / host wiring', () => {
@@ -1018,6 +1163,79 @@ describe('StageRenderer', () => {
       expect(stage.updateFrame).toHaveBeenCalledTimes(1);
       expect(stage.updateFrame).toHaveBeenCalledWith(1, 1, 1);
       expect(stage.renderTo).toHaveBeenCalledTimes(1);
+    });
+
+    it('attach() to a new host behind an OnRemoveFromParent listener that throws leaves the old host and joins the new one', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const sr = new StageRenderer();
+      const failure = new Error('the listener failed');
+      // ahead of the host subscriptions: registered before attach()
+      on(sr, OnRemoveFromParent, () => {
+        throw failure;
+      });
+      sr.attach(hostA);
+      const stage = fakeStage('s');
+      sr.add(stage);
+
+      expect(thrownBy(() => sr.attach(hostB))).toBe(failure);
+
+      expect(hostA._unsubs).toBe(2);
+      expect(sr.parent).toBe(hostB);
+      hostA._emitFrame(1, 0.016, 1);
+      expect(stage.renderTo, 'the old host drives the renderer no longer').not.toHaveBeenCalled();
+      hostB._emitFrame(2, 0.016, 2);
+      expect(stage.renderTo, 'the new host drives it').toHaveBeenCalledTimes(1);
+    });
+
+    it('a write to parent hands on the errors of OnRemoveFromParent and OnAddToParent as an AggregateError', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const sr = new StageRenderer(hostA);
+      const e1 = new Error('left');
+      const e2 = new Error('joined');
+      on(sr, OnRemoveFromParent, () => {
+        throw e1;
+      });
+      on(sr, OnAddToParent, () => {
+        throw e2;
+      });
+
+      const error = thrownBy(() => {
+        sr.parent = hostB;
+      }) as AggregateError;
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe(
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent threw',
+      );
+      expect(error.errors).toHaveLength(2);
+      expect(error.errors[0]).toBe(e1);
+      expect(error.errors[1]).toBe(e2);
+    });
+
+    it('a write to parent leaves a renderer that a listener of OnRemoveFromParent disposes off the new host', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const sr = new StageRenderer(hostA);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      on(sr, OnRemoveFromParent, () => sr.dispose());
+      const joined = vi.fn();
+      on(sr, OnAddToParent, joined);
+
+      expect(() => {
+        sr.parent = hostB;
+      }).not.toThrow();
+
+      expect(sr.isDisposed).toBe(true);
+      expect(sr.parent).toBeUndefined();
+      expect(joined).not.toHaveBeenCalled();
+      const width = sr.width;
+      hostB._emitResize(80, 40);
+      expect(sr.width, 'the new host does not reach the renderer').toBe(width);
+      hostB._emitFrame(1, 0.016, 1);
+      expect(stage.renderTo).not.toHaveBeenCalled();
     });
   });
 
@@ -2521,6 +2739,166 @@ describe('StageRenderer', () => {
       expect(thrownBy(() => sr.dispose())).toBe(failure);
 
       expect(heard).toHaveBeenCalledExactlyOnceWith(sr);
+    });
+
+    it('a listener of OnStageRemoved that throws does not hold up the teardown', () => {
+      const h = makeHost();
+      const sr = new StageRenderer(h);
+      sr.resize(50, 50);
+      const a = fakeStage('a');
+      const b = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      const onB = getSubscriptionCount(b);
+      sr.add(a);
+      sr.add(b);
+      sr.pipeline = makePipelineMock() as any;
+      // the pipeline path builds the internal target
+      sr.renderTo(renderer as any);
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+      const failure = new Error('the listener failed');
+      on(sr, OnStageRemoved, ({stage}: {stage: IStage}) => {
+        if (stage === a) throw failure;
+      });
+      const heard = vi.fn();
+      on(sr, OnStageDispose, heard);
+
+      expect(thrownBy(() => sr.dispose())).toBe(failure);
+
+      expect(sr.stages).toHaveLength(0);
+      expect(getSubscriptionCount(b), 'the renderer stopped listening to the stage behind it').toBe(onB);
+      expect(rtDispose.callCount).toBe(1);
+      expect(h._unsubs).toBe(2);
+      expect(heard).toHaveBeenCalledExactlyOnceWith(sr);
+      expect(getSubscriptionCount(sr)).toBe(0);
+      expect(sr.pipeline).toBeUndefined();
+      expect(() => sr.dispose()).not.toThrow();
+    });
+
+    it('a listener of OnRemoveFromParent that throws does not keep the renderer on its host', () => {
+      const h = makeHost();
+      const sr = new StageRenderer();
+      const failure = new Error('the listener failed');
+      // ahead of the host subscriptions: registered before attach()
+      on(sr, OnRemoveFromParent, () => {
+        throw failure;
+      });
+      sr.attach(h);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      const heard = vi.fn();
+      on(sr, OnStageDispose, heard);
+
+      expect(thrownBy(() => sr.dispose())).toBe(failure);
+
+      expect(h._unsubs).toBe(2);
+      h._emitFrame(1, 0.016, 1);
+      expect(stage.renderTo).not.toHaveBeenCalled();
+      expect(sr.parent).toBeUndefined();
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(getSubscriptionCount(sr)).toBe(0);
+    });
+
+    it('a listener of OnRemoveFromParent that throws does not keep the renderer among the stages of its parent', () => {
+      const parent = new StageRenderer();
+      const sr = new StageRenderer(parent);
+      const failure = new Error('the listener failed');
+      on(sr, OnRemoveFromParent, () => {
+        throw failure;
+      });
+
+      expect(thrownBy(() => sr.dispose())).toBe(failure);
+
+      expect(parent.hasStage(sr)).toBe(false);
+      expect(sr.parent).toBeUndefined();
+      expect(getSubscriptionCount(sr)).toBe(0);
+    });
+
+    it('a child whose OnRemoveFromParent listener throws leaves the renderer and releases its pass target', () => {
+      const parent = new StageRenderer();
+      const child = new StageRenderer(parent);
+      child.resize(50, 50);
+      const passTarget = (child.asPassNode(renderer as any) as any).value.renderTarget;
+      const failure = new Error('the listener failed');
+      on(child, OnRemoveFromParent, () => {
+        throw failure;
+      });
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+      const heard = vi.fn();
+      on(parent, OnStageDispose, heard);
+
+      expect(thrownBy(() => parent.dispose())).toBe(failure);
+
+      expect(child.parent).toBeUndefined();
+      expect(rtDispose.calledOn(passTarget)).toBe(true);
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(getSubscriptionCount(parent)).toBe(0);
+    });
+
+    it('errors from several parts of the teardown reach the caller as an AggregateError in the order they arose', () => {
+      const h = makeHost();
+      const sr = new StageRenderer(h);
+      const a = fakeStage('a');
+      const b = fakeStage('b');
+      sr.add(a).add(b);
+      const eA = new Error('a');
+      const eB = new Error('b');
+      const eP = new Error('parent');
+      const eD = new Error('dispose');
+      on(sr, OnStageRemoved, ({stage}: {stage: IStage}) => {
+        throw stage === a ? eA : eB;
+      });
+      on(sr, OnRemoveFromParent, () => {
+        throw eP;
+      });
+      on(sr, OnStageDispose, () => {
+        throw eD;
+      });
+
+      const error = thrownBy(() => sr.dispose()) as AggregateError;
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe(
+        'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw',
+      );
+      expect(error.errors).toHaveLength(4);
+      expect(error.errors[0]).toBe(eA);
+      expect(error.errors[1]).toBe(eB);
+      expect(error.errors[2]).toBe(eP);
+      expect(error.errors[3]).toBe(eD);
+      expect(h._unsubs).toBe(2);
+    });
+
+    it('a remove() that threw twice stands as one AggregateError among the errors of dispose()', () => {
+      const sr = new StageRenderer();
+      const child = new StageRenderer(sr);
+      const e1 = new Error('removed');
+      const e2 = new Error('left');
+      const e3 = new Error('dispose');
+      on(sr, OnStageRemoved, () => {
+        throw e1;
+      });
+      on(child, OnRemoveFromParent, () => {
+        throw e2;
+      });
+      on(sr, OnStageDispose, () => {
+        throw e3;
+      });
+
+      const error = thrownBy(() => sr.dispose()) as AggregateError;
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe(
+        'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw',
+      );
+      expect(error.errors).toHaveLength(2);
+      const removed = error.errors[0] as AggregateError;
+      expect(removed).toBeInstanceOf(AggregateError);
+      expect(removed.message).toBe(
+        'StageRenderer#remove(): more than one listener of OnStageRemoved and OnRemoveFromParent threw',
+      );
+      expect(removed.errors).toHaveLength(2);
+      expect(removed.errors[0]).toBe(e1);
+      expect(removed.errors[1]).toBe(e2);
+      expect(error.errors[1]).toBe(e3);
     });
 
     // (d) the second call throws nothing and releases nothing a second time

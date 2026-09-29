@@ -1,4 +1,4 @@
-import {emit, emitStrict, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
+import {emitStrict, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {
   Color,
@@ -23,6 +23,7 @@ import {
   type StageRemovedProps,
 } from '../events.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
@@ -54,6 +55,9 @@ type StageRendererMode = 'plain' | 'pipeline-only' | 'composed';
 function disposedError(member: string): Error {
   return new Error(`StageRenderer#${member} is not available: this renderer has been disposed`);
 }
+
+const ADD_THREW =
+  'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent threw';
 
 export interface StageItem {
   stage: IStage & IRenderable;
@@ -246,6 +250,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * host takes this renderer out of the renderer or the host that held it and wires it into the
    * frame loop of the new one; assigning `undefined` lets go of the holder. On a disposed renderer
    * the assignment does nothing.
+   *
+   * A listener that throws does not cut the assignment short — one of `OnRemoveFromParent`
+   * here or of `OnStageRemoved` at a previous `StageRenderer` while this renderer leaves its
+   * holder, one of `OnAddToParent` as it joins a host: every listener hears its event, the
+   * renderer leaves its holder and joins the new one, and the errors reach the caller
+   * afterwards — one unchanged, several as an `AggregateError` in the order they arose. A
+   * listener that disposes this renderer or gives it another holder while it leaves its holder
+   * ends the assignment there. For a `StageRenderer` assigned here, {@link add} says the same.
    */
   get parent(): StageRendererParentType | undefined {
     return this.#parent;
@@ -261,15 +273,28 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       return;
     }
 
-    this.#removeFromParent();
-    this.#parent = parent;
-    if (parent) {
-      this.#addToHost(parent);
-      emit(this, OnAddToParent);
+    const errors: unknown[] = [];
+    this.#removeFromParent(errors);
+    // a listener of the move out can have disposed this renderer or given it another holder: the
+    // move ends here then
+    if (!this.#disposed && this.#parent === undefined) {
+      this.#parent = parent;
+      if (parent) {
+        this.#addToHost(parent);
+        try {
+          emitStrict(this, OnAddToParent);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
     }
+    throwCollected(
+      errors,
+      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent threw',
+    );
   }
 
-  #removeFromParent(): void {
+  #removeFromParent(errors: unknown[]): void {
     const parent = this.#parent;
     if (parent == null) return;
 
@@ -278,10 +303,21 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // between the two halves stops after one pass
     this.#parent = undefined;
 
-    emit(this, OnRemoveFromParent);
+    // every listener hears it, even behind one that throws: the host subscriptions from
+    // #addToHost() are listeners of this event and let go of the host here. The error goes to the
+    // caller once its call has run to its end
+    try {
+      emitStrict(this, OnRemoveFromParent);
+    } catch (error) {
+      errors.push(error);
+    }
 
     if (parent instanceof StageRenderer) {
-      parent.remove(this);
+      try {
+        parent.remove(this);
+      } catch (error) {
+        errors.push(error);
+      }
     }
   }
 
@@ -973,12 +1009,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `dispose()` do nothing.
    *
    * An `OnStageDispose` goes out to every subscriber before this renderer stops listening; no
-   * event follows it. A listener of the event that throws does not hold up the teardown: every
-   * subscriber hears the event, the renderer is torn down completely, and the error reaches the
-   * caller afterwards — one unchanged, several as an `AggregateError`. Every listener on this
-   * renderer goes with it, including the `OnStageAdded` and `OnStageRemoved` subscriptions a
-   * caller placed on it, and so do the camera, scene and dispose listeners it placed on its
-   * stages (through `remove()`).
+   * event follows it. Every listener on this renderer goes with it, including the `OnStageAdded`
+   * and `OnStageRemoved` subscriptions a caller placed on it, and so do the camera, scene and
+   * dispose listeners it placed on its stages (through `remove()`).
+   *
+   * A listener that throws does not hold up the teardown — one of `OnStageRemoved` or
+   * `OnRemoveFromParent` while the renderer lets go of its stages and its holder, or one of
+   * `OnStageDispose`: every subscriber hears its event, the renderer is torn down completely,
+   * and the errors reach the caller afterwards — one unchanged, several as an `AggregateError`
+   * in the order they arose: that of the {@link remove} of each stage that threw, in the order
+   * of `stages`; then those of leaving the holder — of the `OnRemoveFromParent` listeners here,
+   * then of the `remove()` of a parent `StageRenderer`; then that of the `OnStageDispose`
+   * listeners. Each is as it was thrown — an `AggregateError` itself when more than one
+   * listener of one event threw, or when both events of a `remove()` did.
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
@@ -994,9 +1037,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (this.#disposed) return;
     this.#disposed = true;
 
-    // the stages came in through add() and stay the caller's — this renderer only lets go
+    const errors: unknown[] = [];
+
+    // the stages came in through add() and stay the caller's — this renderer only lets go. A stage
+    // whose remove() throws is out all the same, and the teardown goes on with the next one
     for (const {stage} of this.#stages.slice()) {
-      this.remove(stage);
+      try {
+        this.remove(stage);
+      } catch (error) {
+        errors.push(error);
+      }
     }
 
     // released before the parent lets go: its remove() releases the pass target of a child it
@@ -1008,19 +1058,25 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // the parent setter refuses a disposed renderer, so the detach runs on the field itself.
     // #removeFromParent() is what emits OnRemoveFromParent, and that event is what makes the
     // host subscriptions from #addToHost() unsubscribe.
-    this.#removeFromParent();
+    this.#removeFromParent(errors);
 
     this.#pipeline = undefined;
     this.#buildOutputNode = undefined;
 
     // the listeners are still attached here: this event is what tells them to let go, and no
-    // event follows it. A listener that throws neither keeps the ones behind it from the event nor
-    // leaves the renderer half torn down
+    // event follows it. Every listener hears it, even behind one that throws, and the error waits
+    // until the renderer is torn down
     try {
       emitStrict(this, OnStageDispose, this);
-    } finally {
-      off(this);
+    } catch (error) {
+      errors.push(error);
     }
+    off(this);
+
+    throwCollected(
+      errors,
+      'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw',
+    );
   }
 
   /**
@@ -1084,6 +1140,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * it, `parent` answers this renderer, and it gets its `OnAddToParent` after
    * `OnStageAdded` went out here. A renderer has one holder.
    *
+   * A listener that throws does not cut the call short — one of
+   * `OnRemoveFromParent` at a child and of `OnStageRemoved` at its previous
+   * `StageRenderer` while the child leaves that holder, one of `OnStageAdded`
+   * here or of `OnAddToParent` at the child: every listener hears its event,
+   * the stage is added, and the errors reach the caller afterwards — one
+   * unchanged, several as an `AggregateError` in the order they arose. The
+   * size stays the exception: a stage that refuses it is not added. A
+   * listener that disposes this renderer or the child, or gives the child
+   * another holder, while the child leaves its previous one ends the call
+   * there: the child is not added.
+   *
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`
    * and, in the composed mode, rebuilds the output node on the next render,
@@ -1110,9 +1177,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // stage or at the previous holder of a child renderer has changed
     this.resizeStage(item, this.width, this.height);
 
+    const errors: unknown[] = [];
+
     const child = stage instanceof StageRenderer ? stage : undefined;
-    // a renderer has one holder: a child leaves its host or the renderer that held it
-    if (child) child.#removeFromParent();
+    if (child) {
+      // a renderer has one holder: a child leaves its host or the renderer that held it
+      child.#removeFromParent(errors);
+      // a listener of the move out can have disposed either renderer or given the child another
+      // holder: this renderer does not take the child in then
+      if (this.#disposed || child.#disposed || child.#parent !== undefined) {
+        throwCollected(errors, ADD_THREW);
+        return this;
+      }
+    }
 
     this.#stages.push(item);
     this.#order.warnAboutSharedNames(this.#stages, [stage.name]);
@@ -1140,9 +1217,20 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     if (child) child.#parent = this;
 
-    emit(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
-    if (child) emit(child, OnAddToParent);
+    try {
+      emitStrict(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (child) {
+      try {
+        emitStrict(child, OnAddToParent);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
 
+    throwCollected(errors, ADD_THREW);
     return this;
   }
 
@@ -1157,6 +1245,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * A stage removed during `updateFrame()`, `renderTo()` or `resize()` is
    * still reached by that call and left out from the next call on, see
    * {@link orderedStages}.
+   *
+   * A listener that throws does not cut the call short: every listener of
+   * `OnStageRemoved` hears it, and so does every listener of
+   * `OnRemoveFromParent` at a removed child, which leaves this renderer and
+   * releases its pass-target all the same. The errors reach the caller
+   * afterwards — one unchanged, several as an `AggregateError`, those of
+   * `OnStageRemoved` first.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);
@@ -1166,7 +1261,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#stageSubscriptions.delete(stage);
       this.#order.invalidate();
       this.#outputDirty = true;
-      emit(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
+      const errors: unknown[] = [];
+      try {
+        emitStrict(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
+      } catch (error) {
+        errors.push(error);
+      }
       if (stage instanceof StageRenderer) {
         // the pass target belongs to the child, and this renderer, which let go of it, samples it
         // no longer. The object stays, so every texture() node another parent built from it stays
@@ -1175,9 +1275,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         if (stage.parent === this) {
           // the child still names this renderer as its holder; letting go is a move both
           // sides make, whichever of them started it
-          stage.#removeFromParent();
+          stage.#removeFromParent(errors);
         }
       }
+      throwCollected(errors, 'StageRenderer#remove(): more than one listener of OnStageRemoved and OnRemoveFromParent threw');
     }
     return this;
   }

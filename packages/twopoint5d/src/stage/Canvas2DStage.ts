@@ -277,13 +277,14 @@ export class Canvas2DStage {
    * A listener of `OnCanvas2DStageDispose` that throws does not hold up the teardown: every
    * subscriber hears the event, the instance is torn down completely, and the error reaches the
    * caller afterwards — one unchanged, several as an `AggregateError`. That holds for the
-   * `OnStageDispose` listeners of the {@link StageRenderer} and the {@link Stage2D} as well, and
-   * for the release of the pass node of the `Stage2D`. Three parts contribute one error each at
-   * most — the listeners of `OnCanvas2DStageDispose`, `StageRenderer#dispose()` and
-   * `Stage2D#dispose()`; when more than one of them throws, the `AggregateError` carries their
-   * errors in this order, each as it was thrown — an `AggregateError` itself when more than one
-   * listener of its event threw, or when both the listeners of the `Stage2D` and the release of
-   * its pass node threw.
+   * `OnStageDispose` listeners of the {@link StageRenderer} and the {@link Stage2D} as well, for
+   * the `OnStageRemoved` listeners of the `StageRenderer`, and for the release of the pass node
+   * of the `Stage2D`. Three parts contribute one error each at most — the listeners of
+   * `OnCanvas2DStageDispose`, `StageRenderer#dispose()` and `Stage2D#dispose()`; when more than
+   * one of them throws, the `AggregateError` carries their errors in this order, each as it was
+   * thrown — an `AggregateError` itself when more than one listener of its event threw, when
+   * more than one part of the teardown of the `StageRenderer` threw, or when both the listeners
+   * of the `Stage2D` and the release of its pass node threw.
    */
   dispose(): void {
     if (this.#disposed) return;
