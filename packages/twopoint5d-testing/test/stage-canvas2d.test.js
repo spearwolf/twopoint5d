@@ -47,7 +47,12 @@ describe('Canvas2DStage — canvas on screen', () => {
     return canvasStage;
   }
 
-  /** @param {HTMLCanvasElement} canvas */
+  /**
+   * Paints the whole canvas in one color.
+   *
+   * @param {HTMLCanvasElement} canvas
+   * @param {string} color a CSS color, as `fillStyle` takes it
+   */
   function fill(canvas, color) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = color;

@@ -16,11 +16,11 @@ export class StageRendererTargets {
   #pixelRatio = 1;
 
   /**
-   * Internal RT used in Mode C (a pipeline without buildOutputNode that is not a
+   * The internal target of Mode C (a pipeline without buildOutputNode that is not a
    * RootRenderPipeline), built here. Without a pool only; with one, Mode C borrows its target.
    */
   #internal?: RenderTarget;
-  /** Internal RT used when a parent calls `asPassNode()` on the renderer. */
+  /** The pass target a composing parent draws this renderer into and samples through `asPassNode()`. */
   #pass?: RenderTarget;
 
   /** The pool the internal target of Mode C is borrowed from; `undefined` for a target of its own. */

@@ -37,10 +37,10 @@ export class StageRenderOrder {
     return true;
   }
 
-  // the frame path reads the entries through here; StageRenderer#renderOrderArray hands out a copy
   /**
    * The entries of the order, split at the commas, trimmed, empty ones left out — the entries
-   * themselves, not a copy.
+   * themselves, not a copy. The frame path reads the entries through here;
+   * `StageRenderer#renderOrderArray` hands out a copy.
    */
   entries(): readonly string[] {
     if (!this.#entries) {

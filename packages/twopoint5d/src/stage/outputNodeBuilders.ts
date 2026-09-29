@@ -6,8 +6,8 @@ import {RootRenderPipeline} from './RootRenderPipeline.js';
  * A `buildOutputNode` callback that owns the effect nodes it builds and releases them itself.
  * Assign it to `StageRenderer#buildOutputNode` as it is, no adapter needed.
  *
- * After {@link dispose} a call throws an error naming the class and the state, `isDisposed` is
- * `true`, and a further `dispose()` does nothing.
+ * After {@link dispose} a call throws an error naming the factory that built the builder and the
+ * state, `isDisposed` is `true`, and a further `dispose()` does nothing.
  */
 export interface OutputNodeBuilder {
   (stagePasses: Node[]): Node;

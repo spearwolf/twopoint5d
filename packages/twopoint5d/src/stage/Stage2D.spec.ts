@@ -698,6 +698,50 @@ describe('Stage2D', () => {
       expect(getSubscriptionCount(stage)).toBe(0);
     });
 
+    it('an error from releasing the pass node reaches the caller together with the error of a dispose listener', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const listenerFailure = new Error('the listener failed');
+      const releaseFailure = new Error('the release failed');
+      sandbox.stub(passNode, 'dispose').throws(releaseFailure);
+      const heard = vi.fn();
+      on(stage, OnStageDispose, () => {
+        throw listenerFailure;
+      });
+      on(stage, OnStageDispose, heard);
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([listenerFailure, releaseFailure]);
+      expect((caught as AggregateError).message).toMatch(/^Stage2D#dispose\(\)/);
+      expect(heard, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(stage.isDisposed).toBe(true);
+      expect(getSubscriptionCount(stage)).toBe(0);
+    });
+
+    it('an error from releasing the pass node reaches the caller unchanged when no listener throws', () => {
+      const stage = makeStage();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const releaseFailure = new Error('the release failed');
+      sandbox.stub(passNode, 'dispose').throws(releaseFailure);
+
+      let caught: unknown;
+      try {
+        stage.dispose();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBe(releaseFailure);
+      expect(stage.isDisposed).toBe(true);
+    });
+
     it('announces its dispose to a listener of IStageDispose with the stage', () => {
       const stage = makeStage();
       const heard = vi.fn();
@@ -761,7 +805,6 @@ describe('Stage2D', () => {
       expect([stage.containerWidth, stage.containerHeight], 'the container size stays where it was').toEqual([320, 200]);
     });
 
-    // (d) the second call throws nothing and releases nothing a second time
     it('takes a scene after dispose() and announces nothing', () => {
       const stage = makeStage();
       stage.dispose();
@@ -776,6 +819,7 @@ describe('Stage2D', () => {
       expect(changed).not.toHaveBeenCalled();
     });
 
+    // (d) the second call throws nothing and releases nothing a second time
     it('is safe to call twice', () => {
       const stage = makeStage();
       const passNode = stage.asPassNode(noRenderer) as PassNode;

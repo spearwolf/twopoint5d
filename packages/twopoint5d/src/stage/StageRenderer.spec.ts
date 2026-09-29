@@ -1948,9 +1948,6 @@ describe('StageRenderer', () => {
       expect(buildOutputNode.mock.calls[0]![0]).toEqual([passA, passB]);
     });
 
-    // -------------------------------------------------------------------------
-    // renderOrder × buildOutputNode — the order the user reads in their pipeline
-    // -------------------------------------------------------------------------
     it('applies its own clear to the target it writes to before the pipeline runs', () => {
       const {sr, pipeline} = makeComposedSetup();
       sr.resize(100, 100);
@@ -1990,6 +1987,9 @@ describe('StageRenderer', () => {
       expect([passTarget.width, passTarget.height], 'resized in device pixels').toEqual([600, 300]);
     });
 
+    // -------------------------------------------------------------------------
+    // renderOrder × buildOutputNode — the order the user reads in their pipeline
+    // -------------------------------------------------------------------------
     describe('renderOrder controls the order of pass nodes passed to buildOutputNode', () => {
       function makeOrderedSetup(names: string[], renderOrder?: string) {
         const sr = new StageRenderer();

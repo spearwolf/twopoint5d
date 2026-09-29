@@ -14,6 +14,7 @@ import {
   type StageUpdateFrameProps,
 } from '../events.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
@@ -430,20 +431,31 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * `OnStageDispose` goes out to every subscriber before this stage stops listening; no event
    * follows it. A listener of `OnStageDispose` that throws does not hold up the teardown:
    * every subscriber hears the event, the instance is torn down completely, and the error reaches
-   * the caller afterwards — one unchanged, several as an `AggregateError`.
+   * the caller afterwards — one unchanged, several as an `AggregateError`. An error from releasing
+   * the pass node reaches the caller the same way, collected after that of the listeners.
    */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+
+    const errors: unknown[] = [];
 
     // the listeners are still attached here: this event is what tells them to let go. Every one
     // of them hears it, also behind one that throws — so every StageRenderer that holds this stage
     // lets go of it; the error goes to the caller after the teardown
     try {
       emitStrict(this, OnStageDispose, this);
-    } finally {
-      off(this);
-      this.#disposePassNode();
+    } catch (error) {
+      errors.push(error);
     }
+    off(this);
+
+    try {
+      this.#disposePassNode();
+    } catch (error) {
+      errors.push(error);
+    }
+
+    throwCollected(errors, 'Stage2D#dispose(): a listener of the dispose event threw, and so did the release of the pass node');
   }
 }

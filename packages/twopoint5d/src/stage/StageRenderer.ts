@@ -964,9 +964,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * the GPU memory of its pass-target as well; the child itself is not disposed, and three.js
    * allocates that memory again on its next draw into the target.
    *
-   * A {@link pipeline}, an {@link outputRenderTarget}, an {@link internalTargetPool} and every
-   * stage were handed in and belong to the caller: none of them is disposed here. Dispose them
-   * where they were built.
+   * A {@link pipeline}, an {@link outputRenderTarget}, an {@link internalTargetPool}, a builder
+   * assigned as {@link buildOutputNode} and every stage were handed in and belong to the caller:
+   * none of them is disposed here. Dispose them where they were built.
    *
    * Afterwards `isDisposed` is `true`, `parent`, `pipeline`, `buildOutputNode` and
    * `internalTargetPool` answer `undefined`, `stages` and `orderedStages` are empty, and no

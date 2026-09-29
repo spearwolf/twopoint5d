@@ -419,35 +419,41 @@ describe('StageRenderer — pipeline integration', () => {
    * @param {string} [color] the color of the square, white by default
    */
   async function withSquare(makeBuild, run, color = '#fff') {
-    // a display of its own, released here: a test that calls this twice must not leave the first one to
-    // the afterEach of the suite, which knows only the last one
-    const squareHost = makeContainer({width: 64, height: 64});
-    const squareDisplay = new Display(squareHost);
-    await squareDisplay.start();
-    const renderer = squareDisplay.renderer;
-
     const target = new RenderTarget(64, 64);
     const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
     const geometry = new PlaneGeometry(16, 16);
     const material = new MeshBasicMaterial({color: new Color(color)});
     stage.scene.add(new Mesh(geometry, material));
-
     const sr = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
-    const pipeline = new RenderPipeline(renderer);
-    const build = makeBuild();
-    sr.pipeline = pipeline;
-    sr.buildOutputNode = build;
-    sr.outputRenderTarget = target;
-    sr.resize(64, 64);
 
+    // a display of its own, released here: a test that calls this twice must not leave the first one to
+    // the afterEach of the suite, which knows only the last one. Everything from the container on sits
+    // in the try, so a display that fails to start or a builder that throws leaves nothing behind
+    const squareHost = makeContainer({width: 64, height: 64});
+    /** @type {Display | undefined} */
+    let squareDisplay;
+    /** @type {RenderPipeline | undefined} */
+    let pipeline;
+    let build;
     try {
+      squareDisplay = new Display(squareHost);
+      await squareDisplay.start();
+      const renderer = squareDisplay.renderer;
+
+      pipeline = new RenderPipeline(renderer);
+      build = makeBuild();
+      sr.pipeline = pipeline;
+      sr.buildOutputNode = build;
+      sr.outputRenderTarget = target;
+      sr.resize(64, 64);
+
       await run({sr, target, renderer});
     } finally {
       // the renderer lets go first, then the builder, the stage, the pipeline and the rest, the display last
       sr.dispose();
-      build.dispose?.();
+      build?.dispose?.();
       stage.dispose();
-      pipeline.dispose();
+      pipeline?.dispose();
       target.dispose();
       geometry.dispose();
       material.dispose();
@@ -456,29 +462,32 @@ describe('StageRenderer — pipeline integration', () => {
     }
   }
 
-  it('Mode D: createBloomOutputNodeBuilder() keeps the stage and lays a glow around what is bright', async () => {
-    const readProbe = async () => {
-      let pixels;
-      await withSquare(
-        () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}),
-        async ({sr, target, renderer}) => {
-          sr.renderTo(renderer);
-          pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
-        },
-      );
-      return pixels;
-    };
-    const withBloom = await readProbe();
-
-    let control;
+  /**
+   * The pixels of the 64 x 64 target once `withSquare()` has drawn the square through the
+   * `buildOutputNode` `makeBuild` answers.
+   *
+   * @param {Parameters<typeof withSquare>[0]} makeBuild
+   * @param {string} [color] the color of the square, white by default
+   */
+  async function readSquare(makeBuild, color) {
+    let pixels;
     await withSquare(
+      makeBuild,
+      async ({sr, target, renderer}) => {
+        sr.renderTo(renderer);
+        pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+      },
+      color,
+    );
+    return pixels;
+  }
+
+  it('Mode D: createBloomOutputNodeBuilder() keeps the stage and lays a glow around what is bright', async () => {
+    const withBloom = await readSquare(() => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}));
+    const control = await readSquare(
       () =>
         ([pass]) =>
           pass,
-      async ({sr, target, renderer}) => {
-        sr.renderTo(renderer);
-        control = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
-      },
     );
 
     const center = rgbAt(withBloom, 64, 32, 32);
@@ -493,15 +502,7 @@ describe('StageRenderer — pipeline integration', () => {
   });
 
   it('Mode D: createBloomOutputNodeBuilder() draws what stays below its threshold as the stage draws it', async () => {
-    let pixels;
-    await withSquare(
-      () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0.9}),
-      async ({sr, target, renderer}) => {
-        sr.renderTo(renderer);
-        pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
-      },
-      '#808080',
-    );
+    const pixels = await readSquare(() => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0.9}), '#808080');
 
     // linear 0.216 is far below the threshold, so no glow is added and the composition alone stands
     // in the output: encoded to sRGB once it reads 128

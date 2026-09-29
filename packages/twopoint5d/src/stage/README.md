@@ -397,6 +397,10 @@ last one when you are done, as `createBloomOutputNodeBuilder()` does:
 import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
 import type {Node} from 'three/webgpu';
 
+const sr = new StageRenderer(display).setClearColor(new Color('#000')).add(stage);
+const pipeline = new RenderPipeline(display.renderer!);
+sr.pipeline = pipeline;
+
 let lastGlow: {dispose(): void} | undefined;
 sr.buildOutputNode = ([scenePass]) => {
   // `sr` was given exactly one stage above, so the pass list has its first entry,
@@ -407,6 +411,11 @@ sr.buildOutputNode = ([scenePass]) => {
   lastGlow = glow;
   return pass.add(glow);
 };
+
+// teardown: the renderer lets go first, then the glow of the last call and the pipeline go
+sr.dispose();
+lastGlow?.dispose();
+pipeline.dispose();
 ```
 
 ### Shortcut: `RootRenderPipeline` — additive composition out of the box
@@ -659,7 +668,8 @@ What this layer does on top of the general rules in
   restores it: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets
   the lost context.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
-  `pipeline` or an `outputRenderTarget` assigned from outside.
+  `pipeline`, an `outputRenderTarget`, an `internalTargetPool` or a builder assigned as
+  `buildOutputNode` from outside.
 
 ---
 
@@ -693,10 +703,12 @@ What this layer does on top of the general rules in
   `RootRenderPipeline`, every stage in the list must implement `asPassNode()`.
   `ClearStage` doesn't — keep it for non-pipeline layering only. The renderer
   throws with a clear message in that case.
-- **Pipeline lifecycle**: a `pipeline` and an `outputRenderTarget` belong to
-  whoever assigned them. Dispose the previous instance yourself when you replace
-  one, and dispose the current one when you dispose the renderer; the renderer
-  only releases what it owns — its internal RTs.
+- **Pipeline lifecycle**: a `pipeline`, an `outputRenderTarget`, an
+  `internalTargetPool` and a builder assigned as `buildOutputNode` belong to
+  whoever assigned them. Dispose the previous instance yourself when you
+  replace one, and the current one once the renderers that use it are
+  disposed. The renderer only releases the targets it built for itself — its
+  internal target, as long as no pool lends it one, and its pass-target.
 - **Disposing a custom stage a renderer still holds**: take a custom stage that
   emits no `OnStageDispose` out of every `StageRenderer` that has it —
   `remove(stage)` — before you call its `dispose()`. A renderer that still lists
