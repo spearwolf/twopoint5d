@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-29T08:09:14.994Z"
+    "generatedAt": "2026-09-29T12:27:56.301Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,18 +205,18 @@
     "domains": {
       "code": {
         "executiveSummary": "Zwei `high`-Befunde aus dem Vorlauf sind noch offen. Ein verschachtelter `StageRenderer` ohne eigene Pipeline löscht sein asPassNode-RenderTarget nie, bewegte Sprites ziehen deshalb Schlieren (BUG-113). `PanControl2D` pannt nach einem Fokuswechsel mit gehaltener Taste endlos weiter (BUG-121).\n\nIm rAF-Hot-Path von vertex-objects, sprites und map2d gibt es keine Allokationslawine. Die spürbaren Kosten stecken im Upload-Modell: `autoTouch` lädt Position und Rotation *aller* Sprites jeden Frame über `0 … usedCount − 1` hoch (PERF-006, PERF-003). Ein `freeVO()` mitten im Pool weitet die Dirty-Range bis ans Pool-Ende, auch für static-Buffer (PERF-005). `Display.resize()` misst das DOM in jedem Frame (PERF-001), und `CameraBasedVisibility` hat keine Obergrenze für abzulaufende Tiles (PERF-002). Darunter liegen rund zwei Dutzend kleine Posten pro Frame oder Aufruf, etwa ein string-keyed `Map.get` in jedem generierten Accessor, Generator-Iteratoren im Upload-Pfad und eager gebaute `expectDefined`-Meldungen. Einzeln kosten sie Nanosekunden, bei vielen Layern summieren sie sich.",
-        "score": 84,
-        "penalty": 34,
+        "score": 89,
+        "penalty": 21,
         "bySeverity": {
           "critical": 0,
-          "high": 2,
-          "medium": 7,
-          "low": 20,
-          "info": 12
+          "high": 0,
+          "medium": 5,
+          "low": 22,
+          "info": 13
         },
         "byCategory": {
-          "correctness": 8,
           "performance": 6,
+          "correctness": 6,
           "completeness": 3,
           "api": 8,
           "resources": 1,
@@ -225,7 +225,7 @@
           "architecture": 1,
           "readability": 2,
           "consistency": 2,
-          "dx": 6,
+          "dx": 7,
           "testing": 2
         }
       },
@@ -238,10 +238,10 @@
           "high": 0,
           "medium": 7,
           "low": 29,
-          "info": 16
+          "info": 17
         },
         "byCategory": {
-          "testing": 11,
+          "testing": 12,
           "dependencies": 3,
           "types": 4,
           "dx": 24,
@@ -253,14 +253,14 @@
       }
     },
     "previousDate": "2026-09-21",
-    "resolvedCount": 62,
+    "resolvedCount": 66,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 21021,
         "findings": 54,
-        "score": 87
+        "score": 90
       },
       {
         "name": "workspace",
@@ -285,7 +285,7 @@
       }
     ],
     "scoreModel": 2,
-    "score": 75,
+    "score": 78,
     "scoring": {
       "model": 2,
       "weights": {
@@ -301,22 +301,22 @@
     },
     "bySeverity": {
       "critical": 0,
-      "high": 2,
-      "medium": 14,
-      "low": 49,
-      "info": 28
+      "high": 0,
+      "medium": 12,
+      "low": 51,
+      "info": 30
     },
     "byCategory": {
-      "correctness": 8,
       "performance": 6,
-      "testing": 13,
+      "correctness": 6,
+      "testing": 14,
       "completeness": 4,
       "dependencies": 3,
       "types": 4,
       "api": 8,
       "resources": 1,
       "async": 1,
-      "dx": 30,
+      "dx": 31,
       "build": 4,
       "security": 1,
       "architecture": 1,
@@ -329,10 +329,10 @@
     },
     "counts": {
       "findings": 93,
-      "improvements": 11,
+      "improvements": 12,
       "byStatus": {
-        "unchanged": 6,
-        "new": 20,
+        "new": 24,
+        "unchanged": 2,
         "carried-over": 67
       }
     },
@@ -512,44 +512,6 @@
   },
   "findings": [
     {
-      "id": "BUG-113",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "high",
-      "title": "Verschachtelten StageRenderer ohne eigene Pipeline vor dem Vorab-Rendern in sein asPassNode-RenderTarget leeren",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:588",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:512",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:560"
-      ],
-      "description": "Im komponierten Modus (`pipeline` mit `buildOutputNode` oder `RootRenderPipeline`) rendert der Parent jedes Kind-`StageRenderer` pro Frame in dessen `#asPassNodeRT`: `setRenderTarget(childRT)` und dann direkt `stage.#renderToCurrentTarget(renderer)` (Zeile 588–595). Hat das Kind keine eigene Pipeline, landet das in `#renderStagesInline()`, das nur bei `clear === true` löscht und sonst `autoClear = false` setzt (Zeile 514–516). Mit dem Default `clear = false` wird das RenderTarget also nie gelöscht: Farbe und Depth des Vorframes bleiben stehen, bewegte Sprites ziehen Schlieren, und die Depth-Werte des Vorframes verdecken neue Geometrie. Modus C schützt sein internes RT genau dagegen mit `#clearForInternalRT()` (Zeile 560–569, README: »so frame content does not accumulate«); der Pfad für verschachtelte Kinder hat kein Gegenstück. Aufrufpfad: Display.onRenderFrame → Parent.renderTo → #renderToCurrentTarget → #renderPipelineComposed → child.#renderToCurrentTarget → #renderStagesInline. Der Test »nested StageRenderer is pre-rendered into its asPassNode-RT« in StageRenderer.spec.ts:1011 prüft nur das Ziel, nicht das Löschen.",
-      "evidence": "`renderer.setRenderTarget(childRT);\\n  try {\\n    stage.#renderToCurrentTarget(renderer);` — ohne vorheriges `clear`",
-      "recommendation": "Vor dem Vorab-Rendern das `childRT` pro Frame löschen wie in `#clearForInternalRT()` (mit `child.clear` die Farbe/Alpha des Kindes, sonst transparentes Schwarz inklusive Depth). Einen Test ergänzen, der zwei Frames mit bewegtem Inhalt rendert und `renderer.clear` auf dem Kind-RT erwartet.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-121",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "high",
-      "title": "Gehaltene Pan-Tasten bei Fokusverlust des Fensters freigeben",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:624",
-      "component": "controls",
-      "locations": [
-        "packages/twopoint5d/src/controls/PanControl2D.ts:357",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:406"
-      ],
-      "description": "`#onKeyDown` setzt das Speed-Feld auf `pixelsPerSecond`, nur `#onKeyUp` nimmt es zurück. Hält der Nutzer W/A/S/D und wechselt per Alt-Tab, Tab-Wechsel oder einen Browser-Shortcut (Strg+S, Strg+D öffnen Dialoge) den Fokus, erreicht das `keyup` das Dokument nie. `update()` verschiebt `panView` dann in jedem Frame weiter, bis dieselbe Taste erneut gedrückt und losgelassen wird. Die Klasse kennt das Problem — `unsubscribe()` und `keyboardDisabled` rufen `#releaseKeyedSpeeds()` genau aus diesem Grund (Kommentar Zeile 401–403: »the view would keep moving by a key nobody is pressing«) —, es fehlt aber ein Listener auf `window` `blur` bzw. `document` `visibilitychange`.",
-      "evidence": "`#onKeyDown = (event) => { … this[field] = this.pixelsPerSecond; this.#keyedSpeeds.add(field); }` — kein blur-Handler in src/controls",
-      "recommendation": "Über `addEventListener()` der Basisklasse einen `blur`-Listener auf `window` und einen `visibilitychange`-Listener auf `document` registrieren (nur solange die Tastatur aktiv ist), die `#releaseKeyedSpeeds()` aufrufen. Test: keydown, dann blur, dann `update(1)` bewegt nichts mehr.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
       "id": "PERF-004",
       "category": "performance",
       "domain": "code",
@@ -585,43 +547,6 @@
       "recommendation": "`scene` als Accessor mit Setter führen, der bei Änderung ein Event (z. B. das bestehende `OnStageAfterCameraChanged` verallgemeinert oder ein eigenes) auslöst, auf das `StageRenderer.add()` ebenfalls `invalidateOutputNode()` legt. Alternativ im komponierten Pfad pro Frame Szene und Kamera jeder `Stage2D` gegen den gebauten Knoten vergleichen.",
       "effort": "S",
       "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-122",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "Tastatur-Panning bei Eingabe in editierbare Elemente und bei Modifier-Kombinationen überspringen",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:606",
-      "component": "controls",
-      "locations": [
-        "packages/twopoint5d/src/controls/PanControl2D.ts:624"
-      ],
-      "description": "Die Key-Listener hängen an `document` und prüfen nur `event.code`/`event.keyCode` (`#speedFieldFor`, Zeile 606–615). Tippt der Nutzer in ein `\u003cinput>`, `\u003ctextarea>` oder `contenteditable` derselben Seite ein »w« oder »a«, pant die Ansicht mit; ebenso Strg+S/Strg+D/Strg+A, die zusätzlich den Fokus-Fall aus dem blur-Befund auslösen können.",
-      "evidence": "`holdsDefault(this.keys, DEFAULT_KEYS) && … ? this.keyCodes.indexOf(event.keyCode) : this.keys.indexOf(event.code)` — kein Blick auf `event.target`, `ctrlKey`, `metaKey`, `altKey`",
-      "recommendation": "In `#onKeyDown` Ereignisse mit `ctrlKey`/`metaKey`/`altKey` und solche, deren `event.target` editierbar ist (`isContentEditable`, `input`, `textarea`, `select`), ignorieren; optional als Option abschaltbar. `#onKeyUp` weiter jede passende Taste freigeben lassen.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "BUG-115",
-      "category": "correctness",
-      "domain": "code",
-      "severity": "medium",
-      "title": "`ProjectionPlane.getForward()` als Richtung aus der Normalen berechnen statt aus einem Punkt",
-      "location": "packages/twopoint5d/src/stage/ProjectionPlane.ts:69",
-      "component": "stage",
-      "locations": [
-        "packages/twopoint5d/src/stage/ProjectionPlane.ts:73",
-        "packages/twopoint5d/src/stage/ProjectionPlane.ts:77"
-      ],
-      "description": "`getForward()` gibt `getPointByDistance(1).negate()` zurück, also `-(origin + normal)` — einen negierten Punkt, keine Richtung. Das stimmt nur für Ebenen durch den Ursprung (`constant === 0`), was für die vier Presets gilt. Der Konstruktor nimmt aber ausdrücklich eigene `THREE.Plane` an (Zeile 29–36). Mit `constant = c` ist `coplanarPoint = -c·normal`, `getForward()` liefert `(c − 1)·normal`: bei `c = 1` den Nullvektor, bei `c > 1` die umgekehrte Richtung. `getRight()` (Kreuzprodukt damit) wird dann null bzw. gespiegelt, und `getPoint(x, y)` ignoriert bei `c = 1` den x-Anteil (setLength auf einem Nullvektor) und spiegelt ihn bei `c > 1`. `applyRotation()` ist nicht betroffen, weil es die Differenz zweier Punkte nutzt. ProjectionPlane.spec.ts testet diese Methoden nur mit den Presets.",
-      "evidence": "`getForward(target?: Vector3): Vector3 {\\n  return this.getPointByDistance(1, target).negate();\\n}`",
-      "recommendation": "`getForward(target)` als `(target ?? new Vector3()).copy(this.plane.normal).negate()` schreiben; Tests für eine eigene Ebene mit `constant` 1 und 5 ergänzen, die Richtung und Länge von `getForward`, `getRight` und `getPoint` prüfen.",
-      "effort": "S",
-      "status": "unchanged",
       "package": "@spearwolf/twopoint5d"
     },
     {
@@ -1072,13 +997,13 @@
       "category": "testing",
       "domain": "harness",
       "severity": "medium",
-      "title": "Die riskantesten GPU-Pfade der Stage und das verlorene keyup von PanControl2D mit Tests absichern",
+      "title": "Mode E der Stage mit einem Pixel-Test absichern",
       "location": "packages/twopoint5d-testing/test/stage-pipeline.test.js",
       "locations": [
-        "packages/twopoint5d-testing/test/pan-control-keys.test.js"
+        "packages/twopoint5d/src/stage/StageRenderer.ts:587-595"
       ],
-      "description": "Der Display-Anteil (start/stop-Race, Chronometer, Dispose während Init, Device-Pixel-Clamp bei dpr > 1) ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`), der Sprites-Anteil (Billboards an einem verschobenen Mesh, `texCoordsFromIndex` mit einer zweiten Zeile, die Frame-Index-Formel samt `animOffset`, Zeit über der Dauer, zweiter Animation und Dauer 0) im Lauf vom 2026-09-26 (`324ab4a1`). Offen bleiben die Pfade der Stage, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für Mode E und für ein verschachteltes Plain-Kind über zwei Frames; dazu kein Test für ein verlorenes `keyup`, und `PanControl2D` hat keine `*.spec.ts`.",
-      "recommendation": "Für Mode E und das verschachtelte Plain-Kind je einen Browser-Test mit Pixel-Readback ergänzen; für das verlorene `keyup` genügt eine Vitest-Spec.",
+      "description": "Der Display-Anteil ist im Remediation-Lauf vom 2026-09-24 abgedeckt (`6a4bcacf`, `a33a6961`), der Sprites-Anteil im Lauf vom 2026-09-26 (`324ab4a1`). Im Lauf vom 2026-09-29 (`e2026856`) kamen der Zwei-Frame-Pixel-Readback für ein verschachteltes Plain-Kind (`stage-pipeline.test.js`) und Vitest-Tests für ein verlorenes `keyup` (`PanControl2D.spec.ts`) dazu. Offen bleibt Mode E, wo Vitest-Mocks nichts sehen: kein Pixel-Readback für ein verschachteltes Kind mit eigener Pipeline. Ein solcher Test dürfte am doppelten Output-Transform (BUG-114) scheitern und gehört mit dessen Fix zusammen.",
+      "recommendation": "Für Mode E einen Browser-Test mit Pixel-Readback ergänzen, zusammen mit dem Abschalten des Output-Transforms der Kind-Pipeline.",
       "effort": "M",
       "status": "carried-over",
       "package": "twopoint5d-testing"
@@ -1275,11 +1200,11 @@
       "category": "testing",
       "domain": "harness",
       "severity": "low",
-      "title": "Die Testlücken um Touch-Eingabe und PanControl2D schließen; controls steht bei 15 % Vitest-Coverage",
+      "title": "Die Testlücken um Touch-Eingabe und mehrere Pointer in PanControl2D schließen",
       "location": "packages/twopoint5d-testing/test/pan-control-input.test.js",
-      "description": "Der Display-Anteil (Pause/Restart, `stop()`, `visibilitychange`, `maxFps`, `resizePollIntervalMs`, Init/Start-Reihenfolge, Rejection bei gescheitertem Init) ist mit `Display.spec.ts` und `display-lifecycle.test.js` abgedeckt (Remediation-Lauf vom 2026-09-24, `6a4bcacf`), `styleUtils` hat inzwischen eine Spec. Offen bleibt `PanControl2D`: die Tests nutzen nur Maus mit `pointerId: 1` — kein Touch, kein zweiter Pointer, kein `pointercancel`, keine `mouseButton`/`keyCodes`-Optionen, keine zwei Controls in einer Root. `PanControl2D.ts` steht bei 0 % Vitest-Coverage.",
-      "recommendation": "`pan-control-input.test.js` um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen `pointercancel`-Fall erweitern; eine `PanControl2D.spec.ts` für Optionen und zwei Controls in einer Root.",
-      "effort": "M",
+      "description": "Der Display-Anteil ist mit `Display.spec.ts` und `display-lifecycle.test.js` abgedeckt (Remediation-Lauf vom 2026-09-24, `6a4bcacf`), `styleUtils` hat eine Spec, und seit dem Lauf vom 2026-09-29 (`e2026856`) deckt `PanControl2D.spec.ts` Fokusverlust, Tastenfilter und die Optionen `speed`, `keys`, `keyCodes`, `disableKeyboard`, `mouseButton`, `disablePointer` und `state` ab. Offen bleibt die Pointer-Seite: die Browser-Tests nutzen nur Maus mit `pointerId: 1` — kein Touch, kein zweiter Pointer, kein `pointercancel`, keine zwei Controls in einer Root.",
+      "recommendation": "`pan-control-input.test.js` um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen `pointercancel`-Fall erweitern; zwei Controls in einer Root in `PanControl2D.spec.ts` oder der Browser-Suite prüfen.",
+      "effort": "S",
       "status": "carried-over",
       "package": "twopoint5d-testing",
       "component": "controls"
@@ -2134,6 +2059,103 @@
         "kind": "induced",
         "run": "2026-09-28"
       }
+    },
+    {
+      "id": "BUG-129",
+      "category": "correctness",
+      "domain": "code",
+      "component": "stage",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "low",
+      "title": "Internes RenderTarget von Modus C zu echtem transparentem Schwarz leeren",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:560",
+      "locations": [
+        "packages/twopoint5d/src/stage/README.md:204-206"
+      ],
+      "description": "`#clearForInternalRT()` leert das interne RT von Modus C mit der aktuellen Clear-Farbe des Renderers bei Alpha 0, während die Stage-README »transparent black« verspricht. Bei einer Clear-Farbe ungleich Schwarz bleibt deren RGB im Target stehen und färbt über die Pipeline ins Bild, sobald ein Pass die Farbkanäle ohne Alpha-Gewichtung nutzt. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
+      "recommendation": "Wie für verschachtelte Kinder die Clear-Farbe für den Clear kurz auf (0, 0, 0, 0) setzen und danach wiederherstellen, oder die README auf das tatsächliche Verhalten zurücknehmen.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "id": "BUG-130",
+      "category": "correctness",
+      "domain": "code",
+      "component": "stage",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "low",
+      "title": "Modus C mit clear = true und abgeschaltetem Buffer-Clear leert sein internes RT nur teilweise",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:567-576",
+      "locations": [
+        "packages/twopoint5d/src/stage/README.md:204-206"
+      ],
+      "description": "Bei `clear = true` ruft `#clearForInternalRT()` nur `#applyClear()`. Steht `clearColorBuffer` oder `clearDepthBuffer` auf `false`, bleibt Farbe bzw. Depth des Vorframes im internen RT stehen, während die README »always cleared … so frame content does not accumulate« zusagt. Tritt nur auf, wenn ein Aufrufer einen Buffer-Clear ausdrücklich abschaltet; dort kann Akkumulation gewollt sein. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
+      "recommendation": "Entscheiden, was gilt: entweder das interne RT immer vollständig leeren und die Farbe des Renderers danach per eigenem Clear auftragen (wie beim verschachtelten Kind), oder die README-Zusage auf den Default einschränken.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "discovered",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "id": "DOC-078",
+      "category": "dx",
+      "domain": "code",
+      "component": "controls",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "Inline-Kommentar in PanControl2D#unsubscribe() nennt nur document",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:429",
+      "description": "Der Kommentar sagt »with the listeners off document«; die Listener für Fokusverlust hängen inzwischen auch an `window`, wie die TSDoc darüber schon sagt. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
+      "recommendation": "»off document and window« schreiben.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "id": "TEST-051",
+      "category": "testing",
+      "domain": "harness",
+      "component": "controls",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "title": "Der Shadow-Root-Test des Tastenfilters prüft dasselbe wie der input-Fall",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.spec.ts:184-196",
+      "description": "Der Test baut dasselbe Ereignis wie der `input`-Fall des `it.each` darüber und fängt keine zusätzliche Regression; nur die Assertion `target === doc` macht die Retargeting-Annahme sichtbar. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
+      "recommendation": "Das Ereignis wirklich aus einem Element im Shadow Root abfeuern (mit `composed: true`), sodass der Test ohne die `composedPath()`-Auswertung rot würde, oder ihn streichen.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
+    },
+    {
+      "id": "PERF-035",
+      "category": "performance",
+      "domain": "code",
+      "component": "stage",
+      "package": "@spearwolf/twopoint5d",
+      "severity": "info",
+      "kind": "improvement",
+      "title": "Doppelten Clear für ein verschachteltes Kind mit eigenem clear einsparen",
+      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:602",
+      "description": "Der komponierende Parent leert das Pass-Target jedes verschachtelten Kindes pro Frame zu transparentem Schwarz; ein Kind mit `clear = true` leert danach selbst mit seiner Farbe. Das ist gewollt, damit keine Renderer-Clear-Farbe mitaddiert wird und ein teilweise abgeschalteter Buffer-Clear keine Schlieren hinterlässt, kostet aber einen zweiten Clear pro Frame. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
+      "recommendation": "Den Vorab-Clear überspringen, wenn das Kind `clear`, `clearColorBuffer` und `clearDepthBuffer` gesetzt hat und seine Farbe vollständig schreibt.",
+      "effort": "S",
+      "status": "new",
+      "origin": {
+        "kind": "induced",
+        "run": "2026-09-29"
+      }
     }
   ],
   "openQuestions": [
@@ -2154,7 +2176,8 @@
       "Neue Findings bekamen ihr Package über die Fundstelle; zwei mitgeführte Findings ohne Package wurden dabei ebenfalls zugeordnet.",
       "Nachgeführt nach dem Remediation-Lauf vom 2026-09-27 (Performance der Feature-Domain vertex-objects samt Hot-Path-Tests): 7 Commits 92facd32..5e4ede07 auf main, 12 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 5 Nebenbefunde und 6 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft.",
       "Nachgeführt nach dem Remediation-Lauf vom 2026-09-28 (Feature-Domänen vertex-objects, sprites und map2d, jede Severity): 10 Commits 93628b3c..28d2cff0 auf main, 26 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 1 Nebenbefund aus der dritten Drain-Runde und 9 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft.",
-      "Remediation-Lauf vom 2026-09-29 (Features Vertex Objects, Texturen & Atlanten, Display & Frame-Loop, Sprites, Map2D): 5 Commits 801906f3..35e7942e auf main, 24 Findings nach Reviewer-Urteil geschlossen, 13 Nebenbefunde und 4 Folgen im selben Lauf behoben, keines mangels Beleg offen. Der Code wurde seit dem Audit vom 2026-09-28 nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
+      "Remediation-Lauf vom 2026-09-29 (Features Vertex Objects, Texturen & Atlanten, Display & Frame-Loop, Sprites, Map2D): 5 Commits 801906f3..35e7942e auf main, 24 Findings nach Reviewer-Urteil geschlossen, 13 Nebenbefunde und 4 Folgen im selben Lauf behoben, keines mangels Beleg offen. Der Code wurde seit dem Audit vom 2026-09-28 nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
+      "Remediation-Lauf vom 2026-09-29 (Stage und Input-Controls): 1 Commit e2026856 auf main, 4 Findings nach Reviewer-Urteil geschlossen, zwei Testlücken-Findings teilweise erfüllt und nachgeführt, 2 Nebenbefunde und 3 kleine Reviewer-Befunde ins Backlog, keines mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
     ]
   },
   "acknowledged": [
@@ -2438,11 +2461,11 @@
     },
     {
       "date": "2026-09-29",
-      "score": 75,
+      "score": 78,
       "source": "remediation",
       "scoreModel": 2,
       "domains": {
-        "code": 84,
+        "code": 89,
         "harness": 68
       },
       "coverage": 1
@@ -2597,6 +2620,16 @@
       "inducedFixed": 7,
       "inducedOpen": 0,
       "discovered": 13,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-29",
+      "source": "remediation",
+      "ref": "2026-09-29",
+      "fixed": 4,
+      "inducedFixed": 0,
+      "inducedOpen": 3,
+      "discovered": 2,
       "attribution": "reviewed"
     }
   ]
