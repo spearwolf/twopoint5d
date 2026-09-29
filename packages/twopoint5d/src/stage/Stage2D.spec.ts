@@ -201,6 +201,58 @@ describe('Stage2D', () => {
       expect(updateViewRect).not.toHaveBeenCalled();
     });
 
+    it('updateProjection() leaves the projection alone without needsUpdate', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+
+      const updateViewRect = vi.spyOn(projection, 'updateViewRect');
+      stage.updateProjection();
+
+      expect(updateViewRect).not.toHaveBeenCalled();
+    });
+
+    it('updateProjection() applies needsUpdate and clears it', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+
+      const updateViewRect = vi.spyOn(projection, 'updateViewRect');
+      stage.needsUpdate = true;
+      stage.updateProjection();
+
+      expect(updateViewRect).toHaveBeenCalledTimes(1);
+      expect(updateViewRect).toHaveBeenCalledWith(800, 600);
+      expect(stage.needsUpdate).toBe(false);
+    });
+
+    it('keeps needsUpdate while the container has no area', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+
+      stage.needsUpdate = true;
+      stage.updateProjection();
+
+      expect(stage.needsUpdate).toBe(true);
+      expect(stage.camera).toBeUndefined();
+    });
+
+    it('keeps needsUpdate and the size when the projection refuses the camera', () => {
+      const projection = new OrthographicProjection('xy|bottom-left', {fit: 'fill'});
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+      expect([stage.width, stage.height]).toEqual([800, 600]);
+
+      // the assignment itself places nothing; the next update is where the projection says no
+      stage.camera = new PerspectiveCamera();
+      projection.viewSpecs = {fit: 'contain', width: 400};
+      stage.needsUpdate = true;
+
+      expect(() => stage.updateProjection()).toThrow(TypeError);
+
+      expect(stage.needsUpdate).toBe(true);
+      expect([stage.width, stage.height]).toEqual([800, 600]);
+    });
+
     it('creates the camera in the frame that applies needsUpdate', () => {
       const projection = new ParallaxProjection('xy|bottom-left', {});
       const stage = new Stage2D(projection);
@@ -264,6 +316,36 @@ describe('Stage2D', () => {
       expect(firstFrame.mock.calls[0]![0], 'a late subscriber reads the first frame, not the current one').not.toBe(
         updateFrameProps,
       );
+    });
+
+    it('emits OnStageFirstFrame to a subscriber from the start once, not again in the next frame', () => {
+      const stage = makeStage();
+      const firstFrame = vi.fn();
+      on(stage, OnStageFirstFrame, firstFrame);
+
+      stage.updateFrame(1, 0.016, 1);
+      stage.updateFrame(2, 0.016, 2);
+
+      expect(firstFrame).toHaveBeenCalledTimes(1);
+      expect(firstFrame.mock.calls[0]![0]).toMatchObject({stage, frameNo: 1});
+    });
+
+    it('emits neither frame event while the stage has no camera', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      const firstFrame = vi.fn();
+      const updateFrame = vi.fn();
+      on(stage, OnStageFirstFrame, firstFrame);
+      on(stage, OnStageUpdateFrame, updateFrame);
+
+      stage.updateFrame(1, 0.016, 1);
+      stage.updateFrame(2, 0.016, 2);
+      expect(firstFrame).not.toHaveBeenCalled();
+      expect(updateFrame).not.toHaveBeenCalled();
+
+      stage.resize(800, 600);
+      stage.updateFrame(3, 0.016, 3);
+      expect(firstFrame).toHaveBeenCalledTimes(1);
+      expect(updateFrame).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -431,6 +513,74 @@ describe('Stage2D', () => {
       stage.projection = undefined;
 
       expect(onResize).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('camera', () => {
+    const createResizedStage = () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+      return {projection, stage, projectionCamera: stage.camera as PerspectiveCamera};
+    };
+
+    it('answers an assigned camera while the projection has one of its own', () => {
+      const {stage, projectionCamera} = createResizedStage();
+      expect(projectionCamera).toBeInstanceOf(PerspectiveCamera);
+
+      const assigned = new PerspectiveCamera();
+      stage.camera = assigned;
+
+      expect(stage.camera).toBe(assigned);
+    });
+
+    it('hands back the very projection camera it had once the assignment is cleared', () => {
+      const {projection, stage, projectionCamera} = createResizedStage();
+      stage.camera = new PerspectiveCamera();
+      const createCamera = vi.spyOn(projection, 'createCamera');
+
+      stage.camera = undefined;
+
+      expect(stage.camera).toBe(projectionCamera);
+      expect(createCamera).not.toHaveBeenCalled();
+    });
+
+    it('announces the camera the first resize() with an area creates', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      const changed = vi.fn();
+      on(stage, OnStageAfterCameraChanged, changed);
+
+      stage.resize(800, 600);
+
+      expect(changed).toHaveBeenCalledTimes(1);
+      expect(changed).toHaveBeenCalledWith(stage, undefined);
+    });
+
+    it('announces an assigned camera and a cleared assignment with the camera each replaced', () => {
+      const {stage, projectionCamera} = createResizedStage();
+      const changed = vi.fn();
+      on(stage, OnStageAfterCameraChanged, changed);
+      const assigned = new PerspectiveCamera();
+
+      stage.camera = assigned;
+      expect(changed).toHaveBeenCalledTimes(1);
+      expect(changed).toHaveBeenLastCalledWith(stage, projectionCamera);
+
+      stage.camera = undefined;
+      expect(changed).toHaveBeenCalledTimes(2);
+      expect(changed).toHaveBeenLastCalledWith(stage, assigned);
+    });
+
+    it('does not announce the camera it already has', () => {
+      const {stage} = createResizedStage();
+      const changed = vi.fn();
+      on(stage, OnStageAfterCameraChanged, changed);
+      const assigned = new PerspectiveCamera();
+
+      stage.camera = assigned;
+      stage.camera = assigned;
+
+      expect(changed).toHaveBeenCalledTimes(1);
     });
   });
 

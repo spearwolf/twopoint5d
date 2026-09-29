@@ -149,7 +149,9 @@ describe('StageRenderer', () => {
   }
 
   type LogEntry =
-    {kind: 'clear'; target: unknown; color: number; alpha: number; args: unknown[]} | {kind: 'draw'; target: unknown};
+    | {kind: 'clear'; target: unknown; color: number; alpha: number; args: unknown[]}
+    | {kind: 'draw'; target: unknown}
+    | {kind: 'pipeline'; target: unknown};
 
   // every clear with the target and the clear state it hit, and every draw of the given stages
   function logClearsAndDraws(...stages: {renderTo: Mock}[]): LogEntry[] {
@@ -955,6 +957,41 @@ describe('StageRenderer', () => {
       expect(inner.updateFrame).not.toHaveBeenCalled();
       expect(inner.renderTo).not.toHaveBeenCalled();
     });
+
+    it('attach() moves a renderer from one host to another', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const sr = new StageRenderer(hostA);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      const removed = vi.fn();
+      const added = vi.fn();
+      on(sr, OnRemoveFromParent, removed);
+      on(sr, OnAddToParent, added);
+
+      sr.attach(hostB);
+
+      expect(sr.parent).toBe(hostB);
+      expect(hostA._unsubs, 'both subscriptions to the first host given up').toBe(2);
+      expect(removed).toHaveBeenCalledTimes(1);
+      expect(added).toHaveBeenCalledTimes(1);
+
+      hostA._emitResize(100, 50);
+      hostA._emitFrame(1, 1, 1);
+
+      expect(sr.width, 'the first host reaches the renderer no more').toBe(0);
+      expect(stage.resize).not.toHaveBeenCalled();
+      expect(stage.updateFrame).not.toHaveBeenCalled();
+      expect(stage.renderTo).not.toHaveBeenCalled();
+
+      hostB._emitResize(100, 50);
+      expect([sr.width, sr.height]).toEqual([100, 50]);
+
+      hostB._emitFrame(1, 1, 1);
+      expect(stage.updateFrame).toHaveBeenCalledTimes(1);
+      expect(stage.updateFrame).toHaveBeenCalledWith(1, 1, 1);
+      expect(stage.renderTo).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1104,6 +1141,30 @@ describe('StageRenderer', () => {
 
       const {draw, clears} = clearsBeforeFirstDraw(log);
       expect(clears).toEqual([{kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]}]);
+    });
+
+    it('applies its own clear to the target it writes to after the stages drew and before the pipeline runs', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.setClearColor(new Color(0x336699), 0.75);
+      sr.clearStencilBuffer = false;
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      const log = logClearsAndDraws(stage);
+      pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+
+      sr.renderTo(renderer as any);
+
+      const lastDraw = log.map((entry) => entry.kind).lastIndexOf('draw');
+      expect(lastDraw, 'the stage is drawn').toBeGreaterThanOrEqual(0);
+      expect(log.slice(lastDraw + 1)).toEqual([
+        {kind: 'clear', target: null, color: 0x336699, alpha: 0.75, args: [true, true, false]},
+        {kind: 'pipeline', target: null},
+      ]);
+      expect(renderer.__clearColor.getHex(), 'clear color restored').toBe(0x111111);
+      expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
     });
 
     it('lets the stages of Mode C draw linear, and its own pipeline apply the output transform of the caller', () => {
@@ -1529,6 +1590,45 @@ describe('StageRenderer', () => {
     // -------------------------------------------------------------------------
     // renderOrder × buildOutputNode — the order the user reads in their pipeline
     // -------------------------------------------------------------------------
+    it('applies its own clear to the target it writes to before the pipeline runs', () => {
+      const {sr, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.setClearColor(null, 0.25);
+      const log = logClearsAndDraws();
+      pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+
+      sr.renderTo(renderer as any);
+
+      expect(log).toEqual([
+        {kind: 'clear', target: null, color: 0x111111, alpha: 0.25, args: [true, true, true]},
+        {kind: 'pipeline', target: null},
+      ]);
+      expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
+    });
+
+    it('sizes the pass target of a nested renderer in device pixels, before and after a resize', () => {
+      renderer.getPixelRatio.mockReturnValue(2);
+      const parent = new StageRenderer();
+      parent.resize(100, 50);
+      parent.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
+      parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      const inner = fakeStage('s');
+      let passTarget: any;
+      inner.renderTo.mockImplementation(() => {
+        passTarget = renderer.__renderTarget;
+      });
+      const child = new StageRenderer();
+      child.add(inner);
+      parent.add(child);
+
+      parent.renderTo(renderer as any);
+
+      expect([passTarget.width, passTarget.height], 'built in device pixels').toEqual([200, 100]);
+
+      parent.resize(300, 150);
+      expect([passTarget.width, passTarget.height], 'resized in device pixels').toEqual([600, 300]);
+    });
+
     describe('renderOrder controls the order of pass nodes passed to buildOutputNode', () => {
       function makeOrderedSetup(names: string[], renderOrder?: string) {
         const sr = new StageRenderer();

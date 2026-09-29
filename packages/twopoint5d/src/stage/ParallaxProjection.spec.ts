@@ -135,6 +135,24 @@ describe('ParallaxProjection', () => {
       return projection;
     };
 
+    it('gives a camera it updates the field of view and the aspect of the latest view', () => {
+      const projection = projectionFor({fit: 'fill'});
+      const camera = projection.createCamera();
+      expect(camera.aspect).toBeCloseTo(4 / 3);
+      const fovBefore = camera.fov;
+
+      projection.updateViewRect(400, 200);
+      projection.updateCamera(camera);
+
+      const reference = projection.createCamera();
+      expect(camera.aspect).toBeCloseTo(2);
+      expect(camera.fov).toBeCloseTo(reference.fov);
+      expect(camera.fov).not.toBeCloseTo(fovBefore);
+      camera.projectionMatrix.elements.forEach((element, i) => {
+        expect(element).toBeCloseTo(reference.projectionMatrix.elements[i]!);
+      });
+    });
+
     it('carries the near and the far of the specs onto a camera it updates', () => {
       const specs: Partial<ParallaxProjectionSpecs> = {fit: 'contain', width: 640};
       const projection = projectionFor(specs);

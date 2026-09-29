@@ -1,4 +1,4 @@
-import {Plane as THREE_Plane, Vector3} from 'three/webgpu';
+import {PerspectiveCamera, Plane as THREE_Plane, Vector3} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {ProjectionPlane} from './ProjectionPlane.js';
@@ -158,6 +158,80 @@ describe('ProjectionPlane', () => {
       const xz = ProjectionPlane.get('xz|bottom-left');
       const p = xz.getPoint(5, 4);
       expect(p.equals(new Vector3(5, 0, 4))).toBeTruthy();
+    });
+  });
+
+  describe('constructor', () => {
+    it('refuses a custom plane without up', () => {
+      expect(() => new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)))).toThrow(
+        'up is mandatory for a custom projection plane',
+      );
+    });
+  });
+
+  describe('clone()', () => {
+    it('gives an equal plane that shares no vector with the original', () => {
+      const original = new ProjectionPlane('xz|top-left');
+      const clone = original.clone();
+      expect(clone.equals(original)).toBe(true);
+      expect(clone.plane).not.toBe(original.plane);
+      expect(clone.up).not.toBe(original.up);
+      clone.up.set(1, 0, 0);
+      expect(original.up.equals(new Vector3(0, 0, -1))).toBe(true);
+    });
+  });
+
+  describe('equals()', () => {
+    it('is true for the same instance', () => {
+      const plane = new ProjectionPlane('xy|bottom-left');
+      expect(plane.equals(plane)).toBe(true);
+    });
+
+    it('is false for null', () => {
+      expect(new ProjectionPlane('xy|bottom-left').equals(null as unknown as ProjectionPlane)).toBe(false);
+    });
+
+    it('is true for two planes of the same description', () => {
+      expect(new ProjectionPlane('xy|bottom-left').equals(new ProjectionPlane('xy|bottom-left'))).toBe(true);
+    });
+
+    it('is false for another plane', () => {
+      expect(new ProjectionPlane('xy|bottom-left').equals(new ProjectionPlane('xy|top-left'))).toBe(false);
+    });
+
+    it('is false for the same plane with another up', () => {
+      const a = new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)), new Vector3(0, 1, 0));
+      const b = new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)), new Vector3(1, 0, 0));
+      expect(a.equals(b)).toBe(false);
+    });
+  });
+
+  describe('applyRotation()', () => {
+    const expectLooksAlong = (plane: ProjectionPlane) => {
+      const camera = new PerspectiveCamera();
+      plane.applyRotation(camera);
+
+      const forward = camera.getWorldDirection(new Vector3());
+      const expectedForward = plane.getForward();
+      expect(forward.x).toBeCloseTo(expectedForward.x);
+      expect(forward.y).toBeCloseTo(expectedForward.y);
+      expect(forward.z).toBeCloseTo(expectedForward.z);
+
+      const up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+      expect(up.x).toBeCloseTo(plane.up.x);
+      expect(up.y).toBeCloseTo(plane.up.y);
+      expect(up.z).toBeCloseTo(plane.up.z);
+    };
+
+    it.each(['xy|bottom-left', 'xy|top-left', 'xz|top-left', 'xz|bottom-left'] as const)(
+      'turns a camera without rotation to look along getForward() with up as its up (%s)',
+      (description) => {
+        expectLooksAlong(new ProjectionPlane(description));
+      },
+    );
+
+    it('turns a camera without rotation to look along getForward() with up as its up (custom plane off the origin)', () => {
+      expectLooksAlong(new ProjectionPlane(new THREE_Plane(new Vector3(0, 1, 0), -5), new Vector3(0, 0, -1)));
     });
   });
 });

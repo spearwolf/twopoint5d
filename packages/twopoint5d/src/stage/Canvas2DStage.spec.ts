@@ -111,6 +111,39 @@ describe('Canvas2DStage', () => {
     expect([stage.stageRenderer.width, stage.stageRenderer.height]).toEqual([320, 240]);
   });
 
+  test('a new fit reaches the projection and gives the stage the view of that fit', () => {
+    const stage = makeStage();
+    stage.setContainerSize(320, 240);
+    expect([stage.stage.width, stage.stage.height]).toEqual([32, 24]);
+
+    const resized = vi.fn();
+    on(stage.stage, OnStageResize, resized);
+
+    stage.fit = 'cover';
+
+    expect(stage.projection.viewSpecs.fit).toBe('cover');
+    expect(stage.stage.width).toBeCloseTo(64 / 3);
+    expect(stage.stage.height).toBe(16);
+    expect(resized).toHaveBeenCalledTimes(1);
+    const props = resized.mock.calls[0]![0] as {width: number; height: number};
+    expect(props.width).toBeCloseTo(64 / 3);
+    expect(props.height).toBe(16);
+  });
+
+  test('writing the fit it has changes nothing', () => {
+    const stage = makeStage();
+    stage.setContainerSize(320, 240);
+
+    const updateProjection = sandbox.spy(stage.stage, 'updateProjection');
+    const resized = vi.fn();
+    on(stage.stage, OnStageResize, resized);
+
+    stage.fit = 'contain';
+
+    expect(updateProjection.called).toBe(false);
+    expect(resized).not.toHaveBeenCalled();
+  });
+
   test('uploads a change of the same size into the texture it has', () => {
     const stage = makeStage();
 

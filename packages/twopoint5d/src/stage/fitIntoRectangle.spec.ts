@@ -254,6 +254,54 @@ it('a contain spec takes the side that is a finite number above 0 when the other
   expect([target.width, target.height]).toEqual([160, 100]);
 });
 
+it('cover & width', () => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'cover', width: 400}, new Vector2());
+  expect([target.width, target.height]).toEqual([400, 300]);
+});
+
+it('cover & height', () => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'cover', height: 300}, new Vector2());
+  expect([target.width, target.height]).toEqual([400, 300]);
+});
+
+it('contain & width & height takes the height for a container wider than the specs', () => {
+  const target = fitIntoRectangle(new Vector2(800, 400), {fit: 'contain', width: 640, height: 480}, new Vector2());
+  expect([target.width, target.height]).toEqual([960, 480]);
+});
+
+it('contain & width & height takes the width for a container narrower than the specs', () => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'contain', width: 640, height: 320}, new Vector2());
+  expect([target.width, target.height]).toEqual([640, 480]);
+});
+
+it('cover & width & height takes the width for a container wider than the specs', () => {
+  const target = fitIntoRectangle(new Vector2(800, 400), {fit: 'cover', width: 640, height: 480}, new Vector2());
+  expect([target.width, target.height]).toEqual([640, 320]);
+});
+
+it('cover & width & height takes the height for a container narrower than the specs', () => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'cover', width: 640, height: 320}, new Vector2());
+  expect(target.width).toBeCloseTo(1280 / 3);
+  expect(target.height).toBe(320);
+});
+
+it.each(['contain', 'cover'] as const)('%s & width & height gives the specs for a container of the same aspect ratio', (fit) => {
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit, width: 640, height: 480}, new Vector2());
+  expect([target.width, target.height]).toEqual([640, 480]);
+});
+
+it('cover & width & minPixelZoom', () => {
+  // the view 1600×1200 would zoom by 0.5
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'cover', width: 1600, minPixelZoom: 1}, new Vector2());
+  expect([target.width, target.height]).toEqual([800, 600]);
+});
+
+it('cover & width & maxPixelZoom', () => {
+  // the view 100×75 would zoom by 8
+  const target = fitIntoRectangle(new Vector2(800, 600), {fit: 'cover', width: 100, maxPixelZoom: 4}, new Vector2());
+  expect([target.width, target.height]).toEqual([200, 150]);
+});
+
 it.each([0, -2, NaN, Infinity, -Infinity])('a maxPixelZoom of %s does not apply', (maxPixelZoom) => {
   const target = fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, maxPixelZoom}, new Vector2());
   expect([target.width, target.height]).toEqual([100, 62.5]);

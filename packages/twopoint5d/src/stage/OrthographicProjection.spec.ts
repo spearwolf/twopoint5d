@@ -114,6 +114,17 @@ describe('OrthographicProjection', () => {
       return projection;
     };
 
+    it('gives a camera it updates the frustum of the latest view', () => {
+      const projection = projectionFor({fit: 'fill'});
+      const camera = projection.createCamera();
+      expect([camera.left, camera.right, camera.top, camera.bottom]).toEqual([-400, 400, 300, -300]);
+
+      projection.updateViewRect(400, 200);
+      projection.updateCamera(camera);
+
+      expect([camera.left, camera.right, camera.top, camera.bottom]).toEqual([-200, 200, 100, -100]);
+    });
+
     it('moves a camera it updates to the distance the specs now name', () => {
       const specs: Partial<OrthographicProjectionSpecs> = {fit: 'contain', width: 640, distanceToProjectionPlane: 300};
       const projection = projectionFor(specs);
