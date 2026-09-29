@@ -415,12 +415,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * by whoever built it, and a camera has no `dispose()` either, the one the projection created as
    * little as one assigned here.
    *
-   * Take this stage out of every `StageRenderer` that holds it before calling this — `remove()`
-   * on each of them. A renderer that still lists a disposed stage keeps the released node in its
-   * composed output node, and the backend silently allocates a render target for it again on the
-   * next frame; the next rebuild of that node — every `add()`, every `remove()`, every write to
-   * `renderOrder`, every `invalidateOutputNode()` — asks this stage for a node again and gets the
-   * throw, in the middle of the frame loop.
+   * Every `StageRenderer` that holds this stage takes it out itself on the `dispose` event below,
+   * and its next frame composes without it.
    *
    * Afterwards `isDisposed` is `true` and {@link asPassNode} throws an error naming the class and
    * the state. `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a write to
@@ -429,9 +425,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage
    * was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a
    * write to `scene` goes through and has no effect, since the stage no longer builds a node from
-   * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to `scene.name` as it always does, and so reaches the scene the
-   * caller may have handed in. A `dispose` event goes out to every subscriber before this stage
-   * stops listening; no event follows it.
+   * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to
+   * `scene.name` as it always does, and so reaches the scene the caller may have handed in. A
+   * `dispose` event goes out to every subscriber before this stage stops listening; no event
+   * follows it.
    */
   dispose(): void {
     if (this.#disposed) return;

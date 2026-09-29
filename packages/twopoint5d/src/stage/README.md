@@ -18,11 +18,12 @@ fast and need the canonical idioms.
                    ▼
 ┌─────────────────────────────────────────────┐
 │ StageRenderer (root)                        │   container + render policy
-│   – stages: IStage[]   renderOrder: string  │
-│   – clear / clearColor / clearAlpha         │   §3.2
-│   – pipeline?            §6.2 / §6.4        │   optional post-processing
-│   – outputRenderTarget?  §6.4               │
-│   – buildOutputNode?     §6.2               │
+│   – stages: ReadonlyArray<StageItem>        │
+│   – renderOrder: string                     │
+│   – clear / clearColor / clearAlpha         │   clear policy
+│   – pipeline?            Mode C / Mode D    │   optional post-processing
+│   – outputRenderTarget?  Mode C             │
+│   – buildOutputNode?     Mode D             │
 └──────────────────┬──────────────────────────┘
                    │ holds list of
                    ▼
@@ -179,8 +180,12 @@ root.add(world);
 // `hud` is already added to `root` via its constructor.
 ```
 
+`root.add(hud)` and `new StageRenderer(root)` are the same move: either way
+`hud.parent` is `root` afterwards. A renderer has one holder — an `add()` to
+another renderer, or an `attach(host)`, takes it out of the first.
+
 When the parent has a `pipeline` + `buildOutputNode`, the child renderer's
-`asPassNode()` returns a `texture(...)` node — see "Composing post-effects"
+`asPassNode()` returns a `texture(...)` node — see "Mode D" and "Mode E"
 below.
 
 ---
@@ -266,7 +271,7 @@ runtime are visible to the static type. Each example casts for what it needs —
 `Node<'vec4'>` alone where it only feeds the pass onward, plus `.add()` where it
 composes — and the comment next to the cast names the reason the pass is there at all.
 
-### Mode C (§6.4) — pipeline samples an internal RT
+### Mode C — pipeline samples an internal RT
 
 Mode C applies to a `pipeline` without `buildOutputNode` that is not a
 `RootRenderPipeline`; a `RootRenderPipeline` composes as Mode D does (see
@@ -292,7 +297,7 @@ cameras leave it standing. The internal target has the type and the samples of t
 renderer (`renderer.getOutputBufferType()`, `renderer.samples`), the values
 three.js' `PassNode` gives the pass targets of Mode D.
 
-### Mode D (§6.2) — compose a TSL graph from per-stage pass nodes
+### Mode D — compose a TSL graph from per-stage pass nodes
 
 When you want a real effect (bloom, blur, FXAA, etc.), provide
 `buildOutputNode(stagePasses)`. It receives the list of nodes returned by
@@ -345,7 +350,7 @@ Setting `stageRenderer.buildOutputNode` overrides the default — use it
 when you want a non-additive composition (e.g. bloom wrapping a single
 pass).
 
-### Mode E (§6.3) — nested renderers, each with its own post-effect
+### Mode E — nested renderers, each with its own post-effect
 
 Combine the above: a child `StageRenderer` with its own pipeline produces
 its bloomed/blurred output into a texture, and the parent samples it as
@@ -451,6 +456,12 @@ class MyStage implements IStage, IRenderable, IPassProvider {
 }
 ```
 
+A `StageRenderer` takes a stage out by itself when the stage announces its
+end: an eventized stage (`eventize(this)` from `@spearwolf/eventize`) that
+emits `dispose` in its `dispose()`, as `Stage2D` does. Take any other stage
+out of every renderer that holds it — `remove(stage)` — before you call its
+`dispose()`. A stage whose `isDisposed` is `true` is refused by `add()`.
+
 ---
 
 ## Events you can subscribe to
@@ -459,6 +470,7 @@ On `StageRenderer`:
 
 - `OnStageAdded` / `OnStageRemoved` — emitted at the **parent** with `{stage, renderer}`.
 - `OnAddToParent` / `OnRemoveFromParent` — emitted at the **child** when its `parent` changes.
+- `dispose` — once, from `dispose()`, before the renderer stops listening.
 
 On `Stage2D`:
 
@@ -508,14 +520,19 @@ What this layer does on top of the general rules in
   `StageRenderer`. The target objects stay, so every `texture()` node on them
   stays valid; three.js allocates the memory again on the next draw.
 - `StageRenderer.dispose()` releases both internal RTs. It also detaches from its
-  host and drops its stages through `remove()`, so a disposed renderer is no longer
-  driven by any frame loop, and a nested `StageRenderer` among its stages releases
-  the GPU memory of its pass-target — the child itself is not disposed.
+  host or from the parent `StageRenderer` that holds it, and drops its stages through
+  `remove()`, so a disposed renderer is no longer driven by any frame loop, and a nested
+  `StageRenderer` among its stages releases the GPU memory of its pass-target — the
+  child itself is not disposed. A `dispose` event goes out before the renderer stops
+  listening.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
   write to `pipeline` falls through.
-- `remove(stage)` clears both sides of the relation: a removed child `StageRenderer`
-  answers `undefined` as its `parent` and gets its `OnRemoveFromParent`.
+- `add(stage)` sets both sides of the relation: an added child `StageRenderer` answers
+  the renderer as its `parent` and gets its `OnAddToParent`; it has one holder, and
+  leaves the host or the renderer that held it. `remove(stage)` clears both sides: a
+  removed child `StageRenderer` answers `undefined` as its `parent` and gets its
+  `OnRemoveFromParent`.
 - `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what
   they were, and releases the node built for the pair before it on the next `asPassNode()` after
   either of them has changed; a composing `StageRenderer` asks again on its next render after
@@ -523,8 +540,8 @@ What this layer does on top of the general rules in
   `Stage2D.dispose()` releases that node and the render target behind it, and nothing else: the
   scene, the camera and the projection were handed in and stay the caller's. Afterwards
   `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
-  write to `projection` or `camera` do nothing. Take the stage out of every `StageRenderer` that
-  holds it first — see the pitfall *Disposing a stage a renderer still holds* below.
+  write to `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
+  it out on its `dispose` event.
 - `Canvas2DStage.dispose()` releases the sprite material, both textures that ever sat behind it —
   a texture assigned to `texture` from outside as much as one the stage built — its
   `StageRenderer` and the `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a
@@ -577,15 +594,16 @@ What this layer does on top of the general rules in
   whoever assigned them. Dispose the previous instance yourself when you replace
   one, and dispose the current one when you dispose the renderer; the renderer
   only releases what it owns — its internal RTs.
-- **Disposing a stage a renderer still holds**: take a `Stage2D` out of every
-  `StageRenderer` that has it — `remove(stage)` — before you call
-  `stage.dispose()`. A renderer that still lists a disposed stage keeps its
-  released pass node in the composed output node, and the backend silently
-  allocates a render target for it again on the next frame; the next rebuild of
-  that node — `add()`, `remove()`, a `renderOrder` write,
+- **Disposing a custom stage a renderer still holds**: take a custom stage that
+  emits no `dispose` event out of every `StageRenderer` that has it —
+  `remove(stage)` — before you call its `dispose()`. A renderer that still lists
+  a disposed stage keeps its released pass node in the composed output node, and
+  the backend silently allocates a render target for it again on the next frame;
+  the next rebuild of that node — `add()`, `remove()`, a `renderOrder` write,
   `invalidateOutputNode()` — asks the stage for a node again and gets the throw,
-  in the middle of the frame loop. `StageRenderer.dispose()` removes every stage
-  it holds, so disposing the renderer first is the shorter way there.
+  in the middle of the frame loop. A `Stage2D` announces its end through that
+  event, and the renderer lets go of it by itself; a child `StageRenderer`
+  leaves its parent in its own `dispose()`.
 - **Mixed pipeline / plain writers to the canvas**: don't mix a
   `pipeline.render()` and a plain `renderer.render(scene, camera)` on the
   same canvas in the same frame. Compose everything via one outer pipeline

@@ -4,6 +4,7 @@ import {
   Color,
   ColorManagement,
   FloatType,
+  type Node,
   NoToneMapping,
   PerspectiveCamera,
   RenderTarget,
@@ -78,6 +79,16 @@ function createRendererMock(): RendererMock {
   });
   m.getClearAlpha.mockImplementation(() => m.__clearAlpha);
   return m;
+}
+
+// the very error the call threw, for an identity check that toThrow() does not make
+function thrownBy(call: () => unknown): unknown {
+  try {
+    call();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('the call threw nothing');
 }
 
 function fakeStage(name: string): IStage & IRenderable & {renderTo: Mock; resize: Mock; updateFrame: Mock} {
@@ -551,9 +562,258 @@ describe('StageRenderer', () => {
       expect(sr.width).toBe(0);
       expect(sr.height).toBe(0);
     });
+
+    it('several stages that refuse the size come out as one AggregateError in the order they were added', () => {
+      const sr = new StageRenderer();
+      const a = fakeStage('a');
+      const b = fakeStage('b');
+      const c = fakeStage('c');
+      sr.add(a).add(b).add(c);
+      // the order they draw in is not the order they are asked in
+      sr.renderOrder = 'c,b,a';
+      const errA = new Error('a refused the size');
+      const errC = new Error('c refused the size');
+      a.resize.mockImplementation(() => {
+        throw errA;
+      });
+      c.resize.mockImplementation(() => {
+        throw errC;
+      });
+
+      const caught = thrownBy(() => sr.resize(320, 240));
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      const {errors, message} = caught as AggregateError;
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toBe(errA);
+      expect(errors[1]).toBe(errC);
+      expect(message).toBe('StageRenderer#resize(): 2 of 3 stages refused the size 320x240');
+      expect([sr.width, sr.height], 'the renderer keeps the size it had').toEqual([0, 0]);
+
+      for (const stage of [a, b, c]) stage.resize.mockReset();
+      sr.resize(320, 240);
+
+      expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+      expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+      expect(b.resize, 'b took the size in the first call').not.toHaveBeenCalled();
+    });
+
+    it('adds no stage that refuses the size', () => {
+      const sr = new StageRenderer();
+      sr.resize(320, 240);
+      const added = vi.fn();
+      on(sr, OnStageAdded, added);
+      const refusal = new Error('stage refused the size');
+
+      const stage = fakeStage('a');
+      stage.resize.mockImplementation(() => {
+        throw refusal;
+      });
+
+      expect(thrownBy(() => sr.add(stage))).toBe(refusal);
+      expect(sr.hasStage(stage)).toBe(false);
+
+      // an eventized stage keeps no listener of a renderer that did not take it
+      const stage2D = new Stage2D();
+      vi.spyOn(stage2D, 'resize').mockImplementation(() => {
+        throw refusal;
+      });
+      const before = getSubscriptionCount(stage2D);
+
+      expect(thrownBy(() => sr.add(stage2D))).toBe(refusal);
+      expect(sr.hasStage(stage2D)).toBe(false);
+      expect(getSubscriptionCount(stage2D)).toBe(before);
+
+      expect(added).not.toHaveBeenCalled();
+    });
+
+    it('adds no renderer that refuses the size and leaves it with its host', () => {
+      const host = makeHost();
+      const child = new StageRenderer(host);
+      const refusing = fakeStage('refusing');
+      child.add(refusing);
+      const refusal = new Error('stage refused the size');
+      refusing.resize.mockImplementation(() => {
+        throw refusal;
+      });
+      const root = new StageRenderer();
+      root.resize(320, 240);
+
+      expect(thrownBy(() => root.add(child))).toBe(refusal);
+
+      expect(child.parent).toBe(host);
+      expect(host._unsubs, 'the host still drives the child').toBe(0);
+      expect(root.hasStage(child)).toBe(false);
+    });
+
+    it('refuses a stage that has been disposed', () => {
+      const sr = new StageRenderer();
+      const refused = /StageRenderer#add\(\) cannot take the stage .*: that stage has been disposed/;
+
+      const stage = new Stage2D();
+      stage.dispose();
+      expect(() => sr.add(stage)).toThrow(refused);
+      expect(sr.hasStage(stage)).toBe(false);
+
+      const child = new StageRenderer();
+      child.dispose();
+      expect(() => sr.add(child)).toThrow(refused);
+      expect(sr.hasStage(child)).toBe(false);
+    });
+
+    it('lets go of a Stage2D that is disposed while it holds it', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const removed = vi.fn();
+      on(sr, OnStageRemoved, removed);
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      const other = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      sr.add(stage).add(other);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode.mock.calls[0]![0]).toHaveLength(2);
+
+      stage.dispose();
+
+      expect(sr.hasStage(stage)).toBe(false);
+      expect(removed).toHaveBeenCalledExactlyOnceWith({stage, renderer: sr});
+
+      expect(() => sr.renderTo(renderer as any)).not.toThrow();
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode.mock.calls[1]![0]).toEqual([other.asPassNode(renderer as any)]);
+    });
+
+    it('lets go of a Stage2D that is disposed in every renderer that holds it', () => {
+      // each renderer unsubscribes its own dispose listener from within the dispose event
+      const first = new StageRenderer();
+      const second = new StageRenderer();
+      const stage = new Stage2D();
+      first.add(stage);
+      second.add(stage);
+
+      stage.dispose();
+
+      expect(first.hasStage(stage)).toBe(false);
+      expect(second.hasStage(stage)).toBe(false);
+    });
+
+    for (const order of ['*', 'a,b,c']) {
+      describe(`with renderOrder = ${JSON.stringify(order)}`, () => {
+        function makeStages() {
+          const sr = new StageRenderer();
+          sr.renderOrder = order;
+          const a = fakeStage('a');
+          const b = fakeStage('b');
+          const c = fakeStage('c');
+          return {sr, a, b, c};
+        }
+
+        it('a stage removed during updateFrame() does not keep the next one from its updateFrame()', () => {
+          const {sr, a, b, c} = makeStages();
+          sr.add(a).add(b).add(c);
+          a.updateFrame.mockImplementation(() => sr.remove(a));
+
+          sr.updateFrame(1, 0.016, 1);
+
+          expect(a.updateFrame, 'the removed stage has its call').toHaveBeenCalledTimes(1);
+          expect(b.updateFrame).toHaveBeenCalledTimes(1);
+          expect(c.updateFrame).toHaveBeenCalledTimes(1);
+
+          sr.renderTo(renderer as any);
+
+          expect(a.renderTo, 'and is not drawn').not.toHaveBeenCalled();
+          expect(b.renderTo).toHaveBeenCalledTimes(1);
+          expect(c.renderTo).toHaveBeenCalledTimes(1);
+        });
+
+        it('a stage added during updateFrame() updates from the next frame on', () => {
+          const {sr, a, b, c} = makeStages();
+          sr.add(a).add(b);
+          a.updateFrame.mockImplementationOnce(() => sr.add(c));
+
+          sr.updateFrame(1, 0.016, 1);
+
+          expect(c.updateFrame, 'no call in the frame it was added in').not.toHaveBeenCalled();
+
+          sr.renderTo(renderer as any);
+          expect(c.renderTo, 'drawn by the renderTo() of that frame').toHaveBeenCalledTimes(1);
+
+          sr.updateFrame(2, 0.016, 2);
+          expect(c.updateFrame).toHaveBeenCalledExactlyOnceWith(2, 0.016, 2);
+        });
+
+        it('a stage removed during resize() does not keep the next one from the size', () => {
+          const {sr, a, b, c} = makeStages();
+          sr.add(a).add(b).add(c);
+          a.resize.mockImplementation(() => sr.remove(a));
+
+          sr.resize(320, 240);
+
+          expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+          expect(b.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+          expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+        });
+      });
+    }
+
+    it('orderedStages hands out the same array until the stages change', () => {
+      const sr = new StageRenderer();
+      const a = fakeStage('a');
+      const b = fakeStage('b');
+      const c = fakeStage('c');
+      sr.add(a).add(b);
+
+      const first = sr.orderedStages;
+      expect(sr.orderedStages).toBe(first);
+
+      sr.add(c);
+      const next = sr.orderedStages;
+
+      expect(next).not.toBe(first);
+      expect(next.map((item) => item.stage)).toEqual([a, b, c]);
+      expect(
+        first.map((item) => item.stage),
+        'the array handed out before stays as it was',
+      ).toEqual([a, b]);
+    });
+
+    it("a rename leaves the output node standing while renderOrder is '*'", () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const passNode = {isNode: true, label: 'a', type: 'pass'};
+      const stage = {...fakeStage('a'), asPassNode: vi.fn(() => passNode)};
+      sr.add(stage as any);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+      pipeline.needsUpdate = false;
+
+      stage.name = 'renamed';
+      sr.renderTo(renderer as any);
+
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+    });
+
+    it('renderOrderArray hands out a copy', () => {
+      const sr = new StageRenderer();
+      sr.renderOrder = 'a,b';
+      const x = fakeStage('x');
+      sr.add(fakeStage('a')).add(fakeStage('b')).add(x);
+
+      sr.renderOrderArray.push('x');
+
+      expect(sr.renderOrderArray).toEqual(['a', 'b']);
+      sr.renderTo(renderer as any);
+      expect(x.renderTo, 'the order is the one renderOrder names').not.toHaveBeenCalled();
+    });
   });
 
-  describe('parent / host wiring (3.7)', () => {
+  describe('parent / host wiring', () => {
     it('auto-drives resize + updateFrame + renderTo via a custom host', () => {
       const host = makeHost();
       const sr = new StageRenderer(host);
@@ -611,13 +871,79 @@ describe('StageRenderer', () => {
       expect(child.parent, 'the child let go of its holder as well').toBeUndefined();
       expect(removed, 'and it said so exactly once').toHaveBeenCalledTimes(1);
     });
+
+    it('add() makes a StageRenderer the child of the renderer it joins', () => {
+      const root = new StageRenderer();
+      const child = new StageRenderer();
+      const log: string[] = [];
+      on(root, OnStageAdded, () => log.push('OnStageAdded at the parent'));
+      on(child, OnAddToParent, () => log.push('OnAddToParent at the child'));
+
+      root.add(child);
+
+      expect(child.parent).toBe(root);
+      expect(log).toEqual(['OnStageAdded at the parent', 'OnAddToParent at the child']);
+    });
+
+    it('attaching a child that add() took moves it out of its parent', () => {
+      const host = makeHost();
+      const root = new StageRenderer();
+      const child = new StageRenderer();
+      const inner = fakeStage('inner');
+      child.add(inner);
+      root.add(child);
+
+      child.attach(host);
+
+      expect(root.hasStage(child)).toBe(false);
+      expect(child.parent).toBe(host);
+
+      host._emitFrame(1, 0.016, 1);
+      root.renderTo(renderer as any);
+
+      expect(inner.renderTo, 'driven by one holder').toHaveBeenCalledTimes(1);
+    });
+
+    it('add() moves a StageRenderer out of the renderer that held it', () => {
+      const a = new StageRenderer();
+      const b = new StageRenderer();
+      const child = new StageRenderer();
+      const removedFromA = vi.fn();
+      on(a, OnStageRemoved, removedFromA);
+
+      a.add(child);
+      b.add(child);
+
+      expect(a.hasStage(child)).toBe(false);
+      expect(b.hasStage(child)).toBe(true);
+      expect(child.parent).toBe(b);
+      expect(removedFromA).toHaveBeenCalledExactlyOnceWith({stage: child, renderer: a});
+    });
+
+    it('add() moves a StageRenderer off the host that drove it', () => {
+      const host = makeHost();
+      const child = new StageRenderer(host);
+      const inner = fakeStage('inner');
+      child.add(inner);
+      const root = new StageRenderer();
+
+      root.add(child);
+
+      expect(child.parent).toBe(root);
+      expect(host._unsubs, 'both host subscriptions given up').toBe(2);
+
+      host._emitFrame(1, 0.016, 1);
+
+      expect(inner.updateFrame).not.toHaveBeenCalled();
+      expect(inner.renderTo).not.toHaveBeenCalled();
+    });
   });
 
   // ---------------------------------------------------------------------------
   // Pipeline integration — see "Post-processing" in ./README.md
   // ---------------------------------------------------------------------------
 
-  describe('outputRenderTarget (§6.4 RT only, no pipeline)', () => {
+  describe('outputRenderTarget without a pipeline', () => {
     it('redirects rendering into the given RT and restores the previous target', () => {
       const sr = new StageRenderer();
       const rt = {isRenderTarget: true} as any;
@@ -637,7 +963,7 @@ describe('StageRenderer', () => {
     });
   });
 
-  describe('pipeline without buildOutputNode (§6.4 Mode C)', () => {
+  describe('Mode C: a pipeline that samples the internal pass-target', () => {
     function makePipelineMock() {
       return {
         outputNode: undefined as unknown,
@@ -989,9 +1315,21 @@ describe('StageRenderer', () => {
         'StageRenderer#resize(): the render target and 1 of 2 stages refused the size 300x150',
       );
     });
+
+    it('invalidateOutputNode() forces a rebuild on next render', () => {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(fakeStage('a') as any);
+      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+      sr.renderTo(renderer as any);
+      sr.pipeline!.needsUpdate = false;
+      sr.invalidateOutputNode();
+      sr.renderTo(renderer as any);
+      expect(sr.pipeline!.needsUpdate).toBe(true);
+    });
   });
 
-  describe('asPassNode + buildOutputNode (§6.2 / §6.3)', () => {
+  describe('Mode D and E: composing the pass nodes of the stages', () => {
     function fakePassNode(label: string) {
       return {isNode: true, label, type: 'pass'} as any;
     }
@@ -1411,18 +1749,6 @@ describe('StageRenderer', () => {
       expect(next, 'the same target').toBe(rt);
       expect(rt.samples).toBe(0);
     });
-
-    it('invalidateOutputNode() forces a rebuild on next render', () => {
-      const sr = new StageRenderer();
-      sr.resize(100, 100);
-      sr.add(fakeStage('a') as any);
-      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
-      sr.renderTo(renderer as any);
-      sr.pipeline!.needsUpdate = false;
-      sr.invalidateOutputNode();
-      sr.renderTo(renderer as any);
-      expect(sr.pipeline!.needsUpdate).toBe(true);
-    });
   });
 
   describe('release of the internal render targets', () => {
@@ -1580,11 +1906,16 @@ describe('StageRenderer', () => {
       host._emitFrame(1, 0.016, 1);
       expect(stage.renderTo, 'the renderer is driven while it is alive').toHaveBeenCalledTimes(1);
 
+      const buildOutputNode = (passes: Node[]) => passes[0]!;
+      sr.buildOutputNode = buildOutputNode;
+      expect(sr.buildOutputNode, 'buildOutputNode before dispose()').toBe(buildOutputNode);
+
       sr.dispose();
 
       expect(sr.isDisposed).toBe(true);
       expect(sr.parent).toBeUndefined();
       expect(sr.pipeline).toBeUndefined();
+      expect(sr.buildOutputNode).toBeUndefined();
       expect(sr.stages).toEqual([]);
       expect(sr.orderedStages).toEqual([]);
 
@@ -1614,7 +1945,38 @@ describe('StageRenderer', () => {
       // and no new pipeline either: renderTo() has nothing left to drive it with
       sr.pipeline = makePipelineMock() as any;
       expect(sr.pipeline, 'pipeline after a write').toBeUndefined();
+      sr.buildOutputNode = buildOutputNode;
+      expect(sr.buildOutputNode, 'buildOutputNode after a write').toBeUndefined();
       expect(() => sr.renderTo(renderer as any), 'renderTo() on a disposed renderer').not.toThrow();
+    });
+
+    it('emits dispose once before it stops listening', () => {
+      const sr = new StageRenderer();
+      const listening: number[] = [];
+      const spy = vi.fn(() => listening.push(getSubscriptionCount(sr)));
+      on(sr, 'dispose', spy);
+
+      sr.dispose();
+
+      expect(spy).toHaveBeenCalledExactlyOnceWith(sr);
+      expect(listening[0], 'the listener is still attached when the event arrives').toBeGreaterThan(0);
+      expect(getSubscriptionCount(sr), 'and nothing is attached afterwards').toBe(0);
+
+      on(sr, 'dispose', spy);
+      sr.dispose();
+      expect(spy, 'a second dispose() emits nothing').toHaveBeenCalledTimes(1);
+    });
+
+    it('stops listening even when a dispose listener throws', () => {
+      const sr = new StageRenderer();
+      const failure = new Error('the listener failed');
+      on(sr, 'dispose', () => {
+        throw failure;
+      });
+
+      expect(thrownBy(() => sr.dispose())).toBe(failure);
+      expect(getSubscriptionCount(sr)).toBe(0);
+      expect(sr.isDisposed).toBe(true);
     });
 
     // (d) the second call throws nothing and releases nothing a second time
@@ -1637,6 +1999,33 @@ describe('StageRenderer', () => {
       expect(pipeline.dispose).not.toHaveBeenCalled();
     });
 
+    const joining: [string, (parent: StageRenderer) => StageRenderer][] = [
+      ['new StageRenderer(parent)', (parent) => new StageRenderer(parent)],
+      [
+        'parent.add(child)',
+        (parent) => {
+          const child = new StageRenderer();
+          parent.add(child);
+          return child;
+        },
+      ],
+    ];
+
+    for (const [way, join] of joining) {
+      it(`releases the pass target of a child that joined through ${way} once`, () => {
+        const parent = new StageRenderer();
+        const child = join(parent);
+        child.resize(50, 50);
+        const passTarget = (child.asPassNode(renderer as any) as any).value.renderTarget;
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        child.dispose();
+
+        expect(rtDispose.callCount).toBe(1);
+        expect(rtDispose.firstCall.thisValue).toBe(passTarget);
+      });
+    }
+
     it('throws instead of building a pass target after dispose()', () => {
       const sr = new StageRenderer();
       sr.resize(50, 50);
@@ -1645,17 +2034,24 @@ describe('StageRenderer', () => {
       expect(() => sr.asPassNode(renderer as any)).toThrow(/StageRenderer#asPassNode\(\) is not available/);
     });
 
-    it('does not pre-render a disposed child into a fresh pass target', () => {
+    it('lets go of a child renderer that is disposed while it holds it', () => {
       const parent = new StageRenderer();
       parent.resize(50, 50);
+      const passNode = {isNode: true, label: 'other', type: 'pass'};
+      parent.add({...fakeStage('other'), asPassNode: vi.fn(() => passNode)} as any);
       const child = new StageRenderer();
-      // add() alone: the child never learns who holds it, so its dispose() leaves it in the list
       parent.add(child);
-      child.dispose();
       parent.pipeline = makePipelineMock() as any;
-      parent.buildOutputNode = (passes) => passes[0]!;
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      parent.buildOutputNode = buildOutputNode;
+      parent.renderTo(renderer as any);
 
-      expect(() => parent.renderTo(renderer as any)).toThrow(/StageRenderer#asPassNode\(\) is not available/);
+      child.dispose();
+
+      expect(parent.hasStage(child)).toBe(false);
+      expect(child.parent).toBeUndefined();
+      expect(() => parent.renderTo(renderer as any)).not.toThrow();
+      expect(buildOutputNode.mock.calls.at(-1)![0]).toEqual([passNode]);
     });
 
     it('leaves the renderer alone after dispose()', () => {

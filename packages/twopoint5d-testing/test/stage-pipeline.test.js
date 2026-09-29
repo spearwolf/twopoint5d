@@ -142,6 +142,50 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses[0].scene, 'the pass node renders the new scene').to.equal(stage.scene);
   });
 
+  it('Mode D: a stage disposed while the renderer holds it leaves the renderer, and the next frame composes the stages that are left', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+    const first = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    first.name = 'first';
+    first.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+    const second = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
+    second.name = 'second';
+    second.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(first).add(second);
+    const pipeline = new RenderPipeline(display.renderer);
+    sr.pipeline = pipeline;
+
+    /** @type {PassNode[][]} */
+    const calls = [];
+    sr.buildOutputNode = (passes) => {
+      calls.push(/** @type {PassNode[]} */ (passes));
+      return passes[0];
+    };
+
+    await display.start();
+    await display.nextFrame();
+    await display.nextFrame();
+
+    expect(calls).to.have.length(1);
+    expect(calls[0]).to.have.length(2);
+
+    second.dispose();
+
+    expect(sr.hasStage(second), 'the renderer let go of the disposed stage').to.be.false;
+
+    await display.nextFrame();
+
+    expect(calls, 'the output node is composed again').to.have.length(2);
+    expect(calls[1], 'from the stage that is left').to.have.length(1);
+    expect(calls[1][0], 'the pass node of the first stage').to.equal(first.asPassNode(display.renderer));
+
+    // the pipeline and the stages belong to this test: the renderer lets go first
+    sr.dispose();
+    first.dispose();
+    pipeline.dispose();
+  });
+
   it('Mode D: a rebuild without a camera change keeps the pass node and its render target', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);

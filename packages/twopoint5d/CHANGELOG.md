@@ -168,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureResource#dispose()` releases the texture the resource built for itself. Afterwards every getter of the resource answers `undefined`, while `id` and `type` still say which resource this was, and a write to a setter, a `load()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - a second `TextureStore#dispose()` does nothing: the dispose event goes out once, and the renderer handed to the constructor is never disposed — it belongs to the caller. That dispose event is also the last event the store emits; afterwards `renderer` and `textureFactory` answer `undefined`, `parse()`, `load()`, `on()`, `onResource()` and a write to `renderer` do nothing, and `defaultTextureClasses` keeps its last value — a configuration array is no resource, and the answer stays right
 - an attribute slot of an `InstancedVOBufferGeometry` belongs to one route for the whole life of the geometry: `attachInstancedPool()` throws when an attribute of the pool would take a slot this geometry has already had an attribute in, and the geometry is left exactly as it was. The message names the call and the slots it is about. The base route, the instanced route and the attributes copied from a `BufferGeometry` handed to the constructor may still share a name — until the constructor returns, no attribute of the geometry has reached the renderer. Handing the same pool back under the name it already has changes nothing: every attribute stays where it is, and an `autoDispose` passed along with it still takes effect
-- `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it. Afterwards `isDisposed` is `true`, `parent` and `pipeline` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
+- `StageRenderer#dispose()` releases the `RenderTarget`s the renderer built for itself, and nothing else: a `pipeline`, an `outputRenderTarget` and every stage were handed in and stay the caller's. The renderer takes its stages off itself and lets go of the host that drives it, so no further frame reaches it, and a parent `StageRenderer` that holds it lets go of it as well. A `dispose` event goes out to every subscriber before the renderer stops listening, and no event follows it. Afterwards `isDisposed` is `true`, `parent`, `pipeline` and `buildOutputNode` answer `undefined`, `stages` is empty, and a write to `parent`, `attach()`, `add()` and a second `dispose()` do nothing. The rules behind this are written down in [docs/resource-lifecycle.md](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/resource-lifecycle.md)
 - `FixedFrameLoop#dispose()` leaves the `Display` it was handed exactly as it found it: the display is not disposed, and it keeps only the subscriptions it carried before the loop was built. `fixedDelta`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left with, `fps` and `maxStepsPerFrame` stay writable and no tick reads either one again (a write to `fps` recomputes `fixedDelta` with it), `reset()` and a second `dispose()` do nothing, and a handler subscribed through `onTick()` or `onRender()` afterwards is never called
 - `VOBufferPool#toBuffersData()` and `#fromBuffersData()` throw on a disposed pool, with a message naming the class, the method and the state. The return type of `toBuffersData()` promises the buffers of a live pool, and a disposed one has none to answer with; `fromBuffersData()` turns away a capacity it cannot serve, as it already does for a capacity that does not match its own. `VertexObjectPool` inherits both
 - a disposed `VOBufferPool` hands out nothing and cannot be brought back into service: `createFromAttributes()` and `VertexObjectPool#resize()` throw with a message naming the class, the method and the state, `VertexObjectPool#createVO()` answers `undefined` without counting the refused slot, and `availableCount` is `0`. The object count of `createFromAttributes()` cannot tell a spent pool from a full one, and a `resize()` that allocated fresh buffers would put a disposed pool back to work — both refuse instead. `VertexObjectPool#getVO()` answers `undefined` for every index, whatever `usedCount` says at the time, `clear()` and `freeVO()` go on doing nothing, and `capacity`, `descriptor` and `usedCount` keep saying what this pool is. A write to `usedCount` or to `buffer` falls through, so `usedCount` goes on answering `0` and `buffer` goes on answering the buffer the pool was disposed with, and `VertexObjectPool#containsVO()` answers `false` whatever a vertex object points at, which keeps `freeVO()` the no-op it says it is. `buffer` is an accessor pair on the prototype now; reading and writing it on a live pool is unchanged
@@ -207,7 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a `StageRenderer` composing pass nodes — with `buildOutputNode` or a `RootRenderPipeline` — draws nothing while its `width` or `height` is not a finite number above 0, or while a `Stage2D` it composes has no camera
 - `fitIntoRectangle()` gives a 0×0 view for `contain` and `cover` when the rectangle has a width or a height of 0; `minPixelZoom` and `maxPixelZoom` do not apply to it
 - `OrthographicProjection` and `ParallaxProjection` built without specs start from `{fit: 'fill'}`: the view is the container, one view unit per container pixel. Specs handed in stay the caller's object
-- `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it is unchanged
+- `StageRenderer#buildOutputNode` is an accessor pair on the prototype; reading and writing it on a live renderer is unchanged
 - `StageRenderer` warns about stages sharing a name only while `renderOrder` lists that name, on `add()` and on every write to `renderOrder`. An order that lists no name — `'*'`, `'*,*'`, `' * '` — never warns
 - `Stage2D` warns once, after 100 frames without a camera, that it renders nothing
 - `Map2DTileStreamer#visibilitor` is an accessor pair on the prototype; reading and writing it is unchanged. A subclass that declares `visibilitor` as a field does not compile (TS2610) and overrides the accessor pair instead
@@ -295,6 +295,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Stage2D#updateFrame()` applies a pending `needsUpdate` before it emits the frame events: a new value in the view specs of the projection together with `needsUpdate = true` takes effect from the next frame on, and a stage whose specs give a view only then gets its camera in that frame
 - perf `Stage2D` hands every `OnStageUpdateFrame` the same props object per stage, rewritten before each emit — the values hold for the call they arrive in; `OnStageFirstFrame` carries an object of its own. `StageRenderer` checks the size of its internal render targets without allocating, and so does its check whether every `Stage2D` of a composition has a camera
 - the error of `Stage2D#asPassNode()` without a camera says when the projection creates one, and a stage without a scene gets an error of its own
+- `StageRenderer#add()` makes a `StageRenderer` it adds its child: `parent` of the child answers the renderer, and the child gets its `OnAddToParent` after `OnStageAdded` went out at the renderer. `root.add(child)`, `child.parent = root`, `child.attach(root)` and `new StageRenderer(root)` set up the same relation. A renderer has one holder: an `add()` to a second renderer or an `attach(host)` takes it out of the first — see the migration guide
+- `StageRenderer#stages` is a getter of the type `ReadonlyArray<StageItem>`, a read-only view of the live list, and `orderedStages` answers a `ReadonlyArray<StageItem>` snapshot: `add()`, `remove()`, a write to `renderOrder` and — while `renderOrder` lists names — a renamed stage give the next read a new array, and an array handed out before stays as it was. `renderOrderArray` answers a copy — see the migration guide
+- `StageRenderer#add()` refuses a stage whose `isDisposed` is `true` with an `Error` naming the call and the state
+- a disposed `StageRenderer` answers `undefined` for `buildOutputNode` and takes no new one: the write is a silent no-op, as for `pipeline`
 
 ### Deprecated
 
@@ -505,6 +509,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix the internal target of the pipeline-only mode of `StageRenderer`: it is cleared in full to transparent black every frame, color and depth, before the renderer's own `clear` — no tint of the clear color of the renderer stays in it, and with `clear = true` and `clearColorBuffer` or `clearDepthBuffer` off no rest of the previous frame either
 - fix the internal render targets of `StageRenderer`: they have the type `renderer.getOutputBufferType()` and the sample count `renderer.samples`, as the pass targets of the composed mode do, and a changed `renderer.samples` reaches them on the next frame
 - fix `StageRenderer` that composes pass nodes — with `buildOutputNode` or a `RootRenderPipeline`: it builds its output node anew after a change of `Stage2D#scene` and shows the new scene from the next frame on
+- fix `StageRenderer` holding a stage that is disposed: the renderer takes an eventized stage out through `remove()` as soon as it emits `dispose` — every `Stage2D` does — and a child `StageRenderer` leaves its parent in its own `dispose()`; either way the composed mode builds its output node without it on the next frame
+- fix `StageRenderer#add()` for a stage that refuses the size: the error of its `resize()` comes out of the call, and the renderer, the stage and the previous holder of a child `StageRenderer` stay as they were — no stage sits in the list without its `OnStageAdded`
+- fix `StageRenderer#updateFrame()`, `#renderTo()` and `#resize()`: each call goes through the stages as they stood when it began, so a `remove()` from a listener of a stage's frame or resize event does not keep the next stage from its call, whatever `renderOrder` says. A stage added during such a call is reached from the next call on
 
 ### Migration Guide
 
@@ -2141,48 +2148,35 @@ pipeline.dispose(); // built by the caller, released by the caller
 
 A renderer without a pipeline needs no change.
 
-#### A disposed child leaves its holder before it goes
+#### A disposed child builds no pass node
 
 `StageRenderer#asPassNode()` throws once `dispose()` has run: the node it returns promises a
-pass-target, and a disposed renderer builds none. The direct call is the visible half. The half
-that slips through without a compile error is a **live** parent with `buildOutputNode` or a
-`RootRenderPipeline`: it asks every nested child for its pass node once per frame, so a child
-disposed while it is still in the parent's stage list turns every frame of that parent into a
-throw.
-
-A child that came in through `child.parent = parent` takes itself off the list as it is
-disposed. A child added with `parent.add(child)` never learned who holds it — that one has to be
-removed by hand, and `parent.remove(child)` now clears the child's `parent` as well.
+pass-target, and a disposed renderer builds none. A parent with `buildOutputNode` or a
+`RootRenderPipeline` never asks a disposed child for one — the child leaves the renderer that holds
+it as it is disposed, whether it came in through `parent.add(child)`, `child.parent = parent` or
+`new StageRenderer(parent)`. What needs a look is a call of your own.
 
 **Before**
 
 ```ts
-const parent = new StageRenderer(display);
-parent.pipeline = pipeline;
-parent.buildOutputNode = (passes) => passes[0]!;
+child.dispose();
 
-const child = new StageRenderer();
-parent.add(child);
-
-child.dispose(); // the child is still a stage of the parent
+const node = child.asPassNode(renderer);
 ```
 
 **After**
 
-```ts
-const parent = new StageRenderer(display);
-parent.pipeline = pipeline;
-parent.buildOutputNode = (passes) => passes[0]!;
+```ts check
+import {StageRenderer} from '@spearwolf/twopoint5d';
+import type {WebGPURenderer} from 'three/webgpu';
 
+declare const renderer: WebGPURenderer;
 const child = new StageRenderer();
-parent.add(child);
 
-parent.remove(child); // added with add(), so it has to be taken off by hand
 child.dispose();
-```
 
-A parent without `buildOutputNode` and without a `RootRenderPipeline` asks for no pass node and
-needs no change — though a child left in its stage list is dead weight either way.
+const node = child.isDisposed ? undefined : child.asPassNode(renderer);
+```
 
 #### A geometry is built while its pool is alive
 
@@ -3388,6 +3382,65 @@ on(stage, OnStageUpdateFrame, (props: StageUpdateFrameProps) => frames.push({...
 ```
 
 `OnStageFirstFrame` carries an object of its own, which the stage keeps for late subscribers.
+
+#### A `StageRenderer` has one holder
+
+`StageRenderer#add()` makes a renderer it adds the child of the renderer it joins, exactly as
+`child.parent = root` does: `parent` answers that renderer, and the child gets its `OnAddToParent`.
+A renderer has one holder. Adding it to a second renderer takes it out of the first, and attaching
+it to a host takes it out of the renderer that held it — a renderer that loses the child hears of
+it through `remove()`, with its `OnStageRemoved`. A child that was meant to be driven twice per
+frame, by two renderers or by a renderer and the display, is driven once, by the holder it joined
+last.
+
+**Before**
+
+```ts
+root.add(hud);
+hud.attach(display); // drove hud a second time, next to root
+```
+
+**After**
+
+```ts check
+import {Display, StageRenderer} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.getElementById('canvas')!);
+const root = new StageRenderer(display);
+const hud = new StageRenderer();
+
+root.add(hud); // root drives hud, and hud.parent is root
+```
+
+#### The stage lists of `StageRenderer` are read-only
+
+`StageRenderer#stages` answers a `ReadonlyArray<StageItem>`, and so does `orderedStages`: a `push()`,
+a `splice()` or a write to an index no longer compiles. Such a write went past the listeners the
+renderer places on a stage, its cached order and its output node; `add()` and `remove()` take care
+of all three. `orderedStages` is a snapshot — an array read before an `add()` or a `remove()` keeps
+the stages it had. `renderOrderArray` answers a copy, and writing into it changes nothing: write
+`renderOrder`.
+
+**Before**
+
+```ts
+renderer.stages.push({stage, width: 0, height: 0});
+renderer.stages.splice(renderer.stages.indexOf(item), 1);
+renderer.renderOrderArray.push('ui');
+```
+
+**After**
+
+```ts check
+import {Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const renderer = new StageRenderer();
+const stage = new Stage2D();
+
+renderer.add(stage);
+renderer.remove(stage);
+renderer.renderOrder = `${renderer.renderOrder},ui`;
+```
 
 ## [0.21.2] - 2026-06-19
 
