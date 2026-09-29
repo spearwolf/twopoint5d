@@ -1,7 +1,9 @@
 import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
 
 interface ISetAnimationLoop {
-  // `null` is how three.js stops the loop again, and `stop()` below uses it.
+  // `null` is how three.js stops the loop again, and `stop()` below uses it. three's
+  // setAnimationLoop() is async: it waits for renderer.init() and rejects with its error. The
+  // return type stays `unknown`, because `unknown | Promise<unknown>` collapses into `unknown`
   setAnimationLoop(callback: ((now: number) => unknown) | null): unknown;
 }
 
@@ -9,6 +11,10 @@ const OnRAF = Symbol.for('twopoint5d:FrameLoop.OnRAF');
 const OnFrame = Symbol.for('twopoint5d:FrameLoop.OnFrame');
 
 const MEASURE_FPS_AFTER_NTH_FRAME = 30;
+
+// what #reportedLoopError holds before a failure has been reported: a promise may reject with
+// undefined, and that one is reported as well
+const NO_LOOP_ERROR = Symbol('no loop error');
 const MEASURE_COLLECTION_SIZE = 10;
 
 // `let`, because a WeakMap cannot be emptied — only replaced. See FrameLoop.resetRAF().
@@ -51,6 +57,10 @@ class RAF {
 
   #measuredFps = 0;
   #measuredFpsCollection: number[] = [];
+
+  // three answers every setAnimationLoop() after a failed init with the same rejected promise,
+  // the null of stop() included; one failure is reported once
+  #reportedLoopError: unknown = NO_LOOP_ERROR;
 
   constructor(private readonly renderer?: ISetAnimationLoop) {
     eventize(this);
@@ -96,7 +106,7 @@ class RAF {
   start() {
     if (this.#rafID !== 0) return;
     if (this.renderer) {
-      this.renderer.setAnimationLoop(this.#onAnimationFrame);
+      this.#handleLoopResult(this.renderer.setAnimationLoop(this.#onAnimationFrame));
       this.#rafID = 1; // Using 1 to indicate that the renderer is set
     } else {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
@@ -109,7 +119,7 @@ class RAF {
     if (this.#rafID === 0) return;
 
     if (this.renderer) {
-      this.renderer.setAnimationLoop(null);
+      this.#handleLoopResult(this.renderer.setAnimationLoop(null));
     } else {
       cancelAnimationFrame(this.#rafID);
     }
@@ -118,6 +128,18 @@ class RAF {
     // samples to average, or the first fresh sample would be mixed with the rate from before
     this.#needsMeasureAnchor = true;
     this.#measuredFpsCollection.length = 0;
+  }
+
+  // A renderer whose init fails rejects the promise of its setAnimationLoop(); left alone that
+  // is an unhandled rejection without a word about the loop that asked for frames
+  #handleLoopResult(result: unknown): void {
+    if (result == null || typeof (result as {then?: unknown}).then !== 'function') return;
+    (result as PromiseLike<unknown>).then(undefined, (error: unknown) => {
+      if (error === this.#reportedLoopError) return;
+      this.#reportedLoopError = error;
+      // eslint-disable-next-line no-console
+      console.error('FrameLoop: the renderer could not run its animation loop', error);
+    });
   }
 
   #measureFps(now: number) {
@@ -219,8 +241,9 @@ export class FrameLoop {
   }
 
   /**
-   * The milliseconds between the last two frames this loop emitted; `0` for the first.
-   * `FrameLoop.OnFrame` carries it in seconds.
+   * The milliseconds between the last two frames this loop emitted; `0` for the first, and for
+   * the first after the loop has lost its last subscriber and got one again.
+   * `FrameLoop.OnFrame` carries it in seconds, and on those frames a `lastNow` equal to `now`.
    */
   get deltaTime(): number {
     return this.#deltaTime;
@@ -285,6 +308,11 @@ export class FrameLoop {
 
       if (this.subscriptionCount === 0) {
         this.raf.detach(this);
+        // the first frame after the loop runs again would measure the whole span in which nobody
+        // asked for a frame, and the maxFps grid would still stand where it stood before it —
+        // the driver starts its fps window anew for the same reason
+        this.#lastNow = undefined;
+        this.#nextEmitAt = 0;
       }
     }
   }
@@ -314,7 +342,8 @@ export class FrameLoop {
       }
     }
 
-    // call FrameLoop subscribers
+    // call FrameLoop subscribers. A new object per frame on purpose: a listener may keep the
+    // props, and an object used again would change under it
     emit(this, FrameLoop.OnFrame, {
       now: now / 1000,
       lastNow: (prevNow ?? now) / 1000,

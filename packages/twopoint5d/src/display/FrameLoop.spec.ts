@@ -292,6 +292,82 @@ describe('FrameLoop', () => {
     expect(FrameLoop.OnFrame).toBe(Symbol.for('twopoint5d:FrameLoop.OnFrame'));
   });
 
+  it('starts the delta anew once the loop has lost its last subscriber and got one again', () => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(0, renderer);
+    const {events, target} = subscribe(loop);
+
+    renderer.tick(1000);
+    renderer.tick(1016);
+
+    loop.stop(target);
+    loop.start(target);
+
+    // five seconds in which nobody asked for a frame
+    renderer.tick(6016);
+
+    expect(events).toHaveLength(3);
+    expect(events[2]!.deltaTime, 'deltaTime of the first frame after the restart').toBe(0);
+    expect(events[2]!.lastNow, 'lastNow of the first frame after the restart').toBe(events[2]!.now);
+    expect(loop.deltaTime, 'the getter').toBe(0);
+    expect(events[2]!.frameNo, 'frameNo counts on').toBe(3);
+
+    renderer.tick(6032);
+
+    expect(events[3]!.deltaTime).toBeCloseTo(0.016);
+  });
+
+  it('lays the maxFps grid anew with the first frame after the loop has lost its last subscriber and got one again', () => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(30, renderer); // interval 33.33, tolerance 0.667
+    const {events, target} = subscribe(loop);
+
+    renderer.tick(0); //  emit, nextEmitAt = 33.33
+
+    loop.stop(target);
+    loop.start(target);
+
+    renderer.tick(20); //  the first frame after the restart emits, nextEmitAt = 53.33
+    renderer.tick(50); //  50 < 52.67 → throttled
+    renderer.tick(54); //  emit
+
+    expect(events.map((e) => e.now * 1000)).toEqual([0, 20, 54]);
+  });
+
+  it('reports a renderer whose animation loop fails once per error, and leaves no unhandled rejection', async () => {
+    const error = new Error('the init of the renderer fails on purpose');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // three answers every setAnimationLoop() after a failed init with the same rejected promise,
+    // the null of a stop included
+    const failed = Promise.reject(error);
+    const renderer = {setAnimationLoop: vi.fn(() => failed)};
+    const loop = new FrameLoop(0, renderer);
+    const target = {[FrameLoop.OnFrame]() {}};
+
+    loop.start(target);
+    loop.stop(target);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(renderer.setAnimationLoop).toHaveBeenCalledTimes(2);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('FrameLoop'), error);
+  });
+
+  it('reports a renderer whose animation loop rejects with undefined', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = Promise.reject(undefined);
+    const renderer = {setAnimationLoop: vi.fn(() => failed)};
+    const loop = new FrameLoop(0, renderer);
+    const target = {[FrameLoop.OnFrame]() {}};
+
+    loop.start(target);
+    loop.stop(target);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('FrameLoop'), undefined);
+  });
+
   it('frameNo, now, deltaTime and measuredFps are accessors without a setter', () => {
     const loop = new FrameLoop();
 

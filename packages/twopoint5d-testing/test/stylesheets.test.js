@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Stylesheets} from '@spearwolf/twopoint5d';
+import {makeIframeDocument} from './helpers/fixtures.js';
 
 /** The module state travels from case to case, so every case works under a name of its own. */
 function uniqueName(prefix) {
@@ -28,12 +29,11 @@ describe('Stylesheets', function () {
     return host.attachShadow({mode: 'open'});
   }
 
-  /** The document of a fresh iframe in `document.body`: a document of another realm. */
-  function makeIframeDocument() {
-    const iframe = document.createElement('iframe');
-    document.body.appendChild(iframe);
+  /** The document of a fresh iframe, see the fixture; the iframe goes out after the case. */
+  function makeIframeDocumentOfCase() {
+    const {iframe, doc} = makeIframeDocument();
     hosts.push(iframe);
-    return /** @type {Document} */ (iframe.contentDocument);
+    return doc;
   }
 
   afterEach(() => {
@@ -277,7 +277,7 @@ describe('Stylesheets', function () {
   });
 
   it('installs a rule in the document of an iframe', () => {
-    const iframeDocument = makeIframeDocument();
+    const iframeDocument = makeIframeDocumentOfCase();
     const div = iframeDocument.createElement('div');
     iframeDocument.body.appendChild(div);
 
@@ -292,7 +292,7 @@ describe('Stylesheets', function () {
   });
 
   it('installs a rule in a shadow root inside an iframe', () => {
-    const iframeDocument = makeIframeDocument();
+    const iframeDocument = makeIframeDocumentOfCase();
     const host = iframeDocument.createElement('div');
     iframeDocument.body.appendChild(host);
     const shadowRoot = host.attachShadow({mode: 'open'});

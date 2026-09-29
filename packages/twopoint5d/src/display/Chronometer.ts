@@ -20,6 +20,8 @@ export class Chronometer {
 
   #deltaTime: number;
 
+  #rawDeltaTime: number;
+
   /**
    * Time lost to the pauses `start()` has closed, and the part of an `update()` delta that
    * `maxDeltaTime` cut off
@@ -47,7 +49,8 @@ export class Chronometer {
    * When `> 0`, any `update()` whose measured delta exceeds this value is
    * clamped to `maxDeltaTime` and the overflow is folded into `lostTime`
    * so that `time` does not jump either. Useful against rAF throttling in
-   * background tabs, long GC pauses or breakpoints.
+   * background tabs, long GC pauses or breakpoints. {@link rawDeltaTime}
+   * carries the delta before the cut.
    *
    * Default is `0` (disabled).
    */
@@ -65,6 +68,15 @@ export class Chronometer {
    */
   get deltaTime(): number {
     return this.#deltaTime;
+  }
+
+  /**
+   * The time that has elapsed between the previous time and the current time, as
+   * {@link deltaTime}, with the pause times subtracted — but before {@link maxDeltaTime} cuts
+   * it. Equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded.
+   */
+  get rawDeltaTime(): number {
+    return this.#rawDeltaTime;
   }
 
   /** The time at the beginning */
@@ -90,6 +102,7 @@ export class Chronometer {
     this.#timeStart = curTime;
     this.#currentTime = curTime;
     this.#deltaTime = 0;
+    this.#rawDeltaTime = 0;
     this.#lostTime = 0;
     this.#recentlyLostTime = 0;
     this.#pausedAt = curTime;
@@ -115,6 +128,7 @@ export class Chronometer {
     const deltaTime = Math.max(0, getCurrentTime(time) - previousTime);
     this.#currentTime = previousTime + deltaTime;
     if (this.#isRunning) {
+      this.#rawDeltaTime = deltaTime;
       if (this.maxDeltaTime > 0 && deltaTime > this.maxDeltaTime) {
         this.#lostTime += deltaTime - this.maxDeltaTime;
         this.#deltaTime = this.maxDeltaTime;
@@ -161,7 +175,7 @@ export class Chronometer {
    * A `time` before the latest one the chronometer has seen counts as that one: time does not
    * run backwards, and the "current time" is only ever advanced, never set back.
    *
-   * `deltaTime` is reset to `0` — no active phase has elapsed yet.
+   * `deltaTime` and `rawDeltaTime` are reset to `0` — no active phase has elapsed yet.
    *
    * No-op when already running.
    */
@@ -178,6 +192,7 @@ export class Chronometer {
       this.#recentlyLostTime = 0;
       this.#currentTime = now;
       this.#deltaTime = 0;
+      this.#rawDeltaTime = 0;
     }
   }
 
@@ -185,7 +200,7 @@ export class Chronometer {
    * Reset the chronometer to its initial state.
    *
    * After `reset()` the chronometer is running, `time` is `0`,
-   * `deltaTime` is `0` and all pause-tracking state is cleared.
+   * `deltaTime` and `rawDeltaTime` are `0` and all pause-tracking state is cleared.
    * {@link maxDeltaTime} is preserved.
    */
   reset(time?: number): void {
@@ -193,6 +208,7 @@ export class Chronometer {
     this.#timeStart = curTime;
     this.#currentTime = curTime;
     this.#deltaTime = 0;
+    this.#rawDeltaTime = 0;
     this.#lostTime = 0;
     this.#recentlyLostTime = 0;
     this.#pausedAt = curTime;

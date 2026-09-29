@@ -45,6 +45,17 @@ export interface FixedFrameLoop extends EventizedObject {}
  * followed by one `OnRender` per render frame with an `alpha` factor
  * for interpolating the visual state between sim states.
  *
+ * The delta the loop accumulates is the `rawDeltaTime` of every render
+ * frame: the wall-clock time between the frames, the pauses of the
+ * `Display` not counted, before `Display.maxDeltaTime` cuts it. Below the
+ * sim rate several ticks run per frame, up to `maxStepsPerFrame`; a frame
+ * that needs more — below `fps / maxStepsPerFrame` render fps, 12 with the
+ * defaults — has the rest discarded by the guard, and the simulation falls
+ * behind the wall clock. While `maxDeltaTime` cuts frames, `tickTime` can
+ * run ahead of `display.now`. Props without a finite `rawDeltaTime` — from
+ * a `getEventProps()` override that does not know the field — count their
+ * `deltaTime` instead.
+ *
  * @example
  * ```ts
  * const display = new Display(canvas);
@@ -213,10 +224,15 @@ export class FixedFrameLoop {
   [OnDisplayRenderFrame](props: DisplayEventProps): void {
     if (this.#disposed) return;
 
-    this.#accumulator += props.deltaTime;
+    // a getEventProps() override that builds its props without rawDeltaTime would leave the
+    // accumulator NaN and the loop standing still without a word; deltaTime keeps it running
+    const delta = Number.isFinite(props.rawDeltaTime) ? props.rawDeltaTime : props.deltaTime;
+    this.#accumulator += delta;
 
     let steps = 0;
     while (this.#accumulator >= this.#fixedDelta && steps < this.#maxStepsPerFrame) {
+      // a new object per tick on purpose: a listener may keep the props, and an object used
+      // again would change under it
       emit(this, OnTick, {
         fixedDelta: this.#fixedDelta,
         tickTime: this.#tickTime,
@@ -235,6 +251,7 @@ export class FixedFrameLoop {
 
     this.#alpha = this.#accumulator / this.#fixedDelta;
 
+    // a new object per frame on purpose, for the same reason as the tick props above
     emit(this, OnRender, {
       ...props,
       alpha: this.#alpha,

@@ -2,7 +2,7 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayError} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
-import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
+import {disposeDisplay, makeContainer, makeIframeDocument} from './helpers/fixtures.js';
 
 // The members the display touches on its renderer before the first frame. The result of
 // createRenderer is never checked against WebGPURenderer, so a failing init needs no real one —
@@ -29,6 +29,8 @@ describe('Display — what the constructor accepts and what it reports', functio
   let display;
   /** @type {HTMLElement | undefined} */
   let host;
+  /** @type {HTMLIFrameElement | undefined} */
+  let iframe;
 
   afterEach(() => {
     disposeDisplay(display);
@@ -37,6 +39,62 @@ describe('Display — what the constructor accepts and what it reports', functio
       host.parentNode.removeChild(host);
     }
     host = undefined;
+    iframe?.remove();
+    iframe = undefined;
+  });
+
+  it('takes a canvas in the document of a same-origin iframe, and measures and styles it there', () => {
+    const made = makeIframeDocument({width: 200, height: 100});
+    iframe = made.iframe;
+    const iframeDocument = made.doc;
+    const canvas = iframeDocument.createElement('canvas');
+    canvas.setAttribute('resize-to', 'window');
+    iframeDocument.body.appendChild(canvas);
+
+    display = new Display(canvas, {
+      createRenderer: ({canvas}) => makeRendererStub(canvas, Promise.resolve()),
+    });
+
+    const iframeWindow = /** @type {Window} */ (iframeDocument.defaultView);
+    expect(display.width, 'width').to.equal(iframeWindow.innerWidth);
+    expect(display.height, 'height').to.equal(iframeWindow.innerHeight);
+    expect(display.width, 'the width of the iframe').to.equal(200);
+    expect(display.styleSheetRoot, 'the default styleSheetRoot').to.equal(iframeDocument.head);
+
+    const fullscreenClass = Array.from(canvas.classList).find((c) => c.startsWith(Display.CssRulesPrefixFullscreen));
+    expect(fullscreenClass, 'the fullscreen class on the canvas').to.exist;
+
+    /** @param {Document} doc */
+    const hasRule = (doc) =>
+      doc.adoptedStyleSheets.some((sheet) =>
+        /** @type {CSSStyleRule[]} */ (Array.from(sheet.cssRules)).some((rule) => rule.selectorText === `.${fullscreenClass}`),
+      );
+    expect(hasRule(iframeDocument), 'the rule in the sheets of the iframe document').to.equal(true);
+    // no other case of this file puts a canvas under resize-to="window", so the page has no
+    // fullscreen rule of its own
+    expect(hasRule(document), 'the rule in the sheets of the page').to.equal(false);
+    expect(iframeWindow.getComputedStyle(canvas).position, 'the rule applies in the iframe').to.equal('fixed');
+  });
+
+  it('takes a host element in the document of a same-origin iframe, and builds its container and canvas there', () => {
+    const made = makeIframeDocument({width: 200, height: 100});
+    iframe = made.iframe;
+    const iframeDocument = made.doc;
+    const iframeHost = iframeDocument.createElement('div');
+    iframeHost.style.width = '120px';
+    iframeHost.style.height = '80px';
+    iframeDocument.body.appendChild(iframeHost);
+
+    display = new Display(iframeHost, {
+      createRenderer: ({canvas}) => makeRendererStub(canvas, Promise.resolve()),
+    });
+
+    const {canvas} = display;
+    expect(canvas.ownerDocument, 'the document of the canvas').to.equal(iframeDocument);
+    expect(canvas.parentElement?.ownerDocument, 'the document of the container').to.equal(iframeDocument);
+    expect(canvas.parentElement?.parentElement, 'the host of the container').to.equal(iframeHost);
+    expect(display.width, 'width').to.equal(120);
+    expect(display.height, 'height').to.equal(80);
   });
 
   it('refuses a first argument that is neither an element nor a renderer', () => {

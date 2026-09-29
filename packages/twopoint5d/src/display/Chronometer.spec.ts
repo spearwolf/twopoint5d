@@ -247,6 +247,56 @@ describe('Chronometer', () => {
     });
   });
 
+  describe('rawDeltaTime', () => {
+    it('carries what maxDeltaTime cuts off', () => {
+      const chronus = new Chronometer(0, 0.1);
+      chronus.update(0.05);
+
+      expect(chronus.deltaTime).toBe(0.05);
+      expect(chronus.rawDeltaTime).toBe(0.05);
+
+      chronus.update(0.55);
+
+      expect(chronus.deltaTime).toBe(0.1);
+      expect(chronus.rawDeltaTime).toBe(0.5);
+    });
+
+    it('equals deltaTime while maxDeltaTime is 0', () => {
+      const chronus = new Chronometer(0);
+      chronus.update(10);
+
+      expect(chronus.rawDeltaTime).toBe(10);
+      expect(chronus.rawDeltaTime).toBe(chronus.deltaTime);
+    });
+
+    it('is 0 after the constructor, start() and reset()', () => {
+      const chronus = new Chronometer(0, 0.1);
+
+      expect(chronus.rawDeltaTime, 'after the constructor').toBe(0);
+
+      chronus.update(0.5);
+      chronus.stop(0.5);
+      chronus.start(1);
+
+      expect(chronus.rawDeltaTime, 'after start()').toBe(0);
+
+      chronus.update(1.5);
+      chronus.reset(2);
+
+      expect(chronus.rawDeltaTime, 'after reset()').toBe(0);
+    });
+
+    it('stays as it was with an update() while stopped', () => {
+      const chronus = new Chronometer(0, 0.1);
+      chronus.update(0.5);
+      chronus.stop(0.5);
+      chronus.update(2);
+
+      expect(chronus.deltaTime).toBe(0.1);
+      expect(chronus.rawDeltaTime).toBe(0.5);
+    });
+  });
+
   describe('reset()', () => {
     it('returns the chronometer to its initial state', () => {
       const chronus = new Chronometer(0);

@@ -42,6 +42,24 @@ export function makeContainer({width = 320, height = 200, id} = {}) {
 }
 
 /**
+ * A fresh iframe in `document.body` and its document: a document of another realm, with a
+ * window of its own. `width` and `height` size the iframe in CSS pixels, without a border, so
+ * they are the size of its window; without them the browser's default applies. The caller takes
+ * the iframe out again.
+ *
+ * @param {{width?: number, height?: number}} [options]
+ * @returns {{iframe: HTMLIFrameElement, doc: Document}}
+ */
+export function makeIframeDocument({width, height} = {}) {
+  const iframe = document.createElement('iframe');
+  iframe.style.border = '0';
+  if (width != null) iframe.style.width = `${width}px`;
+  if (height != null) iframe.style.height = `${height}px`;
+  document.body.appendChild(iframe);
+  return {iframe, doc: /** @type {Document} */ (iframe.contentDocument)};
+}
+
+/**
  * Teardown must not mask the failure that got it here: no display, or a display that fails to
  * go down. It calls `dispose()` and nothing else — a disposed display refuses `start()`, and a
  * start in the teardown would cost a renderer init per test.

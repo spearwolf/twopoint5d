@@ -16,6 +16,7 @@ function makeFrame(deltaTime: number, extra?: Partial<DisplayEventProps>): Displ
     pixelRatio: 1,
     now: 0,
     deltaTime,
+    rawDeltaTime: deltaTime,
     frameNo: 1,
     display: null as unknown as Display,
     renderer: null as unknown as DisplayEventProps['renderer'],
@@ -120,6 +121,50 @@ describe('FixedFrameLoop', () => {
     // Next normal frame: accumulator was discarded, no immediate catch-up
     emit(display, OnDisplayRenderFrame, makeFrame(1 / 240));
     expect(ticks).toHaveLength(3);
+  });
+
+  describe('the delta it accumulates', () => {
+    const makeLoop = (options: {fps?: number; maxStepsPerFrame?: number}) => {
+      const loop = new FixedFrameLoop(makeFakeDisplay(), options);
+      const loopTicks: FixedFrameLoopTickProps[] = [];
+      const loopRenders: FixedFrameLoopRenderProps[] = [];
+      loop.onTick((p) => loopTicks.push(p));
+      loop.onRender((p) => loopRenders.push(p));
+      return {loop, ticks: loopTicks, renders: loopRenders};
+    };
+
+    it('is rawDeltaTime, not the deltaTime that maxDeltaTime of the display has cut', () => {
+      const {loop, ticks: loopTicks} = makeLoop({fps: 20});
+
+      // a display at 20 fps under a maxDeltaTime of 1/30
+      for (let i = 0; i < 10; i++) {
+        emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 30, {rawDeltaTime: 1 / 20}));
+      }
+
+      expect(loopTicks).toHaveLength(10);
+      expect(loop.tickTime).toBeCloseTo(0.5);
+    });
+
+    it('is deltaTime for props without a finite rawDeltaTime', () => {
+      for (const rawDeltaTime of [undefined, NaN, Infinity]) {
+        const {ticks: loopTicks, loop} = makeLoop({fps: 60});
+
+        emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 60, {rawDeltaTime: rawDeltaTime as unknown as number}));
+
+        expect(loopTicks, String(rawDeltaTime)).toHaveLength(1);
+        expect(Number.isFinite(loop.alpha), String(rawDeltaTime)).toBe(true);
+      }
+    });
+
+    it('meets the spiral-of-death guard uncut', () => {
+      const {loop, ticks: loopTicks, renders: loopRenders} = makeLoop({fps: 60, maxStepsPerFrame: 5});
+
+      emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 30, {rawDeltaTime: 0.2}));
+
+      expect(loopTicks).toHaveLength(5);
+      // the rest is discarded
+      expect(loopRenders[0]!.alpha).toBe(0);
+    });
   });
 
   it('forwards the original Display event props on OnRender', () => {

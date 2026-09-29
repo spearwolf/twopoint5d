@@ -27,7 +27,7 @@ import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
-import {getContentAreaSize, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
+import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
@@ -43,6 +43,15 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   }
 }
 
+// An element of another realm — one in the document of a same-origin iframe — fails an instanceof
+// against the HTMLElement of this realm; it passes the one of its own window. The typeof guard is for
+// a realm without a DOM at all
+function isHTMLElement(value: unknown): value is HTMLElement {
+  if (typeof HTMLElement !== 'undefined' && value instanceof HTMLElement) return true;
+  const view = (value as Node | null | undefined)?.ownerDocument?.defaultView;
+  return view != null && value instanceof view.HTMLElement;
+}
+
 // one message for every member that refuses to answer once the display is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
 function disposedError(member: string): Error {
@@ -55,6 +64,10 @@ function disposedError(member: string): Error {
 const CONTAINER_RULE_CSS = 'display:block;width:100%;height:100%;margin:0;padding:0;border:0;line-height:0;font-size:0;';
 const CANVAS_RULE_CSS = 'touch-action: none;';
 const FULLSCREEN_RULE_CSS = 'position:fixed;top:0;left:0;';
+
+// the resize-to values that take the window as the size source; a constant, because the source
+// is resolved in every frame
+const RESIZE_TO_WINDOW = /^:?(fullscreen|window)$/;
 
 // A GPU that has not reported the work submitted to it done after this long is not going to;
 // the release goes on instead of holding every later display on the canvas. Generous against the
@@ -417,10 +430,15 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * 1. `new Display(target, options)` — creates (or adopts) the renderer and
  *    canvas, installs the required CSS rules, performs an initial
  *    {@link Display.resize} (no `OnDisplayResize` event yet — see below) and
- *    wires up `document.visibilitychange` so the loop pauses while the tab is
- *    hidden — and, with {@link DisplayParameters.pauseOutsideViewport}, an
- *    `IntersectionObserver` on the canvas so it pauses while the canvas is
- *    outside the viewport, from the first report of the observer on.
+ *    wires up `visibilitychange` on the document of the canvas so the loop
+ *    pauses while the tab is hidden — and, with
+ *    {@link DisplayParameters.pauseOutsideViewport}, an `IntersectionObserver`
+ *    on the canvas so it pauses while the canvas is outside the viewport, from
+ *    the first report of the observer on. It also sets up the size watch: a
+ *    `ResizeObserver` on the size source, a media query on the pixel ratio
+ *    and a `resize` listener on the window of the canvas, see the resize model
+ *    below. Document and window are those of the canvas, so a canvas in a
+ *    same-origin iframe is paused, measured and styled by its own.
  * 2. `await display.start()` — awaits renderer init, fires `OnDisplayInit`
  *    (once), then `OnDisplayStart`, and begins emitting `OnDisplayRenderFrame`.
  *    While the tab is hidden — or, with
@@ -446,8 +464,8 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    throws as well, `start()` rejects with an `AggregateError` of the error of
  *    the start and that of the pause — each an `AggregateError` itself when
  *    more than one listener of its event throws.
- * 3. `display.dispose()` — stops the loop, fires `OnDisplayDispose` and
- *    gives up {@link Display.renderer} right away. A listener that throws does
+ * 3. `display.dispose()` — stops the loop, takes the size watch down, fires
+ *    `OnDisplayDispose` and gives up {@link Display.renderer} right away. A listener that throws does
  *    not stop it; its error follows once the display is down — see
  *    {@link Display.dispose}. A container this display
  *    created inside a host element comes out of the DOM with the canvas in
@@ -474,7 +492,7 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *    earlier that is still pending. {@link Display.width},
  *    {@link Display.height}, {@link Display.frameNo}, {@link Display.now} and
  *    {@link Display.deltaTime} keep their last value,
- *    {@link Display.pixelRatio} keeps reading the window,
+ *    {@link Display.pixelRatio} keeps reading the window of the canvas,
  *    {@link Display.isRunning} is `false` and {@link Display.pause} answers
  *    `true`. No further event is emitted — no `OnDisplayRenderFrame`, no
  *    `OnDisplayResize`, no `OnDisplayError` — and a listener attached
@@ -482,25 +500,46 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *
  * ## Resize model
  *
- * **There is no `window.resize` listener.** {@link Display.resize} is invoked
- * at the beginning of every frame from {@link Display.renderFrame} and measures
- * there, unless {@link Display.resizePollIntervalMs} holds the measurement
- * back; with every measurement the canvas size, the `THREE` renderer size and
- * the `pixelRatio` are re-evaluated against the current DOM/window state. This
- * is a deliberate design decision: it covers window resizes, container reflows,
- * devicePixelRatio changes, `resize-to` attribute mutations and
- * `resizeToElement` swaps uniformly, without registering DOM listeners that
- * would have to be cleaned up. As long as size, pixel ratio and pixel zoom stay
- * the same, a `resize()` changes nothing on the renderer and emits nothing.
- * Apart from that, every call compares `image-rendering` against the inline
- * style of the canvas.
+ * The display measures its size when something reports a change: a
+ * `ResizeObserver` on the size source (on its `device-pixel-content-box`,
+ * where the browser knows that box), a media query on the current
+ * `devicePixelRatio`, or the `resize` event of the window of the canvas.
+ * Each of them only marks the size dirty, and the next frame measures. The
+ * observer reports in the rendering update, after the animation frame
+ * callbacks, so a change of the size source reaches {@link Display.width},
+ * {@link Display.height} and `OnDisplayResize` one frame after the frame it
+ * happened in; a caller that needs it in that frame calls
+ * {@link Display.resize} itself. A frame measures as well when it is the first rendered one, when
+ * {@link Display.pixelZoom} has changed, and when the size source has changed.
+ * The `resize-to` attribute and {@link Display.resizeToElement} are read in
+ * every frame for that — a read of an attribute and a field, no layout — and
+ * the element a selector found is kept as described below.
  *
- * The size source is resolved in this priority order, with every measurement:
+ * The display polls — measures in every frame, spaced out by
+ * {@link Display.resizePollIntervalMs} — with a
+ * {@link Display.resizeToCallback}, whose answer no observer sees, and where
+ * the window of the canvas has no `ResizeObserver` or no `matchMedia`.
+ *
+ * What no observer sees reaches the canvas with the next measurement, or right
+ * away with a {@link Display.resize} of your own: the padding, border or
+ * `box-sizing` of the canvas while another element is the size source, and a
+ * CSS transform on the size source. A `resize()` of your own always measures,
+ * and leaves the timing of the frames alone.
+ *
+ * With every measurement the canvas size, the `THREE` renderer size and the
+ * `pixelRatio` are re-evaluated against the current DOM/window state. As long
+ * as size, pixel ratio and pixel zoom stay the same, a measurement changes
+ * nothing on the renderer and emits nothing. Apart from that, every
+ * `resize()` — the one at the start of a frame included — compares
+ * `image-rendering` against the inline style of the canvas.
+ *
+ * The size source is resolved in this priority order, in every frame and with
+ * every `resize()`:
  *
  * 1. If {@link Display.resizeToAttributeEl} carries a `resize-to` attribute,
  *    its value selects the source:
  *    - `"window"` / `"fullscreen"` (with optional leading colon) →
- *      `window.innerWidth × window.innerHeight`. Adds the
+ *      `innerWidth × innerHeight` of the window of the canvas. Adds the
  *      `twopoint5d-canvas--fullscreen` CSS class to the canvas
  *      (`position:fixed; top:0; left:0`). The class is removed when the
  *      attribute changes back to anything else.
@@ -517,7 +556,7 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  *      as long as it sits in that root node and still matches the selector;
  *      an element inserted in front of it later that matches as well does
  *      not take over. Once the found element leaves the root or stops
- *      matching, the next `resize()` looks the selector up again.
+ *      matching, the next frame or `resize()` looks the selector up again.
  * 2. If {@link Display.resizeToCallback} is set, it is called with every
  *    measurement and its `[width, height]` return value wins over any
  *    element-based size measurement (the `resize-to` attribute still controls
@@ -540,11 +579,11 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * and written only where the inline style differs, see
  * {@link Display.styleImageRendering}.
  *
- * `OnDisplayResize` goes out from a {@link Display.resize} whose measurement
- * changes the size, the pixel ratio or the pixel zoom, once the first frame has
- * begun (`frameNo > 0`) — the call at the start of a frame, or one of your own
- * in between, which emits on its own. The first rendered frame emits it in any
- * case, exactly once: where its `resize()` has not, {@link Display.renderFrame}
+ * `OnDisplayResize` goes out from a measurement that changes the size, the
+ * pixel ratio or the pixel zoom, once the first frame has begun (`frameNo > 0`)
+ * — the one at the start of a frame, or a {@link Display.resize} of your own in
+ * between, which emits on its own. The first rendered frame emits it in any
+ * case, exactly once: where its measurement has not, {@link Display.renderFrame}
  * does, so listeners attached before `start()` receive the initial size. The
  * constructor's initial `resize()` does **not** emit, because `frameNo` is
  * still `0` — `OnDisplayResize` is also `retain`ed, so subscribers attaching
@@ -578,6 +617,11 @@ export class Display {
    * GC pauses, debugger breakpoints) are capped and the overflow is
    * folded into the lost-time accumulator instead of producing a frame
    * spike. Set {@link Display.maxDeltaTime} = 0 to disable the cap.
+   *
+   * A frame rate that stays below `1 / maxDeltaTime` has every frame cut,
+   * and `now` and `deltaTime` run slower than the wall clock. The event
+   * props carry `rawDeltaTime`, the delta before the cut, and
+   * `FixedFrameLoop` runs on it.
    */
   #chronometer = new Chronometer(undefined, 1 / 30);
 
@@ -594,21 +638,69 @@ export class Display {
   // second rAF chain beside the first
   #stoppedAnimationOfThree?: AnimationOfThree;
 
-  #lastResizeHash = '';
+  // The document and the window the canvas sits in — an iframe has its own. Visibility, pixel
+  // ratio, window size, the default styleSheetRoot and the size watch go through these two
+  readonly #doc: Document;
+  readonly #view: Window & typeof globalThis;
+
+  // What the last measurement applied. NaN before the first one, so every comparison differs
+  #appliedWidthPx = NaN;
+  #appliedHeightPx = NaN;
+  #appliedCssWidth = NaN;
+  #appliedCssHeight = NaN;
+  #appliedPixelRatio = NaN;
+  #appliedPixelZoom = NaN;
+
+  // The size watch: a ResizeObserver on the size source, a media query on the pixel ratio and the
+  // resize event of the window. Each of them only marks the size dirty; the next frame measures.
+  // A window without ResizeObserver or matchMedia gets none of them, and the display polls
+  #sizeObserver?: ResizeObserver;
+  #observedElement?: Element;
+  #observedWindow = false;
+  #pixelRatioQuery?: MediaQueryList;
+  #sizeDirty = true;
+  // whether the frame measured last on the poll path
+  #pollingSize = false;
+
+  readonly #onSizeChange = (): void => {
+    this.#sizeDirty = true;
+  };
+
+  readonly #onPixelRatioChange = (): void => {
+    this.#sizeDirty = true;
+    this.#watchPixelRatio();
+  };
+
+  // The size source as #resolveSizeSource() found it last, and the size #measureSizeSource()
+  // measured there in CSS pixels — fields, so a frame allocates nothing for them
+  #sizeSourceIsWindow = false;
+  #sizeSourceElement?: Element;
+  #measuredWidth = 0;
+  #measuredHeight = 0;
+
+  // A computed style declaration is live and follows its element, so one per element is enough.
+  // The canvas of a display never changes; the source is fetched again once it is another element
+  #canvasStyle?: CSSStyleDeclaration;
+  #sourceStyle?: CSSStyleDeclaration;
+  #sourceStyleOf?: Element;
 
   /**
-   * Minimum interval (in milliseconds) between the DOM measurements inside
-   * {@link Display.resize}. Defaults to `0`: no throttle, and `resize()`
-   * measures on every frame. `image-rendering` is not subject to the
-   * interval.
+   * Minimum interval (in milliseconds) between the measurements of the
+   * frames in which the display polls — with a
+   * {@link Display.resizeToCallback}, or where the window of the canvas has
+   * no `ResizeObserver` or no `matchMedia`; see the resize model of the
+   * class. Defaults to `0`: no throttle, and a polling display measures in
+   * every frame. A frame that measures because the size watch reported a
+   * change is not subject to the interval, and neither is `image-rendering`.
+   * A {@link Display.resize} of your own measures right away all the same,
+   * and does not move the next measurement of the frames.
    *
-   * On high-refresh-rate displays the per-frame `getComputedStyle()` and
-   * `getBoundingClientRect()` calls force a layout each frame and can
-   * dominate the per-frame budget (240Hz = up to 240 forced reflows per
-   * second). Set this to e.g. `1000 / 60` to cap the measurement rate at
-   * 60Hz while keeping the size up-to-date for any resize event the user
-   * can perceive. The cheap hash-based no-op short-circuit inside
-   * `resize()` still applies on every poll.
+   * On high-refresh-rate displays the per-frame `getBoundingClientRect()`
+   * call can force a layout each frame and dominate the per-frame budget
+   * (240Hz = up to 240 forced reflows per second). Set this to e.g.
+   * `1000 / 60` to cap the measurement rate at 60Hz while keeping the size
+   * up-to-date for any resize event the user can perceive. A measurement
+   * whose values equal those of the last one still changes nothing.
    */
   resizePollIntervalMs = 0;
 
@@ -670,8 +762,10 @@ export class Display {
    * The width of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
    * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `width`. It follows the size source with every
-   * measurement: at the start of every frame, or less often with
-   * {@link Display.resizePollIntervalMs}.
+   * measurement: at the start of the frame after a reported change, or of every frame while the
+   * display polls — see the resize model of the class. The observer reports after the animation
+   * frame callbacks, so a change of the size source arrives here one frame after the frame it
+   * happened in, unless a {@link Display.resize} of your own measures it earlier.
    */
   get width(): number {
     return this.#width;
@@ -681,8 +775,10 @@ export class Display {
    * The height of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
    * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `height`. It follows the size source with every
-   * measurement: at the start of every frame, or less often with
-   * {@link Display.resizePollIntervalMs}.
+   * measurement: at the start of the frame after a reported change, or of every frame while the
+   * display polls — see the resize model of the class. The observer reports after the animation
+   * frame callbacks, so a change of the size source arrives here one frame after the frame it
+   * happened in, unless a {@link Display.resize} of your own measures it earlier.
    */
   get height(): number {
     return this.#height;
@@ -727,8 +823,8 @@ export class Display {
    *   container is created inside it and the canvas is appended there).
    *
    * Can be overridden via {@link DisplayParameters.resizeToElement} in the
-   * constructor or reassigned at runtime — the next measurement of
-   * {@link Display.resize} picks up the change.
+   * constructor or reassigned at runtime — the next frame, or a
+   * {@link Display.resize} of your own, observes and measures the new element.
    *
    * @see {@link DisplayParameters.resizeToElement}
    */
@@ -737,7 +833,8 @@ export class Display {
   /**
    * Optional size provider. If set, it is invoked with every measurement of
    * {@link Display.resize} — at the start of each frame, unless
-   * {@link Display.resizePollIntervalMs} spaces the measurements out — and
+   * {@link Display.resizePollIntervalMs} spaces the measurements out: no
+   * observer sees what it answers, so with it the display polls — and
    * its returned `[width, height]` (in CSS pixels) overrides
    * any element-based measurement. Use this for app-specific sizing logic
    * (e.g. fitting to a UI panel, applying min/max constraints, locking
@@ -755,8 +852,8 @@ export class Display {
   resizeToCallback?: ResizeDisplayToFn;
 
   /**
-   * The HTML element that {@link Display.resize} consults with every measurement for
-   * the `resize-to` attribute. Defaults to the canvas element, but you can point
+   * The HTML element whose `resize-to` attribute is read in every frame and with every
+   * {@link Display.resize}. Defaults to the canvas element, but you can point
    * it at a wrapper if you prefer to control sizing declaratively from the
    * outside (see {@link DisplayParameters.resizeToAttributeEl}).
    *
@@ -905,8 +1002,16 @@ export class Display {
       ...rendererOptions
     } = options ?? {};
 
+    // read with ?., so that a wrong first argument — a null, a number — fails below with the
+    // TypeError that names what the constructor takes
+    const firstNode = isWebGPURenderer(domElementOrRenderer)
+      ? domElementOrRenderer.domElement
+      : (domElementOrRenderer as Node | null | undefined);
+    this.#doc = firstNode?.ownerDocument ?? document;
+    this.#view = (this.#doc.defaultView ?? window) as Window & typeof globalThis;
+
     this.resizeToCallback = resizeTo;
-    this.#styleSheetRoot = styleSheetRoot ?? document.head;
+    this.#styleSheetRoot = styleSheetRoot ?? this.#doc.head;
 
     if (isWebGLRenderer(domElementOrRenderer)) {
       // eslint-disable-next-line no-console
@@ -920,7 +1025,7 @@ export class Display {
     if (isWebGPURenderer(domElementOrRenderer)) {
       this.#renderer = domElementOrRenderer;
       this.resizeToElement = domElementOrRenderer.domElement;
-    } else if (domElementOrRenderer instanceof HTMLElement) {
+    } else if (isHTMLElement(domElementOrRenderer)) {
       let canvas: HTMLCanvasElement;
       let callersCanvasBefore: CanvasState | undefined;
       if (domElementOrRenderer.tagName === 'CANVAS') {
@@ -929,11 +1034,11 @@ export class Display {
         // read before the renderer is built: three marks the canvas in its constructor already
         callersCanvasBefore = readCanvasState(canvas);
       } else {
-        const container = document.createElement('div');
+        const container = this.#doc.createElement('div');
         Stylesheets.addRule(container, Display.CssRulesPrefixContainer, CONTAINER_RULE_CSS, this.#styleSheetRoot);
         domElementOrRenderer.appendChild(container);
 
-        canvas = document.createElement('canvas');
+        canvas = this.#doc.createElement('canvas');
         container.appendChild(canvas);
 
         // only what was built here: a canvas that arrived as an argument belongs to the caller,
@@ -1002,6 +1107,7 @@ export class Display {
       this.resizeToElement = resizeToElement ?? this.resizeToElement;
       this.resizeToAttributeEl = resizeToAttributeEl ?? canvas;
 
+      this.#startSizeWatch();
       this.resize();
 
       on(this.#stateMachine, {
@@ -1048,14 +1154,15 @@ export class Display {
         },
       });
 
+      const doc = this.#doc;
       const onDocVisibilityChange = () => {
-        this.#stateMachine.documentIsVisible = !document.hidden;
+        this.#stateMachine.documentIsVisible = !doc.hidden;
       };
 
-      document.addEventListener('visibilitychange', onDocVisibilityChange, false);
+      doc.addEventListener('visibilitychange', onDocVisibilityChange, false);
 
       once(this, OnDisplayDispose, () => {
-        document.removeEventListener('visibilitychange', onDocVisibilityChange, false);
+        doc.removeEventListener('visibilitychange', onDocVisibilityChange, false);
       });
 
       onDocVisibilityChange();
@@ -1131,6 +1238,13 @@ export class Display {
    * debugger breakpoints: a single long frame reaches physics and
    * animations as a step of at most `maxDeltaTime`.
    *
+   * The cap does not tell an outlier from a frame rate that stays low: below
+   * `1 / maxDeltaTime` fps — 30 with the default — it cuts every frame, and
+   * `now` and `deltaTime` run slower than the wall clock, at two thirds of it
+   * with 20 fps and at half of it with 15 fps. The event props carry
+   * `rawDeltaTime`, the delta before the cut; `FixedFrameLoop` runs on
+   * it and follows the wall clock within its own `maxStepsPerFrame`.
+   *
    * Defaults to `1 / 30` (~33ms). Set to `0` to disable the cap entirely.
    */
   get maxDeltaTime(): number {
@@ -1196,7 +1310,7 @@ export class Display {
   }
 
   get devicePixelRatio(): number {
-    return window.devicePixelRatio ?? 1;
+    return this.#view.devicePixelRatio ?? 1;
   }
 
   /**
@@ -1204,10 +1318,13 @@ export class Display {
    * the current DOM/window state and applies them to the renderer and the
    * canvas inline style.
    *
-   * Called automatically at the start of every frame from
-   * {@link Display.renderFrame}, so user code rarely needs to invoke this.
-   * It is safe to call manually (e.g. immediately after a layout-affecting
-   * DOM mutation if you cannot wait for the next frame). As long as size,
+   * {@link Display.renderFrame} measures at the start of a frame whenever the
+   * size watch has reported a change, see the resize model of the class, so
+   * user code rarely needs to invoke this. It is safe to call manually — e.g.
+   * immediately after a layout-affecting DOM mutation if you cannot wait for
+   * the next frame, or after a change no observer sees. A call of your own
+   * measures every time, whatever {@link Display.resizePollIntervalMs} says,
+   * and does not move the next measurement of the frames. As long as size,
    * pixel ratio and pixel zoom stay the same, a call changes nothing on the
    * renderer and emits nothing; `image-rendering` is checked against the
    * inline style of the canvas on every call regardless.
@@ -1221,37 +1338,128 @@ export class Display {
    *
    * A call that changes the size emits `OnDisplayResize` once the first frame
    * has begun (`frameNo > 0`); the call inside the constructor emits nothing.
-   * The first frame emits the event in any case: where its `resize()` has not,
+   * The first frame emits the event in any case: where its measurement has not,
    * {@link Display.renderFrame} does.
    *
    * Does nothing after {@link Display.dispose} — there is no canvas left to measure.
    */
   resize(): void {
     if (this.#disposed) return;
+    this.#resize(false);
+  }
 
+  // `fromFrame` is the call at the start of a frame: that one measures only when the size watch
+  // has seen a change, or on the poll path within resizePollIntervalMs. A call of your own
+  // always measures and leaves the timing of the frames alone
+  #resize(fromFrame: boolean): void {
     this.#didEmitResize = false;
 
     const canvas = this.canvas;
 
     // image-rendering is not a size: it needs no measurement, so a change reaches the canvas
-    // with this call, whatever the poll interval says
+    // with this call, whether it measures or not
     this.#applyImageRendering(canvas);
 
-    if (this.resizePollIntervalMs > 0) {
-      const nowMs = performance.now();
-      if (nowMs - this.#lastResizePollMs < this.resizePollIntervalMs) {
-        return;
+    this.#resolveSizeSource(canvas);
+    this.#applyFullscreenClass(canvas, this.#sizeSourceIsWindow);
+    this.#observeSizeSource();
+
+    if (fromFrame) {
+      // no observer sees what a callback answers, and a window without ResizeObserver or
+      // matchMedia has no size watch
+      const polls = this.resizeToCallback != null || this.#sizeObserver == null;
+      if (polls !== this.#pollingSize) {
+        // a display that goes from polling over to the size watch measures once
+        this.#pollingSize = polls;
+        this.#sizeDirty = true;
       }
-      this.#lastResizePollMs = nowMs;
+
+      if (polls) {
+        if (this.resizePollIntervalMs > 0) {
+          const nowMs = performance.now();
+          if (nowMs - this.#lastResizePollMs < this.resizePollIntervalMs) {
+            return;
+          }
+          this.#lastResizePollMs = nowMs;
+        }
+      } else {
+        const zoom = this.pixelZoom > 0 ? this.pixelZoom : 0;
+        // the first frame always measures: the observer reports in the rendering update, after
+        // the animation frame callbacks, and would miss a change between the constructor and
+        // the start
+        if (!this.#isFirstFrame && !this.#sizeDirty && zoom === this.#appliedPixelZoom) {
+          return;
+        }
+      }
     }
 
-    const source = this.#resolveSizeSource(canvas);
-    this.#applyFullscreenClass(canvas, source.window);
-    this.#applyMeasuredSize(canvas, this.#measureSizeSource(source), source.element);
+    this.#sizeDirty = false;
+    this.#measureSizeSource(canvas);
+    this.#applyMeasuredSize(canvas);
   }
 
-  // Outside the resize hash on purpose: in it, every change would run through
-  // setDrawingBufferSize() and emit an OnDisplayResize without a change of size. Compared
+  #startSizeWatch(): void {
+    const view = this.#view;
+    if (typeof view.ResizeObserver !== 'function' || typeof view.matchMedia !== 'function') return;
+
+    this.#sizeObserver = new view.ResizeObserver(this.#onSizeChange);
+    // no observer can watch a window, and document.documentElement does not follow the height of
+    // the viewport: the resize event is what reports a change of the window
+    view.addEventListener('resize', this.#onSizeChange);
+    this.#watchPixelRatio();
+  }
+
+  // A query on the current ratio stops matching as soon as the ratio changes; after that the
+  // watch moves on to a query on the new one
+  #watchPixelRatio(): void {
+    this.#pixelRatioQuery?.removeEventListener('change', this.#onPixelRatioChange);
+    this.#pixelRatioQuery = this.#view.matchMedia(`(resolution: ${this.devicePixelRatio}dppx)`);
+    this.#pixelRatioQuery.addEventListener('change', this.#onPixelRatioChange);
+  }
+
+  // Keeps the observer on the size source #resolveSizeSource() found last. A new source is
+  // measured with the next measurement, observer or not
+  #observeSizeSource(): void {
+    const element = this.#sizeSourceIsWindow ? undefined : this.#sizeSourceElement;
+    if (element === this.#observedElement && this.#sizeSourceIsWindow === this.#observedWindow) return;
+
+    const observer = this.#sizeObserver;
+    if (observer != null) {
+      if (this.#observedElement != null) observer.unobserve(this.#observedElement);
+      if (element != null) {
+        try {
+          // the device pixel box reports a change of the device pixels as well
+          observer.observe(element, {box: 'device-pixel-content-box'});
+        } catch {
+          // Safari does not know that box and throws a TypeError
+          observer.observe(element);
+        }
+      }
+    }
+
+    this.#observedElement = element;
+    this.#observedWindow = this.#sizeSourceIsWindow;
+    this.#sizeDirty = true;
+  }
+
+  // Called by dispose() directly, so a constructor that throws after #startSizeWatch() takes the
+  // watch down as well
+  #stopSizeWatch(): void {
+    if (this.#sizeObserver != null) {
+      this.#sizeObserver.disconnect();
+      // #startSizeWatch() puts the resize listener on the window only together with the observer
+      this.#view.removeEventListener('resize', this.#onSizeChange);
+    }
+    this.#pixelRatioQuery?.removeEventListener('change', this.#onPixelRatioChange);
+
+    this.#sizeObserver = undefined;
+    this.#pixelRatioQuery = undefined;
+    this.#observedElement = undefined;
+    this.#observedWindow = false;
+  }
+
+  // Outside the comparison of the measured values on purpose: in it, every change would run
+  // through setDrawingBufferSize() and emit an OnDisplayResize without a change of size. Compared
   // against the inline style, which is a read of the attribute and forces no layout
   #applyImageRendering(canvas: HTMLCanvasElement): void {
     const imageRendering = this.styleImageRendering ?? (this.pixelZoom > 0 ? 'pixelated' : 'auto');
@@ -1260,20 +1468,24 @@ export class Display {
     }
   }
 
-  // Where the size comes from, as the resize-to attribute says; reads the DOM and writes nothing
-  #resolveSizeSource(canvas: HTMLCanvasElement): {window: boolean; element: Element | undefined} {
+  // Where the size comes from, as the resize-to attribute says. Reads the DOM, forces no layout,
+  // and writes the source into #sizeSourceIsWindow and #sizeSourceElement
+  #resolveSizeSource(canvas: HTMLCanvasElement): void {
     const resizeTo = this.resizeToAttributeEl.getAttribute('resize-to')?.trim();
 
     if (!resizeTo) {
-      return {window: false, element: this.resizeToElement};
+      this.#sizeSourceIsWindow = false;
+      this.#sizeSourceElement = this.resizeToElement;
+    } else if (RESIZE_TO_WINDOW.test(resizeTo)) {
+      this.#sizeSourceIsWindow = true;
+      this.#sizeSourceElement = undefined;
+    } else if (resizeTo === 'self') {
+      this.#sizeSourceIsWindow = false;
+      this.#sizeSourceElement = this.resizeToElement ?? canvas;
+    } else {
+      this.#sizeSourceIsWindow = false;
+      this.#sizeSourceElement = this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvas;
     }
-    if (/^:?(fullscreen|window)$/.test(resizeTo)) {
-      return {window: true, element: undefined};
-    }
-    if (resizeTo === 'self') {
-      return {window: false, element: this.resizeToElement ?? canvas};
-    }
-    return {window: false, element: this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvas};
   }
 
   #applyFullscreenClass(canvas: HTMLCanvasElement, wantsFullscreen: boolean): void {
@@ -1306,29 +1518,59 @@ export class Display {
     }
   }
 
-  // The size of the source in CSS pixels
-  #measureSizeSource(source: {window: boolean; element: Element | undefined}): [width: number, height: number] {
-    const fallback: [number, number] = source.window ? [window.innerWidth, window.innerHeight] : [300, 150];
-
+  // The size of the source in CSS pixels, into #measuredWidth and #measuredHeight
+  #measureSizeSource(canvas: HTMLCanvasElement): void {
     if (this.resizeToCallback) {
       // a callback that reports no size gets the fallback, and no element is measured in its place
       const size = this.resizeToCallback(this);
-      return size != null && Number.isFinite(size[0]) && Number.isFinite(size[1]) ? [size[0], size[1]] : fallback;
+      if (size != null && Number.isFinite(size[0]) && Number.isFinite(size[1])) {
+        this.#measuredWidth = size[0];
+        this.#measuredHeight = size[1];
+        return;
+      }
+    } else {
+      const element = this.#sizeSourceElement;
+      if (element != null) {
+        // the content area: the client rect minus padding and border
+        const rect = element.getBoundingClientRect();
+        const style = this.#getSourceStyle(element, canvas);
+        this.#measuredWidth = rect.width - getHorizontalInnerMargin(style);
+        this.#measuredHeight = rect.height - getVerticalInnerMargin(style);
+        return;
+      }
     }
 
-    if (source.element) {
-      const area = getContentAreaSize(source.element);
-      return [area.width, area.height];
+    if (this.#sizeSourceIsWindow) {
+      this.#measuredWidth = this.#view.innerWidth;
+      this.#measuredHeight = this.#view.innerHeight;
+    } else {
+      this.#measuredWidth = 300;
+      this.#measuredHeight = 150;
     }
-
-    return fallback;
   }
 
-  #applyMeasuredSize(canvas: HTMLCanvasElement, [wPx, hPx]: [number, number], sizeRefElement: Element | undefined): void {
+  #getCanvasStyle(canvas: HTMLCanvasElement): CSSStyleDeclaration {
+    this.#canvasStyle ??= getComputedStyle(canvas, null);
+    return this.#canvasStyle;
+  }
+
+  #getSourceStyle(element: Element, canvas: HTMLCanvasElement): CSSStyleDeclaration {
+    if (element === canvas) return this.#getCanvasStyle(canvas);
+    if (this.#sourceStyle == null || this.#sourceStyleOf !== element) {
+      this.#sourceStyle = getComputedStyle(element, null);
+      this.#sourceStyleOf = element;
+    }
+    return this.#sourceStyle;
+  }
+
+  #applyMeasuredSize(canvas: HTMLCanvasElement): void {
+    let wPx = this.#measuredWidth;
+    let hPx = this.#measuredHeight;
     let cssWidth = wPx;
     let cssHeight = hPx;
 
-    const canvasStyle = getComputedStyle(canvas, null);
+    const sizeRefElement = this.#sizeSourceElement;
+    const canvasStyle = this.#getCanvasStyle(canvas);
     const canvasIsContentBox = getIsContentBox(canvasStyle);
     const canvasHorizontalInnerMargin = getHorizontalInnerMargin(canvasStyle);
     const canvasVerticalInnerMargin = getVerticalInnerMargin(canvasStyle);
@@ -1358,7 +1600,10 @@ export class Display {
     }
 
     // pixelRatio is 1 while pixelZoom is above 0, so the limit then holds the CSS size itself
-    const {pixelRatio, pixelZoom} = this;
+    const {pixelRatio} = this;
+    // a zoom that is NaN or negative works as 0, and counts as 0 in the comparison below: NaN
+    // would differ from itself and make every frame measure
+    const pixelZoom = this.pixelZoom > 0 ? this.pixelZoom : 0;
 
     if (wPx * pixelRatio > Display.MaxResolution || hPx * pixelRatio > Display.MaxResolution) {
       // the warning names the size that was asked for, so it goes out before the clamp
@@ -1367,37 +1612,49 @@ export class Display {
       hPx = Math.min(hPx, Display.MaxResolution / pixelRatio);
     }
 
-    const resizeHash = `${wPx}|${cssWidth}x${hPx}|${cssHeight}x${pixelRatio},${pixelZoom}`;
+    if (
+      wPx === this.#appliedWidthPx &&
+      hPx === this.#appliedHeightPx &&
+      cssWidth === this.#appliedCssWidth &&
+      cssHeight === this.#appliedCssHeight &&
+      pixelRatio === this.#appliedPixelRatio &&
+      pixelZoom === this.#appliedPixelZoom
+    ) {
+      return;
+    }
 
-    if (resizeHash !== this.#lastResizeHash) {
-      this.#lastResizeHash = resizeHash;
+    this.#appliedWidthPx = wPx;
+    this.#appliedHeightPx = hPx;
+    this.#appliedCssWidth = cssWidth;
+    this.#appliedCssHeight = cssHeight;
+    this.#appliedPixelRatio = pixelRatio;
+    this.#appliedPixelZoom = pixelZoom;
 
-      if (pixelZoom > 0) {
-        this.#width = wPx / pixelZoom;
-        this.#height = hPx / pixelZoom;
-      } else {
-        this.#width = wPx;
-        this.#height = hPx;
-      }
+    if (pixelZoom > 0) {
+      this.#width = wPx / pixelZoom;
+      this.#height = hPx / pixelZoom;
+    } else {
+      this.#width = wPx;
+      this.#height = hPx;
+    }
 
-      // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
-      // MaxResolution at a fractional pixel ratio as well
-      this.#width = Math.floor(this.#width);
-      this.#height = Math.floor(this.#height);
+    // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
+    // MaxResolution at a fractional pixel ratio as well
+    this.#width = Math.floor(this.#width);
+    this.#height = Math.floor(this.#height);
 
-      // one call for size and ratio: setPixelRatio() on its own resizes the drawing buffer to the
-      // old size times the new ratio, and a change from a ratio of 1 to 2 at the limit would ask
-      // for a buffer of twice MaxResolution before setSize() brings it back
-      this.renderer!.setDrawingBufferSize(this.#width, this.#height, pixelRatio);
+    // one call for size and ratio: setPixelRatio() on its own resizes the drawing buffer to the
+    // old size times the new ratio, and a change from a ratio of 1 to 2 at the limit would ask
+    // for a buffer of twice MaxResolution before setSize() brings it back
+    this.renderer!.setDrawingBufferSize(this.#width, this.#height, pixelRatio);
 
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
 
-      const isConstructing = this.frameNo === 0;
-      if (!isConstructing) {
-        this.#emit(OnDisplayResize);
-        this.#didEmitResize = true;
-      }
+    const isConstructing = this.frameNo === 0;
+    if (!isConstructing) {
+      this.#emit(OnDisplayResize);
+      this.#didEmitResize = true;
     }
   }
 
@@ -1438,8 +1695,10 @@ export class Display {
   }
 
   /**
-   * Renders one frame: advances the chronometer, runs {@link Display.resize}
-   * to keep the canvas in sync with its environment, emits
+   * Renders one frame: advances the chronometer, measures the size where
+   * the size watch has reported a change or the display polls — see the
+   * resize model of the class — to keep the canvas in sync with its
+   * environment, emits
    * `OnDisplayResize` (always on the first frame, otherwise only when the
    * size, pixelRatio or pixelZoom actually changed), and finally emits
    * `OnDisplayRenderFrame` so listeners can draw.
@@ -1457,10 +1716,10 @@ export class Display {
 
     this.#chronometer.update(now / 1000);
 
-    this.resize();
+    this.#resize(true);
 
     // Exactly one OnDisplayResize goes out on the first rendered frame: either
-    // resize() above emitted it because the measured size differs from the
+    // the measurement above emitted it because the measured size differs from the
     // constructor measurement, or this line does. Listeners attached before
     // start() get their initial size either way.
     if (this.isFirstFrame && !this.#didEmitResize) this.#emit(OnDisplayResize);
@@ -1619,6 +1878,7 @@ export class Display {
       errors.push(error);
     }
     this.frameLoop.stop(this);
+    this.#stopSizeWatch();
     try {
       // the listeners are still attached here: this event is what tells them to let go,
       // and off(this) below is what makes it the last event this display ever emits. Every
@@ -1758,6 +2018,8 @@ export class Display {
     if (this.renderer == null) {
       throw disposedError('getEventProps()');
     }
+    // a new object per event on purpose: a listener may keep the props — nextFrame() resolves
+    // with them — and an object used again would change under it
     return {
       display: this,
       renderer: this.renderer,
@@ -1768,11 +2030,13 @@ export class Display {
 
       now: this.now,
       deltaTime: this.deltaTime,
+      rawDeltaTime: this.#chronometer.rawDeltaTime,
 
       frameNo: this.frameNo,
     };
   }
 
+  // every event gets props of its own, see getEventProps()
   #emit = (eventName: string): void => {
     if (this.renderer != null) {
       emit(this, eventName, this.getEventProps());

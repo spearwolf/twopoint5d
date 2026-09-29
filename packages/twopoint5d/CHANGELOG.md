@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `IMap2DTileRenderer#hasPendingTiles` and `Map2DTileRenderer#hasPendingTiles`: whether the renderer wants the next update cycle even if the tile set it was last handed has not changed, because it does not hold that tile set as its last cycle laid it out — tiles its factory answered `noTileCapacity` for, every tile after `clearTiles()`, and whatever `addTile()`, `reuseTile()` or `removeTile()` changed outside an update cycle. `Map2DTileRenderer` answers `true` from such a call up to the `endUpdatingTiles()` of the next cycle, `true` while an update cycle is open — also one a throw broke off, in `endUpdatingTiles()` as well — and `false` once `dispose()` has run; a renderer that leaves the member out goes through every update cycle
 - add an optional `out` to `ChunkQuadTreeNode#findChunksAt()`: the chunks that hold data at the point are appended to it, from the node down to the leaf the point lies in, and it is returned. The query walks down the tree and allocates nothing with an `out`
 - add `BakeTextureOptions#maxTextureSize` and `#renderer`: `FrameBasedAnimations#bakeDataTexture()` builds a data texture at most as wide as `maxTextureSize`, else as the limit of the device of `renderer` — `maxTextureDimension2D` of a WebGPU device, `MAX_TEXTURE_SIZE` of a WebGL2 context —, else as `FrameBasedAnimations.MaxTextureSize`. A renderer that has not been initialized names no limit, and a `maxTextureSize` that is no whole number of 1 or more throws a `RangeError`
+- add `Chronometer#rawDeltaTime` and the field `rawDeltaTime` of `DisplayEventProps`: the delta between the previous and the current time with the pauses subtracted, before `maxDeltaTime` cuts it — equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded. `Display#getEventProps()` fills it from its chronometer
 
 ### Changed
 
@@ -281,6 +282,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the `error` events of `TextureStore` and `TextureResource` reach every listener: eventize reports a listener that throws on the console, and the store or the resource goes on as it would without it — a `TextureStore#getAsync()` that waits on the resource hears the failure, and the other entries of an animation map are registered
 - a listener of `ready`, `resource:<id>` or `error` that throws inside `TextureStore#parse()` no longer reaches its caller: every listener hears its event, `parse()` runs to its end, and `loadAsync()` resolves with the store. See the Migration Guide
 - perf `TextureAtlas#randomFrameName()` and `randomFrameNames()` draw a name by its index in the order the names were added instead of walking the names up to it; `frameNames()` without an argument answers a copy of that list
+- perf `Display` measures its size when something reports a change — a `ResizeObserver` on the size source (on its `device-pixel-content-box` where the browser knows that box), a media query on the current `devicePixelRatio`, or the `resize` event of the window of the canvas — and in the first frame, after a change of `pixelZoom` and after a change of the size source; the frames in between read no layout. A display with a `resizeToCallback`, or in a window without `ResizeObserver` or `matchMedia`, measures in every frame, spaced out by `resizePollIntervalMs`. The display keeps the computed styles of the canvas and of the size source and the intermediate results of a measurement in fields
+- a `Display#resize()` of your own always measures, also within `resizePollIntervalMs`, and does not move the next measurement of the frames; the interval applies to the frames alone
+- `Display` takes the document and the window of its canvas instead of the global ones: for the `visibilitychange` that pauses it, `devicePixelRatio`, the size of the window under `resize-to="window"` or `"fullscreen"`, the default of `styleSheetRoot` — the `head` of that document — the container and canvas it builds inside a host element, and the size watch. A canvas or a host element in the document of a same-origin iframe is taken
+- `FixedFrameLoop` accumulates the `rawDeltaTime` of every render frame, not the `deltaTime` that `Display#maxDeltaTime` has cut: on a display that stays below `1 / maxDeltaTime` fps — 30 with the default — the simulation keeps up with the wall clock, with up to `maxStepsPerFrame` ticks per frame. Props without a finite `rawDeltaTime` count their `deltaTime`
 
 ### Deprecated
 
@@ -480,6 +485,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `TextureResource#dispose()`, `TextureStore#dispose()` and `TextureStore#clearUnused()` behind a `dispose` listener that throws — of the store, of a resource or of the texture of a resource: every listener hears the event, the teardown runs to its end — the texture is released, effects and listeners are gone, every pending promise of the store is rejected, every resource is disposed and removed — and the throw goes on to the caller afterwards, several as an `AggregateError`. A second `dispose()` does nothing
 - fix the `ready`, `resource:<id>` and `rendererChanged` events of `TextureStore` behind a listener that throws: every listener hears them and the retained value is written, so a `whenReady()`, an `on()` or a `getAsync()` that waits or comes later is answered. The throw of a `rendererChanged` listener goes on to whoever wrote `renderer`
 - fix `evictMissing` of `TextureStore#parse()` behind a `dispose` listener of a resource that throws: the resource is removed, the other resources are evicted as well, and the throw goes out as an `error` event with `source: 'parse'` and the id of the resource
+- fix the first frame of a `FrameLoop` after it has lost its last subscriber and got one again: `deltaTime` is `0` and `lastNow` equals `now`, instead of the whole span in which nobody asked for a frame, and the `maxFps` grid starts anew with that frame
+- fix a renderer whose `setAnimationLoop()` rejects — three's rejects with the error of a failed `init()`: the `FrameLoop` reports it with `console.error`, once per error, instead of leaving an unhandled rejection behind
 
 ### Migration Guide
 
@@ -3281,6 +3288,52 @@ on(store, 'ready', () => {
 store.parse(data);
 ```
 
+#### `DisplayEventProps` carries `rawDeltaTime`
+
+The field is required. An object literal typed as `DisplayEventProps` — in a test, or in a `getEventProps()` override that builds its props without spreading the ones of `super` — needs it. An override that still lacks it at runtime keeps a `FixedFrameLoop` running on `deltaTime`.
+
+**Before**
+
+```ts
+const props: DisplayEventProps = {display, renderer, width, height, pixelRatio, now, deltaTime, frameNo};
+```
+
+**After**
+
+```ts
+const props: DisplayEventProps = {display, renderer, width, height, pixelRatio, now, deltaTime, rawDeltaTime: deltaTime, frameNo};
+```
+
+#### `FixedFrameLoop` runs more ticks per frame at a low frame rate
+
+Below `1 / Display#maxDeltaTime` render fps a `FixedFrameLoop` runs as many ticks as the wall clock asks for, up to `maxStepsPerFrame` per frame, where it ran only as many as the cut `deltaTime` allowed. A tick handler that relied on the slower simulation sees it keep pace with the wall clock now; `tickTime` can run ahead of `display.now` while `maxDeltaTime` cuts frames. Lower `maxStepsPerFrame` to bound the work per frame.
+
+#### What no observer sees needs a `resize()` of your own
+
+A `Display` without a `resizeToCallback` measures when its size watch reports a change, not in every frame. The padding, border or `box-sizing` of the canvas while another element is the size source, and a CSS transform on the size source, reach the canvas with the next measurement — call `resize()` after changing them.
+
+A change the observer does see counts from the frame after its report: the observer reports in the rendering update, after the animation frame callbacks, so the frame in which the size source changes still carries the old `width` and `height`. Code that needs the new size in the next frame calls `resize()` itself.
+
+**Before**
+
+```ts
+host.style.width = '500px';
+canvas.style.padding = '8px';
+await display.nextFrame(); // the frame carries the new size
+```
+
+**After**
+
+```ts
+host.style.width = '500px';
+canvas.style.padding = '8px';
+display.resize(); // measures now; the next frame carries the new size
+await display.nextFrame();
+```
+
+#### `styleSheetRoot` follows the document of the canvas
+
+Without `styleSheetRoot` the display installs its rules in the `head` of the document its canvas sits in, not in the global `document.head`. For a canvas in the page nothing changes; for a canvas in a same-origin iframe the rules land in the iframe's document, where they apply. Pass `styleSheetRoot` to pick another root.
 
 ## [0.21.2] - 2026-06-19
 

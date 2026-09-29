@@ -144,7 +144,7 @@ describe('Display — resize behavior', () => {
     expect(display.height).to.equal(192);
   });
 
-  it('reacts to host element resizes on the next frame (no DOM listener required)', async () => {
+  it('reacts to host element resizes within two frames, through its ResizeObserver', async () => {
     host = makeContainer({width: 200, height: 200});
     display = new Display(host);
 
@@ -156,12 +156,40 @@ describe('Display — resize behavior', () => {
     host.style.width = '500px';
     host.style.height = '350px';
 
-    // Skip one frame to allow layout to settle, then read.
+    // the observer reports in the rendering update, after the animation frame callbacks, so the
+    // frame after its report is the one that measures
     await nextFrame(display);
     await nextFrame(display);
 
     expect(display.width).to.equal(500);
     expect(display.height).to.equal(350);
+  });
+
+  it('measures nothing in the frames after the first two as long as its size source does not change', async () => {
+    host = makeContainer({width: 320, height: 200});
+    display = new Display(host);
+
+    await display.start();
+    await nextFrame(display);
+    await nextFrame(display);
+
+    const measuringHost = host;
+    const getBoundingClientRect = Element.prototype.getBoundingClientRect;
+    let measurements = 0;
+    Element.prototype.getBoundingClientRect = function () {
+      if (this === measuringHost) measurements += 1;
+      return getBoundingClientRect.call(this);
+    };
+    try {
+      await nextFrame(display);
+      await nextFrame(display);
+      await nextFrame(display);
+    } finally {
+      Element.prototype.getBoundingClientRect = getBoundingClientRect;
+    }
+
+    expect(measurements, 'measurements of the host in three frames').to.equal(0);
+    expect(display.width).to.equal(320);
   });
 
   it('emits OnDisplayResize when the size actually changes', async () => {
@@ -276,7 +304,7 @@ describe('Display — resize behavior', () => {
 
     await display.start();
     await nextFrame(display);
-    await nextFrame(display); // pixelZoom change participates in resize hash
+    await nextFrame(display); // a change of pixelZoom lets the next frame measure
 
     expect(display.pixelRatio, 'pixelRatio forced to 1').to.equal(1);
     expect(display.width).to.equal(160);

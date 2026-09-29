@@ -11,8 +11,9 @@ import {
   OnDisplayStart,
 } from '../events.js';
 import {Display} from './Display.js';
+import {FixedFrameLoop} from './FixedFrameLoop.js';
 import {FrameLoop} from './FrameLoop.js';
-import type {DisplayParameters} from './types.js';
+import type {DisplayEventProps, DisplayParameters} from './types.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
 vi.mock('./Stylesheets.js', () => ({
@@ -42,7 +43,8 @@ function makeCanvas() {
     setAttribute: vi.fn(),
     hasAttribute: () => false,
     getAttribute: () => null,
-    getBoundingClientRect: () => ({width: 320, height: 200}),
+    // a mock, so the measurements of the display can be counted
+    getBoundingClientRect: vi.fn(() => ({width: 320, height: 200})),
   };
 }
 
@@ -79,8 +81,20 @@ function makeRenderer(init: () => Promise<unknown> = () => Promise.resolve(), ba
  * renderer: the rAF driver hangs off the renderer in a WeakMap, so no two tests share one.
  */
 function makeDisplay(options?: DisplayParameters, init?: () => Promise<unknown>, backend?: object) {
-  const {renderer, canvas, frame} = makeRenderer(init, backend);
+  return makeDisplayOn(makeRenderer(init, backend), options);
+}
 
+/**
+ * {@link makeDisplay} on a canvas stub that carries `canvasProps` as well — an `ownerDocument`,
+ * say, or a `getAttribute()` that answers `resize-to`.
+ */
+function makeDisplayOnCanvas(canvasProps: object, options?: DisplayParameters) {
+  const made = makeRenderer();
+  Object.assign(made.canvas, canvasProps);
+  return makeDisplayOn(made, options);
+}
+
+function makeDisplayOn({renderer, canvas, frame}: ReturnType<typeof makeRenderer>, options?: DisplayParameters) {
   const display = new Display(renderer as unknown as WebGPURenderer, options);
   displays.push(display);
 
@@ -790,6 +804,39 @@ describe('Display', () => {
       expect(display.deltaTime).toBeCloseTo(0.01);
     });
 
+    it('hands the render frame the delta before maxDeltaTime cuts it as rawDeltaTime', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(1000);
+      const {display, frame} = makeDisplay();
+      await display.start();
+      const props: DisplayEventProps[] = [];
+      on(display, OnDisplayRenderFrame, (p: DisplayEventProps) => {
+        props.push(p);
+      });
+
+      frame(1050);
+      frame(1100);
+
+      expect(props).toHaveLength(2);
+      for (const p of props) {
+        expect(p.deltaTime).toBeCloseTo(1 / 30);
+        expect(p.rawDeltaTime).toBeCloseTo(0.05);
+      }
+    });
+
+    it('lets a FixedFrameLoop keep up with the wall clock on a display at 20 fps', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(1000);
+      const {display, frame} = makeDisplay();
+      const sim = new FixedFrameLoop(display);
+      await display.start();
+
+      for (let i = 1; i <= 20; i++) {
+        frame(1000 + i * 50);
+      }
+
+      // one second of wall clock; maxDeltaTime cuts every frame of the display to 1/30
+      expect(Math.abs(sim.tickTime - 1)).toBeLessThanOrEqual(sim.fixedDelta);
+    });
+
     it('maxFps holds back the frames that come in faster than it allows', async () => {
       const frameInterval = 1000 / 60;
 
@@ -812,22 +859,47 @@ describe('Display', () => {
       expect(await renderFrames()).toBe(10);
     });
 
-    it('resizePollIntervalMs skips the measurement of a resize() within the interval', () => {
+    it('resizePollIntervalMs spaces out the measurements of the frames', async () => {
       const now = vi.spyOn(performance, 'now').mockReturnValue(5000);
-      const {display} = makeDisplay();
+      const {display, canvas, frame} = makeDisplay();
       display.resizePollIntervalMs = 100;
+      await display.start();
 
-      display.resize();
-      const measured = getComputedStyleStub.mock.calls.length;
+      frame(5000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
 
-      display.resize();
+      now.mockReturnValue(5050);
+      frame(5050);
 
-      expect(getComputedStyleStub.mock.calls.length, 'within the interval').toBe(measured);
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'within the interval').toBe(measured);
 
       now.mockReturnValue(5100);
+      frame(5100);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'once the interval is over').toBe(measured + 1);
+    });
+
+    it('a resize() of your own measures within resizePollIntervalMs, and leaves the measurements of the frames where they were', async () => {
+      const now = vi.spyOn(performance, 'now').mockReturnValue(5000);
+      const {display, canvas, frame} = makeDisplay();
+      display.resizePollIntervalMs = 1000;
+      await display.start();
+
+      frame(5000);
+
+      expect(display.width).toBe(320);
+
+      canvas.getBoundingClientRect.mockReturnValue({width: 640, height: 400});
+      now.mockReturnValue(5500);
       display.resize();
 
-      expect(getComputedStyleStub.mock.calls.length, 'once the interval is over').toBeGreaterThan(measured);
+      expect(display.width, 'right after resize()').toBe(640);
+
+      canvas.getBoundingClientRect.mockReturnValue({width: 800, height: 400});
+      now.mockReturnValue(6000);
+      frame(6000);
+
+      expect(display.width, 'the frame one interval after the last measurement of a frame').toBe(800);
     });
   });
 
@@ -870,22 +942,25 @@ describe('Display', () => {
       expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(4096, 50, 1);
     });
 
-    it('applies styleImageRendering without a size change, also within resizePollIntervalMs', () => {
-      const {display, renderer, canvas} = makeDisplay();
+    it('applies styleImageRendering without a size change, also within resizePollIntervalMs', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(5000);
+      const {display, renderer, canvas, frame} = makeDisplay();
       const style = canvas.style as {imageRendering?: string};
 
       expect(style.imageRendering).toBe('auto');
-      const drawingBufferSizeCalls = renderer.setDrawingBufferSize.mock.calls.length;
 
-      vi.spyOn(performance, 'now').mockReturnValue(5000);
       display.resizePollIntervalMs = 1000;
-      // uses up the interval, so the next resize() does not measure
-      display.resize();
+      await display.start();
+      // uses up the interval, so the next frame does not measure
+      frame(5000);
+      const drawingBufferSizeCalls = renderer.setDrawingBufferSize.mock.calls.length;
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
 
       display.styleImageRendering = 'pixelated';
-      display.resize();
+      frame(5016);
 
       expect(style.imageRendering).toBe('pixelated');
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'measurements').toBe(measured);
       expect(renderer.setDrawingBufferSize.mock.calls.length).toBe(drawingBufferSizeCalls);
     });
 
@@ -904,6 +979,263 @@ describe('Display', () => {
           ).toBe(true);
         }
       }
+    });
+  });
+
+  describe('size watch', () => {
+    type ListenerStub = Mock<(type: string, listener: () => void) => void>;
+
+    interface MediaQueryListStub {
+      media: string;
+      addEventListener: ListenerStub;
+      removeEventListener: ListenerStub;
+    }
+
+    let observers: ResizeObserverStub[];
+    let queries: MediaQueryListStub[];
+    // the Safari of today throws for a box it does not know
+    let knowsDevicePixelContentBox: boolean;
+
+    class ResizeObserverStub {
+      readonly observe = vi.fn((_target: unknown, options?: {box?: string}) => {
+        if (options?.box === 'device-pixel-content-box' && !knowsDevicePixelContentBox) {
+          throw new TypeError(`the box ${options.box} is not supported`);
+        }
+      });
+      readonly unobserve = vi.fn<(target: unknown) => void>();
+      readonly disconnect = vi.fn<() => void>();
+
+      constructor(readonly callback: () => void) {
+        observers.push(this);
+      }
+    }
+
+    let view: {
+      devicePixelRatio: number;
+      innerWidth: number;
+      innerHeight: number;
+      performance: Performance;
+      ResizeObserver: typeof ResizeObserverStub;
+      matchMedia: Mock<(media: string) => MediaQueryListStub>;
+      addEventListener: ListenerStub;
+      removeEventListener: ListenerStub;
+    };
+
+    const listenerOf = (target: {addEventListener: ListenerStub}, type: string): (() => void) => {
+      const call = target.addEventListener.mock.calls.find(([name]) => name === type);
+      expect(call, `a ${type} listener`).toBeDefined();
+      return call![1];
+    };
+
+    const onWindow = {getAttribute: (name: string) => (name === 'resize-to' ? 'window' : null)};
+
+    beforeEach(() => {
+      observers = [];
+      queries = [];
+      knowsDevicePixelContentBox = true;
+      view = {
+        devicePixelRatio: 1,
+        innerWidth: 1024,
+        innerHeight: 768,
+        performance,
+        ResizeObserver: ResizeObserverStub,
+        matchMedia: vi.fn((media: string) => {
+          const query = {media, addEventListener: vi.fn(), removeEventListener: vi.fn()};
+          queries.push(query);
+          return query;
+        }),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+      vi.stubGlobal('window', view);
+    });
+
+    it('measures nothing in the frames after the first as long as nothing reports a change', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+      const styled = getComputedStyleStub.mock.calls.length;
+
+      frame(1016);
+      frame(1033);
+      frame(1050);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'getBoundingClientRect()').toBe(measured);
+      expect(getComputedStyleStub.mock.calls.length, 'getComputedStyle()').toBe(styled);
+    });
+
+    it('measures in the first frame without a report', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+
+      frame(1000);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
+    });
+
+    it('lets a report of the ResizeObserver make the next frame measure once', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+
+      expect(observers).toHaveLength(1);
+      expect(observers[0]!.observe).toHaveBeenLastCalledWith(canvas, {box: 'device-pixel-content-box'});
+
+      canvas.getBoundingClientRect.mockReturnValue({width: 640, height: 400});
+      observers[0]!.callback();
+      frame(1016);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'the frame after the report').toBe(measured + 1);
+      expect(display.width).toBe(640);
+
+      frame(1033);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'the frame after that').toBe(measured + 1);
+    });
+
+    it('measures with the new pixel ratio once the media query on the old one reports a change', async () => {
+      const {display, renderer, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+
+      expect(view.matchMedia).toHaveBeenLastCalledWith('(resolution: 1dppx)');
+      const first = queries.at(-1)!;
+      const onChange = listenerOf(first, 'change');
+
+      view.devicePixelRatio = 2;
+      onChange();
+
+      expect(view.matchMedia, 'the query on the new ratio').toHaveBeenLastCalledWith('(resolution: 2dppx)');
+      expect(first.removeEventListener, 'the listener of the old query').toHaveBeenCalledWith('change', onChange);
+      expect(queries.at(-1)!.addEventListener).toHaveBeenCalledWith('change', onChange);
+
+      frame(1016);
+
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 2);
+    });
+
+    it('measures the window under resize-to="window" once the window reports a resize', async () => {
+      const {display, frame} = makeDisplayOnCanvas(onWindow);
+      await display.start();
+      frame(1000);
+
+      expect(display.width).toBe(1024);
+      expect(display.height).toBe(768);
+
+      view.innerWidth = 800;
+      view.innerHeight = 600;
+      listenerOf(view, 'resize')();
+      frame(1016);
+
+      expect(display.width).toBe(800);
+      expect(display.height).toBe(600);
+    });
+
+    it('observes the new element once resizeToElement changes, and measures it in the next frame', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const observer = observers[0]!;
+      const host = {getBoundingClientRect: vi.fn(() => ({width: 500, height: 300}))};
+
+      display.resizeToElement = host as unknown as HTMLElement;
+      frame(1016);
+
+      expect(observer.unobserve).toHaveBeenCalledWith(canvas);
+      expect(observer.observe).toHaveBeenLastCalledWith(host, {box: 'device-pixel-content-box'});
+      expect(host.getBoundingClientRect).toHaveBeenCalledTimes(1);
+      expect(display.width).toBe(500);
+      expect(display.height).toBe(300);
+    });
+
+    it('observes without options where the browser does not know the device-pixel-content-box', () => {
+      knowsDevicePixelContentBox = false;
+      const {canvas} = makeDisplay();
+
+      expect(observers[0]!.observe.mock.calls).toEqual([[canvas, {box: 'device-pixel-content-box'}], [canvas]]);
+    });
+
+    it('measures in the next frame once pixelZoom changes', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+
+      display.pixelZoom = 2;
+      frame(1016);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
+      expect(display.width).toBe(160);
+    });
+
+    it('asks a resizeTo callback in every frame, observer or not', async () => {
+      const resizeTo = vi.fn((): [number, number] => [400, 300]);
+      const {display, frame} = makeDisplay({resizeTo});
+      await display.start();
+      frame(1000);
+      const asked = resizeTo.mock.calls.length;
+
+      frame(1016);
+      frame(1033);
+
+      expect(resizeTo.mock.calls.length).toBe(asked + 2);
+    });
+
+    it('lets go of the observer, the media query and the resize listener on dispose()', () => {
+      const {display} = makeDisplay();
+      const observer = observers[0]!;
+      const query = queries.at(-1)!;
+      const onChange = listenerOf(query, 'change');
+      const onResize = listenerOf(view, 'resize');
+
+      display.dispose();
+
+      expect(observer.disconnect).toHaveBeenCalledTimes(1);
+      expect(query.removeEventListener).toHaveBeenCalledWith('change', onChange);
+      expect(view.removeEventListener).toHaveBeenCalledWith('resize', onResize);
+    });
+  });
+
+  describe('document and window of the canvas', () => {
+    it('takes visibility, pixel ratio, window size and the default styleSheetRoot from the document of its canvas', async () => {
+      const frameDoc = {
+        hidden: false,
+        head: {},
+        addEventListener: vi.fn() as DocumentListenerStub,
+        removeEventListener: vi.fn() as DocumentListenerStub,
+        defaultView: {devicePixelRatio: 3, innerWidth: 640, innerHeight: 480, performance},
+      };
+      const {display, events} = makeDisplayOnCanvas({
+        ownerDocument: frameDoc,
+        getAttribute: (name: string) => (name === 'resize-to' ? 'window' : null),
+      });
+
+      expect(frameDoc.addEventListener, 'the document of the canvas').toHaveBeenCalledWith(
+        'visibilitychange',
+        expect.any(Function),
+        false,
+      );
+      expect(doc.addEventListener, 'the global document').not.toHaveBeenCalled();
+      expect(display.devicePixelRatio).toBe(3);
+      expect(display.width).toBe(640);
+      expect(display.height).toBe(480);
+      expect(display.styleSheetRoot).toBe(frameDoc.head);
+
+      const listener = frameDoc.addEventListener.mock.calls.find(([type]) => type === 'visibilitychange')![1];
+      await display.start();
+      events.length = 0;
+
+      frameDoc.hidden = true;
+      listener();
+
+      expect(events).toEqual([OnDisplayPause]);
+
+      display.dispose();
+
+      expect(frameDoc.removeEventListener).toHaveBeenCalledWith('visibilitychange', listener, false);
     });
   });
 

@@ -8,7 +8,17 @@ export interface DisplayEventProps {
   height: number;
   pixelRatio: number;
   now: number;
+  /**
+   * The seconds since the previous frame, the pauses of the display not counted, at most
+   * {@link Display.maxDeltaTime} while that is above 0.
+   */
   deltaTime: number;
+  /**
+   * The same as {@link DisplayEventProps.deltaTime}, before {@link Display.maxDeltaTime} cuts it:
+   * the wall-clock time between the frames without the pauses of the display.
+   * `FixedFrameLoop` runs on it.
+   */
+  rawDeltaTime: number;
   frameNo: number;
 }
 
@@ -61,8 +71,9 @@ export interface DisplayParameters extends DisplayRendererParameters {
 
   /**
    * If a function is specified here, it is called with every measurement of
-   * {@link Display.resize} (every frame, unless {@link Display.resizePollIntervalMs} spaces them
-   * out) and returns the size of the display: width and height in CSS pixels.
+   * {@link Display.resize} and returns the size of the display: width and height in CSS pixels.
+   * No observer sees what it answers, so with it the display measures in every frame, unless
+   * {@link Display.resizePollIntervalMs} spaces the measurements out.
    *
    * With it, the display measures no element. What happens while the function reports no
    * size is described at {@link ResizeDisplayToFn}.
@@ -71,30 +82,30 @@ export interface DisplayParameters extends DisplayRendererParameters {
 
   /**
    * If an HTML element is specified here, the size of this element is determined
-   * with every measurement of {@link Display.resize} (every frame, unless
-   * {@link Display.resizePollIntervalMs} spaces them out) and the display is synchronized
-   * accordingly (only the size, not the position).
+   * with every measurement of {@link Display.resize} and the display is synchronized
+   * accordingly (only the size, not the position). The display observes the element and
+   * measures it in the frame after it reports a change — see the resize model of
+   * {@link Display}.
    */
   resizeToElement?: HTMLElement;
 
   /**
-   * With every measurement of {@link Display.resize} (every frame, unless
-   * {@link Display.resizePollIntervalMs} spaces them out), this HTML element is queried for a
+   * In every frame and with every {@link Display.resize}, this HTML element is queried for a
    * `resize-to` attribute and read out. If nothing is specified, then this is the canvas element.
    *
    * The `resize-to` attribute can contain either `"fullscreen"` or `"window"` as a value,
    * or alternatively `"self"`. With `"self"`, the display measures its `resizeToElement` — by
    * default the canvas, or the host element when the display built its own container — just
    * as it does without the attribute; with `resizeToElement` cleared, it measures the canvas.
-   * With `"fullscreen"` or `"window"`, the display element is synchronized with the
-   * window size accordingly. Any other value is a CSS selector, looked up in the document or
-   * in the shadow root this element sits in.
+   * With `"fullscreen"` or `"window"`, the display element is synchronized with the size of the
+   * window of the canvas accordingly. Any other value is a CSS selector, looked up in the
+   * document or in the shadow root this element sits in.
    */
   resizeToAttributeEl?: HTMLElement;
 
   /**
-   * The root the display installs its few CSS rules in. Default is `document.head`, which stands
-   * for the document.
+   * The root the display installs its few CSS rules in. Default is the `head` of the document the
+   * canvas sits in, which stands for that document.
    *
    * The rules live in a stylesheet the document or the shadow root has adopted. A display whose
    * canvas sits in a shadow root names that root here; the root may be handed in before its host
