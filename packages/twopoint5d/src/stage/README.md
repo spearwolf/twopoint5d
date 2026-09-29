@@ -205,6 +205,11 @@ When the renderer has a `pipeline`, the **internal pass-target** is always
 cleared each frame (using your `clear`-color when `clear=true`, transparent
 black otherwise) so frame content does not accumulate.
 
+The **pass-target of a nested `StageRenderer`** — the one its parent samples
+through `asPassNode()` — is cleared by the parent every frame to transparent
+black, color and depth, whatever the child's `clear` says. A child with
+`clear = true` then clears it once more with its own color.
+
 ---
 
 ## Off-screen rendering: `outputRenderTarget`
@@ -280,9 +285,10 @@ sr.buildOutputNode = ([scenePass]) => {
 
 - `Stage2D.asPassNode()` returns `pass(scene, camera)` — handled per frame by
   the pipeline.
-- A nested `StageRenderer.asPassNode()` returns `texture(internalRT.texture)`;
-  the parent automatically pre-renders the child into that RT before the
-  pipeline runs.
+- A nested `StageRenderer.asPassNode()` returns a `texture()` node sampling
+  the child's own pass-target (not `internalRT`, which is the target of Mode
+  C); before the pipeline runs, the parent clears that target and renders the
+  child into it.
 
 `buildOutputNode` runs again on the next render after the stages,
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
@@ -337,8 +343,8 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 ```
 
 `worldRenderer.asPassNode()` returns a `texture()` node sampling the
-renderer's `asPassNodeRT`; the root pre-renders the child into that RT
-before its own pipeline runs.
+renderer's `asPassNodeRT`; the root clears that RT and pre-renders the child
+into it before its own pipeline runs.
 
 > **Important — only one writer to the canvas per frame.**
 > The three.js `RenderPipeline.render()` call expects to own the final

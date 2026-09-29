@@ -66,10 +66,17 @@ export class ProjectionPlane {
     return this.plane.coplanarPoint(target ?? new Vector3());
   }
 
+  /**
+   * The direction in which a camera in front of the plane looks at it: the negated
+   * plane normal, as long as the normal is.
+   */
   getForward(target?: Vector3): Vector3 {
-    return this.getPointByDistance(1, target).negate();
+    return (target ?? new Vector3()).copy(this.plane.normal).negate();
   }
 
+  /**
+   * `getForward()` × `up`: the x axis on the plane.
+   */
   getRight(target?: Vector3): Vector3 {
     return this.getForward(target).cross(this.up);
   }

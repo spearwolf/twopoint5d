@@ -48,6 +48,8 @@ const MOUSE = 'mouse';
 
 const KEYUP = 'keyup';
 const KEYDOWN = 'keydown';
+const BLUR = 'blur';
+const VISIBILITYCHANGE = 'visibilitychange';
 
 const POINTERUP = 'pointerup';
 const POINTERDOWN = 'pointerdown';
@@ -81,6 +83,16 @@ function pinnedRootOf(root: HTMLElement | ShadowRoot): HTMLElement | ShadowRoot 
   if ('host' in node && 'adoptedStyleSheets' in node) return node as ShadowRoot;
   return root.ownerDocument.head;
 }
+
+// by property, not by instanceof, like pinnedRootOf() above: an element of another realm passes
+// as well
+const isEditableTarget = (target: EventTarget | null | undefined): boolean => {
+  if (target == null) return false;
+  if ('isContentEditable' in target && target.isContentEditable === true) return true;
+  if (!('localName' in target)) return false;
+  const {localName} = target;
+  return localName === 'input' || localName === 'textarea' || localName === 'select';
+};
 
 export interface PanControl2DOptions {
   state?: PanViewState;
@@ -142,6 +154,11 @@ export interface PanControl2DOptions {
    *
    * Default is `['KeyW', 'KeyS', 'KeyA', 'KeyD']`: the keys at the _WASD_ position, whatever the
    * keyboard layout labels them.
+   *
+   * A key pressed with Ctrl, Meta or Alt does not pan, and neither does one that goes into an
+   * `input`, `textarea`, `select` or an element with `contenteditable` — in an open shadow root
+   * as well; its `keyup` still lets go of a key held before. When the window loses focus or the
+   * page is hidden, the control lets go of every key held down.
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
    */
@@ -359,9 +376,13 @@ export class PanControl2D extends InputControlBase {
     if (!value) {
       this.addEventListener(document, KEYDOWN, this.#onKeyDown);
       this.addEventListener(document, KEYUP, this.#onKeyUp);
+      this.addEventListener(window, BLUR, this.#onKeyboardLost);
+      this.addEventListener(document, VISIBILITYCHANGE, this.#onKeyboardLost);
     } else {
       this.removeEventListener(document, KEYDOWN, this.#onKeyDown);
       this.removeEventListener(document, KEYUP, this.#onKeyUp);
+      this.removeEventListener(window, BLUR, this.#onKeyboardLost);
+      this.removeEventListener(document, VISIBILITYCHANGE, this.#onKeyboardLost);
 
       // the keyup that would release a held key's speed field reaches this control no longer
       this.#releaseKeyedSpeeds();
@@ -395,8 +416,8 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
-   * Take every listener off `document` and give back what the input sources are holding:
-   * the pan collected in a drag, the keys still down and a hidden cursor.
+   * Take every listener off `document` and `window` and give back what the input sources are
+   * holding: the pan collected in a drag, the keys still down and a hidden cursor.
    *
    * None of it can come back through an event any more — a `pointerup` and a `keyup` reach a
    * control that is no longer listening, and without this the view would keep moving by a key
@@ -622,6 +643,13 @@ export class PanControl2D extends InputControlBase {
   }
 
   #onKeyDown = (event: KeyboardEvent): void => {
+    // a key pressed with Ctrl, Meta or Alt is meant for a shortcut of the browser or the app, and
+    // one typed into an editable element is meant for that element. composedPath()[0] and not
+    // event.target: the listener sits on document, where the browser retargets event.target onto
+    // the shadow host, and an input in an open shadow root would pass unseen
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (isEditableTarget(event.composedPath()[0] ?? event.target)) return;
+
     const field = this.#speedFieldFor(event);
     if (field == null) return;
     this[field] = this.pixelsPerSecond;
@@ -635,10 +663,18 @@ export class PanControl2D extends InputControlBase {
     this.#keyedSpeeds.delete(field);
   };
 
+  // a window without focus or a hidden page sends the keyup of a released key somewhere else — a
+  // switch of window or tab, a dialog a shortcut opened. Becoming visible again lets go as well:
+  // no keydown arrived while the page was hidden, and a key still held sets its field again with
+  // the next repeated keydown
+  #onKeyboardLost = (): void => {
+    this.#releaseKeyedSpeeds();
+  };
+
   /**
-   * Take every listener off `document`, give the cursor styles target back the way it was
-   * found, give the cursor rule back to the stylesheet and drop the pan that was collected but
-   * never delivered.
+   * Take every listener off `document` and `window`, give the cursor styles target back the way
+   * it was found, give the cursor rule back to the stylesheet and drop the pan that was collected
+   * but never delivered.
    *
    * The `state` object and the `cursorStylesTarget` element were handed in and stay the
    * caller's: the state keeps the values the last {@link update} wrote, and the element keeps
@@ -647,8 +683,8 @@ export class PanControl2D extends InputControlBase {
    *
    * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
    * reaches this control any more. {@link update} still moves {@link panView} by the speed
-   * fields a caller sets by hand, and by a key that was still held down when `dispose()` ran
-   * gives its field back — what it no longer delivers is a pan from a drag before the call. A
+   * fields a caller sets by hand; a key that was still held down when `dispose()` ran has given
+   * its field back, and what it no longer delivers is a pan from a drag before the call. A
    * write to {@link cursorPanStyle} is refused: a disposed control retains no more rules from
    * a stylesheet that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`,
    * `keyboardDisabled`, `pointerDisabled`,

@@ -1040,6 +1040,70 @@ describe('StageRenderer', () => {
       expect(pipelineOutputNode).toBeDefined();
     });
 
+    function makeNestedSetup() {
+      const parent = new StageRenderer();
+      parent.resize(100, 100);
+      const child = new StageRenderer();
+      parent.add(child as any);
+      child.resize(100, 100);
+      const inner = fakeStage('inner');
+      child.add(inner);
+      parent.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
+      parent.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
+
+      const log: (
+        {kind: 'clear'; target: unknown; color: number; alpha: number; args: unknown[]} | {kind: 'draw'; target: unknown}
+      )[] = [];
+      renderer.clear.mockImplementation((...args: unknown[]) =>
+        log.push({
+          kind: 'clear',
+          target: renderer.__renderTarget,
+          color: renderer.__clearColor.getHex(),
+          alpha: renderer.__clearAlpha,
+          args,
+        }),
+      );
+      inner.renderTo.mockImplementation(() => log.push({kind: 'draw', target: renderer.__renderTarget}));
+
+      return {parent, child, log};
+    }
+
+    it('a nested StageRenderer without clear gets its pass target cleared to transparent black on every frame', () => {
+      const {parent, log} = makeNestedSetup();
+
+      for (let frame = 1; frame <= 2; frame++) {
+        log.length = 0;
+        parent.renderTo(renderer as any);
+
+        const drawIndex = log.findIndex((entry) => entry.kind === 'draw');
+        expect(drawIndex, `frame ${frame}: the child is drawn`).toBeGreaterThanOrEqual(0);
+        const draw = log[drawIndex]!;
+        expect((draw.target as any)?.isRenderTarget, `frame ${frame}: into its pass target`).toBe(true);
+
+        const clearsBeforeDraw = log.slice(0, drawIndex).filter((entry) => entry.kind === 'clear');
+        expect(clearsBeforeDraw, `frame ${frame}: one clear before the draw`).toEqual([
+          {kind: 'clear', target: draw.target, color: 0x000000, alpha: 0, args: [true, true, false]},
+        ]);
+
+        expect(renderer.__clearColor.getHex(), `frame ${frame}: clear color restored`).toBe(0x111111);
+        expect(renderer.__clearAlpha, `frame ${frame}: clear alpha restored`).toBe(0.5);
+      }
+    });
+
+    it('a nested StageRenderer with clear applies its own clear color on top of the transparent black clear', () => {
+      const {parent, child, log} = makeNestedSetup();
+      child.setClearColor(new Color(0x123456), 0.25);
+
+      parent.renderTo(renderer as any);
+
+      const drawIndex = log.findIndex((entry) => entry.kind === 'draw');
+      const draw = log[drawIndex]!;
+      expect(log.slice(0, drawIndex).filter((entry) => entry.kind === 'clear')).toEqual([
+        {kind: 'clear', target: draw.target, color: 0x000000, alpha: 0, args: [true, true, false]},
+        {kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]},
+      ]);
+    });
+
     it('invalidateOutputNode() forces a rebuild on next render', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);

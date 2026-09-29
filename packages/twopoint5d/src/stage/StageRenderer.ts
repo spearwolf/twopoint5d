@@ -21,6 +21,9 @@ import type {Stage2D} from './Stage2D.js';
 
 export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
 
+// never written: setClearColor() copies it
+const TRANSPARENT_BLACK = new Color(0x000000);
+
 const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProvider)?.asPassNode === 'function';
 
 // recognized by its `isStage2D` flag, so this module needs no runtime import of Stage2D
@@ -73,6 +76,10 @@ export interface StageRenderer extends EventizedObject {}
  * convenience. Multiple stages are drawn additively into the same target
  * (the renderer sets `autoClear = false` while iterating stages) — use this
  * to layer stages on top of each other in a single pass.
+ *
+ * A renderer that a parent composes through {@link asPassNode} draws into a
+ * pass-target which the parent clears to transparent black (color and depth)
+ * at the start of every frame; the child's own `clear` then applies on top.
  */
 export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
@@ -589,6 +596,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         const prev = renderer.getRenderTarget();
         renderer.setRenderTarget(childRT);
         try {
+          // the pass target of the child belongs to nobody else who would clear it: a child
+          // without clear draws its stages straight into it, and a child with clear but
+          // clearColorBuffer/clearDepthBuffer off clears only part of it — the previous frame
+          // would stay underneath
+          this.#clearToTransparentBlack(renderer);
           stage.#renderToCurrentTarget(renderer);
         } finally {
           renderer.setRenderTarget(prev);
@@ -608,6 +620,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.pipeline!.render();
   }
 
+  /**
+   * Clears color and depth of the current target to transparent black. The color is set
+   * along with the alpha: with `renderer.alpha === false` a WebGPU clear keeps the RGB of the
+   * clear color at alpha 0, and an additive composition would add that tint once per child.
+   */
+  #clearToTransparentBlack(renderer: WebGPURenderer): void {
+    const oldClearAlpha = renderer.getClearAlpha();
+    renderer.getClearColor(this.#oldClearColor);
+    renderer.setClearColor(TRANSPARENT_BLACK, 0);
+    renderer.clear(true, true, false);
+    renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
+  }
+
   #getStagePass(stageItem: StageItem, renderer: WebGPURenderer): Node {
     const stage = stageItem.stage;
     if (!hasAsPassNode(stage)) {
@@ -624,7 +649,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * The parent is responsible for ensuring the texture is up-to-date before
    * the pipeline runs (`StageRenderer` does that automatically for nested
-   * `StageRenderer` children).
+   * `StageRenderer` children: it clears the target to transparent black
+   * first, then renders the child into it).
    *
    * A disposed renderer throws here instead of building a fresh pass-target
    * that nothing would release again.

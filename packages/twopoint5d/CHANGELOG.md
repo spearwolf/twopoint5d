@@ -287,6 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a `Display#resize()` of your own always measures, also within `resizePollIntervalMs`, and does not move the next measurement of the frames; the interval applies to the frames alone
 - `Display` takes the document and the window of its canvas instead of the global ones: for the `visibilitychange` that pauses it, `devicePixelRatio`, the size of the window under `resize-to="window"` or `"fullscreen"`, the default of `styleSheetRoot` — the `head` of that document — the container and canvas it builds inside a host element, and the size watch. A canvas or a host element in the document of a same-origin iframe is taken
 - `FixedFrameLoop` accumulates the `rawDeltaTime` of every render frame, not the `deltaTime` that `Display#maxDeltaTime` has cut: on a display that stays below `1 / maxDeltaTime` fps — 30 with the default — the simulation keeps up with the wall clock, with up to `maxStepsPerFrame` ticks per frame. Props without a finite `rawDeltaTime` count their `deltaTime`
+- `PanControl2D` pans by no key pressed with Ctrl, Meta or Alt and by no key that goes into an `input`, `textarea`, `select` or `contenteditable` element, in an open shadow root as well: such a key is meant for a shortcut or for the element. The `keyup` of a key held before still lets go of it, wherever it comes from. There is no option for it
 
 ### Deprecated
 
@@ -490,6 +491,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix `evictMissing` of `TextureStore#parse()` behind a `dispose` listener of a resource that throws: the resource is removed, the other resources are evicted as well, and the throw goes out as an `error` event with `source: 'parse'` and the id of the resource
 - fix the first frame of a `FrameLoop` after it has lost its last subscriber and got one again: `deltaTime` is `0` and `lastNow` equals `now`, instead of the whole span in which nobody asked for a frame, and the `maxFps` grid starts anew with that frame
 - fix a renderer whose `setAnimationLoop()` rejects — three's rejects with the error of a failed `init()`: the `FrameLoop` reports it with `console.error`, once per error, instead of leaving an unhandled rejection behind
+- fix a `StageRenderer` that a parent composes through `asPassNode()`: it shows the content of the current frame only. The parent clears its pass target to transparent black, color and depth, before every pre-render, and a child with `clear` clears it with its own color after that
+- fix `PanControl2D` for a key that is let go while the window has no focus: the control lets go of every key held down when the window loses focus or the page is hidden, so the view does not keep moving by a key nobody is pressing
+- fix `ProjectionPlane#getForward()`: it answers the negated plane normal for every plane, so `getRight()` and `getPoint()` are right for a plane off the origin as well
 
 ### Migration Guide
 

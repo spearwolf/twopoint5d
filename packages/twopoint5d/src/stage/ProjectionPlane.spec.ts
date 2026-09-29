@@ -97,6 +97,28 @@ describe('ProjectionPlane', () => {
       const p = xz.getForward();
       expect(p.equals(new Vector3(0, -1, 0))).toBeTruthy();
     });
+
+    it('custom plane off the origin (constant = 1)', () => {
+      const pp = new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1), 1), new Vector3(0, 1, 0));
+      expect(pp.getForward().equals(new Vector3(0, 0, -1))).toBeTruthy();
+      expect(pp.getRight().equals(new Vector3(1, 0, 0))).toBeTruthy();
+      expect(pp.getPoint(5, 4).equals(new Vector3(5, 4, -1))).toBeTruthy();
+    });
+
+    it('custom plane off the origin (constant = 5)', () => {
+      const pp = new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1), 5), new Vector3(0, 1, 0));
+      expect(pp.getForward().equals(new Vector3(0, 0, -1))).toBeTruthy();
+      expect(pp.getRight().equals(new Vector3(1, 0, 0))).toBeTruthy();
+      expect(pp.getPoint(5, 4).equals(new Vector3(5, 4, -5))).toBeTruthy();
+    });
+
+    it('writes into and returns the target vector', () => {
+      const xy = ProjectionPlane.get('xy|bottom-left');
+      const target = new Vector3(7, 8, 9);
+      const result = xy.getForward(target);
+      expect(result).toBe(target);
+      expect(target.equals(new Vector3(0, 0, -1))).toBeTruthy();
+    });
   });
 
   describe('getRight()', () => {

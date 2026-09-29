@@ -1,7 +1,14 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
-import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline} from 'three/webgpu';
-import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
+import {
+  Display,
+  OrthographicProjection,
+  ParallaxProjection,
+  RootRenderPipeline,
+  Stage2D,
+  StageRenderer,
+} from '@spearwolf/twopoint5d';
+import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget} from 'three/webgpu';
+import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
 
@@ -232,5 +239,50 @@ describe('StageRenderer — pipeline integration', () => {
     // the owner disposes it, and the pipeline is still there to take the call
     pipeline.dispose();
     expect(disposeCalls).to.equal(1);
+  });
+
+  it('a nested StageRenderer without a pipeline shows only the content of the current frame', async () => {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+
+    // 64 pixels wide: rgbAt() reads the rows at that length
+    const target = new RenderTarget(64, 64);
+    // no specs: 64 x 64 units on 64 x 64 pixels, the camera centred on the origin
+    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const mesh = new Mesh(geometry, material);
+    mesh.position.x = -16;
+    stage.scene.add(mesh);
+
+    // driven by hand, no host: the child keeps clear = false and has no pipeline of its own
+    const child = new StageRenderer().add(stage);
+    const root = new StageRenderer().add(child);
+    const pipeline = new RootRenderPipeline(display.renderer);
+    root.pipeline = pipeline;
+    root.outputRenderTarget = target;
+    root.resize(64, 64);
+
+    root.renderTo(display.renderer);
+    const first = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    mesh.position.x = 16;
+    root.renderTo(display.renderer);
+    const second = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+
+    // pure green and black, so the color transform of the pipeline does not shift the result
+    expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;
+    expect(isNearColor(rgbAt(second, 64, 16, 32), [0, 0, 0]), 'where the content stood a frame before').to.be.true;
+    expect(isNearColor(rgbAt(second, 64, 48, 32), [0, 255, 0]), 'the content in the second frame').to.be.true;
+
+    // the pipeline and the target belong to this test: the renderers let go first
+    root.dispose();
+    child.dispose();
+    stage.dispose();
+    pipeline.dispose();
+    target.dispose();
+    geometry.dispose();
+    material.dispose();
   });
 });
