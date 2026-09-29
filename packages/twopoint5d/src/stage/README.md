@@ -23,6 +23,7 @@ fast and need the canonical idioms.
 │   – clear / clearColor / clearAlpha         │   clear policy
 │   – pipeline?            Mode C / Mode D    │   optional post-processing
 │   – outputRenderTarget?  Mode C             │
+│   – internalTargetPool?  Mode C             │
 │   – buildOutputNode?     Mode D             │
 └──────────────────┬──────────────────────────┘
                    │ holds list of
@@ -48,6 +49,7 @@ fast and need the canonical idioms.
 | `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. Call `render(now, deltaTime, frameNo)` from your own frame loop; the stage has a camera as soon as `setContainerSize()` has given it a size. What its `dispose()` releases is in [Resource lifecycle](#resource-lifecycle). |
 | `ClearStage` | Marker stage that emits `renderer.clear(...)` between siblings (depth-only by default). |
 | `RootRenderPipeline` | `RenderPipeline` subclass with a built-in additive composition (`p0.add(p1).add(p2)…`). Assign as `StageRenderer.pipeline` to skip `buildOutputNode` for the common "compose every stage" case. |
+| `StageRenderTargetPool` | Lends the internal target of Mode C to the `StageRenderer`s it is set on, one draw at a time, so renderers of the same size share one target. Built, handed in and disposed by the caller. |
 
 ### Interfaces
 
@@ -207,11 +209,12 @@ Buffer-level control: `clearColorBuffer`, `clearDepthBuffer`,
 arguments of `WebGPURenderer.clear()`.
 
 When the renderer has a `pipeline` without `buildOutputNode` that is not a
-`RootRenderPipeline` (Mode C), the **internal pass-target** is cleared in full to transparent black every frame,
+`RootRenderPipeline` (Mode C), the **internal target** is cleared in full to transparent black every frame,
 color and depth, so frame content does not accumulate. With `clear = true`
 your own clear applies after that; one that covers color and depth
 (`clearColorBuffer` and `clearDepthBuffer` both `true`) replaces the black
-clear.
+clear. A target borrowed from an `internalTargetPool` is cleared the same way,
+so nothing of the renderer that borrowed it before stays in it.
 
 The **pass-target of a nested `StageRenderer`** — the one its parent samples
 through `asPassNode()` — is cleared by the parent every frame to transparent
@@ -296,6 +299,51 @@ The output node is rebuilt only for a new `pipeline` or after
 cameras leave it standing. The internal target has the type and the samples of the
 renderer (`renderer.getOutputBufferType()`, `renderer.samples`), the values
 three.js' `PassNode` gives the pass targets of Mode D.
+
+#### Sharing the internal target: `StageRenderTargetPool`
+
+Several renderers of the same size in Mode C — children with a pipeline of
+their own under a composing root, say — each hold an internal target of their
+own. A `StageRenderTargetPool` set as `internalTargetPool` on each of them lets
+them share one. Without a pool nothing changes.
+
+A renderer borrows the target at the start of its Mode C draw and gives it back
+once its pipeline has run, in the same call — also when a stage or the pipeline
+throws. Siblings that draw one after another therefore draw through the same
+target, frame after frame; a child with a pipeline of its own under a Mode C
+renderer draws while its parent still holds the borrowed target, and gets a
+target of its own from the pool. The pass-target a composing parent samples
+through `asPassNode()` is never pooled: the parent samples the pass-targets of
+all its children in one run of its pipeline.
+
+The pool lends a target only for the exact width, height, `type` and `samples`
+it was built with, and releases every free target before it builds a new one.
+Renderers of different sizes on one pool build a new target on every switch
+between them — give each size a pool of its own. The pool belongs to whoever
+built it: `StageRenderer#dispose()` leaves it alone.
+
+```ts check
+import {Display, OrthographicProjection, RootRenderPipeline, Stage2D, StageRenderer, StageRenderTargetPool} from '@spearwolf/twopoint5d';
+import {RenderPipeline} from 'three/webgpu';
+
+const display = new Display(document.getElementById('canvas')!);
+const renderer = display.renderer!;
+
+const root = new StageRenderer(display);
+root.pipeline = new RootRenderPipeline(renderer);
+
+// the children have the size of the root and draw one after another: one internal target serves all of them
+const pool = new StageRenderTargetPool();
+
+for (const name of ['back', 'front']) {
+  const child = new StageRenderer(root).add(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+  child.name = name;
+  child.pipeline = new RenderPipeline(renderer);
+  child.internalTargetPool = pool;
+}
+
+// the pool is yours: dispose it once the renderers are done with it
+```
 
 ### Mode D — compose a TSL graph from per-stage pass nodes
 
@@ -514,16 +562,22 @@ What this layer does on top of the general rules in
   renderer (`getOutputBufferType()`, `samples`); a changed `samples` reaches
   them on the next frame, as the same target objects.
 - Leaving Mode C — `pipeline = undefined`, a `buildOutputNode`, a
-  `RootRenderPipeline` — releases the GPU memory of the internal pass-target,
+  `RootRenderPipeline` — releases the GPU memory of the internal target,
   and `remove(child)` releases that of the pass-target of a removed child
   `StageRenderer`. The target objects stay, so every `texture()` node on them
   stays valid; three.js allocates the memory again on the next draw.
-- `StageRenderer.dispose()` releases both internal RTs. It also detaches from its
-  host or from the parent `StageRenderer` that holds it, and drops its stages through
-  `remove()`, so a disposed renderer is no longer driven by any frame loop, and a nested
-  `StageRenderer` among its stages releases the GPU memory of its pass-target — the
-  child itself is not disposed. A `dispose` event goes out before the renderer stops
-  listening.
+- `StageRenderer.dispose()` releases the render targets it built for itself — a target
+  borrowed from an `internalTargetPool` is back in the pool by then, and the pool is not
+  disposed. It also detaches from its host or from the parent `StageRenderer` that holds
+  it, and drops its stages through `remove()`, so a disposed renderer is no longer driven
+  by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
+  of its pass-target — the child itself is not disposed. A `dispose` event goes out
+  before the renderer stops listening.
+- A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for one
+  draw at a time; while it is set the renderer builds no internal target of its own, and
+  assigning it releases the one it had. The pool belongs to the caller: `pool.dispose()`
+  releases every target that is back in the pool at once and every lent one as it comes
+  back; a disposed pool lends nothing — `acquire()` throws, and a `StageRenderer` refuses it.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
   write to `pipeline` falls through.

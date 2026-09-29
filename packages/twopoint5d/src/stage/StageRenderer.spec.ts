@@ -22,6 +22,7 @@ import {ParallaxProjection} from './ParallaxProjection.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
+import {StageRenderTargetPool} from './StageRenderTargetPool.js';
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
 
 interface RendererMock {
@@ -1018,7 +1019,7 @@ describe('StageRenderer', () => {
     });
   });
 
-  describe('Mode C: a pipeline that samples the internal pass-target', () => {
+  describe('Mode C: a pipeline that samples the internal target', () => {
     function makePipelineMock() {
       return {
         outputNode: undefined as unknown,
@@ -1427,6 +1428,248 @@ describe('StageRenderer', () => {
       sr.invalidateOutputNode();
       sr.renderTo(renderer as any);
       expect(sr.pipeline!.needsUpdate).toBe(true);
+    });
+  });
+
+  describe('Mode C with an internalTargetPool', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    function makePipelineMock() {
+      return {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+    }
+
+    // a stage that notes every target it is drawn into
+    function capturingStage(name: string) {
+      const stage = fakeStage(name);
+      const targets: unknown[] = [];
+      stage.renderTo.mockImplementation(() => targets.push(renderer.__renderTarget));
+      return {stage, targets};
+    }
+
+    function makeModeC(pool?: StageRenderTargetPool) {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      const {stage, targets} = capturingStage('s');
+      sr.add(stage);
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      if (pool) sr.internalTargetPool = pool;
+      return {sr, stage, targets, pipeline};
+    }
+
+    it('borrows its internal target from the pool for the draw and gives it back once the pipeline has run', () => {
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+      const release = sandbox.spy(pool, 'release');
+      const {sr, targets, pipeline} = makeModeC(pool);
+      let releasedWhilePipelineRuns = -1;
+      pipeline.render.mockImplementation(() => {
+        releasedWhilePipelineRuns = release.callCount;
+      });
+
+      sr.renderTo(renderer as any);
+
+      expect(acquire.callCount).toBe(1);
+      const rt = acquire.firstCall.returnValue;
+      expect(targets, 'the stage draws into the borrowed target').toEqual([rt]);
+      expect(releasedWhilePipelineRuns, 'not given back while the pipeline runs').toBe(0);
+      expect(release.calledOnceWithExactly(rt)).toBe(true);
+    });
+
+    it('asks the pool for the size in device pixels and the type and the samples of the renderer', () => {
+      renderer.getPixelRatio.mockReturnValue(2);
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+      const {sr} = makeModeC(pool);
+      sr.resize(200, 100);
+
+      sr.renderTo(renderer as any);
+
+      expect(acquire.calledOnceWithExactly(400, 200, FloatType, 4)).toBe(true);
+    });
+
+    it('lets two renderers of the same size that draw one after another draw through one target, frame after frame', () => {
+      const pool = new StageRenderTargetPool();
+      const a = makeModeC(pool);
+      const b = makeModeC(pool);
+
+      a.sr.renderTo(renderer as any);
+      b.sr.renderTo(renderer as any);
+      a.pipeline.needsUpdate = false;
+      b.pipeline.needsUpdate = false;
+      a.sr.renderTo(renderer as any);
+      b.sr.renderTo(renderer as any);
+
+      const rt = a.targets[0];
+      expect((rt as any)?.isRenderTarget).toBe(true);
+      expect(a.targets, 'a in both frames').toEqual([rt, rt]);
+      expect(b.targets, 'b in both frames').toEqual([rt, rt]);
+      expect(a.pipeline.needsUpdate, 'the Mode C node of a stays').toBe(false);
+      expect(b.pipeline.needsUpdate, 'the Mode C node of b stays').toBe(false);
+    });
+
+    it('gives a nested Mode C renderer under a Mode C parent on the same pool a target of its own', () => {
+      const pool = new StageRenderTargetPool();
+      const parent = makeModeC(pool);
+      const child = makeModeC(pool);
+      parent.sr.add(child.sr);
+
+      parent.sr.renderTo(renderer as any);
+      parent.sr.renderTo(renderer as any);
+
+      const [parentRT] = parent.targets;
+      const [childRT] = child.targets;
+      expect((childRT as any)?.isRenderTarget).toBe(true);
+      expect(childRT, 'the child draws while the parent holds its target').not.toBe(parentRT);
+      expect(parent.targets, 'the parent in both frames').toEqual([parentRT, parentRT]);
+      expect(child.targets, 'the child in both frames').toEqual([childRT, childRT]);
+    });
+
+    it('gives the target back when a stage throws', () => {
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+      const release = sandbox.spy(pool, 'release');
+      const {sr, stage} = makeModeC(pool);
+      const failure = new Error('the stage failed');
+      stage.renderTo.mockImplementation(() => {
+        throw failure;
+      });
+
+      expect(thrownBy(() => sr.renderTo(renderer as any))).toBe(failure);
+
+      const rt = acquire.firstCall.returnValue;
+      expect(release.calledOnceWithExactly(rt)).toBe(true);
+      expect(pool.acquire(50, 50, FloatType, 4), 'lent to the next borrower').toBe(rt);
+    });
+
+    it('releases its own internal target when a pool is assigned, and builds a new one when the pool is cleared', () => {
+      const {sr, targets} = makeModeC();
+      sr.renderTo(renderer as any);
+      const own = targets[0];
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+
+      sr.internalTargetPool = pool;
+
+      expect(rtDispose.callCount).toBe(1);
+      expect(rtDispose.firstCall.thisValue).toBe(own);
+
+      sr.renderTo(renderer as any);
+      const pooled = acquire.firstCall.returnValue;
+      expect(targets.at(-1), 'the frame with a pool').toBe(pooled);
+
+      sr.internalTargetPool = undefined;
+      sr.renderTo(renderer as any);
+      expect((targets.at(-1) as any)?.isRenderTarget).toBe(true);
+      expect(targets.at(-1), 'not the old own target').not.toBe(own);
+      expect(targets.at(-1), 'not the pooled target').not.toBe(pooled);
+    });
+
+    it('releases the own target it draws into once the draw ends when a pool is assigned during the draw', () => {
+      const {sr, stage, targets} = makeModeC();
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+      let releasedDuringDraw = -1;
+      stage.renderTo.mockImplementation(() => {
+        targets.push(renderer.__renderTarget);
+        sr.internalTargetPool = pool;
+        releasedDuringDraw = rtDispose.callCount;
+      });
+
+      sr.renderTo(renderer as any);
+
+      const own = targets[0];
+      expect(releasedDuringDraw, 'nothing released while the stage draws').toBe(0);
+      expect(rtDispose.callCount, 'released once the draw ends').toBe(1);
+      expect(rtDispose.firstCall.thisValue).toBe(own);
+      expect(acquire.called, 'the pool counts from the next draw on').toBe(false);
+
+      sr.renderTo(renderer as any);
+      expect(targets.at(-1)).toBe(acquire.firstCall.returnValue);
+    });
+
+    it('uses the pool in Mode C only', () => {
+      const pool = new StageRenderTargetPool();
+      const acquire = sandbox.spy(pool, 'acquire');
+
+      const plain = new StageRenderer();
+      plain.resize(50, 50);
+      plain.add(fakeStage('s'));
+      plain.internalTargetPool = pool;
+      plain.renderTo(renderer as any);
+      expect(acquire.called, 'plain mode').toBe(false);
+
+      const passNode = {isNode: true, label: 's', type: 'pass'};
+      const composed = new StageRenderer();
+      composed.resize(50, 50);
+      composed.add({...fakeStage('s'), asPassNode: vi.fn(() => passNode)} as any);
+      composed.pipeline = makePipelineMock() as any;
+      composed.buildOutputNode = (passes) => passes[0]!;
+      composed.internalTargetPool = pool;
+      composed.renderTo(renderer as any);
+      expect(acquire.called, 'composed mode').toBe(false);
+
+      // a child in Mode C under a composing parent: its internal target is borrowed, the
+      // pass-target the parent samples is its own
+      const child = makeModeC(pool);
+      const parent = new StageRenderer();
+      parent.resize(50, 50);
+      parent.add(child.sr);
+      parent.pipeline = makePipelineMock() as any;
+      parent.buildOutputNode = (passes) => passes[0]!;
+      parent.internalTargetPool = pool;
+      parent.renderTo(renderer as any);
+
+      const passTarget = (child.sr.asPassNode(renderer as any) as any).value.renderTarget;
+      expect(acquire.callCount, 'the internal target of the child alone').toBe(1);
+      expect(acquire.firstCall.returnValue).toBe(child.targets[0]);
+      expect(passTarget, 'the pass-target').not.toBe(acquire.firstCall.returnValue);
+    });
+
+    it('refuses a disposed pool with an error naming the call and the state, and keeps the pool it had', () => {
+      const pool = new StageRenderTargetPool();
+      const {sr} = makeModeC(pool);
+      const disposed = new StageRenderTargetPool();
+      disposed.dispose();
+
+      expect(() => (sr.internalTargetPool = disposed)).toThrow(
+        'StageRenderer#internalTargetPool cannot take the pool: that pool has been disposed',
+      );
+      expect(sr.internalTargetPool).toBe(pool);
+    });
+
+    it('throws the error of acquire() on the next Mode C frame when its pool has been disposed', () => {
+      const pool = new StageRenderTargetPool();
+      const {sr} = makeModeC(pool);
+      sr.renderTo(renderer as any);
+
+      pool.dispose();
+
+      expect(() => sr.renderTo(renderer as any)).toThrow(
+        'StageRenderTargetPool#acquire() is not available: this pool has been disposed',
+      );
+    });
+
+    it('dispose() leaves the pool alone, and afterwards internalTargetPool answers undefined and takes no new pool', () => {
+      const pool = new StageRenderTargetPool();
+      const poolDispose = sandbox.spy(pool, 'dispose');
+      const {sr} = makeModeC(pool);
+      sr.renderTo(renderer as any);
+
+      sr.dispose();
+
+      expect(poolDispose.called).toBe(false);
+      expect(pool.isDisposed).toBe(false);
+      expect(sr.internalTargetPool).toBeUndefined();
+
+      expect(() => (sr.internalTargetPool = new StageRenderTargetPool())).not.toThrow();
+      expect(sr.internalTargetPool, 'after a write').toBeUndefined();
     });
   });
 
@@ -2003,7 +2246,7 @@ describe('StageRenderer', () => {
       sr.add(fakeStage('s'));
       sr.pipeline = makePipelineMock() as any;
 
-      // the pipeline path drives the internal pass-target into existence, asPassNode() the second one
+      // the pipeline path drives the internal target into existence, asPassNode() the second one
       sr.renderTo(renderer as any);
       sr.asPassNode(renderer as any);
 
@@ -2232,8 +2475,10 @@ describe('StageRenderer', () => {
 
     // (e) has no subject here: this renderer creates neither signals nor effects.
 
-    // (f) has no subject here: this renderer takes no slot from a pool and no tile from a
-    // factory. The stages arrive through add() and stay the caller's; the render targets are
-    // its own, and case (a) covers them.
+    // (f) has no subject here: a target borrowed from an internalTargetPool goes back before
+    // renderTo() returns, so dispose() finds none to give back — 'Mode C with an
+    // internalTargetPool' covers the return. The renderer takes no tile from a factory. The
+    // stages arrive through add() and stay the caller's; the render targets it builds are its
+    // own, and case (a) covers them.
   });
 });

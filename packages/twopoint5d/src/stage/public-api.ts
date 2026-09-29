@@ -12,3 +12,4 @@ export * from './ProjectionPlane.js';
 export * from './RootRenderPipeline.js';
 export * from './Stage2D.js';
 export * from './StageRenderer.js';
+export * from './StageRenderTargetPool.js';

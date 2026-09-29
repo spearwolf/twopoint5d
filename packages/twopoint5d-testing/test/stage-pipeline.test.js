@@ -6,6 +6,7 @@ import {
   RootRenderPipeline,
   Stage2D,
   StageRenderer,
+  StageRenderTargetPool,
 } from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
 import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';
@@ -370,8 +371,9 @@ describe('StageRenderer — pipeline integration', () => {
    *
    * @param {(renderer: import('three/webgpu').WebGPURenderer) => RenderPipeline} makeRootPipeline
    * @param {boolean} childComposes whether the child composes its pass through `buildOutputNode`
+   * @param {StageRenderTargetPool} [pool] set as `internalTargetPool` on the child and the root
    */
-  async function grayThroughNestedPipeline(makeRootPipeline, childComposes) {
+  async function grayThroughNestedPipeline(makeRootPipeline, childComposes, pool) {
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();
@@ -393,12 +395,17 @@ describe('StageRenderer — pipeline integration', () => {
     root.pipeline = rootPipeline;
     root.outputRenderTarget = target;
     root.resize(64, 64);
+    if (pool) {
+      child.internalTargetPool = pool;
+      root.internalTargetPool = pool;
+    }
 
     root.renderTo(renderer);
     const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
 
     root.dispose();
     child.dispose();
+    pool?.dispose();
     stage.dispose();
     rootPipeline.dispose();
     childPipeline.dispose();
@@ -417,6 +424,98 @@ describe('StageRenderer — pipeline integration', () => {
   it('Mode C: a nested pipeline under a pipeline-only root applies the output transform once', async () => {
     const rgb = await grayThroughNestedPipeline((renderer) => new RenderPipeline(renderer), false);
     expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
+  });
+
+  it('Mode C: a nested pipeline under a pipeline-only root, both on one StageRenderTargetPool, applies the output transform once', async () => {
+    const rgb = await grayThroughNestedPipeline((renderer) => new RenderPipeline(renderer), false, new StageRenderTargetPool());
+    expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
+  });
+
+  it('Mode C: two renderers of the same size on one StageRenderTargetPool draw through one internal target, each only its own stages', async () => {
+    host = makeContainer({width: 64, height: 64});
+    display = new Display(host);
+    await display.start();
+    const renderer = display.renderer;
+
+    const geometry = new PlaneGeometry(16, 16);
+    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const pool = new StageRenderTargetPool();
+
+    /**
+     * A renderer with a pipeline of its own and a green square at `x`, and the targets its stages
+     * were drawn into.
+     *
+     * @param {number} x
+     */
+    const makeRenderer = (x) => {
+      const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+      const mesh = new Mesh(geometry, material);
+      mesh.position.x = x;
+      stage.scene.add(mesh);
+
+      /** @type {unknown[]} */
+      const seen = [];
+      const capture = {
+        name: 'capture',
+        resize() {},
+        updateFrame() {},
+        /** @param {import('three/webgpu').WebGPURenderer} r */
+        renderTo(r) {
+          seen.push(r.getRenderTarget());
+        },
+      };
+
+      const target = new RenderTarget(64, 64);
+      const pipeline = new RenderPipeline(renderer);
+      const sr = new StageRenderer().add(stage).add(capture);
+      sr.pipeline = pipeline;
+      sr.outputRenderTarget = target;
+      sr.internalTargetPool = pool;
+      sr.resize(64, 64);
+      return {sr, stage, pipeline, target, seen};
+    };
+
+    const a = makeRenderer(-16);
+    const b = makeRenderer(16);
+
+    // two frames by hand, the renderers one after another
+    a.sr.renderTo(renderer);
+    b.sr.renderTo(renderer);
+    a.sr.renderTo(renderer);
+    b.sr.renderTo(renderer);
+
+    const pixelsA = await renderer.readRenderTargetPixelsAsync(a.target, 0, 0, 64, 64);
+    const pixelsB = await renderer.readRenderTargetPixelsAsync(b.target, 0, 0, 64, 64);
+
+    const internalRT = a.seen[0];
+    expect(internalRT, 'the stages draw into an internal target').to.exist;
+    expect(a.seen, 'a draws once per frame').to.have.length(2);
+    expect(b.seen, 'b draws once per frame').to.have.length(2);
+    // by identity: a deep comparison would take two targets of the same size for one
+    for (const [who, seen] of /** @type {const} */ ([
+      ['a', a.seen],
+      ['b', b.seen],
+    ])) {
+      seen.forEach((rt, frame) => expect(rt === internalRT, `${who} in frame ${frame + 1}`).to.be.true);
+    }
+
+    // pure green and black, so the color transform of the pipeline does not shift the result
+    expect(isNearColor(rgbAt(pixelsA, 64, 16, 32), [0, 255, 0]), 'the square of a in a').to.be.true;
+    expect(isNearColor(rgbAt(pixelsA, 64, 48, 32), [0, 0, 0]), 'nothing of b in a').to.be.true;
+    expect(isNearColor(rgbAt(pixelsB, 64, 16, 32), [0, 0, 0]), 'nothing of a in b').to.be.true;
+    expect(isNearColor(rgbAt(pixelsB, 64, 48, 32), [0, 255, 0]), 'the square of b in b').to.be.true;
+
+    // the renderers let go first, then the pool and what else belongs to this test
+    a.sr.dispose();
+    b.sr.dispose();
+    pool.dispose();
+    for (const {stage, pipeline, target} of [a, b]) {
+      stage.dispose();
+      pipeline.dispose();
+      target.dispose();
+    }
+    geometry.dispose();
+    material.dispose();
   });
 
   it('Mode C without clear leaves no tint of the renderer clear color in its internal target', async () => {

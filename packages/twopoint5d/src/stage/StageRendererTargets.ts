@@ -1,25 +1,81 @@
-// The two render targets a `StageRenderer` builds for itself — the internal target of Mode C and
-// the pass target a composing parent draws it into — and the pixel ratio that sizes both. This
-// module is not in `public-api.ts`: only `StageRenderer` reaches it.
+// The two render targets of a `StageRenderer` — the internal target of Mode C and the pass target
+// a composing parent draws it into — and the pixel ratio that sizes both. The internal target is
+// either built here or, with a pool set, borrowed from that pool for the length of one draw; what
+// this module releases is only what it built itself. This module is not in `public-api.ts`: only
+// `StageRenderer` reaches it.
 
 import {RenderTarget, type WebGPURenderer} from 'three/webgpu';
+import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 
 export class StageRendererTargets {
   /**
    * Pixel ratio of the renderer that last built or measured a `RenderTarget` here. `resize()`
-   * has no renderer to ask; it sizes the targets from this value, and the next internalTarget()
+   * has no renderer to ask; it sizes the targets from this value, and the next acquireInternalTarget()
    * or passTarget() corrects them if the renderer has moved to a different ratio in the meantime.
    */
   #pixelRatio = 1;
 
-  /** Internal RT used in Mode C (a pipeline without buildOutputNode that is not a RootRenderPipeline). */
+  /**
+   * Internal RT used in Mode C (a pipeline without buildOutputNode that is not a
+   * RootRenderPipeline), built here. Without a pool only; with one, Mode C borrows its target.
+   */
   #internal?: RenderTarget;
   /** Internal RT used when a parent calls `asPassNode()` on the renderer. */
   #pass?: RenderTarget;
 
-  /** Answers the internal target of Mode C, built or brought to the size `width`×`height` asks for. */
-  internalTarget(renderer: WebGPURenderer, width: number, height: number): RenderTarget {
-    return (this.#internal = this.#ensure(this.#internal, renderer, width, height));
+  /** The pool the internal target of Mode C is borrowed from; `undefined` for a target of its own. */
+  #pool?: StageRenderTargetPool;
+  /** The target of the Mode C draw that is running — the own one or a borrowed one — until it is returned. */
+  #lent?: RenderTarget;
+  /** The pool `#lent` came from; `undefined` while `#lent` is the own target. */
+  #lentFrom?: StageRenderTargetPool;
+
+  get pool(): StageRenderTargetPool | undefined {
+    return this.#pool;
+  }
+
+  /** Stores the pool; with a pool, the internal target built here is released — Mode C borrows from then on. */
+  set pool(pool: StageRenderTargetPool | undefined) {
+    this.#pool = pool;
+    if (pool) this.#dropOwnInternalTarget();
+  }
+
+  /**
+   * Answers the internal target for one Mode C draw: borrowed from the pool if one is set, sized in
+   * device pixels, otherwise the own one, built or brought to the size `width`×`height` asks for.
+   * Every call is paired with one {@link returnInternalTarget} once the draw is over.
+   */
+  acquireInternalTarget(renderer: WebGPURenderer, width: number, height: number): RenderTarget {
+    const pool = this.#pool;
+    let rt: RenderTarget;
+    if (pool) {
+      this.#pixelRatio = renderer.getPixelRatio?.() ?? 1;
+      rt = pool.acquire(this.#deviceSize(width), this.#deviceSize(height), renderer.getOutputBufferType(), renderer.samples);
+    } else {
+      rt = this.#internal = this.#ensure(this.#internal, renderer, width, height);
+    }
+    this.#lent = rt;
+    this.#lentFrom = pool;
+    return rt;
+  }
+
+  /**
+   * Ends the Mode C draw {@link acquireInternalTarget} began: a borrowed target goes back to the
+   * pool it came from, even if another pool or none is set by now; an own target that was taken
+   * away during the draw is released now that nothing draws into it any more.
+   */
+  returnInternalTarget(): void {
+    const rt = this.#lent;
+    const lentFrom = this.#lentFrom;
+    // cleared first: a release() that throws leaves no draw behind that seems to be running
+    this.#lent = undefined;
+    this.#lentFrom = undefined;
+    if (!rt) return;
+    if (lentFrom) {
+      lentFrom.release(rt);
+    } else if (rt !== this.#internal) {
+      rt.dispose();
+    }
   }
 
   /** Answers the pass target a composing parent draws into, built or brought to the size `width`×`height` asks for. */
@@ -53,12 +109,26 @@ export class StageRendererTargets {
     if (this.#pass) this.#resize(this.#pass, width, height);
   }
 
-  /** Disposes the internal target, then the pass target, and forgets both; the next call builds new ones. */
+  /**
+   * Disposes the own internal target, then the pass target, forgets both and lets go of the pool,
+   * which stays the caller's and is not disposed; the next call builds new targets.
+   */
   dispose(): void {
-    this.#internal?.dispose();
-    this.#internal = undefined;
+    this.#dropOwnInternalTarget();
     this.#pass?.dispose();
     this.#pass = undefined;
+    this.#pool = undefined;
+  }
+
+  /**
+   * Forgets the own internal target and releases it — unless a draw is running in it: released in
+   * the middle of that draw, three.js would allocate it again on the next draw into it, and nobody
+   * would release that. {@link returnInternalTarget} releases it once the draw is over.
+   */
+  #dropOwnInternalTarget(): void {
+    const own = this.#internal;
+    this.#internal = undefined;
+    if (own && own !== this.#lent) own.dispose();
   }
 
   /** Width or height a `RenderTarget` has to have, in device pixels, for the logical `size`. */

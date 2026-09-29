@@ -29,6 +29,7 @@ import type {IStageRendererHost} from './IStageRendererHost.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import type {Stage2D} from './Stage2D.js';
 import {StageRendererTargets} from './StageRendererTargets.js';
+import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 import {StageRenderOrder} from './StageRenderOrder.js';
 
 export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
@@ -92,7 +93,7 @@ export interface StageRenderer extends EventizedObject {}
  * target, and frames accumulate unless something else clears it.
  *
  * With a {@link pipeline} that is not a `RootRenderPipeline` and without
- * {@link buildOutputNode} (Mode C), the stages draw into an internal pass-target that the renderer clears to transparent
+ * {@link buildOutputNode} (Mode C), the stages draw into an internal target that the renderer clears to transparent
  * black (color and depth) every frame, whatever `clear` says; the own
  * `clear` then applies on top, and one that covers color and depth replaces
  * the black clear.
@@ -446,7 +447,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Optional `THREE.RenderPipeline` running between the stages and the
    * output. For a pipeline that is not a `RootRenderPipeline`, without
    * `buildOutputNode` (Mode C), the stages render into an internal
-   * pass-target whose texture is sampled by the pipeline. With
+   * target whose texture is sampled by the pipeline. With
    * `buildOutputNode`, or as a `RootRenderPipeline`, the pipeline runs a TSL
    * graph composed from each stage's pass node — the user-defined one of
    * `buildOutputNode`, or the additive composition of the
@@ -460,8 +461,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * In Mode C, the output node is rebuilt only for a new pipeline or after
    * {@link invalidateOutputNode}; stages, their order and names, their scenes
    * and their cameras leave it standing. A write that leaves this mode
-   * releases the GPU memory of the internal pass-target; returning to it
-   * allocates that memory again on the next frame.
+   * releases the GPU memory of the internal target this renderer built for
+   * itself; returning to it allocates that memory again on the next frame. A
+   * target borrowed from {@link internalTargetPool} is back in the pool after
+   * every draw already.
    */
   get pipeline(): RenderPipeline | undefined {
     return this.#pipeline;
@@ -515,7 +518,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * the renderer composes either way. While this renderer's `width`
    * or `height` is 0, or while a `Stage2D` it composes has no camera, the
    * composed mode draws nothing. Assigning it to a renderer whose pipeline
-   * samples the internal pass-target releases the GPU memory of that target;
+   * samples the internal target releases the GPU memory of that target;
    * clearing it again allocates that memory again on the next frame.
    *
    * A disposed renderer answers `undefined` here and takes no new one: like
@@ -532,6 +535,43 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#buildOutputNode = buildOutputNode;
       this.#modeInputChanged(previousMode);
     }
+  }
+
+  /**
+   * Optional pool the internal target of Mode C — a {@link pipeline} without
+   * {@link buildOutputNode} that is not a `RootRenderPipeline` — is borrowed
+   * from. Renderers of the same size on the same pool that draw one after
+   * another draw through one target, see `StageRenderTargetPool`; without a
+   * pool the renderer builds its internal target itself.
+   *
+   * The target is borrowed at the start of the Mode C draw and given back once
+   * the pipeline has run, in the same call, also when a stage or the pipeline
+   * throws — no pooled target is held between frames. In the plain mode and
+   * the composing modes the pool is not used, and the pass-target a composing
+   * parent samples through {@link asPassNode} never comes from it.
+   *
+   * Assigning a pool releases the internal target this renderer built for
+   * itself; clearing it again builds a new one on the next Mode C frame. A
+   * pool assigned during a Mode C draw of this renderer counts from the next
+   * draw on.
+   *
+   * The pool is handed in and stays the caller's: {@link dispose} leaves it
+   * alone. A disposed pool is refused with an error naming the call and the
+   * state; a pool disposed while it is set makes the next Mode C frame throw
+   * the error of its `acquire()`. A disposed renderer answers `undefined` here
+   * and takes no new pool: like `pipeline`, the write is a silent no-op.
+   */
+  get internalTargetPool(): StageRenderTargetPool | undefined {
+    return this.#targets.pool;
+  }
+
+  set internalTargetPool(pool: StageRenderTargetPool | undefined) {
+    if (this.#disposed) return;
+    if (this.#targets.pool === pool) return;
+    if (pool?.isDisposed) {
+      throw new Error('StageRenderer#internalTargetPool cannot take the pool: that pool has been disposed');
+    }
+    this.#targets.pool = pool;
   }
 
   /**
@@ -699,20 +739,27 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Mode C: render stages into the internal pass-target, then run
-   * the pipeline sampling that target as `texture()`. The internal RT is
-   * cleared in full to transparent black every frame before the user's
-   * `clear` applies; the stages draw into it with linear output. The user's
-   * `clear` additionally clears the final output target before the pipeline
-   * writes, and the pipeline applies the output transform of the caller.
+   * Mode C: borrow the internal target — from {@link internalTargetPool} if
+   * set, otherwise the renderer's own —, render the stages into it, run the
+   * pipeline sampling that target as `texture()`, and give it back, also when
+   * a stage or the pipeline throws. The internal target is cleared in full to
+   * transparent black every frame before the user's `clear` applies; the
+   * stages draw into it with linear output. The user's `clear` additionally
+   * clears the final output target before the pipeline writes, and the
+   * pipeline applies the output transform of the caller.
    */
   #renderPipelineSimple(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     const pipeline = this.#pipeline!;
-    const rt = this.#targets.internalTarget(renderer, this.width, this.height);
-    this.#drawIntoInternalTarget(renderer, rt, stages);
-    this.#wireInternalOutputNode(pipeline, rt);
-    if (this.clear) this.#applyClear(renderer);
-    pipeline.render();
+    // borrowed before the try: an acquire() that throws has lent nothing
+    const rt = this.#targets.acquireInternalTarget(renderer, this.width, this.height);
+    try {
+      this.#drawIntoInternalTarget(renderer, rt, stages);
+      this.#wireInternalOutputNode(pipeline, rt);
+      if (this.clear) this.#applyClear(renderer);
+      pipeline.render();
+    } finally {
+      this.#targets.returnInternalTarget();
+    }
   }
 
   /**
@@ -749,7 +796,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * The internal RT belongs to nobody else who would clear it. It is cleared in full to
+   * Nobody else clears the internal target — neither the renderer's own nor one borrowed from a
+   * pool, which still holds what its previous borrower drew. It is cleared in full to
    * transparent black every frame, color and depth, so that neither the clear color of the
    * renderer nor a rest of the previous frame stays in it; the own `clear` then applies as it
    * does for a nested child, and an own clear that covers color and depth replaces the black one.
@@ -896,15 +944,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * the GPU memory of its pass-target as well; the child itself is not disposed, and three.js
    * allocates that memory again on its next draw into the target.
    *
-   * A {@link pipeline}, an {@link outputRenderTarget} and every stage were handed in and
-   * belong to the caller: none of them is disposed here. Dispose them where they were built.
+   * A {@link pipeline}, an {@link outputRenderTarget}, an {@link internalTargetPool} and every
+   * stage were handed in and belong to the caller: none of them is disposed here. Dispose them
+   * where they were built.
    *
-   * Afterwards `isDisposed` is `true`, `parent`, `pipeline` and `buildOutputNode` answer
-   * `undefined`, `stages` and `orderedStages` are empty, and no host event reaches this
-   * renderer any more — `updateFrame()` and `renderTo()` have no stage left to drive, and a
-   * parent `StageRenderer` that held this renderer has it no longer among its stages. A write
-   * to `parent`, `attach()`, `detach()`, `add()`, `remove()` and a further `dispose()` do
-   * nothing.
+   * Afterwards `isDisposed` is `true`, `parent`, `pipeline`, `buildOutputNode` and
+   * `internalTargetPool` answer `undefined`, `stages` and `orderedStages` are empty, and no
+   * host event reaches this renderer any more — `updateFrame()` and `renderTo()` have no stage
+   * left to drive, and a parent `StageRenderer` that held this renderer has it no longer among
+   * its stages. A write to `parent`, `attach()`, `detach()`, `add()`, `remove()` and a further
+   * `dispose()` do nothing.
    *
    * A `dispose` event goes out to every subscriber before this renderer stops listening; no
    * event follows it. A listener of the event that throws does not hold up the teardown: every
@@ -921,8 +970,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * and `renderOrder` keep the values the renderer was left with.
    *
    * No `RenderTarget` is built after this call: `renderTo()` and `updateFrame()` do nothing,
-   * `asPassNode()` throws an error naming the class and the state, and a write to `pipeline`
-   * or `buildOutputNode` falls through.
+   * `asPassNode()` throws an error naming the class and the state, and a write to `pipeline`,
+   * `buildOutputNode` or `internalTargetPool` falls through.
    */
   dispose(): void {
     if (this.#disposed) return;
