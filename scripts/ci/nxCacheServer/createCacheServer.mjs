@@ -31,7 +31,7 @@ export function createCacheServer({dir, token}) {
     if (req.method !== 'GET' && req.method !== 'PUT') return reply(req, res, 405);
     if (req.headers.authorization !== expectedAuthorization) return reply(req, res, req.method === 'GET' ? 403 : 401);
 
-    const hash = match[1];
+    const hash = /** @type {string} */ (match[1]);
     // Nx hashes are digit strings; anything else could name a path outside dir
     if (!/^[A-Za-z0-9]+$/.test(hash)) return reply(req, res, 400);
 
@@ -44,7 +44,7 @@ export function createCacheServer({dir, token}) {
     try {
       stat = await fs.promises.stat(file);
     } catch (err) {
-      if (err.code === 'ENOENT') return reply(req, res, 404);
+      if (/** @type {NodeJS.ErrnoException} */ (err).code === 'ENOENT') return reply(req, res, 404);
       throw err;
     }
     // the workflow drops every entry whose mtime is older than the server start before it saves the cache
@@ -86,7 +86,7 @@ async function publish(partial, file) {
     await fs.promises.link(partial, file);
     return 200;
   } catch (err) {
-    if (err.code === 'EEXIST') return 409;
+    if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EEXIST') return 409;
     throw err;
   }
 }

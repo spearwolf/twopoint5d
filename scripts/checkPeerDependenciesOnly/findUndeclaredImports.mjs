@@ -14,8 +14,9 @@ export function packageNameOf(specifier) {
  * Lists every import of a package that is not one of the `peerDependencies`, as
  * `{file, specifier}` in the order of `files`; within a file the imports come before the
  * type references, each in source order. `files` is an array of `{file, text}`,
- * `peerDependencies` an object (may be `undefined`). Relative specifiers and subpath imports of the package itself (`#internal`, from
- * the `imports` map of its manifest) never count.
+ * `peerDependencies` an object (may be `undefined`). Relative specifiers and subpath
+ * imports of the package itself (`#internal`, from the `imports` map of its manifest)
+ * never count.
  * A `/// <reference types="x" />` counts unless `x` or `@types/x` is a peer. Comments
  * never count: the compiler's pre-processor skips them, which a regular expression
  * would not — the emitted `.js` files carry TSDoc examples with `import … from '…'`.

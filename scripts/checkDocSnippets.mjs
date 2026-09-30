@@ -49,7 +49,7 @@ try {
 
   diagnostics = compileSnippets({snippets, anchorDir, tsconfigPath});
 } catch (err) {
-  console.error(`checkDocSnippets: ${err.message}`);
+  console.error(`checkDocSnippets: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(2);
 }
 

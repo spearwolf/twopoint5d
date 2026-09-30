@@ -935,7 +935,7 @@ export class TextureResource {
         // No closing .catch() here either: once the try below is over, nothing throws any more —
         // the #fail() of a fetch without a result and the `error` of a throw while publishing both
         // go out with emitSafe()
-        (async () => {
+        void (async () => {
           // the try holds the fetch and nothing else: writing the json publishes whatever it
           // brings — with its image already there, the atlas within this very call — and a
           // subscriber that throws there is no failure of the fetch

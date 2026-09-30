@@ -40,7 +40,7 @@ if (entryFile == null) {
 
 const deref = (sym) => (sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym);
 
-const exported = checker.getExportsOfModule(checker.getSymbolAtLocation(entryFile));
+const exported = checker.getExportsOfModule(/** @type {ts.Symbol} */ (checker.getSymbolAtLocation(entryFile)));
 const nameable = new Set(exported.map(deref));
 
 const isLib = (fileName) => fileName.includes('node_modules') || /lib\.[\w.]*d\.ts$/.test(fileName);

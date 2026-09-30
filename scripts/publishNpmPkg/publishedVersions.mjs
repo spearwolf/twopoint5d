@@ -1,9 +1,13 @@
 /**
- * `npm show . versions --json`, asked in the package directory, answers with a list, or with a bare string when
- * exactly one version is published. Either way this returns the list.
+ * `npm show . versions --json`, asked in the package directory, answers with a list, or
+ * with a bare string when exactly one version is published. Either way this returns the
+ * list.
+ *
+ * @param {string} stdout
+ * @returns {string[]}
  */
 export function parsePublishedVersions(stdout) {
-  return [].concat(JSON.parse(stdout));
+  return /** @type {string[]} */ ([]).concat(JSON.parse(stdout));
 }
 
 /**

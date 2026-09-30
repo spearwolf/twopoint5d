@@ -1,11 +1,15 @@
-export const readOption = <OptionsType extends object, ValueType>(
-  options: OptionsType | null | undefined,
-  propName: keyof OptionsType,
-  defValue: ValueType,
-): ValueType => {
+/**
+ * Reads one option, in the type the options declare for it. An option that is missing,
+ * `undefined` or `null` answers the default.
+ */
+export const readOption = <O extends object, K extends keyof O>(
+  options: O | null | undefined,
+  propName: K,
+  defValue: NonNullable<O[K]>,
+): NonNullable<O[K]> => {
   if (options != null && propName in options) {
     const val = options[propName];
-    if (val !== undefined) return val as unknown as ValueType;
+    if (val != null) return val;
   }
   return defValue;
 };

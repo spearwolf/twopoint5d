@@ -19,6 +19,10 @@ describe('makePackageJson.mjs', () => {
 
   // runs the script in a throwaway project directory; it reads the workspace root from its own
   // path and the project from the working directory, and writes only to `<dir>/dist/`
+  /**
+   * @param {Record<string, string> | undefined} peerDependencies
+   * @param {{dist?: boolean, packageJsonText?: string}} [options]
+   */
   function run(peerDependencies, {dist = true, packageJsonText} = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'makePackageJson-script-'));
     dirs.push(dir);

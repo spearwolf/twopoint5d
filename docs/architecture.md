@@ -14,6 +14,7 @@ pnpm workspaces (`pnpm-workspace.yaml`) define the packages, Nx (`nx.json` plus 
 | `twopoint5d` | `packages/twopoint5d` | `ci`, `twopoint5d` | the published library |
 | `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser/WebGL integration tests |
 | `lookbook` | `apps/lookbook` | `app` | Astro showcase |
+| `scripts` | `scripts` | `scripts` | the Node scripts; as a project only their type check |
 
 `twopoint5d-testing` and `lookbook` both depend on the library through `workspace:*`, so
 `dependsOn: ["^build"]` makes any test or dev-server run compile the library first.
@@ -34,7 +35,9 @@ at least one tag.
   a package outside that list adds it there; otherwise a bump of that package leaves an
   old result standing in the cache. `test` measures no coverage, so a run over a single
   spec is not held to thresholds meant for the whole suite.
-- `typecheck` — cached, runs the project's own `typecheck` script.
+- `typecheck` — cached, runs the project's own `typecheck` script. `scripts` has no
+  manifest: its `project.json` calls `tsc` through `nx:run-commands` and names its
+  inputs itself.
 - `checkPkgTypes`, `checkNameableTypes`, `lintPkg`, `publishNpmPkg` — all depend on
   `build` and are deliberately uncached, since they inspect build output.
 
@@ -86,11 +89,18 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   `.js` and `.astro` files. The `.ts` rules (`consistent-type-imports`, the ban on a
   `.ts` suffix in a relative import) apply to `.astro` files as well: to the frontmatter
   directly, and to every `<script>` block, because `eslint-plugin-astro` hands each
-  block to ESLint as a virtual `.ts` file.
+  block to ESLint as a virtual `.ts` file. `no-floating-promises` and
+  `no-misused-promises` hold `packages/*/src`, specs included, and read the types of the
+  expressions through the project service; `no-explicit-any` holds the published library
+  code, not the specs, benches and `src/testing/`. `no-non-null-assertion` stays off:
+  `arr[i]!` is the idiom under `noUncheckedIndexedAccess`, see the comment beside the rule
+  in `eslint.config.mjs`.
 - `typecheck` covers the library including its specs, the lookbook — its `.ts` files and
   its `.astro` pages, via `astro check` — the browser tests of `twopoint5d-testing`, and
   every code block marked `ts check` in the tracked Markdown files. The tests and the
-  blocks are checked against the built library.
+  blocks are checked against the built library. The scripts under `scripts/` are checked
+  as JavaScript (`checkJs`, `noImplicitAny` off, `strictNullChecks` on) by the Nx project
+  `scripts`.
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/` with the profile
   `esm-only`: the package is ESM only, so `node10` and a `require` from CommonJS lie
   outside, and every other resolution has to succeed.
@@ -304,22 +314,26 @@ wait two seconds at most, the first one with a warning on the console when it ru
 Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
-under `node --test` (`pnpm test:scripts`); no Nx project owns them. So does
-`scripts/lookbook/rainbowLineScript.test.mjs`, which holds
-`apps/lookbook/public/js/` to the script `@spearwolf/astro-rainbow-line` loads at
-runtime — nothing in the repo references that file, so only a spec keeps it from being
-cleaned up. So does `scripts/lookbook/demoMetadata.test.mjs`, which holds the demo
-metadata of the lookbook to the library: every tag that starts with a capital letter names
-an export of `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from
-the sources, so the spec needs no build. Two specs start a script itself, as a child
-process:
-`makePackageJson.mjs` in a throwaway project directory and
-`checkPeerDependenciesOnly.mjs` against a throwaway manifest, because their exit codes,
-their messages and the manifest the first one does not write are wiring that no helper
-test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon as its
-arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
-`scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds the
-Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
+under `node --test` (`pnpm test:scripts`). The Nx project `scripts` has no `test`
+target, so `pnpm test` leaves them out. Three more specs run under `node --test` as
+well:
+
+- `scripts/lookbook/rainbowLineScript.test.mjs` holds `apps/lookbook/public/js/` to the
+  script `@spearwolf/astro-rainbow-line` loads at runtime. Nothing in the repo
+  references that file, so only a spec keeps it from being cleaned up.
+- `scripts/lookbook/demoMetadata.test.mjs` holds the demo metadata of the lookbook to
+  the library: every tag that starts with a capital letter names an export of
+  `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from the
+  sources, so the spec needs no build.
+- `scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds
+  the Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
+
+Two specs start a script itself, as a child process: `makePackageJson.mjs` in a
+throwaway project directory and `checkPeerDependenciesOnly.mjs` against a throwaway
+manifest, because their exit codes, their messages and the manifest the first one does
+not write are wiring that no helper test sees. No spec runs `publishNpmPkg.mjs`, which
+queries the registry as soon as its arguments fit, nor `checkDocSnippets.mjs`, which
+reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

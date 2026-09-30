@@ -17,7 +17,7 @@ function readInput(filePath, parse) {
   try {
     return parse(fs.readFileSync(filePath, 'utf8'));
   } catch (error) {
-    console.error(`cannot read ${filePath}: ${error.message}`);
+    console.error(`cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
@@ -77,6 +77,6 @@ console.log('Write to', releasePackageJsonPath);
 try {
   fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
 } catch (error) {
-  console.error(`cannot write ${releasePackageJsonPath}: ${error.message}`);
+  console.error(`cannot write ${releasePackageJsonPath}: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }

@@ -26,7 +26,7 @@ let manifest;
 try {
   manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 } catch (error) {
-  console.error(`cannot read ${manifestPath}: ${error.message}`);
+  console.error(`cannot read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
 
@@ -36,7 +36,7 @@ for (const {section, name} of found) {
 }
 
 const sources = fs
-  .readdirSync(packageDir, {recursive: true})
+  .readdirSync(packageDir, {recursive: true, encoding: 'utf8'})
   .filter((file) => /\.(js|mjs|d\.ts)$/.test(file) && !file.split(path.sep).includes('node_modules'))
   .sort()
   .map((file) => {
@@ -44,7 +44,7 @@ const sources = fs
     try {
       return {file, text: fs.readFileSync(filePath, 'utf8')};
     } catch (error) {
-      console.error(`cannot read ${filePath}: ${error.message}`);
+      console.error(`cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     }
   });

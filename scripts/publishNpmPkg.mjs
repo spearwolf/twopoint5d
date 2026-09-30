@@ -12,7 +12,7 @@ let args;
 try {
   args = parseArguments(process.argv.slice(2));
 } catch (error) {
-  console.error(error.message);
+  console.error(error instanceof Error ? error.message : String(error));
   console.error(USAGE);
   process.exit(1);
 }
@@ -29,7 +29,7 @@ try {
   pkgJson = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   checkManifest(pkgJson);
 } catch (error) {
-  console.error(`cannot publish ${manifestPath}: ${error.message}`);
+  console.error(`cannot publish ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
 
@@ -55,7 +55,7 @@ execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdo
     try {
       versions = parsePublishedVersions(stdout.trim());
     } catch (parseError) {
-      console.error(`npm show printed no version list: ${parseError.message}`);
+      console.error(`npm show printed no version list: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
       process.exit(1);
     }
     console.log('already published versions: ---');
@@ -83,7 +83,7 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
   try {
     files = releaseFiles({workspaceRoot, projectRoot, packageRoot: cwd});
   } catch (error) {
-    console.error(`cannot publish ${cwd}: ${error.message}`);
+    console.error(`cannot publish ${cwd}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
   for (const {src, dst} of files) {
@@ -96,7 +96,10 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
   try {
     execFileSync(publish.file, publish.args, {...publish.options, cwd, stdio: 'inherit'});
   } catch (error) {
-    console.error(`npm publish failed: ${error.status != null ? `exit code ${error.status}` : error.message}`);
+    // the try holds nothing but the call of execFileSync, which throws an Error with the
+    // exit status
+    const failure = /** @type {Error & {status?: number | null}} */ (error);
+    console.error(`npm publish failed: ${failure.status != null ? `exit code ${failure.status}` : failure.message}`);
     process.exit(1);
   }
 
@@ -107,7 +110,7 @@ function copyFile(src, dst) {
   try {
     fs.copyFileSync(src, dst);
   } catch (error) {
-    console.error(`cannot copy ${src} to ${dst}: ${error.message}`);
+    console.error(`cannot copy ${src} to ${dst}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

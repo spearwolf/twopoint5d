@@ -21,7 +21,7 @@ beforeEach(async () => {
   fs.mkdirSync(dir, {recursive: true});
   server = createCacheServer({dir, token: TOKEN});
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  baseUrl = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
 });
 
 afterEach(async () => {

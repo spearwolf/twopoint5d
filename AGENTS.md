@@ -15,10 +15,12 @@ them.
 | `packages/twopoint5d` | the published library `@spearwolf/twopoint5d` — almost all work happens here |
 | `packages/twopoint5d-testing` | browser/WebGL integration tests, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
 | `apps/lookbook` | Astro showcase and de-facto live documentation |
+| `scripts` | the Node scripts — publish pipeline, CI cache server, the checks of the repo; as an Nx project only their type check |
 
 Nx tags select projects in the root scripts: `twopoint5d` (library + browser harness),
-`ci` (Vitest suite), `browser` (Playwright suite), `app` (lookbook). A project without
-tags silently drops out of every `--projects=tag:…` run.
+`ci` (Vitest suite), `browser` (Playwright suite), `app` (lookbook), `scripts` (the
+type check of `scripts/`). A project without tags silently drops out of every
+`--projects=tag:…` run.
 
 The repo root also carries large generated files — `audit.html`, `remediation-plan.md`.
 Do not read them unless the task is about them.
@@ -46,13 +48,13 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   that checks the lookbook's vendored `rainbow-line` script, one that holds the tags and
   routes of the lookbook's demo metadata to the library's exports, and one that asks Nx
   whether
-  every tracked Markdown file is an input of the docs' type check; no Nx project owns
-  them, so `pnpm test` does not run them
+  every tracked Markdown file is an input of the docs' type check; the Nx project
+  `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
-  the lookbook's `.ts` and `.astro` files, the browser tests, and every code block marked
-  `ts check` in the Markdown files; the tests and the blocks are checked against the built
-  library
+  the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
+  `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
+  Markdown files; the tests and the blocks are checked against the built library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
   checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser. Run

@@ -4,6 +4,10 @@ import {findUndeclaredImports, packageNameOf} from './findUndeclaredImports.mjs'
 
 const peers = {three: '~0.185.1', '@spearwolf/eventize': '^1.0.0'};
 
+/**
+ * @param {string} text
+ * @param {Record<string, string>} [peerDependencies]
+ */
 const find = (text, peerDependencies = peers) => findUndeclaredImports([{file: 'a.js', text}], peerDependencies);
 
 describe('packageNameOf', () => {

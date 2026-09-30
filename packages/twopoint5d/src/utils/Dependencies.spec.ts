@@ -1,4 +1,5 @@
 import {Vector2} from 'three/webgpu';
+import type {Matrix4, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {Dependencies} from './Dependencies.js';
@@ -88,7 +89,7 @@ describe('Dependencies', () => {
     expect(deps.value('centerY')).toBe(2);
   });
 
-  test('a declaration that spells out its key is held against the shape', () => {
+  test('a declaration that spells out its key is held against the shape, its callbacks against the value of its key', () => {
     type Knobs = {centerX: number};
 
     // The whole assurance is a type, so it is the compiler that has to answer here: each
@@ -103,6 +104,18 @@ describe('Dependencies', () => {
 
     // @ts-expect-error the same for a pair that brings its callbacks as an object
     expect(new Dependencies<Knobs>([['cnterX', {equals: (a: number, b: number) => a === b}]])).toBeDefined();
+
+    // @ts-expect-error an equals written for another value type does not fit the key
+    expect(new Dependencies<{m: Matrix4}>([['m', (a: Vector2, b: Vector2) => a.equals(b)]])).toBeDefined();
+
+    // @ts-expect-error the same for callbacks brought as an object
+    expect(new Dependencies<{m: Matrix4}>([['m', {equals: (a: Vector2, b: Vector2) => a.equals(b)}]])).toBeDefined();
+
+    // @ts-expect-error complete callbacks have to fit a value type of the shape
+    expect(new Dependencies<{m: Matrix4}>([Dependencies.cloneable<Vector3>('m')])).toBeDefined();
+
+    // the declaration without a shape takes every callback, typed or not
+    expect(new Dependencies(['centerX', Dependencies.cloneable<Matrix4>('matrixWorld')])).toBeDefined();
   });
 
   test('copy and clone', () => {

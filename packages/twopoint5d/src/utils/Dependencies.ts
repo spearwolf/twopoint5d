@@ -1,14 +1,23 @@
 export type DependencyKey = string;
 
-export type EqualityCallback<T = any> = (a: T, b: T) => boolean;
-export type CloneCallback<T> = (source: T) => T;
-export type CopyCallback<T> = (source: T, target: T) => void;
-
-export interface DependencyCallbacks<T = any> {
-  equals: EqualityCallback<T>;
-  clone?: CloneCallback<T>;
-  copy?: CopyCallback<T>;
+/**
+ * The callbacks that judge the value behind one key. They are declared as methods, whose
+ * parameters TypeScript compares in both directions: a callback written for a narrower
+ * value still fits a key typed `unknown` — every key of a `Dependencies` declared without
+ * a shape — while one written for an unrelated type fits no key of the shape it is held
+ * against.
+ */
+export interface DependencyCallbacks<T = unknown> {
+  equals(a: T, b: T): boolean;
+  clone?(source: T): T;
+  copy?(source: T, target: T): void;
 }
+
+// derived from the methods above, so that a callback in a pair is compared in both
+// directions too
+export type EqualityCallback<T = unknown> = DependencyCallbacks<T>['equals'];
+export type CloneCallback<T> = NonNullable<DependencyCallbacks<T>['clone']>;
+export type CopyCallback<T> = NonNullable<DependencyCallbacks<T>['copy']>;
 
 /**
  * The keys a `Dependencies` watches, and the type of the value behind each of them. Any object
@@ -26,18 +35,22 @@ export type DependencyValues<Shape extends DependencyShape> = {[K in keyof Shape
 
 /**
  * One entry of the list a `Dependencies` is declared with: a bare name, or a name paired with
- * the callbacks that judge the value behind it. An entry that spells its name out is held
- * against `Shape`; one whose callbacks are complete is not, which is the room
- * {@link Dependencies.cloneable} needs — it builds its pair without ever knowing the name as a
- * literal type.
+ * the callbacks that judge the value behind it. The callbacks have to fit the value type
+ * of the key they belong to. A pair that spells its name out is held against `Shape` by
+ * that name; one whose callbacks are complete is not, which is the room
+ * {@link Dependencies.cloneable} needs — it builds its pair without ever knowing the name
+ * as a literal type, so its callbacks have to fit a value type of the shape, whichever
+ * key it is.
  */
 export type DependencyDeclaration<Shape> =
   | (keyof Shape & DependencyKey)
   | {
       [K in keyof Shape & DependencyKey]:
-        [name: K, equals: EqualityCallback<any>] | [name: K, callbacks: DependencyCallbacks<any>];
+        [name: K, equals: EqualityCallback<Shape[K]>] | [name: K, callbacks: DependencyCallbacks<Shape[K]>];
     }[keyof Shape & DependencyKey]
-  | [name: DependencyKey, callbacks: Required<DependencyCallbacks<any>>];
+  | {
+      [K in keyof Shape & DependencyKey]: [name: DependencyKey, callbacks: Required<DependencyCallbacks<Shape[K]>>];
+    }[keyof Shape & DependencyKey];
 
 export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, unknown>> {
   /**
@@ -62,7 +75,7 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
     },
   ];
 
-  readonly #props: [DependencyKey, DependencyCallbacks<any> | undefined][];
+  readonly #props: [DependencyKey, DependencyCallbacks | undefined][];
 
   readonly #state = new Map<DependencyKey, unknown>();
 
@@ -73,10 +86,15 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
    * declaration names is watched by nothing, and {@link value} answers `undefined` for it for
    * as long as the instance lives.
    *
-   * A pair that brings complete callbacks is not held against the shape, and {@link cloneable}
-   * builds exactly such a pair: `cloneable<T>(name)` spells out its value type, which leaves
-   * TypeScript unable to infer the name as a literal, and there is no way to give only one of
-   * two type arguments. A name misspelled inside a `cloneable()` therefore still compiles.
+   * The callbacks of a pair have to fit the value type of its key, and a pair written
+   * with its name in place has to fit exactly the value type of that key.
+   *
+   * A pair that brings complete callbacks is not held against the shape by its name, and
+   * {@link cloneable} builds exactly such a pair: `cloneable<T>(name)` spells out its
+   * value type, which leaves TypeScript unable to infer the name as a literal, and there
+   * is no way to give only one of two type arguments. A name misspelled inside a
+   * `cloneable()` therefore still compiles; its callbacks have to fit a value type of the
+   * shape.
    */
   constructor(props: Array<DependencyDeclaration<NoInfer<Shape>>>) {
     this.#props = props.map((p) => {

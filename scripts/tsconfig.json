@@ -1,0 +1,18 @@
+{
+  // Type-checks the Node scripts as what they are: JavaScript that Node runs without a
+  // build step. Checked are their JSDoc types and their use of the Node API and of the
+  // packages they import. `noImplicitAny` stays off: it would ask for a JSDoc type on
+  // every parameter, every test callback included, and a script spells a type out where
+  // it says something the name does not.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noImplicitAny": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.mjs"]
+}

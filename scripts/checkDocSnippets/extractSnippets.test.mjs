@@ -86,8 +86,9 @@ test('a marked fence that never closes is a problem with the fence line', () => 
 
   assert.deepEqual(snippets, []);
   assert.equal(problems.length, 1);
-  assert.equal(problems[0].file, 'a.md');
-  assert.equal(problems[0].line, 2);
+  const problem = /** @type {(typeof problems)[number]} */ (problems[0]);
+  assert.equal(problem.file, 'a.md');
+  assert.equal(problem.line, 2);
 });
 
 test('tilde fences are not fences', () => {

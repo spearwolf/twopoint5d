@@ -18,7 +18,7 @@ test('maps a diagnostic back to the line and column in the markdown file', () =>
   const diagnostics = compile({line: 10, indent: 2, code: "const n: number = 'x';"});
 
   assert.equal(diagnostics.length, 1);
-  const [diagnostic] = diagnostics;
+  const diagnostic = /** @type {(typeof diagnostics)[number]} */ (diagnostics[0]);
   assert.equal(diagnostic.file, 'a.md');
   assert.equal(diagnostic.code, 2322);
   assert.equal(diagnostic.line, 10);
@@ -39,8 +39,9 @@ test('the strictness of the root config applies, noUncheckedIndexedAccess includ
   const diagnostics = compile({code: 'const xs: string[] = [];\nconst s: string = xs[0];'});
 
   assert.equal(diagnostics.length, 1);
-  assert.equal(diagnostics[0].code, 2322);
-  assert.equal(diagnostics[0].line, 2);
+  const diagnostic = /** @type {(typeof diagnostics)[number]} */ (diagnostics[0]);
+  assert.equal(diagnostic.code, 2322);
+  assert.equal(diagnostic.line, 2);
 });
 
 test('a diagnostic is attributed to the snippet it belongs to', () => {

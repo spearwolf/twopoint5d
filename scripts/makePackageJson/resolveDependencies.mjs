@@ -95,7 +95,7 @@ export function resolvePackageVersion(
         'oops.. cannot read workspace package:',
         pkgName,
         '->',
-        `${pkgJsonPath}: ${error.message}`,
+        `${pkgJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
         'referenced from:',
         referencedFrom,
       );

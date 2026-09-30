@@ -24,7 +24,11 @@ const program = ts.createProgram([entry], {
 });
 const checker = program.getTypeChecker();
 const exported = new Set(
-  checker.getExportsOfModule(checker.getSymbolAtLocation(program.getSourceFile(entry))).map((sym) => sym.getName()),
+  checker
+    .getExportsOfModule(
+      /** @type {ts.Symbol} */ (checker.getSymbolAtLocation(/** @type {ts.SourceFile} */ (program.getSourceFile(entry)))),
+    )
+    .map((sym) => sym.getName()),
 );
 
 const FROM_THREE = new Map([

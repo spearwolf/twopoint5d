@@ -206,7 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - perf `Map2DTileRenderer` asks the factory once for a tile it declined to build. The answer stands until that tile is removed or `clearTiles()` runs, so a map with holes no longer costs one tile-data lookup per hole and per frame
 - perf `Map2DTileRenderer#clearTiles()` on a renderer that held no tile raises no data serial, so the following `endUpdatingTiles()` sends no attribute buffers to the GPU
 - perf `Map2D#update()` leaves the world matrix to the tile streamer, which brings it up to date with `updateWorldMatrix(true, false)` — the parent chain first — on every update that has a visibilitor and a tile renderer to lay out tiles for. An update that is missing either of the two touches no matrix, and the three.js renderer brings the scene graph up to date before it draws
-- `Dependencies` is generic over the shape it watches: `update()`, `equals()` and `changed()` take the keys of that shape, and `value()` answers in the type the shape gives a key instead of `any`. A declaration whose callbacks are not complete — a bare name, and a name paired with an `equals` or with callbacks missing `clone` or `copy` — has to name one of the shape, so a typo in the declaration list does not compile; a pair that brings all three callbacks, `Dependencies.cloneable()` among them, is not held against the shape, and its name goes unchecked. A key nobody declared is no longer written into the state — it was never compared and never reported as changed, so it only made the state look like it watched something it does not
+- `Dependencies` is generic over the shape it watches: `update()`, `equals()` and `changed()` take the keys of that shape, and `value()` answers in the type the shape gives a key instead of `any`. A declaration whose callbacks are not complete — a bare name, and a name paired with an `equals` or with callbacks missing `clone` or `copy` — has to name one of the shape, so a typo in the declaration list does not compile; the callbacks of every pair are held against the value type of their key, and a pair that brings all three callbacks, `Dependencies.cloneable()` among them, has to fit a value type of the shape — only its name goes unchecked. `EqualityCallback` and `DependencyCallbacks` default to `unknown`, and `DependencyCallbacks` declares its callbacks as methods, so that callbacks written without a type argument still fit. A key nobody declared is no longer written into the state — it was never compared and never reported as changed, so it only made the state look like it watched something it does not
 - `InstancedVOBufferGeometry#touch()` applies both argument forms when they are mixed in one call: usage types named without a route reach the buffers of every route, and a `{base, instanced}` argument reaches the routes it names
 - `VOBufferPool#capacity` is a getter over a private field, and `VertexObjectDescriptor#voPrototype` an accessor — neither stands as an own property on the instance, and `capacity` is written only through the pool that owns it
 - `TextureResource` checks the response of an `atlasUrl` fetch against the shape of a texture packer json, the same way `TextureAtlasLoader` already does, before it reads it: a 200 response that is none, or one that names no image and gives no `overrideImageUrl` to fall back on, is reported through the `error` event with `source: 'atlas'` instead of being read
@@ -312,6 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage#needsUpdate` starts out `true`: the first `render()` shows what the canvas already carries
 - `IProjection#getViewRect()`, and with it `ParallaxProjection#getViewRect()` and `OrthographicProjection#getViewRect()`, answers a `ProjectionViewRect` `{width, height, pixelRatioX, pixelRatioY}`, a new object on every call. See the Migration Guide
 - the `.d.ts` files of the package carry the TSDoc of the sources, so an editor shows it for every export; the `.js` files carry the comments of the sources as well
+- `PanControl2D` takes the default for an option that is passed as `null`, as it does for one that is left out
 
 ### Deprecated
 
@@ -908,7 +909,24 @@ const props: DependencyDeclaration<{centerX: number; matrixWorld: Matrix4}>[] = 
 ```
 
 `DependencyDeclaration<Shape>` takes the same three forms and holds the name of
-an entry against the shape wherever it can read it.
+an entry against the shape wherever it can read it, and the callbacks of an entry
+against the value type of its key (see the next section).
+
+#### Inline callbacks in a `Dependencies` with several keys need parameter types
+
+**Before**
+
+```ts
+const deps = new Dependencies<{m: Matrix4; v: Vector2}>([['v', (a, b) => a.equals(b)]]);
+```
+
+**After**
+
+```ts
+const deps = new Dependencies<{m: Matrix4; v: Vector2}>([['v', (a: Vector2, b: Vector2) => a.equals(b)]]);
+```
+
+The callbacks of a pair are held against the value type of their key. With more than one key in the shape, TypeScript cannot infer the parameters of a callback written inline from the declaration list, and `noImplicitAny` reports them. A shape with a single key, and a `Dependencies` without a shape, still infer them.
 
 #### `Dependencies#value()` answers in the type of its shape
 

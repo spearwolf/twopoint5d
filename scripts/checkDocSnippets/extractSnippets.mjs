@@ -26,6 +26,8 @@ export function extractSnippets(markdown, file) {
   const problems = [];
   const lines = markdown.split(/\r?\n/);
 
+  /** @typedef {{marked: boolean, indent: number, ticks: number, line: number, code: string[]}} OpenFence */
+  /** @type {OpenFence | null} */
   let open = null;
 
   lines.forEach((text, index) => {
@@ -35,9 +37,12 @@ export function extractSnippets(markdown, file) {
       const match = OPENING_FENCE.exec(text);
       // CommonMark: the info string of a backtick fence holds no backtick, so a line such as
       // "```inline``` prose" opens nothing
-      if (match == null || match[3].includes('`')) return;
+      if (match == null) return;
+      // the three groups of the pattern always take part in a match
+      const [, indent, ticks, rest] = /** @type {[string, string, string, string]} */ (/** @type {unknown} */ (match));
+      if (rest.includes('`')) return;
 
-      const info = match[3].trim();
+      const info = rest.trim();
       const words = info.split(/\s+/).filter(Boolean);
       const marked = words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
 
@@ -45,12 +50,18 @@ export function extractSnippets(markdown, file) {
         problems.push({file, line: lineNumber, message: `unknown marker \`${info}\` — only \`ts check\` is checked`});
       }
 
-      open = {marked, indent: match[1].length, ticks: match[2].length, line: lineNumber, code: []};
+      open = {
+        marked,
+        indent: indent.length,
+        ticks: ticks.length,
+        line: lineNumber,
+        code: [],
+      };
       return;
     }
 
     const closing = CLOSING_FENCE.exec(text);
-    if (closing != null && closing[1].length >= open.ticks) {
+    if (closing != null && /** @type {string} */ (closing[1]).length >= open.ticks) {
       if (open.marked) {
         snippets.push({file, line: open.line + 1, indent: open.indent, code: open.code.join('\n')});
       }
@@ -64,8 +75,10 @@ export function extractSnippets(markdown, file) {
     }
   });
 
-  if (open?.marked) {
-    problems.push({file, line: open.line, message: 'code block marked `ts check` is never closed'});
+  // the callback above assigns `open`, which the compiler does not follow
+  const unclosed = /** @type {OpenFence | null} */ (open);
+  if (unclosed?.marked) {
+    problems.push({file, line: unclosed.line, message: 'code block marked `ts check` is never closed'});
   }
 
   return {snippets, problems};

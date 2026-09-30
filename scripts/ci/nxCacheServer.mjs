@@ -13,7 +13,7 @@ try {
 }
 
 // the same variable Nx reads, so the server and its client cannot disagree on the token
-const token = process.env.NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN;
+const token = process.env['NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN'];
 const port = Number(values.port);
 
 if (!values.dir || !Number.isInteger(port) || !token) {
@@ -32,5 +32,7 @@ server.on('error', (err) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`nx cache server listening on http://127.0.0.1:${server.address().port}, serving ${dir}`);
+  console.log(
+    `nx cache server listening on http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}, serving ${dir}`,
+  );
 });

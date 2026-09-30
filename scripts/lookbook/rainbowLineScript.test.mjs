@@ -16,7 +16,9 @@ describe('the rainbow-line script the lookbook serves', () => {
     createRequire(path.join(lookbookDir, 'package.json')).resolve('@spearwolf/astro-rainbow-line/package.json'),
   );
   const component = fs.readFileSync(path.join(packageDir, 'RainbowLine.astro'), 'utf8');
-  const scriptPath = /RAINBOW_LINE_JS\s*\|\|\s*'([^']+)'/.exec(component)?.[1];
+  // typed as present: the first spec asserts it, and the specs after it read it without
+  // a check of their own
+  const scriptPath = /** @type {string} */ (/RAINBOW_LINE_JS\s*\|\|\s*'([^']+)'/.exec(component)?.[1]);
 
   it('is named by RainbowLine.astro as its default script path', () => {
     assert.ok(scriptPath, 'RainbowLine.astro no longer names its default script path the way this spec reads it');
