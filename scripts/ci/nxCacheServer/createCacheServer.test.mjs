@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -78,6 +79,18 @@ test('a wrong token gets 403 on GET and 401 on PUT, and stores nothing', async (
   assert.equal((await get('123', 'wrong')).status, 403);
   assert.equal((await put('123', Buffer.from('data'), 'wrong')).status, 401);
   assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('the token is compared in constant time, as two digests of one length, whatever the client sends', async (t) => {
+  const compare = t.mock.method(crypto, 'timingSafeEqual');
+  assert.equal((await get('123', 'a-token-far-longer-than-the-right-one')).status, 403);
+  assert.equal((await fetch(`${baseUrl}/v1/cache/123`)).status, 403);
+  assert.equal((await get('123')).status, 404);
+  assert.equal(compare.mock.callCount(), 3);
+  for (const call of compare.mock.calls) {
+    const [a, b] = call.arguments;
+    assert.equal(a.byteLength, b.byteLength);
+  }
 });
 
 test('a hash that is not alphanumeric answers 400 and writes nothing outside the directory', async () => {

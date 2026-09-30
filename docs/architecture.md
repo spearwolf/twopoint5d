@@ -117,11 +117,12 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
   publish pipeline's helpers and of `makePackageJson.mjs` and
-  `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server, of the
-  helpers of the code block check, the check that every tracked Markdown file is an
-  input of `twopoint5d-testing:typecheck`, the check that every capitalised tag of the
-  lookbook demos names an export of the library, and the check that the lookbook serves the
-  script `RainbowLine` loads at runtime.
+  `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server and its
+  entry script, of the helpers of the code block check, the check that the publish script
+  and its helpers import nothing but Node's built-ins, the check that every tracked
+  Markdown file is an input of `twopoint5d-testing:typecheck`, the check that every
+  capitalised tag of the lookbook demos names an export of the library, and the check
+  that the lookbook serves the script `RainbowLine` loads at runtime.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the
   thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
   it runs the same specs without coverage. The thresholds sit two points under the level
@@ -132,12 +133,18 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
 
 ### In CI
 
-`.github/workflows/ci.yml` runs the gate on every push. Every action is pinned to a full
-commit SHA with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap the
-code that runs. The workflow reads `contents` only. Its concurrency group is the branch,
-so a newer push cancels the running or waiting run of the same branch — except on
-`main`, where the group is the commit: every commit there gets its own run, which
-nothing cancels, because `deploy.yml` follows each successful one.
+`.github/workflows/ci.yml` runs the gate on every push. The workflow has no path
+filter: Markdown is an input of `prettier --check` and of `twopoint5d-testing:typecheck`
+(§2), so a push that changes nothing but docs runs the gate as well, and the Nx cache
+answers every target whose inputs the push leaves alone. Every action is pinned to a
+full commit SHA with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap
+the code that runs. The workflow reads `contents` only. Every checkout, here and in
+`deploy.yml`, sets `persist-credentials: false`: no job pushes from a checkout — the
+`tag` job of `deploy.yml` writes its ref through the REST API (§4) — so no token lies in
+`.git/config` for an install script to find. The concurrency group of the workflow is
+the branch, so a newer push cancels the running or waiting run of the same branch —
+except on `main`, where the group is the commit: every commit there gets its own run,
+which nothing cancels, because `deploy.yml` follows each successful one.
 
 The step `Audit dependencies` follows the install and runs `pnpm audit
 --audit-level=high`. It reports high and critical advisories without failing the run:
@@ -146,7 +153,8 @@ whatever the audit finds sits in tooling, and Dependabot proposes the update tha
 it (§5). Dependabot also keeps the commit SHAs of the actions, and the version comment
 next to each, current.
 
-After the gate the step `Run the hot-path benchmarks` runs `pnpm bench`, and the
+The step `Run the hot-path benchmarks` runs `pnpm bench` once the Nx cache (below) is
+saved: after the save, so that a bench that crashes does not cost the run its cache. The
 artifact `bench` keeps `packages/twopoint5d/bench-results` for 90 days, the coverage
 report for 3. The timings are archived, not held to a limit: a shared runner's timings
 vary too much for a gate, and a regression shows only in the series over weeks. What can
@@ -177,7 +185,7 @@ the newest entry of the same lockfile and then to the newest entry at all. The s
 touches every entry it serves. After a green gate the job deletes each entry older than
 the server start — what this run neither used nor wrote — and saves the directory under
 the commit's key, so each saved state holds exactly the results of one green commit and
-does not grow from run to run. A red run saves nothing, and the next run restores the
+does not grow from run to run. A red gate saves nothing, and the next run restores the
 last green state.
 
 The cache is only as trustworthy as what writes to it: its entries come solely from CI
@@ -233,16 +241,37 @@ three files that is missing, an npm that is missing or fails — ends with one l
 exit code 1, and what `npm publish` itself prints goes straight to the console. Never
 publish from `packages/twopoint5d/` and never run these scripts without being asked to.
 
-`.github/workflows/deploy.yml` runs after every successful CI run on `main`. Both jobs
-check out `github.event.workflow_run.head_sha`, the commit that CI run tested: `main`
-may have moved on while CI ran, and a newer commit gets a CI run and a deploy of its
-own. They run only for a CI run triggered by a push to this repository, the one kind of
-run that may name the commit to publish. The first job asks npm whether the manifest
-version is published already, or whether it ends in `-dev`; only if neither holds does
-the second job install, build and run `publishNpmPkg`. It authenticates through npm
-Trusted Publishing (OIDC, with `id-token: write` granted to the publish job only), so
-there is no npm token. Releases carry SLSA provenance and name `GitHub Actions
-<npm-oidc-no-reply@github.com>` as their publisher, the first being 0.21.2.
+`.github/workflows/deploy.yml` runs after every successful CI run on `main`, in four
+jobs. Each works on `github.event.workflow_run.head_sha`, the commit that CI run tested:
+`main` may have moved on while CI ran, and a newer commit gets a CI run and a deploy of
+its own. They run only for a CI run triggered by a push to this repository, the one kind
+of run that may name the commit to publish.
+
+- `version` asks npm whether the manifest version is published already, or whether it
+  ends in `-dev`; only if neither holds do the other three run.
+- `build` holds no right but reading the repository, and it is the job in which the
+  dependencies and their install scripts run. It installs the workspace root and the
+  library alone, `pnpm install --frozen-lockfile --filter twopoint5d-workspace --filter
+  @spearwolf/twopoint5d`, so the lookbook, the browser tests and their dependencies stay
+  out; it builds the library, runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes`
+  and hands `dist/` on as the artifact `package`.
+- `publish` is the only job with `id-token: write`. It installs nothing: it checks out
+  the commit, takes `dist/` from the artifact and runs `node
+  ../../scripts/publishNpmPkg.mjs dist` in `packages/twopoint5d`, so with the publish
+  rights only that script, its helpers and npm run. That is why `publishNpmPkg.mjs` and
+  `scripts/publishNpmPkg/` import nothing but Node's built-ins and each other, which
+  `scripts/publishNpmPkg/builtinImportsOnly.test.mjs` holds. The step sets
+  `npm_config_ignore_scripts`: `dist/package.json` comes from the `build` job, so npm
+  runs none of its lifecycle scripts with the publish rights. The job authenticates
+  through npm Trusted Publishing (OIDC), so there is no npm token. Releases carry SLSA
+  provenance and name `GitHub Actions <npm-oidc-no-reply@github.com>` as their
+  publisher, the first being 0.21.2.
+- `tag` follows a successful publish and creates the tag `v<version>` on the published
+  commit through the REST API, with `contents: write` as its only right, without a
+  checkout and without an install. A version gets its tag once: a tag that exists
+  already stays, with a warning if it points at another commit. A tag that the
+  `GITHUB_TOKEN` of the workflow creates starts no CI run. Versions up to 0.21.2 carry
+  no tag.
 
 Changes under `scripts/` are changes to the publish pipeline. Treat them accordingly.
 The exception is `scripts/ci/`, which only the CI workflow runs.
@@ -314,9 +343,9 @@ wait two seconds at most, the first one with a warning on the console when it ru
 Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
 The helpers of the publish pipeline, the CI cache server and the code block check run
-under `node --test` (`pnpm test:scripts`). The Nx project `scripts` has no `test`
-target, so `pnpm test` leaves them out. Three more specs run under `node --test` as
-well:
+under `node --test` (`pnpm test:scripts`), and four more specs share that run. The Nx
+project `scripts` has no `test` target, so `pnpm test` leaves all of them out. The four
+are:
 
 - `scripts/lookbook/rainbowLineScript.test.mjs` holds `apps/lookbook/public/js/` to the
   script `@spearwolf/astro-rainbow-line` loads at runtime. Nothing in the repo
@@ -327,13 +356,17 @@ well:
   sources, so the spec needs no build.
 - `scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds
   the Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
+- `scripts/publishNpmPkg/builtinImportsOnly.test.mjs` holds `publishNpmPkg.mjs` and its
+  helpers to imports of Node's built-ins and of each other, because the publish job of
+  the deploy installs nothing (§4).
 
-Two specs start a script itself, as a child process: `makePackageJson.mjs` in a
-throwaway project directory and `checkPeerDependenciesOnly.mjs` against a throwaway
-manifest, because their exit codes, their messages and the manifest the first one does
-not write are wiring that no helper test sees. No spec runs `publishNpmPkg.mjs`, which
-queries the registry as soon as its arguments fit, nor `checkDocSnippets.mjs`, which
-reads git and the file system.
+Three specs start a script itself, as a child process: `makePackageJson.mjs` in a
+throwaway project directory, `checkPeerDependenciesOnly.mjs` against a throwaway
+manifest and `scripts/ci/nxCacheServer.mjs` with a command line it refuses, because
+their exit codes, their messages and the manifest the first one does not write are
+wiring that no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the
+registry as soon as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and
+the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

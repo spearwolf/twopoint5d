@@ -44,11 +44,11 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   archives. Not part of `pnpm run ci`: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server and the docs' code block check (`scripts/**/*.test.mjs`), plus specs that
-  start `makePackageJson.mjs` and `checkPeerDependenciesOnly.mjs` as child processes, one
-  that checks the lookbook's vendored `rainbow-line` script, one that holds the tags and
-  routes of the lookbook's demo metadata to the library's exports, and one that asks Nx
-  whether
-  every tracked Markdown file is an input of the docs' type check; the Nx project
+  start `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs` and `nxCacheServer.mjs` as
+  child processes, one that checks the lookbook's vendored `rainbow-line` script, one
+  that holds the tags and routes of the lookbook's demo metadata to the library's
+  exports, one that asks Nx whether every tracked Markdown file is an input of the docs'
+  type check, and one that holds the publish script to Node's built-ins; the Nx project
   `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
@@ -94,7 +94,9 @@ explicit instruction.
   `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
   the published package. `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions:
   the Nx cache server of the CI workflow, and the check of the docs' code blocks, which
-  publishes nothing.
+  publishes nothing. `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import
+  nothing but Node's built-ins (`node:`) and each other, because the publish job of the
+  deploy installs nothing; `builtinImportsOnly.test.mjs` fails on anything else.
 - **`dispose()` and ownership** follow
   [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md). They
   are binding, not advisory.

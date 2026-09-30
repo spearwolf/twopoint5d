@@ -8,8 +8,11 @@ const USAGE = 'usage: NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN=<token> node scri
 let values;
 try {
   ({values} = parseArgs({options: {dir: {type: 'string'}, port: {type: 'string'}}}));
-} catch {
-  values = {};
+} catch (error) {
+  // parseArgs names the option or the argument it refuses
+  console.error(error instanceof Error ? error.message : String(error));
+  console.error(USAGE);
+  process.exit(1);
 }
 
 // the same variable Nx reads, so the server and its client cannot disagree on the token

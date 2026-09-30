@@ -13,7 +13,9 @@ import {pipeline} from 'node:stream/promises';
  * Returns an `http.Server` that is not listening yet.
  */
 export function createCacheServer({dir, token}) {
-  const expectedAuthorization = `Bearer ${token}`;
+  // compared as SHA-256 digests: crypto.timingSafeEqual takes two buffers of one
+  // length, and a digest has that length whatever the client sends
+  const expectedDigest = sha256(`Bearer ${token}`);
 
   return http.createServer((req, res) => {
     handle(req, res).catch(() => {
@@ -29,7 +31,7 @@ export function createCacheServer({dir, token}) {
     const match = /^\/v1\/cache\/([^/]+)$/.exec(new URL(req.url, 'http://localhost').pathname);
     if (!match) return reply(req, res, 404);
     if (req.method !== 'GET' && req.method !== 'PUT') return reply(req, res, 405);
-    if (req.headers.authorization !== expectedAuthorization) return reply(req, res, req.method === 'GET' ? 403 : 401);
+    if (!authorized(req)) return reply(req, res, req.method === 'GET' ? 403 : 401);
 
     const hash = /** @type {string} */ (match[1]);
     // Nx hashes are digit strings; anything else could name a path outside dir
@@ -37,6 +39,10 @@ export function createCacheServer({dir, token}) {
 
     const file = path.join(dir, hash);
     return req.method === 'GET' ? serve(req, res, file) : store(req, res, hash, file);
+  }
+
+  function authorized(req) {
+    return crypto.timingSafeEqual(sha256(req.headers.authorization ?? ''), expectedDigest);
   }
 
   async function serve(req, res, file) {
@@ -89,6 +95,10 @@ async function publish(partial, file) {
     if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EEXIST') return 409;
     throw err;
   }
+}
+
+function sha256(text) {
+  return crypto.createHash('sha256').update(text).digest();
 }
 
 function reply(req, res, status) {

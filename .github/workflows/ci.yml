@@ -1,9 +1,8 @@
 name: Continuous Integration
 
-on:
-  push:
-    paths-ignore:
-      - '**.md'
+# every push, Markdown included: a Markdown file is an input of prettier --check and of
+# the type check of the docs' marked code blocks
+on: push
 
 permissions:
   contents: read
@@ -25,6 +24,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # nothing in this workflow pushes, so no token waits in .git/config for an
+          # install script to find
+          persist-credentials: false
 
       # installs the pnpm that packageManager in package.json names
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -91,13 +94,6 @@ jobs:
         run: xvfb-run pnpm run ci
         timeout-minutes: 20
 
-      - name: Run the hot-path benchmarks
-        # the timings are archived, not held to a limit: a shared runner's timings vary too much
-        # for a gate, and it is the series over many runs that shows a regression. The
-        # allocation specs in the gate hold what can be counted
-        run: pnpm bench
-        timeout-minutes: 10
-
       - name: Drop the Nx cache entries this run did not use
         # the server touches every entry it serves; what is older than its start went unused
         if: success() && steps.nx-cache.outputs.cache-hit != 'true'
@@ -109,6 +105,16 @@ jobs:
         with:
           path: ${{ runner.temp }}/nx-cache
           key: ${{ steps.nx-cache.outputs.cache-primary-key }}
+
+      - name: Run the hot-path benchmarks
+        # runs once the Nx cache is saved: both cache steps run on success only, and a
+        # bench that crashes must not cost the run its cache
+        #
+        # the timings are archived, not held to a limit: a shared runner's timings vary too much
+        # for a gate, and it is the series over many runs that shows a regression. The
+        # allocation specs in the gate hold what can be counted
+        run: pnpm bench
+        timeout-minutes: 10
 
       - name: Show the Nx cache server log
         if: failure()
