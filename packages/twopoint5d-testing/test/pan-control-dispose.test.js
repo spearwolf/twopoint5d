@@ -90,8 +90,12 @@ describe('PanControl2D — the contract after dispose()', () => {
 
     expect(target.classList.length, 'the cursor class after a drag').to.equal(0);
 
-    // the keys are still held down as far as the browser is concerned
+    // every key that went down goes up again and the pointer lets go, as in the other
+    // tests of these files, so nothing is left pressed for the next control
     key('keyup', KEY_NORTH);
+    key('keyup', KEY_SOUTH);
+    key('keyup', KEY_WEST);
+    key('keyup', KEY_EAST);
     pointer('pointerup', {x: 30, y: 10, buttons: 0});
   });
 

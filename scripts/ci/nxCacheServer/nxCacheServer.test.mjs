@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it} from 'node:test';
 import {fileURLToPath} from 'node:url';
 
@@ -25,5 +28,20 @@ describe('nxCacheServer.mjs', () => {
     const {status, stderr} = run(['--port', '0']);
     assert.equal(status, 1, stderr);
     assert.match(stderr, /^usage: [^\n]*\n$/);
+  });
+
+  it('prints the usage line alone for a port that is no whole number from 0 to 65535, and creates no --dir: exit code 1', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'nx-cache-server-'));
+    const dir = path.join(parent, 'cache');
+    try {
+      for (const port of ['70000', '65536', '-1', '']) {
+        const {status, stderr} = run(['--dir', dir, `--port=${port}`]);
+        assert.equal(status, 1, `--port=${port}: ${stderr}`);
+        assert.match(stderr, /^usage: [^\n]*\n$/, `--port=${port}`);
+        assert.equal(fs.existsSync(dir), false, `--port=${port} created --dir`);
+      }
+    } finally {
+      fs.rmSync(parent, {recursive: true, force: true});
+    }
   });
 });

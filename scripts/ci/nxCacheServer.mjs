@@ -18,8 +18,11 @@ try {
 // the same variable Nx reads, so the server and its client cannot disagree on the token
 const token = process.env['NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN'];
 const port = Number(values.port);
+// server.listen() takes a whole number from 0 (any free port) to 65535 and throws on
+// anything else — past the 'error' handler below, after --dir is created
+const portIsValid = /^\d+$/.test(values.port ?? '') && port <= 65535;
 
-if (!values.dir || !Number.isInteger(port) || !token) {
+if (!values.dir || !portIsValid || !token) {
   console.error(USAGE);
   process.exit(1);
 }

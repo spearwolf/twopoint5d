@@ -552,33 +552,36 @@ refused by `add()`.
 
 On `StageRenderer`:
 
-- `OnStageAdded` / `OnStageRemoved` — emitted at the **parent** with `{stage, renderer}`.
-- `OnAddToParent` / `OnRemoveFromParent` — emitted at the **child** when its `parent` changes.
+- `OnStageAdded` / `OnStageRemoved` — emitted at the **parent** with `{stage,
+  renderer}`.
+- `OnAddToParent` / `OnRemoveFromParent` — emitted at the **child** when its `parent`
+  changes.
 - `OnStageDispose` — once, from `dispose()`, before the renderer stops listening.
 
 A listener of one of these events that throws does not cut short the call that sends it:
 every listener hears the event, `add()`, `remove()`, a write to `parent`, `attach()`,
-`detach()` and `dispose()` run to their end, and the error reaches the caller afterwards —
-one unchanged, several as an `AggregateError`.
+`detach()` and `dispose()` run to their end, and the error reaches the caller afterwards
+— one unchanged, several as an `AggregateError`.
 
 On `Stage2D`:
 
-- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`. `OnStageUpdateFrame` hands every
-  frame the same props object, rewritten — copy the values you need after the call.
-  `OnStageFirstFrame` is kept for late subscribers and carries an object of its own.
-- `OnStageAfterCameraChanged` — emitted on every camera change with the replaced camera; a
-  `StageRenderer` listens to it on each stage it holds.
-- `OnStageAfterSceneChanged` — emitted on every change of `scene` with the replaced scene; a
-  `StageRenderer` listens to it on each stage it holds as well.
+- `OnStageResize`, `OnStageFirstFrame`, `OnStageUpdateFrame`. `OnStageUpdateFrame` hands
+  every frame the same props object, rewritten — copy the values you need after the
+  call. `OnStageFirstFrame` is kept for late subscribers and carries an object of its
+  own.
+- `OnStageAfterCameraChanged` — emitted on every camera change with the replaced camera;
+  a `StageRenderer` listens to it on each stage it holds.
+- `OnStageAfterSceneChanged` — emitted on every change of `scene` with the replaced
+  scene; a `StageRenderer` listens to it on each stage it holds as well.
 - `OnStageDispose` — once, from `dispose()`, before the stage stops listening; every
   `StageRenderer` that holds the stage takes it out on it.
 
 On `Canvas2DStage`:
 
-- `OnCanvas2DStageResize` — from `render()`, when the canvas has another size than at the
-  previous `render()`, the first `render()` included.
-- `OnCanvas2DStageRender` — from every `render()`, before the canvas is uploaded: draw into the
-  canvas here and set `needsUpdate`.
+- `OnCanvas2DStageResize` — from `render()`, when the canvas has another size than at
+  the previous `render()`, the first `render()` included.
+- `OnCanvas2DStageRender` — from every `render()`, before the canvas is uploaded: draw
+  into the canvas here and set `needsUpdate`.
 - `OnCanvas2DStageDispose` — once, from `dispose()`, before the stage stops listening.
 
 All event names are exported from `@spearwolf/twopoint5d`.
@@ -603,11 +606,17 @@ new StageRenderer(host).add(stage);
 ```
 
 The renderer books each unsubscribe as soon as the host hands it out and calls it once
-when it leaves the host — through a write to `parent`, `attach()`, `detach()`, an `add()`
-to a `StageRenderer` or `dispose()` — before `OnRemoveFromParent` goes out. An unsubscribe
-that throws does not keep the renderer from giving up its other subscription; its error
-reaches the caller of that call together with those of the listeners — one unchanged,
-several as an `AggregateError`.
+when it leaves the host — through a write to `parent`, `attach()`, `detach()`, an
+`add()` to a `StageRenderer` or `dispose()` — before `OnRemoveFromParent` goes out. An
+unsubscribe that throws does not keep the renderer from giving up its other
+subscription; its error reaches the caller of that call together with those of the
+listeners — one unchanged, several as an `AggregateError`.
+
+A host whose `onResize()` or `onRenderFrame()` throws as the renderer joins it holds
+nothing of it: the renderer gives back what the host had handed out and joins no
+holder — `parent` answers `undefined`, and `OnAddToParent` does not go out — and the
+error reaches the caller with those of the move out, after them.
+`new StageRenderer(host)` throws it.
 
 ---
 
@@ -628,61 +637,64 @@ What this layer does on top of the general rules in
 - `StageRenderer.dispose()` releases the render targets it built for itself — a target
   borrowed from an `internalTargetPool` is back in the pool by then, and the pool is not
   disposed. It also detaches from its host or from the parent `StageRenderer` that holds
-  it, and drops its stages through `remove()`, so a disposed renderer is no longer driven
-  by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
-  of its pass-target — the child itself is not disposed. An `OnStageDispose` goes out
-  before the renderer stops listening. A listener of `OnStageRemoved`,
-  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this, and neither
-  does an unsubscribe of the host that throws — the renderer gives up its other
-  subscription there all the same; the errors reach the caller once the renderer is down.
-- A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for one
-  draw at a time; while it is set the renderer builds no internal target of its own, and
-  assigning it releases the one it had. The pool belongs to the caller: `pool.dispose()`
-  releases every target that is back in the pool at once and every lent one as it comes
-  back; a disposed pool lends nothing — `acquire()` throws, and a `StageRenderer` refuses it.
+  it, and drops its stages through `remove()`, so a disposed renderer is no longer
+  driven by any frame loop, and a nested `StageRenderer` among its stages releases the
+  GPU memory of its pass-target — the child itself is not disposed. An `OnStageDispose`
+  goes out before the renderer stops listening. A listener of `OnStageRemoved`,
+  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this, and
+  neither does an unsubscribe of the host that throws — the renderer gives up its other
+  subscription there all the same; the errors reach the caller once the renderer is
+  down.
+- A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for
+  one draw at a time; while it is set the renderer builds no internal target of its own,
+  and assigning it releases the one it had. The pool belongs to the caller:
+  `pool.dispose()` releases every target that is back in the pool at once and every lent
+  one as it comes back; a disposed pool lends nothing — `acquire()` throws, and a
+  `StageRenderer` refuses it.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
   write to `pipeline`, `buildOutputNode` or `internalTargetPool` falls through.
-- A builder from `createBloomOutputNodeBuilder()` belongs to the caller. Each call releases
-  the bloom node the call before built, once the new output node stands — neither the
-  renderer nor three's `RenderPipeline` releases an `outputNode` a rebuild replaces —, and
-  `dispose()` releases the last one; the pass nodes it composes belong to the stages and
-  stay. `StageRenderer#dispose()` lets go of the builder and leaves it alone. Give every
-  renderer a builder of its own: one that two renderers share releases the bloom of one of
-  them whenever the other rebuilds. A disposed builder throws when it is called, and a
-  `StageRenderer` refuses it; take the builder off the renderer — `buildOutputNode =
-  undefined`, or dispose the renderer — before you dispose it.
+- A builder from `createBloomOutputNodeBuilder()` belongs to the caller. Each call
+  releases the bloom node the call before built, once the new output node stands —
+  neither the renderer nor three's `RenderPipeline` releases an `outputNode` a rebuild
+  replaces —, and `dispose()` releases the last one; the pass nodes it composes belong
+  to the stages and stay. `StageRenderer#dispose()` lets go of the builder and leaves it
+  alone. Give every renderer a builder of its own: one that two renderers share releases
+  the bloom of one of them whenever the other rebuilds. A disposed builder throws when
+  it is called, and a `StageRenderer` refuses it; take the builder off the renderer —
+  `buildOutputNode = undefined`, or dispose the renderer — before you dispose it.
 - `add(stage)` sets both sides of the relation: an added child `StageRenderer` answers
   the renderer as its `parent` and gets its `OnAddToParent`; it has one holder, and
   leaves the host or the renderer that held it. `remove(stage)` clears both sides: a
   removed child `StageRenderer` answers `undefined` as its `parent` and gets its
   `OnRemoveFromParent`.
-- `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera` stay what
-  they were, and releases the node built for the pair before it on the next `asPassNode()` after
-  either of them has changed; a composing `StageRenderer` asks again on its next render after
-  each of the two changes.
-  `Stage2D.dispose()` releases that node and the render target behind it, and nothing else: the
-  scene, the camera and the projection were handed in and stay the caller's. Afterwards
-  `asPassNode()` throws, and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a
-  write to `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
+- `Stage2D#asPassNode()` hands the same node back for as long as `scene` and `camera`
+  stay what they were, and releases the node built for the pair before it on the next
+  `asPassNode()` after either of them has changed; a composing `StageRenderer` asks
+  again on its next render after each of the two changes. `Stage2D.dispose()` releases
+  that node and the render target behind it, and nothing else: the scene, the camera and
+  the projection were handed in and stay the caller's. Afterwards `asPassNode()` throws,
+  and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a write to
+  `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
   it out on its `OnStageDispose`, even behind a listener of that event that throws.
-- `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material starts
-  out with and the texture the stage built last from the canvas — each earlier one was released
-  when its successor took its place —, its `StageRenderer` and the `Stage2D` its constructor
-  built, and leaves the `WebGPURenderer` and a canvas handed to the constructor alone. The sprite
-  geometry is shared by every `THREE.Sprite` of the module and stays.
+- `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material
+  starts out with and the texture the stage built last from the canvas — each earlier
+  one was released when its successor took its place —, its `StageRenderer` and the
+  `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a canvas handed
+  to the constructor alone. The sprite geometry is shared by every `THREE.Sprite` of the
+  module and stays.
 - `Display.dispose()` releases its `WebGPURenderer` — the one it built as well as one
-  handed to its constructor — and gives up the field, so `Display#canvas` throws afterwards.
-  The field is gone as soon as `dispose()` returns; the renderer itself is released once its
-  init is through and the GPU has run the work submitted to it — two seconds at most, then
-  with a warning — and, under WebGPU, once the page has drawn two more animation frames or two
-  more seconds have passed without one. A renderer whose init failed has built nothing, and
-  `renderer.dispose()` is not called on it. A canvas handed to the constructor stays the
-  caller's and carries a new `Display` afterwards. Under WebGL its context stays lost until
-  then; the next `Display` on it — built while the release is still running or any time later
-  — waits for the release, restores the context and then starts its renderer. Only a `Display`
-  restores it: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets
-  the lost context.
+  handed to its constructor — and gives up the field, so `Display#canvas` throws
+  afterwards. The field is gone as soon as `dispose()` returns; the renderer itself is
+  released once its init is through and the GPU has run the work submitted to it — two
+  seconds at most, then with a warning — and, under WebGPU, once the page has drawn two
+  more animation frames or two more seconds have passed without one. A renderer whose
+  init failed has built nothing, and `renderer.dispose()` is not called on it. A canvas
+  handed to the constructor stays the caller's and carries a new `Display` afterwards.
+  Under WebGL its context stays lost until then; the next `Display` on it — built while
+  the release is still running or any time later — waits for the release, restores the
+  context and then starts its renderer. Only a `Display` restores it: a `WebGPURenderer`
+  or a `getContext('webgl2')` of your own on that canvas gets the lost context.
 - Stages added via `add()` are not auto-disposed — the caller owns them. Neither is a
   `pipeline`, an `outputRenderTarget`, an `internalTargetPool` or a builder assigned as
   `buildOutputNode` from outside.

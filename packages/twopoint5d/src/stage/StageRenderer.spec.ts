@@ -124,11 +124,11 @@ describe('StageRenderer', () => {
     renderer = createRendererMock();
   });
 
-  // failures: onRenderFrame makes the host throw that error before it takes a handler;
-  // unsubscribeResize and unsubscribeFrame make the unsubscribe of that event count the
-  // call and throw, and the host keeps its handler
+  // failures: onResize and onRenderFrame make the host throw that error before it takes a
+  // handler; unsubscribeResize and unsubscribeFrame make the unsubscribe of that event count
+  // the call and throw, and the host keeps its handler
   function makeHost(
-    failures: {onRenderFrame?: Error; unsubscribeResize?: Error; unsubscribeFrame?: Error} = {},
+    failures: {onResize?: Error; onRenderFrame?: Error; unsubscribeResize?: Error; unsubscribeFrame?: Error} = {},
   ): IStageRendererHost & {
     _emitResize: (w: number, h: number) => void;
     _emitFrame: (now: number, dt: number, frame: number) => void;
@@ -148,6 +148,7 @@ describe('StageRenderer', () => {
     };
     return {
       onResize: (h) => {
+        if (failures.onResize) throw failures.onResize;
         resizeHandler = h;
         return makeUnsub(() => {
           resizeHandler = undefined;
@@ -1297,7 +1298,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or unsubscribe of the previous host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
       );
       expect(error.errors).toHaveLength(2);
       expect(error.errors[0]).toBe(e1);
@@ -1369,20 +1370,93 @@ describe('StageRenderer', () => {
       expect(sr.width, 'the first host reaches the renderer no more').toBe(width);
     });
 
-    it('a host whose onRenderFrame() throws gets its onResize() subscription back once the renderer moves on', () => {
+    it('a host whose onRenderFrame() throws gets its onResize() subscription back at once, and the renderer joins no holder', () => {
       const failure = new Error('the host refused the frame handler');
       const hostA = makeHost({onRenderFrame: failure});
       const hostB = makeHost();
       const sr = new StageRenderer();
+      const added = vi.fn();
+      on(sr, OnAddToParent, added);
       expect(thrownBy(() => sr.attach(hostA))).toBe(failure);
+
+      expect(hostA._unsubs, 'the onResize subscription given up').toBe(1);
+      expect(sr.parent).toBeUndefined();
+      hostA._emitResize(80, 40);
+      expect(sr.width, 'the first host reaches the renderer no more').toBe(0);
 
       sr.attach(hostB);
 
-      expect(hostA._unsubs, 'the onResize subscription given up').toBe(1);
-      hostA._emitResize(80, 40);
-      expect(sr.width, 'the first host reaches the renderer no more').toBe(0);
+      expect(hostA._unsubs).toBe(1);
       hostB._emitResize(80, 40);
       expect([sr.width, sr.height], 'the new host drives it').toEqual([80, 40]);
+      expect(added, 'only the join of the second host').toHaveBeenCalledTimes(1);
+    });
+
+    it('new StageRenderer(host) throws the error of a host whose onRenderFrame() throws, and the host keeps no subscription of it', () => {
+      const failure = new Error('the host refused the frame handler');
+      const host = makeHost({onRenderFrame: failure});
+
+      expect(thrownBy(() => new StageRenderer(host))).toBe(failure);
+
+      expect(host._unsubs).toBe(1);
+    });
+
+    it('a host whose onResize() throws takes nothing: the renderer joins no holder and hands the error on', () => {
+      const failure = new Error('the host refused the resize handler');
+      const host = makeHost({onResize: failure});
+      const sr = new StageRenderer();
+      const added = vi.fn();
+      on(sr, OnAddToParent, added);
+
+      expect(thrownBy(() => sr.attach(host))).toBe(failure);
+
+      expect(sr.parent).toBeUndefined();
+      expect(added).not.toHaveBeenCalled();
+      expect(host._unsubs).toBe(0);
+    });
+
+    it('a write to parent that meets a host whose onRenderFrame() throws hands its error on after those of the move out, and the renderer joins no holder', () => {
+      const eP = new Error('remove from parent');
+      const eS = new Error('the host refused the frame handler');
+      const hostA = makeHost();
+      const sr = new StageRenderer(hostA);
+      on(sr, OnRemoveFromParent, () => {
+        throw eP;
+      });
+      const added = vi.fn();
+      on(sr, OnAddToParent, added);
+      const hostB = makeHost({onRenderFrame: eS});
+
+      const error = thrownBy(() => {
+        sr.parent = hostB;
+      }) as AggregateError;
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe(
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+      );
+      expect(error.errors).toEqual([eP, eS]);
+      expect(sr.parent).toBeUndefined();
+      expect(added).not.toHaveBeenCalled();
+      expect(hostA._unsubs).toBe(2);
+      expect(hostB._unsubs).toBe(1);
+    });
+
+    it('an unsubscribe that throws while the renderer gives back what a refusing host handed out joins the error of the host', () => {
+      const eS = new Error('the host refused the frame handler');
+      const eU = new Error('the host refused to let go');
+      const host = makeHost({onRenderFrame: eS, unsubscribeResize: eU});
+      const sr = new StageRenderer();
+
+      const error = thrownBy(() => sr.attach(host)) as AggregateError;
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe(
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+      );
+      expect(error.errors).toEqual([eS, eU]);
+      expect(host._unsubs).toBe(1);
+      expect(sr.parent).toBeUndefined();
     });
 
     it('detach() from a host whose unsubscribe throws gives up the other subscription, sends OnRemoveFromParent and hands the error on', () => {
@@ -1423,7 +1497,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or unsubscribe of the previous host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
       );
       expect(error.errors).toEqual([eU, eP, eA]);
       expect(sr.parent).toBe(hostB);

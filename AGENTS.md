@@ -13,7 +13,7 @@ them.
 | Path | Role |
 | --- | --- |
 | `packages/twopoint5d` | the published library `@spearwolf/twopoint5d` — almost all work happens here |
-| `packages/twopoint5d-testing` | browser/WebGL integration tests, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
+| `packages/twopoint5d-testing` | browser integration tests, under WebGPU or WebGL 2 depending on the browser, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
 | `apps/lookbook` | Astro showcase and de-facto live documentation |
 | `scripts` | the Node scripts — publish pipeline, CI cache server, the checks of the repo; as an Nx project only their type check |
 
@@ -104,8 +104,8 @@ explicit instruction.
   rules](packages/twopoint5d/docs/resource-lifecycle.md). They are binding, not
   advisory.
 - **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js`
-  in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A change to
-  rendering or GPU-buffer code needs both.
+  in `packages/twopoint5d-testing/test/` (real browsers, visual, under WebGPU or
+  WebGL 2). A change to rendering or GPU-buffer code needs both.
   A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of

@@ -12,7 +12,7 @@ pnpm workspaces (`pnpm-workspace.yaml`) define the packages, Nx (`nx.json` plus 
 | Project | Path | Tags | Role |
 | --- | --- | --- | --- |
 | `twopoint5d` | `packages/twopoint5d` | `ci`, `twopoint5d` | the published library |
-| `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser/WebGL integration tests |
+| `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser integration tests, under WebGPU or WebGL 2 |
 | `lookbook` | `apps/lookbook` | `app` | Astro showcase |
 | `scripts` | `scripts` | `scripts` | the Node scripts; as a project only their type check |
 
@@ -51,8 +51,8 @@ which the CI workflow archives as well.
 
 Per-project `inputs` narrow the cache key further. The library's `build` input list
 excludes `*.spec.ts`, `*.bench.ts` and `src/testing/` — tests, benches and their helpers
-do not invalidate a build, which is also why `pnpm build`
-alone never type-checks the tests and `pnpm typecheck` exists separately.
+do not invalidate a build, which is also why `pnpm build` alone never type-checks the
+tests and `pnpm typecheck` exists separately.
 
 The consumers of the library — `twopoint5d-testing:test`, `lookbook:build` and
 `lookbook:typecheck` — take its build output as input (`{"dependentTasksOutputFiles":
@@ -254,7 +254,10 @@ being asked to.
 jobs. Each works on `github.event.workflow_run.head_sha`, the commit that CI run tested:
 `main` may have moved on while CI ran, and a newer commit gets a CI run and a deploy of
 its own. They run only for a CI run triggered by a push to this repository, the one kind
-of run that may name the commit to publish.
+of run that may name the commit to publish. The runs share the concurrency group
+`deploy` with `queue: max`: one deploy runs at a time and the others wait their turn, up
+to 100 of them, where the default would keep one waiting run and let a newer one cancel
+it — a version bump whose deploy waits behind another would never be published.
 
 - `version` asks npm whether the manifest version is published already, or whether it
   ends in `-dev`; only if neither holds do the other three run.

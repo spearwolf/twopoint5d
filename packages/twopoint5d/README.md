@@ -33,26 +33,29 @@ The core features can be roughly classified into the following areas:
 
 #### 📚 [vertex-objects](src/vertex-objects/)
 
-three.js offers standardized geometry properties like position, normal, colors, etc..
-For rendering, triangles are almost always used as primtives.
+three.js offers standardized geometry properties like position, normal, colors, etc.
+For rendering, triangles are almost always used as primitives.
 
 The _vertex-objects_ api simplifies the creation of geometries with custom properties. A
 _vertex-object description_ is used to describe the geometry and its primitives, and an
 object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom
 sprites_ of the geometry.
 
-For such a geometry, however, own vertex and fragment shaders are almost always needed,
-since the standard shaders from the three.js library are of course not written for
-non-standard geometry properties.
+Such a geometry almost always needs a material of its own, since the built-in
+materials of three.js know nothing of custom attributes. In this library that is a
+`NodeMaterial` whose shader is written in TSL (`three/tsl`) and reads the attributes
+through `attribute()` nodes, as the sprite materials under
+[src/sprites/](src/sprites/) do.
 
 The main motivation behind the _vertex objects_ is to make it easier to create custom
 geometries, especially _instanced_ geometries (multiple objects within one buffer
-geometry) without worrying too much about low-level three.js/WebGL details.
+geometry) without worrying too much about the buffer attributes of three.js
+underneath.
 
 This library provides you with a declarative interface to describe the shape of the
 geometry, incl. indices and attributes and manages the internal attribute buffers, deals
 with mapping of attributes to buffers AND the update of them.
-  
+
 It should significantly cut down on the amount of boilerplate code and state management
 you need to do in your applications. At the same time, the _vertex objects_ api gives
 you a convenient object-based interface to write extremely clean and readable programs

@@ -124,9 +124,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #parent?: StageRendererParentType;
 
   // the subscriptions #addToHost() took at the host that drives this renderer, given up
-  // by #removeFromParent() before OnRemoveFromParent goes out rather than by listeners
-  // of that event: a listener that disposes this renderer takes every listener with it
-  // that the event has not reached yet
+  // by #removeFromParent() before OnRemoveFromParent goes out, or by #addToHost() itself
+  // when the host refuses one of them, rather than by listeners of that event: a listener
+  // that disposes this renderer takes every listener with it that the event has not
+  // reached yet
   #hostSubscriptions: StageRendererHostUnsubscribe[] = [];
 
   width: number = 0;
@@ -267,6 +268,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * the listeners, ahead of them. A listener that disposes this renderer or gives it another
    * holder while it leaves its holder ends the assignment there. For a `StageRenderer`
    * assigned here, {@link add} says the same.
+   *
+   * A host whose `onResize()` or `onRenderFrame()` throws as this renderer joins it
+   * holds nothing of it: the renderer gives back the subscription the host had handed
+   * out and joins no holder — `parent` answers `undefined`, and `OnAddToParent` does
+   * not go out. The error of the host joins those of the move out, after them, and an
+   * unsubscribe that throws while the renderer gives back joins after it.
    */
   get parent(): StageRendererParentType | undefined {
     return this.#parent;
@@ -286,20 +293,22 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#removeFromParent(errors);
     // a listener of the move out can have disposed this renderer or given it another holder: the
     // move ends here then
-    if (!this.#disposed && this.#parent === undefined) {
+    if (!this.#disposed && this.#parent === undefined && parent) {
       this.#parent = parent;
-      if (parent) {
-        this.#addToHost(parent);
+      if (this.#addToHost(parent, errors)) {
         try {
           emitStrict(this, OnAddToParent);
         } catch (error) {
           errors.push(error);
         }
+      } else {
+        // a host that refused a subscription does not hold this renderer
+        this.#parent = undefined;
       }
     }
     throwCollected(
       errors,
-      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or unsubscribe of the previous host threw',
+      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
     );
   }
 
@@ -313,18 +322,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#parent = undefined;
 
     // the host lets go before anyone hears of the move, so a listener that disposes this
-    // renderer or gives it another holder finds it off the old host already. Each handle
-    // is asked on its own, and what one throws waits for the caller like the error of a
-    // listener
-    const hostSubscriptions = this.#hostSubscriptions;
-    this.#hostSubscriptions = [];
-    for (const unsubscribe of hostSubscriptions) {
-      try {
-        unsubscribe();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
+    // renderer or gives it another holder finds it off the old host already
+    this.#unsubscribeFromHost(errors);
 
     // every listener hears it, even behind one that throws. The error goes to the caller
     // once its call has run to its end
@@ -343,26 +342,50 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  #addToHost(host: IStageRendererHost): void {
-    // each handle is booked as soon as the host hands it out: a host whose onRenderFrame()
-    // throws still gets its onResize() subscription back once this renderer leaves it
-    this.#hostSubscriptions.push(
-      host.onResize(({width, height}) => {
-        this.resize(width, height);
-      }),
-    );
-    this.#hostSubscriptions.push(
-      host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
-        this.updateFrame(now, deltaTime, frameNo);
-        this.renderTo(renderer);
-      }),
-    );
+  // gives up every subscription booked at the host. Each handle is asked on its own,
+  // and what one throws waits for the caller like the error of a listener
+  #unsubscribeFromHost(errors: unknown[]): void {
+    const hostSubscriptions = this.#hostSubscriptions;
+    this.#hostSubscriptions = [];
+    for (const unsubscribe of hostSubscriptions) {
+      try {
+        unsubscribe();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }
+
+  // each handle is booked as soon as the host hands it out. A host that throws on
+  // either subscription gets back what it handed out and holds nothing of this
+  // renderer; its error waits for the caller. Answers whether the host took both
+  #addToHost(host: IStageRendererHost, errors: unknown[]): boolean {
+    try {
+      this.#hostSubscriptions.push(
+        host.onResize(({width, height}) => {
+          this.resize(width, height);
+        }),
+      );
+      this.#hostSubscriptions.push(
+        host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
+          this.updateFrame(now, deltaTime, frameNo);
+          this.renderTo(renderer);
+        }),
+      );
+      return true;
+    } catch (error) {
+      errors.push(error);
+      this.#unsubscribeFromHost(errors);
+      return false;
+    }
   }
 
   /**
    * @param parent Optional host (e.g. a `Display`) or parent `StageRenderer`.
    * Passing a parent enables the auto-driven frame loop — do not also drive
    * `updateFrame()`/`renderTo()` from your own handler (see class docs).
+   * A host that throws as the renderer subscribes makes the constructor throw that
+   * error and keeps no subscription of the renderer, see {@link parent}.
    */
   constructor(parent?: StageRendererParentType) {
     eventize(this);

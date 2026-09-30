@@ -10,8 +10,12 @@ permissions:
   contents: read
 
 concurrency:
+  # one deploy at a time. By default a group keeps a single run waiting and a newer
+  # run cancels it, so a version bump whose deploy waited behind another would never
+  # be published; queue: max lets up to 100 runs wait their turn
   group: deploy
   cancel-in-progress: false
+  queue: max
 
 jobs:
   version:
