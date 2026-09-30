@@ -26,29 +26,17 @@ enum HideCursorState {
 interface PanInternalState {
   pointerType: string;
 
+  // the rectangle of coordsTarget at the pointerdown of this pointer: every position of
+  // it is measured against this one, to the end of its drag
+  left: number;
+  top: number;
+
   panX: number;
   panY: number;
 
   lastX: number;
   lastY: number;
 }
-
-const mergePan = (states: PanInternalState[]) =>
-  states.reduce(
-    ({panX, panY}, state) => {
-      panX += state.panX;
-      panY += state.panY;
-
-      state.panX = 0;
-      state.panY = 0;
-
-      return {panX, panY};
-    },
-    {
-      panX: 0,
-      panY: 0,
-    },
-  );
 
 const MOUSE = 'mouse';
 
@@ -114,14 +102,14 @@ export interface PanControl2DOptions {
   cursorStylesTarget?: HTMLElement;
 
   /**
-   * The element pointer coordinates are measured against: the control subtracts the
-   * `getBoundingClientRect()` of this element from every pointer position. Default is the
+   * The element pointer coordinates are measured against. When a pointer goes down, the
+   * control takes the `getBoundingClientRect()` of this element and subtracts it from
+   * every position of that pointer until the pointer ends. Default is the
    * `cursorStylesTarget`, and with that `document.body`.
    *
-   * What matters for a pan is that the rectangle stays the same throughout a drag — the pan is
-   * a difference of two measurements, and a fixed offset cancels out. Name the canvas here when
-   * it sits in a shadow root: the browser retargets `event.target` onto the shadow host there,
-   * and a canvas is not its host.
+   * A drag keeps the rectangle of its `pointerdown` to its end: the pan is a difference
+   * of two positions, and an offset that stays the same cancels out. An element that
+   * moves or scrolls under a running drag does not move the view.
    */
   coordsTarget?: HTMLElement;
 
@@ -240,8 +228,9 @@ export class PanControl2D extends InputControlBase {
   keyCodes: [number, number, number, number];
 
   /**
-   * The element pointer coordinates are measured against. Can be swapped at runtime; the next
-   * pointer event is measured against the new one.
+   * The element pointer coordinates are measured against. Can be swapped at runtime: a
+   * pointer that goes down afterwards is measured against the new one, a drag under way
+   * keeps the rectangle it started with.
    *
    * @see {@link PanControl2DOptions.coordsTarget}
    */
@@ -353,10 +342,11 @@ export class PanControl2D extends InputControlBase {
    * fields, the keys and the pointer, and writes them into this very object. Assigning
    * `undefined` puts a fresh state at `0, 0` in its place.
    *
-   * The first `update()` after a state is assigned — in the constructor through `options.state`, or
-   * here — emits `OnPanControl2DUpdate` even when nothing moved, so a listener learns where the
-   * view starts. Assigning the state this control already holds changes nothing: before that first
-   * `update()` the announcement stays due, after it none is added.
+   * The first `update()` after a state is assigned — in the constructor through
+   * `options.state`, or here — emits `OnPanControl2DUpdate` even when nothing moved, so a
+   * listener learns where the view starts. Assigning the state this control already holds
+   * changes nothing: before that first `update()` the announcement stays due, after it
+   * none is added. A disposed control announces nothing: its {@link update} does nothing.
    */
   get panView(): PanViewState {
     return this.#panView;
@@ -427,11 +417,13 @@ export class PanControl2D extends InputControlBase {
    *
    * None of it can come back through an event any more — a `pointerup` and a `keyup` reach a
    * control that is no longer listening, and without this the view would keep moving by a key
-   * nobody is pressing. A speed field a caller wrote by hand is not touched: {@link update}
-   * moves the view by those whether an input source reaches this control or not.
+   * nobody is pressing. A speed field a caller wrote by hand is not touched: on a control
+   * that is not disposed, {@link update} moves the view by those whether an input source
+   * reaches this control or not.
    */
   override unsubscribe(): void {
-    // first: with the listeners off document, no event can refill what the lines below give up
+    // first: with the listeners off document and window, no event can refill what the
+    // lines below give up
     super.unsubscribe();
 
     this.#dropPointers();
@@ -440,13 +432,19 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
-   * Move {@link panView} by what the speed fields, the keys and the pointer collected since the
-   * last call, and emit `OnPanControl2DUpdate` with the new `x` and `y` when that moved the view —
-   * and on the first call after a state was assigned to {@link panView}, whether it moved or not.
+   * Move {@link panView} by what the speed fields, the keys and the pointer collected
+   * since the last call, and emit `OnPanControl2DUpdate` with the new `x` and `y` when
+   * that moved the view — and on the first call after a state was assigned to
+   * {@link panView}, whether it moved or not.
+   *
+   * On a disposed control this does nothing: the view stays where it is, whatever the
+   * speed fields hold, and no event goes out.
    *
    * @param t delta time since last `update()` call in seconds
    */
   update(t: number): void {
+    if (this.isDisposed) return;
+
     const {x: prevX, y: prevY} = this.panView;
 
     this.panView.y -= this.speedNorth * t;
@@ -455,12 +453,21 @@ export class PanControl2D extends InputControlBase {
     this.panView.x -= this.speedWest * t;
 
     if (!this.#pointerDisabled) {
-      let {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));
-
-      panX += this.#releasedPanX;
-      panY += this.#releasedPanY;
+      let panX = this.#releasedPanX;
+      let panY = this.#releasedPanY;
       this.#releasedPanX = 0;
       this.#releasedPanY = 0;
+
+      // summed in place: update() runs every frame, and a frame loop that has settled
+      // allocates nothing here
+      if (this.#pointersDown.size > 0) {
+        for (const state of this.#pointersDown.values()) {
+          panX += state.panX;
+          panY += state.panY;
+          state.panX = 0;
+          state.panY = 0;
+        }
+      }
 
       const pixelRatio = this.panView.pixelRatio || 1;
 
@@ -491,14 +498,24 @@ export class PanControl2D extends InputControlBase {
 
   #onPointerDown = (event: PointerEvent): void => {
     if (this.#isPanPointer(event)) {
-      // an id that is still down missed its end: its old position is no anchor, and whatever it
-      // collected goes with it
-      const {x: lastX, y: lastY} = this.#toRelativeCoords(event);
+      // the rectangle is measured once per pointer, here: a read on every pointermove
+      // would force a layout on a DOM with pending changes each time. The pan is a
+      // difference of two positions, so an offset that stays the same for the whole drag
+      // cancels out, and without a target the client coordinates are the reference
+      const rect = this.coordsTarget?.getBoundingClientRect();
+      const left = rect?.left ?? 0;
+      const top = rect?.top ?? 0;
+
+      // an id that is still down missed its end: its old position is no anchor, and
+      // whatever it collected goes with it
       this.#pointersDown.set(event.pointerId, {
         pointerType: event.pointerType,
 
-        lastX,
-        lastY,
+        left,
+        top,
+
+        lastX: event.clientX - left,
+        lastY: event.clientY - top,
 
         panX: 0,
         panY: 0,
@@ -560,16 +577,22 @@ export class PanControl2D extends InputControlBase {
   }
 
   #restoreCursorUnlessMouseDown(): void {
-    if (!Array.from(this.#pointersDown.values()).some((state) => state.pointerType === MOUSE)) {
-      this.#restoreCursorStyle();
+    // a mouse that moves over the page with no button down passes here on every move:
+    // with no cursor hidden and none about to be, there is nothing to restore and no
+    // pointer to look at
+    if (this.#hideCursorState === HideCursorState.NO) return;
+    for (const state of this.#pointersDown.values()) {
+      if (state.pointerType === MOUSE) return;
     }
+    this.#restoreCursorStyle();
   }
 
   #restoreCursorStyle() {
-    // Only YES has a cursor to restore: that is the one state in which the class went onto the
-    // target and a hideCursor went out. From MAYBE the state is taken back and nothing else
-    // happens, and from NO there is nothing to take back — every pointer move over the page
-    // passes here, and each one would otherwise report a restore of a cursor nobody hid.
+    // Only YES has a cursor to restore: that is the one state in which the class went
+    // onto the target and a hideCursor went out. From MAYBE the state is taken back and
+    // nothing else happens, and from NO there is nothing to take back — a control that
+    // never hid a cursor passes here as well, when the pointer is switched off and on
+    // dispose(), and would otherwise report a restore of a cursor nobody hid.
     const wasHidden = this.#hideCursorState === HideCursorState.YES;
 
     this.#hideCursorState = HideCursorState.NO;
@@ -604,30 +627,14 @@ export class PanControl2D extends InputControlBase {
   };
 
   #updatePanState(event: PointerEvent, state: PanInternalState) {
-    const {x, y} = this.#toRelativeCoords(event);
+    const x = event.clientX - state.left;
+    const y = event.clientY - state.top;
 
     state.panX += x - state.lastX;
     state.panY += y - state.lastY;
 
     state.lastX = x;
     state.lastY = y;
-  }
-
-  #toRelativeCoords(event: PointerEvent): {x: number; y: number} {
-    const {clientX, clientY} = event;
-
-    // without a target the client coordinates are the reference, and they are as stable a one
-    // as any rectangle: the pan is a difference, and the offset cancels out either way
-    if (this.coordsTarget == null) {
-      return {x: clientX, y: clientY};
-    }
-
-    const {left, top} = this.coordsTarget.getBoundingClientRect();
-
-    return {
-      x: clientX - left,
-      y: clientY - top,
-    };
   }
 
   #speedFieldFor(event: KeyboardEvent): KeyedSpeedField | undefined {
@@ -678,25 +685,33 @@ export class PanControl2D extends InputControlBase {
   };
 
   /**
-   * Take every listener off `document` and `window`, give the cursor styles target back the way
-   * it was found, give the cursor rule back to the stylesheet and drop the pan that was collected
-   * but never delivered.
+   * Take every listener off `document` and `window`, give the cursor styles target back
+   * the way it was found, give the cursor rule back to the stylesheet and drop the pan
+   * that was collected but never delivered.
    *
    * The `state` object and the `cursorStylesTarget` element were handed in and stay the
-   * caller's: the state keeps the values the last {@link update} wrote, and the element keeps
-   * everything but the cursor class this control put on it. The cursor rule stays in the
-   * stylesheet for as long as another control in the same root shows the same cursor style.
+   * caller's: the state keeps the values the last {@link update} wrote, and the element
+   * keeps everything but the cursor class this control put on it. The cursor rule stays
+   * in the stylesheet for as long as another control in the same root shows the same
+   * cursor style.
    *
-   * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a key
-   * reaches this control any more. {@link update} still moves {@link panView} by the speed fields a
-   * caller sets by hand; a key that was still held down when `dispose()` ran has given its field
-   * back, and what it no longer delivers is a pan from a drag before the call. A write to
-   * {@link cursorPanStyle} is refused: a disposed control retains no more rules from a stylesheet
-   * that is not its own. `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`, `keyboardDisabled`,
-   * `pointerDisabled`, `panView` and the four `speed…` fields still take values, they just drive
-   * nothing. A control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor`
-   * while its subscribers can still hear it; after that every listener on this control goes with
-   * it, and a further `dispose()` does nothing.
+   * Afterwards `isDisposed` is `true`, `isActive` is `false`, and neither a pointer nor a
+   * key reaches this control any more. A key that was still held down when `dispose()`
+   * ran has given its field back, and the pan of a drag that was still running is
+   * dropped. {@link update} does nothing on a disposed control: it moves {@link panView}
+   * no further, not even by a speed field a caller sets by hand, and emits no
+   * `OnPanControl2DUpdate`. {@link onUpdate}, {@link onHideCursor} and
+   * {@link onRestoreCursor} subscribe nothing. A write to {@link cursorPanStyle} is
+   * refused: a disposed control retains no more rules from a stylesheet that is not its
+   * own.
+   *
+   * `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`, `keyboardDisabled`,
+   * `pointerDisabled`, `panView` and the four `speed…` fields still take values; they
+   * drive nothing.
+   *
+   * A control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor`
+   * while its subscribers can still hear it; after that every listener on this control
+   * goes with it, and a further `dispose()` does nothing.
    */
   override dispose(): void {
     if (this.isDisposed) return;
@@ -720,26 +735,34 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
-   * Subscribes `listener` to `OnPanControl2DUpdate`: the position {@link update} moved the view to.
-   * Returns the function that takes the listener off again. {@link update} keeps moving the view
-   * after {@link dispose}, so a listener attached then still hears it.
+   * Subscribes `listener` to `OnPanControl2DUpdate`: the position {@link update} moved
+   * the view to. Returns the function that takes the listener off again.
+   *
+   * On a disposed control this does nothing: {@link update} moves no view there, the
+   * listener is never called, and the returned function has nothing to take back.
    */
   readonly onUpdate = (listener: (props: PanControl2DUpdateProps) => unknown): UnsubscribeFunc =>
-    on(this, OnPanControl2DUpdate, listener);
+    this.isDisposed ? () => {} : on(this, OnPanControl2DUpdate, listener);
 
   /**
-   * Subscribes `listener` to `OnPanControl2DHideCursor`: a mouse drag with the pan button started to
-   * move, and the control hid the cursor. Returns the function that takes the listener off again.
+   * Subscribes `listener` to `OnPanControl2DHideCursor`: a mouse drag with the pan button
+   * started to move, and the control hid the cursor. Returns the function that takes the
+   * listener off again.
+   *
+   * On a disposed control this does nothing: the listener is never called, and the
+   * returned function has nothing to take back.
    */
   readonly onHideCursor = (listener: (control: PanControl2D) => unknown): UnsubscribeFunc =>
-    on(this, OnPanControl2DHideCursor, listener);
+    this.isDisposed ? () => {} : on(this, OnPanControl2DHideCursor, listener);
 
   /**
-   * Subscribes `listener` to `OnPanControl2DRestoreCursor`: a cursor this control hid came back.
-   * Returns the function that takes the listener off again. {@link dispose} of a control that is
-   * hiding the cursor emits it one last time; a disposed control hides no cursor, so a listener
-   * attached after that hears nothing.
+   * Subscribes `listener` to `OnPanControl2DRestoreCursor`: a cursor this control hid
+   * came back. Returns the function that takes the listener off again. {@link dispose} of
+   * a control that is hiding the cursor emits it one last time.
+   *
+   * On a disposed control this does nothing: the listener is never called, and the
+   * returned function has nothing to take back.
    */
   readonly onRestoreCursor = (listener: (control: PanControl2D) => unknown): UnsubscribeFunc =>
-    on(this, OnPanControl2DRestoreCursor, listener);
+    this.isDisposed ? () => {} : on(this, OnPanControl2DRestoreCursor, listener);
 }

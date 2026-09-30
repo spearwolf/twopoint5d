@@ -1,7 +1,12 @@
-import {on} from '@spearwolf/eventize';
+import {emit, on} from '@spearwolf/eventize';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
-import {OnPanControl2DUpdate, type PanControl2DUpdateProps} from '../events.js';
+import {
+  OnPanControl2DHideCursor,
+  OnPanControl2DRestoreCursor,
+  OnPanControl2DUpdate,
+  type PanControl2DUpdateProps,
+} from '../events.js';
 import {PanControl2D, type PanControl2DOptions} from './PanControl2D.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
@@ -182,20 +187,6 @@ describe('PanControl2D', () => {
       expect(control.speedNorth).toBe(0);
     });
 
-    it('does not pan by a key typed into an input in an open shadow root', () => {
-      const control = makeControl();
-      let target: EventTarget | null = null;
-      doc.addEventListener('keydown', (event) => {
-        target = event.target;
-      });
-
-      key('keydown', {code: 'KeyW', origin: {localName: 'input'}});
-
-      // the listener on document sees the shadow host, here the document stub itself
-      expect(target).toBe(doc);
-      expect(control.speedNorth).toBe(0);
-    });
-
     it('pans by a key pressed with Shift', () => {
       const control = makeControl();
       key('keydown', {code: 'KeyW', shiftKey: true});
@@ -310,6 +301,21 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('pointer positions', () => {
+    it('measures the rectangle of its coordsTarget once per drag, when the pointer goes down', () => {
+      const getBoundingClientRect = vi.fn(() => ({left: 5, top: 7}));
+      const control = makeControl({coordsTarget: {getBoundingClientRect} as unknown as HTMLElement});
+
+      pointer('pointerdown', {buttons: 1, clientX: 0});
+      for (const clientX of [10, 20, 30]) pointer('pointermove', {buttons: 1, clientX});
+      pointer('pointerup', {buttons: 0, clientX: 30});
+      control.update(0);
+
+      expect(getBoundingClientRect).toHaveBeenCalledOnce();
+      expect(control.panView.x).toBe(-30);
+    });
+  });
+
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();
@@ -341,16 +347,34 @@ describe('PanControl2D', () => {
       expect(restored).toHaveBeenCalledExactlyOnceWith(control);
     });
 
-    it('a listener added through onUpdate() after dispose() still hears update(), which keeps moving the view', () => {
+    it('update() on a disposed control leaves the view where it is and emits nothing', () => {
+      const control = makeControl();
+      const spy = vi.fn();
+      control.dispose();
+      on(control, OnPanControl2DUpdate, spy);
+
+      control.panView = {x: 1, y: 1};
+      control.speedEast = 10;
+      control.update(1);
+
+      expect(control.panView).toEqual({x: 1, y: 1});
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('onUpdate(), onHideCursor() and onRestoreCursor() subscribe nothing on a disposed control', () => {
       const control = makeControl();
       control.dispose();
       const spy = vi.fn();
-      control.onUpdate(spy);
+      const offs = [control.onUpdate(spy), control.onHideCursor(spy), control.onRestoreCursor(spy)];
 
-      control.panView = {x: 1, y: 1};
-      control.update(0);
+      // straight through eventize, past update() and the pointer: whoever is subscribed
+      // hears these
+      emit(control, OnPanControl2DUpdate, {x: 0, y: 0});
+      emit(control, OnPanControl2DHideCursor, control);
+      emit(control, OnPanControl2DRestoreCursor, control);
 
-      expect(spy).toHaveBeenCalledExactlyOnceWith({x: 1, y: 1});
+      expect(spy).not.toHaveBeenCalled();
+      for (const off of offs) expect(off).not.toThrow();
     });
 
     it('a listener added through onRestoreCursor() after dispose() hears nothing', () => {

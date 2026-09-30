@@ -111,16 +111,21 @@ export function whenPageAnimates() {
 // --- input for PanControl2D ---
 
 /**
- * PanControl2D listens on `document`, so a pointer event dispatched on any element bubbles up
- * to it. The element it is dispatched on — `document.body` unless `target` names another — is
- * what the control sees as `event.target`.
+ * PanControl2D listens on `document`, so a pointer event dispatched on any element
+ * bubbles up to it. The element it is dispatched on — `document.body` unless `target`
+ * names another — is what the control sees as `event.target`. `isPrimary` is `true`
+ * unless named otherwise: the first pointer of its type, which a second finger on a
+ * touch screen is not.
  */
-export function pointer(type, {x = 0, y = 0, buttons = 1, pointerId = 1, pointerType = 'mouse', target = document.body} = {}) {
+export function pointer(
+  type,
+  {x = 0, y = 0, buttons = 1, pointerId = 1, pointerType = 'mouse', isPrimary = true, target = document.body} = {},
+) {
   target.dispatchEvent(
     new PointerEvent(type, {
       bubbles: true,
       pointerId,
-      isPrimary: true,
+      isPrimary,
       pointerType,
       buttons,
       clientX: x,
@@ -129,9 +134,15 @@ export function pointer(type, {x = 0, y = 0, buttons = 1, pointerId = 1, pointer
   );
 }
 
-/** A key event on `document`, where PanControl2D listens; `init` names the key, usually by `code`. */
-export function key(type, init) {
-  document.dispatchEvent(new KeyboardEvent(type, {bubbles: true, ...init}));
+/**
+ * A key event on `target` — `document` unless another is named —, bubbling and composed,
+ * so that it reaches the listener of PanControl2D on `document` from inside a shadow
+ * root as well; `init` names the key, usually by `code`.
+ *
+ * @param {EventTarget} [target]
+ */
+export function key(type, init, target = document) {
+  target.dispatchEvent(new KeyboardEvent(type, {bubbles: true, composed: true, ...init}));
 }
 
 /** The pan state a PanControl2D writes into: at the origin, at a pixel ratio of 1. */

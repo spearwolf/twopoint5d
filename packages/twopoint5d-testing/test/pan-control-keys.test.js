@@ -1,14 +1,14 @@
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
-import {key} from './helpers/fixtures.js';
+import {key, makeState} from './helpers/fixtures.js';
 
 // every keydown a test sends is followed by its keyup, so no key stays held for the next control
-function press(init) {
-  key('keydown', init);
+function press(init, target) {
+  key('keydown', init, target);
 }
 
-function release(init) {
-  key('keyup', init);
+function release(init, target) {
+  key('keyup', init, target);
 }
 
 function speeds(control) {
@@ -29,7 +29,7 @@ describe('PanControl2D — which keys it pans by', () => {
   let control;
 
   function makeControl(options) {
-    control = new PanControl2D({state: {x: 0, y: 0, pixelRatio: 1}, disablePointer: true, ...options});
+    control = new PanControl2D({state: makeState(), disablePointer: true, ...options});
     return control;
   }
 
@@ -117,5 +117,35 @@ describe('PanControl2D — which keys it pans by', () => {
 
     expect(heldUp, 'the arrow up key').to.deep.equal({...STILL, speedNorth: control.pixelsPerSecond});
     expect(heldI, 'the key named by keyCodes').to.deep.equal(STILL);
+  });
+
+  it('does not pan by a key typed into an input in an open shadow root', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    try {
+      const shadowRoot = host.attachShadow({mode: 'open'});
+      const input = document.createElement('input');
+      const canvas = document.createElement('canvas');
+      shadowRoot.append(input, canvas);
+
+      makeControl();
+
+      const w = {code: 'KeyW'};
+      press(w, input);
+      const heldInInput = speeds(control);
+      release(w, input);
+
+      press(w, canvas);
+      const heldInCanvas = speeds(control);
+      release(w, canvas);
+
+      expect(heldInInput, 'a key typed into the input').to.deep.equal(STILL);
+      expect(heldInCanvas, 'a key that goes into the canvas beside it').to.deep.equal({
+        ...STILL,
+        speedNorth: control.pixelsPerSecond,
+      });
+    } finally {
+      host.remove();
+    }
   });
 });

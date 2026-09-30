@@ -188,8 +188,9 @@ export interface ICanvas2DStageDispose {
 // ------------------------------------------------------------
 
 /**
- * Emitted by `PanControl2D#update()` when the call moved the view, and on the first call after a
- * state was assigned to `panView`, whether it moved or not.
+ * Emitted by `PanControl2D#update()` when the call moved the view, and on the first call
+ * after a state was assigned to `panView`, whether it moved or not. A disposed control
+ * emits it no more.
  */
 export const OnPanControl2DUpdate = 'update';
 /**

@@ -1,4 +1,4 @@
-import {on} from '@spearwolf/eventize';
+import {emit, on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 import {pointer, key, makeState} from './helpers/fixtures.js';
@@ -32,9 +32,10 @@ describe('PanControl2D — the contract after dispose()', () => {
   // the element belongs to the caller, and the case below checks it is left as it was found.
 
   // Assertion (c) — "every public member behaves after dispose() as its TSDoc says" — is
-  // what the cases below are about: a disposed control ignores keyboard and pointer, hooks
-  // nothing up again through subscribe(), delivers no pan collected before dispose() and
-  // cannot be brought back through its public setters.
+  // what the cases below are about: a disposed control ignores keyboard and pointer,
+  // hooks nothing up again through subscribe(), moves the view no further through
+  // update(), takes no listener through its on…() helpers and cannot be brought back
+  // through its public setters.
 
   // Assertion (d) — "the second call throws nothing and releases nothing a second time" —
   // is the case "is safe to call twice" below.
@@ -65,7 +66,8 @@ describe('PanControl2D — the contract after dispose()', () => {
   });
 
   it('ignores keyboard and pointer after dispose()', () => {
-    control = new PanControl2D({state: makeState()});
+    const target = document.createElement('div');
+    control = new PanControl2D({state: makeState(), cursorStylesTarget: target});
 
     control.dispose();
 
@@ -81,12 +83,12 @@ describe('PanControl2D — the contract after dispose()', () => {
     expect(control.speedWest, 'speedWest').to.equal(0);
     expect(control.speedEast, 'speedEast').to.equal(0);
 
+    // update() of a disposed control does nothing, so the drag is watched at the cursor:
+    // a pointer listener that dispose() left behind would show it
     pointer('pointerdown', {x: 10, y: 10});
     pointer('pointermove', {x: 30, y: 10});
-    control.update(1 / 60);
 
-    expect(control.panView.x, 'panView.x').to.equal(0);
-    expect(control.panView.y, 'panView.y').to.equal(0);
+    expect(target.classList.length, 'the cursor class after a drag').to.equal(0);
 
     // the keys are still held down as far as the browser is concerned
     key('keyup', KEY_NORTH);
@@ -119,13 +121,22 @@ describe('PanControl2D — the contract after dispose()', () => {
 
     control.dispose();
 
-    // a speed set by hand is the one way left to make update() move the view, so the emit
-    // this case is about does happen — what is gone is the listener
+    // update() of a disposed control emits nothing, so a direct emit is what shows
+    // whether the listener is still there
+    emit(control, 'update', {x: 0, y: 0});
+
+    expect(updates, 'after dispose()').to.equal(1);
+  });
+
+  it('update() moves the view no further, not even by a speed set by hand', () => {
+    control = new PanControl2D({state: makeState()});
+
+    control.dispose();
+
     control.speedNorth = 100;
     control.update(1 / 60);
 
-    expect(control.panView.y, 'panView.y still moves').to.be.lessThan(0);
-    expect(updates, 'after dispose()').to.equal(1);
+    expect(control.panView.y, 'panView.y').to.equal(0);
   });
 
   it('leaves the cursor styles target as it found it', () => {
@@ -141,20 +152,9 @@ describe('PanControl2D — the contract after dispose()', () => {
     expect(target.classList.length, 'after dispose()').to.equal(0);
   });
 
-  it('delivers no pan collected before dispose()', () => {
-    control = new PanControl2D({state: makeState()});
-
-    pointer('pointerdown', {x: 10, y: 10});
-    pointer('pointermove', {x: 30, y: 10});
-    control.dispose();
-    control.update(1 / 60);
-
-    expect(control.panView.x, 'panView.x').to.equal(0);
-    expect(control.panView.y, 'panView.y').to.equal(0);
-  });
-
   it('cannot be brought back through its public setters', () => {
-    control = new PanControl2D({state: makeState()});
+    const target = document.createElement('div');
+    control = new PanControl2D({state: makeState(), cursorStylesTarget: target});
 
     control.dispose();
 
@@ -167,11 +167,12 @@ describe('PanControl2D — the contract after dispose()', () => {
     expect(control.isDisposed, 'isDisposed').to.equal(true);
     expect(control.isActive, 'isActive').to.equal(false);
 
+    // update() of a disposed control does nothing, so the drag is watched at the cursor:
+    // a pointer listener that is back would hide it
     pointer('pointerdown', {x: 10, y: 10});
     pointer('pointermove', {x: 30, y: 10});
-    control.update(1 / 60);
 
-    expect(control.panView.x, 'panView.x').to.equal(0);
+    expect(target.classList.length, 'the cursor class after a drag').to.equal(0);
 
     key('keydown', KEY_EAST);
     expect(control.speedEast, 'speedEast').to.equal(0);

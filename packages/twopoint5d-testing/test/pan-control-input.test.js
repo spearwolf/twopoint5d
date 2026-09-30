@@ -52,6 +52,114 @@ describe('PanControl2D — what it measures and what it reports', () => {
     expect(control.panView.x, 'panView.x after a 320px drag').to.equal(-320);
   });
 
+  it('a drag keeps the rectangle of its pointerdown when the coordsTarget moves under it', () => {
+    const box = makeBox({left: 0});
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    box.style.left = '50px';
+    pointer('pointermove', {target: box, x: 30, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x after a 20px drag over a box that moved by 50px').to.equal(-20);
+  });
+
+  it('a touch drag delivers its pan up to its pointerup', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    const touch = {pointerId: 7, pointerType: 'touch', target: box};
+    pointer('pointerdown', {...touch, x: 10, y: 10});
+    pointer('pointermove', {...touch, x: 30, y: 10});
+    pointer('pointerup', {...touch, x: 40, y: 10, buttons: 0});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-30);
+  });
+
+  it('a mouse and a touch that drag at once move the view by the sum of both', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    const touch = {pointerId: 2, pointerType: 'touch', target: box};
+    pointer('pointerdown', {target: box, x: 10, y: 10});
+    pointer('pointerdown', {...touch, x: 100, y: 10});
+    pointer('pointermove', {target: box, x: 30, y: 10});
+    pointer('pointermove', {...touch, x: 130, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-50);
+
+    pointer('pointerup', {target: box, x: 30, y: 10, buttons: 0});
+    pointer('pointerup', {...touch, x: 130, y: 10, buttons: 0});
+  });
+
+  it('a second finger on a touch screen does not pan', () => {
+    const box = makeBox();
+    boxes = [box];
+
+    control = new PanControl2D({state: makeState(), coordsTarget: box});
+
+    const first = {pointerId: 2, pointerType: 'touch', target: box};
+    const second = {pointerId: 3, pointerType: 'touch', isPrimary: false, target: box};
+    pointer('pointerdown', {...first, x: 10, y: 10});
+    pointer('pointerdown', {...second, x: 200, y: 10});
+    pointer('pointermove', {...first, x: 30, y: 10});
+    pointer('pointermove', {...second, x: 260, y: 10});
+    control.update(1 / 60);
+
+    expect(control.panView.x, 'panView.x').to.equal(-20);
+
+    pointer('pointerup', {...first, x: 30, y: 10, buttons: 0});
+    pointer('pointerup', {...second, x: 260, y: 10, buttons: 0});
+  });
+
+  it("two controls on one document both follow a drag, and the one left after the other one's dispose() keeps panning under its cursor", () => {
+    const box = makeBox();
+    const otherBox = makeBox({left: 300});
+    boxes = [box, otherBox];
+
+    const other = new PanControl2D({state: makeState(), cursorStylesTarget: otherBox, cursorPanStyle: 'grabbing'});
+    control = new PanControl2D({state: makeState(), coordsTarget: box, cursorStylesTarget: box, cursorPanStyle: 'grabbing'});
+    try {
+      pointer('pointerdown', {target: box, x: 10, y: 10});
+      pointer('pointermove', {target: box, x: 30, y: 10});
+      control.update(1 / 60);
+      other.update(1 / 60);
+
+      expect(control.panView.x, 'panView.x of the first control').to.equal(-20);
+      expect(other.panView.x, 'panView.x of the other control').to.equal(-20);
+      expect(otherBox.classList.length, 'the cursor class of the other control').to.equal(1);
+
+      pointer('pointerup', {target: box, x: 30, y: 10, buttons: 0});
+      other.dispose();
+
+      pointer('pointerdown', {target: box, x: 10, y: 10});
+      pointer('pointermove', {target: box, x: 40, y: 10});
+
+      // the rule both controls showed stays for the one left
+      expect(getComputedStyle(box).cursor, 'the cursor of the box while panning').to.equal('grabbing');
+
+      // update() of a disposed control does nothing, so the disposed one is watched at
+      // its own cursor: a pointer listener that dispose() left behind would show it
+      expect(otherBox.classList.length, 'the cursor class of the disposed control').to.equal(0);
+
+      control.update(1 / 60);
+
+      expect(control.panView.x, 'panView.x of the control left').to.equal(-50);
+
+      pointer('pointerup', {target: box, x: 40, y: 10, buttons: 0});
+    } finally {
+      other.dispose();
+    }
+  });
+
   it('drops the pan collected while the pointer is switched off', () => {
     const box = makeBox();
     boxes = [box];

@@ -3,8 +3,8 @@ import {expect} from '@esm-bundle/chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
 import {pointer, key, makeState} from './helpers/fixtures.js';
 
-// the default keys of PanControl2D, in the order the class reads them: up, down, left, right —
-// each as the init of a key event, naming the KeyboardEvent.code of the keys at the W, S, A and D positions
+// the key PanControl2D moves north by default, as the init of a key event: the
+// KeyboardEvent.code of the key at the W position
 const KEY_NORTH = {code: 'KeyW'};
 
 describe('PanControl2D — what it gives back when an input source is switched off', () => {
