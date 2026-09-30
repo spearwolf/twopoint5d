@@ -602,6 +602,13 @@ const host: IStageRendererHost = {
 new StageRenderer(host).add(stage);
 ```
 
+The renderer books each unsubscribe as soon as the host hands it out and calls it once
+when it leaves the host — through a write to `parent`, `attach()`, `detach()`, an `add()`
+to a `StageRenderer` or `dispose()` — before `OnRemoveFromParent` goes out. An unsubscribe
+that throws does not keep the renderer from giving up its other subscription; its error
+reaches the caller of that call together with those of the listeners — one unchanged,
+several as an `AggregateError`.
+
 ---
 
 ## Resource lifecycle

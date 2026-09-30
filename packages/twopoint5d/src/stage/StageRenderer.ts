@@ -57,7 +57,7 @@ function disposedError(member: string): Error {
 }
 
 const ADD_THREW =
-  'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent threw';
+  'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent or unsubscribe of the previous host threw';
 
 export interface StageItem {
   stage: IStage & IRenderable;
@@ -261,9 +261,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * here or of `OnStageRemoved` at a previous `StageRenderer` while this renderer leaves its
    * holder, one of `OnAddToParent` as it joins a host: every listener hears its event, the
    * renderer leaves its holder and joins the new one, and the errors reach the caller
-   * afterwards — one unchanged, several as an `AggregateError` in the order they arose. A
-   * listener that disposes this renderer or gives it another holder while it leaves its holder
-   * ends the assignment there. For a `StageRenderer` assigned here, {@link add} says the same.
+   * afterwards — one unchanged, several as an `AggregateError` in the order they arose. An
+   * unsubscribe of the host this renderer leaves that throws is taken the same way: the
+   * renderer gives up its other subscription there all the same, and the error joins those of
+   * the listeners, ahead of them. A listener that disposes this renderer or gives it another
+   * holder while it leaves its holder ends the assignment there. For a `StageRenderer`
+   * assigned here, {@link add} says the same.
    */
   get parent(): StageRendererParentType | undefined {
     return this.#parent;
@@ -296,7 +299,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent threw',
+      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or unsubscribe of the previous host threw',
     );
   }
 
@@ -341,10 +344,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #addToHost(host: IStageRendererHost): void {
+    // each handle is booked as soon as the host hands it out: a host whose onRenderFrame()
+    // throws still gets its onResize() subscription back once this renderer leaves it
     this.#hostSubscriptions.push(
       host.onResize(({width, height}) => {
         this.resize(width, height);
       }),
+    );
+    this.#hostSubscriptions.push(
       host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
         this.updateFrame(now, deltaTime, frameNo);
         this.renderTo(renderer);
@@ -1031,10 +1038,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `OnStageDispose`: every subscriber hears its event, the renderer is torn down completely,
    * and the errors reach the caller afterwards — one unchanged, several as an `AggregateError`
    * in the order they arose: that of the {@link remove} of each stage that threw, in the order
-   * of `stages`; then those of leaving the holder — of the `OnRemoveFromParent` listeners here,
-   * then of the `remove()` of a parent `StageRenderer`; then that of the `OnStageDispose`
-   * listeners. Each is as it was thrown — an `AggregateError` itself when more than one
-   * listener of one event threw, or when both events of a `remove()` did.
+   * of `stages`; then those of leaving the holder — of an unsubscribe of the host that threw,
+   * then of the `OnRemoveFromParent` listeners here, then of the `remove()` of a parent
+   * `StageRenderer`; then that of the `OnStageDispose` listeners. Each is as it was thrown — an
+   * `AggregateError` itself when more than one listener of one event threw, or when both
+   * events of a `remove()` did. An unsubscribe of the host that throws holds up nothing
+   * either: the renderer gives up its other subscription there all the same.
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
@@ -1088,7 +1097,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     throwCollected(
       errors,
-      'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw',
+      'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose or unsubscribe of the host threw',
     );
   }
 
@@ -1158,8 +1167,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `StageRenderer` while the child leaves that holder, one of `OnStageAdded`
    * here or of `OnAddToParent` at the child: every listener hears its event,
    * the stage is added, and the errors reach the caller afterwards — one
-   * unchanged, several as an `AggregateError` in the order they arose. The
-   * size stays the exception: a stage that refuses it is not added. A
+   * unchanged, several as an `AggregateError` in the order they arose. An
+   * unsubscribe of the host a child leaves that throws is taken the same way:
+   * the child gives up its other subscription there all the same, and the
+   * error joins those of the listeners, ahead of them. The size stays the
+   * exception: a stage that refuses it is not added. A
    * listener that disposes this renderer or the child, or gives the child
    * another holder, while the child leaves its previous one ends the call
    * there: the child is not added. What came before stays: the child has
