@@ -4,17 +4,18 @@ import {describe, it} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
 
-// Every tag of a lookbook demo that starts with a capital letter advertises a class, a function or
-// a type of the library, and a reader will search for that name. This spec holds those tags to the
-// exports of `packages/twopoint5d/src/index.ts`. No other check reads the JSON files of the
-// lookbook, so it also keeps each demo page paired with its metadata file and its route.
+// Every tag of a lookbook demo that starts with a capital letter advertises a class, a
+// function or a type of the library, and a reader will search for that name. This spec
+// holds those tags to the exports of `packages/twopoint5d/src/index.ts`. No other check
+// reads the JSON files of the lookbook, so it also keeps each demo page paired with its
+// metadata file and its route.
 const demosUrl = new URL('../../apps/lookbook/src/pages/demos/', import.meta.url);
 const demosDir = fileURLToPath(demosUrl);
 const tagCategoriesFile = fileURLToPath(new URL('../../apps/lookbook/src/data/tag-categories.json', import.meta.url));
 const entry = fileURLToPath(new URL('../../packages/twopoint5d/src/index.ts', import.meta.url));
 
-// the sources are read and not `dist`, so the spec runs without a build, and type exports such as
-// `VO` count as well
+// the sources are read and not `dist`, so the spec runs without a build, and type exports
+// such as `VO` count as well
 const program = ts.createProgram([entry], {
   target: ts.ScriptTarget.ESNext,
   module: ts.ModuleKind.NodeNext,
@@ -23,13 +24,10 @@ const program = ts.createProgram([entry], {
   strict: true,
 });
 const checker = program.getTypeChecker();
-const exported = new Set(
-  checker
-    .getExportsOfModule(
-      /** @type {ts.Symbol} */ (checker.getSymbolAtLocation(/** @type {ts.SourceFile} */ (program.getSourceFile(entry)))),
-    )
-    .map((sym) => sym.getName()),
+const entrySymbol = /** @type {ts.Symbol} */ (
+  checker.getSymbolAtLocation(/** @type {ts.SourceFile} */ (program.getSourceFile(entry)))
 );
+const exported = new Set(checker.getExportsOfModule(entrySymbol).map((sym) => sym.getName()));
 
 const FROM_THREE = new Map([
   [

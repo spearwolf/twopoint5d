@@ -17,8 +17,9 @@ describe('makePackageJson.mjs', () => {
     }
   });
 
-  // runs the script in a throwaway project directory; it reads the workspace root from its own
-  // path and the project from the working directory, and writes only to `<dir>/dist/`
+  // runs the script in a throwaway project directory; it reads the workspace root
+  // from its own path and the project from the working directory, and writes only
+  // to `<dir>/dist/`
   /**
    * @param {Record<string, string> | undefined} peerDependencies
    * @param {{dist?: boolean, packageJsonText?: string}} [options]
@@ -26,9 +27,9 @@ describe('makePackageJson.mjs', () => {
   function run(peerDependencies, {dist = true, packageJsonText} = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'makePackageJson-script-'));
     dirs.push(dir);
-    // the script writes the manifest only into an existing `dist/`, which the compiler creates, and
-    // stops with a message of its own without it; the cases on specifiers need it to get as far as
-    // the write
+    // the script writes the manifest only into an existing `dist/`, which the compiler
+    // creates, and stops with a message of its own without it; the cases on specifiers
+    // need it to get as far as the write
     if (dist) {
       fs.mkdirSync(path.join(dir, 'dist'));
     }
@@ -67,5 +68,15 @@ describe('makePackageJson.mjs', () => {
     assert.equal(status, 1, stderr);
     assert.match(stderr, /cannot read .*package\.json: /);
     assert.doesNotMatch(stderr, /^\s+at /m);
+  });
+
+  it('refuses a dependency whose value is not a string: exit code 1, no stack trace, no manifest written', () => {
+    const {status, stderr, manifestPath} = run(undefined, {
+      packageJsonText: JSON.stringify({name: '@scope/probe', version: '1.0.0', peerDependencies: {three: null}}),
+    });
+    assert.equal(status, 1, stderr);
+    assert.match(stderr, /peerDependencies\.three is null, which resolves to no version range/);
+    assert.doesNotMatch(stderr, /^\s+at /m);
+    assert.equal(fs.existsSync(manifestPath), false);
   });
 });

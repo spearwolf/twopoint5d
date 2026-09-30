@@ -1,12 +1,12 @@
 // Finds the code blocks of a Markdown document that are marked `ts check`.
 //
-// A pure function over text: no file system, no TypeScript. `checkDocSnippets.mjs` reads the
-// files and hands them in, `compileSnippets.mjs` type-checks what comes out.
+// A pure function over text: no file system, no TypeScript. `checkDocSnippets.mjs` reads
+// the files and hands them in, `compileSnippets.mjs` type-checks what comes out.
 //
-// Every fence is tracked, marked or not, because a `ts check` line inside another code block
-// (a four-backtick block that shows Markdown, say) is an example of the marker, not the marker.
-// A marker that is nearly right (`js check`, `ts check strict`) is reported instead of ignored:
-// a typo must not drop a block out of the check without a word.
+// Every fence is tracked, marked or not, because a `ts check` line inside another code
+// block (a four-backtick block that shows Markdown, say) is an example of the marker, not
+// the marker. A marker that is nearly right (`js check`, `ts check strict`) is reported
+// instead of ignored: a typo must not drop a block out of the check without a word.
 
 const OPENING_FENCE = /^(\s*)(`{3,})(.*)$/;
 const CLOSING_FENCE = /^\s*(`{3,})\s*$/;
@@ -26,7 +26,14 @@ export function extractSnippets(markdown, file) {
   const problems = [];
   const lines = markdown.split(/\r?\n/);
 
-  /** @typedef {{marked: boolean, indent: number, ticks: number, line: number, code: string[]}} OpenFence */
+  /**
+   * @typedef {object} OpenFence
+   * @property {boolean} marked
+   * @property {number} indent
+   * @property {number} ticks
+   * @property {number} line
+   * @property {string[]} code
+   */
   /** @type {OpenFence | null} */
   let open = null;
 
@@ -35,8 +42,8 @@ export function extractSnippets(markdown, file) {
 
     if (open == null) {
       const match = OPENING_FENCE.exec(text);
-      // CommonMark: the info string of a backtick fence holds no backtick, so a line such as
-      // "```inline``` prose" opens nothing
+      // CommonMark: the info string of a backtick fence holds no backtick, so a line such
+      // as "```inline``` prose" opens nothing
       if (match == null) return;
       // the three groups of the pattern always take part in a match
       const [, indent, ticks, rest] = /** @type {[string, string, string, string]} */ (/** @type {unknown} */ (match));
@@ -70,7 +77,8 @@ export function extractSnippets(markdown, file) {
     }
 
     if (open.marked) {
-      // a fence inside a list item is indented; CommonMark takes that much off every code line
+      // a fence inside a list item is indented; CommonMark takes that much off every
+      // code line
       open.code.push(text.replace(new RegExp(`^ {0,${open.indent}}`), ''));
     }
   });

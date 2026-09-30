@@ -33,4 +33,13 @@ describe('findUnpublishableSpecifiers', () => {
       {section: 'dependencies', name: '@scope/other', specifier: 'workspace:../other'},
     ]);
   });
+
+  it('names a value that is not a string', () => {
+    const manifest = {dependencies: {a: null}, peerDependencies: {b: 42}};
+
+    assert.deepEqual(findUnpublishableSpecifiers(manifest), [
+      {section: 'dependencies', name: 'a', specifier: null},
+      {section: 'peerDependencies', name: 'b', specifier: 42},
+    ]);
+  });
 });

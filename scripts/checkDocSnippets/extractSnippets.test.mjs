@@ -33,7 +33,8 @@ test('strips the fence indentation from the code and reports it as `indent`', ()
     'a.md',
   );
 
-  // up to `indent` leading spaces go, deeper indentation stays, a shallower line loses what it has
+  // up to `indent` leading spaces go, deeper indentation stays, a shallower line loses
+  // what it has
   assert.deepEqual(snippets, [{file: 'a.md', line: 4, indent: 2, code: 'const a = 1;\n  const b = 2;\nx'}]);
 });
 
@@ -44,7 +45,8 @@ test('a `ts check` line inside a block of four backticks is no marker', () => {
     'a.md',
   );
 
-  // the inner three-backtick line does not end the outer fence; only the block after it counts
+  // the inner three-backtick line does not end the outer fence; only the block after
+  // it counts
   assert.deepEqual(problems, []);
   assert.deepEqual(snippets, [{file: 'a.md', line: 7, indent: 0, code: 'const z = 26;'}]);
 });
@@ -95,5 +97,15 @@ test('tilde fences are not fences', () => {
   const {snippets, problems} = extractSnippets(doc('~~~ts check', 'const a = 1;', '~~~'), 'a.md');
 
   assert.deepEqual(snippets, []);
+  assert.deepEqual(problems, []);
+});
+
+test('a line whose info string holds a backtick opens no fence, so a marked block after it is found', () => {
+  const {snippets, problems} = extractSnippets(
+    doc(`${FENCE}inline${FENCE} prose`, '', `${FENCE}ts check`, 'const a = 1;', FENCE),
+    'a.md',
+  );
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 4, indent: 0, code: 'const a = 1;'}]);
   assert.deepEqual(problems, []);
 });

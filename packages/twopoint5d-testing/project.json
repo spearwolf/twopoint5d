@@ -23,6 +23,8 @@
         "{workspaceRoot}/scripts/checkDocSnippets.mjs",
         "{workspaceRoot}/scripts/checkDocSnippets/*.mjs",
         "!{workspaceRoot}/scripts/checkDocSnippets/*.test.mjs",
+        "{workspaceRoot}/scripts/shared/*.mjs",
+        "!{workspaceRoot}/scripts/shared/*.test.mjs",
         {"dependentTasksOutputFiles": "**/*", "transitive": true}
       ]
     }

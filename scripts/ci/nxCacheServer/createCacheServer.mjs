@@ -53,7 +53,8 @@ export function createCacheServer({dir, token}) {
       if (/** @type {NodeJS.ErrnoException} */ (err).code === 'ENOENT') return reply(req, res, 404);
       throw err;
     }
-    // the workflow drops every entry whose mtime is older than the server start before it saves the cache
+    // the workflow drops every entry whose mtime is older than the server start before it
+    // saves the cache
     const now = new Date();
     await fs.promises.utimes(file, now, now);
     res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': stat.size});

@@ -1,12 +1,14 @@
 // Type-checks Markdown code snippets against the library as a consumer sees it.
 //
-// Each snippet becomes a virtual TypeScript module in `<anchorDir>/__doc_snippets__/`; nothing
-// is written to disk. Because the virtual folder sits in `anchorDir`, a bare import such as
-// `@spearwolf/twopoint5d` or `three/webgpu` resolves the way it does for a package there.
-// Diagnostics are mapped back to the line and column in the Markdown file.
+// Each snippet becomes a virtual TypeScript module in `<anchorDir>/__doc_snippets__/`;
+// nothing is written to disk. Because the virtual folder sits in `anchorDir`, a bare
+// import such as `@spearwolf/twopoint5d` or `three/webgpu` resolves the way it does for
+// a package there. Diagnostics are mapped back to the line and column in the Markdown
+// file.
 
 import path from 'node:path';
 import ts from 'typescript';
+import {readCompilerOptions} from '../shared/readCompilerOptions.mjs';
 
 const VIRTUAL_DIR = '__doc_snippets__';
 
@@ -16,13 +18,33 @@ const VIRTUAL_DIR = '__doc_snippets__';
  *   anchorDir: string,
  *   tsconfigPath: string,
  * }} params
- * @returns {Array<{file?: string, line?: number, column?: number, code: number, message: string}>}
- *   a diagnostic without a location (a global one from the compiler) has no `file`, `line` and `column`
+ * @returns {Array<{
+ *   file?: string,
+ *   line?: number,
+ *   column?: number,
+ *   code: number,
+ *   message: string,
+ * }>}
+ *   a diagnostic without a location (a global one from the compiler) has no `file`,
+ *   `line` and `column`
  */
 export function compileSnippets({snippets, anchorDir, tsconfigPath}) {
-  if (snippets.length === 0) return [];
+  const options = {
+    ...readCompilerOptions(tsconfigPath),
+    noEmit: true,
+    // an example declares what it shows without having to use it
+    noUnusedLocals: false,
+    noUnusedParameters: false,
+    // nothing is emitted, so `tslib` is not needed
+    importHelpers: false,
+    // a snippet sees the DOM and what it imports, not the globals of Node, Mocha or Sinon
+    types: [],
+    // every snippet is a module of its own, so two of them may both declare
+    // `const display`
+    moduleDetection: ts.ModuleDetectionKind.Force,
+  };
 
-  const options = readCompilerOptions(tsconfigPath);
+  if (snippets.length === 0) return [];
 
   const virtualFiles = new Map(snippets.map((snippet, index) => [path.join(anchorDir, VIRTUAL_DIR, `${index}.ts`), snippet]));
 
@@ -61,32 +83,4 @@ export function compileSnippets({snippets, anchorDir, tsconfigPath}) {
     });
   }
   return diagnostics;
-}
-
-// `parseJsonConfigFileContent` would scan the whole repository for files (the root config has no
-// `include`), and the snippets are the only files that matter here.
-function readCompilerOptions(tsconfigPath) {
-  const {config, error} = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
-  if (error != null) throw new Error(`cannot read ${tsconfigPath}: ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`);
-
-  const {options, errors} = ts.convertCompilerOptionsFromJson(config.compilerOptions, path.dirname(tsconfigPath));
-  if (errors.length > 0) {
-    throw new Error(
-      `invalid compiler options in ${tsconfigPath}: ${errors.map((e) => ts.flattenDiagnosticMessageText(e.messageText, '\n')).join('; ')}`,
-    );
-  }
-
-  return {
-    ...options,
-    noEmit: true,
-    // an example declares what it shows without having to use it
-    noUnusedLocals: false,
-    noUnusedParameters: false,
-    // nothing is emitted, so `tslib` is not needed
-    importHelpers: false,
-    // a snippet sees the DOM and what it imports, not the globals of Node, Mocha or Sinon
-    types: [],
-    // every snippet is a module of its own, so two of them may both declare `const display`
-    moduleDetection: ts.ModuleDetectionKind.Force,
-  };
 }

@@ -1,15 +1,19 @@
 // The code blocks of the Markdown docs that stand on their own must keep compiling.
-// A plain `ts` block is an excerpt and nothing checks it; a block that imports everything it
-// uses and declares everything it names carries `ts check` as its info string, and this script
-// compiles it as a module of its own against the built library under the root tsconfig.
+// A plain `ts` block is an excerpt and nothing checks it; a block that imports
+// everything it uses and declares everything it names carries `ts check` as its info
+// string, and this script compiles it as a module of its own against the built library
+// under the root tsconfig.
 //
-// The blocks import `@spearwolf/twopoint5d` like a consumer, so they resolve from the working
-// directory: the Nx target `twopoint5d-testing:typecheck` runs this from `packages/twopoint5d-testing`,
-// the package that depends on the built library, `three`, `@spearwolf/eventize` and `@spearwolf/signalize`.
+// The blocks import `@spearwolf/twopoint5d` like a consumer, so they resolve from the
+// working directory: the Nx target `twopoint5d-testing:typecheck` runs this from
+// `packages/twopoint5d-testing`, the package that depends on the built library,
+// `three`, `@spearwolf/eventize` and `@spearwolf/signalize`.
 //
-//   node scripts/checkDocSnippets.mjs [file.md …]   (default: every tracked *.md of the repository)
+//   cd packages/twopoint5d-testing && node ../../scripts/checkDocSnippets.mjs [file.md …]
+//   (default: every tracked *.md of the repository)
 //
-// Exit 0: no errors. 1: a type error, or a marker that is not exactly `ts check`. 2: git or the tsconfig is unreadable.
+// Exit 0: no errors. 1: a type error, or a marker that is not exactly `ts check`.
+// 2: git or the tsconfig is unreadable.
 
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
@@ -28,8 +32,8 @@ const display = (file) => {
 
 let files;
 let diagnostics;
-let snippets = [];
-let problems = [];
+const snippets = [];
+const problems = [];
 
 try {
   // tracked files only: untracked notes must not decide whether the gate passes

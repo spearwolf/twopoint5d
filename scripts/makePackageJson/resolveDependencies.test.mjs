@@ -118,4 +118,12 @@ describe('resolveDependencies', () => {
   it('a * dependency nothing resolves stays *', () => {
     assert.deepEqual(resolve({unknown: '*'}, {}), {unknown: '*'});
   });
+
+  it('a dependency whose value is not a string stays as it is', () => {
+    assert.deepEqual(resolve({a: null, b: 42, c: true}, {}), {a: null, b: 42, c: true});
+  });
+
+  it('a * dependency whose shared version is not a string stays *', () => {
+    assert.deepEqual(resolve({unknown: '*'}, {}, {unknown: 42}), {unknown: '*'});
+  });
 });

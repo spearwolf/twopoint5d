@@ -8,13 +8,14 @@ permissions:
   contents: read
 
 env:
-  # Nx shows the output of failed tasks only; static prints every task's log, one after the other
+  # Nx shows the output of failed tasks only; static prints every task's log, one after
+  # the other
   NX_DEFAULT_OUTPUT_STYLE: static
 
 concurrency:
-  # on main each commit gets a group of its own, so none is cancelled or displaced from the
-  # queue and the deploy workflow has a result to follow; on other branches a newer push
-  # replaces the run of the older one
+  # on main each commit gets a group of its own, so none is cancelled or displaced from
+  # the queue and the deploy workflow has a result to follow; on other branches a newer
+  # push replaces the run of the older one
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
@@ -95,7 +96,8 @@ jobs:
         timeout-minutes: 20
 
       - name: Drop the Nx cache entries this run did not use
-        # the server touches every entry it serves; what is older than its start went unused
+        # the server touches every entry it serves; what is older than its start went
+        # unused
         if: success() && steps.nx-cache.outputs.cache-hit != 'true'
         run: find "$RUNNER_TEMP/nx-cache" -type f \( ! -newer "$RUNNER_TEMP/nx-cache.start" -o -name '*.partial' \) -delete
 
@@ -110,9 +112,9 @@ jobs:
         # runs once the Nx cache is saved: both cache steps run on success only, and a
         # bench that crashes must not cost the run its cache
         #
-        # the timings are archived, not held to a limit: a shared runner's timings vary too much
-        # for a gate, and it is the series over many runs that shows a regression. The
-        # allocation specs in the gate hold what can be counted
+        # the timings are archived, not held to a limit: a shared runner's timings vary
+        # too much for a gate, and it is the series over many runs that shows a
+        # regression. The allocation specs in the gate hold what can be counted
         run: pnpm bench
         timeout-minutes: 10
 
@@ -129,7 +131,8 @@ jobs:
           retention-days: 3
 
       - name: Archive benchmark results
-        # kept far longer than the coverage report: a regression shows only in the series over weeks
+        # kept far longer than the coverage report: a regression shows only in the series
+        # over weeks
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

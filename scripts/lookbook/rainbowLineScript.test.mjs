@@ -7,10 +7,10 @@ import {fileURLToPath} from 'node:url';
 
 const lookbookDir = fileURLToPath(new URL('../../apps/lookbook/', import.meta.url));
 
-// RainbowLine from @spearwolf/astro-rainbow-line emits `<script src="${BASE_URL}/<path>">` at
-// runtime and expects that file in the lookbook's `public/`; the package ships a copy but does not
-// serve it, and the only reference to the path lives inside node_modules, where no grep of the repo
-// sees it
+// RainbowLine from @spearwolf/astro-rainbow-line emits
+// `<script src="${BASE_URL}/<path>">` at runtime and expects that file in the lookbook's
+// `public/`; the package ships a copy but does not serve it, and the only reference to
+// the path lives inside node_modules, where no grep of the repo sees it
 describe('the rainbow-line script the lookbook serves', () => {
   const packageDir = path.dirname(
     createRequire(path.join(lookbookDir, 'package.json')).resolve('@spearwolf/astro-rainbow-line/package.json'),

@@ -1,7 +1,7 @@
-// The library reaches its consumers with peer dependencies only, and the non-blocking audit
-// step in CI relies on that (docs/architecture.md, §3). This script fails on a package
-// that declares anything npm would install along with it, or whose `.js`, `.mjs` or
-// `.d.ts` files import a package that is not one of its `peerDependencies`.
+// The library reaches its consumers with peer dependencies only, and the non-blocking
+// audit step in CI relies on that (docs/architecture.md, §3). This script fails on a
+// package that declares anything npm would install along with it, or whose `.js`, `.mjs`
+// or `.d.ts` files import a package that is not one of its `peerDependencies`.
 //
 //   node scripts/checkPeerDependenciesOnly.mjs <package-dir>
 //

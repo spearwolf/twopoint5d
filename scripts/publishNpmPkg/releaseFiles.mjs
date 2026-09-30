@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Lists the files a release copies into the package directory before `npm publish`, each as
- * `{src, dst}`: the license from the workspace root, the changelog and the readme from the
- * project directory — `README-pkg.md` if there is one, `README.md` otherwise — and a workspace
- * `.npmrc` if there is one, first. Throws with every missing source path when the license,
- * the changelog or the readme is absent: a published version is immutable on npm, so a release
- * without them cannot be repaired by anything but a new version.
+ * Lists the files a release copies into the package directory before `npm publish`,
+ * each as `{src, dst}`: the license from the workspace root, the changelog and the
+ * readme from the project directory — `README-pkg.md` if there is one, `README.md`
+ * otherwise — and a workspace `.npmrc` if there is one, first. Throws with every
+ * missing source path when the license, the changelog or the readme is absent: a
+ * published version is immutable on npm, so a release without them cannot be repaired
+ * by anything but a new version.
  */
 export function releaseFiles({workspaceRoot, projectRoot, packageRoot}) {
   const readmePkg = path.resolve(projectRoot, 'README-pkg.md');

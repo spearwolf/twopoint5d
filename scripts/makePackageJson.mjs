@@ -12,7 +12,8 @@ const projectRoot = path.resolve(process.cwd());
 console.log('workspaceRoot:', workspaceRoot);
 console.log('projectRoot:', projectRoot);
 
-// every file the manifest is made from is input that can be wrong, and gets a message instead of a stack trace
+// every file the manifest is made from is input that can be wrong, and gets a message
+// instead of a stack trace
 function readInput(filePath, parse) {
   try {
     return parse(fs.readFileSync(filePath, 'utf8'));
@@ -59,7 +60,7 @@ const unpublishable = findUnpublishableSpecifiers(outPackageJson);
 if (unpublishable.length > 0) {
   for (const {section, name, specifier} of unpublishable) {
     console.error(
-      `cannot publish ${inPackageJson.name}: ${section}.${name} is "${specifier}", which resolves to no version range`,
+      `cannot publish ${inPackageJson.name}: ${section}.${name} is ${JSON.stringify(specifier)}, which resolves to no version range`,
     );
   }
   process.exit(1);
@@ -67,8 +68,9 @@ if (unpublishable.length > 0) {
 
 const distDir = path.resolve(projectRoot, 'dist');
 const releasePackageJsonPath = path.resolve(distDir, 'package.json');
-// the manifest belongs next to the compiled library; a `dist/` holding nothing but a manifest
-// would be a package without code, so the script does not create the directory itself
+// the manifest belongs next to the compiled library; a `dist/` holding nothing but a
+// manifest would be a package without code, so the script does not create the
+// directory itself
 if (!fs.existsSync(distDir)) {
   console.error(`cannot write ${releasePackageJsonPath}: ${distDir} does not exist, compile the package first`);
   process.exit(1);

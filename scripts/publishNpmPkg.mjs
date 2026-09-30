@@ -45,8 +45,8 @@ if (pkgJson.version.endsWith('-dev')) {
   process.exit(0);
 }
 
-// `.` because npm reads the name from the manifest in `packageRoot`, the one `npm publish` reads
-// there, and no value from the manifest ends up on a command line
+// `.` because npm reads the name from the manifest in `packageRoot`, the one
+// `npm publish` reads there, and no value from the manifest ends up on a command line
 const show = npmCommand(['show', '.', 'versions', '--json']);
 
 execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdout, stderr) => {
@@ -71,8 +71,8 @@ execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdo
     console.log('oh it looks like this is the first time to publish the package');
     publishPackage(packageRoot);
   } else {
-    // npm gives its reason on stderr; when npm could not be started at all, stderr is empty and
-    // `error.message` names the cause (`spawn npm ENOENT`)
+    // npm gives its reason on stderr; when npm could not be started at all, stderr is
+    // empty and `error.message` names the cause (`spawn npm ENOENT`)
     console.error(`npm show failed: ${stderr.trim() || error.message}`);
     process.exit(1);
   }
@@ -91,8 +91,8 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
   }
 
   const publish = npmCommand(['publish', '--access', 'public', ...(dryRun ? ['--dry-run'] : [])]);
-  // npm writes straight to the console — the published version on success, the reason on failure —
-  // so the message of our own names only the exit code
+  // npm writes straight to the console — the published version on success, the reason
+  // on failure — so the message of our own names only the exit code
   try {
     execFileSync(publish.file, publish.args, {...publish.options, cwd, stdio: 'inherit'});
   } catch (error) {

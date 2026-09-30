@@ -17,7 +17,8 @@ let baseUrl;
 
 beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'nx-cache-server-'));
-  // the served directory sits two levels down, so a hash that climbs two levels out of it still lands inside root
+  // the served directory sits two levels down, so a hash that climbs two levels out
+  // of it still lands inside root
   dir = path.join(root, 'parent', 'cache');
   fs.mkdirSync(dir, {recursive: true});
   server = createCacheServer({dir, token: TOKEN});

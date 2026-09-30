@@ -22,7 +22,8 @@ test('maps a diagnostic back to the line and column in the markdown file', () =>
   assert.equal(diagnostic.file, 'a.md');
   assert.equal(diagnostic.code, 2322);
   assert.equal(diagnostic.line, 10);
-  // `n` sits at index 6 of the code line, plus one for 1-based columns, plus the fence indentation
+  // `n` sits at index 6 of the code line, plus one for 1-based columns, plus the
+  // fence indentation
   assert.equal(diagnostic.column, 9);
   assert.match(diagnostic.message, /not assignable/);
 });
@@ -53,5 +54,12 @@ test('a diagnostic is attributed to the snippet it belongs to', () => {
   assert.deepEqual(
     diagnostics.map(({file, line}) => ({file, line})),
     [{file: 'b.md', line: 40}],
+  );
+});
+
+test('an unreadable tsconfig throws even when no block is marked', () => {
+  assert.throws(
+    () => compileSnippets({snippets: [], anchorDir, tsconfigPath: path.join(repoRoot, 'no-such-tsconfig.json')}),
+    /cannot read/,
   );
 });

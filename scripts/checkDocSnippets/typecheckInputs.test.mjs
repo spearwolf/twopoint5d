@@ -10,8 +10,8 @@ import path from 'node:path';
 import {it} from 'node:test';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
-// resolves through the `./bin/*.js` export of nx to its CLI; started with this node, it needs
-// no shell and no pnpm shim on any platform
+// resolves through the `./bin/*.js` export of nx to its CLI; started with this node, it
+// needs no shell and no pnpm shim on any platform
 const nxBin = createRequire(path.join(repoRoot, 'package.json')).resolve('nx/bin/nx.js');
 
 it('every tracked Markdown file is an input of twopoint5d-testing:typecheck', () => {

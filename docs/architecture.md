@@ -65,13 +65,13 @@ Markdown file is an input. It checks the browser tests through the package's own
 `tsconfig.json` (`checkJs`, with `noImplicitAny` and `strictNullChecks` off) and every
 code block marked `ts check` through `scripts/checkDocSnippets.mjs`, both against the
 library's build output. Its inputs are that build output, the tests, the tsconfig,
-`package.json`, the modules of the check and every Markdown file git tracks: a marked
-block can sit in any of them, and one that stops compiling has to turn the target red.
-`project.json` names those files by the directories that hold tracked docs, and the
-three at the root by name, so an untracked note — which the check never reads — does not
-invalidate the cache. `scripts/checkDocSnippets/typecheckInputs.test.mjs` asks Nx for the
-inputs it resolves and fails on a tracked `*.md` outside them; a doc in a new place gets
-its glob there.
+`package.json`, the modules of the check, the tsconfig reader it shares with
+`checkNameableTypes` and every Markdown file git tracks: a marked block can sit in any of
+them, and one that stops compiling has to turn the target red. `project.json` names those
+files by the directories that hold tracked docs, and the three at the root by name, so an
+untracked note — which the check never reads — does not invalidate the cache.
+`scripts/checkDocSnippets/typecheckInputs.test.mjs` asks Nx for the inputs it resolves and
+fails on a tracked `*.md` outside them; a doc in a new place gets its glob there.
 
 Named inputs worth knowing: `sharedTsconfigs` (root + project tsconfig),
 `makePackageJson` (everything that feeds the publish manifest, the root `package.json`
@@ -104,10 +104,13 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/` with the profile
   `esm-only`: the package is ESM only, so `node10` and a `require` from CommonJS lie
   outside, and every other resolution has to succeed.
-- `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts`
-  and fails on published declarations that reference a type consumers cannot name.
-  `attw` and `publint` resolve such a type structurally and stay quiet, which is exactly
-  why this check exists.
+- `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts` and
+  fails on published declarations that reference a type consumers cannot name. It reads
+  its compiler options from the root `tsconfig.json`, as the code block check does, and
+  follows a reference in every form the declarations carry — a type reference, a
+  `typeof` query, an `import("…")` type — judging it by its leftmost name. Its logic
+  lives in `scripts/checkNameableTypes/`. `attw` and `publint` resolve such a type
+  structurally and stay quiet, which is exactly why this check exists.
 - `lintPkg` runs publint against `dist/` and then `scripts/checkPeerDependenciesOnly.mjs`,
   which fails as soon as `dist/package.json` declares `dependencies` or
   `optionalDependencies`, and also when a `.js`, `.mjs` or `.d.ts` file in `dist/`
@@ -116,13 +119,15 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   consumers with peer dependencies only, and the non-blocking audit step in CI relies on
   that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
-  publish pipeline's helpers and of `makePackageJson.mjs` and
-  `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server and its
-  entry script, of the helpers of the code block check, the check that the publish script
-  and its helpers import nothing but Node's built-ins, the check that every tracked
-  Markdown file is an input of `twopoint5d-testing:typecheck`, the check that every
-  capitalised tag of the lookbook demos names an export of the library, and the check
-  that the lookbook serves the script `RainbowLine` loads at runtime.
+  publish pipeline's helpers and of `makePackageJson.mjs`,
+  `checkPeerDependenciesOnly.mjs` and `checkNameableTypes.mjs` themselves (§4, §6), of
+  the CI cache server and its entry script, of the helpers of the code block check and
+  of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`),
+  the check that the publish script and its helpers import nothing but Node's built-ins,
+  the check that every tracked Markdown file is an input of
+  `twopoint5d-testing:typecheck`, the check that every capitalised tag of the lookbook
+  demos names an export of the library, and the check that the lookbook serves the
+  script `RainbowLine` loads at runtime.
 - `test:coverage` runs the library's Vitest suite once, with coverage, against the
   thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
   it runs the same specs without coverage. The thresholds sit two points under the level
@@ -133,18 +138,18 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
 
 ### In CI
 
-`.github/workflows/ci.yml` runs the gate on every push. The workflow has no path
-filter: Markdown is an input of `prettier --check` and of `twopoint5d-testing:typecheck`
-(§2), so a push that changes nothing but docs runs the gate as well, and the Nx cache
-answers every target whose inputs the push leaves alone. Every action is pinned to a
-full commit SHA with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap
-the code that runs. The workflow reads `contents` only. Every checkout, here and in
-`deploy.yml`, sets `persist-credentials: false`: no job pushes from a checkout — the
-`tag` job of `deploy.yml` writes its ref through the REST API (§4) — so no token lies in
-`.git/config` for an install script to find. The concurrency group of the workflow is
-the branch, so a newer push cancels the running or waiting run of the same branch —
-except on `main`, where the group is the commit: every commit there gets its own run,
-which nothing cancels, because `deploy.yml` follows each successful one.
+`.github/workflows/ci.yml` runs the gate on every push. The workflow has no path filter:
+Markdown is an input of `prettier --check` and of `twopoint5d-testing:typecheck` (§2), so
+a push that changes nothing but docs runs the gate as well, and the Nx cache answers every
+target whose inputs the push leaves alone. Every action is pinned to a full commit SHA
+with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap the code that
+runs. The workflow reads `contents` only. Every checkout, here and in `deploy.yml`, sets
+`persist-credentials: false`: no job pushes from a checkout — the `tag` job of
+`deploy.yml` writes its ref through the REST API (§4) — so no token lies in
+`.git/config` for an install script to find. The concurrency group of the workflow is the
+branch, so a newer push cancels the running or waiting run of the same branch — except
+on `main`, where the group is the commit: every commit there gets its own run, which
+nothing cancels, because `deploy.yml` follows each successful one.
 
 The step `Audit dependencies` follows the install and runs `pnpm audit
 --audit-level=high`. It reports high and critical advisories without failing the run:
@@ -154,11 +159,12 @@ it (§5). Dependabot also keeps the commit SHAs of the actions, and the version 
 next to each, current.
 
 The step `Run the hot-path benchmarks` runs `pnpm bench` once the Nx cache (below) is
-saved: after the save, so that a bench that crashes does not cost the run its cache. The
-artifact `bench` keeps `packages/twopoint5d/bench-results` for 90 days, the coverage
-report for 3. The timings are archived, not held to a limit: a shared runner's timings
-vary too much for a gate, and a regression shows only in the series over weeks. What can
-be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
+saved: after the save, so that a bench that crashes does not cost the run its cache.
+The artifact `bench` keeps `packages/twopoint5d/bench-results` for 90 days, the
+coverage report for 3. The timings are archived, not held to a limit: a shared runner's
+timings vary too much for a gate, and a regression shows only in the series over weeks.
+What can be counted — the heap bytes of a hot-path call — the allocation specs hold
+in the gate.
 
 The browser suite writes one line per browser and run into the "Browser logs" of the
 test output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from
@@ -176,17 +182,16 @@ version.
 
 Nx indexes its local cache in a database named after the machine id, and every runner
 comes with a new one, so a restored Nx cache directory would never hit. Nx does take
-results from a self-hosted remote cache, so the job starts
-`scripts/ci/nxCacheServer.mjs` on `127.0.0.1:47873`, serving `$RUNNER_TEMP/nx-cache`
-with a random per-run token, and hands `NX_SELF_HOSTED_REMOTE_CACHE_SERVER` and
-`NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN` to every later step. `actions/cache` restores
-that directory under `nx-<os>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to
-the newest entry of the same lockfile and then to the newest entry at all. The server
-touches every entry it serves. After a green gate the job deletes each entry older than
-the server start — what this run neither used nor wrote — and saves the directory under
-the commit's key, so each saved state holds exactly the results of one green commit and
-does not grow from run to run. A red gate saves nothing, and the next run restores the
-last green state.
+results from a self-hosted remote cache, so the job starts `scripts/ci/nxCacheServer.mjs`
+on `127.0.0.1:47873`, serving `$RUNNER_TEMP/nx-cache` with a random per-run token, and
+hands `NX_SELF_HOSTED_REMOTE_CACHE_SERVER` and `NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN`
+to every later step. `actions/cache` restores that directory under
+`nx-<os>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to the newest entry of the
+same lockfile and then to the newest entry at all. The server touches every entry it
+serves. After a green gate the job deletes each entry older than the server start — what
+this run neither used nor wrote — and saves the directory under the commit's key, so
+each saved state holds exactly the results of one green commit and does not grow from run
+to run. A red gate saves nothing, and the next run restores the last green state.
 
 The cache is only as trustworthy as what writes to it: its entries come solely from CI
 runs on pushes to this repository. `deploy.yml` does not use it and builds the published
@@ -200,23 +205,25 @@ source maps, because both would point at `src/`, which the package does not cont
 the workspace, "Go to definition" from the lookbook or the testing package into the
 library lands in `dist/lib/*.d.ts`, and the browser shows its `.js`.
 
-`makePackageJson.mjs` synthesizes the publish-time manifest from the source
-`package.json` merged with `package.override.json`. The override file's `null` entries
-strip development-only fields (`scripts`, `devDependencies`) from what ships. Specifiers
-are resolved to real ranges: `catalog:` and `catalog:<name>` from the default or the
-named catalog in `pnpm-workspace.yaml`; `workspace:` from the `package.json` of the
-package it names (`workspace:^` and `workspace:~` keep their operator, `workspace:*`
-becomes a caret range, a spelled-out range ships as it is written, only without the
-whitespace around it and not in the form semver normalizes it to — but only if it is a
-version range; anything else, a range of nothing but whitespace included, leaves the
-specifier standing). A `package.json` there that cannot be read, or whose version semver
-cannot read, leaves the specifier standing as well. If a `catalog:` or `workspace:`
-specifier is left in the manifest afterwards, the build fails — npm installs neither
-protocol. The script writes `dist/package.json` only into an existing `dist/` and stops
-without the compiled library, with the hint to compile first; an input file it cannot
-read stops it with the path and the reason. Since `dist/` is what gets published,
-`main`, `module`, `types` and every target in `exports` lose a leading `dist/` or
-`./dist/`; a `dist/` further inside a path is part of the name and stays.
+`makePackageJson.mjs` synthesizes the publish-time manifest from the source `package.json`
+merged with `package.override.json`. The override file's `null` entries strip
+development-only fields (`scripts`, `devDependencies`) from what ships. Specifiers are
+resolved to real ranges: `catalog:` and `catalog:<name>` from the default or the named
+catalog in `pnpm-workspace.yaml`; `workspace:` from the `package.json` of the package it
+names (`workspace:^` and `workspace:~` keep their operator, `workspace:*` becomes a caret
+range, a spelled-out range ships as it is written, only without the whitespace around it
+and not in the form semver normalizes it to — but only if it is a version range;
+anything else, a range of nothing but whitespace included, leaves the specifier standing).
+A `package.json` there that cannot be read, or whose version semver cannot read, leaves
+the specifier standing as well. If a `catalog:` or `workspace:` specifier is left in the
+manifest afterwards, the build fails — npm installs neither protocol. A value that is no
+string, a `null` or a number, stays standing with a warning, and the build fails on it the
+same way, with a message that names the section, the name and the value. The script writes
+`dist/package.json` only into an existing `dist/` and stops without the compiled library,
+with the hint to compile first; an input file it cannot read stops it with the path and
+the reason. Since `dist/` is what gets published, `main`, `module`, `types` and every
+target in `exports` lose a leading `dist/` or `./dist/`; a `dist/` further inside a path
+is part of the name and stays.
 
 The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
@@ -224,22 +231,23 @@ wire it up.
 
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
-publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a
-first publish. Before `npm publish` it copies `LICENSE` from the workspace root, and
+publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a first
+publish. Before `npm publish` it copies `LICENSE` from the workspace root, and
 `CHANGELOG.md` and the README from the directory it is started in, into the package
 directory; the README is `README-pkg.md`, or `README.md` if there is none, and ships as
-`README.md`. A workspace `.npmrc` goes along if there is one. `publishNpmPkg.mjs
-<package-dir> [--dry-run]` stops with a usage line and exit code 1 on a missing
-directory and on any other option — a misspelled `--dry-run` included — before it asks
-npm. npm is asked with `npm show .` in the package directory, so the name comes from the
-manifest that `npm publish` reads there and no value from it stands on a command line.
-npm runs without a shell; on Windows, where `npm` is an `npm.cmd` that Node starts only
-through `cmd.exe`, it runs as a single string of literals, and an argument with any
-character besides letters, digits and `_ @ . / -` is refused on every platform. Every
-failure — a manifest that is unreadable or has no `name` or `version`, one of those
-three files that is missing, an npm that is missing or fails — ends with one line and
-exit code 1, and what `npm publish` itself prints goes straight to the console. Never
-publish from `packages/twopoint5d/` and never run these scripts without being asked to.
+`README.md`. A workspace `.npmrc` goes along if there is one.
+`publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and exit code 1 on a
+missing directory, on a second one and on any other option — a misspelled `--dry-run`
+included — before it asks npm. npm is asked with `npm show .` in the package directory,
+so the name comes from the manifest that `npm publish` reads there and no value from it
+stands on a command line. npm runs without a shell; on Windows, where `npm` is an
+`npm.cmd` that Node starts only through `cmd.exe`, it runs as a single string of literals,
+and an argument with any character besides letters, digits and `_ @ . / -` is refused on
+every platform. Every failure — a manifest that is unreadable or has no `name` or
+`version`, one of those three files that is missing, an npm that is missing or fails —
+ends with one line and exit code 1, and what `npm publish` itself prints goes straight to
+the console. Never publish from `packages/twopoint5d/` and never run these scripts without
+being asked to.
 
 `.github/workflows/deploy.yml` runs after every successful CI run on `main`, in four
 jobs. Each works on `github.event.workflow_run.head_sha`, the commit that CI run tested:
@@ -298,7 +306,9 @@ carries a comment that names the advisory it answers and says when the entry can
 Two toolchain updates wait on purpose. TypeScript stays on the 6.x line:
 `typescript-eslint` 8 allows `typescript <6.1.0` only, and TypeScript 7 exports no
 compiler API under `typescript` any more (only `typescript/unstable/*`), while
-`scripts/checkNameableTypes.mjs`, `scripts/checkDocSnippets/compileSnippets.mjs` and
+`scripts/checkNameableTypes/findUnnameableTypes.mjs`,
+`scripts/shared/readCompilerOptions.mjs`,
+`scripts/checkDocSnippets/compileSnippets.mjs` and
 `scripts/checkPeerDependenciesOnly/findUndeclaredImports.mjs` import the classic API.
 The step to 7 waits for both. `prettier-plugin-astro` stays on 0.14: 1.x formats with
 the Rust compiler `@astrojs/compiler-rs` (0.x) and reformats part of the `.astro` files;
@@ -315,9 +325,9 @@ install --lockfile-only --resolution-only` leaves the lockfile untouched and war
 nothing without them.
 
 Node and pnpm versions come from `engines` in the root `package.json`: Node
-`^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm is
-`packageManager` in the root `package.json`; `pnpm/action-setup` in both workflows reads
-it from there and names no version of its own. `.nvmrc`, `mise.toml` and the
+`^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm
+is `packageManager` in the root `package.json`; `pnpm/action-setup` in both workflows
+reads it from there and names no version of its own. `.nvmrc`, `mise.toml` and the
 `node-version` of the CI workflows name a plain `24`. They answer which version to
 install, not which ones are allowed, and none of them understands an alternative like
 `||`; a `24` picks the newest 24.x the tool can get and lands inside the range, while a
@@ -342,10 +352,10 @@ submitted to it and, under WebGPU, the page has drawn two more animation frames 
 wait two seconds at most, the first one with a warning on the console when it runs out.
 Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
-The helpers of the publish pipeline, the CI cache server and the code block check run
-under `node --test` (`pnpm test:scripts`), and four more specs share that run. The Nx
-project `scripts` has no `test` target, so `pnpm test` leaves all of them out. The four
-are:
+The helpers of the publish pipeline, the CI cache server, the code block check and the
+Nameable-Types check run under `node --test` (`pnpm test:scripts`), and four more specs
+share that run. The Nx project `scripts` has no `test` target, so `pnpm test` leaves all
+of them out. The four are:
 
 - `scripts/lookbook/rainbowLineScript.test.mjs` holds `apps/lookbook/public/js/` to the
   script `@spearwolf/astro-rainbow-line` loads at runtime. Nothing in the repo
@@ -360,9 +370,10 @@ are:
   helpers to imports of Node's built-ins and of each other, because the publish job of
   the deploy installs nothing (§4).
 
-Three specs start a script itself, as a child process: `makePackageJson.mjs` in a
+Four specs start a script itself, as a child process: `makePackageJson.mjs` in a
 throwaway project directory, `checkPeerDependenciesOnly.mjs` against a throwaway
-manifest and `scripts/ci/nxCacheServer.mjs` with a command line it refuses, because
+manifest, `checkNameableTypes.mjs` against throwaway declaration files and
+`scripts/ci/nxCacheServer.mjs` with a command line it refuses, because
 their exit codes, their messages and the manifest the first one does not write are
 wiring that no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the
 registry as soon as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and

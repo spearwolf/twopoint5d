@@ -9,6 +9,19 @@ import {valid, validRange} from 'semver';
 export function resolveDependencies(dependenciesSection, context) {
   if (dependenciesSection) {
     Object.entries(dependenciesSection).forEach(([depName, specifier]) => {
+      // a manifest is JSON, so a value may be `null`, a number or an object; it stays
+      // as it is, and the manifest check refuses it
+      if (typeof specifier !== 'string') {
+        console.warn(
+          'oops.. dependency specifier is not a string:',
+          depName,
+          '->',
+          JSON.stringify(specifier),
+          'referenced from:',
+          context.referencedFrom,
+        );
+        return;
+      }
       if (specifier.startsWith('catalog:') || specifier.startsWith('workspace:') || specifier === '*') {
         const pkgVersion = resolvePackageVersion(depName, specifier, context);
         if (pkgVersion) {
@@ -41,11 +54,14 @@ export function resolvePackageVersion(
     return undefined;
   }
 
-  // whitespace around the range belongs to no version range; every check below and the
-  // manifest see the trimmed value
+  // trimmed because a spelled-out range goes into the manifest as it stands: whitespace
+  // around it would land in the published manifest verbatim, and a range of nothing but
+  // whitespace would pass as `*` (semver's validRange(' ') answers '*'). Every check
+  // below and the manifest see the trimmed value
   const range = specifier.startsWith('workspace:') ? specifier.slice('workspace:'.length).trim() : '*';
   if (range.includes('@')) {
-    // `workspace:<name>@<range>` names another package than its key, which this script does not map
+    // `workspace:<name>@<range>` names another package than its key, which this script
+    // does not map
     console.warn(
       'oops.. aliased workspace package is not supported:',
       pkgName,
@@ -62,8 +78,8 @@ export function resolvePackageVersion(
     // supplies one for `*`, `^` and `~`, so it is not looked up for this one
     // semver's validRange('') answers '*', so the empty range needs a check of its own
     if (range === '' || validRange(range) == null) {
-      // anything else would go into the published manifest as a version range and is none —
-      // the specifier stays and the manifest check refuses it
+      // anything else would go into the published manifest as a version range and
+      // is none — the specifier stays and the manifest check refuses it
       console.warn(
         'oops.. workspace range is not a version range:',
         pkgName,
@@ -84,9 +100,9 @@ export function resolvePackageVersion(
   const pkgJsonPath = path.resolve(workspaceRoot, `packages/${pkgNameWithoutScope}/package.json`);
 
   if (fs.existsSync(pkgJsonPath)) {
-    // the package under packages/ is the one pnpm links, so its manifest is the only source of
-    // the version; without a readable one the specifier stays and the manifest check refuses it,
-    // and sharedDependencies does not stand in for it
+    // the package under packages/ is the one pnpm links, so its manifest is the only
+    // source of the version; without a readable one the specifier stays and the manifest
+    // check refuses it, and sharedDependencies does not stand in for it
     let pkgJson;
     try {
       pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
@@ -104,7 +120,14 @@ export function resolvePackageVersion(
 
     const version = typeof pkgJson?.version === 'string' ? pkgJson.version.replace(/-dev$/, '') : undefined;
     if (valid(version) == null) {
-      console.warn('oops.. workspace package has no version:', pkgName, '->', pkgJsonPath, 'referenced from:', referencedFrom);
+      console.warn(
+        'oops.. workspace package has no version semver can read:',
+        pkgName,
+        '->',
+        pkgJsonPath,
+        'referenced from:',
+        referencedFrom,
+      );
       return undefined;
     }
 
@@ -114,7 +137,7 @@ export function resolvePackageVersion(
   }
 
   const pkgVersion = sharedDependencies[pkgName];
-  if (pkgVersion && !pkgVersion.startsWith('workspace:')) {
+  if (typeof pkgVersion === 'string' && pkgVersion && !pkgVersion.startsWith('workspace:')) {
     console.log('resolve shared package version', pkgName, '->', pkgVersion);
     return pkgVersion;
   }

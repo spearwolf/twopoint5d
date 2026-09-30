@@ -1,8 +1,8 @@
 /**
- * Rewrites `main`, `module`, `types` and every target in `exports` to paths relative to `dist/`,
- * because the manifest is published from within `dist/`. Only a leading `dist/` or `./dist/`
- * falls; a `dist/` further inside a path is part of the name. Changes the manifest in place and
- * returns it.
+ * Rewrites `main`, `module`, `types` and every target in `exports` to paths relative to
+ * `dist/`, because the manifest is published from within `dist/`. Only a leading `dist/`
+ * or `./dist/` falls; a `dist/` further inside a path is part of the name. Changes the
+ * manifest in place and returns it.
  */
 export function removeDistPathPrefix(manifest) {
   for (const key of ['main', 'module', 'types']) {

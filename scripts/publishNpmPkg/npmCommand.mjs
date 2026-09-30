@@ -1,11 +1,13 @@
-// letters, digits and _ @ . / - reach npm unchanged even through cmd.exe; quotes, spaces, % ^ & | < > ( ) ! do not
+// letters, digits and _ @ . / - reach npm unchanged even through cmd.exe; quotes, spaces,
+// % ^ & | < > ( ) ! do not
 const PLAIN_ARGUMENT = /^[\w@./-]+$/;
 
 /**
- * How to start `npm <args>` so that no shell reads anything into an argument. `npm` is started
- * directly, except on Windows: there it is `npm.cmd`, which Node starts only through `cmd.exe`,
- * so the command becomes a single string for the shell. An argument with any other character is
- * refused on every platform, so a run on Linux fails where Windows would interpret it.
+ * How to start `npm <args>` so that no shell reads anything into an argument. `npm` is
+ * started directly, except on Windows: there it is `npm.cmd`, which Node starts only
+ * through `cmd.exe`, so the command becomes a single string for the shell. An argument
+ * with any other character is refused on every platform, so a run on Linux fails where
+ * Windows would interpret it.
  *
  * @param {string[]} args
  * @param {NodeJS.Platform} [platform]
