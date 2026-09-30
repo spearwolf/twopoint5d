@@ -1,20 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
-
-    // Astro directly run TypeScript code, no transpilation needed.
+    // Astro runs the TypeScript code itself, nothing is emitted.
     "noEmit": true,
-    // TypeScript 5.0 changed how `isolatedModules` and `importsNotUsedAsValues` works, deprecating the later
-    // Until the majority of users are on TypeScript 5.0, we'll have to supress those deprecation errors
-    // "ignoreDeprecations": "5.0",
-    // Error when a value import is only used as a type.
-    // "importsNotUsedAsValues": "error",
 
     "paths": {
-      "~components/*": ["src/components/*"],
-      "~layouts/*": ["src/layouts/*"],
-      "~demos/*": ["src/demos/*"]
+      "~components/*": ["./src/components/*"],
+      "~layouts/*": ["./src/layouts/*"],
+      "~demos/*": ["./src/demos/*"]
     }
   }
 }

@@ -3,10 +3,13 @@
   // declaration map or a source map would point at `src/`, so the build writes neither.
   // The benches and `src/testing/` are test infrastructure and belong in `dist/` as little as
   // the specs do.
+  // `types: []` keeps Node's types out of the build: the published code cannot lean on Node
+  // globals, and the specs and `src/testing/`, which run under Node in Vitest, are excluded.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "declarationMap": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "types": []
   },
   "exclude": ["**/*.spec.ts", "**/*.bench.ts", "src/testing"]
 }

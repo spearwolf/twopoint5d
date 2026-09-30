@@ -1,4 +1,4 @@
-import tagCategoriesJson from '../../data/tag-categories.json' assert {type: 'json'};
+import tagCategoriesJson from '../../data/tag-categories.json' with {type: 'json'};
 import {baseUrl, makeUrl} from './makeUrl.js';
 
 export interface IDemo {

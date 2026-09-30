@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `createBloomOutputNodeBuilder()` and the `OutputNodeBuilder` and `BloomOutputNodeBuilderOptions` types: a ready-made `StageRenderer#buildOutputNode` that composes the pass of every stage additively, as `RootRenderPipeline` does, and adds the bloom of three.js over that composition on top, with the `strength`, `radius` and `threshold` of `bloom()`. Neither the renderer nor `RenderPipeline` releases an `outputNode` a rebuild replaces; the builder releases the bloom node of its previous call once the next output node stands, and the last one on `dispose()`. The builder belongs to the caller: `StageRenderer#dispose()` leaves it alone, a `StageRenderer` refuses one that has been disposed, and a disposed builder throws when it is called. Give every renderer a builder of its own
 - export the event names of `Stage2D`, `StageRenderer`, `Canvas2DStage` and `PanControl2D` as constants with an interface for their payload, as the other events of the library have them: `OnStageDispose` (`IStageDispose`) for the `dispose` event of `Stage2D` and `StageRenderer`, `OnCanvas2DStageResize`, `OnCanvas2DStageRender` and `OnCanvas2DStageDispose` (`ICanvas2DStageResize`, `ICanvas2DStageRender`, `ICanvas2DStageDispose`), `OnPanControl2DUpdate`, `OnPanControl2DHideCursor` and `OnPanControl2DRestoreCursor` (`IPanControl2DUpdate`, `IPanControl2DHideCursor`, `IPanControl2DRestoreCursor`) with `PanControl2DUpdateProps`. The values are the event names the classes emit, so a subscription by name keeps working. Add `PanControl2D#onUpdate()`, `#onHideCursor()` and `#onRestoreCursor()`: each subscribes a listener to its event and returns the function that takes it off again
 - add lookbook demo `stage-projections.astro` — one scene under `OrthographicProjection` and `ParallaxProjection` side by side, moving so the parallax shows, with the `fit` of both switched in one place
+- add `@types/three` as an optional peer dependency (`~0.185.4`): a TypeScript consumer learns which types fit the library, a JavaScript consumer installs nothing
 
 ### Changed
 
@@ -310,6 +311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage` uploads a change of its canvas into the texture it has and builds a new one only for a canvas of another size; the sprite material is rebuilt only then
 - `Canvas2DStage#needsUpdate` starts out `true`: the first `render()` shows what the canvas already carries
 - `IProjection#getViewRect()`, and with it `ParallaxProjection#getViewRect()` and `OrthographicProjection#getViewRect()`, answers a `ProjectionViewRect` `{width, height, pixelRatioX, pixelRatioY}`, a new object on every call. See the Migration Guide
+- the `.d.ts` files of the package carry the TSDoc of the sources, so an editor shows it for every export; the `.js` files carry the comments of the sources as well
 
 ### Deprecated
 
@@ -3525,6 +3527,30 @@ orthographicProjection.updateViewRect(800, 600);
 
 const parallax = parallaxProjection.getParallaxFactor(150);
 const scale = orthographicProjection.getScaleFactor(150); // always 1
+```
+
+#### `@types/three` is an optional peer dependency
+
+A TypeScript consumer keeps `@types/three` in its `devDependencies`, on the version the library is built against; npm reports any other installed version as a peer conflict. A JavaScript consumer installs nothing.
+
+**Before**
+
+```json
+{
+  "devDependencies": {
+    "@types/three": "^0.184.0"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "devDependencies": {
+    "@types/three": "~0.185.4"
+  }
+}
 ```
 
 ## [0.21.2] - 2026-06-19

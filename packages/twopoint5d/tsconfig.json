@@ -4,6 +4,10 @@
   "compilerOptions": {
     "rootDir": "./src",
 
+    // The specs and `src/testing/` run under Node in Vitest (`node:assert`, `node:v8`,
+    // `node:vm`, `globalThis.gc`); this is the config an editor finds for them.
+    "types": ["node"],
+
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 

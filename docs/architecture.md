@@ -91,15 +91,20 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   its `.astro` pages, via `astro check` — the browser tests of `twopoint5d-testing`, and
   every code block marked `ts check` in the tracked Markdown files. The tests and the
   blocks are checked against the built library.
-- `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/`.
+- `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/` with the profile
+  `esm-only`: the package is ESM only, so `node10` and a `require` from CommonJS lie
+  outside, and every other resolution has to succeed.
 - `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts`
   and fails on published declarations that reference a type consumers cannot name.
   `attw` and `publint` resolve such a type structurally and stay quiet, which is exactly
   why this check exists.
 - `lintPkg` runs publint against `dist/` and then `scripts/checkPeerDependenciesOnly.mjs`,
   which fails as soon as `dist/package.json` declares `dependencies` or
-  `optionalDependencies`. The library reaches its consumers with peer dependencies only,
-  and the non-blocking audit step in CI relies on that (see below).
+  `optionalDependencies`, and also when a `.js`, `.mjs` or `.d.ts` file in `dist/`
+  imports a package that is not a peer; apart from its peers the package may import
+  relative paths and its own `#` subpath imports only. The library reaches its
+  consumers with peer dependencies only, and the non-blocking audit step in CI relies on
+  that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
   publish pipeline's helpers and of `makePackageJson.mjs` and
   `checkPeerDependenciesOnly.mjs` themselves (§4, §6), of the CI cache server, of the
@@ -238,16 +243,27 @@ The exception is `scripts/ci/`, which only the CI workflow runs.
 the `catalog:` block of `pnpm-workspace.yaml`. Individual `package.json` files reference
 them as `"catalog:"`, so a version bump happens in exactly one place and stays
 consistent across library, test harness and lookbook. In the library they are
-`peerDependencies`.
+`peerDependencies`; `@types/three` is an optional peer (`peerDependenciesMeta`), because
+only a TypeScript consumer needs it.
 
 `.github/dependabot.yml` has Dependabot look at `npm` and `github-actions` once a week.
 The minor and patch updates of the toolchain arrive as one pull request, the group
 `toolchain`. The four catalog entries stay out of it: a jump of `three` moves the peer
-range of the library and needs a review of its own, so each of them, and every major
-update, comes as a pull request by itself. `playwright` stays out of the group as well:
-each of its updates brings the Chromium and Firefox the browser suite runs on, so it
-comes as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one
+range of the library and is a release of its own, because the catalog range lands
+verbatim in the published manifest. So each of them, and every major update, comes as a
+pull request by itself, to be reviewed on its own. `playwright` stays out of the group as
+well: each of its updates brings the Chromium and Firefox the browser suite runs on, so
+it comes as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one
 carries a comment that names the advisory it answers and says when the entry can go.
+
+Two toolchain updates wait on purpose. TypeScript stays on the 6.x line:
+`typescript-eslint` 8 allows `typescript <6.1.0` only, and TypeScript 7 exports no
+compiler API under `typescript` any more (only `typescript/unstable/*`), while
+`scripts/checkNameableTypes.mjs`, `scripts/checkDocSnippets/compileSnippets.mjs` and
+`scripts/checkPeerDependenciesOnly/findUndeclaredImports.mjs` import the classic API.
+The step to 7 waits for both. `prettier-plugin-astro` stays on 0.14: 1.x formats with
+the Rust compiler `@astrojs/compiler-rs` (0.x) and reformats part of the `.astro` files;
+that switch is a formatting change in its own right and no part of a toolchain update.
 
 `@emnapi/core` and `@emnapi/runtime` are root devDependencies that nothing imports. They
 are peers of `@napi-rs/wasm-runtime`, which `eslint-plugin-astro` pulls in through the

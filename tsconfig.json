@@ -6,18 +6,20 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "alwaysStrict": true,
-    "baseUrl": ".",
     "declaration": true,
     "declarationMap": true,
-    "downlevelIteration": false,
     "emitDecoratorMetadata": false,
     "esModuleInterop": true,
-    "experimentalDecorators": false,
     // Off on purpose: it would make every optional member of the public option bags
-    // reject an explicit `undefined`, in the published declarations too, with no known bug behind it.
+    // reject an explicit `undefined`, in the published declarations too, with no known
+    // bug behind it.
     "exactOptionalPropertyTypes": false,
+    "experimentalDecorators": false,
     "forceConsistentCasingInFileNames": true,
-    "importHelpers": true,
+    // tsc writes its helpers into the output instead of importing them from `tslib`:
+    // the package reaches its consumers with peer dependencies only and cannot bring
+    // `tslib` along.
+    "importHelpers": false,
     "isolatedModules": true,
     "lib": ["ES2022", "ESNext.Float16", "DOM", "DOM.Iterable"],
     "module": "ESNext",
@@ -34,7 +36,10 @@
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "removeComments": true,
+    // The `.d.ts` files carry the TSDoc into the consumer's editor. tsc cannot keep the
+    // comments in the declarations alone, so the `.js` files carry them too and the
+    // consumer's bundler strips them there.
+    "removeComments": false,
     "resolveJsonModule": true,
     "rootDir": ".",
     "skipDefaultLibCheck": true,
@@ -43,6 +48,9 @@
     "strict": true,
     "stripInternal": true,
     "target": "ES2022",
+    // Globals come from what a file imports; a project that runs under Node or Mocha
+    // names those types in its own config.
+    "types": [],
     "useDefineForClassFields": false,
     "useUnknownInCatchVariables": true,
     "verbatimModuleSyntax": true

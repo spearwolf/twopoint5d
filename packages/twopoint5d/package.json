@@ -52,7 +52,7 @@
     "bench": "pnpm vitest bench --run --reporter=default --reporter=json --outputFile.json=bench-results/results.json",
     "watch": "pnpm vitest --watch",
     "makePackageJson": "node ../../scripts/makePackageJson.mjs",
-    "checkPkgTypes": "pnpm exec attw --pack dist --ignore-rules cjs-resolves-to-esm no-resolution",
+    "checkPkgTypes": "pnpm exec attw --pack dist --profile esm-only",
     "checkNameableTypes": "node ../../scripts/checkNameableTypes.mjs",
     "lintPkg": "pnpm exec publint dist && node ../../scripts/checkPeerDependenciesOnly.mjs dist",
     "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run checkNameableTypes && node ../../scripts/publishNpmPkg.mjs dist"
@@ -60,6 +60,12 @@
   "peerDependencies": {
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
+    "@types/three": "catalog:",
     "three": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@types/three": {
+      "optional": true
+    }
   }
 }

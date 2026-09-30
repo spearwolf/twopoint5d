@@ -71,7 +71,10 @@ explicit instruction.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. They are peer dependencies of
-  the library.
+  the library; `@types/three` is an optional one (only a TypeScript consumer needs it).
+  The catalog range lands verbatim in the published manifest, and a 0.x minor of `three`
+  breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
+  library publishes, a consumer on the newer `three` meets a peer conflict.
 - **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
   nothing and stay: they hold `pnpm-lock.yaml` to one resolution
   ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
