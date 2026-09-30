@@ -30,6 +30,10 @@
       "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
       "outputs": ["{projectRoot}/coverage"]
     },
+    "allocations": {
+      "cache": true,
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
+    },
     "bench": {
       "cache": false
     }

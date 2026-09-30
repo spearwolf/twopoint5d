@@ -1,21 +1,44 @@
-import {defineConfig} from 'vitest/config';
+import {configDefaults, defineConfig} from 'vitest/config';
+
+// The allocation specs measure heap bytes over tens of thousands of hot-path calls. Under V8
+// coverage those calls run some five times slower, and on a shared CI runner a single test took
+// anywhere from 3.5 to 6 seconds — the verdict hung on the runner's load, not on the bytes. They
+// form a project of their own, which the coverage run leaves out and which gives each test the time
+// a measurement needs; their bytes stay a gate of their own (`pnpm test:allocations`).
+const allocationSpecs = 'src/**/hot-path-allocations*.spec.ts';
 
 export default defineConfig({
   test: {
-    // The suite lives in the sources: a spec is named `*.spec.ts` and sits next to
-    // its module. The pattern is therefore pinned to `src/` instead of the default
-    // glob — compiled output under `dist/` carries the same specs as `.js` and must
-    // not be collected along with them.
-    include: ['src/**/*.spec.ts'],
     // the allocation specs call gc() before every measurement (`src/testing/measureAllocatedBytes.ts`),
     // and without this flag the function does not exist
     execArgv: ['--expose-gc'],
-    // pinned to `src/` like the specs, for the same reason: `dist/` must not contribute a copy
-    benchmark: {include: ['src/**/*.bench.ts']},
     // Every `vi.spyOn` is taken back when its test ends. A spy that outlives the test that
     // installed it lies over every following test of the same file, and a test that measures
     // an order silently stops measuring anything.
     restoreMocks: true,
+    // `vitest --run` runs both projects, `coverage` runs `specs` alone. A project that extends
+    // this config appends its `include` to the one here, so the patterns live in the projects.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'specs',
+          // The suite lives in the sources: a spec is named `*.spec.ts` and sits next to
+          // its module. The pattern is therefore pinned to `src/` instead of the default
+          // glob — compiled output under `dist/` carries the same specs as `.js` and must
+          // not be collected along with them.
+          include: ['src/**/*.spec.ts'],
+          exclude: [...configDefaults.exclude, allocationSpecs],
+          // pinned to `src/` like the specs, for the same reason: `dist/` must not contribute a copy
+          benchmark: {include: ['src/**/*.bench.ts']},
+        },
+      },
+      {
+        extends: true,
+        // no benchmarks: they belong to `specs`, and the default pattern would run each of them twice
+        test: {name: 'allocations', include: [allocationSpecs], testTimeout: 30_000, benchmark: {include: []}},
+      },
+    ],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

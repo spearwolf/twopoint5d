@@ -21,6 +21,7 @@ jobs:
   version:
     name: Check whether npm has this version
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     # every job works on the commit the CI run names, so only a push to this
     # repository may name it
     if: >-
@@ -72,6 +73,7 @@ jobs:
     needs: version
     if: ${{ needs.version.outputs.publish == 'true' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     # reads the repository and holds no other right: every dependency of the build and its
     # install script runs in this job, away from the publish rights
     env:
@@ -122,6 +124,7 @@ jobs:
     name: Publish the package to npm
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       id-token: write # npm Trusted Publishing (OIDC)
       contents: read
@@ -159,6 +162,7 @@ jobs:
     name: Tag the published version
     needs: [version, publish]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       # creates the tag through the REST API; the job checks nothing out and
       # installs nothing

@@ -20,9 +20,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Build, Lint and Test
+  gate:
+    # The gate of `pnpm run ci`, cut into four jobs that run side by side: a red one names
+    # its part of the gate, the others still report theirs, and "Re-run failed jobs" repeats
+    # only what failed. The deploy workflow follows the conclusion of the whole run, so every
+    # job has to pass.
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    # a hosted job runs for six hours by default; one whose apt stalled did once for over
+    # twenty minutes before it was cancelled by hand
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - task: checks
+            name: Lint, build and check
+            run: pnpm run ci:checks
+          - task: coverage
+            name: Unit tests with coverage
+            run: pnpm run test:coverage
+          - task: allocations
+            name: Hot-path allocations
+            run: pnpm run test:allocations
+          - task: browser
+            name: Browser tests
+            run: xvfb-run pnpm run test:browser
+            browsers: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,43 +64,67 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        timeout-minutes: 5
 
       - name: Audit dependencies
         # reports high and critical advisories without failing the run: the published
         # package declares peer dependencies only (lintPkg holds that), so whatever this
         # finds sits in tooling, and Dependabot proposes the update that fixes it
+        if: matrix.task == 'checks'
         run: pnpm audit --audit-level=high
         continue-on-error: true
+        timeout-minutes: 2
 
       - name: Read the Playwright version
+        if: matrix.browsers
         id: playwright
         run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Cache the Playwright browsers
+        if: matrix.browsers
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Bound the network waits of apt
+        # apt-get update once fell back from the Azure mirror to archive.ubuntu.com and
+        # then waited on a silent connection for over twenty minutes: apt has no overall
+        # timeout of its own. With these a stalled fetch fails within a minute and is retried
+        if: matrix.browsers
+        run: |
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' \
+            | sudo tee /etc/apt/apt.conf.d/99ci-network-timeouts
+
+      - name: Install Playwright browsers and their system libraries
+        if: matrix.browsers && steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium firefox
+        timeout-minutes: 8
 
       - name: Install the system libraries of the Playwright browsers
-        # the cache holds the browsers, not the apt packages they link against
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium firefox
+        # the cache holds the browsers, not the apt packages they link against. Each attempt
+        # is cut off after three minutes — it takes some twenty seconds when the mirrors answer
+        if: matrix.browsers && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: |
+          for attempt in 1 2 3; do
+            timeout 180 pnpm exec playwright install-deps chromium firefox && exit 0
+            echo "::warning::playwright install-deps failed or stalled (attempt $attempt of 3)"
+          done
+          exit 1
+        timeout-minutes: 10
 
       - name: Restore the Nx cache
         id: nx-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/nx-cache
-          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          # one cache per job: each saves what its own tasks produced, and two jobs of the
+          # same commit would otherwise race for the same key
+          key: nx-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
-            nx-${{ runner.os }}-
+            nx-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-${{ matrix.task }}-
 
       - name: Start the Nx cache server
         # Nx indexes its local cache in a database named after the machine id, so a
@@ -91,9 +139,9 @@ jobs:
           echo "NX_SELF_HOSTED_REMOTE_CACHE_SERVER=http://127.0.0.1:47873" >> "$GITHUB_ENV"
           echo "NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Build packages and run all tests
-        run: xvfb-run pnpm run ci
-        timeout-minutes: 20
+      - name: ${{ matrix.name }}
+        run: ${{ matrix.run }}
+        timeout-minutes: 12
 
       - name: Drop the Nx cache entries this run did not use
         # the server touches every entry it serves; what is older than its start went
@@ -108,34 +156,14 @@ jobs:
           path: ${{ runner.temp }}/nx-cache
           key: ${{ steps.nx-cache.outputs.cache-primary-key }}
 
-      - name: Run the hot-path benchmarks
-        # runs once the Nx cache is saved: both cache steps run on success only, and a
-        # bench that crashes must not cost the run its cache
-        #
-        # the timings are archived, not held to a limit: a shared runner's timings vary
-        # too much for a gate, and it is the series over many runs that shows a
-        # regression. The allocation specs in the gate hold what can be counted
-        run: pnpm bench
-        timeout-minutes: 10
-
       - name: Show the Nx cache server log
         if: failure()
         run: cat "$RUNNER_TEMP/nx-cache-server.log" || true
 
       - name: Archive coverage report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        if: always() && matrix.task == 'coverage'
         with:
           name: coverage
           path: packages/twopoint5d/coverage
           retention-days: 3
-
-      - name: Archive benchmark results
-        # kept far longer than the coverage report: a regression shows only in the series
-        # over weeks
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: bench
-          path: packages/twopoint5d/bench-results
-          retention-days: 90

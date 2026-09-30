@@ -41,13 +41,24 @@ at least one tag.
 - `checkPkgTypes`, `checkNameableTypes`, `lintPkg`, `publishNpmPkg` — all depend on
   `build` and are deliberately uncached, since they inspect build output.
 
-The library's `project.json` adds the target `coverage`, which no other project has: the
-same Vitest run as `test` with `--coverage`, cached with the inputs of `test`. Its
-output is `{projectRoot}/coverage`, which the CI workflow archives.
+The library's Vitest config splits its specs into two projects: `allocations`, the
+allocation specs (`src/**/hot-path-allocations*.spec.ts`) with 30 seconds per test, and
+`specs`, everything else. `test` runs both. The allocation specs measure heap bytes over
+tens of thousands of hot-path calls; under V8 coverage those calls run some five times
+slower, and on a shared CI runner a single test took anywhere from 3.5 to 6 seconds, so
+the default timeout of 5 seconds decided the verdict instead of the bytes.
+
+The library's `project.json` adds the target `coverage`, which no other project has:
+the project `specs` with `--coverage`, cached with the inputs of `test`. Its output is
+`{projectRoot}/coverage`, which the CI workflow archives. Without the allocation specs
+the coverage still stays above every threshold.
+
+It adds the target `allocations`, the project `allocations` without coverage, cached with
+the same inputs.
 
 It also adds the target `bench`: `vitest bench` over `src/**/*.bench.ts`, uncached, since
 a timing is never a cache hit. Its output is `{projectRoot}/bench-results/results.json`,
-which the CI workflow archives as well.
+which the nightly workflow `bench.yml` archives.
 
 Per-project `inputs` narrow the cache key further. The library's `build` input list
 excludes `*.spec.ts`, `*.bench.ts` and `src/testing/` — tests, benches and their helpers
@@ -83,7 +94,8 @@ included — change any of it and the library rebuilds).
 `pnpm run ci` (alias `pnpm cbt`) chains:
 
 ```
-clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts → test:coverage → test:browser
+clean → ci:checks → test:coverage → test:allocations → test:browser
+ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts
 ```
 
 - `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`,
@@ -129,17 +141,24 @@ clean → lint → build → typecheck → checkPkgTypes → checkNameableTypes 
   `twopoint5d-testing:typecheck`, the check that every capitalised tag of the lookbook
   demos names an export of the library, and the check that the lookbook serves the
   script `RainbowLine` loads at runtime.
-- `test:coverage` runs the library's Vitest suite once, with coverage, against the
-  thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the gate:
-  it runs the same specs without coverage. The thresholds sit two points under the level
+- `test:coverage` runs the library's Vitest project `specs` once, with coverage, against
+  the thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the
+  gate: it runs every spec without coverage. The thresholds sit two points under the level
   measured when they were set, globally and per module: the measured percentage rounded
   down, minus two. A regression turns the gate red, a line that moves does not.
   `controls` and `display` carry no threshold of their own; the browser suite exercises
   them and is not measured.
+- `test:allocations` runs the Vitest project `allocations` (§2) without coverage: the
+  heap bytes a hot-path call puts on the V8 heap, each against its limit in the spec.
 
 ### In CI
 
-`.github/workflows/ci.yml` runs the gate on every push. The workflow has no path filter:
+`.github/workflows/ci.yml` runs the gate on every push, in four jobs side by side — one
+matrix job per part: `ci:checks`, `test:coverage`, `test:allocations` and, under
+`xvfb-run`, `test:browser`. `fail-fast` is off, so a red job does not hide the verdict of
+the others, and "Re-run failed jobs" repeats only the part that failed. Every job and
+every long step carries a `timeout-minutes`; a hosted job otherwise runs for six hours.
+The workflow has no path filter:
 Markdown is an input of `prettier --check` and of `twopoint5d-testing:typecheck` (§2), so
 a push that changes nothing but docs runs the gate as well, and the Nx cache answers every
 target whose inputs the push leaves alone. Every action is pinned to a full commit SHA
@@ -152,20 +171,20 @@ branch, so a newer push cancels the running or waiting run of the same branch �
 on `main`, where the group is the commit: every commit there gets its own run, which
 nothing cancels, because `deploy.yml` follows each successful one.
 
-The step `Audit dependencies` follows the install and runs `pnpm audit
---audit-level=high`. It reports high and critical advisories without failing the run:
+The step `Audit dependencies` follows the install in the job `ci:checks` and runs `pnpm
+audit --audit-level=high`. It reports high and critical advisories without failing the run:
 the published package declares peer dependencies only (`lintPkg` holds that), so
 whatever the audit finds sits in tooling, and Dependabot proposes the update that fixes
 it (§5). Dependabot also keeps the commit SHAs of the actions, and the version comment
 next to each, current.
 
-The step `Run the hot-path benchmarks` runs `pnpm bench` once the Nx cache (below) is
-saved: after the save, so that a bench that crashes does not cost the run its cache.
-The artifact `bench` keeps `packages/twopoint5d/bench-results` for 90 days, the
-coverage report for 3. The timings are archived, not held to a limit: a shared runner's
-timings vary too much for a gate, and a regression shows only in the series over weeks.
-What can be counted — the heap bytes of a hot-path call — the allocation specs hold
-in the gate.
+The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
+`main` and by hand (`workflow_dispatch`) on any branch. It installs the workspace root and
+the library only and runs `bench` through pnpm. The artifact `bench-<commit sha>` keeps
+`packages/twopoint5d/bench-results` for 90 days, the coverage report of the CI workflow
+is kept for 3. The timings are archived, not held to a limit: a shared runner's timings
+vary too much for a gate, and a regression shows only in the series over weeks. What can
+be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
 The browser suite writes one line per browser and run into the "Browser logs" of the
 test output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from
@@ -174,10 +193,15 @@ Playwright 1.63.0, Chromium 153 runs on WebGL2 (three reports `WebGPU is not ava
 running under WebGL2 backend`) and Firefox 155 on WebGPU (`dom.webgpu.enabled` in
 `web-test-runner.config.js`). What CI gets is in the log of the CI run.
 
-The Playwright browsers are cached under the key `playwright-<os>-<version>`, the
-version being what `pnpm exec playwright --version` reports from the root package. A hit
-still runs `playwright install-deps`, since the cache holds the browsers and not the
-system libraries they link against. The key follows the root `playwright`, so the root
+Only the job of the browser tests installs Playwright. The browsers are cached under the
+key `playwright-<os>-<version>`, the version being what `pnpm exec playwright --version`
+reports from the root package. A hit still runs `playwright install-deps`, since the
+cache holds the browsers and not the system libraries they link against. That is an
+`apt-get update` and `install`, which once fell back from the Azure mirror to
+`archive.ubuntu.com` and waited on a silent connection for over twenty minutes: apt has
+no overall timeout. The job therefore gives apt a 30-second network timeout and three
+retries (`/etc/apt/apt.conf.d/99ci-network-timeouts`), cuts each attempt of
+`install-deps` off after three minutes and tries three times. The key follows the root `playwright`, so the root
 `playwright` and the one `@web/test-runner-playwright` resolves have to be the same
 version.
 
@@ -186,13 +210,16 @@ comes with a new one, so a restored Nx cache directory would never hit. Nx does 
 results from a self-hosted remote cache, so the job starts `scripts/ci/nxCacheServer.mjs`
 on `127.0.0.1:47873`, serving `$RUNNER_TEMP/nx-cache` with a random per-run token, and
 hands `NX_SELF_HOSTED_REMOTE_CACHE_SERVER` and `NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN`
-to every later step. `actions/cache` restores that directory under
-`nx-<os>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to the newest entry of the
-same lockfile and then to the newest entry at all. The server touches every entry it
-serves. After a green gate the job deletes each entry older than the server start — what
+to every later step. Each job keeps a cache of its own — `actions/cache` restores that
+directory under `nx-<os>-<job>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to the
+newest entry of the same job and lockfile and then to the newest entry of the job at all.
+Four jobs of one commit would otherwise race for one key, and only the first save would
+count. The server touches every entry it
+serves. After a green run the job deletes each entry older than the server start — what
 this run neither used nor wrote — and saves the directory under the commit's key, so
-each saved state holds exactly the results of one green commit and does not grow from run
-to run. A red gate saves nothing, and the next run restores the last green state.
+each saved state holds exactly the results of one green job of one commit and does not
+grow from run to run. A red job saves nothing, and its next run restores the last green
+state.
 
 The cache is only as trustworthy as what writes to it: its entries come solely from CI
 runs on pushes to this repository. `deploy.yml` does not use it and builds the published

@@ -20,7 +20,7 @@ const RECOMPUTATIONS_PER_ROUND = 4;
 // the rounds of both views before the first measurement — 3 200 recomputations, see `measurePerTile()`
 const SETTLE_ROUNDS = 400;
 // the rounds a view runs before each of its measurements, and the rounds measured: short, so that
-// five groups keep a test under three seconds with V8 coverage
+// five groups keep a test short
 const WARM_UP_ROUNDS = 5;
 const MEASURED_ROUNDS = 10;
 const GROUPS = 5;

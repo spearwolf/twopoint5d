@@ -220,7 +220,7 @@ $ pnpm exec playwright install chromium firefox
 ```sh
 # clean, lint, build, type-check, check the package types and that every published
 # type can be named, lint the manifest, then the script tests, the Vitest suite with
-# coverage and the browser tests
+# coverage, the allocation specs and the browser tests
 $ pnpm cbt
 ```
 

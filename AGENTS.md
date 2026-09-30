@@ -38,12 +38,16 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
 - `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
-  thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
-  single-file run measure nothing
+  thresholds in `packages/twopoint5d/vite.config.ts`, without the allocation specs;
+  `pnpm test`, `pnpm test:ci` and a single-file run measure nothing
+- `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
+  alone, without coverage: the Vitest project `allocations` in
+  `packages/twopoint5d/vite.config.ts`, 30 s per test. `pnpm test` runs them along with
+  the rest
 - `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through
   `vitest bench`; the timings land in `packages/twopoint5d/bench-results/results.json`,
-  which CI archives. Not part of `pnpm run ci`: timings are archived, not held to a
-  limit
+  which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
+  CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server, the docs' code block check and the Nameable-Types check
   (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
@@ -59,9 +63,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
-- `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
-  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser.
-  Run it before committing.
+- `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, then `ci:checks` (lint,
+  build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, test:scripts), then
+  test:coverage, test:allocations, test:browser. Run it before committing. CI runs the
+  four parts as parallel jobs.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.

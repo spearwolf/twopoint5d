@@ -27,8 +27,9 @@ const BYTES_PER_RECOMPUTATION_LIMIT = 8;
 // `CameraBasedVisibility`, and 226.78 B beside 226.78 B in `RectangularVisibilityArea`
 const BYTES_PER_TILE_MARGIN = 8;
 
-// Forty recomputations a round keep a test under three seconds with V8 coverage too, which runs
-// them some five times slower.
+// Forty recomputations a round keep a test short. The allocation specs run without coverage, in
+// the Vitest project `allocations`: under V8 coverage a test here took up to six seconds on a CI
+// runner.
 const CALLS_PER_ROUND = 1000;
 const RECOMPUTATIONS_PER_ROUND = 40;
 
