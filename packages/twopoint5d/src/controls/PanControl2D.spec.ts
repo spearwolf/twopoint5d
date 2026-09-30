@@ -301,21 +301,6 @@ describe('PanControl2D', () => {
     });
   });
 
-  describe('pointer positions', () => {
-    it('measures the rectangle of its coordsTarget once per drag, when the pointer goes down', () => {
-      const getBoundingClientRect = vi.fn(() => ({left: 5, top: 7}));
-      const control = makeControl({coordsTarget: {getBoundingClientRect} as unknown as HTMLElement});
-
-      pointer('pointerdown', {buttons: 1, clientX: 0});
-      for (const clientX of [10, 20, 30]) pointer('pointermove', {buttons: 1, clientX});
-      pointer('pointerup', {buttons: 0, clientX: 30});
-      control.update(0);
-
-      expect(getBoundingClientRect).toHaveBeenCalledOnce();
-      expect(control.panView.x).toBe(-30);
-    });
-  });
-
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();

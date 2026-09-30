@@ -26,11 +26,6 @@ enum HideCursorState {
 interface PanInternalState {
   pointerType: string;
 
-  // the rectangle of coordsTarget at the pointerdown of this pointer: every position of
-  // it is measured against this one, to the end of its drag
-  left: number;
-  top: number;
-
   panX: number;
   panY: number;
 
@@ -100,18 +95,6 @@ export interface PanControl2DOptions {
   cursorPanStyle?: string;
 
   cursorStylesTarget?: HTMLElement;
-
-  /**
-   * The element pointer coordinates are measured against. When a pointer goes down, the
-   * control takes the `getBoundingClientRect()` of this element and subtracts it from
-   * every position of that pointer until the pointer ends. Default is the
-   * `cursorStylesTarget`, and with that `document.body`.
-   *
-   * A drag keeps the rectangle of its `pointerdown` to its end: the pan is a difference
-   * of two positions, and an offset that stays the same cancels out. An element that
-   * moves or scrolls under a running drag does not move the view.
-   */
-  coordsTarget?: HTMLElement;
 
   /**
    * The root the cursor style rule is installed in. Default is `document.head`.
@@ -227,15 +210,6 @@ export class PanControl2D extends InputControlBase {
    */
   keyCodes: [number, number, number, number];
 
-  /**
-   * The element pointer coordinates are measured against. Can be swapped at runtime: a
-   * pointer that goes down afterwards is measured against the new one, a drag under way
-   * keeps the rectangle it started with.
-   *
-   * @see {@link PanControl2DOptions.coordsTarget}
-   */
-  coordsTarget?: HTMLElement;
-
   #pointerDisabled = false;
   #keyboardDisabled = false;
 
@@ -255,7 +229,6 @@ export class PanControl2D extends InputControlBase {
     // an option the setter refuses leaves the default standing
     if (this.#cursorPanClass == null) this.cursorPanStyle = 'none';
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
-    this.coordsTarget = readOption(options, 'coordsTarget', this.#cursorStylesTarget);
 
     this.mouseButton = readOption(options, 'mouseButton', 1);
     this.keys = readOption(options, 'keys', [...DEFAULT_KEYS] as [string, string, string, string]);
@@ -498,24 +471,13 @@ export class PanControl2D extends InputControlBase {
 
   #onPointerDown = (event: PointerEvent): void => {
     if (this.#isPanPointer(event)) {
-      // the rectangle is measured once per pointer, here: a read on every pointermove
-      // would force a layout on a DOM with pending changes each time. The pan is a
-      // difference of two positions, so an offset that stays the same for the whole drag
-      // cancels out, and without a target the client coordinates are the reference
-      const rect = this.coordsTarget?.getBoundingClientRect();
-      const left = rect?.left ?? 0;
-      const top = rect?.top ?? 0;
-
       // an id that is still down missed its end: its old position is no anchor, and
       // whatever it collected goes with it
       this.#pointersDown.set(event.pointerId, {
         pointerType: event.pointerType,
 
-        left,
-        top,
-
-        lastX: event.clientX - left,
-        lastY: event.clientY - top,
+        lastX: event.clientX,
+        lastY: event.clientY,
 
         panX: 0,
         panY: 0,
@@ -626,9 +588,12 @@ export class PanControl2D extends InputControlBase {
     }
   };
 
+  // the pan is the difference of two client positions of one pointer: no element's rectangle
+  // enters it, so neither the element under the pointer nor one that moves or scrolls during
+  // the drag shifts the view
   #updatePanState(event: PointerEvent, state: PanInternalState) {
-    const x = event.clientX - state.left;
-    const y = event.clientY - state.top;
+    const x = event.clientX;
+    const y = event.clientY;
 
     state.panX += x - state.lastX;
     state.panY += y - state.lastY;

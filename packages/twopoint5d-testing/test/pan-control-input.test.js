@@ -36,12 +36,12 @@ describe('PanControl2D — what it measures and what it reports', () => {
     boxes = [];
   });
 
-  it('measures against its coordsTarget while the pointer crosses other elements', () => {
+  it('follows the pointer while it crosses other elements', () => {
     const near = makeBox({left: 0});
     const far = makeBox({left: 300});
     boxes = [near, far];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: near});
+    control = new PanControl2D({state: makeState()});
 
     // a drag that starts over one element and ends over another: the pointer moves 320px, and
     // that is what the view has to follow — whatever lies under the pointer on the way
@@ -52,11 +52,11 @@ describe('PanControl2D — what it measures and what it reports', () => {
     expect(control.panView.x, 'panView.x after a 320px drag').to.equal(-320);
   });
 
-  it('a drag keeps the rectangle of its pointerdown when the coordsTarget moves under it', () => {
+  it('an element that moves under a drag does not move the view', () => {
     const box = makeBox({left: 0});
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     pointer('pointerdown', {target: box, x: 10, y: 10});
     box.style.left = '50px';
@@ -70,7 +70,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     const touch = {pointerId: 7, pointerType: 'touch', target: box};
     pointer('pointerdown', {...touch, x: 10, y: 10});
@@ -85,7 +85,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     const touch = {pointerId: 2, pointerType: 'touch', target: box};
     pointer('pointerdown', {target: box, x: 10, y: 10});
@@ -104,7 +104,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     const first = {pointerId: 2, pointerType: 'touch', target: box};
     const second = {pointerId: 3, pointerType: 'touch', isPrimary: false, target: box};
@@ -126,7 +126,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     boxes = [box, otherBox];
 
     const other = new PanControl2D({state: makeState(), cursorStylesTarget: otherBox, cursorPanStyle: 'grabbing'});
-    control = new PanControl2D({state: makeState(), coordsTarget: box, cursorStylesTarget: box, cursorPanStyle: 'grabbing'});
+    control = new PanControl2D({state: makeState(), cursorStylesTarget: box, cursorPanStyle: 'grabbing'});
     try {
       pointer('pointerdown', {target: box, x: 10, y: 10});
       pointer('pointermove', {target: box, x: 30, y: 10});
@@ -164,7 +164,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     pointer('pointerdown', {target: box, x: 10, y: 10});
     pointer('pointermove', {target: box, x: 30, y: 10});
@@ -275,7 +275,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box, cursorStylesTarget: box});
+    control = new PanControl2D({state: makeState(), cursorStylesTarget: box});
 
     let restores = 0;
     on(control, 'restoreCursor', () => {
@@ -303,7 +303,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     const touch = {pointerId: 7, pointerType: 'touch'};
     pointer('pointerdown', {...touch, target: box, x: 10, y: 10});
@@ -321,7 +321,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     pointer('pointerdown', {target: box, x: 10, y: 10});
     pointer('pointermove', {target: box, x: 30, y: 10});
@@ -341,7 +341,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     pointer('pointerdown', {target: box, x: 10, y: 10});
     pointer('pointermove', {target: box, x: 30, y: 10});
@@ -355,7 +355,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     const box = makeBox();
     boxes = [box];
 
-    control = new PanControl2D({state: makeState(), coordsTarget: box});
+    control = new PanControl2D({state: makeState()});
 
     // the left button pans, the right one joins, the left one lets go: the browser reports the
     // last step as a pointermove, and the pointerup only comes with the right button

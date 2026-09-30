@@ -21,7 +21,7 @@ describe('PanControl2D — the cursor each control shows while panning', () => {
   function makeControl(cursorPanStyle) {
     const target = makeTarget();
     targets.push(target);
-    const control = new PanControl2D({state: makeState(), cursorStylesTarget: target, coordsTarget: target, cursorPanStyle});
+    const control = new PanControl2D({state: makeState(), cursorStylesTarget: target, cursorPanStyle});
     controls.push(control);
     return {control, target};
   }
@@ -126,7 +126,6 @@ describe('PanControl2D — the cursor rules it keeps in the stylesheet', () => {
     const control = new PanControl2D({
       state: makeState(),
       cursorStylesTarget: target,
-      coordsTarget: target,
       styleSheetRoot: root,
       cursorPanStyle,
     });
