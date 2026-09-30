@@ -60,10 +60,11 @@ const demos = Object.entries(
       }
       const meta = tags.get(tag)!;
       meta.demoIds.add(id);
-      json.tags.filter((t: string) => t !== tag).forEach((t: string) => meta.relatedTags.add(t));
+      json.tags.filter((t: string) => t !== tag && !hiddenTags.has(t)).forEach((t: string) => meta.relatedTags.add(t));
     });
   }
-  return {...json, id, href: makeUrl(json.url), tags: json.tags?.sort()};
+  // a copy: json.tags is the array of the imported metadata module
+  return {...json, id, href: makeUrl(json.url), tags: json.tags ? [...json.tags].sort() : undefined};
 }) as IDemo[];
 
 // sort() is stable: demos with the same order keep the alphabetical order of their files

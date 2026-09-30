@@ -15,7 +15,7 @@
     "astro": "pnpm exec astro"
   },
   "dependencies": {
-    "@spearwolf/astro-rainbow-line": "^1.3.0",
+    "@spearwolf/astro-rainbow-line": "^2.1.0",
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",

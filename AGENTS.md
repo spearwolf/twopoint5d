@@ -83,9 +83,9 @@ explicit instruction.
 - **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
   nothing and stay: they hold `pnpm-lock.yaml` to one resolution ([monorepo architecture
   §5](docs/architecture.md#5-shared-dependency-versions)).
-- **`apps/lookbook/public/js/rainbow-line-v0.4.0.js`** is the web component behind every
+- **`apps/lookbook/public/js/rainbow-line-v0.6.0.js`** is the web component behind every
   `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
-  `<script src="${BASE_URL}/js/rainbow-line-v0.4.0.js">` at runtime and expects the file
+  `<script src="${BASE_URL}/js/rainbow-line-v0.6.0.js">` at runtime and expects the file
   in `public/` — it ships a copy but does not serve it. The only reference lives inside
   `node_modules`, so a grep of the repo finds nothing; the file is not dead weight and
   stays. Keep it byte-for-byte identical to the package's copy, and replace it when a

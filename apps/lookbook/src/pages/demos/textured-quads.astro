@@ -32,14 +32,7 @@ import {description, title} from './_textured-quads.json';
   //
   // +================================================================================+
 
-  async function createMesh(
-    rows: number,
-    columns: number,
-    size: number,
-    offset: number,
-    texCoords: TextureCoords,
-    texture: Texture,
-  ) {
+  function createMesh(rows: number, columns: number, size: number, offset: number, texCoords: TextureCoords, texture: Texture) {
     const geometry = new InstancedQuadsGeometry(rows * columns);
 
     // the geometry was built with a capacity, so it has its base pool, and the first
@@ -65,7 +58,7 @@ import {description, title} from './_textured-quads.json';
       }
     }
 
-    const mesh = new VertexObjects(geometry, await createMaterial(texture));
+    const mesh = new VertexObjects(geometry, createMaterial(texture));
 
     mesh.name = 'InstancedQuadsMesh';
 
@@ -80,7 +73,7 @@ import {description, title} from './_textured-quads.json';
   //
   // +================================================================================+
 
-  async function createMaterial(texture: Texture) {
+  function createMaterial(texture: Texture) {
     const material = new NodeMaterial();
 
     material.positionNode = vertexByInstancePosition({scale: vec3(attribute<'vec2'>('quadSize'), 1.0)});
@@ -111,7 +104,7 @@ import {description, title} from './_textured-quads.json';
     // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
-    demo.scene.add(await createMesh(16, 32, 3.7, 1, texCoords, texture));
+    demo.scene.add(createMesh(16, 32, 3.7, 1, texCoords, texture));
   });
 
   // eslint-disable-next-line no-console

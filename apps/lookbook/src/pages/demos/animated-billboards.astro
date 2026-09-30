@@ -77,7 +77,7 @@ import {description, title} from './_animated-billboards.json';
 
     on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
-      material.time = now; // material.uniforms['time'].value = now;
+      material.time = now;
       mesh.update();
     });
 

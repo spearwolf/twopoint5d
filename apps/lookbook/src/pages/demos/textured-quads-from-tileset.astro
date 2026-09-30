@@ -32,7 +32,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   //
   // +================================================================================+
 
-  async function makeMesh(rows: number, columns: number, size: number, offset: number, tileset: TileSet, texture: Texture) {
+  function makeMesh(rows: number, columns: number, size: number, offset: number, tileset: TileSet, texture: Texture) {
     const capacity = rows * columns;
 
     const material = new MeshBasicNodeMaterial({
@@ -86,9 +86,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
     // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
-    demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));
-
-    Object.assign(globalThis, {demo});
+    demo.scene.add(makeMesh(16, 32, 3.5, 1, tileSet, texture));
   });
 
   // eslint-disable-next-line no-console

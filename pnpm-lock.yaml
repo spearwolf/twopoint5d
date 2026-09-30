@@ -105,8 +105,8 @@ importers:
   apps/lookbook:
     dependencies:
       '@spearwolf/astro-rainbow-line':
-        specifier: ^1.3.0
-        version: 1.3.0
+        specifier: ^2.1.0
+        version: 2.1.0(astro@7.3.5(@types/node@26.6.3)(jiti@2.7.0)(yaml@2.9.1))
       '@spearwolf/eventize':
         specifier: 'catalog:'
         version: 6.2.0
@@ -1319,8 +1319,10 @@ packages:
   '@sinonjs/samsam@10.0.2':
     resolution: {integrity: sha512-8lVwD1Df1BmzoaOLhMcGGcz/Jyr5QY2KSB75/YK1QgKzoabTeLdIVyhXNZK9ojfSKSdirbXqdbsXXqP9/Ve8+A==}
 
-  '@spearwolf/astro-rainbow-line@1.3.0':
-    resolution: {integrity: sha512-zX/JWrxWmBcEl0i3G/mL+CBP0FaE08F7lWYqbVGfjwVKYdtVATk16dcZsRD6IoEvGvlm0mQCELMd75OEpbqA3g==}
+  '@spearwolf/astro-rainbow-line@2.1.0':
+    resolution: {integrity: sha512-HHhOOCc2wi7RtLSTqEa/+Vu9qVWQ3ICi0pCyCY4YwwaJw+LphOcaZxrSSxOcW5F4LiIqE4s6KwrL1OesTrn57g==}
+    peerDependencies:
+      astro: '>=5'
 
   '@spearwolf/eventize@6.2.0':
     resolution: {integrity: sha512-Tqc90j9w87+4HlOEnmNApT/6eyy+laXKRG+C/ZQJeCDb8T3kPSnTIwA/Uet3RM+qeYOw5kq/ZMqb5AYkIN3mzw==}
@@ -5344,7 +5346,9 @@ snapshots:
       '@sinonjs/commons': 3.0.1
       type-detect: 4.1.0
 
-  '@spearwolf/astro-rainbow-line@1.3.0': {}
+  '@spearwolf/astro-rainbow-line@2.1.0(astro@7.3.5(@types/node@26.6.3)(jiti@2.7.0)(yaml@2.9.1))':
+    dependencies:
+      astro: 7.3.5(@types/node@26.6.3)(jiti@2.7.0)(yaml@2.9.1)
 
   '@spearwolf/eventize@6.2.0': {}
 
