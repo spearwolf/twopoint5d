@@ -1,9 +1,9 @@
 # Resource lifecycle: `dispose()` and ownership
 
 Binding rules for every class in this package that has a `dispose()`, and for every new
-one that gets one — geometries, materials, meshes, pools, renderers, stores, display.
-A `dispose()` that breaks them is a bug, not a variation. Section 7 is the checklist,
-section 8 the tests to ship with it.
+one that gets one — geometries, materials, meshes, pools, renderers, stores, display. A
+`dispose()` that breaks them is a bug, not a variation. Section 6 is the checklist,
+section 7 the tests to ship with it.
 
 ## 1. Ownership
 
@@ -14,7 +14,8 @@ to the caller: not disposed, not cleared, not modified. Handing a resource out d
 transfer it either; returning a pool from a getter keeps you the owner.
 
 **What a method builds for its caller and keeps no reference to belongs to the caller.**
-The loaders of the texture module — [`TextureImageLoader`](../src/texture/TextureImageLoader.ts),
+The loaders of the texture module —
+[`TextureImageLoader`](../src/texture/TextureImageLoader.ts),
 [`TileSetLoader`](../src/texture/TileSetLoader.ts),
 [`TextureAtlasLoader`](../src/texture/TextureAtlasLoader.ts) —,
 [`TextureFactory`](../src/texture/TextureFactory.ts)`#create()`, `#load()` and
@@ -49,7 +50,8 @@ Reference implementation —
 asks the bookkeeping instead of guessing:
 
 ```ts
-this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
+this.pool =
+  source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
 if (!(source instanceof VOBufferPool)) {
   this.declareOwnedPool(this.pool);
 }
@@ -76,7 +78,7 @@ is the last place to honour the pairing: `createVO()` ↔ `freeVO()`,
 is not releasing — the pool or the factory stays the owner.
 [`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) hands every tile back
 before it lets the factory go, so a factory serving a second renderer gets the slots of
-the first one back. Assertion (f) in section 8 tests it.
+the first one back. Assertion (f) in section 7 tests it.
 
 An instance that passes what it took straight out to its caller has nothing to give
 back: `TexturedSprites#createSprite()` hands the sprite over, and whoever asked for it
@@ -99,8 +101,8 @@ dispose(): void {
 Two other shapes are legitimate. Idempotent by construction, when every step runs empty
 the second time anyway — a reference already given up, `removeFromParent()` with no
 parent, `SignalGroup.delete()`, a repeated `set(undefined)`, `Material.dispose()` whose
-own dispose event already unsubscribed the renderer. And guarded on the state the
-method itself gives up, the way
+own dispose event already unsubscribed the renderer. And guarded on the state the method
+itself gives up, the way
 [`Map2DTileRenderer.dispose()`](../src/map2d/Map2DTileRenderer.ts) returns early on
 `tileFactory === null`. Neither is claimed, both are shown by assertion (d).
 
@@ -120,7 +122,8 @@ Every public member of a disposed instance behaves in one of exactly three ways,
 by its declared type. Its TSDoc says which.
 
 1. **Type admits absence → answer `undefined`.** `T | undefined` is a value the caller
-   handles anyway. [`TexturedSprites#texture`](../src/sprites/TexturedSprites/TexturedSprites.ts).
+   handles anyway.
+   [`TexturedSprites#texture`](../src/sprites/TexturedSprites/TexturedSprites.ts).
 2. **Type claims presence → throw.** For a declared `T`, do not hand back `undefined`
    and lie about the type. Throw an `Error` naming class and state, so the stack points
    at the real mistake. [`Display#canvas`](../src/display/Display.ts) raises
@@ -128,21 +131,22 @@ by its declared type. Its TSDoc says which.
 3. **Mutating method with nothing left to act on → silent no-op.**
    [`TexturedSprites#freeSprite()`](../src/sprites/TexturedSprites/TexturedSprites.ts)
    returns a sprite to a pool that is gone and does nothing. Invalid input is still
-   turned away: [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts)
-   keeps rejecting a mismatched capacity.
+   turned away:
+   [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) keeps
+   rejecting a mismatched capacity.
 
 This rules out the fourth reaction — a `TypeError` from deep inside the class because a
-field quietly became `undefined`, where the caller learns nothing and the stack points at
-the wrong line.
+field quietly became `undefined`, where the caller learns nothing and the stack points
+at the wrong line.
 
 A pending promise does not survive either — anything a caller is still awaiting when
 `dispose()` runs is rejected as part of it.
 
-The rule points outwards too: a constructor or method handed an already-disposed instance
-refuses it, with an error naming the call and the state. Otherwise it builds something
-that looks alive and does nothing — a
-[`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) over a disposed pool is a
-geometry without attributes, and no frame says so until one comes out empty.
+The rule points outwards too: a constructor or method handed an already-disposed
+instance refuses it, with an error naming the call and the state. Otherwise it builds
+something that looks alive and does nothing — a
+[`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) over a disposed pool is
+a geometry without attributes, and no frame says so until one comes out empty.
 
 ## 4. Signals, effects and events
 
@@ -159,8 +163,9 @@ this.#colorEffect = createEffect(() => {
 
 ```ts
 override dispose() {
-  // the effects go first: a write to a signal runs every effect that reads it on the spot, and
-  // clearing the references below would build nodes for a material on its way out
+  // the effects go first: a write to a signal runs every effect that reads it on the
+  // spot, and clearing the references below would build nodes for a material on its way
+  // out
   this.#positionEffect.destroy();
   this.#colorEffect.destroy();
 
@@ -177,16 +182,16 @@ override dispose() {
 ```
 
 An effect that builds something out of the values `dispose()` clears is destroyed before
-they are cleared: a write runs every effect that reads the signal right away, and an effect
-still alive at that point does its work once more for an instance that is going away. Keep
-the handle `createEffect()` returns for such an effect and call its `destroy()` first;
-`SignalGroup.delete(this)` removes the rest afterwards.
+they are cleared: a write runs every effect that reads the signal right away, and an
+effect still alive at that point does its work once more for an instance that is going
+away. Keep the handle `createEffect()` returns for such an effect and call its
+`destroy()` first; `SignalGroup.delete(this)` removes the rest afterwards.
 
 `SignalGroup.delete(this)` is the entire teardown of the signal side. Never
 `SignalGroup.destroy()` — deprecated in `@spearwolf/signalize`.
 
-On the eventize side `off(this)` removes every listener, and a class others subscribe
-to **emits its dispose event before** that call, or the event reaches nobody. See
+On the eventize side `off(this)` removes every listener, and a class others subscribe to
+**emits its dispose event before** that call, or the event reaches nobody. See
 [`Display.dispose()`](../src/display/Display.ts):
 
 ```ts
@@ -194,8 +199,9 @@ dispose(): void {
   if (this.#disposed) return;
   this.#disposed = true;
 
-  // a listener that throws does not hold up the teardown: its error waits until the display
-  // is down, so a caller that catches it holds a disposed display, not half of one
+  // a listener that throws does not hold up the teardown: its error waits until the
+  // display is down, so a caller that catches it holds a disposed display, not half of
+  // one
   const errors: unknown[] = [];
 
   try {
@@ -207,33 +213,37 @@ dispose(): void {
   this.frameLoop.stop(this);
   try {
     // the listeners are still attached here: this event is what tells them to let go,
-    // and off(this) below is what makes it the last event this display ever emits. Every
-    // listener hears it, even behind one that throws
+    // and off(this) below is what makes it the last event this display ever emits.
+    // Every listener hears it, even behind one that throws
     emitStrict(this, OnDisplayDispose, this);
   } catch (error) {
     errors.push(error);
   }
   off(this);
 
-  // before the release, which lets go of the canvas; and synchronously, so a display built on
-  // the same canvas in this tick writes its values afterwards and nothing overwrites them
+  // before the release, which lets go of the canvas; and synchronously, so a display
+  // built on the same canvas in this tick writes its values afterwards and nothing
+  // overwrites them
   this.#giveBackCallersCanvas();
 
   const renderer = this.renderer;
   this.#renderer = undefined;
   if (renderer != null) this.#releaseRenderer(renderer);
 
-  // the container and the canvas in it leave the document right away; the renderer holds on
-  // to its canvas itself and does not need it in the document to release it
+  // the container and the canvas in it leave the document right away; the renderer
+  // holds on to its canvas itself and does not need it in the document to release it
   this.#ownContainer?.remove();
   this.#ownContainer = undefined;
 
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) {
-    // neither goes missing: the error of the pause, and the one of the dispose event after it
-    throw new AggregateError(errors, 'Display#dispose(): a listener of pause threw, and a listener of dispose threw', {
-      cause: errors[1],
-    });
+    // neither goes missing: the error of the pause, and the one of the dispose event
+    // after it
+    throw new AggregateError(
+      errors,
+      'Display#dispose(): a listener of pause threw, and a listener of dispose threw',
+      {cause: errors[1]},
+    );
   }
 }
 ```
@@ -429,8 +439,9 @@ Notes on the assertions:
   the test would notice if the class stopped creating signals altogether.
 - **(f)** is the one spy on something the instance does not own. Take the instance
   through the calls that hand slots out, then dispose it, and assert on the releasing
-  call — not on a `dispose()` of the pool. A class that passes every slot straight to its
-  caller has no subject here.
+  call — not on a `dispose()` of the pool. A class that passes every slot straight to
+  its caller has no subject here.
 
 Where `dispose()` decides what happens to GPU buffers, a unit test cannot see the
-result. Add a browser test in `packages/twopoint5d-testing/` and run `pnpm test:browser`.
+result. Add a browser test in `packages/twopoint5d-testing/` and run
+`pnpm test:browser`.

@@ -6,8 +6,8 @@ own source, searchable by tags.
 ## Running it
 
 From the repo root, `pnpm lookbook` (an alias for `pnpm nx dev lookbook`, which depends on
-`^build` and therefore builds the library first). From `apps/lookbook/` itself, `pnpm dev`.
-Both serve at `http://localhost:4321/lookbook` — the path comes from `base` in
+`^build` and therefore builds the library first). From `apps/lookbook/` itself,
+`pnpm dev`. Both serve at `http://localhost:4321/lookbook` — the path comes from `base` in
 `astro.config.mjs`; without it the root URL 404s. For installing dependencies, see the
 repo-root `README.md`.
 
@@ -61,7 +61,6 @@ declared in `tsconfig.json`. All 18 demo pages import through them.
 ## Checks
 
 `pnpm nx typecheck lookbook` runs `astro check` over the `.astro` and `.ts` files of the
-lookbook and
-is part of the repo-wide `pnpm typecheck`. `pnpm nx build lookbook` builds the static site.
-The library is pulled in as `workspace:*`, so a change in `packages/twopoint5d` shows up here
-as soon as it's built.
+lookbook and is part of the repo-wide `pnpm typecheck`. `pnpm nx build lookbook` builds
+the static site. The library is pulled in as `workspace:*`, so a change in
+`packages/twopoint5d` shows up here as soon as it's built.

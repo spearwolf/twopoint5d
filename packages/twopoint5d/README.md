@@ -27,24 +27,39 @@ The core features can be roughly classified into the following areas:
 - :heavy_check_mark: api is stable and ready to use
 
 #### 📚 [map2d](src/map2d/)
-- create and render tiled maps which are laid out in a 2D spatial grid map data structure
+- create and render tiled maps which are laid out in a 2D spatial grid map data
+  structure
 - :warning: work in progress
 
 #### 📚 [vertex-objects](src/vertex-objects/)
 
-three.js offers standardized geometry properties like position, normal, colors, etc.. For rendering, triangles are almost always used as primtives.
+three.js offers standardized geometry properties like position, normal, colors, etc..
+For rendering, triangles are almost always used as primtives.
 
-The _vertex-objects_ api simplifies the creation of geometries with custom properties. A _vertex-object description_ is used to describe the geometry and its primitives, and an object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom sprites_ of the geometry.
+The _vertex-objects_ api simplifies the creation of geometries with custom properties. A
+_vertex-object description_ is used to describe the geometry and its primitives, and an
+object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom
+sprites_ of the geometry.
 
-For such a geometry, however, own vertex and fragment shaders are almost always needed, since the standard shaders from the three.js library are of course not written for non-standard geometry properties.
+For such a geometry, however, own vertex and fragment shaders are almost always needed,
+since the standard shaders from the three.js library are of course not written for
+non-standard geometry properties.
 
-The main motivation behind the _vertex objects_ is to make it easier to create custom geometries, especially _instanced_ geometries (multiple objects within one buffer geometry) without worrying too much about low-level three.js/WebGL details.
+The main motivation behind the _vertex objects_ is to make it easier to create custom
+geometries, especially _instanced_ geometries (multiple objects within one buffer
+geometry) without worrying too much about low-level three.js/WebGL details.
 
-This library provides you with a declarative interface to describe the shape of the geometry, incl. indices and attributes and manages the internal attribute buffers, deals with mapping of attributes to buffers AND the update of them.
+This library provides you with a declarative interface to describe the shape of the
+geometry, incl. indices and attributes and manages the internal attribute buffers, deals
+with mapping of attributes to buffers AND the update of them.
   
-It should significantly cut down on the amount of boilerplate code and state management you need to do in your applications. At the same time, the _vertex objects_ api gives you a convenient object-based interface to write extremely clean and readable programs for your custom geometries.
+It should significantly cut down on the amount of boilerplate code and state management
+you need to do in your applications. At the same time, the _vertex objects_ api gives
+you a convenient object-based interface to write extremely clean and readable programs
+for your custom geometries.
 
-- provides an object based abstraction over instanced buffer geometries. build them with your own api
+- provides an object based abstraction over instanced buffer geometries. build them with
+  your own api
 - create, update and delete instances with ease
 - :heavy_check_mark: api is stable and ready to use
 
@@ -55,16 +70,19 @@ It should significantly cut down on the amount of boilerplate code and state man
 - :heavy_check_mark: api is stable and ready to use
 
 #### [display](src/display/)
-- cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the _init_, _resize_ and _frame_ event&#x2011;loop
+- cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the
+  _init_, _resize_ and _frame_ event&#x2011;loop
 - nice starting point for your three.js demos
-- depends on nothing but three.js and `@spearwolf/eventize`, both peer dependencies of the package
-- api docs: the `Display` class docs — lifecycle and resize model — in [src/display/Display.ts](src/display/Display.ts)
+- imports nothing but three.js and `@spearwolf/eventize`; the peer dependencies of the
+  package are listed under [Usage](../../README.md#usage)
+- api docs: the `Display` class docs — lifecycle and resize model — in
+  [src/display/Display.ts](src/display/Display.ts)
 - :heavy_check_mark: api is stable and ready to use
 
 #### [resource lifecycle](docs/resource-lifecycle.md)
-- the binding rules for `dispose()` and ownership of geometries, materials, textures and pools
+- the binding rules for `dispose()` and ownership of geometries, materials, textures and
+  pools
 - what a disposed instance answers, and how signals, effects and events are torn down
 - a checklist and a test pattern for every new `dispose()`
 
-have fun!
-:rocket:
+have fun! :rocket:

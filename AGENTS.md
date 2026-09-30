@@ -18,8 +18,8 @@ them.
 | `scripts` | the Node scripts — publish pipeline, CI cache server, the checks of the repo; as an Nx project only their type check |
 
 Nx tags select projects in the root scripts: `twopoint5d` (library + browser harness),
-`ci` (Vitest suite), `browser` (Playwright suite), `app` (lookbook), `scripts` (the
-type check of `scripts/`). A project without tags silently drops out of every
+`ci` (Vitest suite), `browser` (Playwright suite), `app` (lookbook), `scripts` (the type
+check of `scripts/`). A project without tags silently drops out of every
 `--projects=tag:…` run.
 
 The repo root also carries large generated files — `audit.html`, `remediation-plan.md`.
@@ -27,11 +27,12 @@ Do not read them unless the task is about them.
 
 ## Commands
 
-All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` — `engines` in `package.json`.
+All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` —
+`engines` in `package.json`.
 
 - `pnpm install`
-- `pnpm exec playwright install chromium firefox` — the browsers for `pnpm test:browser`; once
-  after the first install and after every Playwright bump
+- `pnpm exec playwright install chromium firefox` — the browsers for
+  `pnpm test:browser`; once after the first install and after every Playwright bump
 - `pnpm lint` — ESLint + `prettier --check`; `pnpm format` writes the Prettier changes
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
@@ -39,18 +40,19 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
   thresholds in `packages/twopoint5d/vite.config.ts`; `pnpm test`, `pnpm test:ci` and a
   single-file run measure nothing
-- `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through `vitest
-  bench`; the timings land in `packages/twopoint5d/bench-results/results.json`, which CI
-  archives. Not part of `pnpm run ci`: timings are archived, not held to a limit
+- `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through
+  `vitest bench`; the timings land in `packages/twopoint5d/bench-results/results.json`,
+  which CI archives. Not part of `pnpm run ci`: timings are archived, not held to a
+  limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server, the docs' code block check and the Nameable-Types check
   (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
   `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and `nxCacheServer.mjs` as
-  child processes, one that checks the lookbook's vendored `rainbow-line` script, one that
-  holds the tags and routes of the lookbook's demo metadata to the library's exports, one
-  that asks Nx whether every tracked Markdown file is an input of the docs' type check,
-  and one that holds the publish script to Node's built-ins; the Nx project `scripts` has
-  no `test` target, so `pnpm test` leaves them out
+  child processes, one that checks the lookbook's vendored `rainbow-line` script, one
+  that holds the tags and routes of the lookbook's demo metadata to the library's
+  exports, one that asks Nx whether every tracked Markdown file is an input of the docs'
+  type check, and one that holds the publish script to Node's built-ins; the Nx project
+  `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
@@ -58,8 +60,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   Markdown files; the tests and the blocks are checked against the built library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, lint, build, typecheck,
-  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser. Run
-  it before committing.
+  checkPkgTypes, checkNameableTypes, lintPkg, test:scripts, test:coverage, test:browser.
+  Run it before committing.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.
@@ -79,8 +81,8 @@ explicit instruction.
   breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
   library publishes, a consumer on the newer `three` meets a peer conflict.
 - **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
-  nothing and stay: they hold `pnpm-lock.yaml` to one resolution
-  ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
+  nothing and stay: they hold `pnpm-lock.yaml` to one resolution ([monorepo architecture
+  §5](docs/architecture.md#5-shared-dependency-versions)).
 - **`apps/lookbook/public/js/rainbow-line-v0.4.0.js`** is the web component behind every
   `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
   `<script src="${BASE_URL}/js/rainbow-line-v0.4.0.js">` at runtime and expects the file
@@ -91,47 +93,48 @@ explicit instruction.
   `scripts/lookbook/rainbowLineScript.test.mjs` (`pnpm test:scripts`) fails otherwise.
   The `.prettierignore` entry and the `**/lookbook/public` ignore in `eslint.config.mjs`
   exist for it and stay too.
-- **Publishing** happens from the generated `dist/`, never from
-  `packages/twopoint5d/`. `scripts/` is the publish pipeline — changes there can break
-  the published package. `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions:
-  the Nx cache server of the CI workflow, and the check of the docs' code blocks, which
-  publishes nothing. `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import
-  nothing but Node's built-ins (`node:`) and each other, because the publish job of the
-  deploy installs nothing; `builtinImportsOnly.test.mjs` fails on anything else.
-- **`dispose()` and ownership** follow
-  [the resource lifecycle rules](packages/twopoint5d/docs/resource-lifecycle.md). They
-  are binding, not advisory.
-- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and
-  `*.test.js` in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A
-  change to rendering or GPU-buffer code needs both.
+- **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
+  `scripts/` is the publish pipeline — changes there can break the published package.
+  `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server
+  of the CI workflow, and the check of the docs' code blocks, which publishes nothing.
+  `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import nothing but Node's
+  built-ins (`node:`) and each other, because the publish job of the deploy installs
+  nothing; `builtinImportsOnly.test.mjs` fails on anything else.
+- **`dispose()` and ownership** follow [the resource lifecycle
+  rules](packages/twopoint5d/docs/resource-lifecycle.md). They are binding, not
+  advisory.
+- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js`
+  in `packages/twopoint5d-testing/test/` (real browsers, visual/WebGL). A change to
+  rendering or GPU-buffer code needs both.
   A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of
   `measureAllocatedBytes()`, which empties only the young generation before its rounds.
-  A spec that measures bytes per tile or per vertex object as the difference of two sizes —
-  two views of a camera, two ranges of a pool — calls `measureAllocatedBytes()` directly, so
-  that the two sizes take turns within one sequence of measurements and a cost that is still
-  settling falls on both alike; `measurePerTile()` in
+  The Vitest config starts its workers with `--expose-gc` for these two helpers, and
+  `src/testing/` never reaches `dist/`.
+  A spec that measures bytes per tile or per vertex object as the difference of two
+  sizes — two views of a camera, two ranges of a pool — calls `measureAllocatedBytes()`
+  directly, so that the two sizes take turns within one sequence of measurements and a
+  cost that is still settling falls on both alike; `measurePerTile()` in
   `src/map2d/hot-path-allocations.tilted-view.spec.ts` shows the sequence.
   A round hands the calls it measures whole numbers, constants and objects, never a
   fractional value it works out itself: V8 boxes such a value at each call it leaves
   un-inlined, and which calls it inlines shifts with the inlining budget, which block
   coverage uses up sooner — the round would measure heap numbers of its own. Whether a
-  method hands the values of its caller on without boxing them is checked by what it calls,
-  as `src/sprites/hot-path-allocations.spec.ts` does for the sprite setters.
-  The Vitest config starts its workers with `--expose-gc` for it, and `src/testing/`
-  never reaches `dist/`.
+  method hands the values of its caller on without boxing them is checked by what it
+  calls, as `src/sprites/hot-path-allocations.spec.ts` does for the sprite setters.
   The browser tests share their fixtures through
-  `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second
-  test file needs goes there, not into both.
-- **Code blocks in Markdown.** A plain `ts` code block is an excerpt and nothing checks it.
-  A block that stands on its own — imports everything it uses, declares everything it
-  names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as a
-  module of its own against the built library under the root tsconfig (unused locals and
-  parameters allowed). Released CHANGELOG sections are not marked after the fact; their
-  blocks show the API of their release.
-- **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
-  Code, comments and docs are written in English.
+  `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second test
+  file needs goes there, not into both.
+- **Code blocks in Markdown.** A plain `ts` code block is an excerpt and nothing checks
+  it. A block that stands on its own — imports everything it uses, declares everything
+  it names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as
+  a module of its own against the built library under the root tsconfig (unused locals
+  and parameters allowed). Released CHANGELOG sections are not marked after the fact;
+  their blocks show the API of their release.
+- **Commits** follow [Conventional
+  Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
+  written in English.
 
 ## Working on the library
 
@@ -142,16 +145,18 @@ plumbing only makes sense in one piece; assembling it from grep hits is how wron
 assumptions get in.
 
 `@spearwolf/eventize` and `@spearwolf/signalize` are used heavily. The `using-eventize`
-and `using-signalize` skills carry the semantics that differ from other event and
-signal libraries.
+and `using-signalize` skills carry the semantics that differ from other event and signal
+libraries.
 
 ## Deeper docs
 
 - [Library architecture](packages/twopoint5d/docs/architecture.md) — layers, the
   vertex-object core, what each module owns
-- [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — `dispose()` and ownership
-- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — `Display` + `Stage2D` + `StageRenderer` idioms
-- [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a description
-  declares and which accessors it generates
+- [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — `dispose()` and
+  ownership
+- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — `Display` +
+  `Stage2D` + `StageRenderer` idioms
+- [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a
+  description declares and which accessors it generates
 - [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
   publish pipeline, the CI gate

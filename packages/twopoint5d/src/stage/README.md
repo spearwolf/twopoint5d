@@ -632,8 +632,9 @@ What this layer does on top of the general rules in
   by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
   of its pass-target — the child itself is not disposed. An `OnStageDispose` goes out
   before the renderer stops listening. A listener of `OnStageRemoved`,
-  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this; its error
-  reaches the caller once the renderer is down.
+  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this, and neither
+  does an unsubscribe of the host that throws — the renderer gives up its other
+  subscription there all the same; the errors reach the caller once the renderer is down.
 - A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for one
   draw at a time; while it is set the renderer builds no internal target of its own, and
   assigning it releases the one it had. The pool belongs to the caller: `pool.dispose()`

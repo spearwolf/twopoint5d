@@ -1171,11 +1171,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * unsubscribe of the host a child leaves that throws is taken the same way:
    * the child gives up its other subscription there all the same, and the
    * error joins those of the listeners, ahead of them. The size stays the
-   * exception: a stage that refuses it is not added. A
-   * listener that disposes this renderer or the child, or gives the child
-   * another holder, while the child leaves its previous one ends the call
-   * there: the child is not added. What came before stays: the child has
-   * taken the size of this renderer and has left its previous holder.
+   * exception: a stage that refuses it is not added. A listener that disposes
+   * this renderer or the child, or gives the child another holder, while the
+   * child leaves its previous one ends the call there: the child is not
+   * added. What came before stays: the child has taken the size of this
+   * renderer and has left its previous holder.
    *
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`

@@ -66,12 +66,13 @@ Markdown file is an input. It checks the browser tests through the package's own
 code block marked `ts check` through `scripts/checkDocSnippets.mjs`, both against the
 library's build output. Its inputs are that build output, the tests, the tsconfig,
 `package.json`, the modules of the check, the tsconfig reader it shares with
-`checkNameableTypes` and every Markdown file git tracks: a marked block can sit in any of
-them, and one that stops compiling has to turn the target red. `project.json` names those
-files by the directories that hold tracked docs, and the three at the root by name, so an
-untracked note — which the check never reads — does not invalidate the cache.
-`scripts/checkDocSnippets/typecheckInputs.test.mjs` asks Nx for the inputs it resolves and
-fails on a tracked `*.md` outside them; a doc in a new place gets its glob there.
+`checkNameableTypes` and every Markdown file git tracks: a marked block can sit in any
+tracked Markdown file, and one that stops compiling has to turn the target red.
+`project.json` names those files by the directories that hold tracked docs, and the three
+at the root by name, so an untracked note — which the check never reads — does not
+invalidate the cache. `scripts/checkDocSnippets/typecheckInputs.test.mjs` asks Nx for the
+inputs it resolves and fails on a tracked `*.md` outside them; a doc in a new place gets
+its glob there.
 
 Named inputs worth knowing: `sharedTsconfigs` (root + project tsconfig),
 `makePackageJson` (everything that feeds the publish manifest, the root `package.json`
@@ -339,12 +340,14 @@ Two runners, deliberately in separate packages:
 
 - Vitest in `packages/twopoint5d` (tag `ci`) — unit and logic tests as `*.spec.ts` next
   to the source. No browser dependencies in the library package.
-- `@web/test-runner` with Playwright Chromium and Firefox in
-  `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for
-  anything that needs a real GPU context. `pnpm install` downloads no browsers; they
-  come from `pnpm exec playwright install chromium firefox`. The `*.test.js` files are
-  type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it
-  from JSDoc — vertex object interfaces, descriptions.
+- `@web/test-runner` with Playwright Chromium and Firefox in `packages/twopoint5d-testing`
+  (tag `browser`) — `*.test.js` under `test/`, for anything that needs a real GPU context.
+  `pnpm install` downloads no browsers; they come from
+  `pnpm exec playwright install chromium firefox`. The `*.test.js` files are type-checked
+  with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —
+  vertex object interfaces, descriptions. The package is `"private": true`: it is a test
+  harness, never a release, so npm refuses to publish it and `pnpm publish -r` passes it
+  by.
 
 A browser test takes its display down with `dispose()` alone: `Display#dispose()`
 stops the loop right away and releases the renderer only once the GPU has run the work
@@ -370,14 +373,13 @@ of them out. The four are:
   helpers to imports of Node's built-ins and of each other, because the publish job of
   the deploy installs nothing (§4).
 
-Four specs start a script itself, as a child process: `makePackageJson.mjs` in a
-throwaway project directory, `checkPeerDependenciesOnly.mjs` against a throwaway
-manifest, `checkNameableTypes.mjs` against throwaway declaration files and
-`scripts/ci/nxCacheServer.mjs` with a command line it refuses, because
-their exit codes, their messages and the manifest the first one does not write are
-wiring that no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the
-registry as soon as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and
-the file system.
+Four specs start a script itself, as a child process: `makePackageJson.mjs` in a throwaway
+project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
+`checkNameableTypes.mjs` against throwaway declaration files and
+`scripts/ci/nxCacheServer.mjs` with a command line it refuses, because their exit codes,
+their messages and the manifest the first one does not write are wiring that no helper
+test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon as its
+arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 
