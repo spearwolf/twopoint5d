@@ -420,6 +420,9 @@ function restoreCanvasState(canvas: HTMLCanvasElement, state: CanvasState, class
 
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Display extends EventizedObject {}
+
 /**
  * The `Display` is the entry point for rendering with twopoint5d. It owns the
  * three.js `WebGPURenderer`, drives the per-frame loop via {@link FrameLoop},
@@ -589,9 +592,6 @@ export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
  * still `0` — `OnDisplayResize` is also `retain`ed, so subscribers attaching
  * after the first frame still receive the latest size on subscription.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Display extends EventizedObject {}
-
 export class Display {
   /**
    * Upper bound per axis, in device pixels, for the drawing buffer that

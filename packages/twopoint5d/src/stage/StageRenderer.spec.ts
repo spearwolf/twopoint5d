@@ -1002,6 +1002,89 @@ describe('StageRenderer', () => {
         expect(child.parent).toBeUndefined();
         expect(child.isDisposed).toBe(false);
       });
+
+      it('add() hands on the error of the move out when a listener disposes the child while it leaves its previous holder', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const child = new StageRenderer(a);
+        const failure = new Error('the listener failed');
+        // ahead of the listener that disposes the child: dispose() takes every listener
+        // with it that the event has not reached yet
+        on(child, OnRemoveFromParent, () => {
+          throw failure;
+        });
+        on(child, OnRemoveFromParent, () => child.dispose());
+
+        expect(thrownBy(() => b.add(child))).toBe(failure);
+
+        expect(b.hasStage(child)).toBe(false);
+        expect(a.hasStage(child)).toBe(false);
+        expect(child.parent).toBeUndefined();
+        expect(child.isDisposed).toBe(true);
+      });
+
+      it('add() hands on the errors of the move out as an AggregateError when a listener disposes this renderer while the child leaves its previous holder', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const child = new StageRenderer(a);
+        const e1 = new Error('left');
+        const e2 = new Error('removed');
+        on(child, OnRemoveFromParent, () => {
+          throw e1;
+        });
+        on(child, OnRemoveFromParent, () => b.dispose());
+        on(a, OnStageRemoved, () => {
+          throw e2;
+        });
+
+        const error = thrownBy(() => b.add(child)) as AggregateError;
+
+        expect(error).toBeInstanceOf(AggregateError);
+        expect(error.message).toBe(
+          'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent threw',
+        );
+        expect(error.errors).toHaveLength(2);
+        expect(error.errors[0]).toBe(e1);
+        expect(error.errors[1]).toBe(e2);
+        expect(b.isDisposed).toBe(true);
+        expect(b.stages).toHaveLength(0);
+        expect(a.hasStage(child)).toBe(false);
+        expect(child.parent).toBeUndefined();
+        expect(child.isDisposed).toBe(false);
+      });
+
+      it('add() leaves out a child that a listener gives another holder while it leaves its previous one', () => {
+        const a = new StageRenderer();
+        const b = new StageRenderer();
+        const hostC = makeHost();
+        const child = new StageRenderer(a);
+        on(child, OnRemoveFromParent, () => {
+          child.parent = hostC;
+        });
+
+        expect(() => b.add(child)).not.toThrow();
+
+        expect(b.hasStage(child)).toBe(false);
+        expect(a.hasStage(child)).toBe(false);
+        expect(child.parent).toBe(hostC);
+        hostC._emitResize(80, 40);
+        expect([child.width, child.height], 'the new host drives the child').toEqual([80, 40]);
+      });
+
+      it('add() takes a child off its host when a listener registered ahead of the host subscriptions disposes it', () => {
+        const host = makeHost();
+        const b = new StageRenderer();
+        const child = new StageRenderer();
+        // ahead of the host subscriptions: registered before attach()
+        on(child, OnRemoveFromParent, () => child.dispose());
+        child.attach(host);
+
+        expect(() => b.add(child)).not.toThrow();
+
+        expect(b.hasStage(child)).toBe(false);
+        expect(child.isDisposed).toBe(true);
+        expect(host._unsubs, 'both host subscriptions given up').toBe(2);
+      });
     });
   });
 
@@ -1231,11 +1314,52 @@ describe('StageRenderer', () => {
       expect(sr.isDisposed).toBe(true);
       expect(sr.parent).toBeUndefined();
       expect(joined).not.toHaveBeenCalled();
+      expect(hostA._unsubs, 'both subscriptions to the first host given up').toBe(2);
       const width = sr.width;
       hostB._emitResize(80, 40);
       expect(sr.width, 'the new host does not reach the renderer').toBe(width);
       hostB._emitFrame(1, 0.016, 1);
       expect(stage.renderTo).not.toHaveBeenCalled();
+    });
+
+    it('a write to parent leaves a renderer that a listener of OnRemoveFromParent gives another host off the host it was assigned', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const hostC = makeHost();
+      const sr = new StageRenderer(hostA);
+      on(sr, OnRemoveFromParent, () => {
+        sr.parent = hostC;
+      });
+
+      expect(() => {
+        sr.parent = hostB;
+      }).not.toThrow();
+
+      expect(sr.parent).toBe(hostC);
+      expect(hostA._unsubs, 'both subscriptions to the first host given up').toBe(2);
+      hostB._emitResize(10, 10);
+      expect(sr.width, 'the assigned host does not reach the renderer').toBe(0);
+      hostC._emitResize(80, 40);
+      expect([sr.width, sr.height], 'the host the listener gave drives it').toEqual([80, 40]);
+    });
+
+    it('a write to parent takes a renderer off its host when a listener registered ahead of the host subscriptions disposes it', () => {
+      const hostA = makeHost();
+      const hostB = makeHost();
+      const sr = new StageRenderer();
+      // ahead of the host subscriptions: registered before attach()
+      on(sr, OnRemoveFromParent, () => sr.dispose());
+      sr.attach(hostA);
+
+      expect(() => {
+        sr.parent = hostB;
+      }).not.toThrow();
+
+      expect(sr.isDisposed).toBe(true);
+      expect(hostA._unsubs, 'both subscriptions to the first host given up').toBe(2);
+      const width = sr.width;
+      hostA._emitResize(80, 40);
+      expect(sr.width, 'the first host reaches the renderer no more').toBe(width);
     });
   });
 

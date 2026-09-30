@@ -1,4 +1,4 @@
-import {emitStrict, type EventizedObject, eventize, isEventized, off, on, once} from '@spearwolf/eventize';
+import {emitStrict, type EventizedObject, eventize, isEventized, off, on} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {
   Color,
@@ -27,7 +27,7 @@ import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
-import type {IStageRendererHost} from './IStageRendererHost.js';
+import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
 import type {OutputNodeBuilder} from './outputNodeBuilders.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import type {Stage2D} from './Stage2D.js';
@@ -122,6 +122,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   name = 'StageRenderer';
 
   #parent?: StageRendererParentType;
+
+  // the subscriptions #addToHost() took at the host that drives this renderer, given up
+  // by #removeFromParent() before OnRemoveFromParent goes out rather than by listeners
+  // of that event: a listener that disposes this renderer takes every listener with it
+  // that the event has not reached yet
+  #hostSubscriptions: StageRendererHostUnsubscribe[] = [];
 
   width: number = 0;
   height: number = 0;
@@ -303,9 +309,22 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // between the two halves stops after one pass
     this.#parent = undefined;
 
-    // every listener hears it, even behind one that throws: the host subscriptions from
-    // #addToHost() are listeners of this event and let go of the host here. The error goes to the
-    // caller once its call has run to its end
+    // the host lets go before anyone hears of the move, so a listener that disposes this
+    // renderer or gives it another holder finds it off the old host already. Each handle
+    // is asked on its own, and what one throws waits for the caller like the error of a
+    // listener
+    const hostSubscriptions = this.#hostSubscriptions;
+    this.#hostSubscriptions = [];
+    for (const unsubscribe of hostSubscriptions) {
+      try {
+        unsubscribe();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+
+    // every listener hears it, even behind one that throws. The error goes to the caller
+    // once its call has run to its end
     try {
       emitStrict(this, OnRemoveFromParent);
     } catch (error) {
@@ -322,16 +341,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #addToHost(host: IStageRendererHost): void {
-    once(
-      this,
-      OnRemoveFromParent,
+    this.#hostSubscriptions.push(
       host.onResize(({width, height}) => {
         this.resize(width, height);
       }),
-    );
-    once(
-      this,
-      OnRemoveFromParent,
       host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
         this.updateFrame(now, deltaTime, frameNo);
         this.renderTo(renderer);
@@ -1056,8 +1069,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#internalOutputTexture = undefined;
 
     // the parent setter refuses a disposed renderer, so the detach runs on the field itself.
-    // #removeFromParent() is what emits OnRemoveFromParent, and that event is what makes the
-    // host subscriptions from #addToHost() unsubscribe.
+    // #removeFromParent() gives up the host subscriptions from #addToHost() and emits
+    // OnRemoveFromParent
     this.#removeFromParent(errors);
 
     this.#pipeline = undefined;
@@ -1149,7 +1162,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * size stays the exception: a stage that refuses it is not added. A
    * listener that disposes this renderer or the child, or gives the child
    * another holder, while the child leaves its previous one ends the call
-   * there: the child is not added.
+   * there: the child is not added. What came before stays: the child has
+   * taken the size of this renderer and has left its previous holder.
    *
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`
