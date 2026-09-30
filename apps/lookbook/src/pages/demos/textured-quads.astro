@@ -1,38 +1,16 @@
 ---
+import TexturePreview from '~components/TexturePreview.astro';
 import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_textured-quads.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
-  <div id="texture-preview" class="texture-preview"></div>
+<Layout title={title} description={description} fullscreenCanvas>
+  <TexturePreview size={256} />
 </Layout>
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background: radial-gradient(circle, rgb(195, 130, 74) 0%, rgb(95, 26, 26) 100%);
-  }
-
-  .texture-preview {
-    background-color: rgba(100, 100, 100, 0.8);
-    border: 1px solid #000;
-    border-radius: 5px;
-    width: 256px;
-    height: 256px;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    box-shadow:
-      0 0 0 2px #b1b1a2,
-      5px 5px 10px rgba(31, 29, 18, 0.5);
-    overflow: hidden;
-  }
-  .texture-preview :global(img),
-  .texture-preview :global(canvas) {
-    max-width: 100%;
   }
 </style>
 
@@ -44,6 +22,7 @@ import {description, title} from './_textured-quads.json';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
@@ -117,8 +96,7 @@ import {description, title} from './_textured-quads.json';
   //
   // +================================================================================+
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   await demo.start(async ({renderer}) => {
     renderer.toneMapping = AgXToneMapping;
@@ -130,7 +108,7 @@ import {description, title} from './_textured-quads.json';
     // eslint-disable-next-line no-console
     console.log('loaded texture-image', {texCoords, texture});
 
-    // the <div id="texture-preview"> is written by the markup of this very page
+    // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
     demo.scene.add(await createMesh(16, 32, 3.7, 1, texCoords, texture));

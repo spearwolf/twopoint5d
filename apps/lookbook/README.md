@@ -1,6 +1,6 @@
 # twopoint5d lookbook
 
-The living documentation of `@spearwolf/twopoint5d`: 17 runnable demos, each linked to its
+The living documentation of `@spearwolf/twopoint5d`: 18 runnable demos, each linked to its
 own source, searchable by tags.
 
 ## Running it
@@ -14,38 +14,46 @@ repo-root `README.md`.
 ## What's in `src/`
 
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
-- `pages/demos/<name>.astro` — 17 demo pages, all built on `VanillaDemo.astro`
-- `pages/demos/_<name>.json` — 17 metadata files, one per demo page
+- `pages/demos/<name>.astro` — 18 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 18 metadata files, one per demo page
 - `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
   share `map2d/`
-- `components/` — the lookbook UI: the card grid, the tag cloud, search
+- `components/` — the lookbook UI: the card grid, the tag cloud, search, and
+  `TexturePreview`, the texture preview of the demo pages
 - `layouts/`
 - `data/tag-categories.json` — the ordering of the tag cloud
 - `images/`
 - `styles/`
 
-Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`, declared
-in `tsconfig.json`. All 17 demo pages import through them.
+Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`,
+declared in `tsconfig.json`. All 18 demo pages import through them.
 
 ## Adding a demo
 
 1. Put the reusable classes under `src/demos/<name>/`. The wiring lives in the page's
    `<script>` block instead — every demo page has one, and all of them import from
    `~demos/…` there.
-2. Add `src/pages/demos/<name>.astro`, using the `VanillaDemo.astro` layout. Existing pages
-   import it under the local name `Layout`, e.g. `crosses.astro`.
+2. Add `src/pages/demos/<name>.astro`, using the `VanillaDemo.astro` layout. Existing
+   pages import it under the local name `Layout`, e.g. `first-sprite.astro`. With
+   `fullscreenCanvas` the layout writes a canvas that fills the window, and
+   `getFullscreenCanvas()` from `src/demos/utils/fullscreenCanvas.ts` hands it to the
+   script of the page. `<TexturePreview>` from `src/components/` shows a texture in a
+   corner of the page, filled by `showTexturePreview()`.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are
    required — `url` must match the page's route, since the card links to it.
-   `description`, `tags` and `previewImage` are optional, per the `IDemo` interface in the
-   same file; without `previewImage`, `Card.astro` falls back to a default image, as in
-   `_stage-nested-pipelines.json` and `_stage-postprocessing.json`. The dialog of a demo
-   page links to the page's own source on GitHub; `DemoNavBar.astro` builds that link from
-   the route, so the JSON carries none. A tag that starts with a capital letter names an
-   export of `@spearwolf/twopoint5d`. `scripts/lookbook/demoMetadata.test.mjs`
-   (`pnpm test:scripts`) checks the tags, the tags of `data/tag-categories.json` and that
-   `url` is the page's route; a class from three.js needs an entry with its reason there.
+   `shortDescription` (the text of the card), `description` (Markdown, the dialog of the
+   demo page, and the card when there is no `shortDescription`), `order` (the position
+   among the cards, ascending, 0 when missing), `tags` and `previewImage` are optional,
+   per the `IDemo` interface in the same file; without `previewImage`, `Card.astro` falls
+   back to a default image, as in `_stage-nested-pipelines.json` and
+   `_stage-postprocessing.json`. The dialog of a demo page links to the page's own source
+   on GitHub; `DemoNavBar.astro` builds that link from the route, so the JSON carries
+   none. A tag that starts with a capital letter names an export of
+   `@spearwolf/twopoint5d`. `scripts/lookbook/demoMetadata.test.mjs` (`pnpm test:scripts`)
+   checks the tags, the tags of `data/tag-categories.json` and that `url` is the page's
+   route; a class from three.js needs an entry with its reason there.
    `_textured-sprites.json` shows the full pattern.
 4. Drop the preview image into `public/images/demo-preview/`, referenced by its bare file
    name — `src/demos/utils/demoPreviewImageUrl.ts` prepends the path.

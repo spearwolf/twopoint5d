@@ -3,9 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_textured-sprites.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
+<Layout title={title} description={description} fullscreenCanvas>
   <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
     <div class="actionBtn render-as-billboards select-none" data-render-as-billboards="true">render as billboards</div>
   </section>
@@ -13,25 +11,11 @@ import {description, title} from './_textured-sprites.json';
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background: radial-gradient(circle, rgb(175 82 82) 0%, rgb(90 148 191) 100%);
     color: #eee;
     font-family: sans-serif;
     font-size: 16px;
     line-height: 2;
-  }
-  .actionBtn {
-    padding: 0.5em;
-    background-color: rgba(50 20 90 / 60%);
-    color: #eee;
-    border-radius: 4px;
-    border: 1px solid rgba(11, 15, 17);
-    box-shadow: 4px 4px 0 rgba(11, 15, 17);
-    font-size: 100%;
-    font-weight: bold;
-    cursor: pointer;
-    display: inline-flex;
   }
 </style>
 
@@ -40,12 +24,12 @@ import {description, title} from './_textured-sprites.json';
   import {LessEqualDepth} from 'three/webgpu';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
   const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
 
   demo.onInit(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);

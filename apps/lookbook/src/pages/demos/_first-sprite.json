@@ -1,0 +1,8 @@
+{
+  "title": "your first sprite",
+  "shortDescription": "One textured sprite from a texture atlas, drawn by a Display with a scene and a camera of its own — the place to start",
+  "description": "One sprite, drawn with the frame `splotch0` of a texture atlas. The page builds a `Display` on its canvas, a three.js `Scene` and `PerspectiveCamera`, and loads the atlas through a `TextureStore`.\n\nThe sprite lives in a `TexturedSprites` mesh, which draws every sprite as one instance: a base vertex object description gives the four vertices of the quad, an instanced one the size, position and texture coordinates of each sprite. [Vertex objects](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/src/vertex-objects/README.md) explains what such a description declares.",
+  "url": "/demos/first-sprite",
+  "order": -1,
+  "tags": ["Display", "TexturedSprites", "TextureStore", "textures", "vanilla"]
+}

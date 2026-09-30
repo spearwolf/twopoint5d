@@ -339,6 +339,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - remove the exports `postFixID` and `globalStylesID`: the class name `Stylesheets` hands out comes whole from the return value of `installRule()`, `retainRule()` and `addRule()`, and `globalStylesID` named a `<style>` element the module does not create — see the migration guide
 - remove `compression` from `StringDataIdsChunk2DParams`: the chunk decodes plain base64 only. See the Migration Guide
 - remove `IProjection#getZoom()`, `ParallaxProjection#getZoom()` and `OrthographicProjection#getZoom()`: the name answered two different questions. `getScaleFactor()` answers how large something appears, `ParallaxProjection#getParallaxFactor()` what the parallax value of `ParallaxProjection#getZoom()` answered. See the Migration Guide
+- remove `printSceneGraphToConsole()` from the public API: a debug helper that wrote every node of a subtree to the console through `console.dir`, without a limit, and that nothing in the library called. `findRootNode()` stays. See the Migration Guide
 
 ### Fixed
 
@@ -965,6 +966,23 @@ factory.freeTileSprite(sprite);
 ```ts
 factory.destroyTile(sprite);
 ```
+
+#### `printSceneGraphToConsole()` is gone
+
+**Before**
+
+```ts
+printSceneGraphToConsole(scene);
+```
+
+**After**
+
+```ts
+scene.traverse((node) => console.log(node.type, node.name));
+```
+
+For the grouped output with every node passed to `console.dir`, keep a copy of the
+function in your own project; it takes `findRootNode()` from the library.
 
 #### A frame name in a `TextureAtlas` is taken only once
 

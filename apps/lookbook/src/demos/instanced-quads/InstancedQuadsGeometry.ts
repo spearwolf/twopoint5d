@@ -20,10 +20,6 @@ export interface BaseQuad extends VO {
   y3: number;
   z3: number;
 
-  x4: number;
-  y4: number;
-  z4: number;
-
   setUv(uvs: [number, number, number, number, number, number, number, number]): void;
 }
 

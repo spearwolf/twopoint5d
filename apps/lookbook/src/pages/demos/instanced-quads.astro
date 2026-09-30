@@ -3,82 +3,27 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_instanced-quads.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-</Layout>
+<Layout title={title} description={description} fullscreenCanvas />
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background: radial-gradient(circle, rgba(189, 70, 98, 1) 0%, rgba(37, 4, 73, 1) 100%);
   }
 </style>
 
 <script>
-  import {
-    InstancedVertexObjectGeometry,
-    vertexByInstancePosition,
-    VertexObjects,
-    type VertexObjectPool,
-    type VO,
-  } from '@spearwolf/twopoint5d';
+  import {vertexByInstancePosition, VertexObjects, type VertexObjectPool} from '@spearwolf/twopoint5d';
   import {add, attribute, cos, length, mul, sin, sub, uniform, vec2, vec3, vec4} from 'three/tsl';
   import {NodeMaterial} from 'three/webgpu';
+  import {InstancedQuadsGeometry, type InstancedQuad} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {printSceneGraphToConsole} from '~demos/utils/printSceneGraphToConsole';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {forceWebGL: true});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {forceWebGL: true});
 
   demo.camera.position.z = 110;
   demo.camera.position.y = -100;
-
-  // +================================================================================+
-  //
-  // base quad
-  //
-  // +================================================================================+
-
-  interface BaseQuad extends VO {
-    setPosition(position: [number, number, number, number, number, number, number, number, number, number, number, number]): void;
-  }
-
-  class BaseQuad {
-    make(width = 0.5, height = 0.5) {
-      this.setPosition([-width, -height, 0, -width, +height, 0, +width, +height, 0, +width, -height, 0]);
-    }
-  }
-
-  const BaseQuadDescriptor = {
-    vertexCount: 4,
-    indices: [0, 2, 1, 0, 3, 2],
-
-    attributes: {
-      position: {components: ['x', 'y', 'z']},
-    },
-
-    basePrototype: BaseQuad.prototype,
-  };
-
-  // +================================================================================+
-  //
-  // instanced quad
-  //
-  // +================================================================================+
-
-  interface InstancedQuad extends VO {
-    width: number;
-    height: number;
-
-    setInstancePosition: (position: [number, number]) => void;
-  }
-
-  const InstancedQuadDescriptor = {
-    attributes: {
-      quadSize: {components: ['width', 'height']},
-      instancePosition: {components: ['x', 'y', 'z']},
-    },
-  };
 
   // +================================================================================+
   //
@@ -87,11 +32,7 @@ import {description, title} from './_instanced-quads.json';
   // +================================================================================+
 
   function createMesh(rows: number, columns: number, size: number, offset: number) {
-    const geometry = new InstancedVertexObjectGeometry<InstancedQuad, BaseQuad>(
-      InstancedQuadDescriptor,
-      rows * columns,
-      BaseQuadDescriptor,
-    );
+    const geometry = new InstancedQuadsGeometry(rows * columns);
 
     // Create a base quad to use as a prototype for instanced quads.
     // The geometry was built with a capacity, so it has its base pool, and the first
@@ -135,6 +76,7 @@ import {description, title} from './_instanced-quads.json';
         quad.setInstancePosition([
           x * size * offset - ((columns - 1) * size * offset) / 2,
           y * size * offset - ((rows - 1) * size * offset) / 2,
+          0,
         ]);
       }
     }
@@ -180,6 +122,5 @@ import {description, title} from './_instanced-quads.json';
     demo.scene.add(createMesh(100, 200, 3, 1.2));
   });
 
-  // eslint-disable-next-line no-console
-  console.log('InstancedQuadsMesh', {mesh: demo.scene.children[0], demo});
+  printSceneGraphToConsole(demo.scene);
 </script>

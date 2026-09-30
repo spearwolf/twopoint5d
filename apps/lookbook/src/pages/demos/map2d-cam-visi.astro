@@ -5,9 +5,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_map2d-cam-visi.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
+<Layout title={title} description={description} fullscreenCanvas>
   <CrossHair />
 
   <div class="info-controls text-neutral-200 text-sm pt-4 pl-1 text-center">
@@ -27,8 +25,6 @@ import {description, title} from './_map2d-cam-visi.json';
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background-color: #458497;
     background-image: linear-gradient(to bottom, #001020 0, #001020 25%, #667686);
     color: #fff;
@@ -43,9 +39,9 @@ import {description, title} from './_map2d-cam-visi.json';
   import {queryRadioButtons} from '~components/RadioButtonsApi';
   import {run} from '~demos/map2d/map2d-cam-visi';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const app = await run(new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false}));
+  const app = await run(new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false}));
 
   const cameraControl = queryRadioButtons('camera');
 

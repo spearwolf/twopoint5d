@@ -1,14 +1,16 @@
 import type {Texture} from 'three/webgpu';
 
+export const TEXTURE_PREVIEW_ID = 'texture-preview';
+
 /**
- * Show a copy of the image of `texture` in the `#texture-preview` element of the page. A copy: an
- * `<img>` in the layout answers width and height as its CSS sizes it, and three.js reads the size
- * of the texture from there.
+ * Show a copy of the image of `texture` in the `#texture-preview` element of the page,
+ * which `TexturePreview.astro` writes. A copy: an `<img>` in the layout answers width and
+ * height as its CSS sizes it, and three.js reads the size of the texture from there.
  */
 export function showTexturePreview(texture: Texture): void {
-  const preview = document.getElementById('texture-preview');
+  const preview = document.getElementById(TEXTURE_PREVIEW_ID);
   if (!preview) {
-    throw new Error('[lookbook] showTexturePreview(): the page has no #texture-preview element');
+    throw new Error(`[lookbook] showTexturePreview(): the page has no #${TEXTURE_PREVIEW_ID} element`);
   }
   if (!(texture.image instanceof HTMLImageElement)) {
     // eslint-disable-next-line no-console

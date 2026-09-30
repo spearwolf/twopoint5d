@@ -151,5 +151,7 @@ signal libraries.
   vertex-object core, what each module owns
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — `dispose()` and ownership
 - [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — `Display` + `Stage2D` + `StageRenderer` idioms
+- [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a description
+  declares and which accessors it generates
 - [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
   publish pipeline, the CI gate

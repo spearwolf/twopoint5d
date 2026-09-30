@@ -1,6 +1,6 @@
 {
   "title": "crosses",
-  "description": "A minimal example of how to use the VertexObjects mesh",
+  "description": "A vertex object description of its own — a cross of twelve vertices — drawn by the VertexObjects mesh",
   "url": "/demos/crosses",
   "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "vanilla"],
   "previewImage": "crosses.png"

@@ -1,56 +1,16 @@
 ---
+import TexturePreview from '~components/TexturePreview.astro';
 import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_textured-quads-from-tileset.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
-  <div id="texture-preview" class="texture-preview">
-    <header class="tileset-image-title">tileset image</header>
-  </div>
+<Layout title={title} description={description} fullscreenCanvas>
+  <TexturePreview title="tileset image" />
 </Layout>
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background: radial-gradient(circle, rgba(109 80 87) 0%, rgba(21 2 41) 100%);
-  }
-  .texture-preview {
-    background-color: rgba(86, 101, 115, 80%);
-    border: 5px solid #324168;
-    border-radius: 5px;
-    width: 150px;
-    height: 150px;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
-  }
-  .tileset-image-title {
-    font-size: 13px;
-    color: #eee;
-    text-shadow: 1px 1px #000;
-    display: none;
-  }
-  #texture-preview:hover > .tileset-image-title {
-    display: block;
-  }
-  .texture-preview :global(img),
-  .texture-preview :global(canvas) {
-    max-width: 100%;
-  }
-  .texture-preview:hover :global(canvas),
-  .texture-preview:hover :global(img) {
-    box-shadow:
-      0 0 0 1px #fff,
-      0 0 10px rgba(255 255 255 / 80%);
-  }
-  .texture-preview :global(header) {
-    position: absolute;
-    bottom: calc(100% - 4px);
-    left: 0;
   }
 </style>
 
@@ -62,6 +22,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
@@ -111,8 +72,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   //
   // +================================================================================+
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   await demo.start(async ({renderer}) => {
     renderer.toneMapping = NeutralToneMapping;
@@ -123,7 +83,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
     // eslint-disable-next-line no-console
     console.log('loaded tileset', {tileSet, texture});
 
-    // the <div id="texture-preview"> is written by the markup of this very page
+    // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
     demo.scene.add(await makeMesh(16, 32, 3.5, 1, tileSet, texture));

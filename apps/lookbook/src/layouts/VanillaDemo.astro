@@ -1,13 +1,16 @@
 ---
 import DemoNavBar from '~components/DemoNavBar.astro';
+import {FULLSCREEN_CANVAS_ID} from '~demos/utils/fullscreenCanvas';
 import '../styles/global.css';
 
 export interface Props {
   title: string;
   description: string;
+  /** Write a `<canvas>` that fills the window, for `getFullscreenCanvas()` to pick up. */
+  fullscreenCanvas?: boolean;
 }
 
-const {title, description} = Astro.props;
+const {title, description, fullscreenCanvas = false} = Astro.props;
 ---
 
 <!doctype html>
@@ -19,8 +22,9 @@ const {title, description} = Astro.props;
     <meta name="generator" content={Astro.generator} />
     <title>2.5d lookbook &#x2022; {title} demo</title>
   </head>
-  <body>
+  <body class:list={{'fullscreen-canvas': fullscreenCanvas}}>
     <DemoNavBar title={title} description={description} />
+    {fullscreenCanvas && <canvas id={FULLSCREEN_CANVAS_ID} resize-to="window" />}
     <slot />
   </body>
 </html>
@@ -40,5 +44,28 @@ const {title, description} = Astro.props;
       Bitstream Vera Sans Mono,
       Courier New,
       monospace;
+  }
+  /* global: the <body> is written here, and Astro hoists no <style> under a condition */
+  body.fullscreen-canvas {
+    height: 100vh;
+    overflow-y: hidden;
+  }
+  /* the buttons a demo page puts over its canvas */
+  .actionBtn {
+    padding: 0.5em;
+    background-color: rgba(50 20 90 / 60%);
+    color: #eee;
+    border-radius: 4px;
+    border: 1px solid rgba(11, 15, 17);
+    box-shadow: 4px 4px 0 rgba(11, 15, 17);
+    font-size: 100%;
+    font-weight: bold;
+    cursor: pointer;
+    display: inline-flex;
+  }
+  .actionBtn:hover {
+    background-color: rgba(90 50 180 / 70%);
+    color: #fff;
+    user-select: none;
   }
 </style>

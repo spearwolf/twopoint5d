@@ -1,0 +1,53 @@
+---
+import {TEXTURE_PREVIEW_ID} from '~demos/utils/showTexturePreview';
+
+export interface Props {
+  /** Edge length of the square preview in px, border included. */
+  size?: number;
+  /** A caption that shows while the pointer is over the preview. */
+  title?: string;
+}
+
+const {size = 150, title} = Astro.props;
+---
+
+<div id={TEXTURE_PREVIEW_ID} class="texture-preview" style={`width: ${size}px; height: ${size}px;`}>
+  {title && <header>{title}</header>}
+</div>
+
+<style>
+  .texture-preview {
+    background-color: rgba(86, 101, 115, 80%);
+    border: 5px solid #324168;
+    border-radius: 5px;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
+  }
+  /* max-height keeps a tall image inside the box: overflow: hidden would clip the caption
+     above the box and the glow on hover */
+  .texture-preview :global(img),
+  .texture-preview :global(canvas) {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .texture-preview:hover :global(canvas),
+  .texture-preview:hover :global(img) {
+    box-shadow:
+      0 0 0 1px #fff,
+      0 0 10px rgba(255 255 255 / 80%);
+  }
+  header {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    left: 0;
+    font-size: 13px;
+    color: #eee;
+    text-shadow: 1px 1px #000;
+    display: none;
+  }
+  .texture-preview:hover > header {
+    display: block;
+  }
+</style>

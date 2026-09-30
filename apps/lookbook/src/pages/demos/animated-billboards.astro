@@ -3,9 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_animated-billboards.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
+<Layout title={title} description={description} fullscreenCanvas>
   <div class="loading-wrapper">
     <div class="loading-content">.&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.</div>
   </div>
@@ -13,8 +11,6 @@ import {description, title} from './_animated-billboards.json';
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background-color: rgb(17 28 38);
     color: #eee;
   }
@@ -45,10 +41,10 @@ import {description, title} from './_animated-billboards.json';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
 
   await demo.start(async ({renderer}) => {
     demo.camera.position.set(0, 70, -220);

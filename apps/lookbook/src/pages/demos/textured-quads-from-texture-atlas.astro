@@ -1,35 +1,16 @@
 ---
+import TexturePreview from '~components/TexturePreview.astro';
 import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_textured-quads-from-texture-atlas.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-
-  <div id="texture-preview" class="texture-preview"></div>
+<Layout title={title} description={description} fullscreenCanvas>
+  <TexturePreview />
 </Layout>
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background-color: #3f313f;
-  }
-  .texture-preview {
-    background-color: rgba(86, 101, 115, 80%);
-    border: 5px solid #324168;
-    border-radius: 5px;
-    width: 150px;
-    height: 150px;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    box-shadow: 5px 5px 10px rgba(0 0 0 / 50%);
-    overflow: hidden;
-  }
-  .texture-preview :global(img),
-  .texture-preview :global(canvas) {
-    max-width: 100%;
   }
 </style>
 
@@ -39,6 +20,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
@@ -86,8 +68,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
   //
   // +================================================================================+
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!);
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   await demo.start(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
@@ -96,7 +77,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
     // eslint-disable-next-line no-console
     console.log('loaded texture-atlas', {atlas, texture});
 
-    // the <div id="texture-preview"> is written by the markup of this very page
+    // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
     const mesh = makeMesh(16, 32, 3.5, 1, atlas, texture);

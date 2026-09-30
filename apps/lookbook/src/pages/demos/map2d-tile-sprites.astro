@@ -3,14 +3,10 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_map2d-tile-sprites.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
-</Layout>
+<Layout title={title} description={description} fullscreenCanvas />
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background-color: #458497;
     background-image: linear-gradient(to right bottom, #458497 0, #2e4564 52%, #9b1a61);
     color: #eee;
@@ -20,7 +16,7 @@ import {description, title} from './_map2d-tile-sprites.json';
 <script>
   import {run} from '~demos/map2d/map2d-tile-sprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  run(new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false}));
+  run(new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false}));
 </script>

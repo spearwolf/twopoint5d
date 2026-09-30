@@ -1,0 +1,71 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_first-sprite.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas />
+
+<style>
+  body {
+    background: radial-gradient(circle, rgb(64, 82, 122) 0%, rgb(20, 22, 48) 100%);
+  }
+</style>
+
+<script>
+  import {Display, TexturedSprites, TextureStore} from '@spearwolf/twopoint5d';
+  import {PerspectiveCamera, Scene} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the vertical field of view of the camera, in degrees
+  const FIELD_OF_VIEW = 60;
+  // one world unit per pixel of the frame: from this far away the camera sees about 460
+  // units from top to bottom, and the frame of 296 pixels stands in it with room to spare
+  const CAMERA_DISTANCE = 400;
+
+  // the display owns the renderer, drives the frame loop and follows the window's size
+  const display = new Display(getFullscreenCanvas());
+
+  const scene = new Scene();
+  const camera = new PerspectiveCamera(FIELD_OF_VIEW);
+  camera.position.z = CAMERA_DISTANCE;
+
+  display.onResize(({width, height}) => {
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  });
+
+  display.onInit(async ({renderer}) => {
+    // the catalog of the lookbook names each texture, the image behind it and its frames
+    const store = new TextureStore(renderer);
+    await store.loadAsync(assetsUrl('textures.json'));
+    const [atlas, texture] = await store.getAsync('splotchs', ['atlas', 'texture']);
+
+    // splotchs-256x.json names the frame splotch0, 256 × 296 pixels, so frame() finds it
+    const frame = atlas.frame('splotch0')!;
+
+    // a mesh with room for one sprite, drawn with the texture of the atlas
+    const sprites = new TexturedSprites(1, texture);
+
+    // the mesh has room for one sprite, and this is the first to take it
+    const sprite = sprites.createSprite()!;
+    sprite.setSize(frame.coords.width, frame.coords.height);
+    sprite.setFrame(frame);
+
+    // upload what the sprite wrote into the buffers of the mesh
+    sprites.update();
+    scene.add(sprites);
+
+    display.onDispose(() => {
+      // the mesh releases the material it built around the texture, the store the texture
+      sprites.dispose();
+      store.dispose();
+    });
+  });
+
+  display.onRenderFrame(({renderer}) => {
+    renderer.render(scene, camera);
+  });
+
+  display.start();
+</script>

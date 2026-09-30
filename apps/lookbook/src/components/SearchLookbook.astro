@@ -11,7 +11,7 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
 
 <dialog class="search-lookbook-dialog min-w-80 max-w-xl px-6 py-4 rounded-md backdrop-blur-xs">
   <header class="flex flex-row items-center justify-end mb-4">
-    <button autofocus>
+    <button aria-label="close search">
       <CloseDialogIcon />
     </button>
   </header>
@@ -21,7 +21,18 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
     <RainbowLine colorSliceWidth={8} cycleDirection="left" />
   </section>
 
-  <section class="mb-4 text-sm text-slate-200">TODO search lookbook</section>
+  <section class="mb-4 text-sm text-slate-200">
+    <input
+      type="search"
+      class="search-input"
+      aria-label="search the demos by title, tag or description"
+      placeholder="sprite, Map2D, instanced …"
+      autocomplete="off"
+      autofocus
+    />
+    <ul class="search-results mt-4"></ul>
+    <p class="search-no-results mt-4 hidden">No demo matches every word.</p>
+  </section>
 </dialog>
 
 <style>
@@ -46,6 +57,51 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
     text-shadow: none;
   }
 
+  .search-input {
+    width: 100%;
+    padding: 0.4em 0.8em;
+    color: #fff;
+    background-color: rgba(0 0 0 / 40%);
+    border-radius: 0.3em;
+    box-shadow: 0 0 1px 1px var(--color-primary-inactive);
+  }
+
+  .search-input:focus {
+    outline: none;
+    box-shadow: 0 0 1px 1px #e5e500;
+  }
+
+  .search-results {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .search-results :global(li) {
+    padding: 0.3em 0;
+  }
+
+  .search-results :global(a) {
+    color: var(--color-primary-highlight);
+    font-weight: 600;
+  }
+
+  .search-results :global(a:is(:hover, :focus)) {
+    color: #e5e500;
+    outline: none;
+  }
+
+  /* Enter opens the first result */
+  .search-results :global(li:first-child > a::after) {
+    content: ' ⏎';
+    color: var(--color-primary-inactive);
+  }
+
+  .search-results :global(.search-result-tags) {
+    display: block;
+    font-size: var(--tag-font-size);
+    color: var(--color-primary);
+  }
+
   .search-lookbook-dialog::backdrop {
     background: rgb(187, 0, 51);
     background: linear-gradient(
@@ -62,19 +118,84 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
 </style>
 
 <script>
-  // the dialog is written by the markup of this component
+  import type {IDemo} from '~demos/utils/loadMetadataForDemos';
+  import {searchDemos} from './searchDemos';
+
+  // the page that carries the header writes LookbookMetadata next to it,
+  // see pages/index.astro
+  const metadata = document.getElementById('lookbook-metadata');
+  if (!metadata) {
+    throw new Error('[lookbook] SearchLookbook: the page has no #lookbook-metadata element, write LookbookMetadata next to it');
+  }
+  const demos: IDemo[] = JSON.parse(metadata.dataset['lookbookDemos'] ?? '[]');
+
+  // the dialog, its close button, the search field and the result list are written by the
+  // markup of this component
   const dialog = document.querySelector<HTMLDialogElement>('dialog.search-lookbook-dialog')!;
-  // the dialog carries its close button in the markup of this component
   const closeButton = dialog.querySelector('button')!;
+  const input = dialog.querySelector<HTMLInputElement>('input.search-input')!;
+  const resultList = dialog.querySelector<HTMLUListElement>('ul.search-results')!;
+  const noResults = dialog.querySelector<HTMLParagraphElement>('p.search-no-results')!;
   const showButtons = document.querySelectorAll('button.open-search-dialog-action');
 
-  for (const showButton of showButtons) {
-    showButton.addEventListener('click', () => {
-      dialog.showModal();
+  let results: IDemo[] = [];
+
+  function renderResults() {
+    results = searchDemos(demos, input.value);
+
+    const items = results.map((demo) => {
+      const link = document.createElement('a');
+      link.href = demo.href;
+      link.textContent = demo.title;
+
+      const item = document.createElement('li');
+      item.append(link);
+
+      if (demo.tags?.length) {
+        const tags = document.createElement('span');
+        tags.className = 'search-result-tags';
+        tags.textContent = demo.tags.join(' · ');
+        item.append(tags);
+      }
+      return item;
     });
+
+    resultList.replaceChildren(...items);
+    noResults.classList.toggle('hidden', results.length > 0);
+  }
+
+  function openSearch() {
+    if (!dialog.open) {
+      renderResults();
+      dialog.showModal();
+    }
+    input.focus();
+    input.select();
+  }
+
+  for (const showButton of showButtons) {
+    showButton.addEventListener('click', openSearch);
   }
 
   closeButton.addEventListener('click', () => {
     dialog.close();
+  });
+
+  input.addEventListener('input', renderResults);
+
+  input.addEventListener('keydown', (event) => {
+    const first = results[0];
+    if (event.key === 'Enter' && first) {
+      event.preventDefault();
+      window.location.assign(first.href);
+    }
+  });
+
+  // Ctrl+K, and Cmd+K on a Mac; Escape closes the modal dialog by itself
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      openSearch();
+    }
   });
 </script>

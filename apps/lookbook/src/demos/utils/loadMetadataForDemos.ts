@@ -10,6 +10,11 @@ export interface IDemo {
   href: string;
   previewImage?: string;
   tags?: string[];
+  /**
+   * Position of the demo among the others, ascending; 0 when missing, like the `order`
+   * of a tag category.
+   */
+  order?: number;
 }
 
 export interface ITag {
@@ -60,6 +65,9 @@ const demos = Object.entries(
   }
   return {...json, id, href: makeUrl(json.url), tags: json.tags?.sort()};
 }) as IDemo[];
+
+// sort() is stable: demos with the same order keep the alphabetical order of their files
+demos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
 const uniqTagKeys = Array.from(tags.keys()).sort();
 

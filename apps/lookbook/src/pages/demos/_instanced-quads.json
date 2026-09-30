@@ -1,6 +1,6 @@
 {
   "title": "instanced quads",
-  "description": "A minimal example of how to render instanced vertex-objects",
+  "description": "Twenty thousand quads of one InstancedVertexObjectGeometry, waved by a node material",
   "url": "/demos/instanced-quads",
   "tags": ["InstancedVertexObjectGeometry", "VO", "VertexObjects", "instanced", "vanilla"],
   "previewImage": "instanced-quads.png"

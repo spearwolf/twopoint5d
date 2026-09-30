@@ -3,8 +3,7 @@ import Layout from '~layouts/VanillaDemo.astro';
 import {description, title} from './_animated-sprites.json';
 ---
 
-<Layout title={title} description={description}>
-  <canvas id="canvas-container" resize-to="window"></canvas>
+<Layout title={title} description={description} fullscreenCanvas>
   <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
     <div class="actionBtn lessSprites">less</div>
     <div class="spriteCount">0</div>
@@ -14,8 +13,6 @@ import {description, title} from './_animated-sprites.json';
 
 <style>
   body {
-    height: 100vh;
-    overflow-y: hidden;
     background: radial-gradient(circle, rgb(118, 174, 141) 0%, rgb(13, 77, 75) 80%, rgb(3, 11, 28) 100%);
     color: #eee;
   }
@@ -25,23 +22,6 @@ import {description, title} from './_animated-sprites.json';
     font-size: 250%;
     min-width: 3em;
     text-align: center;
-  }
-  .actionBtn {
-    padding: 0.5em;
-    background-color: rgba(50 20 90 / 60%);
-    color: #eee;
-    border-radius: 4px;
-    border: 1px solid rgba(11, 15, 17);
-    box-shadow: 4px 4px 0 rgba(11, 15, 17);
-    font-size: 100%;
-    font-weight: bold;
-    cursor: pointer;
-    display: inline-flex;
-  }
-  .actionBtn:hover {
-    background-color: rgba(90 50 180 / 70%);
-    color: #fff;
-    user-select: none;
   }
 </style>
 
@@ -58,9 +38,9 @@ import {description, title} from './_animated-sprites.json';
   import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
-  // the <canvas id="canvas-container"> is written by the markup of this very page
-  const demo = new PerspectiveOrbitDemo(document.getElementById('canvas-container')!, {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
 
   // the .spriteCount readout is written by the markup of this very page
   const renderSpriteCount = (count: number) => {
