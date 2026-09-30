@@ -638,9 +638,10 @@ export class PanControl2D extends InputControlBase {
   }
 
   #speedFieldFor(event: KeyboardEvent): KeyedSpeedField | undefined {
-    // keyCodes is deprecated and only decides when a caller set it. That is read off the values,
-    // not a flag: the field is public and holds an array of its own, so a keyCodes[0] = 38
-    // rebinds in place and has to keep working. Whoever sets keys as well gets keys
+    // keyCodes is deprecated and only decides when a caller set it. That is read off the
+    // values, not a flag: the field is public and holds an array of its own, so a
+    // keyCodes[0] = 38 rebinds in place and has to keep working. Whoever sets keys to
+    // anything but its default gets keys, whatever keyCodes holds
     const index =
       holdsDefault(this.keys, DEFAULT_KEYS) && !holdsDefault(this.keyCodes, DEFAULT_KEY_CODES)
         ? this.keyCodes.indexOf(event.keyCode)

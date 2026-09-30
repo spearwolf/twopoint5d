@@ -419,22 +419,25 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * Every `StageRenderer` that holds this stage takes it out itself on `OnStageDispose` below,
    * and its next frame composes without it.
    *
-   * Afterwards `isDisposed` is `true` and {@link asPassNode} throws an error naming the class and
-   * the state. `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a write to
-   * `projection` or `camera` do nothing, and so does a further `dispose()`. The plain state stays
-   * readable and writable, it just no longer drives anything: `scene`, `camera`, `projection`,
-   * `containerWidth`, `containerHeight`, `width`, `height` and `name` keep the values the stage
-   * was left with, and `name`, `needsUpdate`, `isFirstFrame` and `scene` still take new ones — a
-   * write to `scene` goes through and has no effect, since the stage no longer builds a node from
-   * it, and announces nothing — no `OnStageAfterSceneChanged`. `name` writes through to
-   * `scene.name` as it always does, and so reaches the scene the caller may have handed in. An
-   * `OnStageDispose` goes out to every subscriber before this stage stops listening; no event
-   * follows it. A listener of `OnStageDispose` that throws does not hold up the teardown:
-   * every subscriber hears the event, the instance is torn down completely, and the error reaches
-   * the caller afterwards — one unchanged, several as an `AggregateError`. An error from releasing
-   * the pass node reaches the caller as well: on its own unchanged, together with that of the
-   * listeners as an `AggregateError` of the error of the listeners and that of the release, in
-   * this order — the first an `AggregateError` itself when more than one listener threw.
+   * Afterwards `isDisposed` is `true` and {@link asPassNode} throws an error naming the
+   * class and the state. `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()`
+   * and a write to `projection` or `camera` do nothing, and so does a further
+   * `dispose()`. The plain state no longer drives anything, and `dispose()` resets none
+   * of it: `scene`, `camera`, `projection`, `containerWidth`, `containerHeight`,
+   * `width`, `height`, `name`, `needsUpdate` and `isFirstFrame` answer with the values
+   * the stage was left with. Of these, `scene`, `name`, `needsUpdate` and `isFirstFrame`
+   * still take new ones. A write to `scene` goes through and has no effect, since the
+   * stage no longer builds a node from it, and announces nothing — no
+   * `OnStageAfterSceneChanged`. `name` writes through to `scene.name` as it always does,
+   * and so reaches the scene the caller may have handed in. An `OnStageDispose` goes out
+   * to every subscriber before this stage stops listening; no event follows it. A
+   * listener of `OnStageDispose` that throws does not hold up the teardown: every
+   * subscriber hears the event, the instance is torn down completely, and the error
+   * reaches the caller afterwards — one unchanged, several as an `AggregateError`. An
+   * error from releasing the pass node reaches the caller as well: on its own unchanged,
+   * together with that of the listeners as an `AggregateError` of the error of the
+   * listeners and that of the release, in this order — the first an `AggregateError`
+   * itself when more than one listener threw.
    */
   dispose(): void {
     if (this.#disposed) return;
