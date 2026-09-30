@@ -184,6 +184,11 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
   input.addEventListener('input', renderResults);
 
   input.addEventListener('keydown', (event) => {
+    // an Enter that picks a word in an IME composition belongs to the composition, not to
+    // the search. 229 is the keyCode of a keydown the IME has taken; a browser that ends
+    // the composition before that keydown reports it with isComposing false
+    if (event.isComposing || event.keyCode === 229) return;
+
     const first = results[0];
     if (event.key === 'Enter' && first) {
       event.preventDefault();

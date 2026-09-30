@@ -123,11 +123,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   #parent?: StageRendererParentType;
 
-  // the subscriptions #addToHost() took at the host that drives this renderer, given up
-  // by #removeFromParent() before OnRemoveFromParent goes out, or by #addToHost() itself
-  // when the host refuses one of them, rather than by listeners of that event: a listener
-  // that disposes this renderer takes every listener with it that the event has not
-  // reached yet
+  // the subscriptions #addToHost() took at the host that drives this renderer. When the
+  // host refuses one of them, #addToHost() gives back at once what the host handed out;
+  // otherwise #removeFromParent() gives them up before OnRemoveFromParent goes out, and
+  // no listener of OnRemoveFromParent does: a listener that disposes this renderer takes
+  // every listener with it that the event has not reached yet
   #hostSubscriptions: StageRendererHostUnsubscribe[] = [];
 
   width: number = 0;

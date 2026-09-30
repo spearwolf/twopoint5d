@@ -125,8 +125,8 @@ describe('StageRenderer', () => {
   });
 
   // failures: onResize and onRenderFrame make the host throw that error before it takes a
-  // handler; unsubscribeResize and unsubscribeFrame make the unsubscribe of that event count
-  // the call and throw, and the host keeps its handler
+  // handler; unsubscribeResize and unsubscribeFrame make the unsubscribe of that event
+  // count the call and throw, and the host keeps its handler
   function makeHost(
     failures: {onResize?: Error; onRenderFrame?: Error; unsubscribeResize?: Error; unsubscribeFrame?: Error} = {},
   ): IStageRendererHost & {

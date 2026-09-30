@@ -41,16 +41,14 @@ _vertex-object description_ is used to describe the geometry and its primitives,
 object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom
 sprites_ of the geometry.
 
-Such a geometry almost always needs a material of its own, since the built-in
-materials of three.js know nothing of custom attributes. In this library that is a
-`NodeMaterial` whose shader is written in TSL (`three/tsl`) and reads the attributes
-through `attribute()` nodes, as the sprite materials under
-[src/sprites/](src/sprites/) do.
+Such a geometry almost always needs a material of its own, since the built-in materials
+of three.js know nothing of custom attributes. In this library that is a `NodeMaterial`
+whose shader is written in TSL (`three/tsl`) and reads the attributes through
+`attribute()` nodes, as the sprite materials under [src/sprites/](src/sprites/) do.
 
 The main motivation behind the _vertex objects_ is to make it easier to create custom
 geometries, especially _instanced_ geometries (multiple objects within one buffer
-geometry) without worrying too much about the buffer attributes of three.js
-underneath.
+geometry) without worrying too much about the buffer attributes of three.js underneath.
 
 This library provides you with a declarative interface to describe the shape of the
 geometry, incl. indices and attributes and manages the internal attribute buffers, deals

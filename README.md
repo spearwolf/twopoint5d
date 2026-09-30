@@ -112,15 +112,24 @@ const display = new Display(document.getElementById('canvas')!);
 
 const scene = new Scene();
 const camera = new PerspectiveCamera(60);
-camera.position.z = 400;
 
 display.onResize(({width, height}) => {
   camera.aspect = width / height;
+  // the field of view is vertical: a window taller than wide moves the camera back, so
+  // the sprite fits across as well
+  camera.position.z = 400 / Math.min(1, camera.aspect);
   camera.updateProjectionMatrix();
 });
 
 display.onInit(async ({renderer}) => {
   const texture = await new TextureFactory(renderer).loadAsync('sprite.png');
+
+  // a dispose() while the image loaded has gone out already, and an onDispose() from
+  // here on would never hear it
+  if (display.isDisposed) {
+    texture.dispose();
+    return;
+  }
 
   // a mesh with room for one sprite, drawn with the texture
   const sprites = new TexturedSprites(1, texture);
@@ -143,7 +152,7 @@ display.onInit(async ({renderer}) => {
 
 display.onRenderFrame(({renderer}) => renderer.render(scene, camera));
 
-display.start();
+await display.start();
 ```
 
 `#canvas` is a `<canvas>` on the page, or an element the display puts a canvas into. The

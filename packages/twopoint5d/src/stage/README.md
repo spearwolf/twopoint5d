@@ -605,18 +605,19 @@ const host: IStageRendererHost = {
 new StageRenderer(host).add(stage);
 ```
 
-The renderer books each unsubscribe as soon as the host hands it out and calls it once
+The renderer books each unsubscribe as soon as the host hands it out and calls it once:
 when it leaves the host — through a write to `parent`, `attach()`, `detach()`, an
-`add()` to a `StageRenderer` or `dispose()` — before `OnRemoveFromParent` goes out. An
-unsubscribe that throws does not keep the renderer from giving up its other
+`add()` to a `StageRenderer` or `dispose()` — before `OnRemoveFromParent` goes out, or
+right away when the host throws on the other subscription as the renderer joins it, see
+below. An unsubscribe that throws does not keep the renderer from giving up its other
 subscription; its error reaches the caller of that call together with those of the
 listeners — one unchanged, several as an `AggregateError`.
 
 A host whose `onResize()` or `onRenderFrame()` throws as the renderer joins it holds
-nothing of it: the renderer gives back what the host had handed out and joins no
-holder — `parent` answers `undefined`, and `OnAddToParent` does not go out — and the
-error reaches the caller with those of the move out, after them.
-`new StageRenderer(host)` throws it.
+nothing of it: the renderer gives back what the host had handed out and joins no holder
+— `parent` answers `undefined`, and `OnAddToParent` does not go out. The error of the
+host reaches the caller after those of the move out, and an unsubscribe that throws as
+the renderer gives back follows it. `new StageRenderer(host)` throws the same way.
 
 ---
 

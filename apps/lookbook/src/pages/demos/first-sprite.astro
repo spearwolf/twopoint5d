@@ -20,7 +20,8 @@ import {description, title} from './_first-sprite.json';
   // the vertical field of view of the camera, in degrees
   const FIELD_OF_VIEW = 60;
   // one world unit per pixel of the frame: from this far away the camera sees about 460
-  // units from top to bottom, and the frame of 296 pixels stands in it with room to spare
+  // units across the shorter side of the window, and the frame of 256 × 296 pixels stands
+  // in it with room to spare
   const CAMERA_DISTANCE = 400;
 
   // the display owns the renderer, drives the frame loop and follows the window's size
@@ -28,10 +29,12 @@ import {description, title} from './_first-sprite.json';
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(FIELD_OF_VIEW);
-  camera.position.z = CAMERA_DISTANCE;
 
   display.onResize(({width, height}) => {
     camera.aspect = width / height;
+    // the field of view is vertical: a window taller than wide moves the camera back, so
+    // the sprite fits across as well
+    camera.position.z = CAMERA_DISTANCE / Math.min(1, camera.aspect);
     camera.updateProjectionMatrix();
   });
 
@@ -40,6 +43,13 @@ import {description, title} from './_first-sprite.json';
     const store = new TextureStore(renderer);
     await store.loadAsync(assetsUrl('textures.json'));
     const [atlas, texture] = await store.getAsync('splotchs', ['atlas', 'texture']);
+
+    // a dispose() while the catalog and the texture loaded has gone out already, and an
+    // onDispose() from here on would never hear it: the store goes, and nothing is built
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     // splotchs-256x.json names the frame splotch0, 256 × 296 pixels, so frame() finds it
     const frame = atlas.frame('splotch0')!;
@@ -67,5 +77,5 @@ import {description, title} from './_first-sprite.json';
     renderer.render(scene, camera);
   });
 
-  display.start();
+  await display.start();
 </script>

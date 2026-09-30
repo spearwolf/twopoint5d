@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The changes in this block are held back on purpose, to go out together in one release:
 many of them break the API, and the Migration Guide at the end of this block walks a
-project through all of them in one upgrade.
+project through the upgrade.
 
 ### Added
 
