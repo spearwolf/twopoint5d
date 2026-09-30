@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-30T13:31:41.321Z"
+    "generatedAt": "2026-09-30T15:03:18.289Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -212,11 +212,9 @@
           "high": 0,
           "medium": 0,
           "low": 0,
-          "info": 1
+          "info": 0
         },
-        "byCategory": {
-          "api": 1
-        }
+        "byCategory": {}
       },
       "harness": {
         "executiveSummary": "Für den Hot Path gibt es keine automatische Absicherung. Der CHANGELOG verspricht allokationsfreie Setter und schmale Uploads, aber kein `bench()` und keine Allokations-Assertion hält das fest, obwohl der Browser-Runner Chromium bereits mit `--expose-gc` startet (TEST-001). `checkNameableTypes.mjs` ist das einzige Gate-Skript ohne Test und übersieht weiterhin `import(\"…\")`-Typen (TEST-002, TEST-044). Aus dem Vorlauf bleiben vor allem Doku- und Einstiegslücken offen. Grün sind `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` und `pnpm audit --prod`.",
@@ -233,13 +231,13 @@
       }
     },
     "previousDate": "2026-09-21",
-    "resolvedCount": 176,
+    "resolvedCount": 177,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 21021,
-        "findings": 1,
+        "findings": 0,
         "score": 100
       },
       {
@@ -284,20 +282,14 @@
       "high": 0,
       "medium": 0,
       "low": 0,
-      "info": 1
+      "info": 0
     },
-    "byCategory": {
-      "api": 1
-    },
-    "byComponent": {
-      "controls": 1
-    },
+    "byCategory": {},
+    "byComponent": {},
     "counts": {
-      "findings": 1,
+      "findings": 0,
       "improvements": 0,
-      "byStatus": {
-        "new": 1
-      }
+      "byStatus": {}
     },
     "deltaBreakdown": {
       "code": 51,
@@ -307,7 +299,7 @@
     "lastRun": {
       "source": "remediation",
       "date": "2026-09-30",
-      "ref": "2026-09-30"
+      "ref": "b0ee1e3c"
     }
   },
   "portrait": {
@@ -473,26 +465,7 @@
       ]
     }
   },
-  "findings": [
-    {
-      "id": "API-066",
-      "category": "api",
-      "domain": "code",
-      "severity": "info",
-      "component": "controls",
-      "title": "Die Option coordsTarget von PanControl2D ändert keinen Pan",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:126",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-30. Der Pan ist die Differenz zweier Positionen desselben Pointers; ein Rechteck, das über einen Drag feststeht, fällt aus dieser Differenz heraus. Seit das Rechteck von \u003ccode>coordsTarget\u003c/code> je Pointer beim \u003ccode>pointerdown\u003c/code> gemessen wird, gilt das per Konstruktion — die TSDoc der Option verlangt genau dieses feste Rechteck. Die Option (samt Feld an \u003ccode>:248\u003c/code>) ist erst im \u003ccode>[Unreleased]\u003c/code>-Block hinzugekommen. Offene Frage: der Fix entfernt oder deprecatet eine öffentliche Option und läuft gegen die Entscheidung vom 2026-09-19, Pointer gegen ein festes Element zu messen (CHANGELOG, Eintrag zu \u003ccode>coordsTarget\u003c/code>).",
-      "recommendation": "Entscheiden, ob \u003ccode>coordsTarget\u003c/code> vor dem nächsten Release entfällt (noch unveröffentlicht, also ohne Deprecation möglich) oder einen Zweck bekommt, der den Pan tatsächlich beeinflusst; TSDoc, CHANGELOG und Tests danach ausrichten.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-30"
-      }
-    }
-  ],
+  "findings": [],
   "openQuestions": [
     "Soll `autoTouch` für `dynamic`/`stream`-Attribute weiterhin den vollen genutzten Bereich pro Frame hochladen (so dokumentiert in `vertex-objects/types.ts:60–69`), oder dürfen die generierten Setter künftig eine Dirty-Range pflegen? Davon hängt ab, ob PERF-006 und PERF-005 kleine Verbesserungen oder ein Umbau des Upload-Modells sind.",
     "Ist das WebGL-Backend des `WebGPURenderer` ein unterstütztes Produktionsziel? Nur dort wird die leere Upload-Range (PERF-027) zu einem Upload über die volle Kapazität.",
@@ -514,7 +487,8 @@
       "Remediation-Lauf vom 2026-09-29 (Features Vertex Objects, Texturen & Atlanten, Display & Frame-Loop, Sprites, Map2D): 5 Commits 801906f3..35e7942e auf main, 24 Findings nach Reviewer-Urteil geschlossen, 13 Nebenbefunde und 4 Folgen im selben Lauf behoben, keines mangels Beleg offen. Der Code wurde seit dem Audit vom 2026-09-28 nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
       "Remediation-Lauf vom 2026-09-29 (Stage und Input-Controls): 1 Commit e2026856 auf main, 4 Findings nach Reviewer-Urteil geschlossen, zwei Testlücken-Findings teilweise erfüllt und nachgeführt, 2 Nebenbefunde und 3 kleine Reviewer-Befunde ins Backlog, keines mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
       "Remediation-Lauf vom 2026-09-29/30 (Stages & Render-Pipeline): 15 Commits 676eefa7..51e8b330 auf main, 44 Findings nach Reviewer-Urteil geschlossen (die 38 der Komponente stage, fünf stage-Findings ohne Komponente und ein durch den Lauf gegenstandslos gewordenes), 14 Nebenbefunde und 32 kleine Folgen im selben Lauf behoben, keines mangels Beleg offen; ins Backlog gehen 4 kleine Reviewer-Befunde und 1 Nebenbefund außerhalb der Domain. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
-      "Remediation-Lauf vom 2026-09-30 (Sprint »issue-frei«): 13 Commits 5738b5e5..dcd53a3b auf main, alle 66 offenen Findings nach Reviewer-Urteil geschlossen, keines mangels Beleg offen; 23 Nebenbefunde und 11 Reviewer-Befunde auf die eigenen Diffs im selben Lauf behoben, dazu zwei Folgepakete. Ins Backlog geht 1 Nebenbefund mit offener API-Frage (coordsTarget). Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
+      "Remediation-Lauf vom 2026-09-30 (Sprint »issue-frei«): 13 Commits 5738b5e5..dcd53a3b auf main, alle 66 offenen Findings nach Reviewer-Urteil geschlossen, keines mangels Beleg offen; 23 Nebenbefunde und 11 Reviewer-Befunde auf die eigenen Diffs im selben Lauf behoben, dazu zwei Folgepakete. Ins Backlog geht 1 Nebenbefund mit offener API-Frage (coordsTarget). Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
+      "Einzelbehebung vom 2026-09-30 ohne Remediation-Lauf: Commit b0ee1e3c auf main entfernt die unveröffentlichte Option coordsTarget von PanControl2D samt Feld, Tests und CHANGELOG-Einträgen; geschlossen auf Grundlage des grünen Gates (pnpm run ci), ohne unabhängigen Review. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
     ]
   },
   "acknowledged": [
@@ -993,6 +967,16 @@
       "inducedOpen": 0,
       "discovered": 24,
       "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-30",
+      "source": "remediation",
+      "ref": "b0ee1e3c",
+      "fixed": 1,
+      "inducedFixed": 0,
+      "inducedOpen": 0,
+      "discovered": 0,
+      "attribution": "heuristic"
     }
   ]
 }</script>
