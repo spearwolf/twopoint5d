@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-09-29T22:33:32.516Z"
+    "generatedAt": "2026-09-30T13:31:41.321Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -205,83 +205,67 @@
     "domains": {
       "code": {
         "executiveSummary": "Zwei `high`-Befunde aus dem Vorlauf sind noch offen. Ein verschachtelter `StageRenderer` ohne eigene Pipeline löscht sein asPassNode-RenderTarget nie, bewegte Sprites ziehen deshalb Schlieren (BUG-113). `PanControl2D` pannt nach einem Fokuswechsel mit gehaltener Taste endlos weiter (BUG-121).\n\nIm rAF-Hot-Path von vertex-objects, sprites und map2d gibt es keine Allokationslawine. Die spürbaren Kosten stecken im Upload-Modell: `autoTouch` lädt Position und Rotation *aller* Sprites jeden Frame über `0 … usedCount − 1` hoch (PERF-006, PERF-003). Ein `freeVO()` mitten im Pool weitet die Dirty-Range bis ans Pool-Ende, auch für static-Buffer (PERF-005). `Display.resize()` misst das DOM in jedem Frame (PERF-001), und `CameraBasedVisibility` hat keine Obergrenze für abzulaufende Tiles (PERF-002). Darunter liegen rund zwei Dutzend kleine Posten pro Frame oder Aufruf, etwa ein string-keyed `Map.get` in jedem generierten Accessor, Generator-Iteratoren im Upload-Pfad und eager gebaute `expectDefined`-Meldungen. Einzeln kosten sie Nanosekunden, bei vielen Layern summieren sie sich.",
-        "score": 99,
-        "penalty": 2.5,
+        "score": 100,
+        "penalty": 0,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 0,
-          "low": 5,
-          "info": 9
+          "low": 0,
+          "info": 1
         },
         "byCategory": {
-          "completeness": 1,
-          "performance": 1,
-          "security": 1,
-          "api": 2,
-          "consistency": 1,
-          "dx": 5,
-          "readability": 1,
-          "testing": 2
+          "api": 1
         }
       },
       "harness": {
         "executiveSummary": "Für den Hot Path gibt es keine automatische Absicherung. Der CHANGELOG verspricht allokationsfreie Setter und schmale Uploads, aber kein `bench()` und keine Allokations-Assertion hält das fest, obwohl der Browser-Runner Chromium bereits mit `--expose-gc` startet (TEST-001). `checkNameableTypes.mjs` ist das einzige Gate-Skript ohne Test und übersieht weiterhin `import(\"…\")`-Typen (TEST-002, TEST-044). Aus dem Vorlauf bleiben vor allem Doku- und Einstiegslücken offen. Grün sind `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` und `pnpm audit --prod`.",
-        "score": 73,
-        "penalty": 22,
+        "score": 100,
+        "penalty": 0,
         "bySeverity": {
           "critical": 0,
           "high": 0,
-          "medium": 6,
-          "low": 20,
-          "info": 17
+          "medium": 0,
+          "low": 0,
+          "info": 0
         },
-        "byCategory": {
-          "testing": 7,
-          "dependencies": 3,
-          "types": 4,
-          "dx": 19,
-          "build": 4,
-          "completeness": 1,
-          "readability": 4,
-          "consistency": 1
-        }
+        "byCategory": {}
       }
     },
     "previousDate": "2026-09-21",
-    "resolvedCount": 110,
+    "resolvedCount": 176,
     "packages": [
       {
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 21021,
-        "findings": 22,
-        "score": 97
+        "findings": 1,
+        "score": 100
       },
       {
         "name": "workspace",
         "path": ".",
         "reviewedLoc": 1120,
-        "findings": 24,
-        "score": 88
+        "findings": 0,
+        "score": 100
       },
       {
         "name": "twopoint5d-testing",
         "path": "packages/twopoint5d-testing",
         "reviewedLoc": 0,
-        "findings": 5,
-        "score": 99
+        "findings": 0,
+        "score": 100
       },
       {
         "name": "lookbook",
         "path": "apps/lookbook",
         "reviewedLoc": 0,
-        "findings": 5,
-        "score": 96
+        "findings": 0,
+        "score": 100
       }
     ],
     "scoreModel": 2,
-    "score": 85,
+    "score": 100,
     "scoring": {
       "model": 2,
       "weights": {
@@ -298,35 +282,21 @@
     "bySeverity": {
       "critical": 0,
       "high": 0,
-      "medium": 6,
-      "low": 25,
-      "info": 26
+      "medium": 0,
+      "low": 0,
+      "info": 1
     },
     "byCategory": {
-      "testing": 9,
-      "completeness": 2,
-      "dependencies": 3,
-      "types": 4,
-      "performance": 1,
-      "dx": 24,
-      "build": 4,
-      "security": 1,
-      "api": 2,
-      "consistency": 2,
-      "readability": 5
+      "api": 1
     },
     "byComponent": {
-      "controls": 6,
-      "display": 1,
-      "stage": 3
+      "controls": 1
     },
     "counts": {
-      "findings": 57,
-      "improvements": 9,
+      "findings": 1,
+      "improvements": 0,
       "byStatus": {
-        "new": 19,
-        "unchanged": 1,
-        "carried-over": 37
+        "new": 1
       }
     },
     "deltaBreakdown": {
@@ -337,7 +307,7 @@
     "lastRun": {
       "source": "remediation",
       "date": "2026-09-30",
-      "ref": "2026-09-29"
+      "ref": "2026-09-30"
     }
   },
   "portrait": {
@@ -505,1017 +475,21 @@
   },
   "findings": [
     {
-      "id": "TEST-002",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Unit-Tests für `checkNameableTypes.mjs` ergänzen",
-      "location": "scripts/checkNameableTypes.mjs:1",
-      "description": "Jedes andere Script in `scripts/` zerlegt seine Logik in kleine, pur funktionale Module mit eigener `*.test.mjs` (z. B. `findRuntimeDependencies`, `removeDistPathPrefix`, `resolveDependencies`, `releaseFiles`, `parseArguments`). `checkNameableTypes.mjs` bleibt ein monolithisches 138-Zeilen-Script mit der algorithmisch anspruchsvollsten Logik des Slices — transitive Symbolauflösung über den TypeScript-Checker, Root-Auflösung qualifizierter Namen, Alias-Dereferenzierung — und hat keine einzige Testdatei. `grep -rl checkNameableTypes` findet außer dem Script selbst keine weitere Datei. Das Script ist Teil des blockierenden `publishNpmPkg`-Gates (`packages/twopoint5d/package.json`), ein stiller Fehler dort lässt entweder einen unbenennbaren Typ unbemerkt in die öffentliche API oder blockiert einen validen Release.",
-      "recommendation": "Die Kernlogik (Root-Auflösung, Dereferenzierung, den transitiven Walk) wie bei den Nachbarscripts in testbare Funktionen auslagern und mit ein paar `.d.ts`-Fixtures (benennbar/nicht benennbar, `ACCEPTED`-Eintrag, qualifizierter Name) über `node --test` absichern.",
-      "effort": "M",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "IMPL-001",
-      "category": "completeness",
-      "domain": "code",
-      "severity": "low",
-      "title": "Schichtbild und Material-Angabe in der Library-Architektur-Doku an den Code angleichen",
-      "location": "packages/twopoint5d/docs/architecture.md:34",
-      "locations": [
-        "packages/twopoint5d/docs/architecture.md:116"
-      ],
-      "description": "Das Schichtbild in §2 zeichnet `utils/` in die oberste Reihe und sagt dazu »A lower layer never imports from a higher one«. Im Code ist `utils/` die unterste Schicht: `vertex-objects`, `texture`, `stage`, `map2d` und `controls` importieren daraus (z. B. `vertex-objects/initializeAttributes.ts` → `../utils/expectDefined.js`), `utils/` selbst importiert nichts. Wer das Bild wörtlich nimmt, hält jeden dieser Imports für einen Schichtbruch. Dazu nennt der Abschnitt `sprites/` die Materialien `ShaderMaterial`, während `TexturedSpritesMaterial` und `TileSpritesMaterial` von `NodeMaterial` erben und im Quelltext kein `ShaderMaterial` mehr vorkommt.",
-      "evidence": "`controls/  utils/          (input, helpers — no rendering state)` über `vertex-objects/   the buffer core everything else stands on`",
-      "recommendation": "`utils/` im Schichtbild unter `vertex-objects/` setzen (oder als querliegende Basis kennzeichnen) und in §2 `sprites/` »`NodeMaterial` (TSL)« statt `ShaderMaterial` schreiben.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DEPS-004",
-      "category": "dependencies",
-      "domain": "harness",
-      "severity": "low",
-      "title": "devDependencies nachziehen und die zurückgehaltenen Major-Sprünge von TypeScript und `prettier-plugin-astro` begründen",
-      "location": "package.json:60",
-      "locations": [
-        "package.json:54",
-        "package.json:37"
-      ],
-      "description": "`pnpm outdated` (2026-09-26) meldet sechs Patch-/Minor-Rückstände in den devDependencies (`@types/node`, `@vitest/coverage-v8`, `nx` 23.2.0 → 23.2.1, `prettier`, `typescript-eslint`, `vitest` 5.0.1 → 5.0.2) und zwei Major-Sprünge, die der Caret-Range ausschließt: `typescript` `^5.9.3` gegenüber 7.0.2 und `prettier-plugin-astro` `^0.14.1` gegenüber 1.1.0. `typescript` 7 ist zudem durch den Peer-Range von `typescript-eslint` 8.70 (`>=4.8.4 \u003c6.1.0`) gesperrt, 6.0 wäre erreichbar. Beim TypeScript-Sprung wiegt, dass `scripts/checkNameableTypes.mjs` und `scripts/checkDocSnippets/compileSnippets.mjs` die Compiler-API direkt benutzen. Nichts im Repo sagt, ob die Zurückhaltung gewollt ist; `pnpm audit` meldet keine bekannte Schwachstelle, die Wirkung ist gering.",
-      "evidence": "`typescript 5.9.3 → 7.0.2`, `prettier-plugin-astro 0.14.1 → 1.1.0`",
-      "recommendation": "Die Patch-/Minor-Stände in einem Routine-Update mitziehen. `typescript` auf 6.0 heben, soweit `typescript-eslint` es zulässt; für 7.x und `prettier-plugin-astro` 1.x entweder ein Upgrade-Fenster einplanen (die beiden Gate-Skripte gegen die neue Compiler-API prüfen) oder die Zurückhaltung mit einem Satz in `docs/architecture.md` §5 festhalten.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-061",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Release aus dem stark angewachsenen CHANGELOG-Unreleased-Block schneiden",
-      "location": "packages/twopoint5d/CHANGELOG.md:8",
-      "kind": "improvement",
-      "locations": [
-        "packages/twopoint5d/CHANGELOG.md:2856",
-        "packages/twopoint5d/package.json:4"
-      ],
-      "description": "Der Abschnitt \"## [Unreleased]\" des CHANGELOG erstreckt sich über rund 2850 der insgesamt 3738 Zeilen (Zeile 8 bis 2855, vor dem nächsten Versionskopf \"## [0.21.2] - 2026-06-19\") und enthält bereits eigene Added/Changed/Deprecated/Removed/Fixed/Migration-Guide-Abschnitte mit vielen benannten Breaking Changes. packages/twopoint5d/package.json steht unverändert auf Version 0.21.2 — exakt der zuletzt veröffentlichten Version vom 2026-06-19, gut drei Monate vor dem heutigen Datum —, ohne \"-dev\"-Suffix, wie ihn deploy.yml als Signal für \"noch nicht reif\" auswertet. Wer das Paket heute von npm installiert, sieht keine der dokumentierten Änderungen; wer sie liest, muss einen der größten Abschnitte der Projektgeschichte auf einmal durcharbeiten, sobald doch veröffentlicht wird.",
-      "recommendation": "Den nächsten Release früher schneiden, oder zumindest bewusst entscheiden und kurz festhalten, dass die Ansammlung beabsichtigt ist (z. B. weil erst alle zusammengehörigen Breaking Changes gemeinsam mit einer Migration Guide veröffentlicht werden sollen), damit der Umfang nicht als Versehen wirkt.",
-      "effort": "S",
-      "status": "unchanged",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-001",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "`any` aus den öffentlichen Typen von `Dependencies` entfernen",
-      "location": "packages/twopoint5d/src/utils/Dependencies.ts:3",
-      "locations": [
-        "packages/twopoint5d/src/utils/Dependencies.ts:7",
-        "packages/twopoint5d/src/utils/Dependencies.ts:38",
-        "packages/twopoint5d/src/utils/Dependencies.ts:40",
-        "packages/twopoint5d/src/utils/Dependencies.ts:65"
-      ],
-      "description": "`EqualityCallback\u003cT = any>` und `DependencyCallbacks\u003cT = any>` sind exportierte Typen mit `any` als Default; `DependencyDeclaration` bindet die Callbacks jeder Deklaration an `DependencyCallbacks\u003cany>` bzw. `EqualityCallback\u003cany>`. Ein `equals`-Callback, der für einen Schlüssel vom Typ `Matrix4` einen `Vector2` erwartet, kompiliert deshalb, obwohl der Shape den Werttyp je Schlüssel kennt. Die Klasse ist über `utils/public-api.ts` Teil der Paket-API.",
-      "evidence": "`[name: K, equals: EqualityCallback\u003cany>] | [name: K, callbacks: DependencyCallbacks\u003cany>];`",
-      "recommendation": "Die Callbacks einer benannten Deklaration an `Shape[K]` binden (`EqualityCallback\u003cShape[K]>`, `DependencyCallbacks\u003cShape[K]>`) und die Defaults auf `unknown` setzen; intern genügt `DependencyCallbacks\u003cunknown>` mit einem Cast an der einen Stelle, an der die Werte aus der `Map` kommen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "PERF-018",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "title": "Array-Allokationen über `#pointersDown` in `update()` und im Pointermove-Pfad vermeiden",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:431",
-      "component": "controls",
-      "locations": [
-        "packages/twopoint5d/src/controls/PanControl2D.ts:30",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:536",
-        "packages/twopoint5d/src/controls/PanControl2D.ts:573"
-      ],
-      "description": "`update()` läuft pro Frame und ruft `mergePan(Array.from(this.#pointersDown.values()))`: ein neues Array plus über `reduce` ein Akkumulator-Objekt pro gedrücktem Pointer und das Startobjekt — auch wenn gar kein Pointer unten ist. `#restoreCursorUnlessMouseDown()` kopiert die Map-Werte ebenfalls per `Array.from(...).some(...)`; es läuft über Zeile 573–575 bei jedem `pointermove` einer Maus ohne gedrückten Pan-Button, also bei jeder Hover-Bewegung über die gesamte Seite. Wirkung: dauernder kleiner GC-Druck im rAF- und Input-Pfad.",
-      "evidence": "`let {panX, panY} = mergePan(Array.from(this.#pointersDown.values()));`",
-      "recommendation": "Mit `for (const state of this.#pointersDown.values())` direkt in zwei lokale Zahlen summieren und die States dabei nullen; für den Maus-Check eine Schleife mit frühem `return` verwenden bzw. einen Zähler gedrückter Maus-Pointer führen. Bei leerer Map `update()` den Pointer-Zweig ganz überspringen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-003",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "`no-explicit-any` und `no-non-null-assertion` für den Library-Code wieder einschalten",
-      "location": "eslint.config.mjs:37",
-      "locations": [
-        "eslint.config.mjs:38"
-      ],
-      "description": "Der `.ts`/`.astro`-Block von `eslint.config.mjs` setzt `@typescript-eslint/no-explicit-any` und `@typescript-eslint/no-non-null-assertion` auf 0, für die ganze Bibliothek unter `packages/twopoint5d/src`, nicht nur für Demos und Tests. Der Produktcode trägt heute nur 8 explizite `any`; ein neues fällt aber keinem Gate mehr auf, auch nicht in der öffentlichen API, deren Typqualität `checkNameableTypes.mjs` sonst eigens absichert. Die Non-Null-Assertions sind in den generierten Accessoren von `vertex-objects` bewusst gesetzt, dort bräuchte es einen gezielten Disable.",
-      "recommendation": "Die beiden Regeln zumindest für `packages/*/src/**` wieder aktivieren, oder falls die Deaktivierung bewusst ist, den Grund als Kommentar neben der Regel festhalten, damit ein `any` in der öffentlichen API nicht mehr unbemerkt durchrutscht.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-073",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Konkreten `parseArgs`-Fehler in `nxCacheServer.mjs` ausgeben statt verschlucken",
-      "location": "scripts/ci/nxCacheServer.mjs:9",
-      "locations": [
-        "scripts/ci/nxCacheServer.mjs:13"
-      ],
-      "description": "Wirft `parseArgs` (z. B. bei einer unbekannten Option), fängt der leere `catch` sie ab und setzt nur `values = {}`; das Script zeigt danach ausschließlich die generische `USAGE`-Zeile, nie die eigentliche Fehlermeldung von `parseArgs`. Wer das Script mit einem Tippfehler in einer Option aufruft, sieht nicht, welche Option gemeint war.",
-      "recommendation": "Die gefangene Fehlermeldung mit ausgeben (z. B. `console.error(err.message)` vor der `USAGE`-Zeile), statt sie stillschweigend zu verwerfen.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "CFG-001",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Wirkungslosen `{files: [...]}`-Block in eslint.config.mjs entfernen oder korrigieren",
-      "location": "eslint.config.mjs:14",
-      "description": "Der Eintrag `{files: ['**/*.{js,ts}']}` ganz ohne `rules`/`languageOptions` unmittelbar vor `pluginJs.configs.recommended` und `...tseslint.configs.recommended` sieht aus, als solle er die beiden folgenden Configs auf `.js`/`.ts`-Dateien eingrenzen. In ESLint Flat Config gilt `files` aber nur für das eigene Config-Objekt, nie für nachfolgende Einträge im Array — der Block hat keinerlei Wirkung. `pluginJs.configs.recommended` und `tseslint.configs.recommended` greifen unverändert nach ihren eigenen, unbeeinflussten Regeln.",
-      "recommendation": "Den wirkungslosen Block entfernen, oder falls die Eingrenzung wirklich gewollt ist, `pluginJs.configs.recommended`/`tseslint.configs.recommended` selbst mit einem `files`-Feld versehen (z. B. per Objekt-Spread).",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "CFG-002",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Hartkodierte Compiler-Options von checkNameableTypes.mjs an das gemeinsame tsconfig.json angleichen",
-      "location": "scripts/checkNameableTypes.mjs:26",
-      "description": "`checkNameableTypes.mjs` baut sein eigenes Options-Objekt (`target: ESNext, module/moduleResolution: NodeNext, skipLibCheck, strict: true`) von Hand, während das Schwester-Script `scripts/checkDocSnippets/compileSnippets.mjs:69` dieselben Einstellungen aus dem echten `tsconfig.json` der Repo-Wurzel liest. Zwei unabhängige Quellen für dieselbe Art von Konfiguration in derselben Script-Familie können auseinanderlaufen, ohne dass etwas das bemerkt.",
-      "recommendation": "`checkNameableTypes.mjs` seine Compiler-Options ebenfalls aus `tsconfig.json` lesen lassen (ggf. mit denselben Overrides wie `compileSnippets.mjs`), statt sie zu duplizieren.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "SEC-001",
-      "category": "security",
-      "domain": "code",
-      "severity": "low",
-      "title": "Bearer-Token-Vergleich des Nx-Cache-Servers gegen Timing-Angriffe absichern",
-      "location": "scripts/ci/nxCacheServer/createCacheServer.mjs:32",
-      "description": "`req.headers.authorization !== expectedAuthorization` vergleicht das Token mit einem gewöhnlichen String-Vergleich, der bei einem Unterschied früh abbricht und damit ein Timing-Seitenkanal ist. Die Angriffsfläche ist durch `server.listen(port, '127.0.0.1', ...)` auf localhost begrenzt, ein Angreifer bräuchte also ohnehin schon Zugriff auf den CI-Runner-Prozess.",
-      "recommendation": "`crypto.timingSafeEqual` auf gleich lange, z. B. mit SHA-256 vorab gehashte Puffer anwenden, statt des direkten String-Vergleichs — günstige Absicherung ohne Funktionsänderung.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace"
-    },
-    {
-      "id": "PERF-031",
-      "category": "performance",
-      "domain": "code",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Das Rechteck des Koordinatenziels bei pointerdown cachen",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:548-563",
-      "description": "Jedes `pointermove` ruft `getBoundingClientRect()` auf, standardmäßig auf `document.body`. Ist das DOM dirty, erzwingt das pro Move ein Layout, obwohl das Rechteck laut TSDoc während eines Drags konstant sein muss.",
-      "recommendation": "Das Rechteck bei `pointerdown` pro Pointer cachen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TEST-043",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Markdown-Pushes nicht am Check der ts-check-Blöcke vorbeilassen",
-      "location": ".github/workflows/ci.yml:5-6",
-      "locations": [
-        "packages/twopoint5d-testing/project.json:15"
-      ],
-      "description": "`paths-ignore: '**.md'` lässt CI für jeden Push ausfallen, der nur Markdown ändert. Genau Markdown ist aber der Input von `twopoint5d-testing:typecheck`, das alle `ts check`-Blöcke kompiliert. Ein kaputter Doc-Snippet landet so ungeprüft auf main und fällt erst beim nächsten Code-Push auf, ohne erkennbaren Bezug zur Ursache.",
-      "recommendation": "`paths-ignore` entfernen oder für reine Markdown-Pushes einen leichten Job mit Build und `twopoint5d-testing:typecheck` fahren.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "TEST-044",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "checkNameableTypes auf import(\"…\").T-Referenzen erweitern",
-      "location": "scripts/checkNameableTypes.mjs:69-75",
-      "description": "`referencedName` behandelt TypeReference, TypeQuery, ComputedPropertyName und ExpressionWithTypeArguments, aber keinen `ImportTypeNode`. Genau diese Form schreibt tsc in die `.d.ts`, wenn ein Typ aus einem internen Modul inferiert wird, also im typischen Fall eines nicht benennbaren Typs. Nachgestellt: `export declare const a: import(\"./internal.js\").Hidden;` ergibt »0 not nameable« und Exit 0. Aktuell ist die Lücke latent.",
-      "recommendation": "In `referencedName` `ts.isImportTypeNode(node)` über `node.qualifier` auswerten und mit einer Fixture testen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "SEC-003",
-      "category": "security",
-      "domain": "harness",
-      "severity": "medium",
-      "kind": "improvement",
-      "title": "Build und Publish in Jobs mit getrennten Rechten aufteilen",
-      "location": ".github/workflows/deploy.yml:61-92",
-      "locations": [
-        "apps/lookbook/package.json:12",
-        ".github/workflows/ci.yml:23"
-      ],
-      "description": "Der Job mit `id-token: write` führt `pnpm install` samt Workspace-`postinstall` und den Build-Skripten von esbuild, nx, sharp und @parcel/watcher aus und baut dann alles. Jede Dev-Dependency kann dabei über `ACTIONS_ID_TOKEN_REQUEST_*` ein npm-Publish-Token anfordern. Die Lookbook-Installation braucht der Publish gar nicht, und der Checkout läuft ohne `persist-credentials: false`.",
-      "recommendation": "Build und Checks in einem Job ohne `id-token`, `dist/` als Artifact weitergeben, der Publish-Job lädt nur das Artifact und ruft `npm publish` auf. Mindestens `--filter @spearwolf/twopoint5d...` und `persist-credentials: false`.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-060",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Architektur-Doku und Library-README auf den WebGPU- und NodeMaterial-Stand bringen",
-      "location": "packages/twopoint5d/docs/architecture.md:87-88",
-      "locations": [
-        "packages/twopoint5d/docs/architecture.md:105",
-        "packages/twopoint5d/README.md:60"
-      ],
-      "description": "Die Doku nennt »WebGL or WebGPU«, `Display` weist einen `WebGLRenderer` aber ab. Sie spricht von `ShaderMaterial`, die Sprite-Materialien erben jedoch von `NodeMaterial`. Laut README hat display »no other dependency than the three.js package«, tatsächlich importiert es `@spearwolf/eventize` an sechs Stellen.",
-      "recommendation": "Die drei Stellen korrigieren.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DEPS-008",
-      "category": "dependencies",
-      "domain": "harness",
-      "severity": "low",
-      "title": "@types/three als optionalen Peer deklarieren oder die Doku auf drei Peers korrigieren",
-      "location": "packages/twopoint5d/package.json:59-63",
-      "locations": [
-        "AGENTS.md:66",
-        "docs/architecture.md:217-221"
-      ],
-      "description": "AGENTS.md und die Architektur-Doku nennen alle vier Catalog-Einträge Peer Dependencies. Deklariert sind nur drei. Die publizierten `.d.ts` importieren `three`, TS-Konsumenten brauchen also `@types/three` in passender Version (~0.185) und erfahren das nirgends.",
-      "recommendation": "`@types/three: catalog:` mit `peerDependenciesMeta.optional` deklarieren oder die Doku anpassen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CFG-023",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Nackte Imports im Build-Output gegen die Peer-Liste prüfen",
-      "location": "tsconfig.json:17",
-      "locations": [
-        "packages/twopoint5d/package.json:56"
-      ],
-      "description": "`importHelpers: true` lässt tsc `import … from \"tslib\"` emittieren, sobald ein Helper nötig wird, etwa für `using` oder Standard-Decorators bei ES2022. Nach der Peer-only-Policy kann tslib nie eine Dependency sein, und kein Gate prüft, dass `dist` nur Peers und relative Pfade importiert. Heute ist `dist` frei von tslib, ein Verstoß käme aber als kaputter Release an.",
-      "recommendation": "`importHelpers: false` im Build-Tsconfig setzen oder in `lintPkg` die bare-specifier-Imports in `dist/lib/**/*.js` gegen `peerDependencies` abgleichen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "CFG-024",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "attw mit dem esm-only-Profil statt mit abgeschaltetem no-resolution fahren",
-      "location": "packages/twopoint5d/package.json:54",
-      "description": "`--ignore-rules cjs-resolves-to-esm no-resolution` schaltet `no-resolution` auch für node16-ESM und bundler ab. Eine echte Auflösungsregression dort bliebe stumm.",
-      "recommendation": "`attw --pack dist --profile esm-only` verwenden.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DEPS-009",
-      "category": "dependencies",
-      "domain": "harness",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Die tsconfig für TypeScript 6/7 vorbereiten",
-      "location": "tsconfig.json:9",
-      "locations": [
-        "tsconfig.json:12",
-        "apps/lookbook/tsconfig.json:4"
-      ],
-      "description": "TypeScript 7.0.2 ist erschienen. Die Root-tsconfig nutzt `baseUrl` und `downlevelIteration`, die mit TS 6 deprecated sind, und setzt kein `types`. Library-Code sieht damit `@types/node` und `@types/sinon` als Globals, und mit dem neuen Default `types: []` ändert sich das Verhalten.",
-      "recommendation": "`baseUrl` und `downlevelIteration` entfernen und `types` explizit setzen (Library: `[]`), bevor der Major-Bump kommt.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "TYPE-021",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "readOption den Rückgabetyp aus dem Optionstyp ableiten lassen",
-      "location": "packages/twopoint5d/src/controls/readOption.ts:8",
-      "description": "`val as unknown as ValueType` lässt `ValueType` allein aus `defValue` folgen. `readOption(opts, 'x', 'str')` liefert `string`, egal welchen Typ `opts.x` hat.",
-      "recommendation": "`\u003cO, K extends keyof O>(options: O, propName: K, defValue: NonNullable\u003cO[K]>): NonNullable\u003cO[K]>`.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-022",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "kind": "improvement",
-      "title": "Typbasierte Promise-Regeln ins Lint und die Skripte in den Typecheck aufnehmen",
-      "location": "eslint.config.mjs:16",
-      "description": "Das Lint nutzt nur `tseslint.configs.recommended`, ohne `no-floating-promises` und `no-misused-promises`, und das in einer stark async- und signal-lastigen Library. Die knapp 1k Zeilen Publish-Pipeline unter `scripts/` erfasst kein Typecheck (`checkJs` fehlt), obwohl dort schon JSDoc-Typen stehen.",
-      "recommendation": "Die beiden Promise-Regeln für `packages/twopoint5d/src` aktivieren und eine tsconfig mit `checkJs` für `scripts/` in `pnpm typecheck` aufnehmen.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-062",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "kind": "improvement",
-      "title": "Releases mit einem Git-Tag markieren",
-      "location": ".github/workflows/deploy.yml:92",
-      "description": "Es gibt keinen einzigen Versionstag. Der Deploy erzeugt weder Tag noch Release, ein npm-Release lässt sich nur über die Provenance auf seinen Commit zurückführen.",
-      "recommendation": "Nach erfolgreichem Publish `v\u003cversion>` taggen oder einen GitHub Release anlegen (`contents: write` nur im Publish-Job).",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "TEST-004",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Testlücken um Touch-Eingabe und mehrere Pointer in PanControl2D schließen",
-      "location": "packages/twopoint5d-testing/test/pan-control-input.test.js",
-      "description": "Der Display-Anteil ist mit `Display.spec.ts` und `display-lifecycle.test.js` abgedeckt (Remediation-Lauf vom 2026-09-24, `6a4bcacf`), `styleUtils` hat eine Spec, und seit dem Lauf vom 2026-09-29 (`e2026856`) deckt `PanControl2D.spec.ts` Fokusverlust, Tastenfilter und die Optionen `speed`, `keys`, `keyCodes`, `disableKeyboard`, `mouseButton`, `disablePointer` und `state` ab. Offen bleibt die Pointer-Seite: die Browser-Tests nutzen nur Maus mit `pointerId: 1` — kein Touch, kein zweiter Pointer, kein `pointercancel`, keine zwei Controls in einer Root.",
-      "recommendation": "`pan-control-input.test.js` um einen Touch-Pointer, einen Zwei-Pointer-Merge und einen `pointercancel`-Fall erweitern; zwei Controls in einer Root in `PanControl2D.spec.ts` oder der Browser-Suite prüfen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing",
-      "component": "controls"
-    },
-    {
-      "id": "API-049",
-      "category": "api",
-      "domain": "code",
-      "severity": "low",
-      "title": "printSceneGraphToConsole aus der öffentlichen Oberfläche nehmen oder begrenzen",
-      "location": "packages/twopoint5d/src/utils/printSceneGraphToConsole.ts:6",
-      "description": "Eine Debughilfe, die jedes \u003ccode>Object3D\u003c/code> eines Teilbaums per \u003ccode>console.dir\u003c/code> ausgibt (ein \u003ccode>TexturedSprites\u003c/code>-Mesh zieht Geometrie, Pools und TypedArrays in die Konsole, wo DevTools sie erreichbar hält), ist als erstklassige API neben den Rendering-Klassen exportiert. Kein Tiefen- oder Anzahllimit, keine injizierbare Senke, keine Spec; nichts in \u003ccode>packages/\u003c/code> oder \u003ccode>apps/\u003c/code> nutzt sie. Es ist der einzige Bibliothekscode, der außerhalb eines einmaligen \u003ccode>warn\u003c/code> in die Konsole schreibt.",
-      "recommendation": "In die Lookbook verschieben (oder einen \u003ccode>/devtools\u003c/code>-Subpath, sollte je einer entstehen) und aus \u003ccode>utils/public-api.ts\u003c/code> streichen (CHANGELOG »Removed«); bleibt sie, einen \u003ccode>log\u003c/code>-Senken-Parameter und ein \u003ccode>maxDepth\u003c/code> nehmen, eine Zeile pro Knoten statt \u003ccode>console.dir\u003c/code>.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-032",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Den Satzbau und Umbruch im TSDoc von PanControl2D#dispose() reparieren",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:607",
-      "description": "Der Satz »{@link update} still moves … and by a key that was still held down when \u003ccode>dispose()\u003c/code> ran gives its field back« hat kein Verb für den zweiten Teil, und die Aufzählung \u003ccode>keyboardDisabled\u003c/code>, \u003ccode>pointerDisabled\u003c/code>, \u003ccode>panView\u003c/code> bricht mitten in der Zeile um. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Den Satz teilen (»A key that was still held down … gives its field back«) und den Absatz neu umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "CONS-047",
-      "category": "consistency",
-      "domain": "code",
-      "severity": "info",
-      "title": "Die dispose()-TSDoc führt scene und name in zwei einander ausschließenden Aufzählungen",
-      "location": "packages/twopoint5d/CHANGELOG.md:33",
-      "description": "\u003ccode>scene\u003c/code> und \u003ccode>name\u003c/code> stehen im selben Satz sowohl unter »keep the values the stage was left with« als auch unter »still take new ones«. Gemeint ist: \u003ccode>dispose()\u003c/code> setzt sie nicht zurück, und sie bleiben beschreibbar. Lesbar, aber nicht trennscharf; die CHANGELOG-Zeile trägt denselben Satzbau.",
-      "recommendation": "Die beiden Aussagen trennen — was seinen Wert behält, und was weiter Schreibzugriffe annimmt — und die CHANGELOG-Zeile nachziehen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-003",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Kein Einstiegs-Beispiel für Vertex-Object-Descriptions",
-      "location": "apps/lookbook/src/demos/crosses/Crosses.ts:4",
-      "description": "Die bestehenden Demos zeigen fertige Systeme mit Subclasses und Magic Numbers; \u003ccode>crosses\u003c/code> nennt sich »minimal example«, bringt aber eine 12-Vertex-Description mit 18 Indizes und eine falsche Grad-Umrechnung (BUG-095) mit. Wer verstehen will, was eine \u003ccode>VertexObjectDescription\u003c/code> überhaupt ist, findet keinen Einstieg — dabei ist genau das der Begriff, an dem die ganze Bibliothek hängt. Re-Check: unverändert.",
-      "recommendation": "Eine Demo \u003ci>Your First Sprite\u003c/i>, die in dreißig Zeilen einen einzelnen TexturedSprite zeigt — ohne Subclass, ohne unerklärte Zahlen. Begleitend eine Concept-Seite, die die Description erklärt.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "DOC-015",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "removeComments streicht jede TSDoc aus den ausgelieferten .d.ts",
-      "location": "tsconfig.json:34",
-      "description": "Die Quellen tragen 418 TSDoc-Blöcke (gezählt über \u003ccode>src/**/*.ts\u003c/code> ohne Specs), die veröffentlichten Declaration-Dateien unter \u003ccode>dist/lib\u003c/code> tragen null. \u003ccode>removeComments: true\u003c/code> in der Root-tsconfig entfernt Kommentare nicht nur aus dem JS, sondern auch aus den \u003ccode>.d.ts\u003c/code>; ein Konsument sieht im Editor zu keiner der 278 exportierten Deklarationen einen Hover-Text — auch nicht zu den ausführlich dokumentierten \u003ccode>dispose()\u003c/code>-Verträgen, die der Remediation-Lauf gerade geschrieben hat. Re-Check: unverändert; die Doku-Arbeit der letzten Wochen kommt beim Konsumenten nicht an.",
-      "recommendation": "\u003ccode>removeComments\u003c/code> auf \u003ccode>false\u003c/code> setzen (oder nur im JS-Emit über einen Bundler-Schritt entfernen). Der \u003ccode>lintPkg\u003c/code>-Schritt kann mit \u003ccode>grep -c '/\\*\\*' dist/lib/index.d.ts\u003c/code> wachen, dass Doku im Paket bleibt.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-025",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "medium",
-      "title": "Die ersten fünf Minuten des Konsumenten ins README schreiben",
-      "location": "README.md:28-38",
-      "description": "Das einzige \u003ccode>install\u003c/code> im README ist das \u003ccode>pnpm install\u003c/code> des Contributors. Es gibt kein \u003ccode>npm i @spearwolf/twopoint5d three @spearwolf/eventize @spearwolf/signalize\u003c/code> (drei Peers, die der Konsument selbst installieren muss), kein Import-Snippet, keinen Hinweis auf \u003ccode>three/webgpu\u003c/code> / TSL, obwohl jede Demo daraus importiert, und die Prosa beschreibt weiter eine WebGL/GLSL-Bibliothek (»custom vertex shader«, »WebGL API«), während die Paket-Keywords \u003ccode>webgpu\u003c/code> sagen. Das npm-README ist neun Zeilen, die hierher zurückverweisen. Scripts und Befehle in README und AGENTS.md sind korrekt (gegen package.json geprüft).",
-      "recommendation": "Ein »Usage«-Abschnitt: Install-Zeile mit Peers, ein 15-Zeilen-Beispiel \u003ccode>Display\u003c/code> + \u003ccode>TexturedSprites\u003c/code>, ein Satz zu WebGPURenderer mit WebGL-Fallback, Link auf die Lookbook und \u003ccode>src/stage/README.md\u003c/code>; die zwei WebGL-Sätze auffrischen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DEPS-007",
-      "category": "dependencies",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die three-Peer-Policy entscheiden und dokumentieren: ~0.185.1 weist jeden Konsumenten auf 0.186 ab",
-      "location": "pnpm-workspace.yaml:11",
-      "description": "Der Katalog-Bereich landet wörtlich im veröffentlichten Manifest. Mit three auf 0.186 (laut \u003ccode>pnpm outdated\u003c/code>) bekommt jeder Konsument auf 0.186 \u003ccode>ERESOLVE\u003c/code>/\u003ccode>ERR_PNPM_PEER_DEP_ISSUES\u003c/code>, bis diese Bibliothek released — und sie hat seit drei Monaten nicht released (der Release-Rückstand selbst ist als CFG-017 vom Autor akzeptiert). Tilde ist vertretbar, weil three-0.x-Minors breaking sind, aber dann muss jeder three-Bump ein Release sein, und nichts sagt das.",
-      "recommendation": "Entweder die Tilde behalten und die Policy in AGENTS.md §»Shared dependency versions« schreiben (»ein three-Bump ist ein Release«), oder auf \u003ccode>&gt;=0.185.0 &lt;0.187.0\u003c/code> weiten, nachdem gegen 0.186 verifiziert wurde, und die Obergrenze mit jedem verifizierten Bump mitziehen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "IMPL-004",
-      "category": "completeness",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Suche ausliefern oder den Button entfernen; Ctrl K verdrahten, wenn sie bleibt",
-      "location": "apps/lookbook/src/components/SearchLookbook.astro:7-10",
-      "description": "Der Header bewirbt eine \u003ccode>Ctrl K\u003c/code>-Suche; nirgends in \u003ccode>src/\u003c/code> existiert ein \u003ccode>keydown\u003c/code>-Handler, und der Dialog-Rumpf ist der String »TODO search lookbook«. \u003ccode>LookbookMetadata.astro\u003c/code> serialisiert den gesamten Demo-Katalog und den Tag-Graphen in DOM-Attribute eines versteckten Divs, das kein Script liest — vermutlich die Datenquelle für diese Suche. Als Startseite der lebenden Dokumentation sieht der Stub für einen Besucher wie ein Bug aus. Re-Check: unverändert.",
-      "recommendation": "Entweder implementieren (die Daten liegen schon im DOM: \u003ccode>.link-card\u003c/code> nach Titel/Tags filtern und das bestehende \u003ccode>lookbook.showDemos\u003c/code>-Event dispatchen) mit einem \u003ccode>keydown\u003c/code>-Listener für Ctrl/Cmd+K, oder \u003ccode>SearchLookbook\u003c/code> und \u003ccode>LookbookMetadata\u003c/code> bis dahin entfernen.",
-      "effort": "M",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "READ-013",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Das Boilerplate pro Demo-Seite in VanillaDemo.astro falten und eine Definition des Instanced-Quads behalten",
-      "location": "apps/lookbook/src/pages/demos/instanced-quads.astro:71-76",
-      "description": "\u003ccode>PerspectiveOrbitDemo\u003c/code> und \u003ccode>assetsUrl\u003c/code> sind sauber geteilt. Dupliziert sind: \u003ccode>&lt;canvas id=\"canvas-container\" resize-to=\"window\"&gt;\u003c/code> + \u003ccode>body {height:100vh; overflow-y:hidden}\u003c/code> + \u003ccode>new PerspectiveOrbitDemo(…)\u003c/code> in 12 Seiten, das \u003ccode>.texture-preview\u003c/code>-CSS in 4, \u003ccode>.actionBtn\u003c/code> in 2, und — was den Leser kostet — zwei \u003ccode>InstancedQuad\u003c/code>/\u003ccode>BaseQuad\u003c/code>-Definitionen, deren \u003ccode>setInstancePosition\u003c/code>-Signaturen sich unterscheiden (2-Tupel gegen 3-Tupel), während der Descriptor drei Komponenten deklariert. Etwas Wiederholung ist für selbsttragende Demo-Seiten richtig; zwei divergierende Definitionen desselben Konzepts nicht.",
-      "recommendation": "\u003ccode>VanillaDemo.astro\u003c/code> bekommt eine \u003ccode>fullscreenCanvas\u003c/code>-Prop, die Canvas und Body-Regel emittiert; eine \u003ccode>TexturePreview.astro\u003c/code>-Komponente; \u003ccode>instanced-quads.astro\u003c/code> importiert \u003ccode>InstancedQuadsGeometry.ts\u003c/code> wie \u003ccode>textured-quads.astro\u003c/code>.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "DOC-034",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Abschnittsverweise in resource-lifecycle.md richtigstellen",
-      "location": "packages/twopoint5d/docs/resource-lifecycle.md:5-6",
-      "description": "Die Einleitung nennt »section 7 the checklist, section 8 the tests«, Zeile 55 »Assertion (f) in section 8«. Das Dokument hat nur §1–§7: die Checkliste ist §6, das Testmuster §7. Die Datei ist die verbindliche Regel für jedes neue \u003ccode>dispose()\u003c/code> (AGENTS.md verweist darauf). Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "»Section 6 is the checklist, section 7 the tests«; »Assertion (f) in section 7«.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-038",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Im CHANGELOG bei jedem neuen Accessor-Paar sagen, dass ein Feld in der Unterklasse nicht mehr kompiliert",
-      "location": "packages/twopoint5d/CHANGELOG.md:126",
-      "description": "Unter \u003ccode>Unreleased\u003c/code> steht für \u003ccode>StageRenderer#pipeline\u003c/code> und \u003ccode>#buildOutputNode\u003c/code> »reading and writing it is unchanged«, für \u003ccode>FixedFrameLoop#maxStepsPerFrame\u003c/code> nur »is an accessor pair on the prototype«. Eine TS-Unterklasse, die eines davon als Feld deklariert, bekommt TS2610 (und ein Klassenfeld verdeckte den Setter). Der Eintrag zu \u003ccode>Map2DTileStreamer#visibilitor\u003c/code> (Zeile 133) sagt genau das; die drei anderen nicht. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "Den Halbsatz aus Zeile 133 an die drei Einträge hängen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-039",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Die Vorrangregel von keys gegenüber keyCodes im CHANGELOG genau fassen",
-      "location": "packages/twopoint5d/CHANGELOG.md:180",
-      "description": "»\u003ccode>keys\u003c/code> wins where both are set« stimmt nicht, wenn \u003ccode>keys\u003c/code> ausdrücklich auf den Default gesetzt wird und \u003ccode>keyCodes\u003c/code> abweicht — dann entscheidet \u003ccode>keyCodes\u003c/code>. Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "»\u003ccode>keys\u003c/code> wins wherever it differs from its default«.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "DOC-040",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Den Bezug von »it« im CHANGELOG-Eintrag zum Pointer-Handling klären",
-      "location": "packages/twopoint5d/CHANGELOG.md:276",
-      "description": "Das angehängte »and the cursor comes back with it« lässt offen, worauf sich »it« bezieht (Pan-Taste, Pan oder Drag). Aufgefallen im Remediation-Lauf vom 2026-09-19.",
-      "recommendation": "»… and the cursor comes back as the pan ends«.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d"
-    },
-    {
-      "id": "TYPE-019",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "BaseQuad sagt drei Properties zu, die der Descriptor nie erzeugt",
-      "location": "apps/lookbook/src/demos/instanced-quads/InstancedQuadsGeometry.ts:22-24",
-      "description": "Das Interface \u003ccode>BaseQuad\u003c/code> deklariert \u003ccode>x4\u003c/code>, \u003ccode>y4\u003c/code> und \u003ccode>z4\u003c/code>, obwohl \u003ccode>BaseQuadDescriptor\u003c/code> mit \u003ccode>vertexCount: 4\u003c/code> nur \u003ccode>x0\u003c/code> … \u003ccode>x3\u003c/code> erzeugt. Drei Properties, die zur Laufzeit \u003ccode>undefined\u003c/code> sind und die der Typ zusagt. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Die drei Deklarationen streichen; der Descriptor ist die Quelle, das Interface bildet ihn ab.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "TYPE-020",
-      "category": "types",
-      "domain": "harness",
-      "severity": "low",
-      "title": "setInstancePosition ist als Paar typisiert, nimmt aber ein Tripel",
-      "location": "apps/lookbook/src/pages/demos/instanced-quads.astro:75",
-      "description": "\u003ccode>setInstancePosition: (position: [number, number]) =&gt; void\u003c/code> bei einem Attribut \u003ccode>instancePosition\u003c/code> mit drei Komponenten; der generierte Setter nimmt drei Werte. Die Demo-Version daneben (\u003ccode>InstancedQuadsGeometry.ts:67\u003c/code>) schreibt das Tripel korrekt. Aufgefallen im Remediation-Lauf vom 2026-09-20.",
-      "recommendation": "Die Signatur auf drei Komponenten ziehen, wie in der Schwesterdatei.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "lookbook"
-    },
-    {
-      "id": "DOC-054",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "resolveDependencies wirft einen TypeError, wenn ein Dependency-Wert kein String ist",
-      "location": "scripts/makePackageJson/resolveDependencies.mjs:12",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21 (vorbestehend). \u003ccode>specifier.startsWith(…)\u003c/code> wirft bei einem Dependency-Wert, der kein String ist (\u003ccode>null\u003c/code>, eine Zahl), einen \u003ccode>TypeError\u003c/code> mit Stacktrace statt einer Meldung — die letzte Stelle der beiden Publish-Skripte, an der ein Fehler ungefangen durchläuft. Praktisch kaum erreichbar, weil ein gültiges \u003ccode>package.json\u003c/code> nur String-Specifier trägt.",
-      "recommendation": "Vor dem \u003ccode>startsWith\u003c/code> \u003ccode>typeof specifier === 'string'\u003c/code> prüfen und einen Nicht-String wie jeden anderen unauflösbaren Specifier mit Warnung stehen lassen; \u003ccode>makePackageJson.mjs\u003c/code> verweigert ihn dann mit seiner Meldung.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-055",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Architektur-Doku nennt nicht, dass ein zweites Paketverzeichnis ebenfalls abbricht",
-      "location": "docs/architecture.md:189-191",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Der Satz zur Kommandozeile von \u003ccode>publishNpmPkg.mjs\u003c/code> nennt als Abbruchgründe ein fehlendes Verzeichnis und jede andere Option; ein zweites Verzeichnis bricht ebenso mit Exit 1 ab (\u003ccode>expected one &lt;package-dir&gt;\u003c/code>).",
-      "recommendation": "Den Fall im selben Satz ergänzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-056",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Der Kommentar zum Trimmen der workspace:-Range nennt den falschen Grund",
-      "location": "scripts/makePackageJson/resolveDependencies.mjs:44-45",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. »whitespace around the range belongs to no version range« ist ungenau — \u003ccode>validRange(' ^1')\u003c/code> ist gültig. Der eigentliche Grund ist, dass der Leerraum sonst wörtlich ins veröffentlichte Manifest ginge und \u003ccode>' '\u003c/code> als \u003ccode>'*'\u003c/code> durchrutschte.",
-      "recommendation": "Den Kommentar auf diesen Grund umschreiben.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-057",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Warnung »workspace package has no version« trifft bei einer unlesbaren Version nicht zu",
-      "location": "scripts/makePackageJson/resolveDependencies.mjs:107",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Die Warnung erscheint auch, wenn das Nachbar-Manifest eine \u003ccode>version\u003c/code> trägt, die semver nicht lesen kann (etwa \u003ccode>banana\u003c/code>); sie sagt dann etwas Falsches über das Manifest.",
-      "recommendation": "Wortlaut auf »has no version semver can read« ändern.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-058",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Usage-Zeile von checkDocSnippets nennt das nötige Arbeitsverzeichnis nicht",
-      "location": "scripts/checkDocSnippets.mjs:10",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Die Usage-Zeile zeigt \u003ccode>node scripts/checkDocSnippets.mjs [file.md …]\u003c/code>; aus dem Repo-Root aufgerufen, lösen die Snippets \u003ccode>@spearwolf/twopoint5d\u003c/code> nicht auf (TS2307). Der Absatz darüber erklärt es, die Zeile, die man kopiert, nicht.",
-      "recommendation": "Die Zeile als \u003ccode>cd packages/twopoint5d-testing &amp;&amp; node ../../scripts/checkDocSnippets.mjs [file.md …]\u003c/code> schreiben.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "CFG-021",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Der Snippet-Check meldet eine unlesbare tsconfig nicht, solange es keine markierten Blöcke gibt",
-      "location": "scripts/checkDocSnippets/compileSnippets.mjs:23-25",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. Bei null Snippets kehrt \u003ccode>compileSnippets\u003c/code> vor \u003ccode>readCompilerOptions\u003c/code> zurück; eine unlesbare Root-tsconfig ergibt dann Exit 0 statt des dokumentierten Exit 2 — der Fehler zeigt sich erst mit dem ersten markierten Block.",
-      "recommendation": "\u003ccode>readCompilerOptions(tsconfigPath)\u003c/code> vor die Früh-Rückkehr ziehen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "TEST-037",
-      "category": "testing",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Die Regel »Backtick in der Info-Zeile ist keine Fence« hat keinen Test",
-      "location": "scripts/checkDocSnippets/extractSnippets.mjs:36-38",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. \u003ccode>extractSnippets\u003c/code> folgt CommonMark und behandelt eine Zeile wie \u003ccode>```inline``` prose\u003c/code> nicht als Fence; \u003ccode>extractSnippets.test.mjs\u003c/code> deckt die Regel mit keinem Fall ab.",
-      "recommendation": "Einen Fall ergänzen, in dem eine solche Zeile vor einem markierten Block steht und der Block trotzdem gefunden wird.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "READ-016",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "info",
-      "title": "checkDocSnippets deklariert snippets und problems mit let, ohne sie neu zuzuweisen",
-      "location": "scripts/checkDocSnippets.mjs:31-32",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. \u003ccode>let snippets = []\u003c/code> und \u003ccode>let problems = []\u003c/code> werden nur befüllt, nie neu zugewiesen.",
-      "recommendation": "\u003ccode>const\u003c/code> verwenden.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-059",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Dass das Browser-Testpaket private ist, steht in keiner Doku",
-      "location": "packages/twopoint5d-testing/package.json:11",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleiner Befund des Reviewers. \u003ccode>\"private\": true\u003c/code> schützt das reine Testpaket vor einem versehentlichen Publish; weder \u003ccode>AGENTS.md\u003c/code> noch \u003ccode>docs/architecture.md\u003c/code> noch das README nennen das.",
-      "recommendation": "Einen Satz in \u003ccode>docs/architecture.md\u003c/code> (Abschnitt zum Testpaket oder zum Publish) ergänzen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "twopoint5d-testing"
-    },
-    {
-      "id": "READ-018",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Zwei Kommentare der Skripte brechen ungleich bzw. über die Umbruchbreite um",
-      "location": "scripts/publishNpmPkg/publishedVersions.mjs:2-3",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21, kleine Befunde zweier Reviewer. Der Doc-Kommentar von \u003ccode>parsePublishedVersions\u003c/code> bricht nach 112 und 70 Zeichen um; der Kommentar zur Verzeichnistiefe im Cache-Server-Test ist rund 115 Zeichen lang. Prettier lässt beides durch.",
-      "recommendation": "Beide auf die Breite der Nachbarzeilen umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-067",
-      "category": "dx",
-      "domain": "code",
-      "severity": "low",
-      "title": "resource-lifecycle.md hat 11 Zeilen über der Zeilenlänge von 88 Zeichen",
-      "location": "packages/twopoint5d/docs/resource-lifecycle.md",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-21. 11 Zeilen sind länger als 88 Zeichen (\u003ccode>awk 'length>88'\u003c/code>). Die übrigen Architektur-Dokumente sind auf 88 Spalten umbrochen.",
-      "recommendation": "Die Datei auf 88 Spalten umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "@spearwolf/twopoint5d",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-21"
-      }
-    },
-    {
-      "id": "CONS-057",
-      "category": "consistency",
-      "domain": "harness",
-      "severity": "info",
-      "title": "exactOptionalPropertyTypes steht in tsconfig.json nicht an seiner alphabetischen Stelle",
-      "location": "tsconfig.json:18",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-22, kleiner Befund des Reviewers. Die bewusst abgeschaltete Option \u003ccode>exactOptionalPropertyTypes\u003c/code> steht nach \u003ccode>experimentalDecorators\u003c/code>, obwohl die Datei ihre Optionen sonst alphabetisch führt. Für \u003ccode>tsc\u003c/code> spielt die Reihenfolge keine Rolle.",
-      "recommendation": "Die Option samt Kommentar vor \u003ccode>experimentalDecorators\u003c/code> ziehen.",
-      "effort": "S",
-      "status": "carried-over",
-      "package": "workspace",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-22"
-      }
-    },
-    {
-      "id": "TEST-046",
-      "category": "testing",
-      "severity": "low",
-      "title": "Der Stylesheet-Root-Test von PanControl2D findet Regeln früherer Tests",
-      "location": "packages/twopoint5d-testing/test/pan-control-stylesheet-root.test.js:42",
-      "description": "`puts the rule in the stylesheet of the document when no root is named` sucht irgendeine `.PanControl2D-`-Regel im Sheet des Dokuments. Regeln früherer Tests bleiben dort stehen, der Test ist also grün, auch wenn der Control selbst keine Regel anlegt. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "Nach der Regel mit dem Klassennamen genau dieses Controls suchen oder die Regelzahl vor und nach dem Anlegen vergleichen.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "harness",
-      "status": "carried-over",
-      "package": "twopoint5d-testing",
-      "effort": "S"
-    },
-    {
-      "id": "DOC-069",
-      "category": "dx",
-      "severity": "info",
-      "title": "Ein Kommentar in pan-control-switch-off nennt vier Tasten, die Datei hat eine",
-      "location": "packages/twopoint5d-testing/test/pan-control-switch-off.test.js:6",
-      "description": "Der Kommentar spricht von W, S, A und D; die Datei nutzt nur `KEY_NORTH`. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "Den Kommentar auf die eine Taste zurücknehmen.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "harness",
-      "status": "carried-over",
-      "package": "twopoint5d-testing",
-      "effort": "S"
-    },
-    {
-      "id": "READ-021",
-      "category": "readability",
-      "severity": "info",
-      "title": "pan-control-keys baut den Zustand inline statt über makeState()",
-      "location": "packages/twopoint5d-testing/test/pan-control-keys.test.js:32",
-      "description": "Das Literal `{x: 0, y: 0, pixelRatio: 1}` steht inline, obwohl die gemeinsamen Test-Helfer `makeState()` dafür haben. Aufgefallen im Remediation-Lauf vom 2026-09-24.",
-      "recommendation": "`makeState()` verwenden.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-24"
-      },
-      "domain": "code",
-      "status": "carried-over",
-      "package": "twopoint5d-testing",
-      "effort": "S"
-    },
-    {
-      "id": "DOC-070",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "title": "Zwei neu umbrochene Absätze lassen ein einzelnes Wort auf einer eigenen Zeile stehen",
-      "location": "AGENTS.md:45",
-      "locations": [
-        "apps/lookbook/README.md:56"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-25. Nach dem Umbruch langer Zeilen steht in \u003ccode>AGENTS.md\u003c/code> das Wort \u003ccode>whether\u003c/code> und in \u003ccode>apps/lookbook/README.md\u003c/code> \u003ccode>lookbook and\u003c/code> allein auf einer Zeile vor der unveränderten Nachbarzeile. Reine Optik, Lint ist grün.",
-      "recommendation": "Beide Absätze durchgehend bei rund 90 Zeichen neu umbrechen.",
-      "effort": "S",
-      "status": "carried-over",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-25"
-      },
-      "package": "workspace"
-    },
-    {
-      "id": "DOC-071",
-      "category": "dx",
-      "domain": "harness",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "Der CHANGELOG-Eintrag zu loadAsync() bezieht »the failures above« nicht eindeutig",
-      "location": "packages/twopoint5d/CHANGELOG.md:54",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-26. Der Eintrag zu `TextureStore#loadAsync()` sagt, ein werfender `error`-Listener ändere nicht, wie das Promise settlet, »while it hears one of the failures above«. Unmittelbar davor stehen die Item-Events, die nicht rejecten; »the failures above« lässt sich zur Not auch auf sie beziehen, gemeint sind nur die vier Fehlschläge, die rejecten.",
-      "recommendation": "»one of the four failures that reject« statt »one of the failures above« schreiben.",
-      "effort": "S",
-      "status": "carried-over",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-26"
-      }
-    },
-    {
-      "id": "CFG-025",
-      "category": "build",
-      "domain": "harness",
-      "severity": "low",
-      "title": "Bench-Schritt in CI hinter das Speichern des Nx-Caches legen",
-      "location": ".github/workflows/ci.yml:94",
-      "description": "Der Schritt »Run the hot-path benchmarks« steht vor »Drop the Nx cache entries this run did not use« und »Save the Nx cache« (beide `if: success()`). Ein abstürzender Bench kostet damit das Speichern des Nx-Caches des ganzen Laufs.",
-      "recommendation": "Den Bench-Schritt hinter »Save the Nx cache« verschieben oder die beiden Cache-Schritte mit `if: always()` laufen lassen.",
-      "effort": "S",
-      "status": "new",
-      "package": "workspace",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-27"
-      },
-      "locations": [
-        ".github/workflows/ci.yml:106"
-      ]
-    },
-    {
-      "id": "READ-025",
-      "category": "readability",
-      "domain": "harness",
-      "severity": "info",
-      "title": "Vorzeitiger Zeilenumbruch im Absatz zu geteilten Descriptoren in architecture.md",
-      "location": "packages/twopoint5d/docs/architecture.md:93",
-      "description": "Kleiner Befund des Reviewers im Remediation-Lauf vom 2026-09-28. Die Zeile endet nach 62 Zeichen, die Nachbarzeilen bei rund 95 — kosmetischer Umbruch im Markdown-Quelltext.",
-      "recommendation": "Den Absatz neu umbrechen.",
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-28"
-      }
-    },
-    {
-      "id": "DOC-076",
-      "category": "dx",
-      "domain": "harness",
-      "severity": "info",
-      "title": "»for it« in AGENTS.md verliert seinen Bezug",
-      "location": "AGENTS.md:114",
-      "description": "Kleiner Befund des Reviewers im Remediation-Lauf vom 2026-09-28. Der eingefügte Absatz zu Bruchwerten in Messrunden steht zwischen dem Satz zu `measureSettledBytes()` und »The Vitest config starts its workers with `--expose-gc` for it«; »for it« bezieht sich jetzt auf den eingefügten Satz statt auf `measureSettledBytes()`.",
-      "recommendation": "Den Satz hinter »never reaches `dist/`« setzen oder »for it« ausschreiben (»for `measureSettledBytes()`«).",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-28"
-      }
-    },
-    {
-      "id": "DOC-078",
-      "category": "dx",
-      "domain": "code",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "Inline-Kommentar in PanControl2D#unsubscribe() nennt nur document",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:429",
-      "description": "Der Kommentar sagt »with the listeners off document«; die Listener für Fokusverlust hängen inzwischen auch an `window`, wie die TSDoc darüber schon sagt. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
-      "recommendation": "»off document and window« schreiben.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "id": "TEST-051",
-      "category": "testing",
-      "domain": "harness",
-      "component": "controls",
-      "package": "@spearwolf/twopoint5d",
-      "severity": "info",
-      "title": "Der Shadow-Root-Test des Tastenfilters prüft dasselbe wie der input-Fall",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.spec.ts:184-196",
-      "description": "Der Test baut dasselbe Ereignis wie der `input`-Fall des `it.each` darüber und fängt keine zusätzliche Regression; nur die Assertion `target === doc` macht die Retargeting-Annahme sichtbar. Aufgefallen im Remediation-Lauf vom 2026-09-29.",
-      "recommendation": "Das Ereignis wirklich aus einem Element im Shadow Root abfeuern (mit `composed: true`), sodass der Test ohne die `composedPath()`-Auswertung rot würde, oder ihn streichen.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "id": "DOC-079",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "component": "display",
-      "title": "Die Klassen-TSDoc von Display steht über der mergenden Interface-Deklaration",
-      "location": "packages/twopoint5d/src/display/Display.ts:593",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Die Klassen-TSDoc von \u003ccode>Display\u003c/code> steht über \u003ccode>export interface Display extends EventizedObject {}\u003c/code> statt über der Klasse; Editoren und API-Extraktion ordnen sie damit dem Interface zu. Bei \u003ccode>Stage2D\u003c/code> ist derselbe Versatz im selben Lauf behoben worden.",
-      "recommendation": "Die TSDoc direkt über die Klassendeklaration setzen und die mergende Interface-Deklaration darunter ohne eigenen Block führen.",
-      "origin": {
-        "kind": "discovered",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "id": "API-065",
+      "id": "API-066",
       "category": "api",
       "domain": "code",
       "severity": "info",
       "component": "controls",
-      "title": "PanControl2D: Listener, die nach dispose() über onUpdate() hinzukommen, hören update() weiter",
-      "location": "packages/twopoint5d/src/controls/PanControl2D.spec.ts:344",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. \u003ccode>dispose()\u003c/code> leert nur die vorhandenen Listener; \u003ccode>update()\u003c/code> emittiert und bewegt die View auch danach, und über die typisierten \u003ccode>on*()\u003c/code>-Helfer lassen sich neue Listener anhängen. TSDoc und Test halten das Verhalten fest, statt es zu unterbinden — offen ist, ob es gewollt ist.",
-      "recommendation": "Entscheiden, ob update() und die on*()-Helfer nach dispose() zu No-ops werden sollen wie onRestoreCursor(), und TSDoc und Test danach ausrichten.",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
-      }
-    },
-    {
+      "title": "Die Option coordsTarget von PanControl2D ändert keinen Pan",
+      "location": "packages/twopoint5d/src/controls/PanControl2D.ts:126",
+      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-30. Der Pan ist die Differenz zweier Positionen desselben Pointers; ein Rechteck, das über einen Drag feststeht, fällt aus dieser Differenz heraus. Seit das Rechteck von \u003ccode>coordsTarget\u003c/code> je Pointer beim \u003ccode>pointerdown\u003c/code> gemessen wird, gilt das per Konstruktion — die TSDoc der Option verlangt genau dieses feste Rechteck. Die Option (samt Feld an \u003ccode>:248\u003c/code>) ist erst im \u003ccode>[Unreleased]\u003c/code>-Block hinzugekommen. Offene Frage: der Fix entfernt oder deprecatet eine öffentliche Option und läuft gegen die Entscheidung vom 2026-09-19, Pointer gegen ein festes Element zu messen (CHANGELOG, Eintrag zu \u003ccode>coordsTarget\u003c/code>).",
+      "recommendation": "Entscheiden, ob \u003ccode>coordsTarget\u003c/code> vor dem nächsten Release entfällt (noch unveröffentlicht, also ohne Deprecation möglich) oder einen Zweck bekommt, der den Pan tatsächlich beeinflusst; TSDoc, CHANGELOG und Tests danach ausrichten.",
       "effort": "S",
       "status": "new",
       "package": "@spearwolf/twopoint5d",
-      "id": "DOC-080",
-      "category": "dx",
-      "domain": "code",
-      "severity": "info",
-      "component": "stage",
-      "title": "TSDoc von StageRenderer#add() verschweigt, dass die Stage schon auf die Größe gebracht ist, wenn der Umzug abbricht",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.ts:1152",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.ts:1178",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:1194-1197"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. \u003ccode>add()\u003c/code> ruft \u003ccode>resizeStage()\u003c/code> vor dem Auszug eines Kind-Renderers aus seinem vorigen Halter; bricht der Umzug ab, weil ein Listener einen der Renderer disposed oder dem Kind einen anderen Halter gibt, ist die Größe schon gesetzt. Die TSDoc sagt nur »the child is not added«.",
-      "recommendation": "In der TSDoc festhalten, dass die Stage in diesem Fall bereits auf die Größe des Renderers gebracht ist.",
       "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "id": "TEST-052",
-      "category": "testing",
-      "domain": "code",
-      "severity": "info",
-      "component": "stage",
-      "title": "Test zum Umzug per parent-Setter prüft die Abmeldung vom alten Host nicht",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:1217",
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Der Test »a write to parent leaves a renderer that a listener of OnRemoveFromParent disposes off the new host« prüft nicht, dass der Renderer seine Abonnements am alten Host vollständig abgemeldet hat (\u003ccode>hostA._unsubs === 2\u003c/code>).",
-      "recommendation": "Die Assertion auf die Abmeldungen am alten Host ergänzen.",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
-      }
-    },
-    {
-      "effort": "S",
-      "status": "new",
-      "package": "@spearwolf/twopoint5d",
-      "id": "TEST-053",
-      "category": "testing",
-      "domain": "code",
-      "severity": "info",
-      "component": "stage",
-      "title": "Tests zum abgebrochenen Umzug in add() prüfen nicht, dass ein Fehler aus dem Auszug beim Aufrufer ankommt",
-      "location": "packages/twopoint5d/src/stage/StageRenderer.spec.ts:978",
-      "locations": [
-        "packages/twopoint5d/src/stage/StageRenderer.spec.ts:992",
-        "packages/twopoint5d/src/stage/StageRenderer.ts:1195"
-      ],
-      "description": "Aufgefallen im Remediation-Lauf vom 2026-09-29. Die beiden Tests zum Abbruch des Umzugs in \u003ccode>add()\u003c/code> decken den frühen \u003ccode>return\u003c/code>-Pfad ab, prüfen aber nicht, dass ein beim Auszug gesammelter Fehler über \u003ccode>throwCollected()\u003c/code> beim Aufrufer ankommt.",
-      "recommendation": "Einen werfenden Listener des Auszugs ergänzen und den geworfenen Fehler beim Aufrufer assertieren.",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-09-29"
+        "kind": "discovered",
+        "run": "2026-09-30"
       }
     }
   ],
@@ -1539,7 +513,8 @@
       "Nachgeführt nach dem Remediation-Lauf vom 2026-09-28 (Feature-Domänen vertex-objects, sprites und map2d, jede Severity): 10 Commits 93628b3c..28d2cff0 auf main, 26 Findings mit Reviewer-Beleg geschlossen, keines mangels Beleg offen geblieben. 1 Nebenbefund aus der dritten Drain-Runde und 9 kleine Reviewer-Befunde sind als neue Findings eingetragen. Der Code wurde seit dem Audit vom 2026-09-26 nicht neu geprüft.",
       "Remediation-Lauf vom 2026-09-29 (Features Vertex Objects, Texturen & Atlanten, Display & Frame-Loop, Sprites, Map2D): 5 Commits 801906f3..35e7942e auf main, 24 Findings nach Reviewer-Urteil geschlossen, 13 Nebenbefunde und 4 Folgen im selben Lauf behoben, keines mangels Beleg offen. Der Code wurde seit dem Audit vom 2026-09-28 nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
       "Remediation-Lauf vom 2026-09-29 (Stage und Input-Controls): 1 Commit e2026856 auf main, 4 Findings nach Reviewer-Urteil geschlossen, zwei Testlücken-Findings teilweise erfüllt und nachgeführt, 2 Nebenbefunde und 3 kleine Reviewer-Befunde ins Backlog, keines mangels Beleg offen. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
-      "Remediation-Lauf vom 2026-09-29/30 (Stages & Render-Pipeline): 15 Commits 676eefa7..51e8b330 auf main, 44 Findings nach Reviewer-Urteil geschlossen (die 38 der Komponente stage, fünf stage-Findings ohne Komponente und ein durch den Lauf gegenstandslos gewordenes), 14 Nebenbefunde und 32 kleine Folgen im selben Lauf behoben, keines mangels Beleg offen; ins Backlog gehen 4 kleine Reviewer-Befunde und 1 Nebenbefund außerhalb der Domain. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
+      "Remediation-Lauf vom 2026-09-29/30 (Stages & Render-Pipeline): 15 Commits 676eefa7..51e8b330 auf main, 44 Findings nach Reviewer-Urteil geschlossen (die 38 der Komponente stage, fünf stage-Findings ohne Komponente und ein durch den Lauf gegenstandslos gewordenes), 14 Nebenbefunde und 32 kleine Folgen im selben Lauf behoben, keines mangels Beleg offen; ins Backlog gehen 4 kleine Reviewer-Befunde und 1 Nebenbefund außerhalb der Domain. Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet.",
+      "Remediation-Lauf vom 2026-09-30 (Sprint »issue-frei«): 13 Commits 5738b5e5..dcd53a3b auf main, alle 66 offenen Findings nach Reviewer-Urteil geschlossen, keines mangels Beleg offen; 23 Nebenbefunde und 11 Reviewer-Befunde auf die eigenen Diffs im selben Lauf behoben, dazu zwei Folgepakete. Ins Backlog geht 1 Nebenbefund mit offener API-Frage (coordsTarget). Der Code wurde seit dem Audit nicht neu geprüft; Scores sind auf das veränderte Backlog nachgerechnet."
     ]
   },
   "acknowledged": [
@@ -1828,12 +803,12 @@
     },
     {
       "date": "2026-09-30",
-      "score": 85,
+      "score": 100,
       "source": "remediation",
       "scoreModel": 2,
       "domains": {
-        "code": 99,
-        "harness": 73
+        "code": 100,
+        "harness": 100
       },
       "coverage": 1
     }
@@ -2007,6 +982,16 @@
       "inducedFixed": 12,
       "inducedOpen": 4,
       "discovered": 14,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-09-30",
+      "source": "remediation",
+      "ref": "2026-09-30",
+      "fixed": 66,
+      "inducedFixed": 13,
+      "inducedOpen": 0,
+      "discovered": 24,
       "attribution": "reviewed"
     }
   ]
