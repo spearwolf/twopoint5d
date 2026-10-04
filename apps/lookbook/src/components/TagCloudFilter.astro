@@ -2,38 +2,112 @@
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos';
 import ClearActionIcon from '../images/iconoir/xmark-circle-solid.svg?raw';
 
-const {tags, tagCategories} = loadMetadataForDemos();
+const {demos, tags, tagCategories} = loadMetadataForDemos();
 ---
 
-<section class="tags select-none invisible">
-  {tagCategories.map((category) => (
-    <>
-      <h3 class="tag-category">{category.name}</h3>
-      <p class="tag-category-description">{category.description}</p>
-      <ul class="tag-cloud-filter">
-        {/* the category tag names are filled from the keys of `tags`, so the map holds every one of them */}
-        {category.tags.sort().map((tag) => (
-          <li
-            class="tag"
-            data-tag={tag}
-            data-related-demos={Array.from(tags.get(tag)!.demoIds).join(',')}
-            data-related-tags={Array.from(tags.get(tag)!.relatedTags).join(',')}
-          >
-            {tag}
-          </li>
-        ))}
-      </ul>
-    </>
-  ))}
-  <div class="flex flex-row justify-end lg:justify-start mt-8 pt-2 border-t border-dashed border-[var(--color-primary-inactive)]">
-    <button class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2">
+<section class="tags select-none invisible" data-demo-count={demos.length}>
+  <div class="tag-filter-bar">
+    {/* below the lg breakpoint the filter folds away behind this button; the sidebar above it
+        shows the plain heading instead */}
+    <button type="button" class="toggle-tags-action" aria-expanded="false" aria-controls="tag-filter-body">
+      <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path
+          d="M6 9l6 6 6-6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="title">Filter demos</span>
+    </button>
+    <h2 class="title">Filter demos</h2>
+    <span class="tag-filter-summary"></span>
+    <button type="button" class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2">
       <Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span>
     </button>
+  </div>
+
+  <div id="tag-filter-body" class="tag-filter-body">
+    {tagCategories.map((category) => (
+      <>
+        <h3 class="tag-category">{category.name}</h3>
+        <p class="tag-category-description">{category.description}</p>
+        <ul class="tag-cloud-filter">
+          {/* the category tag names are filled from the keys of `tags`, so the map holds every one of them */}
+          {category.tags.sort().map((tag) => (
+            <li>
+              <button
+                type="button"
+                class="tag"
+                aria-pressed="false"
+                data-tag={tag}
+                data-related-demos={Array.from(tags.get(tag)!.demoIds).join(',')}
+                data-related-tags={Array.from(tags.get(tag)!.relatedTags).join(',')}
+              >
+                {tag}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </>
+    ))}
   </div>
 </section>
 
 <style>
+  .tag-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--color-primary-inactive);
+    background-color: var(--color-header-background);
+    backdrop-filter: blur(8px);
+  }
+
+  .tag-filter-bar .title {
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  .toggle-tags-action {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2em 0.6em 0.2em 0.2em;
+    border-radius: 2em;
+  }
+  .toggle-tags-action:is(:hover, :focus-visible) {
+    outline: none;
+    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
+  }
+  .toggle-tags-action .chevron {
+    color: var(--color-primary);
+    transform: rotate(-90deg);
+    transition: transform 150ms ease-out;
+  }
+  .toggle-tags-action[aria-expanded='true'] .chevron {
+    transform: none;
+  }
+
+  .tag-filter-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--color-primary-darker);
+    font-size: var(--tag-font-size);
+  }
+
   .clear-tags-action {
+    flex-shrink: 0;
     color: var(--color-primary);
     background-color: var(--color-background-light);
     font-size: var(--tag-font-size);
@@ -45,18 +119,54 @@ const {tags, tagCategories} = loadMetadataForDemos();
     background-color: transparent;
     cursor: default;
   }
-  .clear-tags-action:is(:hover, :focus-within) {
+  .clear-tags-action:is(:hover, :focus-visible) {
+    outline: none;
     box-shadow: 0 0 1px 1px var(--color-primary-highlight);
   }
-  .clear-tags-action.inactive:is(:hover, :focus-within) {
+  .clear-tags-action.inactive:is(:hover, :focus-visible) {
     box-shadow: none;
   }
   .clear-tags-action .label {
     line-height: 2;
   }
 
+  /* folded only below the lg breakpoint: the sidebar always shows the whole filter. There the
+     bar sticks to the page under the sticky header, in the sidebar to the top of its scroller */
+  @media (width < 64rem) {
+    .tag-filter-bar {
+      top: 4rem;
+      flex-wrap: wrap;
+      row-gap: 0;
+    }
+    /* the summary takes a line of its own under the toggle, where the selected tags have room */
+    .tag-filter-summary {
+      order: 1;
+      flex-basis: 100%;
+      padding-left: 1.6rem;
+    }
+    .clear-tags-action {
+      margin-left: auto;
+    }
+    .tag-filter-bar h2.title {
+      display: none;
+    }
+    .tags.collapsed .tag-filter-body {
+      display: none;
+    }
+  }
+
+  @media (width >= 64rem) {
+    .toggle-tags-action {
+      display: none;
+    }
+  }
+
   .tags {
     color: var(--color-primary);
+  }
+  .tag-cloud-filter {
+    display: flex;
+    flex-wrap: wrap;
   }
   .tag {
     display: inline-block;
@@ -77,11 +187,12 @@ const {tags, tagCategories} = loadMetadataForDemos();
     background-color: var(--color-background);
     box-shadow: 0 0 1px var(--color-background);
   }
-  .tag:is(:hover, :focus-within) {
+  .tag:is(:hover, :focus-visible) {
+    outline: none;
     color: var(--color-primary-highlight);
     box-shadow: 0 0 1px 1px var(--color-primary-highlight);
   }
-  .tag.active:is(:hover, :focus-within) {
+  .tag.active:is(:hover, :focus-visible) {
     color: var(--color-primary);
     background-color: var(--color-background-light);
     box-shadow: 0 0 1px 1px var(--color-primary-highlight);
@@ -101,7 +212,7 @@ const {tags, tagCategories} = loadMetadataForDemos();
 </style>
 
 <script>
-  import {EVENT_SHOW_DEMOS} from './constants.js';
+  import {EVENT_SHOW_DEMOS, EVENT_TOGGLE_TAG, STORAGE_KEY_TAGS_COLLAPSED} from './constants.js';
   import {getShowDemosConfig, saveShowDemosConfig} from './LookBookApi';
   import type {LookBookShowDemosEventDetail} from './types';
 
@@ -109,153 +220,139 @@ const {tags, tagCategories} = loadMetadataForDemos();
   const ATTR_RELATED_DEMOS = 'data-related-demos';
   const ATTR_RELATED_TAGS = 'data-related-tags';
 
-  const CSS_TAG_CLOUD_FILTER = '.tag-cloud-filter';
-
   const CSS_ACTIVE = 'active';
   const CSS_INACTIVE = 'inactive';
+  const CSS_COLLAPSED = 'collapsed';
 
-  function readUniqValuesFromAttribute($el: Element, attrName: string, target: Set<string> = new Set()): Set<string> {
-    // neither the element nor the attribute name is known here, so a missing attribute is
-    // an answer and not a fault: there is nothing to add
-    const attrValue = $el.getAttribute(attrName);
-    if (attrValue == null) return target;
-
-    attrValue.split(',').forEach((value: string) => {
-      target.add(value);
-    });
-
-    return target;
+  function readUniqValuesFromAttribute($el: Element, attrName: string): Set<string> {
+    // a tag without related tags writes an empty attribute, and that is no tag named ''
+    return new Set(($el.getAttribute(attrName) ?? '').split(',').filter(Boolean));
   }
 
-  // the <button class="clear-tags-action"> is written by the markup of this component
-  const getClearTagsAction = () => document.querySelector<HTMLButtonElement>('.tags .clear-tags-action')!;
+  function intersect(target: Set<string>, other: Set<string>): void {
+    for (const value of target) {
+      if (!other.has(value)) target.delete(value);
+    }
+  }
 
-  function dispatchShowDemosEvent(payload: LookBookShowDemosEventDetail): void {
-    getClearTagsAction().classList.toggle(CSS_INACTIVE, payload.showAll);
+  // the section, its bar and every tag button are written by the markup of this component
+  const $section = document.querySelector<HTMLElement>('section.tags')!;
+  const $clearAction = $section.querySelector<HTMLButtonElement>('.clear-tags-action')!;
+  const $toggleAction = $section.querySelector<HTMLButtonElement>('.toggle-tags-action')!;
+  const $summary = $section.querySelector<HTMLElement>('.tag-filter-summary')!;
+  const demoCount = Number($section.dataset['demoCount']);
+
+  const $tags = new Map<string, HTMLButtonElement>();
+  for (const $tag of $section.querySelectorAll<HTMLButtonElement>(`.tag-cloud-filter [${ATTR_TAG}]`)) {
+    $tags.set($tag.getAttribute(ATTR_TAG)!, $tag);
+  }
+
+  let activeTags = new Set<string>();
+  let relatedTags = new Set<string>();
+
+  function renderSummary(payload: LookBookShowDemosEventDetail): void {
+    if (payload.showAll) {
+      $summary.textContent = `all ${demoCount} demos`;
+      $summary.removeAttribute('title');
+    } else {
+      const shown = payload.filterById?.size ?? 0;
+      const tags = Array.from(activeTags);
+      $summary.textContent = `${shown} of ${demoCount} · ${tags.join(', ')}`;
+      // the line is cut off with an ellipsis in the narrow sidebar, the tooltip lists every tag
+      $summary.title = [`${shown} of ${demoCount} demos match`, ...tags.map((tag) => `· ${tag}`)].join('\n');
+    }
+  }
+
+  /**
+   * Makes `tags` the selection of the filter: a demo is shown when it carries every selected
+   * tag, and a tag stays selectable when it shares a demo with all of them. Tags the filter
+   * does not offer are dropped.
+   */
+  function select(tags: Iterable<string>): void {
+    activeTags = new Set(Array.from(tags).filter((tag) => $tags.has(tag)));
+
+    let payload: LookBookShowDemosEventDetail;
+
+    if (activeTags.size === 0) {
+      relatedTags = new Set();
+      payload = {showAll: true};
+    } else {
+      let relatedDemos: Set<string> | undefined;
+      let related: Set<string> | undefined;
+
+      for (const tag of activeTags) {
+        const $tag = $tags.get(tag)!;
+        const demos = readUniqValuesFromAttribute($tag, ATTR_RELATED_DEMOS);
+        const tags = readUniqValuesFromAttribute($tag, ATTR_RELATED_TAGS);
+        if (relatedDemos && related) {
+          intersect(relatedDemos, demos);
+          intersect(related, tags);
+        } else {
+          relatedDemos = demos;
+          related = tags;
+        }
+      }
+
+      relatedTags = related!;
+      for (const tag of activeTags) relatedTags.add(tag);
+
+      payload = {showAll: false, filterById: relatedDemos, activeTags, relatedTags};
+    }
+
+    for (const [tag, $tag] of $tags) {
+      const active = activeTags.has(tag);
+      $tag.classList.toggle(CSS_ACTIVE, active);
+      $tag.classList.toggle(CSS_INACTIVE, !payload.showAll && !relatedTags.has(tag));
+      $tag.setAttribute('aria-pressed', String(active));
+    }
+
+    $clearAction.classList.toggle(CSS_INACTIVE, payload.showAll);
+    renderSummary(payload);
 
     saveShowDemosConfig(payload);
 
-    document.dispatchEvent(
-      new CustomEvent(EVENT_SHOW_DEMOS, {
-        detail: payload,
-      }),
-    );
+    document.dispatchEvent(new CustomEvent(EVENT_SHOW_DEMOS, {detail: payload}));
   }
 
-  function clearTags() {
-    for (const $container of document.querySelectorAll(CSS_TAG_CLOUD_FILTER)) {
-      for (const $tag of $container.querySelectorAll(`[${ATTR_TAG}]`)) {
-        $tag.classList.remove(CSS_INACTIVE);
-        $tag.classList.remove(CSS_ACTIVE);
-      }
+  /**
+   * A tag that shares no demo with the selection starts a new one of its own; any other tag is
+   * added to the selection or taken out of it.
+   */
+  function toggle(tag: string): void {
+    if (!$tags.has(tag)) return;
+
+    if (activeTags.size > 0 && !relatedTags.has(tag)) {
+      select([tag]);
+    } else if (activeTags.has(tag)) {
+      select(Array.from(activeTags).filter((t) => t !== tag));
+    } else {
+      select([...activeTags, tag]);
     }
-    dispatchShowDemosEvent({showAll: true});
   }
 
-  getClearTagsAction().addEventListener('pointerdown', () => clearTags());
-
-  const $tagCloud = document.querySelectorAll<HTMLElement>(CSS_TAG_CLOUD_FILTER);
-
-  const localConfig = getShowDemosConfig();
-
-  getClearTagsAction().classList.toggle(CSS_INACTIVE, localConfig.showAll);
-
-  // bound to a const so that the guard below still holds inside the callback
-  const activeTags = localConfig.activeTags;
-
-  if (activeTags?.size) {
-    $tagCloud.forEach(($el) => {
-      // the elements were selected by [data-tag], so they carry the attribute
-      for (const el of $el.querySelectorAll(`[${ATTR_TAG}]`)) {
-        const tagName = el.getAttribute(ATTR_TAG)!;
-        if (activeTags.has(tagName)) {
-          el.classList.add(CSS_ACTIVE);
-        } else if (!localConfig.relatedTags?.has(tagName)) {
-          el.classList.add(CSS_INACTIVE);
-        }
-      }
-    });
+  function setCollapsed(collapsed: boolean): void {
+    $section.classList.toggle(CSS_COLLAPSED, collapsed);
+    $toggleAction.setAttribute('aria-expanded', String(!collapsed));
+    localStorage.setItem(STORAGE_KEY_TAGS_COLLAPSED, String(collapsed));
   }
 
-  // the <section class="tags"> is written by the markup of this component
-  document.querySelector('.tags')!.classList.remove('invisible');
-
-  $tagCloud.forEach(($el) => {
-    $el.addEventListener(
-      'pointerdown',
-      (event) => {
-        const $tag = event.target;
-        if (event.isPrimary && event.button === 0 && $tag instanceof HTMLElement && $tag.hasAttribute(ATTR_TAG)) {
-          // every tag cloud sits inside the <section class="tags"> of this component
-          const $container = $el.parentElement!;
-          const $allTags = $container.querySelectorAll(`[${ATTR_TAG}]`);
-
-          if ($tag.classList.contains(CSS_INACTIVE)) {
-            for (const el of $allTags) {
-              el.classList.remove(CSS_INACTIVE);
-              el.classList.remove(CSS_ACTIVE);
-            }
-          }
-
-          $tag.classList.toggle(CSS_ACTIVE);
-
-          const $activated = $container.querySelectorAll(`.${CSS_ACTIVE}`);
-
-          if ($activated.length === 0) {
-            for (const el of $container.querySelectorAll(`.${CSS_INACTIVE}`)) {
-              el.classList.remove(CSS_INACTIVE);
-            }
-            dispatchShowDemosEvent({showAll: true});
-            return;
-          }
-
-          // the empty case returned above, and the loop bound is `$activated.length`
-          const relatedTags = readUniqValuesFromAttribute($activated[0]!, ATTR_RELATED_TAGS);
-          const relatedDemos = readUniqValuesFromAttribute($activated[0]!, ATTR_RELATED_DEMOS);
-
-          for (let i = 1; i < $activated.length; i++) {
-            const _relatedTags = readUniqValuesFromAttribute($activated[i]!, ATTR_RELATED_TAGS);
-            for (const tag of relatedTags) {
-              if (!_relatedTags.has(tag)) {
-                relatedTags.delete(tag);
-              }
-            }
-            const _relatedDemos = readUniqValuesFromAttribute($activated[i]!, ATTR_RELATED_DEMOS);
-            for (const demo of relatedDemos) {
-              if (!_relatedDemos.has(demo)) {
-                relatedDemos.delete(demo);
-              }
-            }
-          }
-
-          // every tag element in here was selected by [data-tag], so it carries the attribute
-          const activeTags = new Set((Array.from($activated) as HTMLElement[]).map((el) => el.getAttribute(ATTR_TAG)!));
-
-          for (const tag of activeTags) {
-            relatedTags.add(tag);
-          }
-
-          for (const el of $allTags) {
-            const tagName = el.getAttribute(ATTR_TAG)!;
-            if (activeTags.has(tagName)) {
-              el.classList.remove(CSS_INACTIVE);
-            }
-            if (relatedTags.has(tagName)) {
-              el.classList.remove(CSS_INACTIVE);
-            } else {
-              el.classList.add(CSS_INACTIVE);
-            }
-          }
-
-          dispatchShowDemosEvent({
-            showAll: false,
-            filterById: relatedDemos,
-            activeTags,
-            relatedTags,
-          });
-        }
-      },
-      {passive: true},
-    );
+  $section.addEventListener('click', (event) => {
+    const $tag = event.target instanceof Element ? event.target.closest(`.tag-cloud-filter [${ATTR_TAG}]`) : null;
+    if ($tag) toggle($tag.getAttribute(ATTR_TAG)!);
   });
+
+  $clearAction.addEventListener('click', () => select([]));
+
+  $toggleAction.addEventListener('click', () => setCollapsed(!$section.classList.contains(CSS_COLLAPSED)));
+
+  document.addEventListener(EVENT_TOGGLE_TAG, ({detail: {tag}}) => toggle(tag));
+
+  // folded by default, so that on a narrow screen the demos come first
+  setCollapsed(localStorage.getItem(STORAGE_KEY_TAGS_COLLAPSED) !== 'false');
+
+  // the stored selection is recomputed from the markup, so a tag that no demo carries any more
+  // drops out of it
+  select(getShowDemosConfig().activeTags ?? []);
+
+  $section.classList.remove('invisible');
 </script>

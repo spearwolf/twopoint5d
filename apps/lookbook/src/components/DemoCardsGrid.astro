@@ -2,11 +2,20 @@
 import {loadMetadataForDemos} from '~demos/utils/loadMetadataForDemos.js';
 import Card from './Card.astro';
 
-const {demos} = loadMetadataForDemos();
+const {demos, tags: filterTags} = loadMetadataForDemos();
+const filterTagNames = new Set(filterTags.keys());
 ---
 
 <ul role="list" class="grid grid-cols-demo-cards gap-x-4 gap-y-8 sm:gap-x-6 xl:gap-x-8">
   {demos.map(({id, title, shortDescription, description, href, previewImage, tags}) => (
-    <Card id={id} href={href} title={title} body={shortDescription ?? description ?? ''} image={previewImage} tags={tags} />
+    <Card
+      id={id}
+      href={href}
+      title={title}
+      body={shortDescription ?? description ?? ''}
+      image={previewImage}
+      tags={tags}
+      filterTags={filterTagNames}
+    />
   ))}
 </ul>

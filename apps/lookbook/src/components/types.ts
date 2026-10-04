@@ -1,4 +1,4 @@
-import type {EVENT_SHOW_DEMOS} from './constants.js';
+import type {EVENT_SHOW_DEMOS, EVENT_TOGGLE_TAG} from './constants.js';
 
 export interface LookBookShowDemosEventDetail {
   showAll: boolean;
@@ -11,8 +11,14 @@ export interface LookBookShowDemosEvent extends CustomEvent {
   detail: LookBookShowDemosEventDetail;
 }
 
+/** Asks the tag filter to toggle a tag, as a click on the tag in the filter would. */
+export interface LookBookToggleTagEvent extends CustomEvent {
+  detail: {tag: string};
+}
+
 export interface LookBookEventMap {
   [EVENT_SHOW_DEMOS]: LookBookShowDemosEvent;
+  [EVENT_TOGGLE_TAG]: LookBookToggleTagEvent;
 }
 
 declare global {

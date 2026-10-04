@@ -10,7 +10,7 @@ import {RAINBOW_COLORS} from './rainbowColors';
   <span class="leading-[2]">Ctrl K</span>
 </button>
 
-<dialog class="search-lookbook-dialog min-w-80 max-w-xl px-6 py-4 rounded-md backdrop-blur-xs">
+<dialog class="search-lookbook-dialog m-auto max-w-xl px-6 py-4 rounded-md backdrop-blur-xs">
   <header class="flex flex-row items-center justify-end mb-4">
     <button aria-label="close search">
       <CloseDialogIcon />
@@ -22,7 +22,7 @@ import {RAINBOW_COLORS} from './rainbowColors';
     <RainbowLine colorSliceWidth={8} cycleDirection="left" cycleColors={RAINBOW_COLORS} />
   </section>
 
-  <section class="mb-4 text-sm text-slate-200">
+  <section class="search-body mb-4 text-sm text-slate-200">
     <input
       type="search"
       class="search-input"
@@ -50,12 +50,29 @@ import {RAINBOW_COLORS} from './rainbowColors';
     box-shadow: 0 0 1px 1px var(--color-primary-highlight);
   }
 
+  /* centered by the m-auto of the markup, which Tailwind's preflight would reset; it floats with
+     a generous margin to the edges of the window and, when the results grow taller than that
+     leaves room for, scrolls the result list and keeps the header and the search field in view */
   .search-lookbook-dialog {
+    --search-dialog-float: clamp(1rem, 7vh, 5rem);
+    width: calc(100% - 2rem);
+    max-height: calc(100dvh - 2 * var(--search-dialog-float));
     background-color: rgba(18 22 25 / 75%);
     color: #fff;
     outline: 1px solid #e5e500;
     box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
     text-shadow: none;
+  }
+
+  .search-lookbook-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .search-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .search-input {
@@ -73,8 +90,9 @@ import {RAINBOW_COLORS} from './rainbowColors';
   }
 
   .search-results {
-    max-height: 50vh;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .search-results :global(li) {

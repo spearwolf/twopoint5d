@@ -10,9 +10,11 @@ export interface Props {
   href: string;
   image?: string;
   tags?: string[];
+  /** The tags the tag filter offers; a card renders these as buttons that toggle the tag there. */
+  filterTags?: ReadonlySet<string>;
 }
 
-const {id, href, title, body, image, tags} = Astro.props;
+const {id, href, title, body, image, tags, filterTags} = Astro.props;
 
 const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 ---
@@ -30,8 +32,22 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   {tags && tags.length > 0 && (
     <ul class="tags">
       {tags.map((tag) => (
-        <li class="tag" data-tag={tag}>
-          {tag}
+        <li>
+          {filterTags?.has(tag) ? (
+            <button
+              type="button"
+              class="tag interactive"
+              data-tag={tag}
+              aria-pressed="false"
+              title={`filter the demos by ${tag}`}
+            >
+              {tag}
+            </button>
+          ) : (
+            <span class="tag" data-tag={tag}>
+              {tag}
+            </span>
+          )}
         </li>
       ))}
     </ul>
@@ -39,7 +55,7 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 </li>
 
 <script>
-  import {EVENT_SHOW_DEMOS} from './constants.js';
+  import {EVENT_SHOW_DEMOS, EVENT_TOGGLE_TAG} from './constants.js';
   import {getShowDemosConfig} from './LookBookApi';
   import type {LookBookShowDemosEvent} from './types';
 
@@ -60,21 +76,14 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
     const $tagEls = $el.querySelectorAll('[data-tag]');
 
-    if (showAll) {
-      $tagEls.forEach((el) => {
-        el.classList.remove('active');
-      });
-    } else if (activeTags?.size) {
-      $tagEls.forEach((el) => {
-        // the elements were selected by [data-tag], so they carry the attribute
-        const tag = el.getAttribute('data-tag')!;
-        if (activeTags.has(tag)) {
-          el.classList.add('active');
-        } else {
-          el.classList.remove('active');
-        }
-      });
-    }
+    $tagEls.forEach((el) => {
+      // the elements were selected by [data-tag], so they carry the attribute
+      const active = !showAll && !!activeTags?.has(el.getAttribute('data-tag')!);
+      el.classList.toggle('active', active);
+      if (el instanceof HTMLButtonElement) {
+        el.setAttribute('aria-pressed', String(active));
+      }
+    });
   }
 
   document.querySelectorAll('.link-card').forEach(($el) => {
@@ -85,6 +94,14 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
 
     document.addEventListener(EVENT_SHOW_DEMOS, ({detail: {showAll, filterById, activeTags}}: LookBookShowDemosEvent) => {
       updateCardVisibility($el, demoId, showAll, filterById, activeTags);
+    });
+
+    // a tag of the card toggles the same tag in the tag filter, which answers with EVENT_SHOW_DEMOS
+    $el.addEventListener('click', (event) => {
+      const $tag = event.target instanceof Element ? event.target.closest('button[data-tag]') : null;
+      if ($tag) {
+        document.dispatchEvent(new CustomEvent(EVENT_TOGGLE_TAG, {detail: {tag: $tag.getAttribute('data-tag')!}}));
+      }
     });
 
     // Make the card visible after JS is loaded and visibility is set
@@ -135,6 +152,8 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   }
 
   .tags {
+    display: flex;
+    flex-wrap: wrap;
     margin: -0.1rem -0.1rem 0.5rem;
   }
 
@@ -151,5 +170,14 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   .tag.active {
     color: var(--color-background-dark);
     background-color: var(--color-primary);
+  }
+  .tag.interactive:is(:hover, :focus-visible) {
+    color: var(--color-primary-highlight);
+    box-shadow: 0 0 1px 1px var(--color-primary-highlight);
+    outline: none;
+  }
+  .tag.interactive.active:is(:hover, :focus-visible) {
+    color: var(--color-primary);
+    background-color: var(--color-background-light);
   }
 </style>
