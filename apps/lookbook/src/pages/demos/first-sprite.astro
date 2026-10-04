@@ -16,6 +16,7 @@ import {description, title} from './_first-sprite.json';
   import {PerspectiveCamera, Scene} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {deferPreview} from '~demos/utils/demoPreview';
 
   // the vertical field of view of the camera, in degrees
   const FIELD_OF_VIEW = 60;
@@ -23,6 +24,9 @@ import {description, title} from './_first-sprite.json';
   // units across the shorter side of the window, and the frame of 256 × 296 pixels stands
   // in it with room to spare
   const CAMERA_DISTANCE = 400;
+
+  // the preview screenshot waits for the sprite, not for the default delay
+  const preview = deferPreview();
 
   // the display owns the renderer, drives the frame loop and follows the window's size
   const display = new Display(getFullscreenCanvas());
@@ -65,6 +69,9 @@ import {description, title} from './_first-sprite.json';
     // upload what the sprite wrote into the buffers of the mesh
     sprites.update();
     scene.add(sprites);
+
+    // the next frame draws the sprite: the moment for the preview image
+    preview.ready(display);
 
     display.onDispose(() => {
       // the mesh releases the material it built around the texture, the store the texture

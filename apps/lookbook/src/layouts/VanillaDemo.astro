@@ -29,9 +29,19 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     <title>2.5d lookbook &#x2022; {title} demo</title>
     <script is:inline>
       // ?ui=0 hides the chrome of the lookbook around the demo, for a demo embedded in an
-      // iframe; set before the first paint, so the navbar never flashes up
-      if (new URLSearchParams(location.search).get('ui') === '0') {
-        document.documentElement.dataset.demoUi = 'off';
+      // iframe; ?preview=1 is the page `pnpm lookbook:generate-previews` takes its screenshot
+      // of, without the chrome and without the <demo-ui> either. Both are set before the
+      // first paint, so nothing flashes up. A block: a classic script's top-level const would
+      // land in the global scope of the page
+      {
+        const params = new URLSearchParams(location.search);
+        const preview = params.get('preview') === '1';
+        if (preview || params.get('ui') === '0') {
+          document.documentElement.dataset.demoUi = 'off';
+        }
+        if (preview) {
+          document.documentElement.dataset.demoPreview = 'on';
+        }
       }
     </script>
   </head>
@@ -39,6 +49,12 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     <DemoNavBar title={title} description={description} />
     {fullscreenCanvas && <canvas id={FULLSCREEN_CANVAS_ID} resize-to="window" />}
     <slot />
+    <script>
+      import {armPreviewTimeout} from '~demos/utils/demoPreview';
+
+      // the default moment of the preview screenshot; a demo takes it over with deferPreview()
+      armPreviewTimeout();
+    </script>
   </body>
 </html>
 
@@ -73,6 +89,11 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     demo-ui > * {
       pointer-events: auto;
     }
+  }
+  /* ?preview=1: the screenshot shows what the demo draws, not the panels and buttons over it.
+     Outside the layer, so it wins over the display: block in there */
+  :root[data-demo-preview='on'] demo-ui {
+    display: none;
   }
   /* a lil-gui panel that a demo hands the <demo-ui> as its container: in the top right corner,
      where autoPlace would put it, but below the navbar on a narrow screen, where the title would
