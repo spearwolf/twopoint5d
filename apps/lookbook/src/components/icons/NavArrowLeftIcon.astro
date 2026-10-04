@@ -1,0 +1,9 @@
+---
+import Icon from '../../images/iconoir/nav-arrow-left.svg?raw';
+
+const {class: classes} = Astro.props;
+---
+
+<span class:list={['inline-block shrink-0 [&>svg]:size-full', classes]} aria-hidden="true">
+  <Fragment set:html={Icon} />
+</span>
