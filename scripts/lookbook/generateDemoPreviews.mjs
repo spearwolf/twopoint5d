@@ -3,6 +3,7 @@
 // apps/lookbook/public/images/demo-preview/<id>.webp. See the "Preview images" section of
 // apps/lookbook/README.md.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {chromium} from 'playwright';
 import {
@@ -119,12 +120,14 @@ async function main() {
   let server;
   /** @type {import('playwright').Browser | undefined} */
   let browser;
+  // process.exit() runs the exit hook of previewServer.mjs, which ends the server, the one
+  // still starting included; a closed terminal (SIGHUP) counts as well
   const onSignal = (/** @type {NodeJS.Signals} */ signal) => {
-    server?.stop();
-    process.exit(signal === 'SIGINT' ? 130 : 143);
+    process.exit(128 + os.constants.signals[signal]);
   };
   process.once('SIGINT', onSignal);
   process.once('SIGTERM', onSignal);
+  process.once('SIGHUP', onSignal);
 
   try {
     server = options.url ? undefined : await startPreviewServer();

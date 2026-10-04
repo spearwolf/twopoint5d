@@ -23,15 +23,22 @@ function findFreePort() {
   });
 }
 
-/** @returns {Promise<{baseUrl: string, stop: () => void}>} */
-export async function startPreviewServer() {
+/**
+ * @param {{command?: string, args?: (port: number) => string[]}} [server] what to start on the
+ *   free port: astro preview of the lookbook, unless a spec hands in a stand-in
+ * @returns {Promise<{baseUrl: string, stop: () => void}>}
+ */
+export async function startPreviewServer({
+  command = 'pnpm',
+  args = (port) => ['exec', 'astro', 'preview', '--ignore-lock', '--host', '127.0.0.1', '--port', String(port)],
+} = {}) {
   const port = await findFreePort();
   // --ignore-lock: without it Astro 7 refuses a second preview server next to one already
   // running, and moves the server into the background on its own when an AI agent runs the
   // command, where stop() would not reach it.
   // A process group of its own: stop() ends pnpm, astro and whatever astro started, and a
   // Ctrl-C in the terminal reaches the generator only, which then stops the group
-  const child = spawn('pnpm', ['exec', 'astro', 'preview', '--ignore-lock', '--host', '127.0.0.1', '--port', String(port)], {
+  const child = spawn(command, args(port), {
     cwd: lookbookDir,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -45,6 +52,7 @@ export async function startPreviewServer() {
   });
 
   const stop = () => {
+    process.off('exit', stop);
     if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
     try {
       process.kill(-child.pid, 'SIGTERM');
@@ -52,6 +60,9 @@ export async function startPreviewServer() {
       // the group is gone already
     }
   };
+  // from the spawn on, every way out of the process ends the group, a process.exit() while the
+  // server still starts as well: the caller holds no stop() before this function returns
+  process.once('exit', stop);
 
   const baseUrl = `http://127.0.0.1:${port}${BASE_PATH}`;
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
