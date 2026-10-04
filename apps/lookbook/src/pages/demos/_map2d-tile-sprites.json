@@ -1,6 +1,7 @@
 {
   "title": "map2d tile sprites",
-  "description": "How to create and use a `Map2DTileRenderer` with `TileSprites`",
+  "shortDescription": "A Map2DTileRenderer driven by hand, without a Map2D: four tiles, added one by one",
+  "description": "This demo leaves out `Map2D` and its visibilitor and talks to the `Map2DTileRenderer` directly. Between `beginUpdatingTiles()` and `endUpdatingTiles()` it adds four tiles, each a `Map2DTileCoords` with its tile position and its bounds as an `AABB2` — the same calls a `Map2D` makes on every update. The renderer gets its sprites from a `TileSpritesFactory`, which reads the tile ids from a `RepeatingTilesProvider` and the frames from the `TileSet`, and its `node` goes into the scene by hand. The white box marks the 512 × 512 area the four tiles cover.",
   "url": "/demos/map2d-tile-sprites",
   "tags": [
     "AABB2",

@@ -1,6 +1,7 @@
 {
   "title": "textured quads from texture atlas",
-  "description": "Render instanced quads with textures from a textures-atlas",
+  "shortDescription": "Instanced quads with frames picked by name from a TextureAtlas",
+  "description": "The instanced quads of *textured quads*, but each one shows a frame of its own. A `TextureStore` loads the atlas `labWallsAtlas` from the texture catalog, `atlas.frameNames(/numbers32/)` selects frames by name, `atlas.frame(name).coords` returns their `TextureCoords`, and each quad gets one of them at random. The atlas image is shown in the preview in the corner.",
   "url": "/demos/textured-quads-from-texture-atlas",
   "tags": ["TextureAtlas", "TextureStore", "VertexObjects", "instanced", "texture-atlas", "textures", "vanilla"],
   "previewImage": "textured-quads-from-texture-atlas.png"

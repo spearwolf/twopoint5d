@@ -1,6 +1,7 @@
 {
   "title": "animated sprites",
-  "description": "Frame-based animation with textured sprites",
+  "shortDescription": "Frame-based sprite animation with an AnimatedSprites mesh, its animation declared in the texture catalog",
+  "description": "Up to 3000 sprites in one `AnimatedSprites` mesh, each a vertex object of the `AnimatedSpritesGeometry` with an `animId` of its own. A `TextureStore` loads `nobingers.json`, which declares the texture, the `TileSet` and the animation `anim0` — eight tiles at 12 fps — in one place, and `getAsync()` hands back the texture and the `FrameBasedAnimations`. The animations are baked into a data texture for the `AnimatedSpritesMaterial`, which plays them on the GPU from `material.time`. The *more* and *less* buttons create and free sprites in the pool while the demo runs.",
   "url": "/demos/animated-sprites",
   "tags": [
     "AnimatedSprites",

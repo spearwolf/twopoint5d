@@ -1,6 +1,7 @@
 {
   "title": "stage nested pipelines",
-  "description": "Outer composite of two stage layers: world layer post-processed via its own `RenderPipeline`, UI layer rendered plainly on top",
+  "shortDescription": "Two stage layers, one with a bloom pipeline of its own, composed by a RootRenderPipeline",
+  "description": "The root `StageRenderer` of the `Display` holds two layers: a nested `StageRenderer` with the world stage, and the UI stage directly. The world renderer has a three.js `RenderPipeline` of its own with a bloom from `createBloomOutputNodeBuilder()`; the UI is drawn without post-processing on top. A `RootRenderPipeline` on the root composes the passes of all children additively and makes the one draw to the canvas — the pattern the stage cheat-sheet calls *Mode E*.",
   "url": "/demos/stage-nested-pipelines",
   "tags": [
     "Display",

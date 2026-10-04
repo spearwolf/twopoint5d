@@ -1,6 +1,7 @@
 {
   "title": "stage post-processing",
-  "description": "Stage2D with a `RenderPipeline` post-pass (bloom) from `createBloomOutputNodeBuilder()`, wired via `StageRenderer.buildOutputNode`",
+  "shortDescription": "A Stage2D with a bloom post-pass through a RenderPipeline on its StageRenderer",
+  "description": "The smallest post-processing setup of the stage layer: a three.js `RenderPipeline` goes into `StageRenderer.pipeline`, a node builder into `StageRenderer.buildOutputNode`, and the stage is drawn through both. The builder comes from `createBloomOutputNodeBuilder({strength, radius})` and lays a bloom over the rendered scene. Eighty tinted sprites circle in an `OnStageUpdateFrame` handler, so the glow has something to smear.",
   "url": "/demos/stage-postprocessing",
   "tags": ["Display", "ParallaxProjection", "Stage2D", "StageRenderer", "RenderPipeline", "post-processing", "vanilla"]
 }

@@ -1,6 +1,7 @@
 {
   "title": "multiple displays",
-  "description": "A test-page demonstrating the sizing behavior of the canvas element created by the Display helper class in different css contexts",
+  "shortDescription": "A test page for the canvas sizing of the Display in six CSS contexts, on WebGPU and on WebGL 2",
+  "description": "Six `Display`s in a grid, each set up on a different element: a `<canvas>` inside a container, or a `<div>` the display creates its canvas in, with and without a size of its own, as `content-box` and as `border-box`, with padding and borders on purpose. Three of them run with `forceWebGL: true`, the others on WebGPU where the browser offers it. The label of each cell shows the backend and, from the `OnDisplayResize` event, the size and pixel ratio the display arrived at. The stage uses a `ParallaxProjection` with `pixelZoom: 2`, so the sprite of 100 × 100 units has to come out as a crisp 200 × 200 CSS pixels in every cell — anything else is a bug.",
   "url": "/demos/display-multi",
   "tags": ["TextureFactory", "Stage2D", "StageRenderer", "ParallaxProjection", "Display", "vanilla"],
   "previewImage": "multiple-displays.png"

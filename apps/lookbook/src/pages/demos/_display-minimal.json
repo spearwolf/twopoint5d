@@ -1,6 +1,7 @@
 {
   "title": "minimal display",
-  "description": "A minimal example of how to use the Display helper class",
+  "shortDescription": "The smallest setup of the stage layer: a Display, one Stage2D and a StageRenderer",
+  "description": "A `Display` takes over the `<canvas resize-to=\"window\">`, creates the renderer and runs the frame loop. A `Stage2D` with a `ParallaxProjection('xy|bottom-left', {width, height, fit: 'contain'})` lays a fixed rectangle of 2288 × 3264 units into the window, whatever its aspect ratio, and a `StageRenderer` clears the canvas and draws the stage. The image itself is an ordinary three.js `Sprite`, its texture loaded by a `TextureFactory` with the classes `nearest`, `flipy` and `srgb`. `display`, `stage` and `stageRenderer` hang on `window` for a look in the devtools.",
   "url": "/demos/display-minimal",
   "tags": ["Display", "ParallaxProjection", "Stage2D", "StageRenderer", "TextureFactory", "vanilla"],
   "previewImage": "minimal-display.png"

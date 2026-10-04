@@ -1,7 +1,7 @@
 {
   "title": "map2d using camera based visibility",
-  "shortDescription": "How to render a Map2D with CameraBasedVisibility",
-  "description": "This demo shows how to create and display a `Map2D`.\n\nUse the `[W]`, `[A]`, `[S]`, and `[D]` keys to scroll the map.\n\nThe `CameraBasedVisibility` class is used as the visibilitor, and `RepeatingTilesProvider` is used as the tile ID provider.",
+  "shortDescription": "An endless tile map whose visible tiles follow the frustum of a perspective camera",
+  "description": "A `Map2D` of 256 × 256 tiles whose visibilitor is a `CameraBasedVisibility`: it works out from the frustum of the `PerspectiveCamera` which tiles can be seen, so the map reaches out to the horizon, where fog hides its edge. A `RepeatingTilesProvider` repeats a 16 × 16 pattern of tile ids, and a `Map2DTileRenderer` with a `TileSpritesFactory` turns each visible tile into a sprite of a `TileSprites` mesh. `PanControl2D` moves the center of the map with `[W]`, `[A]`, `[S]` and `[D]`; the radio buttons hand the mouse either to the orbit controls of the camera or to the pointer panning of `PanControl2D`.",
   "url": "/demos/map2d-cam-visi",
   "tags": [
     "Map2D",

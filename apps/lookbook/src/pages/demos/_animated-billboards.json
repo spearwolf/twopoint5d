@@ -1,6 +1,7 @@
 {
   "title": "animated billboards",
-  "description": "Animated billboards dancing in a 3D environment",
+  "shortDescription": "Four hundred animated sprites bouncing over a ground plane, drawn as billboards that face the camera",
+  "description": "An `AnimatedSprites` mesh with room for 400 sprites, whose `AnimatedSpritesMaterial` runs with `renderAsBillboards: true` and with depth test and depth write switched on, so the sprites turn towards the orbiting camera and hide each other in the right order. Unlike in *animated sprites*, the animation is built in code rather than read from the texture catalog: `FrameBasedAnimations.add()` takes a name, a duration of 0.66 seconds, the `TileSet` and the tile ids of the frames. `bakeDataTexture()` turns the animations into the `animsMap` of the material, and `material.time` drives them each frame. The ground is a plain three.js `PlaneGeometry` — the sprites share the scene with any other three.js object.",
   "url": "/demos/animated-billboards",
   "tags": [
     "AnimatedSprites",
