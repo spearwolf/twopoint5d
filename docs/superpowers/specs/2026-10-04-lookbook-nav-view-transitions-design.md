@@ -171,15 +171,20 @@ do not reach the figure inside the dialog.
 }
 ```
 
-- **Curtain.** `::view-transition-group(lb-curtain)` gets `overflow: clip` with
-  `overflow-clip-margin` large enough for the 20px shadow. Its old and new images get
+- **Curtain.** `::view-transition-group(lb-curtain)` gets
+  `clip-path: inset(-32px -32px 0 -32px)`: it clips exactly at the group's bottom edge,
+  where the rainbow line runs, and leaves room for the 20px shadow on the other three
+  sides. (`overflow-clip-margin` would widen the clip at the bottom too and let the
+  background show below the line.) Its old and new images get
   `animation: none`, so the group's own height animation is the only motion. The group's
   top edge stays at 0 while its height shrinks, and the images stay anchored at the top,
   so the clip cuts the header background off from below: the blind rolls up. Growing,
   the group reveals the background from the top down.
 - **Rainbow.** `::view-transition-old(lb-rainbow)` gets `animation: none; opacity: 1`
   and stays opaque for the whole transition. `::view-transition-new(lb-rainbow)` fades
-  in over the last 100ms (`animation-delay: calc(var(--lb-vt-duration) - 100ms)`). The
+  in over the last 100ms (`animation-delay: calc(var(--lb-vt-duration) - 100ms)`). Both
+  images get `mix-blend-mode: normal`: under the default `plus-lighter`, an opaque old
+  line plus a fading-in new one would add up to an overbright flash. The
   new line may still be empty while it moves, as described under "Current state", and
   the old snapshot covers for it. For 450ms the frozen colors of the old snapshot are not
   noticeable.
@@ -255,8 +260,8 @@ assumed:
 2. The explorer header's `backdrop-filter` in its snapshot: the snapshot may show the
    header without the blur. At 65% background opacity that is acceptable. If it looks
    wrong, the curtain gets a solid background for the duration of the transition.
-3. `overflow: clip` with `overflow-clip-margin` on a `::view-transition-group` keeps the
-   shadow and the clipped edge together as intended.
+3. `clip-path` on a `::view-transition-group` clips the curtain at its bottom edge as
+   intended.
 4. `z-index` on `::view-transition-group(…)` orders the groups in every target browser.
 5. Custom properties on `:root` reach the `::view-transition-*` pseudo-elements.
 6. A dialog in the top layer with a `view-transition-name` is captured on its own, and
