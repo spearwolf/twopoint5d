@@ -1,0 +1,28 @@
+/* Demo → explorer, imported by the explorer layout: the view transition that ends on the
+   explorer takes this page's styles. The curtain and the line come down over the demo title by
+   the shared rules of view-transitions.css; here the parts that only one of the two pages has */
+
+/* the demo dialog, open while its "Explore LookBook" link is followed; its backdrop is part of the
+   root and goes with the root's crossfade */
+::view-transition-old(lb-dialog) {
+  animation: lb-fade-out var(--lb-vt-fade) ease-out both;
+}
+
+::view-transition-old(lb-caption-pre) {
+  --lb-vt-slide-from: -2.5rem;
+  animation: lb-slide-out-left 250ms ease-in both;
+}
+::view-transition-old(lb-caption-post) {
+  --lb-vt-slide-from: -3.5rem;
+  animation: lb-slide-out-left 250ms ease-in both;
+}
+
+/* under the curtain that comes down over it */
+::view-transition-old(lb-demo-title) {
+  animation: lb-fade-out 200ms ease-out 100ms both;
+}
+
+::view-transition-new(lb-wordmark),
+::view-transition-new(lb-search) {
+  animation: lb-fade-in 200ms ease-out 250ms both;
+}

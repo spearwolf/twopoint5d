@@ -1,6 +1,9 @@
 ---
 import '../styles/global.css';
 import '../styles/view-transitions.css';
+// the choreography of a view transition that ends on this layout: back from a demo to the
+// explorer. Only index.astro uses this layout; a later page on it inherits that choreography
+import '../styles/view-transitions-to-explorer.css';
 
 export interface Props {
   title: string;

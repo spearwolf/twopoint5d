@@ -101,6 +101,39 @@ example.
 `?preview=1` is the URL the generator opens: it hides the navbar like `?ui=0` and the
 `<demo-ui>` layer as well, so the image shows what the demo draws.
 
+## Navbar view transitions
+
+Going from the explorer to a demo and back morphs the navbar through cross-document view
+transitions: the rainbow line rolls the explorer's header up into the top edge of the demo,
+and pulls it down over the demo title on the way back. Everything else crossfades. Both
+layouts opt in through `src/styles/view-transitions.css`, which also holds the timing, the
+keyframes and the rules both directions share.
+
+The pseudo-elements of a transition take the styles of the page it ends on. The demo layout
+therefore imports the choreography into a demo (`view-transitions-into-demo.css`), the
+explorer layout the one back (`view-transitions-to-explorer.css`), and neither has to know
+where it came from.
+
+The browser pairs elements by `view-transition-name`. Each name is set in the component
+that owns the element:
+
+| Name | Explorer | Demo |
+| --- | --- | --- |
+| `lb-curtain` | the header (`LookbookHeader`) | `.demo-nav-curtain`, 0px high (`DemoNavBar`) |
+| `lb-rainbow` | the rainbow line under the header | the rainbow line at the top |
+| `lb-logo` | the twopoint5d logo | the twopoint5d logo |
+| `lb-wordmark`, `lb-search` | the lookbook wordmark, the search button | — |
+| `lb-caption-pre`, `lb-caption-post`, `lb-demo-title` | — | "a", "demo::", the title |
+| `lb-dialog` | the open search dialog | the open demo dialog |
+
+A name that occurs twice in one page makes the browser skip the whole transition, without an
+error. `scripts/lookbook/navViewTransitions.test.mjs` (`pnpm test:scripts`) holds each page
+to this table and the stylesheets to the names. A new navbar element either gets a name, a
+row here and a place in both choreographies, or stays part of the root's crossfade.
+
+Under `prefers-reduced-motion: reduce`, and in a browser without cross-document view
+transitions, navigation is a plain page switch.
+
 ## Checks
 
 `pnpm nx typecheck lookbook` runs `astro check` over the `.astro` and `.ts` files of the

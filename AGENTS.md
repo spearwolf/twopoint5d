@@ -58,9 +58,11 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   child processes, one that checks the lookbook's vendored `rainbow-line` script, one
   that holds the tags and routes of the lookbook's demo metadata to the library's
   exports, one that holds the preview images of the lookbook to its demos, ids and card
-  size, one that asks Nx whether every tracked Markdown file is an input of the docs'
-  type check, and one that holds the publish script to Node's built-ins; the Nx project
-  `scripts` has no `test` target, so `pnpm test` leaves them out
+  size, one that holds the view-transition names of the lookbook's navbar to its two
+  pages and the stylesheets to those names, one that asks Nx whether every tracked
+  Markdown file is an input of the docs' type check, and one that holds the publish
+  script to Node's built-ins; the Nx project `scripts` has no `test` target, so
+  `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under

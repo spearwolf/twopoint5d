@@ -47,6 +47,18 @@ const namesOf = (page) => page.components.flatMap((file) => declaredNames(src(fi
 /** @param {string} source @param {string} tag */
 const count = (source, tag) => source.split(tag).length - 1;
 
+/**
+ * The names a stylesheet addresses through `::view-transition-<part>(lb-…)`
+ *
+ * @param {string} css
+ * @param {string} part `group`, `image-pair`, `old` or `new`
+ */
+const addressed = (css, part) =>
+  new Set([...css.matchAll(new RegExp(`::view-transition-${part}\\((lb-[a-z-]+)\\)`, 'g'))].map((m) => m[1] ?? ''));
+
+/** @param {{components: string[]}} page */
+const nameSet = (page) => new Set(namesOf(page).map(({name}) => name));
+
 describe('the navbar view transitions', () => {
   it('both layouts opt in through the shared stylesheet', () => {
     for (const layout of ['layouts/Layout.astro', 'layouts/VanillaDemo.astro']) {
@@ -100,6 +112,46 @@ describe('the navbar view transitions', () => {
         `${layout} has no render-blocking <link rel="expect"> for #${id}`,
       );
       assert.match(src(component), new RegExp(`id="${id}"`), `${component} carries no element #${id}`);
+    }
+  });
+
+  it('lets each layout carry the choreography of the direction that ends on it', () => {
+    const explorer = importsOf(src('layouts/Layout.astro'));
+    const demo = importsOf(src('layouts/VanillaDemo.astro'));
+    assert.ok(explorer.includes('../styles/view-transitions-to-explorer.css'));
+    assert.ok(!explorer.includes('../styles/view-transitions-into-demo.css'));
+    assert.ok(demo.includes('../styles/view-transitions-into-demo.css'));
+    assert.ok(!demo.includes('../styles/view-transitions-to-explorer.css'));
+  });
+
+  for (const [file, from, to] of /** @type {[string, {components: string[]}, {components: string[]}][]} */ ([
+    ['styles/view-transitions-into-demo.css', PAGES.explorer, PAGES.demo],
+    ['styles/view-transitions-to-explorer.css', PAGES.demo, PAGES.explorer],
+  ])) {
+    it(`${file} addresses old images of the page it leaves and new images of the page it ends on`, () => {
+      const css = src(file);
+      for (const name of addressed(css, 'old')) {
+        assert.ok(nameSet(from).has(name), `${file} animates the old image of ${name}, which the page it leaves never names`);
+      }
+      for (const name of addressed(css, 'new')) {
+        assert.ok(nameSet(to).has(name), `${file} animates the new image of ${name}, which the page it ends on never names`);
+      }
+    });
+  }
+
+  it('addresses only names that one of the pages declares', () => {
+    const declared = new Set([...nameSet(PAGES.explorer), ...nameSet(PAGES.demo)]);
+    for (const file of [
+      'styles/view-transitions.css',
+      'styles/view-transitions-into-demo.css',
+      'styles/view-transitions-to-explorer.css',
+    ]) {
+      const css = src(file);
+      for (const part of ['group', 'image-pair', 'old', 'new']) {
+        for (const name of addressed(css, part)) {
+          assert.ok(declared.has(name), `${file} addresses ${name}, which no page declares`);
+        }
+      }
     }
   });
 });

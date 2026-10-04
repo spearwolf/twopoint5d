@@ -1,0 +1,24 @@
+/* Explorer → demo, imported by the demo layout: the view transition that ends on a demo page
+   takes this page's styles. The curtain, the line and the logo morph by the shared rules of
+   view-transitions.css; here the parts that only one of the two pages has */
+
+/* what the explorer's header holds and a demo's does not, and a search dialog left open */
+::view-transition-old(lb-wordmark),
+::view-transition-old(lb-search),
+::view-transition-old(lb-dialog) {
+  animation: lb-fade-out var(--lb-vt-fade) ease-out both;
+}
+
+/* "a" comes in from the left edge, "demo::" from behind the logo */
+::view-transition-new(lb-caption-pre) {
+  --lb-vt-slide-from: -2.5rem;
+  animation: lb-slide-in-left 300ms var(--lb-vt-ease) 150ms both;
+}
+::view-transition-new(lb-caption-post) {
+  --lb-vt-slide-from: -3.5rem;
+  animation: lb-slide-in-left 250ms var(--lb-vt-ease) 200ms both;
+}
+
+::view-transition-new(lb-demo-title) {
+  animation: lb-fade-in 200ms ease-out 250ms both;
+}

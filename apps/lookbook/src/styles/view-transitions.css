@@ -57,3 +57,56 @@
     transform: translateX(var(--lb-vt-slide-from));
   }
 }
+
+/* bottom to top above the root: the curtain and the line come down over the demo title, and
+   the logo lies over the captions, so "demo::" slides out from behind it */
+::view-transition-group(lb-demo-title) {
+  z-index: 1;
+}
+::view-transition-group(lb-curtain) {
+  z-index: 2;
+}
+::view-transition-group(lb-caption-pre),
+::view-transition-group(lb-caption-post) {
+  z-index: 3;
+}
+::view-transition-group(lb-rainbow) {
+  z-index: 4;
+}
+::view-transition-group(lb-logo) {
+  z-index: 5;
+}
+::view-transition-group(lb-wordmark),
+::view-transition-group(lb-search) {
+  z-index: 6;
+}
+::view-transition-group(lb-dialog) {
+  z-index: 7;
+}
+
+/* the roller blind: the group's height runs between the explorer's 64px header and the demo's
+   0px curtain, its top edge stays at 0 and the images stay anchored at the top, so the clip at
+   the bottom edge cuts the header background off from below as the blind rolls up and reveals it
+   from the top as it comes down. The other three sides leave room for the header's shadow. No
+   fade: the height is the only motion */
+::view-transition-group(lb-curtain) {
+  clip-path: inset(-32px -32px 0 -32px);
+}
+::view-transition-old(lb-curtain),
+::view-transition-new(lb-curtain) {
+  animation: none;
+}
+
+/* <rainbow-line> draws from a worker into an OffscreenCanvas and loads its script async, so on
+   the new page it is empty for its first frames. The old snapshot stays opaque all the way and
+   covers for it; the new line fades in over it at the very end. Normal blending: under the
+   default plus-lighter the two lines would add up to an overbright flash */
+::view-transition-old(lb-rainbow) {
+  animation: none;
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+::view-transition-new(lb-rainbow) {
+  animation: lb-fade-in 100ms linear calc(var(--lb-vt-duration) - 100ms) both;
+  mix-blend-mode: normal;
+}
