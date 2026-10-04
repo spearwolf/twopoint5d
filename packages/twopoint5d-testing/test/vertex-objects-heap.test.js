@@ -113,6 +113,9 @@ describe('vertex-objects — heap', function () {
       geometry.instancedPool.createVO().setInstanceOffset([1, 1, 1]);
       const mesh = new VertexObjects(geometry, material);
       scene.add(mesh);
+      // without it the instance count stays at three's default of Infinity: WebGL2 draws no
+      // instance at all then, and WebGPU's drawIndexed() refuses the value
+      mesh.update();
       display.renderer.render(scene, camera);
       await display.nextFrame();
       scene.remove(mesh);

@@ -1,6 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display} from '@spearwolf/twopoint5d';
-import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
+import {disposeDisplay, expectedBackend, makeContainer} from './helpers/fixtures.js';
 
 describe('renderer backend', function () {
   // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
@@ -18,12 +18,12 @@ describe('renderer backend', function () {
     host = undefined;
   });
 
-  it('names the renderer backend three picked in this browser', async () => {
+  it('runs on the backend this browser pins', async () => {
     host = makeContainer();
     display = new Display(host);
     await display.start();
 
-    // the browser is named in the line itself: the reporter merges identical lines of both
+    // the browser is named in the line itself: the reporter merges identical lines of all
     // browsers into one block that carries no browser name; console.debug because the runner
     // collects log, debug, warn and error into its report and drops console.info
     const backend = display.isWebGPUBackend ? 'WebGPU' : display.isWebGLBackend ? 'WebGL2' : 'no backend';
@@ -31,5 +31,8 @@ describe('renderer backend', function () {
     console.debug(`[renderer-backend] ${backend} on ${browser}`);
 
     expect([display.isWebGPUBackend, display.isWebGLBackend].filter(Boolean), 'exactly one backend').to.have.lengthOf(1);
+    // three falls back to WebGL2 without a word when WebGPU fails its init. Every other test
+    // would then pass on the wrong backend, and this is the one that says so
+    expect(backend, 'three fell back from the pinned backend').to.equal(expectedBackend());
   });
 });

@@ -15,6 +15,22 @@ import {DataTexture, PerspectiveCamera} from 'three/webgpu';
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
 
+// --- backend ---
+
+/**
+ * The backend this run renders under. Each browser of web-test-runner.config.js pins one before
+ * the page loads, and every test file runs once per backend.
+ *
+ * @returns {'WebGPU' | 'WebGL2'}
+ */
+export function expectedBackend() {
+  const backend = Reflect.get(globalThis, 'twopoint5dTestBackend');
+  if (backend !== 'WebGPU' && backend !== 'WebGL2') {
+    throw new Error(`no renderer backend pinned for this run (got ${backend}) — see web-test-runner.config.js`);
+  }
+  return backend;
+}
+
 // --- containers and displays ---
 
 /**

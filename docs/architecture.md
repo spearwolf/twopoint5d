@@ -12,7 +12,7 @@ pnpm workspaces (`pnpm-workspace.yaml`) define the packages, Nx (`nx.json` plus 
 | Project | Path | Tags | Role |
 | --- | --- | --- | --- |
 | `twopoint5d` | `packages/twopoint5d` | `ci`, `twopoint5d` | the published library |
-| `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser integration tests, under WebGPU or WebGL 2 |
+| `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser integration tests, under WebGPU and WebGL 2 |
 | `lookbook` | `apps/lookbook` | `app` | Astro showcase |
 | `scripts` | `scripts` | `scripts` | the Node scripts; as a project only their type check |
 
@@ -200,12 +200,28 @@ is kept for 3. The timings are archived, not held to a limit: a shared runner's 
 vary too much for a gate, and a regression shows only in the series over weeks. What can
 be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
-The browser suite writes one line per browser and run into the "Browser logs" of the
-test output: `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>`, from
-`packages/twopoint5d-testing/test/renderer-backend.test.js`. Measured locally with
-Playwright 1.63.0, Chromium 153 runs on WebGL2 (three reports `WebGPU is not available,
-running under WebGL2 backend`) and Firefox 155 on WebGPU (`dom.webgpu.enabled` in
-`web-test-runner.config.js`). What CI gets is in the log of the CI run.
+The browser suite runs every test file in three browsers, each pinned to one backend of
+three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2` and `Firefox WebGL2`
+(`packages/twopoint5d-testing/web-test-runner.config.js`). Left to themselves the
+browsers would pick by machine — headless Chromium offers WebGPU only behind
+`--enable-unsafe-webgpu`, headless Firefox 155 finds no adapter — and measured with
+Playwright 1.63.0 both ended up on WebGL2, so WebGPU went untested. Now an init script
+of each launcher sets the backend before the page loads: for WebGL2 it takes
+`navigator.gpu` away, and three falls back as it does for a user without WebGPU. Chromium
+WebGPU runs on SwiftShader, the software adapter Chromium ships, with its compositor on
+SwiftShader as well (`--use-angle=swiftshader`, and on Linux through Vulkan:
+`--enable-features=Vulkan --use-vulkan=swiftshader`). A compositor on anything else cannot
+take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
+device of the page ("A valid external Instance reference no longer exists"). Measured
+with Playwright 1.63.0 on macOS and in its `v1.63.0-noble` image on arm64 and amd64:
+macOS needs the first flag, Linux all three.
+
+three falls back to WebGL2 without a word when WebGPU fails its init, and every other
+test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one
+that fails then: it holds the backend three picked to the pinned one, read through
+`expectedBackend()` from `test/helpers/fixtures.js`, and writes
+`[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>` into the "Browser logs" of
+each launcher.
 
 Only the job of the browser tests installs Playwright. The browsers are cached under the
 key `playwright-<os>-<version>`, the version being what `pnpm exec playwright --version`
@@ -380,7 +396,8 @@ Two runners, deliberately in separate packages:
 - Vitest in `packages/twopoint5d` (tag `ci`) — unit and logic tests as `*.spec.ts` next
   to the source. No browser dependencies in the library package.
 - `@web/test-runner` with Playwright Chromium and Firefox in `packages/twopoint5d-testing`
-  (tag `browser`) — `*.test.js` under `test/`, for anything that needs a real GPU context.
+  (tag `browser`) — `*.test.js` under `test/`, for anything that needs a real GPU context,
+  every file under WebGPU in Chromium and under WebGL 2 in Chromium and Firefox.
   `pnpm install` downloads no browsers; they come from
   `pnpm exec playwright install chromium firefox`. The `*.test.js` files are type-checked
   with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —

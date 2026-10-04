@@ -54,7 +54,7 @@ describe('vertex-objects — dispose', function () {
   /**
    * The number of attributes the renderer holds before anything of the test is in the scene. The
    * renderer builds attributes of its own with the first frame, and how many depends on the
-   * backend — chromium falls back to webgl2, firefox runs webgpu. Every count below is compared
+   * backend, and every file runs under both. Every count below is compared
    * against this line, never against a fixed number.
    */
   async function attributesBaseline() {
