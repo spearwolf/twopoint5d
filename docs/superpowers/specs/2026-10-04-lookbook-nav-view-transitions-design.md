@@ -248,6 +248,13 @@ parsed. A browser that does not know `rel="expect"` ignores it.
   return; `lb-dialog` is then new-only and fades in with the default animation.
 - **Swipe-back in Safari (iOS, macOS trackpad).** The browser plays its own gesture
   animation. Whether a view transition runs on top of it is checked on a device.
+- **An open dialog on the page left behind.** "Explore LookBook" lives in the demo dialog,
+  so that path always starts with the dialog open (and a search result, with the search
+  dialog open). The dialog's `::backdrop` is part of the root snapshot, and every named
+  navbar group is drawn above the root: on the first frame the navbar shows untinted over
+  the backdrop, which then crossfades out with the root. Accepted — taking the navbar
+  names away while a dialog is open would drop the morph on exactly this path, and closing
+  the dialog in `pageswap` would put JavaScript into the navigation path.
 - **Middle click / new tab.** No transition, as before.
 
 ## To verify during implementation
