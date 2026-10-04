@@ -95,8 +95,17 @@ import {RAINBOW_COLORS} from './rainbowColors';
     overscroll-behavior: contain;
   }
 
+  /* the transparent border keeps the items from shifting when the active one shows its frame */
   .search-results :global(li) {
-    padding: 0.3em 0;
+    padding: 0.3em 0.6em;
+    border: 1px solid transparent;
+    border-radius: 0.3em;
+  }
+
+  /* the title link carries the focus, the frame wraps the whole item including its tags */
+  .search-results :global(li:has(> a:is(:hover, :focus))) {
+    border-color: #e5e500;
+    background-color: rgba(229 229 0 / 12%);
   }
 
   .search-results :global(a) {
