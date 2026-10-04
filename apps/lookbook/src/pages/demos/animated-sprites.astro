@@ -4,11 +4,15 @@ import {description, title} from './_animated-sprites.json';
 ---
 
 <Layout title={title} description={description} fullscreenCanvas>
-  <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
-    <div class="actionBtn lessSprites">less</div>
-    <div class="spriteCount">0</div>
-    <div class="actionBtn moreSprites">more</div>
-  </section>
+  <demo-ui>
+    <section
+      class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-1 items-center content-center justify-center"
+    >
+      <div class="actionBtn lessSprites">less</div>
+      <div class="spriteCount">0</div>
+      <div class="actionBtn moreSprites">more</div>
+    </section>
+  </demo-ui>
 </Layout>
 
 <style>

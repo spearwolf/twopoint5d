@@ -11,6 +11,12 @@ export interface Props {
 }
 
 const {title, description, fullscreenCanvas = false} = Astro.props;
+
+// The layers of a demo, bottom to top: the canvas, the blur and the rainbow line of the
+// DemoNavBar, the <demo-ui> of the page, the logo and the title of the DemoNavBar, and the
+// dialog in the top layer. A page puts the HTML it shows over its canvas into one <demo-ui>:
+// its in-flow content starts below the navbar, its positioned content keeps clear of the navbar
+// through --demo-nav-bar-height, which ?ui=0 sets to 0px.
 ---
 
 <!doctype html>
@@ -40,9 +46,57 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
   /* the room the DemoNavBar overlay takes at the top, for a page that keeps its content clear of it */
   :root {
     --demo-nav-bar-height: 4rem;
+    --demo-nav-bar-rainbow-line-height: 3px;
   }
   :root[data-demo-ui='off'] {
     --demo-nav-bar-height: 0px;
+    --demo-nav-bar-rainbow-line-height: 0px;
+  }
+  /* the canvas stays at z-index auto, below all three */
+  :root {
+    --demo-layer-nav-bar: 10;
+    --demo-layer-ui: 20;
+    --demo-layer-title: 30;
+  }
+  /* in a layer, so the Tailwind utilities on a child still win over the pointer-events here */
+  @layer components {
+    /* a glass pane over the whole window: only its children catch the pointer, everywhere else
+       the events fall through to the canvas */
+    demo-ui {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: var(--demo-layer-ui);
+      padding-top: var(--demo-nav-bar-height);
+      pointer-events: none;
+    }
+    demo-ui > * {
+      pointer-events: auto;
+    }
+  }
+  /* a lil-gui panel that a demo hands the <demo-ui> as its container: in the top right corner,
+     where autoPlace would put it, but below the navbar on a narrow screen, where the title would
+     run over it, and right below the rainbow line on a wider one. Outside the layer, the
+     stylesheet that lil-gui injects is none either */
+  demo-ui > .lil-gui.lil-root {
+    --lil-gui-top: var(--demo-nav-bar-height);
+    position: absolute;
+    top: var(--lil-gui-top);
+    right: 15px;
+    max-height: calc(100% - var(--lil-gui-top));
+  }
+  @media (width >= 48rem) {
+    demo-ui > .lil-gui.lil-root {
+      --lil-gui-top: var(--demo-nav-bar-rainbow-line-height);
+    }
+  }
+  /* the dropdown of a select is drawn by the browser: dark like the panel, in the colors of lil-gui */
+  demo-ui > .lil-gui.lil-root {
+    color-scheme: dark;
+  }
+  demo-ui > .lil-gui.lil-root option {
+    background-color: var(--widget-color);
+    color: var(--text-color);
   }
   html {
     font-family: system-ui, sans-serif;

@@ -6,21 +6,23 @@ import {description, title} from './_map2d-cam-visi.json';
 ---
 
 <Layout title={title} description={description} fullscreenCanvas>
-  <CrossHair />
+  <demo-ui>
+    <CrossHair />
 
-  <div class="info-controls text-neutral-200 text-sm pt-4 pl-1 text-center">
-    <div class="py-2">
-      <RadioButtons
-        name="camera"
-        buttons={[
-          {value: 'map2d-camera', label: 'View & Control Map2D Camera', isActive: true},
-          {value: 'pan-control', label: 'Map2D PanControl', isActive: false},
-        ]}
-      />
+    <div class="text-neutral-200 text-sm pt-4 pl-1 text-center pointer-events-none">
+      <div class="py-2 pointer-events-auto">
+        <RadioButtons
+          name="camera"
+          buttons={[
+            {value: 'map2d-camera', label: 'View & Control Map2D Camera', isActive: true},
+            {value: 'pan-control', label: 'Map2D PanControl', isActive: false},
+          ]}
+        />
+      </div>
+      <p>Use the W, A, S, and D keys to scroll the map.</p>
+      <p>Use the mouse to control the camera.</p>
     </div>
-    <p>Use the W, A, S, and D keys to scroll the map.</p>
-    <p>Use the mouse to control the camera.</p>
-  </div>
+  </demo-ui>
 </Layout>
 
 <style>
@@ -28,9 +30,6 @@ import {description, title} from './_map2d-cam-visi.json';
     background-color: #458497;
     background-image: linear-gradient(to bottom, #001020 0, #001020 25%, #667686);
     color: #fff;
-  }
-  .info-controls {
-    transform: translateZ(10px);
   }
 </style>
 

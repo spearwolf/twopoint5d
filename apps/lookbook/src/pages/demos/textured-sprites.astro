@@ -4,9 +4,13 @@ import {description, title} from './_textured-sprites.json';
 ---
 
 <Layout title={title} description={description} fullscreenCanvas>
-  <section class="fixed top-20 right-4 flex flex-wrap gap-1 items-center content-center justify-center">
-    <div class="actionBtn render-as-billboards select-none" data-render-as-billboards="true">render as billboards</div>
-  </section>
+  <demo-ui>
+    <section
+      class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-1 items-center content-center justify-center"
+    >
+      <div class="actionBtn render-as-billboards select-none" data-render-as-billboards="true">render as billboards</div>
+    </section>
+  </demo-ui>
 </Layout>
 
 <style>

@@ -5,12 +5,10 @@ import {description, title} from './_quadtree-playground.json';
 
 <Layout title={title} description={description}>
   <canvas id="twopoint5d" resize-to="window"></canvas>
+  <demo-ui></demo-ui>
 </Layout>
 
 <style>
-  :global(.lil-gui) :global(option) {
-    color: #555;
-  }
   html {
     height: 100%;
     overflow: hidden;
@@ -26,6 +24,7 @@ import {description, title} from './_quadtree-playground.json';
   import {ChunkQuadTreeNode, Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~demos/quadtree-playground/QuadTreeVisualization';
+  import {getDemoUi} from '~demos/utils/demoUi';
 
   // -----------------------------
 
@@ -55,7 +54,7 @@ import {description, title} from './_quadtree-playground.json';
   });
   // -----------------------------
 
-  const gui = new GUI({title: 'quadtree playground'});
+  const gui = new GUI({title: 'quadtree playground', container: getDemoUi()});
 
   const actions = {
     randomChunkCount: 100,

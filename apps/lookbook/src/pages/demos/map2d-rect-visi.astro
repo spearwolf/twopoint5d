@@ -4,10 +4,12 @@ import {description, title} from './_map2d-rect-visi.json';
 ---
 
 <Layout title={title} description={description} fullscreenCanvas>
-  <div class="info-controls text-sky-200 pt-4 pl-1">
-    <p>Use the W, A, S, and D keys to scroll the map.</p>
-    <p>Use the mouse to rotate the camera.</p>
-  </div>
+  <demo-ui>
+    <div class="text-sky-200 pt-4 pl-1 pointer-events-none">
+      <p>Use the W, A, S, and D keys to scroll the map.</p>
+      <p>Use the mouse to rotate the camera.</p>
+    </div>
+  </demo-ui>
 </Layout>
 
 <style>

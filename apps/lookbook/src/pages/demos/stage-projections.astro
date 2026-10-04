@@ -4,7 +4,7 @@ import {description, title} from './_stage-projections.json';
 ---
 
 <Layout title={title} description={description}>
-  <div class="flow-root pt-(--demo-nav-bar-height) h-full">
+  <div class="flow-root h-full">
     <section class="gridContainer">
       <div class="gridCell">
         <div class="canvasContainer" data-projection="orthographic"></div>
@@ -16,6 +16,7 @@ import {description, title} from './_stage-projections.json';
       </div>
     </section>
   </div>
+  <demo-ui></demo-ui>
 </Layout>
 
 <script>
@@ -42,6 +43,7 @@ import {description, title} from './_stage-projections.json';
   } from 'three/webgpu';
   import GUI from 'lil-gui';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {getDemoUi} from '~demos/utils/demoUi';
 
   type SharedSpecs = {
     fit: 'contain' | 'cover' | 'fill';
@@ -129,7 +131,7 @@ import {description, title} from './_stage-projections.json';
     setupPane(parallaxContainer!, new ParallaxProjection('xy|bottom-left', specs)),
   ];
 
-  const gui = new GUI({title: 'stage projections'});
+  const gui = new GUI({title: 'stage projections', container: getDemoUi()});
   gui.add(specs, 'fit', ['contain', 'cover', 'fill']).onChange(() => {
     for (const stage of stages) stage.needsUpdate = true;
   });

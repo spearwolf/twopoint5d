@@ -98,11 +98,11 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
 
 <style>
   /* an overlay over the demo: it takes no room in the page and lets every pointer event through
-     to the demo, apart from the logo button */
+     to the demo, apart from the logo button. It spreads over two layers of VanillaDemo.astro, the
+     blur and the rainbow line under the <demo-ui> of the page, the logo and the title over it; a
+     box of its own would hold both in one stacking context, so the wrapper generates none */
   .demo-nav-bar {
-    position: fixed;
-    inset: 0 0 auto 0;
-    z-index: 50;
+    display: contents;
     pointer-events: none;
   }
 
@@ -114,8 +114,9 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
   /* no color of its own: stacked layers blur the demo behind the bar, each one stronger and
      shorter than the one before, so the blur is heaviest at the top edge and fades out below */
   .progressive-blur {
-    position: absolute;
+    position: fixed;
     inset: 0 0 auto 0;
+    z-index: var(--demo-layer-nav-bar);
     height: 6rem;
   }
   .progressive-blur > div {
@@ -146,14 +147,17 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
   }
 
   .rainbow-line-container {
-    position: absolute;
+    position: fixed;
     inset: 0 0 auto 0;
-    --rainbow-line-height: 3px;
+    z-index: var(--demo-layer-nav-bar);
+    --rainbow-line-height: var(--demo-nav-bar-rainbow-line-height);
   }
 
   /* without a background of its own, the text has to stand out from whatever the demo draws */
   .lookbook-demo-header {
-    position: relative;
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: var(--demo-layer-title);
     height: var(--demo-nav-bar-height);
     text-shadow:
       0 1px 2px rgba(0 0 0 / 70%),
