@@ -21,7 +21,7 @@ const CENTER = TARGET_SIZE / 2;
 
 // a tile of 2 × 2 texels, four colors
 const TILE_SIZE = 2;
-// prettier-ignore
+// biome-ignore format: the line breaks lay the numbers out row by row
 const IMAGE = [
   [255, 0, 0, 255], [0, 255, 0, 255],
   [0, 0, 255, 255], [255, 255, 0, 255],

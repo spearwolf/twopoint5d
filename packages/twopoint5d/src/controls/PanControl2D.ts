@@ -161,7 +161,6 @@ export interface PanControl2DOptions {
   disableKeyboard?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface PanControl2D extends EventizedObject {}
 
 export class PanControl2D extends InputControlBase {
@@ -270,7 +269,7 @@ export class PanControl2D extends InputControlBase {
     // declaration or a closing brace never passes. A value only another browser knows costs a
     // warning, not the app
     if (!CSS.supports('cursor', cursor)) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
         `[PanControl2D] cursorPanStyle "${value}" is not a value of the CSS property cursor in this browser; the write is refused`,
       );

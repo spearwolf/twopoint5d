@@ -13,7 +13,8 @@ export type AnimatedSpritesBasePool = VertexObjectPool<BaseSprite>;
 export type AnimatedSpritesPool = VertexObjectPool<AnimatedSprite>;
 
 export type AnimatedSpritesMakeBaseSpriteArgs =
-  [halfWidth: number, halfHeight: number] | [halfWidth: number, halfHeight: number, xOffset: number, yOffset: number];
+  | [halfWidth: number, halfHeight: number]
+  | [halfWidth: number, halfHeight: number, xOffset: number, yOffset: number];
 
 export interface AnimatedSpritesGeometryParameters {
   capacity: number;

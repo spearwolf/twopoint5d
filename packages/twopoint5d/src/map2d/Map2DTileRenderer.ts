@@ -126,7 +126,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   #warnNoTileCapacity(tileCoords: IMap2DTileCoords): void {
     if (this.#warnedNoTileCapacity) return;
     this.#warnedNoTileCapacity = true;
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
       `Map2DTileRenderer: the tile factory has no room for another tile, so the tile at (${tileCoords.x}, ${tileCoords.y}) stays empty until a tile that leaves the view gives its slot back. With a TileSpritesFactory, build its TileSpritesGeometry with a capacity for the most tiles the view shows at once. This warning is shown once per renderer.`,
     );

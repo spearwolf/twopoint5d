@@ -27,17 +27,15 @@ const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
   <div class="description">
     <Fragment set:html={marked.parse(body)} />
   </div>
-  {
-    tags && tags.length > 0 && (
-      <ul class="tags">
-        {tags.map((tag) => (
-          <li class="tag" data-tag={tag}>
-            {tag}
-          </li>
-        ))}
-      </ul>
-    )
-  }
+  {tags && tags.length > 0 && (
+    <ul class="tags">
+      {tags.map((tag) => (
+        <li class="tag" data-tag={tag}>
+          {tag}
+        </li>
+      ))}
+    </ul>
+  )}
 </li>
 
 <script>

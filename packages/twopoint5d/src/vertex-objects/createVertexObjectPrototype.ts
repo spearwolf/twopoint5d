@@ -214,16 +214,17 @@ const makeAttributeValueSetter = (
     // a check on every value
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
     const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
-    // eslint-disable-next-line prefer-rest-params -- see the comment above the factory
+    // biome-ignore lint/complexity/noArguments: see the comment above the factory
     const first: unknown = arguments[0];
     if (typeof first === 'object' && first !== null) {
       writeValues(target, idx, first as ArrayLike<number>, vertexCount, bufferItemSize, attrSize);
       return;
     }
     // the loop stays in here: handing `arguments` to a function would make V8 build the object
+    // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the factory
     const n = Math.min(arguments.length, count);
     for (let k = 0; k < n; k++) {
-      // eslint-disable-next-line prefer-rest-params -- see the comment above the factory
+      // biome-ignore lint/complexity/noArguments: see the comment above the factory
       const value: unknown = arguments[k];
       if (value != null) target[idx + Math.floor(k / attrSize) * bufferItemSize + (k % attrSize)] = value as number;
     }

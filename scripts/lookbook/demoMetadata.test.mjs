@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {describe, it} from 'node:test';
 import {fileURLToPath} from 'node:url';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 // Every tag of a lookbook demo that starts with a capital letter advertises a class, a
 // function or a type of the library, and a reader will search for that name. This spec

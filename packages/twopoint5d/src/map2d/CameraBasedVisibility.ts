@@ -1345,7 +1345,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     if (this.#warnedCapped) return;
     this.#warnedCapped = true;
     const limit = this.#maxVisibleTiles;
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
       `CameraBasedVisibility: the view reaches more than ${limit} tiles, so only the ${limit} nearest to the camera are kept. Raise maxVisibleTiles, or lower camera.far, if the tiles further out should be drawn. This warning is shown once per visibility.`,
     );

@@ -22,7 +22,7 @@ const hasUpdate = (geometry: BufferGeometry): geometry is BufferGeometry & {upda
 // three's Mesh types `geometry` and `material` as always present; the `declare` fields
 // below add `undefined`, the state of a mesh that gave both up, and only `any` as the
 // type arguments of Mesh leaves room for that
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the fields below widen them
+// biome-ignore lint/suspicious/noExplicitAny: the fields below widen them
 export class VertexObjects<GeoType extends BufferGeometry = BufferGeometry> extends Mesh<any, any> {
   // undefined only once a caller writes it or a subclass that disposes gives both up; a mesh
   // built without either holds what THREE.Mesh puts in their place

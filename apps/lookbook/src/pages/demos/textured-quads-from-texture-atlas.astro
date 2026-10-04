@@ -74,7 +74,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
     const store = await loadTextureCatalog(renderer);
     const [atlas, texture] = await store.getAsync('labWallsAtlas', ['atlas', 'texture']);
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded texture-atlas', {atlas, texture});
 
     // the <TexturePreview> in the markup of this very page writes #texture-preview
@@ -82,7 +82,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
 
     const mesh = makeMesh(16, 32, 3.5, 1, atlas, texture);
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('TexturedQuadsMesh', mesh);
 
     demo.scene.add(mesh);

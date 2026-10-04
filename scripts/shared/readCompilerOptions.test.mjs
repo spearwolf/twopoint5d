@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {after, test} from 'node:test';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import {readCompilerOptions} from './readCompilerOptions.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');

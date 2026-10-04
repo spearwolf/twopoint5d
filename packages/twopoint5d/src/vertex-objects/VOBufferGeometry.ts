@@ -119,8 +119,9 @@ export class VOBufferGeometry extends BufferGeometry {
     // read through `arguments` rather than the rest parameter of the signature: once the method of
     // a second geometry class had run, V8 built the rest array on every call (56 B with a single
     // argument, measured on Node 24), while `arguments` stayed free in every order
+    // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
-      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      // biome-ignore lint/complexity/noArguments: see the comment above the loop
       this.#routes.touchAttribute(arguments[i] as string);
     }
   }
@@ -147,8 +148,9 @@ export class VOBufferGeometry extends BufferGeometry {
     // read through `arguments` rather than the rest parameter of the signature: once the method of
     // a second geometry class had run, V8 built the rest array on every call (56 B with a single
     // argument, measured on Node 24), while `arguments` stayed free in every order
+    // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
-      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      // biome-ignore lint/complexity/noArguments: see the comment above the loop
       const arg = arguments[i] as string | TouchBuffersType;
       if (typeof arg === 'string') {
         this.#routes.touchAttribute(arg);

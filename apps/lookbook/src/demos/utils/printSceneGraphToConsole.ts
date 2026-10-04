@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// biome-ignore-all lint/suspicious/noConsole: printing to the console is what this module does
 
 import {findRootNode} from '@spearwolf/twopoint5d';
 import type {Object3D} from 'three/webgpu';
@@ -10,7 +10,8 @@ import type {Object3D} from 'three/webgpu';
  */
 export function printSceneGraphToConsole(node: Object3D, startAtRoot = false): void {
   if (startAtRoot) {
-    return printSceneGraphToConsole(findRootNode(node), false);
+    printSceneGraphToConsole(findRootNode(node), false);
+    return;
   }
 
   console.group(`<${node.type || node.constructor.name}> ${node.name}`);

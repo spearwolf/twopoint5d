@@ -25,14 +25,14 @@ export interface BaseQuad extends VO {
 
 export class BaseQuad {
   make(width = 0.5, height = 0.5) {
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setPosition([
       - width, - height, 0,
       - width, + height, 0,
       + width, + height, 0,
       + width, - height, 0,
     ]);
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setUv([
       // flipY = false
       0, 1,

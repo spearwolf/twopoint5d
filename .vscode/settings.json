@@ -26,5 +26,5 @@
         "visibles"
     ],
     "nxConsole.generateAiAgentRules": true,
-    "biome.enabled": false
+    "editor.defaultFormatter": "biomejs.biome"
 }

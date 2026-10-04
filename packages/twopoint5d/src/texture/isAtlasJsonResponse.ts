@@ -23,12 +23,9 @@ const isFrameData = (value: unknown): value is TexturePackerFrameData => {
   if (typeof value !== 'object' || value == null) return false;
   const {frame} = value as Partial<TexturePackerFrameData>;
   if (typeof frame !== 'object' || frame == null) return false;
-  if (!(
-    typeof frame.x === 'number' &&
-    typeof frame.y === 'number' &&
-    typeof frame.w === 'number' &&
-    typeof frame.h === 'number'
-  )) {
+  if (
+    !(typeof frame.x === 'number' && typeof frame.y === 'number' && typeof frame.w === 'number' && typeof frame.h === 'number')
+  ) {
     return false;
   }
   const {rotated, trimmed, spriteSourceSize, sourceSize} = value as Partial<TexturePackerFrameData>;

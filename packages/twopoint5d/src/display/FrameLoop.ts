@@ -21,7 +21,7 @@ const MEASURE_COLLECTION_SIZE = 10;
 let rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
 let rafUniqueInstance: RAF | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+// biome-ignore lint/correctness/noUnusedVariables: merges into the class RAF below
 interface RAF extends EventizedObject {}
 
 class RAF {
@@ -137,7 +137,7 @@ class RAF {
     (result as PromiseLike<unknown>).then(undefined, (error: unknown) => {
       if (error === this.#reportedLoopError) return;
       this.#reportedLoopError = error;
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: no caller is left to hand the error to
       console.error('FrameLoop: the renderer could not run its animation loop', error);
     });
   }
@@ -176,7 +176,6 @@ class RAF {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface FrameLoop extends EventizedObject {}
 
 export class FrameLoop {

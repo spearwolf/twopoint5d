@@ -98,16 +98,30 @@ clean → ci:checks → test:coverage → test:allocations → test:browser
 ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts
 ```
 
-- `lint` = `eslint .` plus `prettier --check .`; `no-console` is an error in `.ts`,
-  `.js` and `.astro` files. The `.ts` rules (`consistent-type-imports`, the ban on a
-  `.ts` suffix in a relative import) apply to `.astro` files as well: to the frontmatter
-  directly, and to every `<script>` block, because `eslint-plugin-astro` hands each
-  block to ESLint as a virtual `.ts` file. `no-floating-promises` and
-  `no-misused-promises` hold `packages/*/src`, specs included, and read the types of the
-  expressions through the project service; `no-explicit-any` holds the published library
-  code, not the specs, benches and `src/testing/`. `no-non-null-assertion` stays off:
-  `arr[i]!` is the idiom under `noUncheckedIndexedAccess`, see the comment beside the rule
-  in `eslint.config.mjs`.
+- `lint` = `biome ci .`: Biome checks the formatting of every `.ts`, `.js`, `.mjs`,
+  `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in `biome.jsonc`,
+  lints all of them but the stylesheets, and writes nothing; `pnpm format` writes.
+  Markdown, YAML and the SVG assets are neither formatted nor linted. `noConsole` is an
+  error everywhere except in the `.mjs` scripts and the browser tests. The `.ts` rules
+  (`useImportType`, the ban on a `.ts` suffix in a relative import through
+  `noRestrictedImports`) apply to `.astro` files as well: to the frontmatter and to
+  every `<script>` block; the markup and the `<style>` blocks are formatted, not linted.
+  Biome's support for `.astro` files is still experimental, and its formatting of them
+  is not always stable in one go: when `biome ci` still finds a difference right after
+  `pnpm format`, a second `pnpm format` settles it. `noFloatingPromises` and
+  `noMisusedPromises` hold `packages/*/src`, specs included. Both are still in Biome's
+  nursery and read the types Biome infers itself, not those of the TypeScript checker,
+  so they see less than a type-aware ESLint rule did; and Biome runs that inference only
+  for a rule switched on at the top of the config, which is why they are on globally and
+  an override takes them off outside `packages/*/src`. `noExplicitAny` holds the
+  published library code, not the specs, benches and `src/testing/`.
+  `noNonNullAssertion` stays off: `arr[i]!` is the idiom under
+  `noUncheckedIndexedAccess`, see the comment beside the rule in `biome.jsonc`. The
+  rules of Biome's recommended preset that the code breaks on purpose are off, each with
+  its reason beside it — `useLiteralKeys`, for one, contradicts
+  `noPropertyAccessFromIndexSignature`. `@biomejs/biome` is pinned to an exact version:
+  a release that formats differently turns `lint` red, so a bump comes with its
+  reformatting in the same commit.
 - `typecheck` covers the library including its specs, the lookbook — its `.ts` files and
   its `.astro` pages, via `astro check` — the browser tests of `twopoint5d-testing`, and
   every code block marked `ts check` in the tracked Markdown files. The tests and the
@@ -159,7 +173,7 @@ matrix job per part: `ci:checks`, `test:coverage`, `test:allocations` and, under
 the others, and "Re-run failed jobs" repeats only the part that failed. Every job and
 every long step carries a `timeout-minutes`; a hosted job otherwise runs for six hours.
 The workflow has no path filter:
-Markdown is an input of `prettier --check` and of `twopoint5d-testing:typecheck` (§2), so
+Markdown is an input of `twopoint5d-testing:typecheck` (§2), so
 a push that changes nothing but docs runs the gate as well, and the Nx cache answers every
 target whose inputs the push leaves alone. Every action is pinned to a full commit SHA
 with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap the code that
@@ -334,26 +348,21 @@ well: each of its updates brings the Chromium and Firefox the browser suite runs
 it comes as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one
 carries a comment that names the advisory it answers and says when the entry can go.
 
-Two toolchain updates wait on purpose. TypeScript stays on the 6.x line:
-`typescript-eslint` 8 allows `typescript <6.1.0` only, and TypeScript 7 exports no
-compiler API under `typescript` any more (only `typescript/unstable/*`), while
+The repo runs two TypeScripts. `typescript` in the root is 7.x, the native compiler: its
+`tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
+exports no compiler API under `typescript` (only `typescript/unstable/*`, whose shape
+may still change), so the scripts that need one —
 `scripts/checkNameableTypes/findUnnameableTypes.mjs`,
 `scripts/shared/readCompilerOptions.mjs`,
-`scripts/checkDocSnippets/compileSnippets.mjs` and
-`scripts/checkPeerDependenciesOnly/findUndeclaredImports.mjs` import the classic API.
-The step to 7 waits for both. `prettier-plugin-astro` stays on 0.14: 1.x formats with
-the Rust compiler `@astrojs/compiler-rs` (0.x) and reformats part of the `.astro` files;
-that switch is a formatting change in its own right and no part of a toolchain update.
-
-`@emnapi/core` and `@emnapi/runtime` are root devDependencies that nothing imports. They
-are peers of `@napi-rs/wasm-runtime`, which `eslint-plugin-astro` pulls in through the
-WebAssembly build of the Astro compiler. Left undeclared, pnpm resolves that peer one
-way or the other from run to run: an install that re-resolves on top of the lockfile —
-after any manifest change, in every Dependabot update — rewrites about 40 lines of
-`pnpm-lock.yaml` and warns about a missing peer, and a resolution from scratch lands on
-either form. Declared, every resolution writes the same lockfile. They can go once `pnpm
-install --lockfile-only --resolution-only` leaves the lockfile untouched and warns about
-nothing without them.
+`scripts/checkDocSnippets/compileSnippets.mjs`,
+`scripts/checkPeerDependenciesOnly/findUndeclaredImports.mjs` and three specs — import
+the classic API from `@typescript/typescript6`, the package Microsoft publishes for
+exactly that. The code block check therefore compiles the marked blocks with 6.x,
+against declarations 7.x emitted. The lookbook keeps a `typescript` 6.x of its own:
+`@astrojs/check` declares `typescript ^5.0.0 || ^6.0.0` as its peer, and `astro check`
+type-checks the `.ts` files and `.astro` pages of the lookbook through it. A Dependabot
+pull request that moves the lookbook's `typescript` to 7 breaks `pnpm typecheck` until
+`@astrojs/check` accepts 7.
 
 Node and pnpm versions come from `engines` in the root `package.json`: Node
 `^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm

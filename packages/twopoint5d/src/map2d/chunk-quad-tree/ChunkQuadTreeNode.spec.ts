@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import {beforeEach, describe, it} from 'vitest';
 
 import {AABB2} from '../AABB2.js';

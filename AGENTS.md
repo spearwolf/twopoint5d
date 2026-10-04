@@ -33,7 +33,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm install`
 - `pnpm exec playwright install chromium firefox` — the browsers for
   `pnpm test:browser`; once after the first install and after every Playwright bump
-- `pnpm lint` — ESLint + `prettier --check`; `pnpm format` writes the Prettier changes
+- `pnpm lint` — `biome ci`: Biome's linter and formatter check, nothing written;
+  `pnpm format` writes the formatting and the safe lint fixes (`biome check --write`).
+  Config in `biome.jsonc`; a suppression is `// biome-ignore <rule>: <reason>`, and the
+  reason is required
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
@@ -85,9 +88,11 @@ explicit instruction.
   The catalog range lands verbatim in the published manifest, and a 0.x minor of `three`
   breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
   library publishes, a consumer on the newer `three` meets a peer conflict.
-- **`@emnapi/core` and `@emnapi/runtime`** in the root `devDependencies` are imported by
-  nothing and stay: they hold `pnpm-lock.yaml` to one resolution ([monorepo architecture
-  §5](docs/architecture.md#5-shared-dependency-versions)).
+- **Two TypeScripts.** `tsc` is TypeScript 7 — it builds the library and runs every type
+  check outside the lookbook. TypeScript 7 exports no compiler API under `typescript`, so
+  a script that needs one imports the classic API from `@typescript/typescript6`, never
+  from `typescript`. The lookbook keeps its own `typescript` 6 for `astro check`, whose
+  peer range ends at 6 ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
 - **`apps/lookbook/public/js/rainbow-line-v0.6.0.js`** is the web component behind every
   `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
   `<script src="${BASE_URL}/js/rainbow-line-v0.6.0.js">` at runtime and expects the file
@@ -96,8 +101,7 @@ explicit instruction.
   stays. Keep it byte-for-byte identical to the package's copy, and replace it when a
   package bump changes the version in that path —
   `scripts/lookbook/rainbowLineScript.test.mjs` (`pnpm test:scripts`) fails otherwise.
-  The `.prettierignore` entry and the `**/lookbook/public` ignore in `eslint.config.mjs`
-  exist for it and stay too.
+  The `!apps/lookbook/public/js` entry in `biome.jsonc` exists for it and stays too.
 - **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
   `scripts/` is the publish pipeline — changes there can break the published package.
   `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server

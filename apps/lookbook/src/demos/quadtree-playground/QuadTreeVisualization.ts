@@ -1,5 +1,5 @@
 import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@spearwolf/twopoint5d';
-import {type WebGPURenderer} from 'three/webgpu';
+import type {WebGPURenderer} from 'three/webgpu';
 
 export class QuadTreeVisualization {
   readonly canvasStage: Canvas2DStage;
@@ -43,7 +43,7 @@ export class QuadTreeVisualization {
   }
 
   visualizeChunkQuadTree(root: ChunkQuadTreeNode<NumberDataChunk2D>, width: number, height: number) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('visualizeChunkQuadTree', root, width, height);
 
     this.canvasStage.setCanvasSize(width, height);
@@ -63,7 +63,7 @@ export class QuadTreeVisualization {
     stats.totalFrames = stats.leafs + stats.noLeafs;
     stats.averageChunksPerFrame = Math.round(stats.averageChunksPerFrame / stats.totalFrames);
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('render chunks stats', stats);
 
     this.canvasStage.needsUpdate = true;

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 /**
  * `parseJsonConfigFileContent` would scan the whole repository for files (the root
@@ -8,7 +8,7 @@ import ts from 'typescript';
  * `extends` is not followed, and the root config inherits from nothing.
  *
  * @param {string} tsconfigPath
- * @returns {import('typescript').CompilerOptions}
+ * @returns {import('@typescript/typescript6').CompilerOptions}
  */
 export function readCompilerOptions(tsconfigPath) {
   const {config, error} = ts.readConfigFile(tsconfigPath, ts.sys.readFile);

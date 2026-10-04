@@ -1,5 +1,5 @@
 import path from 'node:path';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 const isLib = (fileName) => fileName.includes('node_modules') || /lib\.[\w.]*d\.ts$/.test(fileName);
 
@@ -33,7 +33,7 @@ const referencedName = (node) => {
  * collects each declaration that is reachable from the exported surface without being
  * exported itself.
  *
- * @param {{entry: string, compilerOptions: import('typescript').CompilerOptions}} params
+ * @param {{entry: string, compilerOptions: import('@typescript/typescript6').CompilerOptions}} params
  * @returns {{
  *   exported: number,
  *   rows: Array<{name: string, file: string, line: number, uses: string[]}>,

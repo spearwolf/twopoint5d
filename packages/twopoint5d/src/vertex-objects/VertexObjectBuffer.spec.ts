@@ -341,19 +341,19 @@ describe('VertexObjectBuffer', () => {
 
     expect(
       vob.copyAttributes({
-        // prettier-ignore
+        // biome-ignore format: the line breaks lay the numbers out row by row
         foo: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
         bar: [100, 101, 102, 103],
       }),
     ).toEqual(2);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('static_float32')!.typedArray!)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       9, 10, 0, 0, 0, 11, 12, 0, 0, 0, 13, 14, 0, 0, 0, 15, 16, 0, 0, 0,
     ]);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('dynamic_float32')!.typedArray!)).toEqual([
       100, 101, 102, 103,
       0, 0, 0, 0,
@@ -382,7 +382,7 @@ describe('VertexObjectBuffer', () => {
 
     vob.copyArray(new Float32Array([100, 101, 102, 103]), 'bar');
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('bar')!.typedArray!)).toEqual([
       100, 101, 102, 103,
       0, 0, 0, 0,
@@ -390,7 +390,7 @@ describe('VertexObjectBuffer', () => {
 
     vob.copyArray(new Float32Array([200, 201, 202, 203]), 'bar', 1);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('bar')!.typedArray!)).toEqual([
       100, 101, 102, 103,
       200, 201, 202, 203,
@@ -628,13 +628,13 @@ describe('VertexObjectBuffer', () => {
 
     vob.copyWithin(1, 0, 1);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('static_float32')!.typedArray!)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
     ]);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('dynamic_float32')!.typedArray!)).toEqual([100, 101, 102, 103, 100, 101, 102, 103]);
   });
 
@@ -668,13 +668,13 @@ describe('VertexObjectBuffer', () => {
 
     const vob1 = vob.clone();
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob1.buffers.get('static_float32')!.typedArray!)).toEqual([
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
       1, 2, 0, 0, 0, 3, 4, 0, 0, 0, 5, 6, 0, 0, 0, 7, 8, 0, 0, 0,
     ]);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob1.buffers.get('dynamic_float32')!.typedArray!)).toEqual([
       100, 101, 102, 103,
       100, 101, 102, 103,
@@ -700,7 +700,7 @@ describe('VertexObjectBuffer', () => {
       }),
     ).toEqual(1);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.buffers.get('static_float32')!.typedArray!)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 0,
       0, 0, 0, 0, 0, 0, 0, 0,
@@ -735,16 +735,16 @@ describe('VertexObjectBuffer', () => {
       2,
     );
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     vob.copyAttributes({
       foo: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
       bar: [100, 101, 102, 103],
     });
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.toAttributeArrays(['foo'], 1)['foo']!)).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(vob.toAttributeArrays(['bar'], 0, 1)['bar']!)).toEqual([100, 101, 102, 103]);
   });
 
@@ -1209,7 +1209,7 @@ describe('VertexObjectBuffer', () => {
         }),
       ).toBe(2);
 
-      // prettier-ignore
+      // biome-ignore format: the line breaks lay the numbers out row by row
       expect(Array.from(vob.buffers.get('static_uint8N')!.typedArray!)).toEqual([
         1, 2, 3, 0, 4, 5, 6, 0,
         7, 8, 9, 0, 10, 11, 12, 0,

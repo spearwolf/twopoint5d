@@ -57,7 +57,7 @@ export type CrossVertexIndexType = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 
 
 export class Cross {
   make(width = 0.5, height = 0.5, innerSize = 1 / 8, outerSize = 1 / 2, z = 0) {
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setPosition([
         - width * innerSize, + height * innerSize, z,
         - width * innerSize, + height * outerSize, z,

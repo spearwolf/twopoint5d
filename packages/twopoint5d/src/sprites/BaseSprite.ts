@@ -44,7 +44,7 @@ export class BaseSprite {
     //          /
     //      (z)v
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setPosition([
       -halfWidth + xOffset, -halfHeight + yOffset, 0,
       -halfWidth + xOffset, +halfHeight + yOffset, 0,
@@ -57,7 +57,7 @@ export class BaseSprite {
     //     |        |
     //   (0,1)----(1,1)
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setUv([
       // flipY = false
       0, 1,

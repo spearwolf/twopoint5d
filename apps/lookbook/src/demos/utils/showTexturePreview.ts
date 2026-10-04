@@ -13,7 +13,7 @@ export function showTexturePreview(texture: Texture): void {
     throw new Error(`[lookbook] showTexturePreview(): the page has no #${TEXTURE_PREVIEW_ID} element`);
   }
   if (!(texture.image instanceof HTMLImageElement)) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.warn(
       `[lookbook] showTexturePreview(): the image of the texture "${texture.name}" is no <img>, there is nothing to copy`,
       texture.image,

@@ -1,7 +1,7 @@
 name: Continuous Integration
 
-# every push, Markdown included: a Markdown file is an input of prettier --check and of
-# the type check of the docs' marked code blocks
+# every push, Markdown included: a Markdown file is an input of the type check of the
+# docs' marked code blocks
 on: push
 
 permissions:

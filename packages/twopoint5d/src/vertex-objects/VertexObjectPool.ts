@@ -171,6 +171,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     if (!this.containsVO(vo)) return;
 
     const idx = VOUtils.getIndex(vo);
+    // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop below
     if (arguments.length === 1) {
       this.buffer.touch(idx, idx);
       return;
@@ -179,8 +180,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     // the names are read through `arguments` rather than the rest parameter of the signature, as in
     // the touch() of the geometries: V8 does not keep a rest array off the heap in every state of
     // the optimizer, `arguments` it did
+    // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 1; i < arguments.length; i++) {
-      // eslint-disable-next-line prefer-rest-params -- see the comment above the loop
+      // biome-ignore lint/complexity/noArguments: see the comment above the loop
       const layout = this.buffer.bufferAttributes.get(arguments[i] as string);
       if (layout !== undefined) {
         this.buffer.touchBuffer(layout.bufferName, idx, idx);

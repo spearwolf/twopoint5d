@@ -46,7 +46,8 @@ export type DependencyDeclaration<Shape> =
   | (keyof Shape & DependencyKey)
   | {
       [K in keyof Shape & DependencyKey]:
-        [name: K, equals: EqualityCallback<Shape[K]>] | [name: K, callbacks: DependencyCallbacks<Shape[K]>];
+        | [name: K, equals: EqualityCallback<Shape[K]>]
+        | [name: K, callbacks: DependencyCallbacks<Shape[K]>];
     }[keyof Shape & DependencyKey]
   | {
       [K in keyof Shape & DependencyKey]: [name: DependencyKey, callbacks: Required<DependencyCallbacks<Shape[K]>>];

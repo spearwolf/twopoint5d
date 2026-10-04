@@ -80,7 +80,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
     const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('glaskugelnTiles', ['tileSet', 'texture']);
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded tileset', {tileSet, texture});
 
     // the <TexturePreview> in the markup of this very page writes #texture-preview
@@ -89,6 +89,6 @@ import {description, title} from './_textured-quads-from-tileset.json';
     demo.scene.add(makeMesh(16, 32, 3.5, 1, tileSet, texture));
   });
 
-  // eslint-disable-next-line no-console
+  // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
   console.log('TexturedQuadsMesh', demo.scene.children[0]);
 </script>

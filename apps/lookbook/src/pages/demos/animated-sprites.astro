@@ -58,11 +58,11 @@ import {description, title} from './_animated-sprites.json';
     const store = new TextureStore(renderer);
 
     on(store, 'error', ({source, url, id, error}) => {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
       console.error(`[animated-sprites] TextureStore ${source} failed for ${url ?? id}`, error);
     });
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loading textures...', store);
 
     await store.loadAsync(assetsUrl('nobingers.json'));
@@ -99,9 +99,9 @@ import {description, title} from './_animated-sprites.json';
       mesh.update();
     });
 
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('BouncingSprites', bouncingSprites);
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('AnimatedSprites', mesh);
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page

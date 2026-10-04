@@ -29,6 +29,7 @@ const ACCEPTED = new Map([
 const entry = path.resolve(process.argv[2] ?? 'dist/lib/index.d.ts');
 const tsconfigPath = path.join(path.resolve(import.meta.dirname, '..'), 'tsconfig.json');
 
+/** @type {ReturnType<typeof findUnnameableTypes>} */
 let result;
 try {
   // The options go in as the root tsconfig has them: the check reads the type checker,

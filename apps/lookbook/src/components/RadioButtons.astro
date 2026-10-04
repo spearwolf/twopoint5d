@@ -12,13 +12,11 @@ const {name, buttons} = Astro.props;
 ---
 
 <div class="radio-buttons">
-  {
-    buttons.map((button) => (
-      <button class="btn" class:list={[{'is-active': button.isActive}]} data-radio-buttons-group={name} data-value={button.value}>
-        {button.label}
-      </button>
-    ))
-  }
+  {buttons.map((button) => (
+    <button class="btn" class:list={[{'is-active': button.isActive}]} data-radio-buttons-group={name} data-value={button.value}>
+      {button.label}
+    </button>
+  ))}
 </div>
 
 <script>

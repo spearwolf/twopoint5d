@@ -6,31 +6,29 @@ const {tags, tagCategories} = loadMetadataForDemos();
 ---
 
 <section class="tags select-none invisible">
-  {
-    tagCategories.map((category) => (
-      <>
-        <h3 class="tag-category">{category.name}</h3>
-        <p class="tag-category-description">{category.description}</p>
-        <ul class="tag-cloud-filter">
-          {/* the category tag names are filled from the keys of `tags`, so the map holds every one of them */}
-          {category.tags.sort().map((tag) => (
-            <li
-              class="tag"
-              data-tag={tag}
-              data-related-demos={Array.from(tags.get(tag)!.demoIds).join(',')}
-              data-related-tags={Array.from(tags.get(tag)!.relatedTags).join(',')}
-            >
-              {tag}
-            </li>
-          ))}
-        </ul>
-      </>
-    ))
-  }
+  {tagCategories.map((category) => (
+    <>
+      <h3 class="tag-category">{category.name}</h3>
+      <p class="tag-category-description">{category.description}</p>
+      <ul class="tag-cloud-filter">
+        {/* the category tag names are filled from the keys of `tags`, so the map holds every one of them */}
+        {category.tags.sort().map((tag) => (
+          <li
+            class="tag"
+            data-tag={tag}
+            data-related-demos={Array.from(tags.get(tag)!.demoIds).join(',')}
+            data-related-tags={Array.from(tags.get(tag)!.relatedTags).join(',')}
+          >
+            {tag}
+          </li>
+        ))}
+      </ul>
+    </>
+  ))}
   <div class="flex flex-row justify-end lg:justify-start mt-8 pt-2 border-t border-dashed border-[var(--color-primary-inactive)]">
-    <button class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2"
-      ><Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span></button
-    >
+    <button class="clear-tags-action inactive inline-flex flex-row items-start justify-center gap-2">
+      <Fragment set:html={ClearActionIcon} /><span class="label">clear selection</span>
+    </button>
   </div>
 </section>
 

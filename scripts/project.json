@@ -7,7 +7,11 @@
       "executor": "nx:run-commands",
       "options": {"command": "pnpm exec tsc -p scripts/tsconfig.json"},
       "cache": true,
-      "inputs": ["{projectRoot}/**/*.mjs", "sharedTsconfigs", {"externalDependencies": ["typescript", "@types/node", "yaml"]}]
+      "inputs": [
+        "{projectRoot}/**/*.mjs",
+        "sharedTsconfigs",
+        {"externalDependencies": ["typescript", "@typescript/typescript6", "@types/node", "yaml"]}
+      ]
     }
   }
 }

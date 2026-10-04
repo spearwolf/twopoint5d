@@ -34,7 +34,7 @@ let canvasMaxResolutionWarningWasShown = false;
 
 function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
       `Oops, the canvas width or height should not be bigger than ${Display.MaxResolution} device pixels (${w}x${h} was requested).`,
       'If you need more, please set Display.MaxResolution before you create a Display!',
@@ -107,7 +107,7 @@ async function drainSubmittedWork(renderer: WebGPURenderer): Promise<void> {
 
   try {
     if (await Promise.race(lost != null ? [drained, lost, timedOut] : [drained, timedOut])) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
         `Display#dispose(): the GPU did not report the work submitted to it done within ${SUBMITTED_WORK_TIMEOUT_MS} ms; the renderer is released anyway`,
       );
@@ -308,7 +308,7 @@ function restoreContext(canvas: HTMLCanvasElement, lost: LostContext): Promise<v
 
     const timeout = setTimeout(() => {
       endWait();
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
         `new Display(): the WebGL context of the canvas did not come back within ${CONTEXT_RESTORE_TIMEOUT_MS} ms; the display starts on it anyway`,
       );
@@ -420,7 +420,6 @@ function restoreCanvasState(canvas: HTMLCanvasElement, state: CanvasState, class
 
 export type DisplayEventListener<T = DisplayEventProps> = (props: T) => unknown;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Display extends EventizedObject {}
 
 /**
@@ -1014,7 +1013,7 @@ export class Display {
     this.#styleSheetRoot = styleSheetRoot ?? this.#doc.head;
 
     if (isWebGLRenderer(domElementOrRenderer)) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
         'The Display constructor expects a WebGPURenderer or an HTML element as the first argument.',
         'Since twopoint5d@0.13 a WebGLRenderer is not supported anymore.',
@@ -1675,7 +1674,7 @@ export class Display {
     try {
       element = root.querySelector(value);
     } catch {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
         `[Display] resize-to="${value}" is not a valid selector; the display falls back to its resizeToElement or the canvas`,
       );
@@ -1960,7 +1959,7 @@ export class Display {
         },
       )
       .catch((error: unknown) => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: no caller is left to hand the error to
         console.error('Display#dispose(): releasing the renderer failed after dispose() returned', error);
       });
 

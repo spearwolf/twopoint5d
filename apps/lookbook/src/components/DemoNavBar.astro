@@ -55,14 +55,12 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     </button>
   </header>
 
-  {
-    title && (
-      <section class="demo-title mb-4">
-        <h1 class="text-l">{title}</h1>
-        <RainbowLine colorSliceWidth={8} cycleDirection="left" />
-      </section>
-    )
-  }
+  {title && (
+    <section class="demo-title mb-4">
+      <h1 class="text-l">{title}</h1>
+      <RainbowLine colorSliceWidth={8} cycleDirection="left" />
+    </section>
+  )}
 
   <section class="demo-description mb-16 text-sm text-slate-200 [&>p]:mb-2 [&>p:last-child]:mb-0">
     <Fragment set:html={marked.parse(description)} />
@@ -72,16 +70,14 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     <h2 class="text-2xl">Explore Source Code</h2>
     <p class="text-sm text-slate-200">Want to see how it is done?</p>
     <ul class="max-w-xs mx-auto mt-4 mb-6">
-      {
-        githubUrl && (
-          <li class="ring-1 ring-white rounded-md hover:bg-slate-800">
-            <a class="flex flex-row justify-center items-center text-sm py-2 gap-2" href={githubUrl} target="_blank">
-              <GitHubInvertocatIcon class="h-10" />
-              <span>Show source on GitHub</span>
-            </a>
-          </li>
-        )
-      }
+      {githubUrl && (
+        <li class="ring-1 ring-white rounded-md hover:bg-slate-800">
+          <a class="flex flex-row justify-center items-center text-sm py-2 gap-2" href={githubUrl} target="_blank">
+            <GitHubInvertocatIcon class="h-10" />
+            <span>Show source on GitHub</span>
+          </a>
+        </li>
+      )}
     </ul>
 
     <a class="block mb-4 text-xs text-center text-slate-400 underline" href="https://github.com/spearwolf/twopoint5d"

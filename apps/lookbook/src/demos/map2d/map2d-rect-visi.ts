@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// biome-ignore-all lint/suspicious/noConsole: the demo logs to the devtools on purpose
 import {once} from '@spearwolf/eventize';
 import {
   Map2D,
@@ -27,7 +27,7 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     scene.fog = new Fog(0x458497, 300, 1500);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     scene.add(makePoints([
       -384, 11, -384,
       -128, 11, -384,

@@ -23,7 +23,16 @@ export type TypedArray =
  * `'float64'` and `'uint8clamped'` have no WebGPU vertex format, and a `VertexObjectDescriptor` refuses an attribute of either.
  */
 export type VertexAttributeDataType =
-  'float64' | 'float32' | 'float16' | 'uint32' | 'int32' | 'uint16' | 'int16' | 'uint8clamped' | 'uint8' | 'int8';
+  | 'float64'
+  | 'float32'
+  | 'float16'
+  | 'uint32'
+  | 'int32'
+  | 'uint16'
+  | 'int16'
+  | 'uint8clamped'
+  | 'uint8'
+  | 'int8';
 
 /**
  * How often the values of an attribute change: `'static'` for values written once, `'dynamic'` and
@@ -210,7 +219,8 @@ export interface VertexObjectDescription {
  * a consumer can write down, which a generic helper would not be.
  */
 export type FrozenVertexAttributeDescription =
-  (Readonly<Omit<VAComponentsType, 'components'>> & {readonly components: readonly string[]}) | Readonly<VASizeType>;
+  | (Readonly<Omit<VAComponentsType, 'components'>> & {readonly components: readonly string[]})
+  | Readonly<VASizeType>;
 
 /**
  * A {@link VertexObjectDescription} as a `VertexObjectDescriptor` hands its own out:

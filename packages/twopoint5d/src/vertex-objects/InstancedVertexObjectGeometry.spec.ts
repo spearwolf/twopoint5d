@@ -122,7 +122,7 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(geometry.index).toBeDefined();
     expect(geometry.index!.array.length).toBe(baseDescriptor.indices.length * capacity);
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(geometry.index!.array).slice(0, baseDescriptor.indices.length * 3)).toEqual([
       0, 1, 2, 0, 2, 3,
       4, 5, 6, 4, 6, 7,

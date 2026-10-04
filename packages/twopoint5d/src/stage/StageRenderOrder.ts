@@ -146,7 +146,7 @@ export class StageRenderOrder {
         if (item.stage.name === name) count++;
       }
       if (count > 1) {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
           `StageRenderer: ${count} stages are named ${JSON.stringify(name)} and renderOrder=${JSON.stringify(this.#value)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
         );

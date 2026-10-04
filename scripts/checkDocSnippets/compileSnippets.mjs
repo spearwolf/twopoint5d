@@ -7,7 +7,7 @@
 // file.
 
 import path from 'node:path';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import {readCompilerOptions} from '../shared/readCompilerOptions.mjs';
 
 const VIRTUAL_DIR = '__doc_snippets__';

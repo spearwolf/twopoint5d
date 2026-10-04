@@ -19,7 +19,6 @@ export type Canvas2DStageFitType = 'contain' | 'cover';
  */
 type Canvas2DViewSpecs = {fit: Canvas2DStageFitType; width: number; height: number};
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Canvas2DStage extends EventizedObject {}
 
 export class Canvas2DStage {

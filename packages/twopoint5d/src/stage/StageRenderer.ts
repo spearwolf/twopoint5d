@@ -66,7 +66,6 @@ export interface StageItem {
   height: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface StageRenderer extends EventizedObject {}
 
 /**

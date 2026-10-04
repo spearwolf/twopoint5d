@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 
 /**
  * The package a module specifier reaches: `@scope/name` for `@scope/name/sub/path.js`,

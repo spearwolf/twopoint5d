@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// biome-ignore-all lint/suspicious/noConsole: the demo logs to the devtools on purpose
 import {
   CameraBasedVisibility,
   Map2D,

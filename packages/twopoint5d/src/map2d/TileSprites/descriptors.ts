@@ -19,7 +19,7 @@ export class TileBaseSprite {
     //          /
     //      (z)v
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setPosition([
       xOffset,         0, zOffset,
       xOffset,         0, zOffset + height,
@@ -32,7 +32,7 @@ export class TileBaseSprite {
     //     |        |
     //   (0,1)----(1,1)
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     this.setUv([
       0, 0,
       0, 1,

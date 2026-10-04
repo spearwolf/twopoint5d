@@ -79,6 +79,7 @@ export function disposeDisplay(display) {
  * Resolves once renderer.dispose() has run — the release of a display happens after its dispose() has returned.
  *
  * @param {{dispose(): void}} renderer
+ * @returns {Promise<void>}
  */
 export function whenReleased(renderer) {
   return new Promise((resolve) => {

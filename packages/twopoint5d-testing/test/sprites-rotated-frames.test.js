@@ -19,7 +19,7 @@ const CENTER = TARGET_SIZE / 2;
 // an image of 3 × 2 texels, six colors: not square, so a mix-up of width and height shows
 const IMAGE_WIDTH = 3;
 const IMAGE_HEIGHT = 2;
-// prettier-ignore
+// biome-ignore format: the line breaks lay the numbers out row by row
 const IMAGE = [
   [255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255],
   [255, 255, 0, 255], [0, 255, 255, 255], [255, 0, 255, 255],

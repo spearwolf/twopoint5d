@@ -35,7 +35,6 @@ export interface FixedFrameLoopRenderProps extends DisplayEventProps {
   tickNo: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface FixedFrameLoop extends EventizedObject {}
 
 /**

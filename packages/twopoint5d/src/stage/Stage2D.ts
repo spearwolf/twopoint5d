@@ -28,7 +28,6 @@ function disposedError(member: string): Error {
   return new Error(`Stage2D#${member} is not available: this stage has been disposed`);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Stage2D extends EventizedObject {}
 
 /**
@@ -311,7 +310,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if (camera == null) {
       if (!this.#warnedNoCamera && ++this.#framesWithoutCamera >= FRAMES_WITHOUT_CAMERA_BEFORE_WARNING) {
         this.#warnedNoCamera = true;
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
           `Stage2D has had no camera for ${FRAMES_WITHOUT_CAMERA_BEFORE_WARNING} frames and renders nothing: the projection creates one on the first resize() whose width and height are finite numbers above 0 and for which its specs give a view with an area, or assign your own to stage.camera`,
         );

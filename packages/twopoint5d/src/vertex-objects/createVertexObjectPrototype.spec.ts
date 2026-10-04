@@ -129,7 +129,7 @@ describe('the generated attribute accessors', () => {
     );
     const vo = pool.createVO()!;
     vo.setFoo(new Float32Array([7, 8, 9, 10]));
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
       0, 0, 0, 7, 8,
       0, 0, 0, 9, 10,
@@ -279,7 +279,7 @@ describe('the generated attribute accessors', () => {
     );
     const vo = pool.createVO()!;
     vo.setFoo(7, 8, 9, 10);
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
       0, 0, 0, 7, 8,
       0, 0, 0, 9, 10,
@@ -336,7 +336,7 @@ describe('the generated attribute accessors', () => {
     );
     const vo = pool.createVO()!;
     vo.setFoo(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
       0, 0, 0, 1, 2, 3,
       0, 0, 0, 4, 5, 6,
@@ -393,7 +393,7 @@ describe('the generated attribute accessors', () => {
     );
     const vo = pool.createVO()!;
     vo.setFoo(...Array.from({length: 18}, (_, k) => k + 1));
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     expect(Array.from(pool.buffer.buffers.get('static_float32')!.typedArray!)).toEqual([
       0, 0, 0, 1, 2, 3,
       0, 0, 0, 4, 5, 6,

@@ -82,7 +82,7 @@ describe('vertex-buffers-geometry-updates', () => {
     y3: number;
     z3: number;
 
-    // prettier-ignore
+    // biome-ignore format: the line breaks lay the numbers out row by row
     setPosition(values: [
       number, number, number,
       number, number, number,
@@ -159,7 +159,7 @@ describe('vertex-buffers-geometry-updates', () => {
       vo2.impact = 1002;
 
       const base = geometry.basePool!.createVO()!;
-      // prettier-ignore
+      // biome-ignore format: the line breaks lay the numbers out row by row
       base.setPosition([
         0, 1, 2,
         3, 4, 5,
@@ -240,7 +240,7 @@ describe('vertex-buffers-geometry-updates', () => {
         expect(base.y3).toBe(10);
         expect(base.z3).toBe(11);
 
-        // prettier-ignore
+        // biome-ignore format: the line breaks lay the numbers out row by row
         const positions = new Float32Array([
           100, 101, 102,
           103, 104, 105,
@@ -290,7 +290,7 @@ describe('vertex-buffers-geometry-updates', () => {
         expect(base.y3).toBe(10);
         expect(base.z3).toBe(11);
 
-        // prettier-ignore
+        // biome-ignore format: the line breaks lay the numbers out row by row
         const positions = new Float32Array([
           100, 101, 102,
           103, 104, 105,
@@ -342,7 +342,7 @@ describe('vertex-buffers-geometry-updates', () => {
         expect(base.y3).toBe(10);
         expect(base.z3).toBe(11);
 
-        // prettier-ignore
+        // biome-ignore format: the line breaks lay the numbers out row by row
         const positions = new Float32Array([
           100, 101, 102,
           103, 104, 105,
@@ -389,7 +389,7 @@ describe('vertex-buffers-geometry-updates', () => {
         expect(vo1.foo).toBe(103);
         expect(vo2.foo).toBe(106);
 
-        // prettier-ignore
+        // biome-ignore format: the line breaks lay the numbers out row by row
         const dataArray = new Float32Array([
           // mh.. here we don't know if foo or bar[2] is first, so we need to set all to same value
           500, 500, 500,
