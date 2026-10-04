@@ -124,13 +124,6 @@ display.onResize(({width, height}) => {
 display.onInit(async ({renderer}) => {
   const texture = await new TextureFactory(renderer).loadAsync('sprite.png');
 
-  // a dispose() while the image loaded has gone out already, and an onDispose() from
-  // here on would never hear it
-  if (display.isDisposed) {
-    texture.dispose();
-    return;
-  }
-
   // a mesh with room for one sprite, drawn with the texture
   const sprites = new TexturedSprites(1, texture);
 
@@ -142,12 +135,6 @@ display.onInit(async ({renderer}) => {
   // upload what the sprite wrote into the buffers of the mesh
   sprites.update();
   scene.add(sprites);
-
-  display.onDispose(() => {
-    // the mesh releases the material it built around the texture; the texture is yours
-    sprites.dispose();
-    texture.dispose();
-  });
 });
 
 display.onRenderFrame(({renderer}) => renderer.render(scene, camera));
