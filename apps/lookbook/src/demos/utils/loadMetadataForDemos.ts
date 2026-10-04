@@ -8,7 +8,8 @@ export interface IDemo {
   description?: string;
   url: string;
   href: string;
-  previewImage?: string;
+  /** `<name>.webp` in `public/images/demo-preview/`, `<name>` being the demo page; written by `pnpm lookbook:generate-previews`. */
+  previewImage: string;
   tags?: string[];
   /**
    * Position of the demo among the others, ascending; 0 when missing, like the `order`
@@ -64,7 +65,14 @@ const demos = Object.entries(
     });
   }
   // a copy: json.tags is the array of the imported metadata module
-  return {...json, id, href: makeUrl(json.url), tags: json.tags ? [...json.tags].sort() : undefined};
+  return {
+    ...json,
+    id,
+    href: makeUrl(json.url),
+    // the id keeps the underscore of `_<name>.json`; the image is named after the page
+    previewImage: `${id.replace(/^_/, '')}.webp`,
+    tags: json.tags ? [...json.tags].sort() : undefined,
+  };
 }) as IDemo[];
 
 // sort() is stable: demos with the same order keep the alphabetical order of their files

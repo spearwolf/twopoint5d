@@ -3,6 +3,5 @@
   "shortDescription": "Twenty thousand quads of one InstancedVertexObjectGeometry, waved by a TSL node material",
   "description": "The geometry joins two vertex object descriptions: a base quad of four vertices, created once, and an instanced description with `quadSize` and `instancePosition` per instance. `InstancedVertexObjectGeometry` puts the two together, its `instancedPool` hands out the 100 × 200 instances, and the `VertexObjects` mesh draws all of them in one draw call. The motion lives in the shader alone: `vertexByInstancePosition()` places and scales the base quad per instance, and a TSL `uniform` that follows the time sends a sine wave outward from the center. The page runs with `forceWebGL: true`, on the WebGL 2 backend.",
   "url": "/demos/instanced-quads",
-  "tags": ["InstancedVertexObjectGeometry", "VO", "VertexObjects", "vertexByInstancePosition", "instanced", "vanilla"],
-  "previewImage": "instanced-quads.png"
+  "tags": ["InstancedVertexObjectGeometry", "VO", "VertexObjects", "vertexByInstancePosition", "instanced", "vanilla"]
 }

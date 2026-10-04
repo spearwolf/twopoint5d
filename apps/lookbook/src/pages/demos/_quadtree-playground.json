@@ -3,6 +3,5 @@
   "shortDescription": "A playground for ChunkQuadTreeNode: random and grid-aligned chunks, subdivided and drawn on a 2D canvas",
   "description": "Generates `NumberDataChunk2D`s, some at random and some on a jittered grid, puts them into a `ChunkQuadTreeNode` and splits it with `subdivide(maxChunkNodes)`. The result is painted with the plain Canvas 2D API — the chunks of leaves red, those of inner nodes yellow, the split lines white — and reaches the screen through a `Canvas2DStage`, which shows the canvas as a texture in a `Stage2D` with an `OrthographicProjection`. The lil-gui panel sets the chunk counts, the node size and the static factors `IntersectDistanceFactor` and `BeforeAfterDeltaFactor` that weigh where a node is split; the statistics of each run land in the devtools console.",
   "url": "/demos/quadtree-playground",
-  "tags": ["Display", "ChunkQuadTreeNode", "Canvas2DStage", "NumberDataChunk2D", "vanilla", "playground"],
-  "previewImage": "quadtree-playground.png"
+  "tags": ["Display", "ChunkQuadTreeNode", "Canvas2DStage", "NumberDataChunk2D", "vanilla", "playground"]
 }

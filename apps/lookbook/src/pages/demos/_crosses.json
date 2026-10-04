@@ -3,6 +3,5 @@
   "shortDescription": "A vertex object description written from scratch — a cross of twelve vertices — drawn by the VertexObjects mesh",
   "description": "The demo declares a vertex object type of its own: a descriptor with twelve vertices, the indices of three quads and a `position` attribute, plus a `basePrototype` whose methods `make()`, `rotate()` and `translate()` work on the generated accessors `x0` … `z11`. `VertexObjectGeometry` builds the buffers from it, `pool.createVO()` hands out the 300 crosses, and `getDescriptorOf()` lets a cross look up its own vertex count. Color and transparency come from a TSL node material that reads the `position` attribute: the deeper a cross lies, the more it fades, and each column twists by almost a quarter turn over its depth.",
   "url": "/demos/crosses",
-  "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "vanilla"],
-  "previewImage": "crosses.png"
+  "tags": ["VO", "VertexObjectGeometry", "VertexObjects", "getDescriptorOf", "vanilla"]
 }

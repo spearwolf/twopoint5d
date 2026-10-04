@@ -1,14 +1,14 @@
 ---
 import {marked} from 'marked';
 import demoPreviewImageUrl from '~demos/utils/demoPreviewImageUrl';
-import defaultTeaserImage from '../images/20221122-dark-circles-back-1024x.jpg?url';
 
 export interface Props {
   id: string;
   title: string;
   body: string;
   href: string;
-  image?: string;
+  /** The file name of the preview image in `public/images/demo-preview/`. */
+  image: string;
   tags?: string[];
   /** The tags the tag filter offers; a card renders these as buttons that toggle the tag there. */
   filterTags?: ReadonlySet<string>;
@@ -16,7 +16,7 @@ export interface Props {
 
 const {id, href, title, body, image, tags, filterTags} = Astro.props;
 
-const previewImage = image ? demoPreviewImageUrl(image) : defaultTeaserImage;
+const previewImage = demoPreviewImageUrl(image);
 ---
 
 <li class="link-card relative invisible" data-demo-id={id}>
