@@ -1,0 +1,59 @@
+/* Cross-document view transitions between the explorer and the demos: the navbar morphs from
+   one shape to the other, everything else keeps the browser's default crossfade. The
+   pseudo-element tree of a transition lives in the new document and takes the new document's
+   styles, so each layout imports the choreography of the direction that ends on it
+   (view-transitions-into-demo.css, view-transitions-to-explorer.css), and both import this file:
+   the opt-in, the timing, the keyframes and what both directions share. The names are set by the
+   components that own the elements; apps/lookbook/README.md, "Navbar view transitions", lists the
+   pairs. */
+
+@view-transition {
+  navigation: auto;
+}
+
+/* asked for no motion: the hard switch of a browser without view transitions */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
+:root {
+  --lb-vt-duration: 450ms;
+  --lb-vt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lb-vt-fade: 150ms;
+}
+
+/* every group morphs in the same time and curve, the root's crossfade included; the images of a
+   group inherit both unless a choreography sets an animation of its own */
+::view-transition-group(*) {
+  animation-duration: var(--lb-vt-duration);
+  animation-timing-function: var(--lb-vt-ease);
+}
+
+@keyframes lb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes lb-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* a caption slides in from --lb-vt-slide-from, set on the image it moves */
+@keyframes lb-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(var(--lb-vt-slide-from));
+  }
+}
+
+@keyframes lb-slide-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(var(--lb-vt-slide-from));
+  }
+}
