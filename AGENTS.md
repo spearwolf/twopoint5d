@@ -57,7 +57,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and `nxCacheServer.mjs` as
   child processes, one that checks the lookbook's vendored `rainbow-line` script, one
   that holds the tags and routes of the lookbook's demo metadata to the library's
-  exports, one that asks Nx whether every tracked Markdown file is an input of the docs'
+  exports, one that holds the preview images of the lookbook to its demos, ids and card
+  size, one that asks Nx whether every tracked Markdown file is an input of the docs'
   type check, and one that holds the publish script to Node's built-ins; the Nx project
   `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
@@ -66,6 +67,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
+- `pnpm lookbook:generate-previews` — the preview image of every lookbook demo, through
+  Playwright's Chromium against `astro preview`; `--only=<name>,…` for some. Not part of
+  `pnpm run ci`: it needs a browser and writes binary files. The protocol is in
+  `apps/lookbook/README.md`, "Preview images"
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, then `ci:checks` (lint,
   build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, test:scripts), then
   test:coverage, test:allocations, test:browser. Run it before committing. CI runs the
