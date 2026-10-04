@@ -20,3 +20,16 @@ overrides:
   # nx 23.2.x pins smol-toml 1.6.1, which GHSA-7w5x-hrqm-74c2 covers. Drop this entry
   # once the nx in package.json depends on smol-toml >=1.7.1 itself.
   'nx>smol-toml': ^1.7.1
+  # nx 23.2.x pins axios 1.18.1 and brace-expansion 5.0.9; the advisories against both are
+  # fixed in axios 1.20.0 and brace-expansion 5.0.12. Drop these entries once the nx in
+  # package.json depends on those versions itself.
+  'nx>axios': ^1.20.0
+  'nx>brace-expansion': ^5.0.12
+
+auditConfig:
+  # Advisories without a patched release, both in tooling that never reaches the published
+  # package: http-cache-semantics through astro (the lookbook build) and braces through
+  # @web/test-runner (the browser tests). Drop an entry once a fixed version exists.
+  ignoreGhsas:
+    - GHSA-ch52-4w7c-c8xp
+    - GHSA-vfj7-8cjw-p6xm
