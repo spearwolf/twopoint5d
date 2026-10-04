@@ -10,7 +10,7 @@
       "inputs": [
         "{projectRoot}/**/*.mjs",
         "sharedTsconfigs",
-        {"externalDependencies": ["typescript", "@typescript/typescript6", "@types/node", "yaml"]}
+        {"externalDependencies": ["typescript", "@typescript/typescript6", "@types/node", "yaml", "playwright"]}
       ]
     }
   }

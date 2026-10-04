@@ -35,7 +35,8 @@
     "ci": "pnpm run clean && pnpm run ci:checks && pnpm run test:coverage && pnpm run test:allocations && pnpm run test:browser",
     "ci:checks": "pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run checkPkgTypes && pnpm run checkNameableTypes && pnpm run lintPkg && pnpm run test:scripts",
     "cbt": "pnpm run ci",
-    "lookbook": "pnpm nx dev lookbook"
+    "lookbook": "pnpm nx dev lookbook",
+    "lookbook:generate-previews": "pnpm nx run lookbook:build && node scripts/lookbook/generateDemoPreviews.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
