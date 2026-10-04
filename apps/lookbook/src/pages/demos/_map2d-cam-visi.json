@@ -12,6 +12,8 @@
     "TextureStore",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
+    "TileSprites",
+    "TileSpritesFactory",
     "tilesets",
     "textures",
     "map2d",

@@ -12,6 +12,7 @@
     "TileSprites",
     "TileSpritesGeometry",
     "TileSpritesMaterial",
+    "TileSpritesFactory",
     "tilesets",
     "textures",
     "map2d",

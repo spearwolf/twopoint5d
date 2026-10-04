@@ -3,14 +3,6 @@
   "shortDescription": "Textured 2D sprites with the TexturedSprites mesh, switchable between flat sprites and billboards",
   "description": "A `TexturedSprites` mesh with room for 256 sprites, built from a capacity and a texture; it creates its `TexturedSpritesGeometry` and `TexturedSpritesMaterial` itself. The sprites come from its `spritePool`, each one gets a frame of the `TileSet` through `setFrame()`, and `sprites.update()` uploads the changed buffers each frame. The button toggles `renderAsBillboards` on the material: as billboards the sprites turn towards the camera, as sprites they stay flat in their plane.",
   "url": "/demos/textured-sprites",
-  "tags": [
-    "TexturedSprites",
-    "TexturedSpritesGeometry",
-    "TexturedSpritesMaterial",
-    "TextureStore",
-    "tilesets",
-    "textures",
-    "vanilla"
-  ],
+  "tags": ["TexturedSprites", "TexturedSpritesMaterial", "TextureStore", "tilesets", "textures", "vanilla"],
   "previewImage": "textured-sprites.png"
 }

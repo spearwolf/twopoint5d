@@ -3,5 +3,5 @@
   "shortDescription": "The same layered scene under an OrthographicProjection and a ParallaxProjection, side by side",
   "description": "Two `Display`s, each with a `Stage2D` and a `StageRenderer`, render the same scene: three layers of sprites at z = −150, 0 and 150, swinging sideways together. Under the `OrthographicProjection` all layers travel alike, under the `ParallaxProjection` the near layer travels further than the far one. Both projections share one specs object, so the lil-gui switch for `fit` (`contain`, `cover`, `fill`) reaches both, and `stage.needsUpdate = true` applies it in the next frame. The yellow frame marks the 800 × 600 rectangle of the specs as the chosen fit lays it into each cell.",
   "url": "/demos/stage-projections",
-  "tags": ["Display", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer", "vanilla"]
+  "tags": ["Display", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer", "TextureFactory", "vanilla"]
 }

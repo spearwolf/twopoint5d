@@ -3,6 +3,16 @@
   "shortDescription": "Instanced quads with a texture, through TextureCoords and the TSL node colorFromTextureByTexCoords()",
   "description": "Builds on the `InstancedQuadsGeometry` of *instanced quads* and adds `texCoords` per instance. Texture and `TextureCoords` come from the texture catalog through a `TextureStore`; each quad takes its coordinates from `TextureCoords.getTexCoords()`, together with the flag for a diagonal flip. The node material reads them with `colorFromTextureByTexCoords()` and places the quads with `vertexByInstancePosition()`. Here every quad shows the whole image, which the preview in the corner shows as well.",
   "url": "/demos/textured-quads",
-  "tags": ["TextureCoords", "TextureStore", "VertexObjects", "instanced", "textures", "vanilla"],
+  "tags": [
+    "TextureCoords",
+    "TextureStore",
+    "VertexObjects",
+    "InstancedVertexObjectGeometry",
+    "colorFromTextureByTexCoords",
+    "vertexByInstancePosition",
+    "instanced",
+    "textures",
+    "vanilla"
+  ],
   "previewImage": "textured-quads.png"
 }

@@ -9,6 +9,9 @@
     "Stage2D",
     "StageRenderer",
     "RenderPipeline",
+    "RootRenderPipeline",
+    "TextureFactory",
+    "createBloomOutputNodeBuilder",
     "post-processing",
     "nested-renderers",
     "vanilla"

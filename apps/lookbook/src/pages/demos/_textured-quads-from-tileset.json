@@ -3,6 +3,17 @@
   "shortDescription": "Instanced quads with frames picked from a TileSet",
   "description": "Like *textured quads from texture atlas*, but the frames come from a `TileSet`: the texture catalog declares the tile size, and the tileset cuts the image into tiles of equal size, kept in an atlas of its own. Each quad gets `tileset.atlas.randomFrame()`. The material is a `MeshBasicNodeMaterial` with an `alphaTestNode` and `DoubleSide`, to which the shared helper `createTexturedQuads()` adds the position and color nodes.",
   "url": "/demos/textured-quads-from-tileset",
-  "tags": ["TileSet", "TextureStore", "VertexObjects", "instanced", "tilesets", "textures", "vanilla"],
+  "tags": [
+    "TileSet",
+    "TextureStore",
+    "VertexObjects",
+    "InstancedVertexObjectGeometry",
+    "colorFromTextureByTexCoords",
+    "vertexByInstancePosition",
+    "instanced",
+    "tilesets",
+    "textures",
+    "vanilla"
+  ],
   "previewImage": "textured-quads-from-tileset.png"
 }
