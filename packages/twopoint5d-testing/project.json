@@ -19,6 +19,7 @@
         "{workspaceRoot}/apps/lookbook/**/*.md",
         "{workspaceRoot}/docs/*.md",
         "{workspaceRoot}/docs/remediation/*-remediation-report.md",
+        "{workspaceRoot}/docs/superpowers/**/*.md",
         "{workspaceRoot}/packages/twopoint5d/**/*.md",
         "{workspaceRoot}/scripts/checkDocSnippets.mjs",
         "{workspaceRoot}/scripts/checkDocSnippets/*.mjs",
