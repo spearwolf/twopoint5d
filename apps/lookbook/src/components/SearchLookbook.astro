@@ -2,6 +2,7 @@
 import CloseDialogIcon from './icons/CloseDialogIcon.astro';
 import SearchIcon from './icons/SearchIcon.astro';
 import RainbowLine from '@spearwolf/astro-rainbow-line';
+import {RAINBOW_COLORS} from './rainbowColors';
 ---
 
 <button class="open-search-dialog-action inline-flex flex-row items-start justify-center gap-2">
@@ -18,7 +19,7 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
 
   <section class="mb-4">
     <h1 class="text-l">Search lookbook</h1>
-    <RainbowLine colorSliceWidth={8} cycleDirection="left" />
+    <RainbowLine colorSliceWidth={8} cycleDirection="left" cycleColors={RAINBOW_COLORS} />
   </section>
 
   <section class="mb-4 text-sm text-slate-200">

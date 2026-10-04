@@ -1,5 +1,6 @@
 ---
 import RainbowLine from '@spearwolf/astro-rainbow-line';
+import {RAINBOW_COLORS} from './rainbowColors';
 import lookbook from '../images/20221122-lookbook-white-fat.svg?url';
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
 import SearchLookbook from './SearchLookbook.astro';
@@ -15,7 +16,7 @@ import SearchLookbook from './SearchLookbook.astro';
     </div>
 
     <div class="rainbow-line-container">
-      <RainbowLine shadow colorSliceWidth={32} />
+      <RainbowLine shadow colorSliceWidth={32} cycleColors={RAINBOW_COLORS} />
     </div>
   </header>
 </div>
