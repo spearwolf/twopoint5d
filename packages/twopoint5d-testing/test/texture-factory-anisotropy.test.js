@@ -15,9 +15,12 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
     await renderer.init();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (renderer) {
-      renderer.dispose();
+      // awaited: WebGLBackend.dispose() gives its context up only after an await of its own, and
+      // the next beforeEach would otherwise ask for a new one while the old is still alive —
+      // headless Firefox on llvmpipe then fails the getContext('webgl2') now and again
+      await renderer.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
