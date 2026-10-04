@@ -24,7 +24,9 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
 //      see https://github.com/danielgjackson/qrcodejs
 ---
 
-<div class="demo-nav-bar">
+<div id="lb-demo-nav" class="demo-nav-bar">
+  <div class="demo-nav-curtain" aria-hidden="true"></div>
+
   <div class="progressive-blur" aria-hidden="true">
     <div></div>
     <div></div>
@@ -38,14 +40,14 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
 
   <header class="lookbook-demo-header flex justify-start items-center gap-3 px-3 sm:gap-4 sm:px-4 lg:px-6">
     <figure class="flex shrink-0 items-center justify-start gap-1.5 text-slate-300">
-      <figcaption>a</figcaption>
+      <figcaption class="demo-caption-pre">a</figcaption>
       <button class="interactive-action open-show-source-dialog-action">
         <img class="h-8" src={twopoint5d} alt="twopoint5d" />
       </button>
-      <figcaption>demo::</figcaption>
+      <figcaption class="demo-caption-post">demo::</figcaption>
     </figure>
 
-    <div class="min-w-0 flex-1 truncate font-bold text-white">{title}</div>
+    <div class="demo-nav-title min-w-0 flex-1 truncate font-bold text-white">{title}</div>
   </header>
 </div>
 
@@ -175,6 +177,9 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     inset: 0 0 auto 0;
     z-index: var(--demo-layer-nav-bar);
     --rainbow-line-height: var(--demo-nav-bar-rainbow-line-height);
+    /* as high as the line, like the explorer's container, so the view transition moves it */
+    height: var(--rainbow-line-height);
+    view-transition-name: lb-rainbow;
   }
 
   /* without a background of its own, the text has to stand out from whatever the demo draws */
@@ -194,6 +199,27 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     pointer-events: auto;
   }
 
+  /* the partner of the explorer's header in the view transition: no height and no paint of its
+     own, the explorer's header background rolls up into it and comes down out of it */
+  .demo-nav-curtain {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 0;
+    view-transition-name: lb-curtain;
+  }
+  .open-show-source-dialog-action img {
+    view-transition-name: lb-logo;
+  }
+  .demo-caption-pre {
+    view-transition-name: lb-caption-pre;
+  }
+  .demo-caption-post {
+    view-transition-name: lb-caption-post;
+  }
+  .demo-nav-title {
+    view-transition-name: lb-demo-title;
+  }
+
   .demo-title {
     --rainbow-line-height: 2px;
   }
@@ -203,6 +229,11 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     color: #fff;
     box-shadow: 0 0 2px 3px rgba(0 0 0 / 20%);
     text-shadow: none;
+  }
+
+  /* fades out when "Explore LookBook" leaves the demo */
+  .show-source-dialog[open] {
+    view-transition-name: lb-dialog;
   }
 
   .show-source-dialog::backdrop {

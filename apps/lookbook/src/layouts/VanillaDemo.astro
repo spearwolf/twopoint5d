@@ -28,6 +28,8 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/lookbook/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>2.5d lookbook &#x2022; {title} demo</title>
+    <!-- the view transition from the explorer takes its snapshot of this page once the navbar is parsed -->
+    <link rel="expect" href="#lb-demo-nav" blocking="render" />
     <script is:inline>
       // ?ui=0 hides the chrome of the lookbook around the demo, for a demo embedded in an
       // iframe; ?preview=1 is the page `pnpm lookbook:generate-previews` takes its screenshot

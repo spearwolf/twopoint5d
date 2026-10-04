@@ -44,6 +44,7 @@ import {RAINBOW_COLORS} from './rainbowColors';
     font-size: var(--tag-font-size);
     padding: 0.2em 0.8em 0.2em 0.3em;
     border-radius: 2em;
+    view-transition-name: lb-search;
   }
 
   .open-search-dialog-action:is(:hover, :focus-within) {
@@ -67,6 +68,8 @@ import {RAINBOW_COLORS} from './rainbowColors';
   .search-lookbook-dialog[open] {
     display: flex;
     flex-direction: column;
+    /* fades out when a search result opens a demo */
+    view-transition-name: lb-dialog;
   }
 
   .search-body {

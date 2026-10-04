@@ -17,6 +17,9 @@ const {title} = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/lookbook/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <!-- the view transition from a demo takes its snapshot of this page once the navbar is parsed;
+         a later page on this layout without the LookbookHeader renders when its document is parsed -->
+    <link rel="expect" href="#lb-explorer-nav" blocking="render" />
   </head>
   <body class="antialiased">
     <slot />
