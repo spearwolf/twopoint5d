@@ -21,6 +21,13 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     <link rel="icon" type="image/svg+xml" href="/lookbook/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>2.5d lookbook &#x2022; {title} demo</title>
+    <script is:inline>
+      // ?ui=0 hides the chrome of the lookbook around the demo, for a demo embedded in an
+      // iframe; set before the first paint, so the navbar never flashes up
+      if (new URLSearchParams(location.search).get('ui') === '0') {
+        document.documentElement.dataset.demoUi = 'off';
+      }
+    </script>
   </head>
   <body class:list={{'fullscreen-canvas': fullscreenCanvas}}>
     <DemoNavBar title={title} description={description} />
@@ -30,6 +37,13 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
 </html>
 
 <style is:global>
+  /* the room the DemoNavBar overlay takes at the top, for a page that keeps its content clear of it */
+  :root {
+    --demo-nav-bar-height: 4rem;
+  }
+  :root[data-demo-ui='off'] {
+    --demo-nav-bar-height: 0px;
+  }
   html {
     font-family: system-ui, sans-serif;
     background-color: #232348;

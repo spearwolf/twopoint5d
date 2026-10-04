@@ -21,9 +21,20 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
 //      see https://github.com/danielgjackson/qrcodejs
 ---
 
-<div class="z-50 sticky top-0 y-0">
-  <header class="lookbook-demo-header flex justify-start items-center px-1.5 lg:pe-5 lg:ps-4 h-14 backdrop-blur-xs">
-    <figure class="flex items-center justify-start text-slate-400">
+<div class="demo-nav-bar">
+  <div class="progressive-blur" aria-hidden="true">
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+
+  <div class="rainbow-line-container">
+    <RainbowLine shadow colorSliceWidth={32} />
+  </div>
+
+  <header class="lookbook-demo-header flex justify-start items-center gap-3 px-3 sm:gap-4 sm:px-4 lg:px-6">
+    <figure class="flex shrink-0 items-center justify-start gap-1.5 text-slate-300">
       <figcaption>a</figcaption>
       <button class="interactive-action open-show-source-dialog-action">
         <img class="h-8" src={twopoint5d} alt="twopoint5d" />
@@ -31,19 +42,15 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
       <figcaption>demo::</figcaption>
     </figure>
 
-    <div class="pl-1 flex-1 flex justify-start items-center font-bold text-white">{title}</div>
-
-    <div class="rainbow-line-container">
-      <RainbowLine shadow colorSliceWidth={32} />
-    </div>
+    <div class="min-w-0 flex-1 truncate font-bold text-white">{title}</div>
   </header>
 </div>
 
 <dialog
-  class="show-source-dialog w-full md:min-w-md max-w-xl px-6 py-4 rounded-md backdrop-blur-xs border-t border-b md:border-r md:border-l border-[#e5e500]"
+  class="show-source-dialog m-auto w-full md:min-w-md max-w-xl px-6 py-4 rounded-md backdrop-blur-xs border-t border-b md:border-r md:border-l border-[#e5e500]"
 >
   <header class="flex flex-row items-center justify-between mb-4">
-    <figure class="flex items-center justify-start text-slate-300">
+    <figure class="flex items-center justify-start gap-1.5 text-slate-300">
       <figcaption>a</figcaption>
       <a href={import.meta.env.BASE_URL}>
         <img class="h-8" src={twopoint5d} alt="twopoint5d" />
@@ -89,19 +96,73 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
 </dialog>
 
 <style>
-  .lookbook-demo-header {
-    background-color: rgba(0 0 0 / 0.5);
-    box-shadow: 0 0 20px #4c4c42;
+  /* an overlay over the demo: it takes no room in the page and lets every pointer event through
+     to the demo, apart from the logo button */
+  .demo-nav-bar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 50;
+    pointer-events: none;
+  }
+
+  /* the ?ui=0 switch of VanillaDemo.astro, read before the first paint */
+  :global(html[data-demo-ui='off']) .demo-nav-bar {
+    display: none;
+  }
+
+  /* no color of its own: stacked layers blur the demo behind the bar, each one stronger and
+     shorter than the one before, so the blur is heaviest at the top edge and fades out below */
+  .progressive-blur {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 6rem;
+  }
+  .progressive-blur > div {
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(var(--blur));
+    mask-image: linear-gradient(to bottom, #000 0%, #000 var(--solid), transparent var(--fade));
+  }
+  .progressive-blur > div:nth-child(1) {
+    --blur: 1px;
+    --solid: 50%;
+    --fade: 100%;
+  }
+  .progressive-blur > div:nth-child(2) {
+    --blur: 2px;
+    --solid: 35%;
+    --fade: 80%;
+  }
+  .progressive-blur > div:nth-child(3) {
+    --blur: 4px;
+    --solid: 20%;
+    --fade: 60%;
+  }
+  .progressive-blur > div:nth-child(4) {
+    --blur: 8px;
+    --solid: 5%;
+    --fade: 40%;
   }
 
   .rainbow-line-container {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    display: block;
-    width: 100%;
-    height: 0;
-    pointer-events: none;
+    inset: 0 0 auto 0;
+    --rainbow-line-height: 3px;
+  }
+
+  /* without a background of its own, the text has to stand out from whatever the demo draws */
+  .lookbook-demo-header {
+    position: relative;
+    height: var(--demo-nav-bar-height);
+    text-shadow:
+      0 1px 2px rgba(0 0 0 / 70%),
+      0 0 12px rgba(0 0 0 / 50%);
+  }
+  .lookbook-demo-header img {
+    filter: drop-shadow(0 1px 2px rgba(0 0 0 / 70%));
+  }
+  .open-show-source-dialog-action {
+    pointer-events: auto;
   }
 
   .demo-title {

@@ -4,7 +4,7 @@ import {description, title} from './_display-multi.json';
 ---
 
 <Layout title={title} description={description}>
-  <div class="pt-[28px] h-full">
+  <div class="flow-root pt-(--demo-nav-bar-height) h-full">
     <section class="gridContainer">
       <div class="gridCell">
         <div class="canvasContainer border-box" data-force-webgl>
@@ -153,7 +153,8 @@ import {description, title} from './_display-multi.json';
 
   .gridContainer {
     display: grid;
-    height: 100%;
+    /* the margin would push the grid out of the page by its own size */
+    height: calc(100% - 4px);
     margin: 2px;
     grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: 1fr 1fr;

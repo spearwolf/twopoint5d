@@ -4,7 +4,7 @@ import {description, title} from './_stage-projections.json';
 ---
 
 <Layout title={title} description={description}>
-  <div class="pt-[28px] h-full">
+  <div class="flow-root pt-(--demo-nav-bar-height) h-full">
     <section class="gridContainer">
       <div class="gridCell">
         <div class="canvasContainer" data-projection="orthographic"></div>
@@ -149,7 +149,8 @@ import {description, title} from './_stage-projections.json';
 
   .gridContainer {
     display: grid;
-    height: 100%;
+    /* the margin would push the grid out of the page by its own size */
+    height: calc(100% - 4px);
     margin: 2px;
     grid-template-columns: 1fr 1fr;
     gap: 1px;

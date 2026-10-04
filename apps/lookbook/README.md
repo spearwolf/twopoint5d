@@ -38,7 +38,11 @@ declared in `tsconfig.json`. All 18 demo pages import through them.
    `fullscreenCanvas` the layout writes a canvas that fills the window, and
    `getFullscreenCanvas()` from `src/demos/utils/fullscreenCanvas.ts` hands it to the
    script of the page. `<TexturePreview>` from `src/components/` shows a texture in a
-   corner of the page, filled by `showTexturePreview()`.
+   corner of the page, filled by `showTexturePreview()`. The layout lays the navbar of
+   `DemoNavBar.astro` over the top of the page; a page that keeps its content clear of
+   it pads by `var(--demo-nav-bar-height)`, as `display-multi.astro` does. `?ui=0` in the
+   URL of any demo page hides the navbar, e.g. for a demo embedded in an iframe, and sets
+   the variable to `0px`.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are
