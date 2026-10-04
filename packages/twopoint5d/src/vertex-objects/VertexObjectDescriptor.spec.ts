@@ -403,6 +403,16 @@ describe('VertexObjectDescriptor', () => {
       expect(run).toThrow(/buffer "shared" holds attribute "a" \(float32, static\) and attribute "b" \(uint8, static\)/);
     });
 
+    test('an integer of one value laid out as 32 bits and one of its declared type in one buffer', () => {
+      const run = build({
+        attributes: {a: {size: 1, type: 'int16', bufferName: 'shared'}, b: {size: 2, type: 'int16', bufferName: 'shared'}},
+      });
+      expect(run).toThrow(TypeError);
+      expect(run).toThrow(
+        /buffer "shared" holds attribute "a" \(int16 laid out as int32, static\) and attribute "b" \(int16, static\)/,
+      );
+    });
+
     test('two attributes of different usage in one buffer', () => {
       expect(
         build({

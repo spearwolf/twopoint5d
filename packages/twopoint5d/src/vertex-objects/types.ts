@@ -57,9 +57,13 @@ export interface VADescription {
    * vertex in its buffer: one whose values do not end on a 4-byte boundary gets padding elements
    * behind them — `'uint8'` with `size: 3` takes 4 elements, `'float16'` with `size: 3` as well.
    * No accessor reads or writes the padding, and `toBuffersData()` carries it along; the gpu asks
-   * for every attribute of a vertex buffer on a 4-byte boundary. Under three's WebGPU backend an
-   * attribute of `'int8'`, `'uint8'`, `'int16'` or `'uint16'` without `normalized` uploads as 32-bit
-   * values, and the geometry holds that copy in step with the pool.
+   * for every attribute of a vertex buffer on a 4-byte boundary.
+   *
+   * An attribute of `'int8'` or `'int16'` with a single value and without `normalized` is laid out
+   * as `'int32'`, one of `'uint8'` or `'uint16'` as `'uint32'`: three builds no vertex format of
+   * one value for these types. Its buffer, its buffers data and the arrays its getter answers take
+   * the 32-bit type, and it holds every value that type holds. The gpu reads the arrays of the pool
+   * as they are laid out — nothing is copied or widened on the way.
    *
    * The descriptor refuses an attribute of `'float64'` or `'uint8clamped'`, of `'float16'` with a
    * single value, and one that holds more than four values per vertex: WebGPU has no vertex

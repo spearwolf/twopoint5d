@@ -70,6 +70,24 @@ describe('VertexAttributeDescriptor', () => {
     expect(descriptor.dataType).toBe('float32');
   });
 
+  test('an 8- or 16-bit integer of one value without normalized is laid out as a 32-bit integer', () => {
+    const layoutOf = (type: 'int8' | 'int16' | 'uint8' | 'uint16') =>
+      new VertexAttributeDescriptor('a', {size: 1, type}).dataType;
+
+    expect(layoutOf('int8')).toBe('int32');
+    expect(layoutOf('int16')).toBe('int32');
+    expect(layoutOf('uint8')).toBe('uint32');
+    expect(layoutOf('uint16')).toBe('uint32');
+    expect(new VertexAttributeDescriptor('a', {components: ['x'], type: 'int16'}).dataType).toBe('int32');
+    expect(new VertexAttributeDescriptor('a', {size: 1, type: 'uint16'}).bufferName).toBe('static_uint32');
+  });
+
+  test('an 8- or 16-bit integer of two values or more, or with normalized, keeps its type', () => {
+    expect(new VertexAttributeDescriptor('a', {size: 2, type: 'int16'}).dataType).toBe('int16');
+    expect(new VertexAttributeDescriptor('a', {size: 4, type: 'uint8'}).dataType).toBe('uint8');
+    expect(new VertexAttributeDescriptor('a', {size: 2, type: 'uint8', normalized: true}).dataType).toBe('uint8');
+  });
+
   test('default usageType is static', () => {
     const descriptor = new VertexAttributeDescriptor('foo', {
       size: 1,

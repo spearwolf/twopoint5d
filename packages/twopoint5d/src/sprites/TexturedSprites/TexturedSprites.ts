@@ -29,6 +29,7 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
 
   #ownsGeometry: boolean;
   #ownsMaterial: boolean;
+  #disposed = false;
 
   /** The sprite pool of the geometry this mesh was built with — `undefined` once disposed. */
   get spritePool(): TexturedSpritesPool | undefined {
@@ -104,12 +105,21 @@ export class TexturedSprites extends VertexObjects<TexturedSpritesGeometry> {
    *
    * The mesh takes itself out of the scene graph first. Afterwards `geometry`, `material`,
    * {@link spritePool} and {@link texture} answer `undefined`, {@link createSprite} answers
-   * `undefined` and {@link freeSprite} does nothing. A second call does nothing.
+   * `undefined` and {@link freeSprite} does nothing. Like `Object3D.dispose()` it fires three's
+   * `dispose` event, so the renderer drops what it built for this mesh. A second call does
+   * nothing.
    */
-  dispose(): void {
+  override dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+
     // a mesh without geometry and material cannot be rendered, so it leaves the
     // scene graph before it gives them up, rather than asking the caller to do it first
     this.removeFromParent();
+
+    // three's dispose event: the renderer drops what it built for this mesh, which a geometry
+    // or a material handed in and left alive below would otherwise keep in its caches
+    super.dispose();
 
     if (this.#ownsGeometry) {
       this.geometry?.dispose();

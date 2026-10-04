@@ -169,8 +169,8 @@ describe('Display — what the constructor accepts and what it reports', functio
         createRenderer: (params) => {
           const renderer = new WebGPURenderer({...params});
           const realDispose = renderer.dispose.bind(renderer);
-          renderer.dispose = () => {
-            realDispose();
+          renderer.dispose = async () => {
+            await realDispose();
             markReleased();
           };
           return renderer;

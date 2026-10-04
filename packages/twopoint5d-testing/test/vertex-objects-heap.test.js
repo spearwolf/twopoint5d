@@ -17,9 +17,11 @@ import {makeContainer, disposeDisplay, quadDescription, instancedDescription} fr
 // - every mesh rendered with the shared material gets a `RenderObject`, held by its dispose
 //   listener on the material. It keeps the mesh, the disposed geometry and its own uniform group.
 //   `geometry.dispose()` leaves the listener in place; three releases the `RenderObject` on
-//   `material.dispose()` or when its cache key changes. A material that is only garbage
-//   collected takes the `RenderObject` along, but not its uniform group: the renderer's
-//   `info.memoryMap` keeps that until `material.dispose()` or `renderer.dispose()`.
+//   `material.dispose()`, on the `dispose()` of the mesh — from three 0.186 on, which this test
+//   does not call — or when its cache key changes. A material that is only garbage collected
+//   takes the `RenderObject` along; through three 0.185 the renderer's `info.memoryMap` kept its
+//   uniform group until `material.dispose()` or `renderer.dispose()`, from 0.186 on the map holds
+//   its keys weakly.
 // - that `RenderObject` also keeps the typed arrays of the geometry through `attributes`: three
 //   clears the field on the dispose event of the geometry, and its geometry bookkeeping fills it
 //   again while handling the same event, because the geometry still holds its attributes then.

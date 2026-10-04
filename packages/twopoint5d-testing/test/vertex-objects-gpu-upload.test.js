@@ -1,6 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
-import {attribute, vec3} from 'three/tsl';
+import {attribute, float, vec3} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   makeContainer,
@@ -14,16 +14,19 @@ import {
   isNearColor,
 } from './helpers/fixtures.js';
 
-/** @import {VO, VOAttrSetter, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @import {VO, VOAttrSetter, VOBufferGeometry, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 /** @typedef {VO & {setInstanceOffset: VOAttrSetter}} InstanceVO */
 /** @typedef {VO & {setPosition: VOAttrSetter, setColor: VOAttrSetter}} ColoredQuadVO */
 /** @typedef {VO & {setPosition: VOAttrSetter, setBase: VOAttrSetter, setTint: VOAttrSetter}} TintedQuadVO */
+/** @typedef {VO & {setPosition: VOAttrSetter, setDx: VOAttrSetter, setDy: VOAttrSetter}} OffsetQuadVO */
+/** @typedef {VO & {setPosition: VOAttrSetter, setLevel: VOAttrSetter}} LevelQuadVO */
+/** @typedef {VO & {setPosition: VOAttrSetter, setBytes: VOAttrSetter}} ByteQuadVO */
 
 /**
  * Reads an interleaved attribute back out of the gpu buffer it shares with its siblings.
  *
- * On the WebGL backend three 0.185.1 answers an empty buffer for it: in
+ * On the WebGL backend three 0.186.1 answers an empty buffer for it: in
  * `src/renderers/webgl-fallback/utils/WebGLAttributeUtils.js`, `createAttribute()` files the
  * record that carries `byteLength` under the attribute wrapper, while `getArrayBufferAsync()`
  * looks it up under the shared buffer, `attribute.data`. The gl buffer is read directly
@@ -85,6 +88,58 @@ const tintedQuadDescription = {
     glow: {size: 3, type: 'uint8', normalized: true, bufferName: 'glow'},
   },
 };
+
+// `dx` and `dy` are int16 attributes of one value that share a buffer, `level` a uint16 attribute
+// of one value alone in its buffer: three builds no vertex format of one value for either type, so
+// the descriptor lays all three out as 32-bit integers
+/** @type {VertexObjectDescription} */
+const offsetQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {
+    position: {components: ['x', 'y', 'z'], type: 'float32'},
+    dx: {size: 1, type: 'int16', bufferName: 'offsets'},
+    dy: {size: 1, type: 'int16', bufferName: 'offsets'},
+  },
+};
+
+// four bytes without `normalized` alone in their buffer: three widens such an array to 32 bits as
+// a BufferAttribute and leaves it as it is as an InterleavedBuffer, which is how the geometry hands
+// it over
+/** @type {VertexObjectDescription} */
+const byteQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {
+    position: {components: ['x', 'y', 'z'], type: 'float32'},
+    bytes: {size: 4, type: 'uint8'},
+  },
+};
+
+/** @type {VertexObjectDescription} */
+const levelQuadDescription = {
+  vertexCount: 4,
+  indices: [0, 1, 2, 0, 2, 3],
+  attributes: {
+    position: {components: ['x', 'y', 'z'], type: 'float32'},
+    level: {size: 1, type: 'uint16'},
+  },
+};
+
+/**
+ * Every attribute of `geometry` still draws from the array its pool holds for it: nothing was
+ * copied or widened on the way to the gpu.
+ *
+ * @param {VOBufferGeometry} geometry
+ */
+function expectPoolArrays(geometry) {
+  for (const [name, attr] of Object.entries(geometry.attributes)) {
+    const {bufferName} = geometry.pool.buffer.bufferAttributes.get(name);
+    expect(bufferOf(attr).array === geometry.pool.buffer.buffers.get(bufferName).typedArray, `the array of ${name}`).to.equal(
+      true,
+    );
+  }
+}
 
 // a width of 64 pixels keeps the rows rgbAt() reads unpadded
 const TARGET_SIZE = 64;
@@ -382,6 +437,91 @@ describe('vertex-objects — gpu upload', function () {
       );
       expect(backend.get(bufferOf(geometry.getAttribute('glow')))._paddedItemSize).to.equal(undefined);
     }
+  });
+
+  it('two int16 attributes of one value that share a buffer are each drawn with their own value and sign', async function () {
+    /** @type {VertexObjectGeometry<OffsetQuadVO>} */
+    const geometry = new VertexObjectGeometry(offsetQuadDescription, 1);
+    const material = new MeshBasicNodeMaterial();
+    // red out of `dx`, green out of the negated `dy`: a sign lost on the way reads as 0
+    material.colorNode = vec3(
+      float(attribute('dx', /** @type {const} */ ('int'))).div(255),
+      float(attribute('dy', /** @type {const} */ ('int')))
+        .negate()
+        .div(255),
+      0,
+    );
+    const mesh = new VertexObjects(geometry, material);
+    scene.add(mesh);
+
+    const quad = geometry.pool.createVO();
+    quad.setPosition([-10, -10, 0, 10, -10, 0, 10, 10, 0, -10, 10, 0]);
+    quad.setDx([200, 200, 200, 200]);
+    quad.setDy([-100, -100, -100, -100]);
+    mesh.update();
+
+    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
+    try {
+      const pixels = await renderToPixels(display.renderer, scene, camera, target);
+      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+      expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
+    } finally {
+      target.dispose();
+    }
+    expectPoolArrays(geometry);
+  });
+
+  it('a uint16 attribute of one value alone in its buffer is drawn with its value', async function () {
+    /** @type {VertexObjectGeometry<LevelQuadVO>} */
+    const geometry = new VertexObjectGeometry(levelQuadDescription, 1);
+    const material = new MeshBasicNodeMaterial();
+    material.colorNode = vec3(float(attribute('level', /** @type {const} */ ('uint'))).div(255), 0, 0);
+    const mesh = new VertexObjects(geometry, material);
+    scene.add(mesh);
+
+    const quad = geometry.pool.createVO();
+    quad.setPosition([-10, -10, 0, 10, -10, 0, 10, 10, 0, -10, 10, 0]);
+    quad.setLevel([200, 200, 200, 200]);
+    mesh.update();
+
+    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
+    try {
+      const pixels = await renderToPixels(display.renderer, scene, camera, target);
+      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+      expect(isNearColor(middle, [200, 0, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
+    } finally {
+      target.dispose();
+    }
+    expectPoolArrays(geometry);
+  });
+
+  it('four bytes without normalized are drawn from the array of the pool', async function () {
+    /** @type {VertexObjectGeometry<ByteQuadVO>} */
+    const geometry = new VertexObjectGeometry(byteQuadDescription, 1);
+    const material = new MeshBasicNodeMaterial();
+    // red out of the first byte, green out of the last: a layout read at the wrong width mixes them
+    const bytes = attribute('bytes', /** @type {const} */ ('uvec4'));
+    material.colorNode = vec3(float(bytes.x).div(255), float(bytes.w).div(255), 0);
+    const mesh = new VertexObjects(geometry, material);
+    scene.add(mesh);
+
+    const quad = geometry.pool.createVO();
+    quad.setPosition([-10, -10, 0, 10, -10, 0, 10, 10, 0, -10, 10, 0]);
+    quad.setBytes([200, 1, 2, 100, 200, 1, 2, 100, 200, 1, 2, 100, 200, 1, 2, 100]);
+    mesh.update();
+
+    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
+    try {
+      const pixels = await renderToPixels(display.renderer, scene, camera, target);
+      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+      expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
+    } finally {
+      target.dispose();
+    }
+    expectPoolArrays(geometry);
   });
 
   it('three still reads an interleaved attribute back as an empty buffer on the WebGL backend', async function () {

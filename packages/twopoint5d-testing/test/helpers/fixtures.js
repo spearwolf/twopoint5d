@@ -76,16 +76,16 @@ export function disposeDisplay(display) {
 }
 
 /**
- * Resolves once renderer.dispose() has run — the release of a display happens after its dispose() has returned.
+ * Resolves once renderer.dispose() has settled — the release of a display happens after its dispose() has returned.
  *
- * @param {{dispose(): void}} renderer
+ * @param {{dispose(): Promise<void>}} renderer
  * @returns {Promise<void>}
  */
 export function whenReleased(renderer) {
   return new Promise((resolve) => {
     const realDispose = renderer.dispose.bind(renderer);
-    renderer.dispose = () => {
-      realDispose();
+    renderer.dispose = async () => {
+      await realDispose();
       resolve();
     };
   });

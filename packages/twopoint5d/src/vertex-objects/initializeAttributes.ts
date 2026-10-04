@@ -8,10 +8,17 @@ import {
 } from 'three/webgpu';
 import type {AttributeRoute, GeometryAttributeSlots} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
+import type {VertexAttributeDataType} from './types.js';
 import {asThreeTypedArray} from './asThreeTypedArray.js';
 import {createIndicesArray} from './createIndicesArray.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
+
+// three 0.186.1 widens the array of an 8- or 16-bit integer BufferAttribute without `normalized`
+// to 32 bits as it builds its gpu buffer, and from then on uploads from that copy
+// (`WebGPUAttributeUtils.js:82–107`). It leaves an InterleavedBuffer as it is and gives it the
+// format of its own type (`sint16x2`, `uint8x4`, …), so a buffer of these types reaches three as one
+const typesThreeWidens: ReadonlySet<VertexAttributeDataType> = new Set(['int8', 'int16', 'uint8', 'uint16']);
 
 /**
  * What separates a plain attribute route from an instanced one: the two three.js
@@ -49,9 +56,12 @@ function initializeRoute(
     // BufferAttribute of the padded itemSize would show the shader the padding as a component, one
     // of the attribute's size would read the array at the wrong stride. An InterleavedBuffer carries
     // the stride, and three never pads one — it has no itemSize (`WebGPUAttributeUtils.js:119`), and
-    // its arrayStride is `stride × BYTES_PER_ELEMENT` (`:306`)
-    const padded = attributes.length === 1 && descriptor.attributes.get(attributes[0]!.attributeName)?.size !== buffer.itemSize;
-    if (attributes.length > 1 || padded) {
+    // its arrayStride is `stride × BYTES_PER_ELEMENT` (`:304`)
+    const first = descriptor.attributes.get(attributes[0]!.attributeName);
+    const padded = attributes.length === 1 && first?.size !== buffer.itemSize;
+    // every attribute of a buffer agrees on type and `normalized` (`VertexObjectDescriptor`)
+    const threeWouldWiden = typesThreeWidens.has(buffer.dataType) && first?.normalizedData === false;
+    if (attributes.length > 1 || padded || threeWouldWiden) {
       const interleavedBuffer = builders.interleavedBuffer(asThreeTypedArray(buffer.typedArray!), buffer.itemSize);
       interleavedBuffer.setUsage(toDrawUsage(buffer.usageType));
       buffers.set(buffer.bufferName, interleavedBuffer);

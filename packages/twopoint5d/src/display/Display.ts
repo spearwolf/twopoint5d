@@ -258,7 +258,7 @@ async function disposeKeepingContextRestorable(renderer: WebGPURenderer): Promis
   // the extension three calls no loseContext(), and there is nothing to restore
   const extension = gl != null && !gl.isContextLost() ? gl.getExtension('WEBGL_lose_context') : null;
   if (gl == null || extension == null) {
-    renderer.dispose();
+    await renderer.dispose();
     return undefined;
   }
 
@@ -275,7 +275,9 @@ async function disposeKeepingContextRestorable(renderer: WebGPURenderer): Promis
   // once: the listener is meant for the loss renderer.dispose() causes and for no later one
   canvas.addEventListener('webglcontextlost', onContextLost, {once: true});
   try {
-    renderer.dispose();
+    // awaited: WebGLBackend.dispose() calls loseContext() only after an await of its own, so the
+    // context is not lost yet when the call returns
+    await renderer.dispose();
   } catch (error) {
     canvas.removeEventListener('webglcontextlost', onContextLost);
     throw error;
@@ -1268,7 +1270,7 @@ export class Display {
    * While the display holds in the pause, the animation loop of its renderer stands still as
    * well. three runs that loop from `renderer.init()` on, on every animation frame of the page,
    * and `setAnimationLoop(null)` only takes the callback out of it; so the display stops the loop
-   * as it goes into the pause and starts it again as it runs. three 0.185 offers no public way to
+   * as it goes into the pause and starts it again as it runs. three 0.186 offers no public way to
    * do so, and the display reaches the loop through `renderer._animation`: a renderer without it
    * keeps its loop running through the pause. So does a renderer whose loop still carries a
    * callback when the display would stop it — that of another {@link FrameLoop} on the renderer,
@@ -1943,7 +1945,7 @@ export class Display {
           await drainSubmittedWork(renderer);
           await waitForTwoAnimationFrames(renderer);
           if (!handBack) {
-            renderer.dispose();
+            await renderer.dispose();
             return;
           }
           const lost = await disposeKeepingContextRestorable(renderer);

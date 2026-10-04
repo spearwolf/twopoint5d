@@ -189,9 +189,10 @@ export class Map2D extends Group {
    * Every member answers afterwards as it did before — `tileStreamer` included — because nothing
    * was given up. When the `clearTiles()` of a renderer throws, the error goes on, and that
    * renderer and those not reached yet stay on the map; a second call takes off what is left.
-   * Otherwise a second call does nothing.
+   * Every call that gets through fires three's `dispose` event, as `Object3D.dispose()` does;
+   * beyond that a second call does nothing.
    */
-  dispose(): void {
+  override dispose(): void {
     // this map is a scene-graph node itself: it goes before it lets its renderers go,
     // so nothing reaches a half-emptied group in the next frame
     this.removeFromParent();
@@ -199,5 +200,7 @@ export class Map2D extends Group {
     for (const renderer of this.#renderers) {
       this.removeTileRenderer(renderer);
     }
+
+    super.dispose();
   }
 }

@@ -1,8 +1,9 @@
 import type {InstancedBufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
-import {BufferAttribute, BufferGeometry} from 'three/webgpu';
+import {BufferAttribute, BufferGeometry, InstancedInterleavedBuffer} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
+import type {VOBufferGeometry} from './VOBufferGeometry.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -189,9 +190,11 @@ describe('vertex-buffers-geometry-updates', () => {
           geometry.instancedPool.buffer.buffers.get('static_uint8')!.typedArray,
         );
 
-        const colorAttribute = geometry.getAttribute('color')! as InstancedBufferAttribute;
-        expect(colorAttribute.isInstancedBufferAttribute).toBe(true);
-        expect(colorAttribute.array).toBe(geometry.instancedPool.buffer.buffers.get('static_uint8')!.typedArray);
+        // four bytes without normalized: an InterleavedBuffer, which three uploads as it is
+        const colorAttribute = geometry.getAttribute('color')! as InterleavedBufferAttribute;
+        expect(colorAttribute.isInterleavedBufferAttribute).toBe(true);
+        expect(colorAttribute.data).toBeInstanceOf(InstancedInterleavedBuffer);
+        expect(colorAttribute.data.array).toBe(geometry.instancedPool.buffer.buffers.get('static_uint8')!.typedArray);
       });
 
       test('foo, bar', () => {
@@ -436,7 +439,7 @@ describe('vertex-buffers-geometry-updates', () => {
       });
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(0);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBe(0);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBe(0);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBe(0);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBe(0);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBe(0);
@@ -446,7 +449,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBeGreaterThan(0);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBeGreaterThan(0);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBeGreaterThan(0);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(0);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(0);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(0);
@@ -460,7 +463,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -468,7 +471,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBe(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBe(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBe(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBe(bar_serial);
@@ -480,7 +483,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -490,7 +493,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBeGreaterThan(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBeGreaterThan(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBe(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBe(bar_serial);
@@ -502,7 +505,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -512,7 +515,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBe(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBe(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(bar_serial);
@@ -524,7 +527,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -534,7 +537,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBeGreaterThan(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBeGreaterThan(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(bar_serial);
@@ -548,7 +551,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -558,7 +561,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBe(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBe(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBe(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBe(bar_serial);
@@ -579,7 +582,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       const position_serial = (geometry.getAttribute('position') as BufferAttribute).version;
-      const color_serial = (geometry.getAttribute('color') as BufferAttribute).version;
+      const color_serial = (geometry.getAttribute('color') as InterleavedBufferAttribute).data.version;
       const impact_serial = (geometry.getAttribute('impact') as BufferAttribute).version;
       const foo_serial = (geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version;
       const bar_serial = (geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version;
@@ -589,7 +592,7 @@ describe('vertex-buffers-geometry-updates', () => {
       geometry.update();
 
       expect((geometry.getAttribute('position') as BufferAttribute).version, 'position').toBe(position_serial);
-      expect((geometry.getAttribute('color') as BufferAttribute).version, 'color').toBeGreaterThan(color_serial);
+      expect((geometry.getAttribute('color') as InterleavedBufferAttribute).data.version, 'color').toBeGreaterThan(color_serial);
       expect((geometry.getAttribute('impact') as BufferAttribute).version, 'impact').toBeGreaterThan(impact_serial);
       expect((geometry.getAttribute('foo') as InterleavedBufferAttribute).data.version, 'foo').toBeGreaterThan(foo_serial);
       expect((geometry.getAttribute('bar') as InterleavedBufferAttribute).data.version, 'bar').toBeGreaterThan(bar_serial);
@@ -1777,69 +1780,30 @@ describe('vertex-buffers-geometry-updates', () => {
     });
   });
 
-  // three 0.185.1 builds the gpu buffer of an 8- or 16-bit integer attribute without `normalized`
-  // out of a 32-bit copy of its array, puts that copy in the place of `array` and uploads from it
-  // alone from then on (`WebGPUAttributeUtils#createAttribute()`,
-  // `src/renderers/webgpu/utils/WebGPUAttributeUtils.js:84–109`). Building the gpu buffer leaves
-  // the update ranges standing; the first update after it takes them up
-  // (`src/renderers/common/Attributes.js:73–107`). Each test below widens the array by hand after
-  // the first `update()` and empties the ranges, the state that update leaves behind, since no
-  // renderer runs in this suite
-  describe('an array three widened to 32 bits', () => {
-    interface LevelVO extends VO {
-      a: number;
-      b: number;
-    }
-
+  // The gpu reads the arrays of the pool as the descriptor lays them out: nothing is copied or
+  // widened on the way. three 0.186.1 widens the array of an 8- or 16-bit integer BufferAttribute
+  // without `normalized` to 32 bits as it builds its gpu buffer (`WebGPUAttributeUtils.js:82–107`)
+  // and leaves an InterleavedBuffer as it is, so such a buffer always reaches three as one; an
+  // attribute of one value of these types is laid out as a 32-bit integer by the descriptor
+  describe('the arrays three gets are the arrays of the pool', () => {
     interface OffsetVO extends VO {
       dx: number;
       dy: number;
+    }
+
+    interface LevelVO extends VO {
+      level: number;
     }
 
     interface RgbaVO extends VO {
       setRgba(...values: number[]): void;
     }
 
-    const rgbaDescription = {attributes: {rgba: {components: ['r', 'g', 'b', 'a'], type: 'uint8' as const}}};
+    const arrayOf = (geometry: BufferGeometry, attrName: string) => bufferInSlot(geometry, attrName)!.array;
+    const poolArrayOf = (geometry: VOBufferGeometry, bufferName: string) =>
+      geometry.pool.buffer.buffers.get(bufferName)!.typedArray;
 
-    const widen = <T extends Uint32Array | Int32Array>(
-      geometry: BufferGeometry,
-      attrName: string,
-      ArrayType: new (source: ArrayLike<number>) => T,
-    ): T => {
-      const buffer = bufferInSlot(geometry, attrName)!;
-      const widened = new ArrayType(buffer.array);
-      buffer.array = widened;
-      buffer.clearUpdateRanges();
-      return widened;
-    };
-
-    test('a write after the widening reaches the gpu through the widened array', () => {
-      const geometry = new VertexObjectGeometry<LevelVO>(
-        {vertexCount: 1, attributes: {level: {components: ['a', 'b'], type: 'uint16', usage: 'dynamic'}}},
-        4,
-      );
-      const vo0 = geometry.pool.createVO()!;
-      const vo1 = geometry.pool.createVO()!;
-      vo0.a = 1;
-      vo0.b = 2;
-      vo1.b = 3;
-      geometry.update();
-
-      const widened = widen(geometry, 'level', Uint32Array);
-
-      vo1.a = 60000;
-      geometry.update();
-
-      const attr = geometry.getAttribute('level') as BufferAttribute;
-      expect(attr.array).toBe(widened);
-      const poolArray = geometry.pool.buffer.buffers.get('dynamic_uint16')!.typedArray!;
-      expect(Array.from(widened.subarray(0, 4))).toEqual(Array.from(poolArray.subarray(0, 4)));
-      expect(Array.from(widened.subarray(0, 4))).toEqual([1, 2, 60000, 3]);
-      expect(attr.updateRanges).toEqual([{start: 0, count: 4}]);
-    });
-
-    test('an interleaved array keeps the sign of every value it takes', () => {
+    test('two int8 attributes of one value share a buffer of 32-bit integers', () => {
       const geometry = new VertexObjectGeometry<OffsetVO>(
         {
           attributes: {
@@ -1850,91 +1814,96 @@ describe('vertex-buffers-geometry-updates', () => {
         4,
       );
       const vo = geometry.pool.createVO()!;
+      vo.dx = -5;
+      vo.dy = -128;
       geometry.update();
 
       const dx = geometry.getAttribute('dx') as InterleavedBufferAttribute;
-      const dy = geometry.getAttribute('dy') as InterleavedBufferAttribute;
-      expect(dx.isInterleavedBufferAttribute).toBe(true);
-      expect(dx.data).toBe(dy.data);
-      expect(dx.data.stride).toBe(8);
-      expect(dx.offset).toBe(0);
-      expect(dy.offset).toBe(4);
-
-      const widened = widen(geometry, 'dx', Int32Array);
-
-      vo.dx = -5;
-      vo.dy = -128;
-      geometry.pool.touchVO(vo);
-      geometry.update();
-
-      expect(dx.data.array).toBe(widened);
-      expect(widened[0]).toBe(-5);
-      expect(widened[4]).toBe(-128);
+      expect(dx.data).toBe((geometry.getAttribute('dy') as InterleavedBufferAttribute).data);
+      expect(dx.data.stride).toBe(2);
+      expect(dx.data.array).toBeInstanceOf(Int32Array);
+      expect(dx.data.array).toBe(poolArrayOf(geometry, 'offsets'));
+      expect(Array.from(dx.data.array.subarray(0, 2))).toEqual([-5, -128]);
     });
 
-    test('only the objects an upload carries are copied into the widened array', () => {
-      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 8);
-      const vo0 = geometry.pool.createVO()!;
-      const vo1 = geometry.pool.createVO()!;
-      const vo2 = geometry.pool.createVO()!;
-      vo0.setRgba(1, 2, 3, 4);
-      vo1.setRgba(5, 6, 7, 8);
-      vo2.setRgba(9, 10, 11, 12);
+    test('a uint16 attribute of one value alone in its buffer is a plain attribute of 32-bit integers', () => {
+      const geometry = new VertexObjectGeometry<LevelVO>({attributes: {level: {size: 1, type: 'uint16'}}}, 4);
+      geometry.pool.createVO()!.level = 70000;
       geometry.update();
 
-      const widened = widen(geometry, 'rgba', Uint32Array);
-      // a value the array of the pool cannot hold, so only a copy of object 0 would replace it
-      widened[0] = 1000;
-
-      vo2.setRgba(13, 14, 15, 16);
-      geometry.pool.touchVO(vo2);
-      geometry.update();
-
-      const attr = geometry.getAttribute('rgba') as BufferAttribute;
-      expect(attr.array).toBe(widened);
-      expect(widened[0]).toBe(1000);
-      expect(Array.from(widened.subarray(8, 12))).toEqual([13, 14, 15, 16]);
-      expect(attr.updateRanges).toEqual([{start: 8, count: 4}]);
+      const level = geometry.getAttribute('level') as BufferAttribute;
+      expect(level.isBufferAttribute).toBe(true);
+      expect(level.itemSize).toBe(1);
+      expect(level.array).toBeInstanceOf(Uint32Array);
+      expect(level.array).toBe(poolArrayOf(geometry, 'static_uint32'));
+      // the layout holds what was written: there is no 16-bit array anywhere to wrap it
+      expect(level.array[0]).toBe(70000);
     });
 
-    test('buffers data that comes back in as a whole lands in the widened array', () => {
-      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 4);
+    test('an integer attribute of two values without normalized reaches three as an interleaved buffer of its own type', () => {
+      const geometry = new VertexObjectGeometry<VO>(
+        {attributes: {level: {components: ['a', 'b'], type: 'uint16', usage: 'dynamic'}}},
+        4,
+      );
+
+      const level = geometry.getAttribute('level') as InterleavedBufferAttribute;
+      expect(level.isInterleavedBufferAttribute).toBe(true);
+      expect(level.data.stride).toBe(2);
+      expect(level.data.array).toBeInstanceOf(Uint16Array);
+      expect(level.data.array).toBe(poolArrayOf(geometry, 'dynamic_uint16'));
+    });
+
+    test('four bytes without normalized reach three as an interleaved buffer of bytes', () => {
+      const geometry = new VertexObjectGeometry<RgbaVO>(
+        {attributes: {rgba: {components: ['r', 'g', 'b', 'a'], type: 'uint8'}}},
+        4,
+      );
+      const vo = geometry.pool.createVO()!;
+      vo.setRgba(1, 2, 3, 4);
+      geometry.update();
+
+      const rgba = geometry.getAttribute('rgba') as InterleavedBufferAttribute;
+      expect(rgba.isInterleavedBufferAttribute).toBe(true);
+      expect(rgba.data.array).toBe(poolArrayOf(geometry, 'static_uint8'));
+      expect(Array.from(rgba.data.array.subarray(0, 4))).toEqual([1, 2, 3, 4]);
+    });
+
+    test('four normalized bytes stay a plain attribute of bytes', () => {
+      const geometry = new VertexObjectGeometry<RgbaVO>(
+        {attributes: {rgba: {components: ['r', 'g', 'b', 'a'], type: 'uint8', normalized: true}}},
+        4,
+      );
+
+      const rgba = geometry.getAttribute('rgba') as BufferAttribute;
+      expect(rgba.isBufferAttribute).toBe(true);
+      expect(rgba.array).toBe(poolArrayOf(geometry, 'static_uint8N'));
+    });
+
+    test('an instanced integer attribute without normalized reaches three as an interleaved buffer of its own type', () => {
+      const geometry = new InstancedVertexObjectGeometry<VO, VO>(
+        {attributes: {level: {components: ['a', 'b'], type: 'int16'}}},
+        4,
+        {vertexCount: 4, attributes: {position: {components: ['x', 'y', 'z'], type: 'float32'}}},
+      );
+
+      const level = geometry.getAttribute('level') as InterleavedBufferAttribute;
+      expect(level.isInterleavedBufferAttribute).toBe(true);
+      expect(level.data.array).toBe(geometry.instancedPool.buffer.buffers.get('static_int16')!.typedArray);
+    });
+
+    test('an array that comes back in as a whole is the array three gets', () => {
+      const description = {attributes: {rgba: {components: ['r', 'g', 'b', 'a'], type: 'uint8' as const}}};
+      const geometry = new VertexObjectGeometry<RgbaVO>(description, 4);
       geometry.pool.createVO()!.setRgba(1, 2, 3, 4);
       geometry.update();
 
-      const widened = widen(geometry, 'rgba', Uint32Array);
-
-      const other = new VertexObjectPool<RgbaVO>(rgbaDescription, 4);
-      other.createVO()!.setRgba(5, 6, 7, 8);
-      other.createVO()!.setRgba(9, 10, 11, 12);
-      geometry.pool.fromBuffersData(other.toBuffersData());
-      geometry.update();
-
-      const attr = geometry.getAttribute('rgba') as BufferAttribute;
-      expect(attr.array).toBe(widened);
-      expect(Array.from(widened.subarray(0, 8))).toEqual([5, 6, 7, 8, 9, 10, 11, 12]);
-    });
-
-    test('an array three left as it is stays the array of the pool', () => {
-      const geometry = new VertexObjectGeometry<RgbaVO>(rgbaDescription, 4);
-      const vo = geometry.pool.createVO()!;
-      geometry.update();
-
-      vo.setRgba(1, 2, 3, 4);
-      geometry.pool.touchVO(vo);
-      geometry.update();
-
-      const attr = geometry.getAttribute('rgba') as BufferAttribute;
-      expect(attr.array).toBe(geometry.pool.buffer.buffers.get('static_uint8')!.typedArray);
-
-      // an array of the same element type that comes back in as a whole is the array of the pool, too
-      const other = new VertexObjectPool<RgbaVO>(rgbaDescription, 4);
+      const other = new VertexObjectPool<RgbaVO>(description, 4);
       other.createVO()!.setRgba(5, 6, 7, 8);
       geometry.pool.fromBuffersData(other.toBuffersData());
       geometry.update();
 
-      expect(attr.array).toBe(geometry.pool.buffer.buffers.get('static_uint8')!.typedArray);
-      expect(attr.array).toBe(other.buffer.buffers.get('static_uint8')!.typedArray);
+      expect(arrayOf(geometry, 'rgba')).toBe(poolArrayOf(geometry, 'static_uint8'));
+      expect(arrayOf(geometry, 'rgba')).toBe(other.buffer.buffers.get('static_uint8')!.typedArray);
     });
   });
 });

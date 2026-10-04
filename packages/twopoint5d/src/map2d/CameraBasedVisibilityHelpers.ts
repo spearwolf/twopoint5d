@@ -34,10 +34,12 @@ class PointHelper extends Mesh<BoxGeometry, MeshBasicMaterial> {
     super(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
   }
 
-  dispose(): void {
+  override dispose(): void {
     // a mesh whose geometry slot is empty cannot be rendered, so it leaves the scene graph
     // before it gives geometry and material up, rather than asking the caller for that order
     this.removeFromParent();
+
+    super.dispose();
 
     this.geometry.dispose();
     this.material.dispose();

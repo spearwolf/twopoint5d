@@ -7,6 +7,16 @@ import type {
   VertexAttributeUsageType,
 } from './types.js';
 
+// three 0.186.1 builds no vertex format of one value for an 8- or 16-bit integer: its table for one
+// value knows the 32-bit types alone (`WebGPUAttributeUtils.js:32–36`, `:518–520`). Such an attribute
+// is laid out in 32 bits from the start, so the gpu reads the array of the pool as it is
+const LAYOUT_OF_ONE_VALUE: Partial<Record<VertexAttributeDataType, VertexAttributeDataType>> = {
+  int8: 'int32',
+  int16: 'int32',
+  uint8: 'uint32',
+  uint16: 'uint32',
+};
+
 const toPascalCase = (str: string) => str.replace(/(^|_)([a-z])/g, (_match: string, _m0: string, m1: string) => m1.toUpperCase());
 
 // read-only throughout, and the components with them: this descriptor only ever reads, and the
@@ -34,8 +44,17 @@ export class VertexAttributeDescriptor {
     this.description = description;
   }
 
+  /**
+   * The type the values of this attribute are laid out in: the declared `type`, or `'float32'`
+   * without one. An attribute of `'int8'` or `'int16'` with a single value and without `normalized`
+   * is laid out as `'int32'`, one of `'uint8'` or `'uint16'` as `'uint32'` — three builds no vertex
+   * format of one value for these types. Its buffer, its buffers data and the arrays its getter
+   * answers take this type.
+   */
   get dataType(): VertexAttributeDataType {
-    return this.description.type ?? 'float32';
+    const declared = this.description.type ?? 'float32';
+    if (this.size !== 1 || this.normalizedData) return declared;
+    return LAYOUT_OF_ONE_VALUE[declared] ?? declared;
   }
 
   get normalizedData(): boolean {

@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- upgrade the `three` peer dependency to `~0.186.1` (was `~0.185.1`) and `@types/three` to `~0.186.0`. three 0.186 makes `Renderer.dispose()` asynchronous — the WebGL backend loses its context only after an await of its own — so the release of a `Display` now awaits `renderer.dispose()` before it hands a canvas back with a restorable context
+- `TexturedSprites#dispose()`, `AnimatedSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. The sprites fire it once; a second call still does nothing
+- an attribute of `int8` or `int16` with a single value and without `normalized` is laid out as `int32`, one of `uint8` or `uint16` as `uint32`: three builds no vertex format of one value for these types. `VertexAttributeDescriptor#dataType` answers the 32-bit type, and the buffer, its default `bufferName` (`static_int32` instead of `static_int16`, for one), the buffers data and the arrays the getter answers follow it. The attribute holds every value of the 32-bit type; a value its declared type would have wrapped is stored as it is
+- the gpu reads the arrays of the pool as the descriptor lays them out, and nothing is copied on the way. A buffer of `int8`, `uint8`, `int16` or `uint16` without `normalized` reaches three as an `InterleavedBuffer` — also one that holds a single attribute without padding — because three widens such an array to 32 bits only as a `BufferAttribute`, and the geometry then copied every upload into that copy. `getAttribute()` answers an `InterleavedBufferAttribute` for such an attribute; its `array` is the array of the pool, its `version` and `updateRanges` sit on `data`
+
+### Fixed
+
+- an attribute of `int8`, `uint8`, `int16` or `uint16` with a single value and without `normalized` is drawn under both backends. Under WebGPU three 0.186 builds no vertex format for it and the render pipeline failed; the WebGL backend declared it with a broken GLSL type already under three 0.185 and drew nothing
+
+### Migration Guide
+
+#### The `three` peer dependency range
+
+**Before**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.185.1"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.186.1"
+  }
+}
+```
+
+A class of your own that extends `TexturedSprites`, `AnimatedSprites`, `Map2D` or any other `Object3D` and declares a `dispose()` now overrides one: under `noImplicitOverride` it needs the `override` modifier, and it should call `super.dispose()` so three's `dispose` event still fires.
+
+#### An 8- or 16-bit integer of one value is laid out in 32 bits
+
+A description with an attribute of `int8`, `uint8`, `int16` or `uint16`, a single value and no `normalized` builds another buffer than before: its elements are 32 bits wide, and without a `bufferName` it lands in the buffer of the 32-bit type.
+
+Buffers data that an earlier release wrote for such a description no longer fits — `fromBuffersData()` and the pool constructors refuse an array of the old type or length. Write it anew from the vertex objects, or rebuild the buffers of the attribute from the old ones.
+
+An attribute like this that shares a named buffer with one of its declared type and more values now breaks the rule that every attribute of a buffer agrees on its type, and the descriptor throws:
+
+**Before**
+
+```ts
+const description = {
+  attributes: {
+    level: {size: 1, type: 'int16', bufferName: 'shared'},
+    offset: {size: 2, type: 'int16', bufferName: 'shared'},
+  },
+};
+```
+
+**After**
+
+```ts
+const description = {
+  attributes: {
+    level: {size: 1, type: 'int16', bufferName: 'levels'},
+    offset: {size: 2, type: 'int16', bufferName: 'shared'},
+  },
+};
+```
+
+#### Integer attributes without `normalized` are interleaved attributes
+
+`geometry.getAttribute()` answers an `InterleavedBufferAttribute` for an attribute of `int8`, `uint8`, `int16` or `uint16` without `normalized`, where it answered a `BufferAttribute` for one alone in its buffer. `array` answers the same array; `version`, `updateRanges` and `needsUpdate` belong to its `data`:
+
+**Before**
+
+```ts
+const uploads = (geometry.getAttribute('rgba') as BufferAttribute).version;
+```
+
+**After**
+
+```ts
+const uploads = (geometry.getAttribute('rgba') as InterleavedBufferAttribute).data.version;
+```
+
 ## [0.22.0] - 2026-09-30
 
 The changes of this release were held back on purpose, to go out together: many of them

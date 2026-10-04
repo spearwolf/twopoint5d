@@ -369,9 +369,9 @@ describe('Display — the contract after dispose()', function () {
       markReleased = resolve;
     });
     const realDispose = renderer.dispose.bind(renderer);
-    renderer.dispose = () => {
+    renderer.dispose = async () => {
       initializedAtRelease = renderer.hasInitialized();
-      realDispose();
+      await realDispose();
       markReleased();
     };
 
@@ -508,9 +508,9 @@ describe('Display — the contract after dispose()', function () {
       markReleased = resolve;
     });
     const realDispose = renderer.dispose.bind(renderer);
-    renderer.dispose = () => {
+    renderer.dispose = async () => {
       steps.push('renderer.dispose()');
-      realDispose();
+      await realDispose();
       markReleased();
     };
 

@@ -63,9 +63,9 @@ describe('Display — the constructor that adopts a renderer', function () {
       markReleased = resolve;
     });
     const realDispose = renderer.dispose.bind(renderer);
-    renderer.dispose = () => {
+    renderer.dispose = async () => {
       disposeCalls++;
-      realDispose();
+      await realDispose();
       markReleased();
     };
 

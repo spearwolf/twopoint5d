@@ -10,11 +10,11 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
-// three 0.185.1 takes the vertex format of an attribute of one value from a table that knows the
-// 32-bit types and the 16-bit integers, which it widens to 32 bits unless they are normalized
-// (`WebGPUAttributeUtils.js:32–38`, `:527–529`), and the format of a larger one from the typed
-// array and `normalized` (`:12–26`, `:533–548`). WebGPU itself has no format for 64-bit values,
-// none that normalizes 32-bit integers or floats, and none of more than four values.
+// three 0.186.1 takes the vertex format of an attribute of one value from a table that knows the
+// 32-bit types alone (`WebGPUAttributeUtils.js:32–36`, `:518–520`) — which is why an 8- or 16-bit
+// integer of one value is laid out in 32 bits (`VertexAttributeDescriptor#dataType`) — and the
+// format of a larger one from the typed array and `normalized` (`:12–26`, `:522–541`). WebGPU itself has no format for 64-bit
+// values, none that normalizes 32-bit integers or floats, and none of more than four values.
 // `Uint8ClampedArray` is in none of the tables.
 const typesWithoutVertexFormat: ReadonlySet<VertexAttributeDataType> = new Set(['float64', 'uint8clamped']);
 const normalizableTypes: ReadonlySet<VertexAttributeDataType> = new Set(['int8', 'uint8', 'int16', 'uint16']);
@@ -118,7 +118,8 @@ export class VertexObjectDescriptor {
    *    `'uint8clamped'`; `normalized` only on `'int8'`, `'uint8'`, `'int16'` or `'uint16'` and with
    *    at least 2 values; `'float16'` with at least 2 values (`TypeError`)
    * 6. the attributes that name the same buffer agree on `type`, `normalized` and `usage`
-   *    (`TypeError`)
+   *    (`TypeError`); the `type` compared is the one an attribute is laid out in — an 8- or 16-bit
+   *    integer of one value without `normalized` is laid out in 32 bits
    * 7. every index is an integer in `0` … `vertexCount - 1` (`RangeError`)
    * 8. no two attributes, components or methods give the vertex object the same property name
    *    (`Error`)
@@ -230,12 +231,17 @@ export class VertexObjectDescriptor {
     }
 
     // the buffer takes the element type and the draw usage of its first attribute (see the
-    // constructor of `VertexObjectBuffer`), and three widens a buffer of 8- or 16-bit integers by
-    // the `normalized` of the attribute that uploads it first (`WebGPUAttributeUtils.js:84–93`) —
-    // an attribute that differs would end up as another type without a word. The default
-    // `bufferName` tells the buffers apart by exactly these three, so a default layout never
-    // breaks the rule
-    const summary = (a: VertexAttributeDescriptor) => `${a.dataType}${a.normalizedData ? ' normalized' : ''}, ${a.usageType}`;
+    // constructor of `VertexObjectBuffer`), and the geometry hands a buffer of 8- or 16-bit
+    // integers to three by the `normalized` of its first attribute (`initializeAttributes.ts`) —
+    // an attribute that differs would end up as another type without a word. The type compared is
+    // the one the attribute is laid out in, and the message names the declared one beside it. The
+    // default `bufferName` tells the buffers apart by exactly these three, so a default layout
+    // never breaks the rule
+    const summary = (a: VertexAttributeDescriptor) => {
+      const declared = this.description.attributes[a.name]!.type ?? 'float32';
+      const type = declared === a.dataType ? declared : `${declared} laid out as ${a.dataType}`;
+      return `${type}${a.normalizedData ? ' normalized' : ''}, ${a.usageType}`;
+    };
     const firstOfBuffer = new Map<string, VertexAttributeDescriptor>();
     for (const attr of this.attributes.values()) {
       const first = firstOfBuffer.get(attr.bufferName);
