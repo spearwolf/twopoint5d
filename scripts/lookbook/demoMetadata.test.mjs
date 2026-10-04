@@ -3,14 +3,13 @@ import fs from 'node:fs';
 import {describe, it} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import ts from '@typescript/typescript6';
+import {listDemoPages, listLookbookDemos} from './lookbookDemos.mjs';
 
 // Every tag of a lookbook demo that starts with a capital letter advertises a class, a
 // function or a type of the library, and a reader will search for that name. This spec
 // holds those tags to the exports of `packages/twopoint5d/src/index.ts`. No other check
 // reads the JSON files of the lookbook, so it also keeps each demo page paired with its
 // metadata file and its route.
-const demosUrl = new URL('../../apps/lookbook/src/pages/demos/', import.meta.url);
-const demosDir = fileURLToPath(demosUrl);
 const tagCategoriesFile = fileURLToPath(new URL('../../apps/lookbook/src/data/tag-categories.json', import.meta.url));
 const entry = fileURLToPath(new URL('../../packages/twopoint5d/src/index.ts', import.meta.url));
 
@@ -39,11 +38,8 @@ const FROM_THREE = new Map([
 const isNamed = (tag) => exported.has(tag) || FROM_THREE.has(tag);
 const isCapitalised = (tag) => /^[A-Z]/.test(tag);
 
-const files = fs.readdirSync(demosDir);
-const pages = files.filter((file) => file.endsWith('.astro')).map((file) => file.slice(0, -'.astro'.length));
-const metadata = files
-  .filter((file) => /^_.*\.json$/.test(file))
-  .map((file) => ({file, json: JSON.parse(fs.readFileSync(new URL(file, demosUrl), 'utf8'))}));
+const pages = listDemoPages();
+const metadata = listLookbookDemos();
 
 describe('the metadata of the lookbook demos', () => {
   it('pairs every demo page with a JSON file whose url is the route of the page', () => {
