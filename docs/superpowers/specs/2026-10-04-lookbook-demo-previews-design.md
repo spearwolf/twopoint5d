@@ -138,24 +138,27 @@ production build (`astro build` + `astro preview`), not only in the dev server.
 
 ### Invocation
 
-- Root `package.json`: `"lookbook:generate-previews": "pnpm nx run lookbook:generate-previews"`.
-- `apps/lookbook/project.json` gets a target `generate-previews`: executor
-  `nx:run-commands`, command `node scripts/lookbook/generateDemoPreviews.mjs`, `cwd`
-  the workspace root, `dependsOn: ["build"]`, `cache: false`. The lookbook build comes
-  from the Nx cache when nothing changed.
+- Root `package.json`:
+  `"lookbook:generate-previews": "pnpm nx run lookbook:build && node scripts/lookbook/generateDemoPreviews.mjs"`.
+  The lookbook build comes from the Nx cache when nothing changed, and pnpm appends the
+  flags of `pnpm lookbook:generate-previews --only=…` to the end of the script, which is
+  the `node` call — no Nx target has to forward them. (The brainstorming had an Nx
+  target `generate-previews`; the plain script does the same with one moving part less.)
 - Flags:
   - `--only=<id>[,<id>…]` — only these demos; an unknown id is an error;
   - `--url=<base>` — use a running server (e.g. `http://localhost:4321/lookbook` from
     `pnpm lookbook`) instead of starting one;
-  - `--headed` — show the browser window, for debugging or when headless gets no GPU.
-- Whether Nx forwards the flags through `pnpm lookbook:generate-previews --only=…` is
-  checked during implementation; if it does not, the README documents the direct
-  `node scripts/lookbook/generateDemoPreviews.mjs …` call.
+  - `--headed` — show the browser window, for debugging or when headless gets no GPU;
+  - `--timeout=<ms>` — how long a demo may take to fire the event, 30000 by default.
 
 ### Files
 
 - `scripts/lookbook/generateDemoPreviews.mjs` — the generator. It lives in `scripts/`
   so the `scripts` project type-checks it (`checkJs`).
+- `scripts/lookbook/demoPreviewConfig.mjs` — the constants (event name, size, quality,
+  timeout, Chromium flags) and the parsing of the flags; importable by specs without
+  starting a run.
+- `scripts/lookbook/previewServer.mjs` — starts and stops `astro preview`.
 - `scripts/lookbook/lookbookDemos.mjs` — lists the demos (id and parsed JSON) from
   `apps/lookbook/src/pages/demos/_*.json`; shared by the generator and the specs.
   `demoMetadata.test.mjs` moves to it as well.
@@ -171,11 +174,12 @@ kill the process group at the end, on error and on `SIGINT`/`SIGTERM`.
 
 ### Browser
 
-- Playwright's `chromium`, headless unless `--headed`. The launch flags that give
-  headless Chromium a WebGPU adapter on Linux (`--enable-unsafe-webgpu`,
-  `--ignore-gpu-blocklist`, possibly Vulkan features) are settled by a spike at the start
-  of the implementation. Without an adapter three.js falls back to WebGL 2; the
-  generator logs which of the two it got, once per run, and carries on.
+- Playwright's `chromium` (its headless shell), headless unless `--headed`, launched with
+  `--enable-unsafe-webgpu --ignore-gpu-blocklist --enable-features=Vulkan --use-angle=vulkan`.
+  A probe on 2026-10-04 (Chromium 153, Linux, RTX 4070 Ti) found the hardware adapter
+  with exactly these flags and none without them; `channel: 'chromium'` found only
+  SwiftShader. Without an adapter three.js falls back to WebGL 2; the generator logs
+  which of the two it got, once per run, and carries on.
 - One browser context with `viewport: {width: 1000, height: 700}` and
   `deviceScaleFactor: 1`. `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` carry a comment that they
   follow `aspect-10/7` in `apps/lookbook/src/components/Card.astro`.
@@ -205,8 +209,9 @@ the default delay. A full run takes about 18 × 6 s.
 - At the end a table: id, trigger (`ready`/`timeout`), duration, size in KB, errors.
   The exit code is 1 when at least one demo failed.
 
-The generator exports the event name as a constant of its own (an `.mjs` cannot import
-the TypeScript constant); a spec holds it equal to `EVENT_GENERATE_PREVIEW`.
+`demoPreviewConfig.mjs` exports the event name as a constant of its own (an `.mjs`
+cannot import the TypeScript constant); a spec holds it equal to
+`EVENT_GENERATE_PREVIEW`.
 
 ## Part 3 — migration, tests, docs
 
