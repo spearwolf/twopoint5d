@@ -12,7 +12,7 @@ import {description, title} from './_first-sprite.json';
 </style>
 
 <script>
-  import {Display, TexturedSprites, TextureStore} from '@spearwolf/twopoint5d';
+  import {Display, FeatureSprites, TexturedSpriteKind, TextureStore} from '@spearwolf/twopoint5d';
   import {PerspectiveCamera, Scene} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -59,7 +59,7 @@ import {description, title} from './_first-sprite.json';
     const frame = atlas.frame('splotch0')!;
 
     // a mesh with room for one sprite, drawn with the texture of the atlas
-    const sprites = new TexturedSprites(1, texture);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: texture}});
 
     // the mesh has room for one sprite, and this is the first to take it
     const sprite = sprites.createSprite()!;

@@ -1,4 +1,6 @@
-import type {AnimatedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
+import type {AnimatedSpriteKind, SpriteOf, VertexObjectPool} from '@spearwolf/twopoint5d';
+
+type AnimatedSprite = SpriteOf<typeof AnimatedSpriteKind>;
 
 interface Sprite extends AnimatedSprite {
   speedX: number;

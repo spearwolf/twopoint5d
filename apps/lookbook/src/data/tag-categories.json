@@ -10,12 +10,11 @@
       "name": "Sprites",
       "tagId": "sprites",
       "includeTags": [
-        "AnimatedSprites",
-        "AnimatedSpritesGeometry",
-        "AnimatedSpritesMaterial",
-        "TexturedSprites",
-        "TexturedSpritesGeometry",
-        "TexturedSpritesMaterial",
+        "FeatureSprites",
+        "FeatureSpritesGeometry",
+        "FeatureSpritesMaterial",
+        "TexturedSpriteKind",
+        "AnimatedSpriteKind",
         "billboards"
       ]
     },

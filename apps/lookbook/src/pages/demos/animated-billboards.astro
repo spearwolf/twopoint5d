@@ -33,9 +33,11 @@ import {description, title} from './_animated-billboards.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {
-    AnimatedSprites,
-    AnimatedSpritesGeometry,
-    AnimatedSpritesMaterial,
+    AnimatedSpriteKind,
+    BillboardPlacement,
+    FeatureSprites,
+    FeatureSpritesGeometry,
+    FeatureSpritesMaterial,
     FrameBasedAnimations,
     OnDisplayRenderFrame,
   } from '@spearwolf/twopoint5d';
@@ -53,7 +55,7 @@ import {description, title} from './_animated-billboards.json';
 
     const CAPACITY = 400;
 
-    const geometry = new AnimatedSpritesGeometry(CAPACITY);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
 
     const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('nobingerTiles', ['tileSet', 'texture']);
@@ -65,21 +67,20 @@ import {description, title} from './_animated-billboards.json';
 
     bouncingSprites.createSprites(CAPACITY, animId);
 
-    const material = new AnimatedSpritesMaterial({
-      colorMap: texture,
-      animsMap: anims.bakeDataTexture({renderer}),
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
+      textures: {colorMap: texture, animsMap: anims.bakeDataTexture({renderer})},
+      placement: BillboardPlacement,
       depthTest: true,
       depthWrite: true,
-      renderAsBillboards: true,
     });
 
-    const mesh = new AnimatedSprites(geometry, material);
+    const mesh = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
 
     demo.scene.add(mesh);
 
     on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
-      material.time = now;
+      material.setUniform('time', now);
       mesh.update();
     });
 
@@ -102,7 +103,7 @@ import {description, title} from './_animated-billboards.json';
     demo.scene.add(plane);
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
-    console.log('AnimatedSprites', mesh);
+    console.log('FeatureSprites', mesh);
   });
 
   // the <div class="loading-wrapper"> is written by the markup of this very page

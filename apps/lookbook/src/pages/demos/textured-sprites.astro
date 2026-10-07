@@ -24,7 +24,7 @@ import {description, title} from './_textured-sprites.json';
 </style>
 
 <script>
-  import {TexturedSprites} from '@spearwolf/twopoint5d';
+  import {BillboardPlacement, FeatureSprites, FlatPlacement, TexturedSpriteKind} from '@spearwolf/twopoint5d';
   import {LessEqualDepth} from 'three/webgpu';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -41,9 +41,9 @@ import {description, title} from './_textured-sprites.json';
 
     const CAPACITY = 256;
 
-    const sprites = new TexturedSprites(CAPACITY, texture);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: CAPACITY, textures: {colorMap: texture}});
 
-    // the constructor always creates a TexturedSpritesMaterial; only dispose() takes it away again
+    // the constructor always creates a FeatureSpritesMaterial; only dispose() takes it away again
     const material = sprites.material!;
 
     material.depthFunc = LessEqualDepth; // AlwaysDepth;
@@ -55,7 +55,7 @@ import {description, title} from './_textured-sprites.json';
       const el = e.currentTarget as HTMLElement;
       const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
 
-      material.renderAsBillboards = dataValue;
+      sprites.placement = dataValue ? BillboardPlacement : FlatPlacement;
 
       el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
       if (dataValue) {
@@ -83,7 +83,7 @@ import {description, title} from './_textured-sprites.json';
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('bouncingSprites', bouncingSprites);
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
-    console.log('TexturedSprites', sprites);
+    console.log('FeatureSprites', sprites);
   });
 
   demo.start();
