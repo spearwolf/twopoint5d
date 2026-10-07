@@ -8,3 +8,5 @@ export * from './TexturedSprites/TexturedSprite.js';
 export * from './TexturedSprites/TexturedSprites.js';
 export * from './TexturedSprites/TexturedSpritesGeometry.js';
 export * from './TexturedSprites/TexturedSpritesMaterial.js';
+export * from './SpriteBase.js';
+export * from './SpriteFeature.js';
