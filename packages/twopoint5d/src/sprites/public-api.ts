@@ -19,6 +19,7 @@ export * from './FeatureSprites/FeatureSpritesGeometry.js';
 export * from './FeatureSprites/FeatureSpritesMaterial.js';
 export * from './FeatureSprites/SpriteResources.js';
 export * from './node-utils.js';
+export * from './presets.js';
 export * from './SpriteBase.js';
 export * from './SpriteFeature.js';
 export type {SpritePipeline} from './spritePipeline.js';

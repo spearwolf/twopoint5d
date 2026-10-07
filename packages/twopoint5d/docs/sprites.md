@@ -350,3 +350,89 @@ it is disposed first, so a refused constructor leaves nothing behind.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`; `createSprite()`
 answers `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`, `touchTexture()` and the
 `placement` setter do nothing. A second `dispose()` does nothing.
+
+## Presets
+
+Two kinds ship ready-made, with the layout, the names and the start values of the textured and the
+animated sprites of earlier versions: `TexturedSpriteKind` (`InstancePosition`, `FlatPlacement`,
+`QuadSize`, `Rotation`, `AtlasFrame`, `TextureColor`, `Tint`) and `AnimatedSpriteKind` (`InstancePosition`,
+`FlatPlacement`, `QuadSize`, `Rotation`, `AnimatedFrames`, `TextureColor` — no tint). Both sit on `QuadBase`.
+A kind with one more feature is a `defineSprite()` away.
+
+```ts check
+import {FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {Color, Scene, Texture} from 'three/webgpu';
+
+const colorMap = new Texture();
+const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1000, textures: {colorMap}, transparent: true});
+
+const scene = new Scene();
+scene.add(sprites);
+
+const sprite = sprites.createSprite();
+if (sprite != null) {
+  sprite.setPosition(10, 20, 0);
+  sprite.setSize(32, 32);
+  sprite.setTexCoords(0, 0, 0.5, 0.5);
+  sprite.setColor(new Color(1, 0.5, 0.25), 0.8);
+}
+
+// once per frame, before rendering
+sprites.update();
+
+sprites.dispose();
+colorMap.dispose();
+```
+
+The animated preset needs the `animsMap` of a `FrameBasedAnimations` next to the `colorMap`, and the
+`time` uniform moves the animations:
+
+```ts check
+import {AnimatedSpriteKind, FeatureSprites} from '@spearwolf/twopoint5d';
+import {Scene, Texture, TextureLoader} from 'three/webgpu';
+
+const colorMap = new Texture();
+const animsMap = new Texture();
+
+const sprites = new FeatureSprites(AnimatedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap, animsMap},
+  uniforms: {time: 0},
+  transparent: true,
+});
+
+const scene = new Scene();
+scene.add(sprites);
+
+// a texture that loads fills its image without an event: tell the material once it is there
+new TextureLoader().load('animations.png', (loaded) => {
+  animsMap.image = loaded.image;
+  animsMap.needsUpdate = true;
+  sprites.touchTexture('animsMap');
+});
+
+const sprite = sprites.createSprite();
+if (sprite != null) {
+  sprite.setPosition(10, 20, 0);
+  sprite.setSize(32, 32);
+  sprite.animId = 0;
+  sprite.animOffset = 0.25;
+}
+
+// once per frame
+export function frame(now: number) {
+  sprites.setUniform('time', now);
+  sprites.update();
+}
+```
+
+## Performance
+
+- The setters of the features allocate nothing per call: they hand their values on in a scratch
+  tuple, and `createSprite()` allocates the sprite and nothing else. The allocation specs
+  (`hot-path-allocations.feature-sprites.spec.ts`) hold both presets to it, and `pnpm bench` times
+  the hot loops of 10 000 sprites.
+- A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
+  and `setPreparedFrame()` per sprite.
+- Keep a hot loop to the sprites of one kind (see "Defining a kind").
+- Call `update()` once per frame, after all writes and before rendering.
