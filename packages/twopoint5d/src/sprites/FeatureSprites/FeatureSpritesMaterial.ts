@@ -325,7 +325,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           `${WHERE}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
         );
       }
-      const held = new Set(this.#features.map(({name}) => name));
+      // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones this material folds
+      const held = new Set(this.kind.features.map(({name}) => name));
       for (const required of feature.requires ?? []) {
         if (!held.has(required)) {
           throw new TypeError(
