@@ -88,3 +88,23 @@ the merged attributes cannot be laid out.
 Every kind brings a prototype of its own. One loop over the sprites of more than four kinds is
 megamorphic and runs about eighteen times slower per sprite (see `docs/architecture.md`, the
 `vertex-objects/` section) — keep a hot loop to the sprites of one kind.
+
+## Built-in features
+
+| feature | attributes (usage) | sprite handle | slot | a new sprite |
+| --- | --- | --- | --- | --- |
+| `InstancePosition` | `instancePosition` (dynamic), word `position` | `x`, `y`, `z`, `setInstancePosition()`, `setPosition(x, y, z?)` | — | at the origin |
+| `FlatPlacement` | — | — | placement | — |
+| `BillboardPlacement` | — | — | placement | — |
+| `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
+| `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
+| `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
+
+`InstancePosition` is data alone. `FlatPlacement` and `BillboardPlacement` read it and bring
+nothing but their placement stage, so the one stands in for the other on a live material (see
+"Flat sprites and billboards"). `setPosition(x, y)` without a `z` keeps the `z` the sprite has.
+
+`BillboardPlacement` maps the x and y of the local vertex — trimmed, scaled, sheared and turned
+already — onto the camera's right and up vectors in the local space of the mesh, so a mesh or its
+parents may be moved, turned and scaled evenly on all axes and its billboards still face the
+camera. A scale that differs from axis to axis skews them.
