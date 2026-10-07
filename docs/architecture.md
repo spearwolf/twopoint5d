@@ -376,9 +376,12 @@ the classic API from `@typescript/typescript6`, the package Microsoft publishes 
 exactly that. The code block check therefore compiles the marked blocks with 6.x,
 against declarations 7.x emitted. The lookbook keeps a `typescript` 6.x of its own:
 `@astrojs/check` declares `typescript ^5.0.0 || ^6.0.0` as its peer, and `astro check`
-type-checks the `.ts` files and `.astro` pages of the lookbook through it. A Dependabot
-pull request that moves the lookbook's `typescript` to 7 breaks `pnpm typecheck` until
-`@astrojs/check` accepts 7.
+type-checks the `.ts` files and `.astro` pages of the lookbook through it. Moving the
+lookbook's `typescript` to 7 breaks `pnpm typecheck` until `@astrojs/check` accepts 7,
+so `.github/dependabot.yml` ignores the major updates of `typescript`. Its one `npm`
+entry covers the whole workspace, which means the rule also holds back a major of the
+root's `typescript`; that step is taken by hand. The rule goes once `@astrojs/check`
+accepts 7.
 
 Node and pnpm versions come from `engines` in the root `package.json`: Node
 `^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm

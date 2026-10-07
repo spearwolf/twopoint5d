@@ -17,6 +17,12 @@ updates:
           - '@spearwolf/signalize'
           - playwright
         update-types: [minor, patch]
+    # the lookbook holds typescript at 6.x for astro check, whose @astrojs/check peer
+    # range ends at ^6.0.0; one entry covers the whole workspace, so this also holds back
+    # a major of the root's typescript. Drop it once @astrojs/check accepts 7
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
   # keeps the commit SHAs the workflows pin, and the version comment next to each, current
   - package-ecosystem: github-actions
     directory: /
