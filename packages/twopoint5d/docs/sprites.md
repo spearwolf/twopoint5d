@@ -212,3 +212,38 @@ or less; either of the two takes the place of that default.
 The graphs depend on the kind and on the kinds of the textures, not on the material. Two meshes
 of one kind with textures of the same kind produce the same shader source, and the second comes
 out of the renderer's caches.
+
+## Flat sprites and billboards
+
+A kind lists one placement: `FlatPlacement` puts the sprite into the plane of the mesh,
+`BillboardPlacement` turns it about its instance position to face the camera. The placement of the
+kind is the one a material starts with, and a swap on a live material is a plain write:
+
+```ts check
+import {
+  BillboardPlacement,
+  defineSprite,
+  FeatureSpritesMaterial,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+} from '@spearwolf/twopoint5d';
+
+const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize]});
+const material = new FeatureSpritesMaterial(kind);
+
+material.placement = BillboardPlacement;
+material.placement = FlatPlacement;
+
+material.dispose();
+```
+
+Another placement takes the place of the current one only when it contributes a placement stage
+and nothing else — no attributes, methods, uniforms or textures, because the sprites and the
+material were built without them — and the kind holds every feature it `requires`. Anything else
+throws a `TypeError` naming both features. The placement of the kind always comes back, whatever
+it brings. A write of the placement the material holds builds nothing.
+
+A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
+built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.

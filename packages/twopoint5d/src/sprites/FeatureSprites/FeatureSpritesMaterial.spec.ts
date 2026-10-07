@@ -8,6 +8,7 @@ import {afterEach, describe, expect, test} from 'vitest';
 import {attributeNamesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
+import {BillboardPlacement} from '../features/BillboardPlacement.js';
 import {FlatPlacement} from '../features/FlatPlacement.js';
 import {InstancePosition} from '../features/InstancePosition.js';
 import {QuadSize} from '../features/QuadSize.js';
@@ -261,6 +262,105 @@ describe('FeatureSpritesMaterial', () => {
           ),
       ).toThrow('FeatureSpritesMaterial: feature "sampler" reads the texture "colorMap", which it does not declare');
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+  });
+
+  describe('the placement', () => {
+    test('builds a billboard graph once BillboardPlacement is set, and a flat one again after', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const {positionNode, version} = material;
+
+      material.placement = BillboardPlacement;
+
+      expect(material.positionNode).not.toBe(positionNode);
+      expect(material.version).toBeGreaterThan(version);
+      expect(attributeNamesOf(operatorOf(material.positionNode).aNode as Node)).toEqual(['instancePosition']);
+      material.placement = FlatPlacement;
+      expect(attributeNamesOf(operatorOf(material.positionNode).bNode as Node)).toEqual(['instancePosition']);
+      material.dispose();
+    });
+
+    test('starts with the placement it is given', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {placement: BillboardPlacement});
+
+      expect(material.placement).toBe(BillboardPlacement);
+      material.dispose();
+    });
+
+    test('builds nothing for a write of the placement it holds', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const {positionNode, version} = material;
+
+      material.placement = FlatPlacement;
+
+      expect([material.positionNode, material.version]).toEqual([positionNode, version]);
+      material.dispose();
+    });
+
+    test('refuses a feature without a placement stage', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = Tint;
+      }).toThrow('FeatureSpritesMaterial: feature "tint" contributes no placement stage and cannot stand in for "flatPlacement"');
+      expect(material.placement).toBe(FlatPlacement);
+      material.dispose();
+    });
+
+    test('refuses a placement that brings more than its stage, naming both features', () => {
+      const heavy = defineFeature({name: 'heavy', attributes: {lift: {size: 1}}, placement: (local) => local});
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = heavy;
+      }).toThrow(
+        'FeatureSpritesMaterial: feature "heavy" brings attributes besides its placement stage; the sprites were built without them, so it cannot stand in for "flatPlacement"',
+      );
+      material.dispose();
+    });
+
+    test('refuses a placement whose requires the kind does not meet', () => {
+      const anchored = defineFeature({name: 'anchored', requires: ['anchor'], placement: (local) => local});
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = anchored;
+      }).toThrow('FeatureSpritesMaterial: feature "anchored" requires feature "anchor", which the sprite kind does not hold');
+      material.dispose();
+    });
+
+    test('takes the placement of the kind back even though it brings more', () => {
+      const own = defineFeature({name: 'own', attributes: {lift: {size: 1}}, placement: (local) => local});
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, own]});
+      const material = new FeatureSpritesMaterial(kind);
+
+      material.placement = BillboardPlacement;
+      expect(() => {
+        material.placement = own;
+      }).not.toThrow();
+      expect(material.placement).toBe(own);
+      material.dispose();
+    });
+
+    test('refuses a placement option the same way and leaves nothing behind', () => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {placement: Tint})).toThrow(
+        'FeatureSpritesMaterial: feature "tint" contributes no placement stage and cannot stand in for "flatPlacement"',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('keeps its last value for a write after dispose(), and builds nothing', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const {positionNode, version} = material;
+      material.dispose();
+
+      expect(() => {
+        material.placement = BillboardPlacement;
+      }).not.toThrow();
+
+      expect([material.positionNode, material.version]).toEqual([positionNode, version]);
     });
   });
 

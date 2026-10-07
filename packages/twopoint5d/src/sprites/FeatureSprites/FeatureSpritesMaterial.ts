@@ -49,6 +49,9 @@ const SCOPES: readonly GraphScope[] = ['frame', 'position', 'color'];
 
 const WHERE = 'FeatureSpritesMaterial';
 
+// the fields a placement may carry to stand in for another on a live material
+const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'placement']);
+
 const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>});
 
 // uv is where the vertex lies on the untrimmed sprite, x to the right and y downwards. A trimmed
@@ -292,12 +295,45 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     this.resources.touchTexture(name);
   }
 
-  /** The placement the position graph is built with. Keeps its last value once disposed. */
+  /**
+   * The placement the position graph is built with; starts with the one of the kind. Another one
+   * takes its place only when it contributes a placement stage and nothing else — no attributes,
+   * methods, uniforms or textures, which the sprites and this material were built without — and the
+   * kind holds every feature it requires; the placement of the kind always comes back. A change
+   * rebuilds the position graph; three serves a source it has built before from its caches.
+   * Keeps its last value once disposed, and a write there reaches nothing that renders.
+   *
+   * @throws a `TypeError` naming both features for a placement that cannot stand in
+   */
   get placement(): SpriteFeature {
     return this.#placement.value;
   }
 
   set placement(feature: SpriteFeature) {
+    const current = this.#placement.value;
+    if (feature.placement == null) {
+      throw new TypeError(
+        `${WHERE}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
+      );
+    }
+    if (feature !== this.#pipeline.placement) {
+      const extra = Object.keys(feature).filter(
+        (key) => !PLACEMENT_ONLY.has(key) && (feature as unknown as Record<string, unknown>)[key] != null,
+      );
+      if (extra.length > 0) {
+        throw new TypeError(
+          `${WHERE}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
+        );
+      }
+      const held = new Set(this.#features.map(({name}) => name));
+      for (const required of feature.requires ?? []) {
+        if (!held.has(required)) {
+          throw new TypeError(
+            `${WHERE}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
+          );
+        }
+      }
+    }
     this.#placement.set(feature);
   }
 
