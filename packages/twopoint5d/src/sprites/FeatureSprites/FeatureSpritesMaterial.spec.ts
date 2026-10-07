@@ -1,0 +1,472 @@
+import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
+import {createSandbox} from 'sinon';
+import {add} from 'three/tsl';
+import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
+import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
+import {afterEach, describe, expect, test} from 'vitest';
+
+import {attributeNamesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
+import {defineSprite} from '../defineSprite.js';
+import {AtlasFrame} from '../features/AtlasFrame.js';
+import {FlatPlacement} from '../features/FlatPlacement.js';
+import {InstancePosition} from '../features/InstancePosition.js';
+import {QuadSize} from '../features/QuadSize.js';
+import {Rotation} from '../features/Rotation.js';
+import {TextureColor} from '../features/TextureColor.js';
+import {Tint} from '../features/Tint.js';
+import {QuadBase} from '../SpriteBase.js';
+import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
+import {SpriteResources} from './SpriteResources.js';
+import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
+
+const TexturedKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, Rotation, AtlasFrame, TextureColor, Tint],
+});
+const PlainKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize]});
+
+const calls: string[] = [];
+const recorder = (name: string, slot: 'local' | 'mesh' | 'color', order: number): SpriteFeature =>
+  defineFeature({
+    name,
+    [slot]: {
+      order,
+      transform: (input: Node) => {
+        calls.push(name);
+        return input;
+      },
+    },
+  } as unknown as SpriteFeature);
+const recordingPlacement = defineFeature({
+  name: 'recordingPlacement',
+  requires: ['instancePosition'],
+  placement: (local, {attribute}) => {
+    calls.push('placement');
+    return add(local, attribute<'vec3'>('instancePosition'));
+  },
+});
+
+// a frame feature that waits for the image of a lookup texture, as AnimatedFrames does
+const lookupFrame = defineFeature({
+  name: 'lookupFrame',
+  textures: {lookup: {needsImage: true}},
+  frame: ({sample, attribute}) => {
+    const texel = sample('lookup', attribute<'vec2'>('uv'));
+    return {texCoords: texel, trim: texel};
+  },
+});
+const LookupKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, lookupFrame, TextureColor]});
+
+const withImage = (width = 4, height = 4) => {
+  const texture = new Texture();
+  texture.image = {width, height} as unknown as HTMLImageElement;
+  return texture;
+};
+
+describe('FeatureSpritesMaterial', () => {
+  const sandbox = createSandbox();
+  afterEach(() => {
+    sandbox.restore();
+    calls.length = 0;
+  });
+
+  test('takes a kind and its parameters, no three.js material and no texture (a type-level check)', () => {
+    const withMaterial = (material: MeshBasicMaterial) =>
+      // @ts-expect-error the parameters of a FeatureSpritesMaterial only
+      new FeatureSpritesMaterial(TexturedKind, material);
+    const withTexture = (texture: Texture) =>
+      // @ts-expect-error the parameters of a FeatureSpritesMaterial only
+      new FeatureSpritesMaterial(TexturedKind, texture);
+    void withMaterial;
+    void withTexture;
+  });
+
+  describe('parameters', () => {
+    test('applies the three.js material parameters it is given', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      });
+
+      expect([material.transparent, material.depthWrite, material.blending]).toEqual([true, false, AdditiveBlending]);
+      material.dispose();
+    });
+
+    test('keeps its own options apart from them', () => {
+      const warn = sandbox.spy(console, 'warn');
+      const colorMap = new Texture();
+
+      const material = new FeatureSpritesMaterial(TexturedKind, {
+        name: 'sprites',
+        textures: {colorMap},
+        uniforms: {},
+        transparent: true,
+      });
+
+      expect(material.name).toBe('sprites');
+      expect(material.getTexture('colorMap')).toBe(colorMap);
+      expect(material.transparent).toBe(true);
+      expect(warn.called).toBe(false);
+      expect(material.isFeatureSpritesMaterial).toBe(true);
+      expect(material.kind).toBe(TexturedKind);
+      material.dispose();
+    });
+
+    test('is named twopoint5d.FeatureSpritesMaterial without a name', () => {
+      const material = new FeatureSpritesMaterial(PlainKind);
+
+      expect(material.name).toBe('twopoint5d.FeatureSpritesMaterial');
+      material.dispose();
+    });
+
+    test('drops fully transparent texels by default, and leaves the alpha test to an alphaTest it is given', () => {
+      const byDefault = new FeatureSpritesMaterial(TexturedKind);
+      const withAlphaTest = new FeatureSpritesMaterial(TexturedKind, {alphaTest: 0.5});
+
+      expect(byDefault.alphaTestNode).not.toBeNull();
+      expect(withAlphaTest.alphaTest).toBe(0.5);
+      expect(withAlphaTest.alphaTestNode).toBeNull();
+      byDefault.dispose();
+      withAlphaTest.dispose();
+    });
+
+    test('refuses resources together with textures or uniforms', () => {
+      const resources = new SpriteResources(TexturedKind.features);
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {resources, textures: {colorMap: new Texture()}})).toThrow(
+        'FeatureSpritesMaterial: textures and uniforms belong to the resources handed in',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+      resources.dispose();
+    });
+
+    test('refuses resources that miss a declaration of the kind', () => {
+      const resources = new SpriteResources(PlainKind.features);
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {resources})).toThrow(
+        'FeatureSpritesMaterial: the resources handed in lack what feature "textureColor" declares',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+      expect(resources.isDisposed).toBe(false);
+      resources.dispose();
+    });
+  });
+
+  describe('the position graph', () => {
+    test('adds the instance position last, flat by default', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      const position = operatorOf(material.positionNode);
+      expect(position.op).toBe('+');
+      expect(attributeNamesOf(position.bNode as Node)).toEqual(['instancePosition']);
+      expect(material.placement).toBe(FlatPlacement);
+      material.dispose();
+    });
+
+    test('reads the base position and uv, the trim, the size and the rotation', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(new Set(attributeNamesOf(material.positionNode!))).toEqual(
+        new Set(['position', 'uv', 'texTrim', 'quadSize', 'rotation', 'instancePosition']),
+      );
+      material.dispose();
+    });
+
+    test('shifts nothing without a frame that has trim margins', () => {
+      const material = new FeatureSpritesMaterial(PlainKind);
+
+      expect(attributeNamesOf(material.positionNode!)).not.toContain('uv');
+      material.dispose();
+    });
+
+    test('runs the local stages by order, then the placement, then the mesh stages by order', () => {
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [
+          InstancePosition,
+          recordingPlacement,
+          recorder('mesh2', 'mesh', 300),
+          recorder('local2', 'local', 400),
+          recorder('mesh1', 'mesh', 100),
+          recorder('local1', 'local', 200),
+        ],
+      });
+
+      const material = new FeatureSpritesMaterial(kind);
+
+      expect(calls).toEqual(['local1', 'local2', 'placement', 'mesh1', 'mesh2']);
+      material.dispose();
+    });
+
+    test('throws, naming the feature and the attribute, for a stage that reads an attribute the kind does not hold', () => {
+      const typo = defineFeature({
+        name: 'typo',
+        local: {order: 250, transform: (p, {attribute}) => add(p, attribute<'vec3'>('instancePositon'))},
+      });
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, typo]});
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(kind)).toThrow(
+        'FeatureSpritesMaterial: feature "typo" reads the attribute "instancePositon", which the sprite kind does not hold',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('throws for a frame stage that reads an attribute the kind does not hold, and leaves nothing behind', () => {
+      const typo = defineFeature({name: 'typoFrame', frame: ({attribute}) => ({texCoords: attribute<'vec4'>('texCoord')})});
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, typo]});
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(kind)).toThrow(
+        'FeatureSpritesMaterial: feature "typoFrame" reads the attribute "texCoord", which the sprite kind does not hold',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('throws for a stage that reads a uniform no feature declares, or samples a texture of another feature', () => {
+      const uniformReader = defineFeature({
+        name: 'uniformReader',
+        local: {order: 250, transform: (p, {uniform}) => add(p, uniform<'vec3'>('wind'))},
+      });
+      const sampler = defineFeature({
+        name: 'sampler',
+        color: {order: 250, transform: (_color, {sample, attribute}) => sample('colorMap', attribute<'vec2'>('uv'))},
+      });
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(
+        () =>
+          new FeatureSpritesMaterial(defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, uniformReader]})),
+      ).toThrow(
+        'FeatureSpritesMaterial: feature "uniformReader" reads the uniform "wind", which no feature of these sprites declares',
+      );
+      expect(
+        () =>
+          new FeatureSpritesMaterial(
+            defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, TextureColor, sampler]}),
+          ),
+      ).toThrow('FeatureSpritesMaterial: feature "sampler" reads the texture "colorMap", which it does not declare');
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+  });
+
+  describe('the color graph', () => {
+    test('tints a flat grey by the sprite color while there is no colorMap', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      const color = operatorOf(material.colorNode);
+      expect(color.op).toBe('*');
+      expect(textureNodesOf(material.colorNode!)).toEqual([]);
+      expect(attributeNamesOf(color.bNode as Node)).toEqual(['color']);
+      material.dispose();
+    });
+
+    test('draws flat grey without a color source and without a tint', () => {
+      const material = new FeatureSpritesMaterial(PlainKind);
+
+      expect(textureNodesOf(material.colorNode!)).toEqual([]);
+      expect(attributeNamesOf(material.colorNode!)).toEqual([]);
+      material.dispose();
+    });
+
+    test('samples the colorMap once one is set, through a varying, still tinted', () => {
+      const colorMap = new Texture();
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const {colorNode, version} = material;
+
+      material.setTexture('colorMap', colorMap);
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(material.version).toBeGreaterThan(version);
+      const [sample] = textureNodesOf(material.colorNode!);
+      expect(sample!.value).toBe(colorMap);
+      expect((sample!.uvNode as unknown as VaryingNode<unknown>).isVaryingNode).toBe(true);
+      expect(attributeNamesOf(material.colorNode!)).toContain('color');
+      material.dispose();
+    });
+
+    test('runs the color stages by order', () => {
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, FlatPlacement, recorder('late', 'color', 300), recorder('early', 'color', 100)],
+      });
+
+      const material = new FeatureSpritesMaterial(kind);
+
+      expect(calls).toEqual(['early', 'late']);
+      material.dispose();
+    });
+  });
+
+  describe('textures', () => {
+    test('a texture of the same kind keeps both graphs and hands the sample the new texture', () => {
+      const a = new Texture();
+      const b = new Texture();
+      const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: a}});
+      const {colorNode, positionNode, version} = material;
+
+      material.setTexture('colorMap', b);
+
+      expect(material.colorNode).toBe(colorNode);
+      expect(material.positionNode).toBe(positionNode);
+      expect(material.version).toBe(version);
+      expect(samplesTexture(material.colorNode!, b)).toBe(true);
+      material.dispose();
+    });
+
+    test('a texture of another kind builds a new color graph', () => {
+      const nearest = new Texture();
+      nearest.minFilter = NearestFilter;
+      nearest.magFilter = NearestFilter;
+      const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: new Texture()}});
+      const {colorNode} = material;
+
+      material.setTexture('colorMap', nearest);
+
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(samplesTexture(material.colorNode!, nearest)).toBe(true);
+      material.dispose();
+    });
+
+    test('clearing the texture builds the flat grey again', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: new Texture()}});
+
+      material.setTexture('colorMap', undefined);
+
+      expect(textureNodesOf(material.colorNode!)).toEqual([]);
+      material.dispose();
+    });
+
+    test('a frame feature waits for the image of its texture, and touchTexture() picks it up', () => {
+      const lookup = new Texture();
+      const material = new FeatureSpritesMaterial(LookupKind, {textures: {lookup, colorMap: new Texture()}});
+
+      // the default frame: no trim, so the position graph reads no uv
+      expect(attributeNamesOf(material.positionNode!)).not.toContain('uv');
+      expect(samplesTexture(material.colorNode!, lookup)).toBe(false);
+
+      lookup.image = {width: 4, height: 4} as unknown as HTMLImageElement;
+      material.touchTexture('lookup');
+
+      expect(attributeNamesOf(material.positionNode!)).toContain('uv');
+      expect(samplesTexture(material.positionNode!, lookup)).toBe(true);
+      expect(samplesTexture(material.colorNode!, lookup)).toBe(true);
+      material.dispose();
+    });
+
+    test('a write to the texture of the frame builds the position and the color graph once each', () => {
+      const material = new FeatureSpritesMaterial(LookupKind, {textures: {colorMap: new Texture()}});
+      const {version} = material;
+
+      material.setTexture('lookup', withImage());
+
+      // one needsUpdate per graph
+      expect(material.version).toBe(version + 2);
+      material.dispose();
+    });
+
+    test('a frame texture of the same kind and another size builds nothing and updates the size uniform', () => {
+      const material = new FeatureSpritesMaterial(LookupKind, {textures: {lookup: withImage(4, 4), colorMap: new Texture()}});
+      const {positionNode, colorNode, version} = material;
+      const bigger = withImage(8, 2);
+
+      material.setTexture('lookup', bigger);
+
+      expect([material.positionNode, material.colorNode, material.version]).toEqual([positionNode, colorNode, version]);
+      expect(samplesTexture(material.positionNode!, bigger)).toBe(true);
+      expect(material.resources.textureSize('lookup').value.toArray()).toEqual([8, 2]);
+      material.dispose();
+    });
+  });
+
+  describe('uniforms', () => {
+    test('exposes the uniforms of its resources and writes them through setUniform()', () => {
+      const timed = defineFeature({name: 'timed', uniforms: {time: 0}});
+      const material = new FeatureSpritesMaterial(
+        defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, timed]}),
+        {uniforms: {time: 2}},
+      );
+      const {version} = material;
+
+      expect(material.uniforms['time']!.value).toBe(2);
+      material.setUniform('time', 3);
+      expect(material.uniforms['time']!.value).toBe(3);
+      expect(material.version).toBe(version);
+      material.dispose();
+    });
+  });
+
+  describe('dispose()', () => {
+    test('does NOT dispose a texture handed in, through the constructor or the setter', () => {
+      const a = new Texture();
+      const b = new Texture();
+      const aDispose = sandbox.spy(a, 'dispose');
+      const bDispose = sandbox.spy(b, 'dispose');
+      const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: a}});
+      material.setTexture('colorMap', b);
+
+      material.dispose();
+
+      expect([aDispose.called, bDispose.called]).toEqual([false, false]);
+    });
+
+    test('releases the resources it built and leaves resources handed in alone', () => {
+      const shared = new SpriteResources(TexturedKind.features, {textures: {colorMap: new Texture()}});
+      const own = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: new Texture()}});
+      const borrowing = new FeatureSpritesMaterial(TexturedKind, {resources: shared});
+
+      own.dispose();
+      borrowing.dispose();
+
+      expect(own.resources.isDisposed).toBe(true);
+      expect(shared.isDisposed).toBe(false);
+      expect(shared.getTexture('colorMap')).toBeDefined();
+      shared.dispose();
+    });
+
+    test('behaves as documented afterwards', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: new Texture()}});
+      const {positionNode, colorNode} = material;
+
+      material.dispose();
+
+      expect(material.getTexture('colorMap')).toBeUndefined();
+      expect(() => material.setTexture('colorMap', new Texture())).not.toThrow();
+      expect(material.placement).toBe(FlatPlacement);
+      expect([material.positionNode, material.colorNode]).toEqual([positionNode, colorNode]);
+    });
+
+    test('is safe to call twice', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.dispose();
+        material.dispose();
+      }).not.toThrow();
+    });
+
+    test('does not leak signals or effects', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+
+      const material = new FeatureSpritesMaterial(LookupKind, {textures: {colorMap: new Texture(), lookup: withImage()}});
+      expect(getEffectsCount()).toBeGreaterThan(effects);
+      material.dispose();
+
+      expect(getSignalsCount()).toBe(signals);
+      expect(getEffectsCount()).toBe(effects);
+    });
+
+    test('builds no node on the way out', () => {
+      const material = new FeatureSpritesMaterial(LookupKind, {textures: {colorMap: new Texture(), lookup: withImage()}});
+      const {version} = material;
+
+      material.dispose();
+
+      expect(material.version).toBe(version);
+    });
+  });
+});

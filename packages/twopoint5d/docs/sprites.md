@@ -147,3 +147,68 @@ for `instancePosition`, `texCoords` for the three frame attributes — and throw
 kind does not know. A geometry built with `attributeUsage` shares its prototype with no other.
 `baseArgs` hands `make()` of the base other arguments: `[halfWidth, halfHeight, xOffset,
 yOffset]` for `QuadBase`. The trim margins still move the corners by the measure of the unit quad.
+
+## The material: textures, uniforms and rebuilds
+
+`FeatureSpritesMaterial` folds the pipeline of a kind into `positionNode` and `colorNode`. It takes
+the kind and, besides every three.js material parameter, its own options: `name`, `textures` and
+`uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources`
+shared with other materials, which then stay the caller's.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSpritesMaterial,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+import {Texture} from 'three/webgpu';
+
+const kind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint],
+});
+
+const material = new FeatureSpritesMaterial(kind, {textures: {colorMap: new Texture()}, transparent: true});
+
+// the next texture of the same kind costs no rebuild
+material.setTexture('colorMap', new Texture());
+
+material.dispose();
+```
+
+Without a frame feature the frame is the whole texture, untrimmed and unturned; without a color
+source the sprite is flat grey, and the color stages — `Tint` among them — work on that grey. A
+feature whose textures are not all set drops out of the graph until they are: a kind with
+`TextureColor` draws its sprites flat grey, tinted, while no `colorMap` is set. A texture declared with `needsImage`
+counts as set only once its image has measures.
+
+`setTexture(name, texture)` and `getTexture(name)` take the names the features declare; a texture
+stays the caller's, and `dispose()` does not release it. `TextureLoader` writes a loaded image into
+the same texture without an event, so `touchTexture(name)` re-reads it once it has loaded.
+
+A texture of the same kind as the one set takes its place without a rebuild: the texture nodes
+of the graphs get it as their value. Of the same kind means alike in `colorSpace`, `type` and
+`format`, in the way three binds it, in whether both filters are `NearestFilter` and whether a
+filter blends texels, in `compareFunction` and in the samples of its render target
+(`textureShapeKey()`). A texture of another kind, and a change from no texture to one or back,
+builds the graphs that read it anew and sets `needsUpdate` — once per graph, even when the frame
+feature waits for the texture and both graphs read the frame. three then generates the shader
+source again and takes program and pipeline out of its caches for a source it has built before.
+Do not alternate such textures every frame.
+
+`uniforms` holds the uniform nodes of the features by name, and `setUniform(name, x, y?, z?, w?)`
+writes one: a number for a `float`, two to four for a `vec2` to `vec4`. A uniform is read at run
+time, so a write builds nothing and allocates nothing — call it every frame.
+
+Without an `alphaTest` or `alphaTestNode` the material drops every texel with an alpha of `0.001`
+or less; either of the two takes the place of that default.
+
+The graphs depend on the kind and on the kinds of the textures, not on the material. Two meshes
+of one kind with textures of the same kind produce the same shader source, and the second comes
+out of the renderer's caches.

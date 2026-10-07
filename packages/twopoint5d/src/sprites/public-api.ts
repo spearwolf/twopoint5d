@@ -14,6 +14,7 @@ export * from './features/Shear.js';
 export * from './features/TextureColor.js';
 export * from './features/Tint.js';
 export * from './FeatureSprites/FeatureSpritesGeometry.js';
+export * from './FeatureSprites/FeatureSpritesMaterial.js';
 export * from './FeatureSprites/SpriteResources.js';
 export * from './node-utils.js';
 export * from './SpriteBase.js';
