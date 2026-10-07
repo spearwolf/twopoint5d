@@ -5,7 +5,7 @@ import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {AnimatedSpritesGeometry} from './AnimatedSprites/AnimatedSpritesGeometry.js';
-import {prepareSpriteFrame} from './TexturedSprites/TexturedSprite.js';
+import {prepareSpriteFrame} from './features/AtlasFrame.js';
 import {TexturedSprites} from './TexturedSprites/TexturedSprites.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths measured below

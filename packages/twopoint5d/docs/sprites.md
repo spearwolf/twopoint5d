@@ -55,7 +55,7 @@ quad, before every local stage — so it scales, shears and turns with the sprit
 
 ## Defining a kind
 
-```ts
+```ts check
 import {
   AtlasFrame,
   defineSprite,
@@ -99,6 +99,9 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
 | `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
+| `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
+| `TextureColor` | — (texture `colorMap`) | — | color source | — |
+| `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 
 `InstancePosition` is data alone. `FlatPlacement` and `BillboardPlacement` read it and bring
 nothing but their placement stage, so the one stands in for the other on a live material (see
@@ -108,3 +111,21 @@ nothing but their placement stage, so the one stands in for the other on a live 
 already — onto the camera's right and up vectors in the local space of the mesh, so a mesh or its
 parents may be moved, turned and scaled evenly on all axes and its billboards still face the
 camera. A scale that differs from axis to axis skews them.
+
+### Frames out of an atlas
+
+A frame is three values: `texCoords` (`s, t, u, v`), `texFlipDiagonal` — a TexturePacker frame
+turned by 90°, read with the two lookup components swapped — and `texTrim`, the margins a
+packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
+frame of any atlas; the margins come from TexturePacker data and are zero for every other.
+
+The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
+frames by the `sourceSize` of its frames, not by the measures of their `coords`.
+
+`setFrame()` walks the coords up to their root texture on every call. A sprite that changes its
+frame every frame takes `prepareSpriteFrame(frame)` once per atlas frame and
+`setPreparedFrame(prepared)` per sprite: nine numbers copied, nothing worked out. A prepared frame
+is a snapshot; prepare it again after its `coords` or `data` change.
+
+The three attributes are static and take one usage together: `attributeUsage: {dynamic:
+['texCoords']}` makes all three dynamic.

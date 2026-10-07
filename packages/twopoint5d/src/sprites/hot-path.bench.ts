@@ -3,7 +3,7 @@ import {test} from 'vitest';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {AnimatedSpritesGeometry} from './AnimatedSprites/AnimatedSpritesGeometry.js';
-import {prepareSpriteFrame} from './TexturedSprites/TexturedSprite.js';
+import {prepareSpriteFrame} from './features/AtlasFrame.js';
 import {TexturedSprites} from './TexturedSprites/TexturedSprites.js';
 
 const options = {time: 500, warmupTime: 200};

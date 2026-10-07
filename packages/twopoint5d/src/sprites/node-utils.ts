@@ -10,16 +10,15 @@ import {
   modelWorldMatrixInverse,
   mul,
   normalize,
-  select,
   sub,
   texture,
-  varying,
   vec2,
   vec3,
   vec4,
 } from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
+import {frameUv} from './frameUv.js';
 import {matrixColumn} from './matrixColumn.js';
 
 export const vertexByInstancePosition = (params?: {
@@ -93,15 +92,8 @@ export const colorFromTextureByTexCoords = (
 ) => {
   const texCoords = params?.texCoords ?? attribute('texCoords');
   const uv = params?.uv ?? attribute('uv');
-  const flipDiagonal = params?.flipDiagonal;
 
-  const st = vec2(add(texCoords.xy, mul(uv.xy, texCoords.zw)));
-
-  // the flip is the same for every vertex of an instance, so swapping before the interpolation
-  // is the same as swapping after it
-  const vTexCoords = varying(flipDiagonal ? select(flipDiagonal.greaterThan(0.5), st.yx, st) : st);
-
-  return texture(colorMap, vTexCoords);
+  return texture(colorMap, frameUv(texCoords, uv, params?.flipDiagonal));
 };
 
 export const texCoordsFromIndex = (mapSize: Node<'vec2'>, ndx: Node<'int'>) => {

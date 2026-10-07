@@ -2,6 +2,7 @@ import {Color, type Node} from 'three/webgpu';
 import {voInitialize} from '../../vertex-objects/constants.js';
 import {frameTrimMargins, type FrameTrimMargins} from '../../texture/frameTrimMargins.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
+import type {PreparedSpriteFrame} from '../features/AtlasFrame.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
 
 export interface TexturedSprite extends VO {
@@ -57,37 +58,6 @@ export interface TexturedSprite extends VO {
   setColorValues(r: number, g: number, b: number, a: number): void;
   /** A tuple of three values writes `r`, `g` and `b` and leaves the alpha as it is. */
   setColorValues(color: [r: number, g: number, b: number, a?: number]): void;
-}
-
-/**
- * What {@link TexturedSprite.setFrame} writes for one frame of an atlas, worked out once: the tex
- * coords, the diagonal flip and the trim margins. Built by {@link prepareSpriteFrame} and written by
- * {@link TexturedSprite.setPreparedFrame}.
- */
-export interface PreparedSpriteFrame {
-  readonly texCoords: [s: number, t: number, u: number, v: number];
-  readonly texFlipDiagonal: number;
-  readonly texTrim: [left: number, top: number, right: number, bottom: number];
-}
-
-/**
- * Works out what {@link TexturedSprite.setFrame} writes for `frame`, for sprites that change their
- * frame often: {@link TexturedSprite.setPreparedFrame} then copies nine numbers into the sprite,
- * where `setFrame()` walks the coords up to their root texture and reads the trim out of the frame
- * data on every call.
- *
- * The result is a snapshot of the frame at the time of the call: once the `coords` or the `data` of
- * the frame change — a new `flip`, another parent — prepare it again.
- *
- * `frame` is a frame of any atlas, whatever the type of its data: the trim margins come from
- * TexturePacker data and are zero for every other.
- */
-export function prepareSpriteFrame(frame: TextureAtlasFrame<unknown>): PreparedSpriteFrame {
-  return {
-    texCoords: frame.coords.getTexCoords(),
-    texFlipDiagonal: frame.coords.flipD ? 1 : 0,
-    texTrim: frameTrimMargins(frame.data),
-  };
 }
 
 // setTexCoords() copies the four values into the buffer of the sprite, so one tuple serves every call
