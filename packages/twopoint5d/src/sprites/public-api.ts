@@ -13,6 +13,7 @@ export * from './features/Rotation.js';
 export * from './features/Shear.js';
 export * from './features/TextureColor.js';
 export * from './features/Tint.js';
+export * from './FeatureSprites/FeatureSpritesGeometry.js';
 export * from './node-utils.js';
 export * from './SpriteBase.js';
 export * from './SpriteFeature.js';

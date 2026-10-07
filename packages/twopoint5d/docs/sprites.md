@@ -129,3 +129,21 @@ is a snapshot; prepare it again after its `coords` or `data` change.
 
 The three attributes are static and take one usage together: `attributeUsage: {dynamic:
 ['texCoords']}` makes all three dynamic.
+
+## Uploads: static and dynamic attributes
+
+`update()` of the mesh uploads what the sprite pool marked. Position, rotation and shear are
+**dynamic**: every `update()` uploads them. Everything else is **static**: written before the
+first `update()` after `createSprite()` it reaches the gpu with that sprite; a later change
+reaches the gpu only once it is marked — `spritePool.touchVO(sprite, 'quadSize')` for one sprite,
+`geometry.touch('quadSize')` for every sprite in use.
+
+A value that changes every frame belongs in a geometry built with `attributeUsage`:
+
+    new FeatureSprites(kind, {capacity: 1000, attributeUsage: {dynamic: ['size', 'texCoords']}})
+
+It takes attribute names and the usage words of the features — `size` for `quadSize`, `position`
+for `instancePosition`, `texCoords` for the three frame attributes — and throws for a word the
+kind does not know. A geometry built with `attributeUsage` shares its prototype with no other.
+`baseArgs` hands `make()` of the base other arguments: `[halfWidth, halfHeight, xOffset,
+yOffset]` for `QuadBase`. The trim margins still move the corners by the measure of the unit quad.
