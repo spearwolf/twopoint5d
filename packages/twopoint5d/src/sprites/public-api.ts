@@ -4,6 +4,7 @@ export * from './AnimatedSprites/AnimatedSpritesGeometry.js';
 export * from './AnimatedSprites/AnimatedSpritesMaterial.js';
 export * from './BaseSprite.js';
 export * from './defineSprite.js';
+export * from './features/AnimatedFrames.js';
 export * from './features/AtlasFrame.js';
 export * from './features/BillboardPlacement.js';
 export * from './features/FlatPlacement.js';

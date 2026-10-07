@@ -100,6 +100,7 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
+| `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time`; texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 
@@ -129,6 +130,40 @@ is a snapshot; prepare it again after its `coords` or `data` change.
 
 The three attributes are static and take one usage together: `attributeUsage: {dynamic:
 ['texCoords']}` makes all three dynamic.
+
+### Animated frames
+
+`AnimatedFrames` takes the place of `AtlasFrame` when the frame is not stored per sprite but
+read out of an `animsMap`, the data texture `FrameBasedAnimations#bakeDataTexture()` bakes. A
+sprite holds only `animId` — the id `FrameBasedAnimations#add()` answers — and `animOffset`,
+the seconds its animation runs ahead of the `time` uniform. The frame is picked in the shader,
+so the whole animation costs no per-frame upload. `anim` is a static attribute: a later change
+of `animId` or `animOffset` is marked with `spritePool.touchVO(sprite, 'anim')` or
+`geometry.touch('anim')`.
+
+The animsMap is one row of RGBA float texels. The first texels are the headers, one per
+animation in the order of the ids: `[frameCount, duration, firstFrameTexel, texelsPerFrame]`.
+The frames of all animations follow, each of `texelsPerFrame` texels, the same number for the
+whole texture:
+
+| texel of a frame | holds | present when |
+| --- | --- | --- |
+| 1 | `[s, t, u, v]`, the tex coords | always |
+| 2 | `[width, height, flipDiagonal, 0]` | `texelsPerFrame` is 2 or 3 |
+| 3 | `[left, top, right, bottom]`, the trim margins | `texelsPerFrame` is 3 |
+
+The bake writes 3 texels when any frame is trimmed, 2 when any frame is turned (or
+`includeTextureSize` is set), and 1 otherwise. A frame without a second texel is never turned,
+one without a third is untrimmed. The frame shown is
+`floor(((time + animOffset) / duration * frameCount) mod frameCount)`; a `duration` of 0 is a
+still image and shows the first frame.
+
+`time` is a uniform: set it with `setUniform('time', seconds)` or the `uniforms` option, a write
+builds nothing. The animsMap itself is a texture with `needsImage`: until it has an image the
+sprite shows the whole `colorMap`, untrimmed. A `TextureLoader` or a `DataTexture` filled later
+writes the image without an event, so call `touchTexture('animsMap')` once it is there. A baked
+`DataTexture` already has its image. The animsMap stays the caller's; the material does not
+dispose it.
 
 ## Uploads: static and dynamic attributes
 
