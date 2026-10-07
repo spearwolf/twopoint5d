@@ -136,6 +136,18 @@ describe('SpriteResources', () => {
     resources.dispose();
   });
 
+  test('a constructor that throws leaves no signal or effect behind', () => {
+    const signals = getSignalsCount();
+    const effects = getEffectsCount();
+
+    expect(() => new SpriteResources([anim, color], {textures: {colormap: new Texture()}})).toThrow(
+      'SpriteResources: no feature declares the texture "colormap"; declared: animsMap, colorMap',
+    );
+
+    expect(getSignalsCount()).toBe(signals);
+    expect(getEffectsCount()).toBe(effects);
+  });
+
   describe('dispose()', () => {
     test('does NOT dispose a texture it holds', () => {
       const texture = new Texture();
@@ -160,6 +172,18 @@ describe('SpriteResources', () => {
       // a uniform keeps working; it reaches nothing that still renders
       resources.setUniform('time', 3);
       expect(resources.uniforms['time']!.value).toBe(3);
+    });
+
+    test('still refuses a misspelled name', () => {
+      const resources = new SpriteResources([anim, color]);
+      resources.dispose();
+
+      expect(() => resources.setTexture('colormap', new Texture())).toThrow(
+        'no feature declares the texture "colormap"; declared: animsMap, colorMap',
+      );
+      expect(() => resources.touchTexture('colormap')).toThrow('no feature declares the texture "colormap"');
+      expect(() => resources.getTexture('colormap')).toThrow('no feature declares the texture "colormap"');
+      expect(() => resources.setUniform('tme', 1)).toThrow('no feature declares the uniform "tme"; declared: time, light');
     });
 
     test('is safe to call twice', () => {

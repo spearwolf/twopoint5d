@@ -98,6 +98,15 @@ export class SpriteResources {
       this.setUniform(name, ...((typeof value === 'number' ? [value] : value) as [number, number?, number?, number?]));
     }
 
+    // refused before any signal exists: a constructor that throws leaves nothing behind
+    for (const name of Object.keys(options.textures ?? {})) {
+      if (!declarations.textures.has(name)) {
+        throw new Error(
+          `${where}: no feature declares the texture "${name}"; declared: ${[...declarations.textures.keys()].join(', ')}`,
+        );
+      }
+    }
+
     for (const [name, {needsImage}] of declarations.textures) {
       const signal = createSignal<Texture | undefined>(undefined, {attach: this});
       // what a graph depends on of the texture: its kind, and for needsImage whether it has an image yet
