@@ -38,6 +38,7 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
   /**
    * Uniforms and textures shared with other materials; they stay the caller's. Without them the
    * material builds its own from `textures` and `uniforms` and releases them in `dispose()`.
+   * Resources that have been disposed are refused.
    */
   resources?: SpriteResources;
 }
@@ -106,6 +107,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
 
     if (resources != null && (textures != null || uniforms != null)) {
       throw new TypeError(`${WHERE}: textures and uniforms belong to the resources handed in`);
+    }
+    if (resources?.isDisposed) {
+      throw new TypeError(`${WHERE}: the resources handed in have been disposed`);
     }
     this.#ownsResources = resources == null;
     this.resources = resources ?? new SpriteResources(this.#features, {textures, uniforms}, WHERE);
@@ -205,6 +209,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         {attach: this},
       );
     } catch (error) {
+      // the group goes first, the opposite of dispose(): an effect whose first run threw never
+      // reached its field and is reachable only through the group, and it has to be gone before
+      // the release below writes the texture signals it reads
       SignalGroup.delete(this);
       if (this.#ownsResources) this.resources.dispose();
       throw error;

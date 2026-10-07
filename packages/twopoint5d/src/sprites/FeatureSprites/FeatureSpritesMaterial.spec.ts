@@ -153,6 +153,17 @@ describe('FeatureSpritesMaterial', () => {
       expect(resources.isDisposed).toBe(false);
       resources.dispose();
     });
+
+    test('refuses resources that have been disposed', () => {
+      const resources = new SpriteResources(TexturedKind.features);
+      resources.dispose();
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {resources})).toThrow(
+        new TypeError('FeatureSpritesMaterial: the resources handed in have been disposed'),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
   });
 
   describe('the position graph', () => {
