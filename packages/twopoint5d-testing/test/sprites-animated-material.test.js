@@ -1,9 +1,10 @@
 import {expect} from '@esm-bundle/chai';
 import {
-  AnimatedSprites,
-  AnimatedSpritesGeometry,
-  AnimatedSpritesMaterial,
+  AnimatedSpriteKind,
   Display,
+  FeatureSprites,
+  FeatureSpritesGeometry,
+  FeatureSpritesMaterial,
   FrameBasedAnimations,
   TextureCoords,
 } from '@spearwolf/twopoint5d';
@@ -19,7 +20,7 @@ const RED = [255, 0, 0, 255];
 const GREEN = [0, 255, 0, 255];
 const BLUE = [0, 0, 255, 255];
 
-describe('sprites — AnimatedSpritesMaterial draws the frame the time points at', function () {
+describe('sprites — AnimatedSpriteKind draws the frame the time points at', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
 
@@ -91,9 +92,9 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
       animId = anims.animId(draw ?? animations[0].name);
     }
 
-    const geometry = new AnimatedSpritesGeometry(1);
-    const material = new AnimatedSpritesMaterial({colorMap, animsMap, time});
-    const sprites = new AnimatedSprites(geometry, material);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 1);
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}});
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
     sprites.frustumCulled = false;
 
     const sprite = geometry.instancedPool.createVO();
@@ -201,9 +202,9 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
     greenAnims.add('padding', 1, [0, 1, 2, 0, 1, 2].map(frameOf));
     const greenBake = greenAnims.bakeDataTexture();
 
-    const geometry = new AnimatedSpritesGeometry(1);
-    const material = new AnimatedSpritesMaterial({colorMap, animsMap: redBake});
-    const sprites = new AnimatedSprites(geometry, material);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 1);
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap: redBake}});
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
 
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -215,14 +216,14 @@ describe('sprites — AnimatedSpritesMaterial draws the frame the time points at
 
     const before = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
 
-    const {texCoordsNode, colorNode, version} = material;
-    material.animsMap = greenBake;
+    const {positionNode, colorNode, version} = material;
+    material.setTexture('animsMap', greenBake);
     sprites.update();
 
     const after = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
 
     // the swap reached the gpu through the texture nodes and the size uniform alone
-    const rebuilt = material.texCoordsNode !== texCoordsNode || material.colorNode !== colorNode || material.version !== version;
+    const rebuilt = material.positionNode !== positionNode || material.colorNode !== colorNode || material.version !== version;
     const widths = [redBake.image.width, greenBake.image.width];
 
     sprites.dispose();

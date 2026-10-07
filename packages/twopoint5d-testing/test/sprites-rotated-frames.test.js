@@ -1,11 +1,12 @@
 import {expect} from '@esm-bundle/chai';
 import {
-  AnimatedSprites,
-  AnimatedSpritesGeometry,
-  AnimatedSpritesMaterial,
+  AnimatedSpriteKind,
   Display,
+  FeatureSprites,
+  FeatureSpritesGeometry,
+  FeatureSpritesMaterial,
   FrameBasedAnimations,
-  TexturedSprites,
+  TexturedSpriteKind,
   TexturePackerJson,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
@@ -102,11 +103,11 @@ describe('sprites — a rotated TexturePacker frame is drawn upright', function 
     });
   }
 
-  it('TexturedSprites draws the turned frame as the upright one', async function () {
+  it('TexturedSpriteKind draws the turned frame as the upright one', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
     const [atlas] = TexturePackerJson.parse(json);
 
-    const sprites = new TexturedSprites(2, texture);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: texture}});
     sprites.frustumCulled = false;
 
     const upright = sprites.createSprite();
@@ -132,7 +133,7 @@ describe('sprites — a rotated TexturePacker frame is drawn upright', function 
     expectSameCells(pixels);
   });
 
-  it('AnimatedSprites draws the turned frame of an animation as the upright one', async function () {
+  it('AnimatedSpriteKind draws the turned frame of an animation as the upright one', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
     const [atlas] = TexturePackerJson.parse(json);
 
@@ -141,9 +142,12 @@ describe('sprites — a rotated TexturePacker frame is drawn upright', function 
     anims.add('turned', 1, [atlas.frame('turned').coords]);
     const animsMap = anims.bakeDataTexture();
 
-    const geometry = new AnimatedSpritesGeometry(2);
-    const material = new AnimatedSpritesMaterial({colorMap: texture, animsMap});
-    const sprites = new AnimatedSprites(geometry, material);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 2);
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
+      textures: {colorMap: texture, animsMap},
+      uniforms: {time: 0},
+    });
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
     sprites.frustumCulled = false;
 
     const upright = geometry.instancedPool.createVO();

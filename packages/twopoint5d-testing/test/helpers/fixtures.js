@@ -316,6 +316,32 @@ export function isNearColor(rgb, expected, tolerance = 2) {
 }
 
 /**
+ * Compares two read-back targets of the same size pixel by pixel: `lit` counts the pixels of `a`
+ * brighter than the clear color, `differing` the pixels where any channel differs by more than
+ * `tolerance`. Independent of the order in which a backend reads the rows back.
+ *
+ * @param {ArrayLike<number>} a
+ * @param {ArrayLike<number>} b
+ * @param {number} [tolerance]
+ * @returns {{lit: number, differing: number}}
+ */
+export function diffPixels(a, b, tolerance = 2) {
+  let lit = 0;
+  let differing = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i] > 16 || a[i + 1] > 16 || a[i + 2] > 16) lit++;
+    if (
+      Math.abs(a[i] - b[i]) > tolerance ||
+      Math.abs(a[i + 1] - b[i + 1]) > tolerance ||
+      Math.abs(a[i + 2] - b[i + 2]) > tolerance
+    ) {
+      differing++;
+    }
+  }
+  return {lit, differing};
+}
+
+/**
  * The width and height, in pixels, of the box around every pixel the sprite covered.
  *
  * It reads the pixels at a row length of `size * 4` bytes and needs a target 64 pixels wide,

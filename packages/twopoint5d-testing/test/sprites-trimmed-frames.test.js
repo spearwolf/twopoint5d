@@ -1,11 +1,12 @@
 import {expect} from '@esm-bundle/chai';
 import {
-  AnimatedSprites,
-  AnimatedSpritesGeometry,
-  AnimatedSpritesMaterial,
+  AnimatedSpriteKind,
   Display,
+  FeatureSprites,
+  FeatureSpritesGeometry,
+  FeatureSpritesMaterial,
   FrameBasedAnimations,
-  TexturedSprites,
+  TexturedSpriteKind,
   TexturePackerJson,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
@@ -145,7 +146,7 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     const {texture, json} = makeTrimmedSheet();
     const [atlas] = TexturePackerJson.parse(json);
 
-    const sprites = new TexturedSprites(2, texture);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: texture}});
     sprites.frustumCulled = false;
 
     const reference = sprites.createSprite();
@@ -180,9 +181,12 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     anims.add('candidate', 1, atlas, candidateFrameQuery);
     const animsMap = anims.bakeDataTexture();
 
-    const geometry = new AnimatedSpritesGeometry(2);
-    const material = new AnimatedSpritesMaterial({colorMap: texture, animsMap, time: 0});
-    const sprites = new AnimatedSprites(geometry, material);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 2);
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
+      textures: {colorMap: texture, animsMap},
+      uniforms: {time: 0},
+    });
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
     sprites.frustumCulled = false;
 
     const reference = geometry.instancedPool.createVO();
@@ -213,19 +217,19 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     return pixels;
   }
 
-  it('TexturedSprites draws a trimmed frame where its untrimmed sprite has it', async function () {
+  it('TexturedSpriteKind draws a trimmed frame where its untrimmed sprite has it', async function () {
     expectSameCells(await renderTexturedSprites('trimmed'));
   });
 
-  it('TexturedSprites draws a trimmed frame the packer turned where its untrimmed sprite has it', async function () {
+  it('TexturedSpriteKind draws a trimmed frame the packer turned where its untrimmed sprite has it', async function () {
     expectSameCells(await renderTexturedSprites('trimmed-turned'));
   });
 
-  it('AnimatedSprites draws the frame of a trimmed animation where its untrimmed sprite has it', async function () {
+  it('AnimatedSpriteKind draws the frame of a trimmed animation where its untrimmed sprite has it', async function () {
     expectSameCells(await renderAnimatedSprites('^trimmed$'));
   });
 
-  it('AnimatedSprites draws the frame of a trimmed animation the packer turned where its untrimmed sprite has it', async function () {
+  it('AnimatedSpriteKind draws the frame of a trimmed animation the packer turned where its untrimmed sprite has it', async function () {
     // the bake then carries the diagonal flip and the margins of the frame
     expectSameCells(await renderAnimatedSprites('^trimmed-turned$'));
   });

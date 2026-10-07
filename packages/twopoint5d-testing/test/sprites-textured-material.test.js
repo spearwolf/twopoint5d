@@ -1,6 +1,6 @@
 /** @import {Texture} from 'three/webgpu' */
 import {expect} from '@esm-bundle/chai';
-import {Display, TexturedSprites} from '@spearwolf/twopoint5d';
+import {Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
 
@@ -13,7 +13,7 @@ const WHITE = [255, 255, 255, 255];
 const GREEN = [0, 255, 0, 255];
 const RED = [255, 0, 0, 255];
 
-describe('sprites — TexturedSpritesMaterial draws its color map', function () {
+describe('sprites — TexturedSpriteKind draws its color map', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
 
@@ -53,7 +53,7 @@ describe('sprites — TexturedSpritesMaterial draws its color map', function () 
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const sprites = new TexturedSprites(1, colorMap);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}});
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -80,6 +80,8 @@ describe('sprites — TexturedSpritesMaterial draws its color map', function () 
     expect(rgb, 'the green of the color map').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
   });
 
+  // the tint is a color stage that reads `color`, an instance attribute of its own feature, in the
+  // fragment stage: red here means the attribute reached the fragment shader under this backend
   it('tints the color map by the color of the sprite', async function () {
     const rgb = await renderSprite({colorMap: makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2), color: [1, 0, 0, 1]});
 
@@ -94,7 +96,7 @@ describe('sprites — TexturedSpritesMaterial draws its color map', function () 
     const red = makeColorTexture([RED, RED, RED, RED], 2, 2);
     const green = makeColorTexture([GREEN, GREEN, GREEN, GREEN], 2, 2);
 
-    const sprites = new TexturedSprites(1, red);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: red}});
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
     sprite.setPosition(0, 0, 0);
@@ -107,7 +109,7 @@ describe('sprites — TexturedSpritesMaterial draws its color map', function () 
     const before = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
 
     const {colorNode, version} = sprites.material;
-    sprites.texture = green;
+    sprites.setTexture('colorMap', green);
     sprites.update();
 
     const after = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
