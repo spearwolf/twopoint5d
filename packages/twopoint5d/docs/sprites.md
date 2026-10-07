@@ -282,3 +282,71 @@ it brings. A write of the placement the material holds builds nothing.
 
 A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
 built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.
+
+## FeatureSprites
+
+`FeatureSprites` is the mesh of a kind: a `VertexObjects` that builds the `FeatureSpritesGeometry`
+and the `FeatureSpritesMaterial` it is not handed, and hands out the sprites.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  Rotation,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+import {Scene, Texture} from 'three/webgpu';
+
+const FancySprite = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, Rotation, AtlasFrame, TextureColor, Tint],
+});
+
+const colorMap = new Texture();
+const sprites = new FeatureSprites(FancySprite, {capacity: 1000, textures: {colorMap}, transparent: true});
+
+const scene = new Scene();
+scene.add(sprites);
+
+const sprite = sprites.createSprite();
+if (sprite != null) {
+  sprite.setPosition(10, 20, 0);
+  sprite.setSize(32, 32);
+  sprite.rotation = Math.PI / 4;
+  sprite.setTexCoords(0, 0, 0.5, 0.5);
+}
+
+// once per frame, before rendering
+sprites.update();
+
+// later
+if (sprite != null) sprites.freeSprite(sprite);
+sprites.dispose();
+colorMap.dispose();
+```
+
+The options are the ones of the geometry (`capacity`, `attributeUsage`, `baseArgs`) and of the
+material (`textures`, `uniforms`, `placement` and every three.js material parameter) side by side.
+`createSprite()` answers `undefined` once the pool is full. `placement`, `uniforms`, `setUniform()`,
+`getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
+
+**Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
+`geometry` or a `material` handed in, and every texture, stays the caller's; `dispose()` leaves
+them alone. A mesh built around a geometry handed in still disposes the material it built for it.
+
+**Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
+sprite kind; `capacity`, `attributeUsage` or `baseArgs` next to a `geometry`; any material
+parameter next to a `material`. A material that cannot be built (a `placement` that cannot stand
+in, a texture name no feature declares) throws as well, and the geometry the constructor built for
+it is disposed first, so a refused constructor leaves nothing behind.
+
+**After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
+`geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`; `createSprite()`
+answers `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`, `touchTexture()` and the
+`placement` setter do nothing. A second `dispose()` does nothing.
