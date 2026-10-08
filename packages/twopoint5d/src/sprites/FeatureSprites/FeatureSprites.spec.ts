@@ -13,6 +13,7 @@ import {QuadSize} from '../features/QuadSize.js';
 import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
+import type {SpritePass} from '../passes/definePass.js';
 import {QuadBase} from '../SpriteBase.js';
 import {FeatureSprites} from './FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSpritesGeometry.js';
@@ -150,6 +151,13 @@ describe('FeatureSprites', () => {
         new FeatureSprites(kind, t);
       void withMaterial;
       void withTexture;
+    });
+
+    test('a pass among its options, which would build the material of the sprites as a pass material (a type-level check)', () => {
+      const withPass = (pass: SpritePass) =>
+        // @ts-expect-error a FeatureSprites draws the sprites themselves
+        new FeatureSprites(kind, {pass});
+      void withPass;
     });
   });
 

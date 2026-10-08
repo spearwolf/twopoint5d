@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {add, vec3} from 'three/tsl';
+import {add, vec3, vec4} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
 import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
@@ -16,6 +16,7 @@ import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
 import {QuadBase} from '../SpriteBase.js';
+import {definePass} from '../passes/definePass.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 import {SpriteResources} from './SpriteResources.js';
 import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
@@ -619,6 +620,108 @@ describe('FeatureSpritesMaterial', () => {
       material.dispose();
 
       expect(material.version).toBe(version);
+    });
+  });
+
+  describe('a pass material', () => {
+    const lift = recorder('lift', 'mesh', 100);
+    const darken = defineFeature({...recorder('darken', 'color', 200), uniforms: {shade: 0.5}});
+
+    test('runs the stages of the kind and of the pass, leaving out those of the features named in without', () => {
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, recordingPlacement, recorder('tintStage', 'color', 100)],
+      });
+      const pass = definePass({name: 'p', features: [lift, darken], without: ['tintStage']});
+
+      const material = new FeatureSpritesMaterial(kind, {pass});
+
+      expect(calls).toEqual(['placement', 'lift', 'darken']);
+      expect(material.pass).toBe(pass);
+      expect(material.uniforms['shade']!.value).toBe(0.5);
+      material.dispose();
+    });
+
+    test('is no pass material without a pass', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(material.pass).toBeUndefined();
+      material.dispose();
+    });
+
+    test('takes the material parameters of the pass', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {
+        pass: definePass({name: 'p', features: [], material: {transparent: true, depthWrite: false}}),
+      });
+
+      expect([material.transparent, material.depthWrite]).toEqual([true, false]);
+      material.dispose();
+    });
+
+    test('lets a parameter handed in win over the one of the pass, and an alphaTest of the pass replace the default', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind, {
+        pass: definePass({name: 'p', features: [], material: {transparent: true, alphaTest: 0.25}}),
+        transparent: false,
+      });
+
+      expect(material.transparent).toBe(false);
+      expect(material.alphaTest).toBe(0.25);
+      expect(material.alphaTestNode).toBeNull();
+      material.dispose();
+    });
+
+    test('takes a pass feature whose requires the kind or the pass meets', () => {
+      const anchor = defineFeature({name: 'anchor', local: {order: 100, transform: (p) => p}});
+      const onTint = defineFeature({name: 'onTint', requires: ['tint'], color: {order: 250, transform: (c) => c}});
+      const onAnchor = defineFeature({name: 'onAnchor', requires: ['anchor'], mesh: {order: 100, transform: (p) => p}});
+
+      const material = new FeatureSpritesMaterial(TexturedKind, {
+        pass: definePass({name: 'p', features: [anchor, onTint, onAnchor]}),
+      });
+
+      expect(material.pass!.features).toEqual([anchor, onTint, onAnchor]);
+      material.dispose();
+    });
+
+    test('refuses a without the kind does not hold, a without of the placement, and an unmet requires, and leaves nothing behind', () => {
+      const needsAnchor = defineFeature({name: 'needsAnchor', requires: ['anchor'], color: {order: 1, transform: (c) => c}});
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(
+        () => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [], without: ['tnt']})}),
+      ).toThrow('FeatureSpritesMaterial: pass "p" leaves out feature "tnt", which the sprite kind does not hold');
+      expect(
+        () => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [], without: ['flatPlacement']})}),
+      ).toThrow(
+        'FeatureSpritesMaterial: pass "p" leaves out the placement "flatPlacement"; a pass draws with the placement of the sprites',
+      );
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [needsAnchor]})})).toThrow(
+        'FeatureSpritesMaterial: feature "needsAnchor" of pass "p" requires feature "anchor", which neither the sprite kind nor the pass holds',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('refuses a pass that brings a second color source, and leaves nothing behind', () => {
+      const flat = defineFeature({name: 'flat', colorSource: () => vec4(0, 0, 0, 1) as unknown as Node<'vec4'>});
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [flat]})})).toThrow(
+        'FeatureSpritesMaterial: pass "p": features "textureColor" and "flat" each contribute a colorSource stage; a sprite takes at most one',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('judges a placement by the features of the kind, not by those of the pass', () => {
+      const anchor = defineFeature({name: 'anchor', local: {order: 100, transform: (p) => p}});
+      const anchored = defineFeature({name: 'anchored', requires: ['anchor'], placement: (local) => local});
+      const material = new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [anchor]})});
+
+      expect(() => {
+        material.placement = anchored;
+      }).toThrow('FeatureSpritesMaterial: feature "anchored" requires feature "anchor", which the sprite kind does not hold');
+      material.placement = BillboardPlacement;
+      expect(material.placement).toBe(BillboardPlacement);
+      material.dispose();
     });
   });
 });

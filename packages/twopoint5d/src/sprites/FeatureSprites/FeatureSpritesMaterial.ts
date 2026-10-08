@@ -11,6 +11,8 @@ import {
 import {add, attribute, float, mul, sub, texture, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import type {SpriteKind} from '../defineSprite.js';
+import type {SpritePass} from '../passes/definePass.js';
+import {passFeatures} from '../passes/passFeatures.js';
 import type {
   SpriteFeature,
   SpriteFrameContext,
@@ -18,7 +20,7 @@ import type {
   SpriteShaderContext,
   SpriteUniformValue,
 } from '../SpriteFeature.js';
-import type {SpritePipeline} from '../spritePipeline.js';
+import {buildSpritePipeline, type SpritePipeline} from '../spritePipeline.js';
 import {SpriteResources, type SpriteUniformNode} from './SpriteResources.js';
 
 /**
@@ -41,6 +43,12 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
    * Resources that have been disposed are refused.
    */
   resources?: SpriteResources;
+  /**
+   * Builds the material for this pass over the kind: from the features of the kind without the
+   * stages of those `without` names, plus the features of the pass. The material parameters of the
+   * pass come first, so a parameter handed in here wins over one of the pass.
+   */
+  pass?: SpritePass;
 }
 
 type TextureNode = ReturnType<typeof texture>;
@@ -65,16 +73,18 @@ const trimShift = (position: Node<'vec3'>, uv: Node<'vec2'>, trim: Node<'vec4'>)
 };
 
 /**
- * The material of a sprite kind: folds the pipeline of the kind into `positionNode` and
- * `colorNode`. A feature whose textures are not all set — or, with `needsImage`, have no image —
- * drops out of the graph until they are: the frame falls back to its defaults, the color source
- * to flat grey.
+ * The material of a sprite kind: folds the pipeline of the kind — or, with a `pass`, the pipeline
+ * of that pass over the kind — into `positionNode` and `colorNode`. A feature whose textures are
+ * not all set — or, with `needsImage`, have no image — drops out of the graph until they are: the
+ * frame falls back to its defaults, the color source to flat grey.
  */
 export class FeatureSpritesMaterial<Api extends object = object> extends NodeMaterial {
   readonly isFeatureSpritesMaterial = true;
 
   readonly kind: SpriteKind<Api>;
   readonly resources: SpriteResources;
+  /** The pass this material draws, `undefined` for the material of the sprites themselves. */
+  readonly pass: SpritePass | undefined;
 
   readonly #features: readonly SpriteFeature[];
   readonly #pipeline: SpritePipeline;
@@ -97,12 +107,16 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
 
     // the options of this material stay out of setValues(): Material.setValues() warns about every
     // key whose current value is undefined
-    const {name, textures, uniforms, placement, resources, ...materialParameters} = options ?? {};
+    const {name, textures, uniforms, placement, resources, pass, ...ownParameters} = options ?? {};
+    // the parameters of the pass first, so that a parameter handed in wins
+    const materialParameters = {...pass?.material, ...ownParameters};
 
     this.kind = kind;
     this.name = name ?? 'twopoint5d.FeatureSpritesMaterial';
-    this.#features = kind.features;
-    this.#pipeline = kind.pipeline;
+    this.pass = pass;
+    // a pass is checked and folded before anything is built, so that its refusal leaves nothing behind
+    this.#features = pass == null ? kind.features : passFeatures(kind, pass, WHERE);
+    this.#pipeline = pass == null ? kind.pipeline : buildSpritePipeline(this.#features, `${WHERE}: pass "${pass.name}"`);
     this.#attributeNames = new Set([
       ...Object.keys(kind.description.attributes),
       ...Object.keys(kind.base.description.attributes),

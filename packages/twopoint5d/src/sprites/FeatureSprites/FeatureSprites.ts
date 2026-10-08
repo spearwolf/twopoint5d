@@ -8,9 +8,10 @@ import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './F
 import {FeatureSpritesMaterial, type FeatureSpritesMaterialParameters} from './FeatureSpritesMaterial.js';
 import type {SpriteUniformNode} from './SpriteResources.js';
 
+// the mesh draws the sprites themselves; a pass material is built next to it, never as its material
 export interface FeatureSpritesOptions<Api extends object = object>
   extends FeatureSpritesGeometryParameters,
-    Omit<FeatureSpritesMaterialParameters, 'resources'> {
+    Omit<FeatureSpritesMaterialParameters, 'resources' | 'pass'> {
   /** A geometry of the same kind; it stays the caller's. Excludes `capacity`, `attributeUsage` and `baseArgs`. */
   geometry?: FeatureSpritesGeometry<Api>;
   /** A material of the same kind; it stays the caller's. Excludes every material parameter. */
