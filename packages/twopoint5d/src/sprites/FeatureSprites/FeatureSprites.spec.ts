@@ -1,6 +1,7 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {MeshBasicMaterial} from 'three/webgpu';
+import {mul} from 'three/tsl';
+import type {MeshBasicMaterial, Vector4} from 'three/webgpu';
 import {Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
 
@@ -13,11 +14,13 @@ import {QuadSize} from '../features/QuadSize.js';
 import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
-import type {SpritePass} from '../passes/definePass.js';
+import {definePass, type SpritePass} from '../passes/definePass.js';
 import {QuadBase} from '../SpriteBase.js';
+import {defineFeature} from '../SpriteFeature.js';
 import {FeatureSprites} from './FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
+import {SpriteResources} from './SpriteResources.js';
 
 const kind = defineSprite({
   base: QuadBase,
@@ -282,6 +285,208 @@ describe('FeatureSprites', () => {
 
       expect(geometryDispose.called).toBe(false);
       geometry.dispose();
+    });
+  });
+
+  describe('passes', () => {
+    const shade = defineFeature({name: 'shade', uniforms: {shadeColor: [0, 0, 0, 1]}, color: {order: 150, transform: (c) => c}});
+    const drop = defineFeature({name: 'drop', uniforms: {dropOffset: [1, -1, 0]}, mesh: {order: 100, transform: (p) => p}});
+    const shadow = definePass({name: 'shadow', features: [drop, shade], renderOrder: -1, material: {transparent: true}});
+
+    test('builds one child mesh per pass over the geometry of the sprites, with a material of its own', () => {
+      const sprites = new FeatureSprites(kind, {passes: [shadow]});
+      const pass = sprites.passes['shadow']!;
+
+      expect(pass.parent).toBe(sprites);
+      expect(pass.geometry).toBe(sprites.geometry);
+      expect(pass.material).not.toBe(sprites.material);
+      expect(pass.material.pass).toBe(shadow);
+      expect([pass.renderOrder, pass.frustumCulled, pass.material.transparent]).toEqual([-1, false, true]);
+      expect(pass.name).toBe('twopoint5d.FeatureSprites.shadow');
+      sprites.dispose();
+    });
+
+    test('draws a pass without a renderOrder in the order of the sprites, and builds no pass without passes', () => {
+      const sprites = new FeatureSprites(kind, {passes: [definePass({name: 'plain', features: []})]});
+
+      expect(sprites.passes['plain']!.renderOrder).toBe(0);
+      expect(new FeatureSprites(kind).passes).toEqual({});
+      sprites.dispose();
+    });
+
+    test('shares uniforms and textures between the sprites and every pass', () => {
+      const colorMap = new Texture();
+      const sprites = new FeatureSprites(kind, {passes: [shadow], textures: {colorMap}});
+      const pass = sprites.passes['shadow']!;
+
+      expect(pass.material.resources).toBe(sprites.material!.resources);
+      expect(pass.material.getTexture('colorMap')).toBe(colorMap);
+      sprites.setUniform('shadeColor', 1, 0, 0, 1);
+      expect((pass.material.uniforms['shadeColor']!.value as Vector4).toArray()).toEqual([1, 0, 0, 1]);
+      sprites.dispose();
+    });
+
+    test('writes a placement swap into every pass material', () => {
+      const sprites = new FeatureSprites(kind, {passes: [shadow]});
+
+      sprites.placement = BillboardPlacement;
+
+      expect(sprites.passes['shadow']!.material.placement).toBe(BillboardPlacement);
+      sprites.dispose();
+    });
+
+    test('starts every pass material with the placement the sprites start with', () => {
+      const sprites = new FeatureSprites(kind, {passes: [shadow], placement: BillboardPlacement});
+
+      expect(sprites.passes['shadow']!.material.placement).toBe(BillboardPlacement);
+      sprites.dispose();
+    });
+
+    test('lets a placement the material of the sprites refuses reach no pass', () => {
+      const sprites = new FeatureSprites(kind, {passes: [shadow]});
+
+      expect(() => {
+        sprites.placement = Tint;
+      }).toThrow(TypeError);
+
+      expect(sprites.passes['shadow']!.material.placement).toBe(FlatPlacement);
+      sprites.dispose();
+    });
+
+    test('update() uploads the dynamic buffer once per frame, whatever the number of passes', () => {
+      const reflection = definePass({name: 'reflection', features: []});
+      const sprites = new FeatureSprites(kind, {capacity: 1, passes: [shadow, reflection]});
+      sprites.createSprite();
+      sprites.update();
+      const attribute = sprites.geometry!.getAttribute('instancePosition') as unknown as {
+        data?: {version: number};
+        version: number;
+      };
+      const versionOf = () => attribute.data?.version ?? attribute.version;
+      const before = versionOf();
+
+      sprites.update();
+
+      expect(versionOf()).toBe(before + 1);
+      expect('update' in sprites.passes['shadow']!).toBe(false);
+      sprites.dispose();
+    });
+
+    test('refuses two passes of one name, a pass next to a material handed in, and a uniform two features declare', () => {
+      const material = new FeatureSpritesMaterial(kind);
+      const clash = definePass({name: 'clash', features: [defineFeature({name: 'other', uniforms: {shadeColor: 0}})]});
+
+      expect(() => new FeatureSprites(kind, {passes: [shadow, shadow]})).toThrow('FeatureSprites: two passes are named "shadow"');
+      expect(() => new FeatureSprites(kind, {material, passes: [shadow]})).toThrow(
+        'FeatureSprites: passes share the uniforms and textures of a material the sprites build; hand in no material with them',
+      );
+      expect(() => new FeatureSprites(kind, {passes: [shadow, clash]})).toThrow(
+        'FeatureSprites: features "shade" and "other" both declare the uniform "shadeColor"',
+      );
+      material.dispose();
+    });
+
+    test('refuses a pass the kind cannot draw before it builds anything', () => {
+      const geometryBuilt = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, {passes: [definePass({name: 'p', features: [], without: ['tnt']})]})).toThrow(
+        'FeatureSprites: pass "p" leaves out feature "tnt", which the sprite kind does not hold',
+      );
+      expect(geometryBuilt.called).toBe(false);
+    });
+
+    test('dispose() removes the pass meshes, releases their materials and the shared resources, and leaves a geometry handed in alone', () => {
+      const geometry = new FeatureSpritesGeometry(kind, 1);
+      const geometryDispose = sandbox.spy(geometry, 'dispose');
+      const sprites = new FeatureSprites(kind, {geometry, passes: [shadow]});
+      const pass = sprites.passes['shadow']!;
+      const passMaterialDispose = sandbox.spy(pass.material, 'dispose');
+      let fired = 0;
+      pass.addEventListener('dispose', () => fired++);
+      const {resources} = sprites.material!;
+
+      sprites.dispose();
+
+      expect([pass.parent, passMaterialDispose.calledOnce, fired, resources.isDisposed, geometryDispose.called]).toEqual([
+        null,
+        true,
+        1,
+        true,
+        false,
+      ]);
+      expect(sprites.passes).toEqual({});
+      geometry.dispose();
+    });
+
+    test('does not leak signals or effects with passes', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+
+      new FeatureSprites(kind, {passes: [shadow], textures: {colorMap: new Texture()}}).dispose();
+
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    describe('a constructor that throws', () => {
+      // the stage reads an attribute the kind does not hold, so the pass is refused only once its material is built
+      const broken = definePass({
+        name: 'broken',
+        features: [
+          defineFeature({name: 'peek', color: {order: 150, transform: (c, {attribute}) => mul(c, attribute<'vec4'>('nope'))}}),
+        ],
+      });
+      const refusal = 'FeatureSpritesMaterial: feature "peek" reads the attribute "nope", which the sprite kind does not hold';
+
+      test('releases the pass materials built so far, the material, the shared resources and the geometry it built when a pass material is refused', () => {
+        const signals = getSignalsCount();
+        const effects = getEffectsCount();
+        const materialDispose = sandbox.spy(FeatureSpritesMaterial.prototype, 'dispose');
+        const resourcesDispose = sandbox.spy(SpriteResources.prototype, 'dispose');
+        const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+        expect(() => new FeatureSprites(kind, {passes: [shadow, broken], textures: {colorMap: new Texture()}})).toThrow(refusal);
+
+        // the material of the sprites and the one of the shadow; the refused one released itself
+        expect([materialDispose.callCount, resourcesDispose.callCount, geometryDispose.callCount]).toEqual([2, 1, 1]);
+        expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+      });
+
+      test('leaves a geometry handed in alone when a pass material is refused', () => {
+        const geometry = new FeatureSpritesGeometry(kind, 1);
+        const geometryDispose = sandbox.spy(geometry, 'dispose');
+
+        expect(() => new FeatureSprites(kind, {geometry, passes: [broken]})).toThrow(refusal);
+
+        expect(geometryDispose.called).toBe(false);
+        geometry.dispose();
+      });
+
+      test('releases the shared resources and the geometry it built when the material of the sprites is refused', () => {
+        const signals = getSignalsCount();
+        const effects = getEffectsCount();
+        const resourcesDispose = sandbox.spy(SpriteResources.prototype, 'dispose');
+        const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+        expect(() => new FeatureSprites(kind, {passes: [shadow], placement: Tint, textures: {colorMap: new Texture()}})).toThrow(
+          TypeError,
+        );
+
+        expect([resourcesDispose.callCount, geometryDispose.callCount]).toEqual([1, 1]);
+        expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+      });
+
+      test('releases the geometry it built when the shared resources are refused', () => {
+        const signals = getSignalsCount();
+        const effects = getEffectsCount();
+        const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+        expect(() => new FeatureSprites(kind, {passes: [shadow], textures: {unknown: new Texture()}})).toThrow(
+          'FeatureSprites: no feature declares the texture "unknown"',
+        );
+
+        expect(geometryDispose.callCount).toBe(1);
+        expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+      });
     });
   });
 });
