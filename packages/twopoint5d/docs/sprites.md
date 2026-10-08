@@ -588,7 +588,7 @@ const sprites = new FeatureSprites(TexturedSpriteKind, {
   passes: [ShadowPass],
 });
 
-// the light comes from above, a little from the right; it points towards the light.
+// the light comes from above, a little from the left; it points towards the light.
 // the ground is the XZ plane of the mesh
 sprites.setUniform('shadowLight', -0.5, 1, -0.3, 0);
 sprites.setUniform('groundPlane', 0, 1, 0, 0);
@@ -653,7 +653,8 @@ Two passes ship ready-made. Both are `transparent`, write no depth, draw both si
 (`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
 (`polygonOffset`, with a factor and units of -1). A plane is `[n.x, n.y, n.z, d]`, the plane
 `dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
-is the plane `y = 2`:
+is the plane `y = 2`. A ground or a light in the scene graph need not be worked out by hand —
+see "Binding uniforms to the scene graph" below:
 
 | pass | features | uniforms (start value) | what it draws |
 | --- | --- | --- | --- |
@@ -793,6 +794,149 @@ The limits:
 - **A light per sprite.** Uniforms hold for every sprite of a `FeatureSprites`, and a pass brings
   no data; sprites under different lights are sprites in different meshes.
 
+## Binding uniforms to the scene graph
+
+The planes and the light of the passes are uniforms in the local space of the sprites, a plane in
+the form `dot(n, p) = d`. A ground mesh and a light, though, live in the scene graph, each in a
+space of its own, and either of them — or the sprites — may move every frame. A **binding** works
+the uniform out of a node every frame: `bindUniform(name, source)` hands the uniform `name` to a
+`SpriteUniformSource`, and `update()` lets the source write it.
+
+```ts check
+import {FeatureSprites, lightOf, planeOf, ReflectionPass, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {DirectionalLight, Mesh, MeshBasicNodeMaterial, PlaneGeometry, Scene} from 'three/webgpu';
+
+const scene = new Scene();
+const ground = new Mesh(new PlaneGeometry(400, 400), new MeshBasicNodeMaterial({transparent: true}));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+const sun = new DirectionalLight();
+sun.position.set(-80, 160, 120);
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 100, passes: [ReflectionPass, ShadowPass]});
+scene.add(sprites);
+
+// the shadow and the reflection follow the ground and the sun, wherever they and the sprites move
+sprites.bindUniform('groundPlane', planeOf(ground));
+sprites.bindUniform('mirrorPlane', planeOf(ground));
+sprites.bindUniform('shadowLight', lightOf(sun));
+
+// reflection < ground < shadow < sprites
+sprites.passes['reflection']!.renderOrder = -3;
+ground.renderOrder = -2;
+sprites.passes['shadow']!.renderOrder = -1;
+
+// once per frame, after the changes, before rendering
+sprites.update();
+
+sprites.dispose();
+ground.geometry.dispose();
+ground.material.dispose();
+```
+
+**`planeOf()`** writes a plane `[n.x, n.y, n.z, d]` — for `groundPlane`, `mirrorPlane` or a plane
+uniform of one's own:
+
+- `planeOf(node)` takes the local XY plane of the node, the normal +Z: the plane a
+  `PlaneGeometry` lies in, its front face on the side the normal points to. A ground built as
+  `rotation.x = -Math.PI / 2` has its normal at +Y. The node is read where it is in each frame —
+  turned, moved, scaled unevenly, its parents included; its world matrix is refreshed for it.
+- `planeOf(node, {plane})` takes `plane` in the local space of the node instead. The plane is
+  copied, so a later change of it does not reach the source.
+- `planeOf(plane)` takes a fixed three `Plane` in world space, copied as well. three's `Plane` is
+  `dot(n, p) + constant = 0`, so `d` is `-constant`: the plane `y = 2` is `new Plane(new
+  Vector3(0, 1, 0), -2)`.
+
+The normal is not normalized; the features do not need it to be. **The sprites stand on the side
+the normal points to**, and the hook of `ShadowPass` judges the light by it: turn the plane
+over, and the shadow is left out.
+
+**`lightOf()`** writes a homogeneous light `[x, y, z, w]` for `shadowLight`:
+
+- a `DirectionalLight`: `w = 0` and the direction *towards* the light, from its `target` to it.
+  The light and its target are read where they are in each frame, the target outside the scene
+  as well.
+- any other node — a `PointLight`, a `SpotLight` (its cone is ignored), an `Object3D` that marks
+  a lamp: `w = 1` and its position, a point light.
+
+An `AmbientLight` or a `HemisphereLight` is taken as any node; its position means nothing, and
+neither does the shadow it throws.
+
+The rules of `bindUniform()` and `unbindUniform()`:
+
+- **Checks.** `bindUniform()` throws a `TypeError` for a name no feature of the sprites or their
+  passes declares, for a source whose `type` is not the type of the uniform, and for something
+  without a `type` of `vec3` or `vec4` and a `write()`. Nothing is bound when it throws.
+- **One binding a name.** A second `bindUniform()` of a name replaces the source and keeps its
+  place; the bindings run in the order they were made. `unbindUniform(name)` ends a binding, and
+  the uniform keeps the value written last; without a binding it does nothing.
+- **The binding wins.** `setUniform()` on a bound name writes the value, and the next `update()`
+  overwrites it. It does not throw, so a start value set before the binding is fine.
+- **Every pass.** The uniforms are shared, so a bound uniform reaches the sprites and every pass
+  that reads it, a renamed one of a copy of `ShadowPass` included.
+- **Ownership.** The nodes and the `Plane` a source reads stay the caller's. `dispose()` drops
+  every binding, so the sprites hold no node after it; afterwards `bindUniform()` and
+  `unbindUniform()` do nothing, as `setUniform()` does.
+- **A material handed in.** Bindings write into the uniforms of the material, so they work with a
+  `material` handed in as well — for the uniforms that material holds.
+
+**The order of `update()`.** With bindings, `update()` first refreshes the world matrix of the
+sprites and their parents and inverts it, then lets every source write its uniform, in the order
+of the bindings, then judges the `visible` hook of every pass, and uploads the geometry last.
+The hooks therefore judge the values the bindings wrote in the same call: a light bound below the
+ground leaves the shadow out in that very frame. Without bindings and hooks `update()` is the
+upload alone.
+
+`update()` refreshes the world matrices it reads itself, because the renderer runs
+`scene.updateMatrixWorld()` only inside `render()`, after `update()`. A node moved after
+`update()` in the same frame shows up one frame late — move first, then `update()`, then render.
+
+**A source of one's own.** `SpriteUniformSource` is a `type` — `'vec3'` or `'vec4'`, the type of
+the uniform it writes — and `write(out, worldToSprites)`. `out` is the vector of the uniform node
+itself, and `worldToSprites` the inverse of the world matrix of the sprites, current for this
+frame: the source writes its value in the local space of the sprites. `write()` runs every frame,
+so it writes the fields of `out` and allocates nothing — no vector built per call, and no
+fractional number handed across a call it makes, since V8 boxes such a value at a call it leaves
+un-inlined. Scratch objects are built once, next to the source.
+
+```ts check
+import {FeatureSprites, type SpriteUniformSource, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {Object3D} from 'three/webgpu';
+
+// a lamp that hovers 40 units above a node, wherever the node goes
+const hoverAbove = (node: Object3D): SpriteUniformSource => ({
+  type: 'vec4',
+  write(out, worldToSprites) {
+    node.updateWorldMatrix(true, false);
+    const p = node.matrixWorld.elements;
+    const e = worldToSprites.elements;
+    const y = p[13]! + 40;
+    out.x = e[0]! * p[12]! + e[4]! * y + e[8]! * p[14]! + e[12]!;
+    out.y = e[1]! * p[12]! + e[5]! * y + e[9]! * p[14]! + e[13]!;
+    out.z = e[2]! * p[12]! + e[6]! * y + e[10]! * p[14]! + e[14]!;
+    out.w = 1;
+  },
+});
+
+const player = new Object3D();
+const sprites = new FeatureSprites(TexturedSpriteKind, {passes: [ShadowPass]});
+sprites.bindUniform('shadowLight', hoverAbove(player));
+sprites.update();
+sprites.dispose();
+```
+
+What does not work:
+
+- **Sprites below the plane.** A sprite on the far side of the plane has no shadow, yet the
+  projection draws one. Only a vertex knows its side, and a sprite that crosses the plane cannot
+  be cut in the vertex shader.
+- **A finite ground.** The plane is infinite, the ground mesh is not: a shadow beyond its edge
+  hangs in the air. Clipping it to the mesh needs a stencil, or a clip in the fragment stage in
+  the local space of the ground.
+- **A light per sprite.** A binding writes a uniform, and a uniform holds for every sprite of a
+  `FeatureSprites`; sprites under different lights are sprites in different meshes.
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
@@ -802,7 +946,9 @@ The limits:
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
   and `setPreparedFrame()` per sprite.
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
-- Call `update()` once per frame, after all writes and before rendering.
+- Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
+  with bindings and `visible` hooks as well; the allocation spec holds a plane and a light
+  binding to it.
 
 ## Migrating from TexturedSprites and AnimatedSprites
 

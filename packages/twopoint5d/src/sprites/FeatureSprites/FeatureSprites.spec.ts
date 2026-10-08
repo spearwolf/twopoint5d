@@ -1,11 +1,14 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {mul} from 'three/tsl';
-import type {MeshBasicMaterial, Vector4} from 'three/webgpu';
-import {Scene, Texture} from 'three/webgpu';
+import type {MeshBasicMaterial, Vector3, Vector4} from 'three/webgpu';
+import {Mesh, Object3D, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
 
 import {nodesOf} from '../../testing/spriteGraph.js';
+import {lightOf} from '../bindings/lightOf.js';
+import {planeOf} from '../bindings/planeOf.js';
+import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
@@ -664,6 +667,150 @@ describe('FeatureSprites', () => {
         expect(mesh.visible).toBe(true);
         sprites.dispose();
       });
+    });
+  });
+
+  describe('bindUniform()', () => {
+    const vec = (sprites: Pick<FeatureSprites, 'uniforms'>, name: string) =>
+      (sprites.uniforms![name]!.value as Vector4).toArray();
+    const ground = () => {
+      const mesh = new Mesh(new PlaneGeometry(4, 4));
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 2;
+      return mesh;
+    };
+
+    test('update() writes the bound uniform in the local space of the sprites, for the sprites and every pass', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      sprites.position.y = 5;
+      sprites.bindUniform('groundPlane', planeOf(ground()));
+
+      sprites.update();
+
+      // the ground at y = 2 lies at y = -3 for the sprites at y = 5
+      const [x, y, z, d] = vec(sprites, 'groundPlane');
+      expect(x).toBeCloseTo(0, 5);
+      expect(z).toBeCloseTo(0, 5);
+      expect(d! / y!).toBeCloseTo(-3, 5);
+      expect(sprites.passes['shadow']!.material.uniforms['groundPlane']!.value).toBe(sprites.uniforms!['groundPlane']!.value);
+      sprites.dispose();
+    });
+
+    test('reads the sprites where they are: a parent moved without updateMatrixWorld()', () => {
+      const parent = new Object3D();
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      parent.add(sprites);
+      parent.updateMatrixWorld();
+      parent.position.y = 2;
+      sprites.bindUniform('groundPlane', planeOf(ground()));
+
+      sprites.update();
+
+      const [, y, , d] = vec(sprites, 'groundPlane');
+      expect(d! / y!).toBeCloseTo(0, 5);
+      sprites.dispose();
+    });
+
+    test('binds a light and overwrites a setUniform() on a bound name in the next update()', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      const lamp = new PointLight();
+      lamp.position.set(1, 8, -2);
+      sprites.bindUniform('shadowLight', lightOf(lamp));
+
+      sprites.setUniform('shadowLight', 0, 1, 0, 0);
+      sprites.update();
+
+      expect(vec(sprites, 'shadowLight')).toEqual([1, 8, -2, 1]);
+      sprites.dispose();
+    });
+
+    test('a rebinding replaces the source, unbindUniform() keeps the last value', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      const a = new Object3D();
+      const b = new Object3D();
+      b.position.set(0, 3, 0);
+      sprites.bindUniform('shadowLight', lightOf(a));
+      sprites.bindUniform('shadowLight', lightOf(b));
+      sprites.update();
+      expect(vec(sprites, 'shadowLight')).toEqual([0, 3, 0, 1]);
+
+      sprites.unbindUniform('shadowLight');
+      b.position.set(0, 9, 0);
+      sprites.update();
+      expect(vec(sprites, 'shadowLight')).toEqual([0, 3, 0, 1]);
+      sprites.dispose();
+    });
+
+    test('refuses an unknown name, a source of another type and no source, and binds nothing then', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      const vec3Source = {type: 'vec3' as const, write: () => {}};
+
+      expect(() => sprites.bindUniform('nothing', planeOf(ground()))).toThrow(
+        'FeatureSprites: no feature of these sprites or their passes declares the uniform "nothing"',
+      );
+      expect(() => sprites.bindUniform('groundPlane', vec3Source)).toThrow(
+        'FeatureSprites: the uniform "groundPlane" is a vec4, and the source bound to it writes a vec3',
+      );
+      expect(() => sprites.bindUniform('groundPlane', {} as never)).toThrow(
+        'FeatureSprites: bindUniform("groundPlane") takes a source with a type of vec3 or vec4 and a write()',
+      );
+      sprites.setUniform('groundPlane', 0, 0, 1, 7);
+      sprites.update();
+      expect(vec(sprites, 'groundPlane')).toEqual([0, 0, 1, 7]);
+      sprites.dispose();
+    });
+
+    test('evaluates the bindings before the hooks: a light bound below the ground hides the shadow in the same update()', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      const lamp = new Object3D();
+      lamp.position.set(0, -4, 0);
+      sprites.bindUniform('shadowLight', lightOf(lamp));
+
+      sprites.update();
+
+      expect(sprites.passes['shadow']!.visible).toBe(false);
+      sprites.dispose();
+    });
+
+    test('dispose() drops the bindings; binding afterwards does nothing', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      sprites.bindUniform('groundPlane', planeOf(ground()));
+      sprites.dispose();
+
+      expect(() => sprites.bindUniform('groundPlane', planeOf(ground()))).not.toThrow();
+      expect(() => sprites.unbindUniform('groundPlane')).not.toThrow();
+      expect(() => sprites.update()).not.toThrow();
+    });
+
+    test('names the type of a float, a vec2 and a vec3 uniform, and binds a vec3 source of its own', () => {
+      const levels = definePass({
+        name: 'levels',
+        features: [defineFeature({name: 'levels', uniforms: {level: 1, offset: [1, 2], lift: [0, 1, 0]}})],
+      });
+      const sprites = new FeatureSprites(kind, {passes: [levels]});
+      const vec4Source = {type: 'vec4' as const, write: () => {}};
+      const lift: SpriteUniformSource = {
+        type: 'vec3',
+        write(out) {
+          out.x = 2;
+          out.y = 4;
+          out.z = 8;
+        },
+      };
+
+      expect(() => sprites.bindUniform('level', vec4Source)).toThrow(
+        'FeatureSprites: the uniform "level" is a float, and the source bound to it writes a vec4',
+      );
+      expect(() => sprites.bindUniform('offset', vec4Source)).toThrow(
+        'FeatureSprites: the uniform "offset" is a vec2, and the source bound to it writes a vec4',
+      );
+      expect(() => sprites.bindUniform('lift', vec4Source)).toThrow(
+        'FeatureSprites: the uniform "lift" is a vec3, and the source bound to it writes a vec4',
+      );
+      sprites.bindUniform('lift', lift);
+      sprites.update();
+      expect((sprites.uniforms!['lift']!.value as Vector3).toArray()).toEqual([2, 4, 8]);
+      sprites.dispose();
     });
   });
 });

@@ -1,9 +1,11 @@
-import {Color} from 'three/webgpu';
+import {Color, DirectionalLight, Object3D} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
+import {lightOf} from './bindings/lightOf.js';
+import {planeOf} from './bindings/planeOf.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
 import {prepareSpriteFrame} from './features/AtlasFrame.js';
@@ -150,6 +152,33 @@ describe('sprites on the hot path', () => {
     });
 
     expect(bytesPerRound / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('update() with a plane and a light binding and a pass with a hook allocates nothing per call', async () => {
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1000, passes: [ShadowPass]});
+    for (let i = 0; i < 1000; i++) sprites.createSprite();
+    const ground = new Object3D();
+    ground.rotation.x = -Math.PI / 2;
+    const sun = new DirectionalLight();
+    sun.position.set(3, 10, 2);
+    const lamp = new Object3D();
+    lamp.position.set(0, 20, 0);
+    sprites.bindUniform('groundPlane', planeOf(ground));
+    sprites.bindUniform('shadowLight', lightOf(sun));
+    sprites.update();
+
+    const sunBytes = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.update();
+    });
+    sprites.bindUniform('shadowLight', lightOf(lamp));
+    sprites.update();
+    const lampBytes = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.update();
+    });
+
+    expect(sunBytes / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(lampBytes / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });
 });

@@ -1,7 +1,8 @@
-import {Mesh, type Texture} from 'three/webgpu';
+import {Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
 import type {VO} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
+import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
@@ -77,6 +78,15 @@ const WHERE = 'FeatureSprites';
 // a record of pass meshes by pass name: without a prototype, a pass named "__proto__" or
 // "constructor" is an own entry like any other instead of a write to Object.prototype's members
 const passRecord = <Api extends object>(): Record<string, FeatureSpritesPass<Api>> => Object.create(null);
+
+const typeOfUniform = (node: SpriteUniformNode): string =>
+  node.value instanceof Vector4
+    ? 'vec4'
+    : node.value instanceof Vector3
+      ? 'vec3'
+      : node.value instanceof Vector2
+        ? 'vec2'
+        : 'float';
 
 const definedKeys = (record: object): string[] =>
   Object.entries(record)
@@ -159,7 +169,8 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
  * the geometry and the material it is not handed, and a child mesh with a material of its own for
  * every pass; what it builds belongs to it and goes with {@link dispose}, while a geometry, a
  * material or a texture handed in stays the caller's. Call `update()` once per frame before
- * rendering — it judges the `visible` hook of every pass and serves every pass as well.
+ * rendering — it writes the bound uniforms, judges the `visible` hook of every pass and serves
+ * every pass as well.
  */
 export class FeatureSprites<Api extends object = object> extends VertexObjects<FeatureSpritesGeometry<Api>> {
   declare geometry: FeatureSpritesGeometry<Api> | undefined;
@@ -172,6 +183,11 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #resources: SpriteResources | undefined;
   #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
   #judgedPasses: readonly FeatureSpritesPass<Api>[] = [];
+  // the bindings in parallel arrays, so that update() walks them by index without an iterator
+  readonly #boundNames: string[] = [];
+  readonly #boundSources: SpriteUniformSource[] = [];
+  readonly #boundVectors: (Vector3 | Vector4)[] = [];
+  readonly #worldToSprites = new Matrix4();
   #disposed = false;
 
   /**
@@ -273,6 +289,47 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.material?.setUniform(name, x, y, z, w);
   }
 
+  /**
+   * Binds the uniform `name` to `source`: every {@link update} writes it, in the local space of the
+   * sprites, for the sprites and every pass. A binding of the same name is replaced and keeps its
+   * place; bindings run in the order they were made. A `setUniform()` on a bound name holds until
+   * the next `update()`. The nodes a source reads stay the caller's. Does nothing once disposed.
+   *
+   * @throws a `TypeError` for a name no feature of the sprites or their passes declares, for a
+   *   source of another type than the uniform, and for something that is no source; nothing is
+   *   bound then
+   */
+  bindUniform(name: string, source: SpriteUniformSource): void {
+    const material = this.material;
+    if (material == null) return;
+    if (source == null || typeof source.write !== 'function' || (source.type !== 'vec3' && source.type !== 'vec4')) {
+      throw new TypeError(`${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write()`);
+    }
+    // an own entry only: a name such as "constructor" is no uniform
+    const node = Object.hasOwn(material.uniforms, name) ? material.uniforms[name] : undefined;
+    if (node == null) {
+      throw new TypeError(`${WHERE}: no feature of these sprites or their passes declares the uniform "${name}"`);
+    }
+    const type = typeOfUniform(node);
+    if (type !== source.type) {
+      throw new TypeError(`${WHERE}: the uniform "${name}" is a ${type}, and the source bound to it writes a ${source.type}`);
+    }
+    const at = this.#boundNames.indexOf(name);
+    const index = at === -1 ? this.#boundNames.length : at;
+    this.#boundNames[index] = name;
+    this.#boundSources[index] = source;
+    this.#boundVectors[index] = node.value as Vector3 | Vector4;
+  }
+
+  /** Ends the binding of `name`; the uniform keeps the value written last. Does nothing without one. */
+  unbindUniform(name: string): void {
+    const at = this.#boundNames.indexOf(name);
+    if (at === -1) return;
+    this.#boundNames.splice(at, 1);
+    this.#boundSources.splice(at, 1);
+    this.#boundVectors.splice(at, 1);
+  }
+
   /** The texture `name` — `undefined` while it is unset, and once disposed. */
   getTexture(name: string): Texture | undefined {
     return this.material?.getTexture(name);
@@ -295,11 +352,24 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
-   * Judges the `visible` hook of every pass that has one, then uploads what the pools have marked
-   * — see {@link VertexObjects.update}. Call it once per frame, after the changes and before
-   * rendering. Allocates nothing.
+   * Writes the bound uniforms (see {@link bindUniform}), judges the `visible` hook of every pass
+   * that has one, then uploads what the pools have marked — see {@link VertexObjects.update}. Call
+   * it once per frame, after the changes and before rendering: it refreshes the world matrices it
+   * reads, so a node moved after it shows up a frame late. Allocates nothing.
    */
   override update(): void {
+    const sources = this.#boundSources;
+    if (sources.length > 0 && this.material != null) {
+      // the renderer refreshes the world matrices only inside render(), after this call
+      this.updateWorldMatrix(true, false);
+      const worldToSprites = this.#worldToSprites.copy(this.matrixWorld).invert();
+      const vectors = this.#boundVectors;
+      for (let i = 0; i < sources.length; i++) {
+        const source = sources[i]!;
+        // the type was checked against the uniform when it was bound
+        source.write(vectors[i] as Vector3 & Vector4, worldToSprites);
+      }
+    }
     const judged = this.#judgedPasses;
     for (let i = 0; i < judged.length; i++) judged[i]!.judgeVisibility();
     super.update();
@@ -307,12 +377,13 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
   /**
    * Releases the geometry and the material this mesh built, the pass meshes with their materials
-   * and the uniforms and textures they shared. The mesh leaves the scene graph first and fires
-   * three's `dispose` event, so the renderer drops what it built for it; every pass mesh leaves this
-   * mesh and fires the event as well. Afterwards `geometry`, `material`, `spritePool`, `placement`
+   * and the uniforms and textures they shared, and drops every binding, so that the sprites hold no
+   * node after it. The mesh leaves the scene graph first and fires three's `dispose` event, so the
+   * renderer drops what it built for it; every pass mesh leaves this mesh and fires the event as
+   * well. Afterwards `geometry`, `material`, `spritePool`, `placement`
    * and `uniforms` answer `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is
-   * empty; `freeSprite()`, `setUniform()`, `setTexture()`, `touchTexture()`, `update()` and the
-   * `placement` setter do nothing. A second call does nothing.
+   * empty; `freeSprite()`, `setUniform()`, `bindUniform()`, `unbindUniform()`, `setTexture()`,
+   * `touchTexture()`, `update()` and the `placement` setter do nothing. A second call does nothing.
    */
   override dispose(): void {
     if (this.#disposed) return;
@@ -334,6 +405,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     }
     this.#passes = Object.freeze(passRecord<Api>());
     this.#judgedPasses = [];
+    this.#boundNames.length = 0;
+    this.#boundSources.length = 0;
+    this.#boundVectors.length = 0;
 
     if (this.#ownsGeometry) this.geometry?.dispose();
     this.geometry = undefined;
