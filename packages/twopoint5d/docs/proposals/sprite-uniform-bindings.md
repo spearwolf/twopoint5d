@@ -1,7 +1,22 @@
 # Proposal: binding sprite uniforms to the scene graph
 
-Status: **proposed** — 2026-10-08, on top of the passes of
-[`sprite-features.md`](sprite-features.md) §6, which are still unreleased.
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Binding uniforms to the
+scene graph" and "Passes: shadows and reflections". Deviations:
+
+- `planeOf()` carries the plane as a covector `[n, −d]` through the inverse of the node→sprites
+  map instead of `Plane#applyMatrix4` (§2.1): that is exact for a normal of any length (three's
+  `applyMatrix4` and `coplanarPoint` assume a unit normal), and it makes no call with fractional
+  arguments on the per-frame path;
+- `definePass()` additionally refuses a `uniformNames` target that a feature of the pass already
+  declares under its own name (the identity mapping stays allowed), not only two keys with one
+  target (§6.2): such a target would collapse two uniforms of the pass into one without an error;
+- `bindUniform()` looks names up as own keys of the uniforms record, so a name like
+  `constructor` is refused as unknown (§3);
+- the browser test of a bound plane uses a node moved along and turned about its normal, and adds
+  it to the scene; that `planeOf()` refreshes a stale world matrix itself is pinned by the Vitest
+  spec instead (§9).
+
+The sketch below is kept as it was written.
 
 ## 1. Goal
 
